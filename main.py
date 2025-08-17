@@ -8,12 +8,16 @@ from routers.scholarships import router as scholarships_router
 from routers.analytics import router as analytics_router
 from routers.auth import router as auth_router
 from routers.database import router as database_router
+from routers.health import router as health_router
 from middleware.error_handling import (
     api_error_handler, http_exception_handler, validation_exception_handler,
     rate_limit_exception_handler, general_exception_handler, trace_id_middleware,
     APIError
 )
 from middleware.rate_limiting import limiter, set_rate_limit_context
+from middleware.request_id import RequestIDMiddleware
+from observability.metrics import setup_metrics
+from observability.tracing import tracing_service
 from config.settings import settings
 from utils.logger import setup_logger
 
@@ -30,7 +34,13 @@ app = FastAPI(
     debug=settings.debug
 )
 
+# Setup observability
+setup_metrics(app)
+tracing_service.setup_tracing()
+tracing_service.instrument_app(app)
+
 # Add middleware in correct order (middleware wraps the app)
+app.add_middleware(RequestIDMiddleware)
 app.middleware("http")(trace_id_middleware)
 app.middleware("http")(set_rate_limit_context)
 
@@ -58,6 +68,7 @@ app.include_router(auth_router)
 app.include_router(scholarships_router, prefix="/api/v1", tags=["scholarships"])
 app.include_router(analytics_router, prefix="/api/v1", tags=["analytics"])
 app.include_router(database_router, tags=["database"])
+app.include_router(health_router)
 
 @app.get("/")
 async def root():

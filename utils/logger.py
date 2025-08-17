@@ -1,9 +1,60 @@
+"""
+Centralized Logging Configuration and Utilities with Type Safety
+Provides structured logging with configurable levels and JSON formatters.
+"""
+
 import logging
 import sys
+import json
 from datetime import datetime
-from typing import Optional
+from typing import Optional, Dict, Any, Mapping
 
-def setup_logger(name: str = "scholarship_api", level: int = logging.INFO) -> logging.Logger:
+class StructuredFormatter(logging.Formatter):
+    """JSON formatter for structured logging"""
+    
+    def format(self, record: logging.LogRecord) -> str:
+        log_data = {
+            "timestamp": datetime.utcnow().isoformat(),
+            "level": record.levelname,
+            "logger": record.name,
+            "message": record.getMessage(),
+        }
+        
+        # Add extra fields if available
+        if hasattr(record, 'trace_id') and record.trace_id:
+            log_data["trace_id"] = record.trace_id
+        
+        if hasattr(record, 'user_id') and record.user_id:
+            log_data["user_id"] = record.user_id
+            
+        if hasattr(record, 'method') and record.method:
+            log_data["method"] = record.method
+            
+        if hasattr(record, 'path') and record.path:
+            log_data["path"] = record.path
+            
+        if hasattr(record, 'status') and record.status:
+            log_data["status"] = record.status
+            
+        if hasattr(record, 'latency_ms') and record.latency_ms is not None:
+            log_data["latency_ms"] = record.latency_ms
+        
+        # Add any other extra fields
+        for key, value in record.__dict__.items():
+            if key not in ['name', 'msg', 'args', 'levelname', 'levelno', 'pathname', 'filename',
+                          'module', 'lineno', 'funcName', 'created', 'msecs', 'relativeCreated',
+                          'thread', 'threadName', 'processName', 'process', 'getMessage', 'exc_info',
+                          'exc_text', 'stack_info', 'trace_id', 'user_id', 'method', 'path', 'status', 'latency_ms']:
+                if not key.startswith('_'):
+                    log_data[key] = value
+        
+        return json.dumps(log_data)
+
+def setup_logger(
+    name: str = "scholarship_api", 
+    level: int = logging.INFO,
+    use_json: bool = False
+) -> logging.Logger:
     """
     Set up and configure the application logger.
     
@@ -25,10 +76,13 @@ def setup_logger(name: str = "scholarship_api", level: int = logging.INFO) -> lo
         console_handler.setLevel(level)
         
         # Create formatter
-        formatter = logging.Formatter(
-            fmt='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-            datefmt='%Y-%m-%d %H:%M:%S'
-        )
+        if use_json:
+            formatter = StructuredFormatter()
+        else:
+            formatter = logging.Formatter(
+                fmt='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+                datefmt='%Y-%m-%d %H:%M:%S'
+            )
         
         # Add formatter to handler
         console_handler.setFormatter(formatter)

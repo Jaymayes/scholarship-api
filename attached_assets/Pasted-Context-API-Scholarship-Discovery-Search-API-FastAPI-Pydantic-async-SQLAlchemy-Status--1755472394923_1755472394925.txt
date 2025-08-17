@@ -1,0 +1,127 @@
+Context
+
+API: Scholarship Discovery & Search API (FastAPI + Pydantic + async SQLAlchemy)
+Status: Phases 0–2 complete. DB integrated with 15 scholarships. Auth + rate limiting + unified errors + tests mostly passing.
+Outstanding: 1 failing DB interaction logging test; type-safety fixes in utils/logger.py; missing optional params in data/scholarships.py; add Phase 3 observability (metrics, tracing, health/readiness, structured logging with request IDs).
+Objectives
+
+Fix the failing “interaction logging” test so interactions are recorded for read/search/detail endpoints.
+Resolve type-safety issues in utils/logger.py and optional parameter warnings in data/scholarships.py.
+Implement Phase 3 observability: Prometheus metrics, OpenTelemetry tracing, request ID middleware, health/readiness probes, structured logs.
+Ensure configuration is robust across environments and rate limiting is correctly parameterized.
+Keep all tests passing; add/adjust tests as needed.
+Deliverables and Steps
+
+Interaction Logging: Model, Service, Wiring
+If an “interactions” table already exists, use it. Otherwise:
+Create SQLAlchemy model: Interaction(id PK, event_type str, user_id Optional[str], scholarship_id Optional[str|int], path str, method str, status int, trace_id Optional[str], metadata JSON/JSONB, created_at tz-aware timestamp default now()).
+Alembic migration to create the table with indexes on (event_type, created_at) and (scholarship_id).
+In the service layer, add a function log_interaction(event_type, request, response, user_id=None, scholarship_id=None, metadata=None, trace_id=None) that persists the event in the same async session pattern as the rest of the repo/services. Ensure it never raises on failure (log-and-continue).
+Instrument the following endpoints to call log_interaction after successful responses and on handled errors:
+GET / (root) → event_type="root_view"
+GET /scholarships → event_type="list_scholarships"
+GET /scholarships/{id} → event_type="view_scholarship"
+POST /search → event_type="search_scholarships"
+Any other high-traffic or analytics endpoints
+Include fields: path, method, status, user_id (if JWT present), scholarship_id (when viewing a single item), trace_id (from middleware), plus metadata like query params or search filters (sanitized).
+Update or create tests to assert:
+Interaction count increments on list, detail, and search calls.
+200 responses result in stored interactions with correct fields.
+Calls without JWT still log interactions without user_id.
+2. Type Safety and Optional Params
+
+utils/logger.py
+Fix function signatures and types to eliminate mypy/ruff warnings: no implicit Any, proper Optional/Mapping/Dict annotations, and return types specified.
+Logger helpers should accept extra: Mapping[str, Any] | None and always include trace_id if available.
+data/scholarships.py
+Add Optional fields where missing (defaults=None) and ensure Pydantic models specify Field(default=None) for optional attributes referenced across code paths.
+Resolve “missing parameter” warnings by giving explicit defaults or making params required consistently in constructors/factories.
+3. Observability (Phase 3)
+
+Request ID and Timing
+Add ASGI middleware that generates/propagates X-Request-ID. Store in request.state.trace_id. Log it on every request and include in responses.
+Structured JSON Logging
+Update global logging config to JSON output with fields: timestamp, level, logger, message, trace_id, user_id (if known), method, path, status, latency_ms.
+Ensure no secrets/tokens are logged.
+Metrics (Prometheus)
+Integrate fastapi-instrumentator or equivalent to expose /metrics with default HTTP metrics (latency histograms, request counts, errors).
+Add custom counters/histograms for interactions logged and DB query latency if hooks exist.
+Tracing (OpenTelemetry)
+Enable OpenTelemetry auto-instrumentation for FastAPI and SQLAlchemy.
+Export OTLP to env-configured collector endpoint; default to no-op locally if endpoint not set.
+Add trace_id to logs via contextvars.
+Health Probes
+Add GET /healthz (liveness, returns 200 with static ok) and GET /readyz (readiness: checks DB connection, Redis for rate limiting if used).
+Include minimal JSON payload with status and upstream statuses.
+4. Rate Limiting and Config Hardening
+
+Rate limiting
+Ensure Redis URL is taken from env (e.g., RATE_LIMIT_REDIS_URL); gracefully degrade to in-memory limiter in local if Redis not set. Keep protected endpoints aligned with current limits.
+Configuration
+Use pydantic-settings Settings class for envs: local, dev, staging, prod.
+Settings include: DATABASE_URL, JWT_ISSUER/AUDIENCE/KEYS, CORS origins, LOG_LEVEL, OTEL_ENDPOINT, ENABLE_METRICS, RATE_LIMITS, ENVIRONMENT.
+Fail fast on missing required prod settings.
+5. Tests and CI Hooks
+
+Fix the failing DB interaction test and add new tests:
+test_interaction_logged_on_list
+test_interaction_logged_on_detail
+test_interaction_logged_on_search_with_filters
+test_interaction_logging_does_not_break_on_error
+Keep coverage threshold as configured (or set to >= 85%).
+Ensure mypy and ruff pass in CI or pre-commit (if present).
+File Changes (Guidance)
+
+models/interaction.py (new) or extend existing models module
+migrations/versions/<timestamp>_add_interactions_table.py (new)
+services/interaction_service.py (new) with async log_interaction
+middleware/request_id.py (new)
+observability/metrics.py (new) for Prometheus setup
+observability/tracing.py (new) for OpenTelemetry setup
+utils/logger.py (edit) to fix type hints and add structured logging helpers
+data/scholarships.py (edit) to correct Optional fields/defaults
+main.py / app.py (edit) to register middleware, metrics, tracing, routes /healthz, /readyz, and wire interaction logging calls
+Example: Interaction model (adjust types/imports to project standards)
+
+id: int PK
+event_type: str
+user_id: Optional[str]
+scholarship_id: Optional[int]
+path: str
+method: str
+status: int
+trace_id: Optional[str]
+metadata: JSON/JSONB
+created_at: timezone-aware timestamp default func.now()
+Acceptance Criteria
+
+Interaction logging
+After calling GET /scholarships, GET /scholarships/{id}, and POST /search, the “interactions” table shows new rows with correct fields. Tests pass: 9/9 database tests green.
+Type safety and params
+mypy and ruff report no errors in utils/logger.py and no missing optional parameter warnings in data/scholarships.py.
+Observability
+/metrics returns Prometheus metrics.
+/healthz returns 200 with { status: "ok" }.
+/readyz returns 200 when DB is connected and 503 when DB is unavailable.
+Logs are JSON-structured and include trace_id and latency_ms.
+If OTEL_ENDPOINT is set, traces are exported; otherwise, app runs with no-op tracer.
+Security and limits
+Rate limiting continues to protect DB endpoints; Redis configuration sourced from env; local runs without Redis still work for development.
+Tests
+All tests pass (unit, integration, API). Coverage threshold maintained or improved.
+Run/Verify Commands
+
+Run server: the default Replit run command or uvicorn main:app --host 0.0.0.0 --port 8000
+Run tests: pytest -q
+Check types/lint: mypy . and ruff check .
+Verify:
+curl -i http://localhost:8000/healthz
+curl -i http://localhost:8000/readyz
+curl -i http://localhost:8000/metrics
+Exercise list/detail/search endpoints and confirm interactions persisted.
+Notes
+
+Preserve existing auth, RBAC, and unified error schema.
+Sanitize logs and metadata (no tokens or PII).
+Keep migrations idempotent and consistent with existing Alembic setup.
+If an interactions table already exists, only wire service calls and fix tests; do not create duplicate schemas.
