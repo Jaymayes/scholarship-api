@@ -1,32 +1,59 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.exceptions import RequestValidationError
+from slowapi.errors import RateLimitExceeded
+import uvicorn
+
 from routers.scholarships import router as scholarships_router
 from routers.analytics import router as analytics_router
+from routers.auth import router as auth_router
+from middleware.error_handling import (
+    api_error_handler, http_exception_handler, validation_exception_handler,
+    rate_limit_exception_handler, general_exception_handler, trace_id_middleware,
+    APIError
+)
+from middleware.rate_limiting import limiter, set_rate_limit_context
+from config.settings import settings
 from utils.logger import setup_logger
-import uvicorn
 
 # Initialize logger
 logger = setup_logger()
 
-# Create FastAPI app
+# Create FastAPI app with settings
 app = FastAPI(
-    title="Scholarship Discovery & Search API",
-    description="A comprehensive scholarship discovery system with search, filtering, and eligibility checking",
-    version="1.0.0",
+    title=settings.api_title,
+    description=settings.api_description,
+    version=settings.api_version,
     docs_url="/docs",
-    redoc_url="/redoc"
+    redoc_url="/redoc",
+    debug=settings.debug
 )
 
-# Add CORS middleware
+# Add middleware in correct order (middleware wraps the app)
+app.middleware("http")(trace_id_middleware)
+app.middleware("http")(set_rate_limit_context)
+
+# Add CORS middleware with settings
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_origins=settings.cors_origins,
+    allow_credentials=settings.cors_allow_credentials,
+    allow_methods=settings.cors_allow_methods,
+    allow_headers=settings.cors_allow_headers,
 )
 
+# Add rate limiter
+app.state.limiter = limiter
+
+# Exception handlers
+app.add_exception_handler(APIError, api_error_handler)
+app.add_exception_handler(HTTPException, http_exception_handler)
+app.add_exception_handler(RequestValidationError, validation_exception_handler)
+app.add_exception_handler(RateLimitExceeded, rate_limit_exception_handler)
+app.add_exception_handler(Exception, general_exception_handler)
+
 # Include routers
+app.include_router(auth_router)
 app.include_router(scholarships_router, prefix="/api/v1", tags=["scholarships"])
 app.include_router(analytics_router, prefix="/api/v1", tags=["analytics"])
 
@@ -35,22 +62,41 @@ async def root():
     """Root endpoint providing API information"""
     return {
         "message": "Scholarship Discovery & Search API",
-        "version": "1.0.0",
+        "version": settings.api_version,
+        "environment": settings.environment,
         "docs": "/docs",
-        "status": "active"
+        "status": "active",
+        "authentication": "JWT Bearer tokens required for protected endpoints"
     }
 
 @app.get("/health")
 async def health_check():
     """Health check endpoint"""
-    return {"status": "healthy", "message": "API is running successfully"}
+    return {
+        "status": "healthy",
+        "version": settings.api_version,
+        "environment": settings.environment
+    }
+
+@app.get("/readiness")
+async def readiness_check():
+    """Readiness check endpoint for deployment"""
+    # Add database connectivity checks here when implemented
+    return {
+        "status": "ready",
+        "services": {
+            "api": "ready",
+            "database": "ready" if settings.database_url else "not_configured",
+            "redis": "ready" if settings.redis_url else "not_configured"
+        }
+    }
 
 if __name__ == "__main__":
     logger.info("Starting Scholarship Discovery API server")
     uvicorn.run(
         "main:app",
-        host="0.0.0.0",
-        port=5000,
-        reload=True,
-        log_level="info"
+        host=settings.host,
+        port=settings.port,
+        reload=settings.reload,
+        log_level=settings.log_level.lower()
     )

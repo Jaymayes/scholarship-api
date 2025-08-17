@@ -76,7 +76,7 @@ class APILogger:
         user_info = f" | User: {user_id}" if user_id else ""
         self.logger.error(f"API Error: {method} {path}{user_info} | Error: {str(error)}")
     
-    def log_business_event(self, event: str, details: dict = None):
+    def log_business_event(self, event: str, details: Optional[dict] = None):
         """Log business-specific events"""
         details_str = f" | Details: {details}" if details else ""
         self.logger.info(f"Business Event: {event}{details_str}")
@@ -86,7 +86,7 @@ class APILogger:
         metadata_str = f" | {metadata}" if metadata else ""
         self.logger.info(f"Performance: {operation} took {duration_ms:.2f}ms{metadata_str}")
     
-    def log_data_operation(self, operation: str, table: str = None, count: int = None, **kwargs):
+    def log_data_operation(self, operation: str, table: Optional[str] = None, count: Optional[int] = None, **kwargs):
         """Log data operations"""
         table_info = f" on {table}" if table else ""
         count_info = f" | Count: {count}" if count is not None else ""
