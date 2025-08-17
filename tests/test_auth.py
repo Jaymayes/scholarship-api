@@ -122,8 +122,12 @@ class TestErrorHandling:
         assert response.status_code == 404
         data = response.json()
         assert "trace_id" in data
-        assert "error" in data
-        assert data["error"]["code"] == "NOT_FOUND"
+        assert "code" in data
+        assert "message" in data
+        assert "status" in data
+        assert "timestamp" in data
+        assert data["code"] == "NOT_FOUND"
+        assert data["status"] == 404
     
     def test_validation_error_format(self):
         """Test validation errors have standardized format"""

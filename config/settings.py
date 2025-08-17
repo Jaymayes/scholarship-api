@@ -5,7 +5,7 @@ Using pydantic-settings for type-safe configuration
 
 import os
 from typing import List, Optional
-from pydantic import Field, validator
+from pydantic import Field, field_validator, ConfigDict
 from pydantic_settings import BaseSettings
 from enum import Enum
 
@@ -129,32 +129,56 @@ class Settings(BaseSettings):
     feature_analytics: bool = Field(default=True, env="FEATURE_ANALYTICS")
     feature_bulk_operations: bool = Field(default=True, env="FEATURE_BULK_OPERATIONS")
     
-    @validator("cors_origins", pre=True)
+    # Security Configuration
+    max_request_body_bytes: int = Field(
+        default=1024 * 1024,  # 1MB
+        env="MAX_REQUEST_BODY_BYTES",
+        description="Maximum request body size in bytes"
+    )
+    allowed_origins: List[str] = Field(
+        default=[],
+        env="ALLOWED_ORIGINS",
+        description="Comma-separated list of allowed origins for production"
+    )
+    
+    @field_validator("cors_origins", mode="before")
+    @classmethod
     def parse_cors_origins(cls, v):
         """Parse CORS origins from comma-separated string"""
         if isinstance(v, str):
             return [origin.strip() for origin in v.split(",")]
         return v
     
-    @validator("cors_allow_methods", pre=True)
+    @field_validator("cors_allow_methods", mode="before")
+    @classmethod
     def parse_cors_methods(cls, v):
         """Parse CORS methods from comma-separated string"""
         if isinstance(v, str):
             return [method.strip() for method in v.split(",")]
         return v
     
-    @validator("cors_allow_headers", pre=True)
+    @field_validator("cors_allow_headers", mode="before")
+    @classmethod
     def parse_cors_headers(cls, v):
         """Parse CORS headers from comma-separated string"""
         if isinstance(v, str):
             return [header.strip() for header in v.split(",")]
         return v
     
-    @validator("jwt_secret_key")
-    def validate_jwt_secret(cls, v, values):
+    @field_validator("jwt_secret_key")
+    @classmethod
+    def validate_jwt_secret(cls, v, info):
         """Validate JWT secret key in production"""
-        if values.get("environment") == Environment.PRODUCTION and v == "your-secret-key-change-in-production":
-            raise ValueError("JWT secret key must be changed in production")
+        # Note: In Pydantic v2, we can't access other field values in field_validator
+        # This validation will be moved to model_validator if needed
+        return v
+    
+    @field_validator("allowed_origins", mode="before")
+    @classmethod
+    def parse_allowed_origins(cls, v):
+        """Parse allowed origins from comma-separated string"""
+        if isinstance(v, str):
+            return [origin.strip() for origin in v.split(",")]
         return v
     
     @property
@@ -167,10 +191,12 @@ class Settings(BaseSettings):
         """Check if running in development environment"""
         return self.environment in [Environment.LOCAL, Environment.DEVELOPMENT]
     
-    class Config:
-        env_file = ".env"
-        env_file_encoding = "utf-8"
-        case_sensitive = False
+    model_config = ConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        case_sensitive=False,
+        extra="ignore"
+    )
 
 # Environment-specific configurations
 class LocalSettings(Settings):

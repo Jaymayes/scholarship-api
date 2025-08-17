@@ -1,0 +1,112 @@
+ Final QA Fixes, Hardening, and Docs Polish
+
+Context
+
+Stack: FastAPI + Pydantic v2 + async SQLAlchemy + JWT + rate limiting + observability.
+Status: Search and Eligibility routers working (GET/POST at / and /api/v1), env-aware rate limits, metrics/tracing/health probes enabled, tests in place.
+QA artifacts to follow: COMPREHENSIVE_QA_ANALYSIS_REPORT.md, comprehensive_qa_report.json, qa_focused_report.json, qa_focused_tests.py.
+Objectives
+
+Close any residual gaps flagged by QA reports and make the test suite fully green.
+Enforce consistent API behavior and docs: error schema, pagination/sorting validation, OpenAPI examples.
+Harden production defaults: CORS, security headers, 429 error body, request size/timeouts, DB indexes.
+Ensure observability fields are complete: trace_id propagation, took_ms accuracy, 503 readiness during DB outage.
+Dependency, config, and CI hygiene: pinned deps, type/lint checks, coverage gate.
+Required Actions
+
+A. Align with QA reports and tests
+
+Open and review:
+COMPREHENSIVE_QA_ANALYSIS_REPORT.md
+comprehensive_qa_report.json
+qa_focused_report.json
+qa_focused_tests.py
+Run tests: pytest -q. Make any failing tests pass without relaxing assertions.
+Keep the existing “dict-with-metadata” response format for scholarship/list/search endpoints.
+B. Router and response consistency
+
+Ensure both GET/POST /search and /api/v1/search map to a single implementation to avoid OpenAPI duplication. Set explicit operation_id for GET and POST to prevent conflicts.
+Ensure both GET/POST /eligibility/check and /api/v1/eligibility/check share a single implementation. Set operation_id explicitly.
+Return the standardized envelope for errors across 400/401/403/404/405/409/422/429/500, including: { trace_id, code, message, details?, status }.
+Add 405 handling for unsupported methods on key routes; ensure 404 only for unknown paths.
+C. Validation, pagination, sorting
+
+Search:
+Enforce bounds: page >= 1, page_size in [1, 100]; clamp or 422 on invalid.
+Validate sort fields against an allowlist; reject unknown sorts with 422.
+Always include took_ms measured from request start to response send.
+Eligibility:
+Validate profile inputs (GPA range, positive numbers, enum fields). Return 422 with field errors when invalid.
+D. Security hardening and limits
+
+CORS: Restrict to Settings.ALLOWED_ORIGINS; default to none in prod unless explicitly set.
+Security headers: Add middleware for:
+X-Content-Type-Options: nosniff
+X-Frame-Options: DENY
+Referrer-Policy: no-referrer
+Content-Security-Policy: default-src 'none'; frame-ancestors 'none'
+Remove/override Server header
+Request limits: Enforce max request body size (e.g., 1MB) and server timeouts (read/write).
+Rate limiting:
+Ensure 429 responses use the unified error schema and include retry-after header.
+Confirm per-environment limits are read from settings and can be overridden via env vars.
+E. Observability polish
+
+Request ID: Ensure X-Request-ID is echoed back and stored as trace_id in logs and responses (when appropriate).
+Logs: JSON-structured logs must include timestamp, level, trace_id, user_id (if JWT), method, path, status, latency_ms.
+Readiness (/readyz): Return 503 when DB not reachable; include component statuses in body.
+Metrics: Confirm /metrics includes route-level metrics and a counter for search/eligibility calls and 429 events.
+Tracing: Ensure spans exist for request handling and DB calls; trace_id correlation with logs.
+F. Database performance and integrity
+
+Add indexes via Alembic migration as needed:
+scholarships(name) btree
+scholarships(criteria) GIN JSONB (if criteria used in filters)
+scholarships(deadline_date) btree (if filtered/sorted)
+Verify slow queries with EXPLAIN ANALYZE (in tests or dev) and adjust indexes. Keep migrations idempotent and consistent with existing heads.
+Seed data migration remains idempotent.
+G. Dependency, config, CI
+
+Pin dependency versions in pyproject.toml or requirements.txt; regenerate lock if present.
+Add/confirm scripts:
+mypy . (strict-ish) and ruff check .
+coverage gate >= 85% lines/branches.
+pip-audit or safety scan in CI (allow ignore list via file).
+Settings (pydantic-settings): Ensure ENVIRONMENT, ALLOWED_ORIGINS, RATE_LIMIT_* vars, OTEL_ENDPOINT, LOG_LEVEL, MAX_REQUEST_BODY_BYTES are typed and validated. Fail fast on missing prod-critical vars.
+Files to Edit/Create (adjust paths to repo layout)
+
+main.py/app.py: router inclusion (avoid duplicate OpenAPI entries), middleware for security headers and body size limit, readiness logic, error handlers for 405/429, echo X-Request-ID.
+routers/search.py, routers/eligibility.py: unify handler functions for GET/POST variants; enforce validation; set operation_id.
+schemas/search.py, schemas/eligibility.py: request/response models, bounds, examples; error schema shared.
+settings/config.py: ALLOWED_ORIGINS, MAX_REQUEST_BODY_BYTES, rate limit env vars (dev vs prod defaults), LOG_LEVEL, OTEL_ENDPOINT.
+middleware/security_headers.py and middleware/body_limit.py: new middlewares for headers and body size enforcement.
+migrations/versions/<timestamp>_add_indexes_for_search.py: Alembic migration for indexes.
+tests/
+Update qa_focused_tests.py to assert 429 error schema, pagination bounds, 405 on wrong methods, readiness returns 503 when DB unavailable.
+Add tests for CSP/security headers and X-Request-ID echo.
+Acceptance Criteria
+
+All tests pass: pytest -q, including qa_focused_tests.py and new/updated tests. Coverage >= 85%.
+OpenAPI (/docs) shows both search and eligibility endpoints once per method per path (no duplication), with correct examples and error schemas.
+429 responses use unified error envelope and include Retry-After header.
+/readyz returns 503 when DB pool cannot connect; /healthz always 200.
+Logs are JSON-structured with trace_id and latency_ms; X-Request-ID is echoed.
+CORS is restricted in prod; security headers present on all responses.
+New DB indexes exist; no regressions; migrations apply cleanly.
+No relaxations to existing response formats or security posture.
+Run/Verify
+
+Run server: uvicorn main:app --host 0.0.0.0 --port 8000
+Quick checks:
+curl -I http://localhost:8000/healthz
+curl -i http://localhost:8000/readyz
+curl -i http://localhost:8000/search
+curl -i -X POST http://localhost:8000/search -H "Content-Type: application/json" -d '{"query":"merit"}'
+curl -i -X POST http://localhost:8000/eligibility/check -H "Content-Type: application/json" -d '{"gpa":3.7,"major":"CS"}'
+curl -i http://localhost:8000/metrics
+Static checks: mypy . && ruff check . && pytest -q
+Notes
+
+Preserve backward compatibility and existing response envelopes.
+Sanitize logs; do not log secrets, tokens, or PII.
+Keep rate limit behavior unchanged functionally, only improve configuration and error shape.

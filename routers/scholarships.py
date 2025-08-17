@@ -61,7 +61,7 @@ async def search_scholarships(
             user_id=user_id,
             query=keyword or "",
             result_count=0,  # Will be updated after search
-            filters=filters.dict()
+            filters=filters.model_dump()
         )
         
         result = scholarship_service.search_scholarships(filters)
@@ -119,7 +119,7 @@ async def smart_search_scholarships(
             user_id=user_id,
             query=keyword or "",
             result_count=0,
-            filters=filters.dict()
+            filters=filters.model_dump()
         )
         
         result = search_service.search_with_smart_suggestions(filters)

@@ -42,6 +42,11 @@ tracing_service.setup_tracing()
 tracing_service.instrument_app(app)
 
 # Add middleware in correct order (middleware wraps the app)
+from middleware.security_headers import SecurityHeadersMiddleware
+from middleware.body_limit import BodySizeLimitMiddleware
+
+app.add_middleware(SecurityHeadersMiddleware)
+app.add_middleware(BodySizeLimitMiddleware, max_size=settings.max_request_body_bytes)
 app.add_middleware(RequestIDMiddleware)
 app.middleware("http")(trace_id_middleware)
 app.middleware("http")(set_rate_limit_context)
@@ -64,6 +69,11 @@ app.add_exception_handler(HTTPException, http_exception_handler)
 app.add_exception_handler(RequestValidationError, validation_exception_handler)
 app.add_exception_handler(RateLimitExceeded, rate_limit_exception_handler)
 app.add_exception_handler(Exception, general_exception_handler)
+
+# Additional handlers for standardized error format
+from middleware.error_handlers import not_found_handler, method_not_allowed_handler
+app.add_exception_handler(404, not_found_handler)
+app.add_exception_handler(405, method_not_allowed_handler)
 
 # Include routers
 app.include_router(auth_router)
