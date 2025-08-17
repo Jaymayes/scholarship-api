@@ -11,6 +11,7 @@ from routers.analytics import router as analytics_router
 from routers.auth import router as auth_router
 from routers.database import router as database_router
 from routers.health import router as health_router
+from routers.ai import router as ai_router
 from middleware.error_handling import (
     api_error_handler, http_exception_handler, validation_exception_handler,
     rate_limit_exception_handler, general_exception_handler, trace_id_middleware,
@@ -90,6 +91,7 @@ app.include_router(eligibility_router, prefix="/api/v1", tags=["eligibility"])
 app.include_router(analytics_router, prefix="/api/v1", tags=["analytics"])
 app.include_router(database_router, tags=["database"])
 app.include_router(health_router)
+app.include_router(ai_router, tags=["ai"])
 
 @app.get("/")
 async def root():
