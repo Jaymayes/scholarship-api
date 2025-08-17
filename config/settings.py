@@ -74,6 +74,30 @@ class Settings(BaseSettings):
     rate_limit_authenticated: str = Field(default="300/minute", env="RATE_LIMIT_AUTHENTICATED")
     rate_limit_admin: str = Field(default="1000/minute", env="RATE_LIMIT_ADMIN")
     
+    # Endpoint-specific rate limits
+    rate_limit_public_search: str = Field(default="60/minute", env="RATE_LIMIT_PUBLIC_SEARCH")
+    rate_limit_public_eligibility: str = Field(default="30/minute", env="RATE_LIMIT_PUBLIC_ELIGIBILITY")
+    
+    @property
+    def get_search_rate_limit(self) -> str:
+        """Get environment-appropriate search rate limit"""
+        if self.environment == Environment.PRODUCTION:
+            return "30/minute"
+        elif self.environment == Environment.STAGING:
+            return "45/minute"
+        else:  # LOCAL, DEVELOPMENT
+            return "60/minute"
+    
+    @property
+    def get_eligibility_rate_limit(self) -> str:
+        """Get environment-appropriate eligibility rate limit"""
+        if self.environment == Environment.PRODUCTION:
+            return "15/minute"
+        elif self.environment == Environment.STAGING:
+            return "20/minute"
+        else:  # LOCAL, DEVELOPMENT
+            return "30/minute"
+    
     # Logging Configuration
     log_level: LogLevel = Field(default=LogLevel.INFO, env="LOG_LEVEL")
     log_format: str = Field(default="json", env="LOG_FORMAT")  # json or text

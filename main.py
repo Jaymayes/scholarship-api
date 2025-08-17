@@ -5,6 +5,8 @@ from slowapi.errors import RateLimitExceeded
 import uvicorn
 
 from routers.scholarships import router as scholarships_router
+from routers.search import router as search_router
+from routers.eligibility import router as eligibility_router
 from routers.analytics import router as analytics_router
 from routers.auth import router as auth_router
 from routers.database import router as database_router
@@ -66,6 +68,15 @@ app.add_exception_handler(Exception, general_exception_handler)
 # Include routers
 app.include_router(auth_router)
 app.include_router(scholarships_router, prefix="/api/v1", tags=["scholarships"])
+
+# Search endpoints - available at both root and /api/v1 for backward compatibility
+app.include_router(search_router, tags=["search"])
+app.include_router(search_router, prefix="/api/v1", tags=["search"])
+
+# Eligibility endpoints - available at both root and /api/v1 for backward compatibility
+app.include_router(eligibility_router, tags=["eligibility"])
+app.include_router(eligibility_router, prefix="/api/v1", tags=["eligibility"])
+
 app.include_router(analytics_router, prefix="/api/v1", tags=["analytics"])
 app.include_router(database_router, tags=["database"])
 app.include_router(health_router)

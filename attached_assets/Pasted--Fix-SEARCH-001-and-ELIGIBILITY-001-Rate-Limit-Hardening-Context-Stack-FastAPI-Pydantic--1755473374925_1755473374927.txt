@@ -1,0 +1,99 @@
+ Fix SEARCH-001 and ELIGIBILITY-001 + Rate Limit Hardening
+
+Context
+
+Stack: FastAPI + Pydantic + async SQLAlchemy + JWT + rate limiting + unified errors + observability.
+Current status: All tests green except routing for search and eligibility endpoints returning 404. Rate limiting tuned for dev.
+Do NOT change the existing, correct “dict-with-metadata” response format for scholarships.
+Objectives
+
+Fix SEARCH-001: Search endpoint returns 404. Ensure both POST /search and GET /search are routed and functional, returning 200 with the existing metadata-rich response.
+Fix ELIGIBILITY-001: Eligibility check endpoint returns 404. Ensure POST /eligibility/check (and GET /eligibility/check with query params for simple checks) routes correctly and returns 200 with expected eligibility payload.
+RATE-001: Move rate-limiting configuration to environment-based settings; reduce defaults for production-like runs while keeping dev values for local.
+Keep all security, error handling, and observability intact. Add/adjust tests minimally to cover fixed routes.
+Expected Endpoints and Behavior
+
+Search
+POST /search: body contains filters (text query, merit/need flags, GPA ranges, fields of study, deadlines, etc.). Returns 200 with: { items: [...], total: int, page: int, page_size: int, filters: {...}, took_ms: int }.
+GET /search: mirrors POST using query params for simple use cases; same response schema.
+Backward compatibility: if the project already exposes /api/v1/search, keep it (include both /search and /api/v1/search if feasible without duplication).
+Eligibility
+POST /eligibility/check: body contains student profile. Returns 200 with: { eligible_count: int, results: [{ scholarship_id, eligible: bool, score: float, reasons: [str] }], took_ms: int }.
+GET /eligibility/check: optional simple checker via query params (e.g., gpa, major, citizenship); returns same schema.
+Backward compatibility: if an /api/v1/eligibility path exists, keep both.
+Diagnosis and Fix Steps
+
+Router wiring
+Inspect main.py/app.py for include_router calls. Ensure the search and eligibility routers are included and prefixes align with intended paths:
+include_router(search_router, prefix="") and/or include_router(search_router, prefix="/api/v1")
+include_router(eligibility_router, prefix="") and/or include_router(eligibility_router, prefix="/api/v1")
+Ensure no conflicting or duplicate prefixes causing shadowing. Verify tags appear in OpenAPI and endpoints show in /docs.
+2. Search endpoint implementation
+
+Ensure routers/search.py exposes:
+@router.post("/search") and @router.get("/search")
+Both should call a single handler function that:
+Validates input via Pydantic schema.
+Executes DB-backed search via existing service layer.
+Returns the metadata-rich response schema.
+Preserve unified error handling and rate limit decorators. Keep interaction logging and tracing.
+3. Eligibility endpoint implementation
+
+Ensure routers/eligibility.py exposes:
+@router.post("/eligibility/check") and optionally @router.get("/eligibility/check")
+Implement using existing eligibility service. If missing, create a service function evaluate_eligibility(profile) that:
+Uses stored scholarship criteria to compute deterministically.
+Produces results with scholarship_id, eligible, score, reasons.
+Preserve unified error handling, interaction logging, and tracing.
+4. Rate limiting hardening
+
+Move hard-coded limits to settings (pydantic-settings):
+Example env vars: RATE_LIMIT_PUBLIC_SEARCH, RATE_LIMIT_PUBLIC_ELIGIBILITY
+Defaults: dev higher (e.g., 60/min), prod lower (e.g., 30/min). Use ENVIRONMENT to decide defaults.
+Ensure Redis configuration read from env; gracefully degrade locally if Redis not set.
+5. Keep response formats and documentation
+
+Do not change the existing scholarship response format (dict with metadata). Update OpenAPI schemas if needed to reflect GET and POST variants for search and eligibility.
+6. Tests
+
+Update or add these tests (minimal additions):
+test_search_post_route_ok: POST /search returns 200 and expected keys.
+test_search_get_route_ok: GET /search returns 200 with same schema.
+test_eligibility_post_route_ok: POST /eligibility/check returns 200 with expected keys.
+test_eligibility_get_route_ok: GET /eligibility/check returns 200 for simple params.
+test_rate_limits_configurable: limits adapt based on ENVIRONMENT.
+Keep “SCHOLAR-002” as non-actionable: confirm existing metadata wrapper remains unchanged.
+Files to Edit/Create
+
+main.py or app.py: include_router wiring for search and eligibility; ensure tags; preserve middleware.
+routers/search.py: ensure both POST /search and GET /search map to handler; unify to one service call.
+routers/eligibility.py: ensure POST /eligibility/check (and optional GET) map to eligibility service.
+services/search_service.py and services/eligibility_service.py: create or adjust to be called by routers; must be async and DB-backed.
+schemas/search.py and schemas/eligibility.py: request/response Pydantic models reflecting current design.
+settings/config.py: add rate limit fields, ENVIRONMENT handling, Redis URL.
+tests/test_search.py and tests/test_eligibility.py: add/adjust tests above.
+Acceptance Criteria
+
+POST /search and GET /search return 200 with: items, total, page, page_size, filters, took_ms. No 404s.
+POST /eligibility/check (and GET /eligibility/check) return 200 with: eligible_count, results[…], took_ms. No 404s.
+The scholarship list/detail response format remains a dict with metadata; existing tests for format pass unchanged.
+Rate limits are sourced from env; dev defaults high, prod defaults lower; local runs without Redis still work.
+All existing tests pass; added tests pass.
+OpenAPI docs show search and eligibility operations under appropriate tags.
+Logging/metrics/tracing remain operational.
+Run/Verify
+
+Run: uvicorn main:app --host 0.0.0.0 --port 8000
+Verify:
+curl -i http://localhost:8000/search
+curl -i -X POST http://localhost:8000/search -H "Content-Type: application/json" -d '{"query":"merit"}'
+curl -i -X POST http://localhost:8000/eligibility/check -H "Content-Type: application/json" -d '{"gpa":3.7,"major":"CS"}'
+curl -i http://localhost:8000/docs
+Check /metrics, /healthz, /readyz still work.
+Tests: pytest -q
+Type/lint (if configured): mypy . && ruff check .
+Notes
+
+Preserve authentication and rate limit protection on these routes as originally intended.
+Sanitize logs (no tokens/PII).
+If a legacy prefix (/api/v1) exists, keep both routes without duplication (e.g., mount same router twice with different prefixes) and ensure tags stay consistent.

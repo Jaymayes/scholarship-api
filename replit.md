@@ -18,6 +18,8 @@ This is a comprehensive Scholarship Discovery & Search API built with FastAPI th
 ✓ **Quality Gates**: Comprehensive test suites and security documentation
 ✓ **Database Operations**: Direct PostgreSQL endpoints for data verification and advanced analytics
 ✓ **Health & Monitoring**: Liveness/readiness probes, Prometheus metrics endpoint, request tracing
+✓ **SEARCH-001 & ELIGIBILITY-001 FIXED**: Dedicated search and eligibility routers created, endpoints working
+✓ **Rate Limiting Hardened**: Environment-aware rate limits with production-ready configuration
 
 # User Preferences
 
@@ -58,8 +60,10 @@ The application follows a service-oriented architecture with clear separation of
 RESTful API design with versioned endpoints (`/api/v1/`) organized into logical router modules:
 
 ### Core Endpoints (v1) - Fully Implemented:
-- **GET /search?q=…&filters=…**: Semantic + keyword search with eligible-first results
-- **POST /eligibility/check**: Bulk student-to-scholarship eligibility checking
+- **GET /search?q=…&filters=…**: Semantic + keyword search with eligible-first results ✅ FIXED
+- **POST /search**: Search with request body for complex filters ✅ FIXED
+- **GET /eligibility/check**: Quick eligibility check via query params ✅ FIXED  
+- **POST /eligibility/check**: Bulk student-to-scholarship eligibility checking ✅ FIXED
 - **GET /scholarships/{id}**: Details + provenance snippets
 - **GET /recommendations?userId=…**: Cascade hybrid recommendations (content + eligibility)
 - **POST /interactions**: Log viewed/saved/applied/dismissed for analytics
@@ -120,6 +124,14 @@ The API is currently running on **port 5000** and fully functional for:
 - Landing page APIs
 - Third-party developer access
 - Analytics and reporting systems
+
+**Latest Updates (August 17, 2025):**
+- Fixed SEARCH-001: Created dedicated `/search` router with GET/POST endpoints
+- Fixed ELIGIBILITY-001: Created dedicated `/eligibility/check` router with GET/POST endpoints  
+- Implemented backward compatibility with `/api/v1` prefixed routes
+- Hardened rate limiting with environment-aware configuration
+- All endpoints returning proper metadata-rich responses with timing information
+- Comprehensive test suite validates all fixed routes
 
 ## Future Enhancements (v2 Roadmap)
 - **Predictive scoring**: Logistic/GBM using profile + scholarship features + historical outcomes (bias-audited, transparent rationale)
