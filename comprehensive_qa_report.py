@@ -1,430 +1,816 @@
 #!/usr/bin/env python3
 """
-COMPREHENSIVE QA ANALYSIS REPORT
-Senior QA Engineer - Final Assessment
-Scholarship Discovery & Search API
+Comprehensive QA Analysis and Testing Suite
+Senior QA Engineer Report Generation
 """
 
+import os
+import sys
 import json
+import traceback
+import requests
+import subprocess
 from datetime import datetime
+from typing import Dict, List, Any, Optional
+import pytest
+import asyncio
+from sqlalchemy import text
+from fastapi.testclient import TestClient
 
-def generate_comprehensive_qa_report():
-    """Generate the complete QA analysis report"""
+# Add project root to path
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+
+try:
+    from main import app
+    from models.database import SessionLocal, get_db
+    from services.scholarship_service import ScholarshipService
+    from services.eligibility_service import EligibilityService
+    from models.scholarship import Scholarship
+    from config.settings import settings
+except ImportError as e:
+    print(f"Critical Import Error: {e}")
+    sys.exit(1)
+
+class QAReportGenerator:
+    """Comprehensive QA Analysis and Bug Reporting System"""
     
-    report = {
-        "analysis_metadata": {
-            "timestamp": datetime.utcnow().isoformat(),
-            "analyst": "Senior QA Engineer",
-            "project": "Scholarship Discovery & Search API",
-            "analysis_type": "Comprehensive Security, Functionality, and Code Quality Review",
-            "methodology": "Static Analysis + Dynamic Testing + Edge Case Validation"
-        },
+    def __init__(self):
+        self.issues = []
+        self.test_results = {}
+        self.client = TestClient(app)
+        self.base_url = "http://localhost:5000"
         
-        "executive_summary": {
-            "total_issues_identified": 22,
-            "critical_issues": 0,
-            "high_severity_issues": 4,
-            "medium_severity_issues": 12,
-            "low_severity_issues": 6,
-            "overall_assessment": "MODERATE RISK",
-            "deployment_recommendation": "CONDITIONAL - Fix High/Medium issues before production"
-        },
+    def add_issue(self, issue_id: str, location: str, description: str, 
+                  steps_to_reproduce: str, observed_output: str, 
+                  expected_output: str, severity: str, category: str = "Bug"):
+        """Add an issue to the report"""
+        self.issues.append({
+            "issue_id": issue_id,
+            "location": location,
+            "description": description,
+            "steps_to_reproduce": steps_to_reproduce,
+            "observed_output": observed_output,
+            "expected_output": expected_output,
+            "severity": severity,
+            "category": category,
+            "timestamp": datetime.now().isoformat()
+        })
+    
+    def test_basic_connectivity(self):
+        """Test basic API connectivity and health"""
+        print("🔍 Testing Basic Connectivity...")
         
-        "issues": [
-            {
-                "issue_id": "LSP001",
-                "location": "data/scholarships.py:18-340 (15 instances)",
-                "description": "EligibilityCriteria constructor calls missing optional parameters",
-                "category": "Code Quality",
-                "steps_to_reproduce": "Review all MOCK_SCHOLARSHIPS entries - LSP reports missing parameters for max_gpa, min_age, max_age, financial_need in multiple scholarships",
-                "observed_output": "LSP diagnostics show 15 instances of missing optional parameters",
-                "expected_output": "All optional parameters should be explicitly defined or use proper defaults",
-                "severity": "Medium",
-                "impact": "Code maintainability, potential runtime issues if defaults change",
-                "fix_complexity": "Low - Add explicit None values for optional parameters"
-            },
+        try:
+            # Test root endpoint
+            response = self.client.get("/")
+            if response.status_code != 200:
+                self.add_issue(
+                    "CONN-001",
+                    "main.py root endpoint",
+                    "Root endpoint returns non-200 status code",
+                    "Send GET request to /",
+                    f"Status: {response.status_code}, Response: {response.text}",
+                    "Status: 200 with valid JSON response",
+                    "High"
+                )
             
-            {
-                "issue_id": "LSP002", 
-                "location": "utils/logger.py:79, 89",
-                "description": "Type safety violations in logger utility functions",
-                "category": "Type Safety",
-                "steps_to_reproduce": "Review logger.py lines 79 and 89 - None values assigned to parameters expecting dict and str/int types",
-                "observed_output": "LSP reports type incompatibility errors",
-                "expected_output": "Proper type handling with None checks",
-                "severity": "Medium",
-                "impact": "Potential runtime errors, type safety violations",
-                "fix_complexity": "Low - Add None checks and default values"
-            },
+            # Test health endpoints
+            health_response = self.client.get("/healthz")
+            if health_response.status_code != 200:
+                self.add_issue(
+                    "HEALTH-001",
+                    "routers/health.py /healthz",
+                    "Liveness probe endpoint failing",
+                    "Send GET request to /healthz",
+                    f"Status: {health_response.status_code}",
+                    "Status: 200 with {'status': 'ok'}",
+                    "Critical"
+                )
+                
+        except Exception as e:
+            self.add_issue(
+                "CONN-002",
+                "FastAPI application startup",
+                "Application fails to start or respond",
+                "Start FastAPI application and send basic requests",
+                f"Exception: {str(e)}",
+                "Application starts successfully and responds to requests",
+                "Critical"
+            )
+    
+    def test_authentication_system(self):
+        """Test authentication and authorization"""
+        print("🔍 Testing Authentication System...")
+        
+        try:
+            # Test login with invalid credentials
+            invalid_login = self.client.post(
+                "/api/v1/auth/login-simple",
+                json={"username": "invalid", "password": "invalid"}
+            )
             
-            {
-                "issue_id": "VAL001",
-                "location": "models/user.py:9, models/scholarship.py:51",
-                "description": "Pydantic validation correctly rejects invalid values",
-                "category": "Data Validation",
-                "steps_to_reproduce": "Attempt to create UserProfile with gpa=5.0 or Scholarship with negative amount",
-                "observed_output": "Validation errors properly raised",
-                "expected_output": "Invalid data should be rejected",
-                "severity": "Low",
-                "impact": "POSITIVE - Validation is working correctly",
-                "fix_complexity": "None - No fix needed, working as intended"
-            },
+            if invalid_login.status_code != 401:
+                self.add_issue(
+                    "AUTH-001",
+                    "routers/auth.py login endpoint",
+                    "Invalid credentials don't return 401 status",
+                    "POST to /api/v1/auth/login-simple with invalid credentials",
+                    f"Status: {invalid_login.status_code}",
+                    "Status: 401 Unauthorized",
+                    "Medium"
+                )
             
-            {
-                "issue_id": "BUS001",
-                "location": "models/user.py:6-16",
-                "description": "UserProfile allows logically inconsistent field combinations",
-                "category": "Business Logic",
-                "steps_to_reproduce": "Create UserProfile with age=15 and grade_level='graduate'",
-                "observed_output": "Profile created without validation error",
-                "expected_output": "Should validate logical consistency between age and education level",
-                "severity": "Low",
-                "impact": "Data quality issues, potential incorrect eligibility calculations",
-                "fix_complexity": "Medium - Requires cross-field validation logic"
-            },
+            # Test login with valid credentials
+            valid_login = self.client.post(
+                "/api/v1/auth/login-simple",
+                json={"username": "admin", "password": "admin123"}
+            )
             
-            {
-                "issue_id": "API001",
-                "location": "routers/analytics.py:28-44",
-                "description": "Inconsistent error handling for non-existent users",
-                "category": "API Consistency",
-                "steps_to_reproduce": "GET /api/v1/analytics/user/nonexistent vs GET /api/v1/scholarships/nonexistent",
-                "observed_output": "User analytics returns 200 with zero data, scholarship returns 404",
-                "expected_output": "Consistent error handling approach across endpoints",
-                "severity": "Medium",
-                "impact": "API inconsistency, potential client confusion",
-                "fix_complexity": "Low - Standardize error response patterns"
-            },
+            if valid_login.status_code != 200:
+                self.add_issue(
+                    "AUTH-002",
+                    "routers/auth.py login endpoint",
+                    "Valid credentials don't return 200 status",
+                    "POST to /api/v1/auth/login-simple with admin/admin123",
+                    f"Status: {valid_login.status_code}, Response: {valid_login.text}",
+                    "Status: 200 with access_token",
+                    "High"
+                )
+                return None
             
-            {
-                "issue_id": "SEC001",
-                "location": "routers/scholarships.py:37-44",
-                "description": "Keyword search handles special characters safely",
-                "category": "Security",
-                "steps_to_reproduce": "Search with keywords: '<script>', '; DROP TABLE', 'null', 'undefined'",
-                "observed_output": "All requests handled safely, return 200 with 0 results",
-                "expected_output": "Safe handling of potentially malicious input",
-                "severity": "Low",
-                "impact": "POSITIVE - Security controls working properly",
-                "fix_complexity": "None - Security is adequate"
-            },
+            token_data = valid_login.json()
+            if "access_token" not in token_data:
+                self.add_issue(
+                    "AUTH-003",
+                    "routers/auth.py login response",
+                    "Login response missing access_token",
+                    "Successful login should return token",
+                    f"Response: {token_data}",
+                    "Response includes 'access_token' field",
+                    "High"
+                )
+                return None
+                
+            return token_data["access_token"]
             
-            {
-                "issue_id": "PERF001",
-                "location": "services/eligibility_service.py:55-157",
-                "description": "Eligibility calculations are deterministic and consistent",
-                "category": "Performance/Consistency", 
-                "steps_to_reproduce": "Run same eligibility check multiple times with identical inputs",
-                "observed_output": "Consistent results returned every time",
-                "expected_output": "Deterministic behavior",
-                "severity": "Low",
-                "impact": "POSITIVE - System behaves predictably",
-                "fix_complexity": "None - Working correctly"
-            },
+        except Exception as e:
+            self.add_issue(
+                "AUTH-004",
+                "routers/auth.py authentication system",
+                "Authentication system throws unexpected exception",
+                "Attempt to authenticate with API",
+                f"Exception: {str(e)}\nTraceback: {traceback.format_exc()}",
+                "Authentication works without exceptions",
+                "Critical"
+            )
+            return None
+    
+    def test_database_integration(self):
+        """Test database connectivity and operations"""
+        print("🔍 Testing Database Integration...")
+        
+        try:
+            db = SessionLocal()
             
-            {
-                "issue_id": "VAL002",
-                "location": "models/scholarship.py:86",
-                "description": "SearchFilters properly validates boundary conditions",
-                "category": "Input Validation",
-                "steps_to_reproduce": "Create SearchFilters with invalid offset=-1, limit=0, or limit>100",
-                "observed_output": "Pydantic validation properly rejects invalid values",
-                "expected_output": "Invalid parameters should be rejected",
-                "severity": "Low", 
-                "impact": "POSITIVE - Input validation working correctly",
-                "fix_complexity": "None - Validation is proper"
-            },
+            # Test basic database connectivity
+            try:
+                result = db.execute(text("SELECT 1"))
+                result.fetchone()
+            except Exception as e:
+                self.add_issue(
+                    "DB-001",
+                    "models/database.py database connection",
+                    "Database connection fails",
+                    "Execute basic SELECT 1 query",
+                    f"Exception: {str(e)}",
+                    "Query executes successfully",
+                    "Critical"
+                )
+                return
             
-            {
-                "issue_id": "FUNC001",
-                "location": "services/scholarship_service.py:37-44",
-                "description": "Case-insensitive keyword search working correctly",
-                "category": "Functionality",
-                "steps_to_reproduce": "Search for 'engineering' vs 'ENGINEERING'",
-                "observed_output": "Both return identical results (2 scholarships)",
-                "expected_output": "Case-insensitive search behavior",
-                "severity": "Low",
-                "impact": "POSITIVE - Search functionality working as expected",
-                "fix_complexity": "None - Working correctly"
-            },
+            # Test scholarships table
+            try:
+                scholarship_count = db.execute(text("SELECT COUNT(*) FROM scholarships")).scalar()
+                if scholarship_count == 0:
+                    self.add_issue(
+                        "DB-002",
+                        "data/scholarship_data.py",
+                        "No scholarships found in database",
+                        "Query scholarships table for count",
+                        f"Count: {scholarship_count}",
+                        "Count > 0 (expected 15 scholarships)",
+                        "Medium"
+                    )
+            except Exception as e:
+                self.add_issue(
+                    "DB-003",
+                    "models/database.py scholarships table",
+                    "Scholarships table query fails",
+                    "SELECT COUNT(*) FROM scholarships",
+                    f"Exception: {str(e)}",
+                    "Query executes successfully",
+                    "High"
+                )
             
-            {
-                "issue_id": "FUNC002",
-                "location": "services/analytics_service.py:16-22",
-                "description": "Analytics tracking working properly",
-                "category": "Functionality",
-                "steps_to_reproduce": "Perform scholarship view and check analytics before/after",
-                "observed_output": "Interaction count properly incremented",
-                "expected_output": "Analytics should track user interactions",
-                "severity": "Low",
-                "impact": "POSITIVE - Analytics functioning correctly",
-                "fix_complexity": "None - Working as designed"
-            },
+            # Test interactions table
+            try:
+                interaction_count = db.execute(text("SELECT COUNT(*) FROM interactions")).scalar()
+                print(f"Interactions table has {interaction_count} records")
+            except Exception as e:
+                self.add_issue(
+                    "DB-004",
+                    "models/interaction.py interactions table",
+                    "Interactions table query fails",
+                    "SELECT COUNT(*) FROM interactions",
+                    f"Exception: {str(e)}",
+                    "Query executes successfully",
+                    "Medium"
+                )
             
-            {
-                "issue_id": "ARCH001",
-                "location": "Overall system architecture",
-                "description": "Missing database integration layer",
-                "category": "Architecture",
-                "steps_to_reproduce": "Review system for persistent storage capabilities",
-                "observed_output": "In-memory storage only, no persistent database",
-                "expected_output": "Production systems should have persistent storage",
-                "severity": "High",
-                "impact": "Data loss on restart, not production-ready for stateful data",
-                "fix_complexity": "High - Requires database integration and migration strategy"
-            },
+            db.close()
             
-            {
-                "issue_id": "ARCH002",
-                "location": "Overall system configuration",
-                "description": "Missing authentication and authorization layer",
-                "category": "Security Architecture",
-                "steps_to_reproduce": "Access any API endpoint without authentication",
-                "observed_output": "All endpoints accessible without authentication",
-                "expected_output": "Production API should have authentication controls",
-                "severity": "High",
-                "impact": "Unauthorized access to all system functions",
-                "fix_complexity": "High - Requires authentication system implementation"
-            },
+        except Exception as e:
+            self.add_issue(
+                "DB-005",
+                "models/database.py SessionLocal",
+                "Database session creation fails",
+                "Create database session using SessionLocal()",
+                f"Exception: {str(e)}",
+                "Session created successfully",
+                "Critical"
+            )
+    
+    def test_scholarship_endpoints(self, token: Optional[str] = None):
+        """Test scholarship-related endpoints"""
+        print("🔍 Testing Scholarship Endpoints...")
+        
+        headers = {"Authorization": f"Bearer {token}"} if token else {}
+        
+        # Test get all scholarships
+        try:
+            scholarships_response = self.client.get("/api/v1/scholarships", headers=headers)
             
-            {
-                "issue_id": "ARCH003",
-                "location": "Overall system monitoring",
-                "description": "Missing comprehensive logging and monitoring",
-                "category": "Operations",
-                "steps_to_reproduce": "Review system for production monitoring capabilities",
-                "observed_output": "Basic console logging only",
-                "expected_output": "Production logging, metrics, and monitoring",
-                "severity": "Medium",
-                "impact": "Limited operational visibility",
-                "fix_complexity": "Medium - Add structured logging and monitoring"
-            },
+            if scholarships_response.status_code != 200:
+                self.add_issue(
+                    "SCHOLAR-001",
+                    "routers/scholarships.py get_scholarships",
+                    "Get scholarships endpoint returns non-200 status",
+                    "GET /api/v1/scholarships",
+                    f"Status: {scholarships_response.status_code}, Response: {scholarships_response.text}",
+                    "Status: 200 with scholarship list",
+                    "High"
+                )
+            else:
+                data = scholarships_response.json()
+                if not isinstance(data, list):
+                    self.add_issue(
+                        "SCHOLAR-002",
+                        "routers/scholarships.py get_scholarships response",
+                        "Scholarships endpoint doesn't return a list",
+                        "GET /api/v1/scholarships and check response type",
+                        f"Response type: {type(data)}, Data: {data}",
+                        "Response should be a list of scholarships",
+                        "Medium"
+                    )
+                elif len(data) == 0:
+                    self.add_issue(
+                        "SCHOLAR-003",
+                        "services/scholarship_service.py",
+                        "No scholarships returned from API",
+                        "GET /api/v1/scholarships",
+                        "Empty list returned",
+                        "List of 15 scholarships",
+                        "Medium"
+                    )
+        
+        except Exception as e:
+            self.add_issue(
+                "SCHOLAR-004",
+                "routers/scholarships.py",
+                "Scholarships endpoint throws unexpected exception",
+                "GET /api/v1/scholarships",
+                f"Exception: {str(e)}\nTraceback: {traceback.format_exc()}",
+                "Endpoint responds without exceptions",
+                "High"
+            )
+        
+        # Test search functionality
+        try:
+            search_response = self.client.get(
+                "/api/v1/scholarships/search",
+                params={"q": "engineering", "limit": 5},
+                headers=headers
+            )
             
-            {
-                "issue_id": "ARCH004",
-                "location": "Overall system configuration",
-                "description": "Missing rate limiting and API protection",
-                "category": "Security/Performance",
-                "steps_to_reproduce": "Send rapid successive API requests",
-                "observed_output": "No rate limiting, all requests processed",
-                "expected_output": "Rate limiting to prevent abuse",
-                "severity": "Medium",
-                "impact": "Vulnerability to DoS attacks, resource exhaustion",
-                "fix_complexity": "Medium - Implement rate limiting middleware"
-            },
+            if search_response.status_code != 200:
+                self.add_issue(
+                    "SEARCH-001",
+                    "routers/scholarships.py search_scholarships",
+                    "Search endpoint returns non-200 status",
+                    "GET /api/v1/scholarships/search?q=engineering&limit=5",
+                    f"Status: {search_response.status_code}",
+                    "Status: 200 with search results",
+                    "High"
+                )
+        
+        except Exception as e:
+            self.add_issue(
+                "SEARCH-002",
+                "routers/scholarships.py search endpoint",
+                "Search endpoint throws unexpected exception",
+                "GET /api/v1/scholarships/search?q=engineering",
+                f"Exception: {str(e)}",
+                "Search completes without exceptions",
+                "High"
+            )
+        
+        # Test individual scholarship retrieval
+        try:
+            individual_response = self.client.get(
+                "/api/v1/scholarships/merit-excellence-scholarship",
+                headers=headers
+            )
             
-            {
-                "issue_id": "DATA001",
-                "location": "data/scholarships.py",
-                "description": "Mock data quality analysis",
-                "category": "Data Quality",
-                "steps_to_reproduce": "Review MOCK_SCHOLARSHIPS for data quality issues",
-                "observed_output": "No duplicate IDs, URLs properly formatted, some deadlines may be in past",
-                "expected_output": "High-quality, realistic test data",
-                "severity": "Low",
-                "impact": "Minor data quality issues for testing",
-                "fix_complexity": "Low - Update test data dates"
-            },
-            
-            {
-                "issue_id": "TEST001",
-                "location": "Overall project structure",
-                "description": "Missing comprehensive automated test suite",
-                "category": "Testing",
-                "steps_to_reproduce": "Look for unit tests, integration tests, and test coverage",
-                "observed_output": "No automated test suite found",
-                "expected_output": "Comprehensive test coverage for production system",
-                "severity": "High",
-                "impact": "No regression protection, difficult to maintain quality",
-                "fix_complexity": "High - Create comprehensive test suite"
-            },
-            
-            {
-                "issue_id": "DOC001",
-                "location": "Overall project documentation",
-                "description": "API documentation auto-generated and accessible",
-                "category": "Documentation",
-                "steps_to_reproduce": "Access /docs endpoint",
-                "observed_output": "Comprehensive OpenAPI documentation available",
-                "expected_output": "Good API documentation",
-                "severity": "Low",
-                "impact": "POSITIVE - Documentation is excellent",
-                "fix_complexity": "None - Working well"
-            },
-            
-            {
-                "issue_id": "CONFIG001",
-                "location": "main.py, overall configuration",
-                "description": "Missing environment-specific configuration",
-                "category": "Configuration Management",
-                "steps_to_reproduce": "Review configuration management for dev/staging/prod environments",
-                "observed_output": "Hardcoded configuration, single environment setup",
-                "expected_output": "Environment-specific configuration management",
-                "severity": "Medium",
-                "impact": "Difficult deployment across environments",
-                "fix_complexity": "Medium - Implement configuration management"
-            },
-            
-            {
-                "issue_id": "ERROR001",
-                "location": "routers/scholarships.py, routers/analytics.py",
-                "description": "Error response format consistency",
-                "category": "API Design",
-                "steps_to_reproduce": "Test various error scenarios across endpoints",
-                "observed_output": "Generally consistent error handling with minor variations",
-                "expected_output": "Standardized error response format",
-                "severity": "Low",
-                "impact": "Minor API consistency issues",
-                "fix_complexity": "Low - Standardize error response format"
-            },
-            
-            {
-                "issue_id": "SCALE001",
-                "location": "Overall architecture",
-                "description": "Missing scalability considerations",
-                "category": "Scalability",
-                "steps_to_reproduce": "Review system for scalability patterns",
-                "observed_output": "Single-instance design, in-memory storage",
-                "expected_output": "Scalable architecture with caching, load balancing considerations",
-                "severity": "Medium",
-                "impact": "Limited scalability for production loads",
-                "fix_complexity": "High - Requires architectural changes"
-            },
-            
-            {
-                "issue_id": "BACKUP001",
-                "location": "Overall system design",
-                "description": "Missing data backup and recovery mechanisms",
-                "category": "Data Protection",
-                "steps_to_reproduce": "Review system for backup/recovery capabilities",
-                "observed_output": "No backup mechanisms (in-memory storage)",
-                "expected_output": "Data backup and recovery procedures",
-                "severity": "Medium",
-                "impact": "Data loss risk, no disaster recovery",
-                "fix_complexity": "Medium - Implement backup strategy with persistent storage"
-            },
-            
-            {
-                "issue_id": "ASYNC001",
-                "location": "Overall request handling",
-                "description": "FastAPI async capabilities properly utilized",
-                "category": "Performance",
-                "steps_to_reproduce": "Review endpoint definitions for async/await usage",
-                "observed_output": "Endpoints properly defined as async",
-                "expected_output": "Proper async implementation",
-                "severity": "Low",
-                "impact": "POSITIVE - Good async design",
-                "fix_complexity": "None - Working correctly"
+            if individual_response.status_code not in [200, 404]:
+                self.add_issue(
+                    "SCHOLAR-005",
+                    "routers/scholarships.py get_scholarship",
+                    "Individual scholarship endpoint returns unexpected status",
+                    "GET /api/v1/scholarships/merit-excellence-scholarship",
+                    f"Status: {individual_response.status_code}",
+                    "Status: 200 (found) or 404 (not found)",
+                    "Medium"
+                )
+        
+        except Exception as e:
+            self.add_issue(
+                "SCHOLAR-006",
+                "routers/scholarships.py get_scholarship",
+                "Individual scholarship endpoint throws exception",
+                "GET /api/v1/scholarships/merit-excellence-scholarship",
+                f"Exception: {str(e)}",
+                "Endpoint responds without exceptions",
+                "Medium"
+            )
+    
+    def test_eligibility_system(self, token: Optional[str] = None):
+        """Test eligibility checking functionality"""
+        print("🔍 Testing Eligibility System...")
+        
+        headers = {"Authorization": f"Bearer {token}"} if token else {}
+        
+        # Test eligibility check endpoint
+        try:
+            eligibility_payload = {
+                "user_profile": {
+                    "gpa": 3.5,
+                    "grade_level": "undergraduate",
+                    "field_of_study": "engineering",
+                    "citizenship": "US",
+                    "state_of_residence": "CA",
+                    "age": 20,
+                    "financial_need": True
+                },
+                "scholarship_ids": ["merit-excellence-scholarship"]
             }
-        ],
+            
+            eligibility_response = self.client.post(
+                "/api/v1/scholarships/eligibility/check",
+                json=eligibility_payload,
+                headers=headers
+            )
+            
+            if eligibility_response.status_code != 200:
+                self.add_issue(
+                    "ELIGIBILITY-001",
+                    "routers/scholarships.py check_eligibility",
+                    "Eligibility check endpoint returns non-200 status",
+                    f"POST /api/v1/scholarships/eligibility/check with payload: {eligibility_payload}",
+                    f"Status: {eligibility_response.status_code}, Response: {eligibility_response.text}",
+                    "Status: 200 with eligibility results",
+                    "High"
+                )
+            else:
+                data = eligibility_response.json()
+                if not isinstance(data, dict) or "results" not in data:
+                    self.add_issue(
+                        "ELIGIBILITY-002",
+                        "services/eligibility_service.py",
+                        "Eligibility response missing 'results' field",
+                        "Check eligibility response structure",
+                        f"Response: {data}",
+                        "Response should contain 'results' field",
+                        "Medium"
+                    )
         
-        "recommendations": {
-            "immediate_actions": [
-                "Fix LSP-identified type safety issues in utils/logger.py",
-                "Resolve missing parameter warnings in data/scholarships.py",
-                "Implement comprehensive automated testing suite",
-                "Add authentication and authorization layer"
-            ],
+        except Exception as e:
+            self.add_issue(
+                "ELIGIBILITY-003",
+                "routers/scholarships.py or services/eligibility_service.py",
+                "Eligibility check throws unexpected exception",
+                "POST eligibility check with valid payload",
+                f"Exception: {str(e)}\nTraceback: {traceback.format_exc()}",
+                "Eligibility check completes without exceptions",
+                "High"
+            )
+    
+    def test_edge_cases_and_input_validation(self, token: Optional[str] = None):
+        """Test edge cases and input validation"""
+        print("🔍 Testing Edge Cases and Input Validation...")
+        
+        headers = {"Authorization": f"Bearer {token}"} if token else {}
+        
+        # Test with extremely long query string
+        try:
+            long_query = "a" * 10000  # 10k character query
+            long_search_response = self.client.get(
+                "/api/v1/scholarships/search",
+                params={"q": long_query},
+                headers=headers
+            )
             
-            "before_production": [
-                "Integrate persistent database storage",
-                "Implement rate limiting and API protection",
-                "Add comprehensive monitoring and logging",
-                "Create environment-specific configuration management",
-                "Implement data backup and recovery procedures",
-                "Add cross-field validation for business logic"
-            ],
+            if long_search_response.status_code == 500:
+                self.add_issue(
+                    "EDGE-001",
+                    "routers/scholarships.py search validation",
+                    "Long query string causes internal server error",
+                    f"Search with {len(long_query)} character query",
+                    f"Status: 500, Server Error",
+                    "Status: 400 (bad request) or graceful handling",
+                    "Medium"
+                )
+        
+        except Exception as e:
+            self.add_issue(
+                "EDGE-002",
+                "routers/scholarships.py search endpoint",
+                "Long query causes unexpected exception",
+                "Search with very long query string",
+                f"Exception: {str(e)}",
+                "Graceful error handling or input validation",
+                "Medium"
+            )
+        
+        # Test with special characters
+        try:
+            special_chars_query = "'; DROP TABLE scholarships; --"
+            sql_injection_response = self.client.get(
+                "/api/v1/scholarships/search",
+                params={"q": special_chars_query},
+                headers=headers
+            )
             
-            "nice_to_have": [
-                "Standardize error response formats",
-                "Update mock data with current dates",
-                "Add scalability patterns (caching, load balancing)",
-                "Enhance documentation with deployment guides"
+            # Should not return 500 error - should handle gracefully
+            if sql_injection_response.status_code == 500:
+                self.add_issue(
+                    "SECURITY-001",
+                    "routers/scholarships.py search input validation",
+                    "Special characters in search query cause server error",
+                    f"Search with SQL injection attempt: {special_chars_query}",
+                    "Status: 500, Internal Server Error",
+                    "Graceful handling with proper input sanitization",
+                    "High"
+                )
+        
+        except Exception as e:
+            self.add_issue(
+                "SECURITY-002",
+                "routers/scholarships.py input validation",
+                "SQL injection attempt causes unexpected exception",
+                "Search with SQL injection characters",
+                f"Exception: {str(e)}",
+                "Proper input validation and sanitization",
+                "High"
+            )
+        
+        # Test with null/empty inputs in eligibility check
+        try:
+            null_eligibility_payload = {
+                "user_profile": {
+                    "gpa": None,
+                    "grade_level": "",
+                    "field_of_study": None,
+                    "citizenship": "",
+                    "state_of_residence": None,
+                    "age": None,
+                    "financial_need": None
+                },
+                "scholarship_ids": []
+            }
+            
+            null_response = self.client.post(
+                "/api/v1/scholarships/eligibility/check",
+                json=null_eligibility_payload,
+                headers=headers
+            )
+            
+            if null_response.status_code == 500:
+                self.add_issue(
+                    "EDGE-003",
+                    "services/eligibility_service.py null handling",
+                    "Null values in eligibility check cause server error",
+                    f"Eligibility check with null payload: {null_eligibility_payload}",
+                    "Status: 500, Internal Server Error",
+                    "Status: 400 with validation error or graceful handling",
+                    "Medium"
+                )
+        
+        except Exception as e:
+            self.add_issue(
+                "EDGE-004",
+                "services/eligibility_service.py",
+                "Null values cause unexpected exception in eligibility check",
+                "Eligibility check with null/empty values",
+                f"Exception: {str(e)}",
+                "Proper null value handling and validation",
+                "Medium"
+            )
+    
+    def test_rate_limiting(self, token: Optional[str] = None):
+        """Test rate limiting functionality"""
+        print("🔍 Testing Rate Limiting...")
+        
+        headers = {"Authorization": f"Bearer {token}"} if token else {}
+        
+        try:
+            # Send many requests rapidly to test rate limiting
+            responses = []
+            for i in range(50):  # Send 50 requests rapidly
+                response = self.client.get("/api/v1/scholarships", headers=headers)
+                responses.append(response.status_code)
+                if response.status_code == 429:  # Rate limited
+                    break
+            
+            # Check if rate limiting is working
+            if 429 not in responses:
+                self.add_issue(
+                    "RATE-001",
+                    "middleware/rate_limiting.py",
+                    "Rate limiting not enforced under load",
+                    "Send 50 rapid requests to /api/v1/scholarships",
+                    f"All responses: {set(responses)}",
+                    "At least some requests should return 429 (Too Many Requests)",
+                    "Low"  # Low severity as it might be configured for high limits
+                )
+        
+        except Exception as e:
+            self.add_issue(
+                "RATE-002",
+                "middleware/rate_limiting.py",
+                "Rate limiting middleware causes unexpected exception",
+                "Send multiple rapid requests",
+                f"Exception: {str(e)}",
+                "Rate limiting works without exceptions",
+                "Medium"
+            )
+    
+    def test_observability_features(self):
+        """Test observability and monitoring features"""
+        print("🔍 Testing Observability Features...")
+        
+        # Test metrics endpoint
+        try:
+            metrics_response = self.client.get("/metrics")
+            if metrics_response.status_code != 200:
+                self.add_issue(
+                    "OBS-001",
+                    "observability/metrics.py metrics endpoint",
+                    "Metrics endpoint not accessible",
+                    "GET /metrics",
+                    f"Status: {metrics_response.status_code}",
+                    "Status: 200 with Prometheus metrics",
+                    "Medium"
+                )
+            elif "# HELP" not in metrics_response.text:
+                self.add_issue(
+                    "OBS-002",
+                    "observability/metrics.py metrics format",
+                    "Metrics endpoint doesn't return Prometheus format",
+                    "GET /metrics and check response format",
+                    f"Response doesn't contain '# HELP'",
+                    "Response should be in Prometheus format",
+                    "Low"
+                )
+        
+        except Exception as e:
+            self.add_issue(
+                "OBS-003",
+                "observability/metrics.py",
+                "Metrics endpoint throws unexpected exception",
+                "GET /metrics",
+                f"Exception: {str(e)}",
+                "Metrics endpoint responds without exceptions",
+                "Medium"
+            )
+        
+        # Test readiness probe
+        try:
+            readiness_response = self.client.get("/readyz")
+            if readiness_response.status_code not in [200, 503]:
+                self.add_issue(
+                    "OBS-004",
+                    "routers/health.py readiness probe",
+                    "Readiness probe returns unexpected status",
+                    "GET /readyz",
+                    f"Status: {readiness_response.status_code}",
+                    "Status: 200 (ready) or 503 (not ready)",
+                    "Medium"
+                )
+        
+        except Exception as e:
+            self.add_issue(
+                "OBS-005",
+                "routers/health.py",
+                "Readiness probe throws unexpected exception",
+                "GET /readyz",
+                f"Exception: {str(e)}",
+                "Readiness probe responds without exceptions",
+                "Medium"
+            )
+        
+        # Test X-Request-ID header presence
+        try:
+            response = self.client.get("/")
+            if "X-Request-ID" not in response.headers:
+                self.add_issue(
+                    "OBS-006",
+                    "middleware/request_id.py",
+                    "X-Request-ID header missing from responses",
+                    "Send any request and check response headers",
+                    f"Headers: {dict(response.headers)}",
+                    "Response should include X-Request-ID header",
+                    "Low"
+                )
+        
+        except Exception as e:
+            self.add_issue(
+                "OBS-007",
+                "middleware/request_id.py",
+                "Request ID middleware causes unexpected exception",
+                "Send request and check for X-Request-ID header",
+                f"Exception: {str(e)}",
+                "Request ID middleware works without exceptions",
+                "Medium"
+            )
+    
+    def test_configuration_and_environment(self):
+        """Test configuration and environment setup"""
+        print("🔍 Testing Configuration and Environment...")
+        
+        try:
+            # Test if required environment variables are set
+            required_vars = ["DATABASE_URL"]
+            missing_vars = []
+            
+            for var in required_vars:
+                if not os.getenv(var):
+                    missing_vars.append(var)
+            
+            if missing_vars:
+                self.add_issue(
+                    "CONFIG-001",
+                    "config/settings.py environment variables",
+                    "Required environment variables are missing",
+                    f"Check for environment variables: {required_vars}",
+                    f"Missing variables: {missing_vars}",
+                    "All required environment variables should be set",
+                    "High"
+                )
+            
+            # Test settings loading
+            try:
+                from config.settings import settings
+                if not hasattr(settings, 'database_url'):
+                    self.add_issue(
+                        "CONFIG-002",
+                        "config/settings.py settings class",
+                        "Settings object missing database_url attribute",
+                        "Load settings and check for database_url",
+                        "database_url attribute not found",
+                        "Settings should have database_url attribute",
+                        "High"
+                    )
+            except Exception as e:
+                self.add_issue(
+                    "CONFIG-003",
+                    "config/settings.py",
+                    "Settings loading throws exception",
+                    "Import and instantiate settings",
+                    f"Exception: {str(e)}",
+                    "Settings load without exceptions",
+                    "Critical"
+                )
+        
+        except Exception as e:
+            self.add_issue(
+                "CONFIG-004",
+                "Configuration system",
+                "Configuration testing throws unexpected exception",
+                "Test configuration and environment setup",
+                f"Exception: {str(e)}",
+                "Configuration testing completes without exceptions",
+                "Medium"
+            )
+    
+    def generate_report(self):
+        """Generate comprehensive QA report"""
+        
+        # Execute all test suites
+        print("🚀 Starting Comprehensive QA Analysis...")
+        
+        self.test_basic_connectivity()
+        token = self.test_authentication_system()
+        self.test_database_integration()
+        self.test_scholarship_endpoints(token)
+        self.test_eligibility_system(token)
+        self.test_edge_cases_and_input_validation(token)
+        self.test_rate_limiting(token)
+        self.test_observability_features()
+        self.test_configuration_and_environment()
+        
+        # Generate summary statistics
+        total_issues = len(self.issues)
+        severity_counts = {}
+        category_counts = {}
+        
+        for issue in self.issues:
+            severity = issue['severity']
+            category = issue['category']
+            
+            severity_counts[severity] = severity_counts.get(severity, 0) + 1
+            category_counts[category] = category_counts.get(category, 0) + 1
+        
+        # Generate report
+        report = {
+            "qa_analysis_metadata": {
+                "analysis_date": datetime.now().isoformat(),
+                "total_issues_found": total_issues,
+                "severity_breakdown": severity_counts,
+                "category_breakdown": category_counts,
+                "qa_engineer": "Senior QA Engineer (Automated Analysis)",
+                "analysis_scope": "Full codebase analysis with comprehensive testing"
+            },
+            "executive_summary": {
+                "critical_issues": len([i for i in self.issues if i['severity'] == 'Critical']),
+                "high_priority_issues": len([i for i in self.issues if i['severity'] == 'High']),
+                "medium_priority_issues": len([i for i in self.issues if i['severity'] == 'Medium']),
+                "low_priority_issues": len([i for i in self.issues if i['severity'] == 'Low']),
+                "overall_system_health": "Needs Review" if total_issues > 0 else "Healthy"
+            },
+            "detailed_issues": self.issues,
+            "recommendations": [
+                "Address all Critical and High severity issues immediately",
+                "Implement comprehensive input validation for all endpoints",
+                "Add missing error handling for edge cases",
+                "Ensure proper security measures against injection attacks",
+                "Verify all environment variables are properly configured",
+                "Consider implementing more robust rate limiting",
+                "Add comprehensive logging for debugging purposes"
             ]
-        },
-        
-        "positive_findings": [
-            "Comprehensive API design with OpenAPI documentation",
-            "Proper input validation using Pydantic models",
-            "Security controls handle malicious input safely",
-            "Consistent and deterministic eligibility calculations",
-            "Well-structured service layer architecture",
-            "Analytics tracking working correctly",
-            "Case-insensitive search functionality",
-            "Proper async/await implementation",
-            "Clean separation of concerns between layers"
-        ],
-        
-        "risk_assessment": {
-            "data_integrity": "MEDIUM - Validation working, but missing persistence",
-            "security": "HIGH - No authentication, basic input validation only",
-            "performance": "LOW - Good async design, but no load testing",
-            "maintainability": "MEDIUM - Good structure, but missing tests and type fixes",
-            "scalability": "HIGH - Single instance design limits scalability",
-            "operational_readiness": "HIGH - Missing monitoring, backups, and environment management"
         }
-    }
-    
-    return report
+        
+        return report
 
-def print_executive_summary(report):
-    """Print executive summary for immediate review"""
+def main():
+    """Main QA analysis execution"""
+    qa_generator = QAReportGenerator()
     
-    print("=" * 80)
-    print("🎯 SENIOR QA ENGINEER - COMPREHENSIVE ANALYSIS REPORT")
-    print("📋 Scholarship Discovery & Search API")
-    print("=" * 80)
-    
-    summary = report["executive_summary"]
-    print(f"\n📊 EXECUTIVE SUMMARY:")
-    print(f"   Overall Assessment: {summary['overall_assessment']}")
-    print(f"   Deployment Recommendation: {summary['deployment_recommendation']}")
-    print(f"   Total Issues: {summary['total_issues_identified']}")
-    print(f"   ├── Critical: {summary['critical_issues']}")
-    print(f"   ├── High: {summary['high_severity_issues']}")
-    print(f"   ├── Medium: {summary['medium_severity_issues']}")
-    print(f"   └── Low: {summary['low_severity_issues']}")
-    
-    print(f"\n🚨 HIGH PRIORITY ISSUES:")
-    high_issues = [issue for issue in report["issues"] if issue["severity"] == "High"]
-    for issue in high_issues:
-        print(f"   • {issue['issue_id']}: {issue['description']}")
-        print(f"     Impact: {issue['impact']}")
-    
-    print(f"\n⚠️  MEDIUM PRIORITY ISSUES:")
-    medium_issues = [issue for issue in report["issues"] if issue["severity"] == "Medium"]
-    for issue in medium_issues[:5]:  # Show first 5
-        print(f"   • {issue['issue_id']}: {issue['description']}")
-    if len(medium_issues) > 5:
-        print(f"   ... and {len(medium_issues) - 5} more medium issues")
-    
-    print(f"\n✅ POSITIVE FINDINGS:")
-    for finding in report["positive_findings"][:5]:
-        print(f"   • {finding}")
-    if len(report["positive_findings"]) > 5:
-        print(f"   ... and {len(report['positive_findings']) - 5} more positive findings")
-    
-    print(f"\n🎯 IMMEDIATE ACTIONS REQUIRED:")
-    for action in report["recommendations"]["immediate_actions"]:
-        print(f"   1. {action}")
-    
-    print(f"\n📈 RISK ASSESSMENT:")
-    for category, risk in report["risk_assessment"].items():
-        risk_level = risk.split(" - ")[0]
-        emoji = "🔴" if risk_level == "HIGH" else "🟡" if risk_level == "MEDIUM" else "🟢"
-        print(f"   {emoji} {category.replace('_', ' ').title()}: {risk}")
+    try:
+        report = qa_generator.generate_report()
+        
+        # Save report to file
+        with open("comprehensive_qa_report.json", "w") as f:
+            json.dump(report, f, indent=2)
+        
+        # Print summary
+        print("\n" + "="*80)
+        print("🎯 COMPREHENSIVE QA ANALYSIS REPORT")
+        print("="*80)
+        print(f"📊 Total Issues Found: {report['qa_analysis_metadata']['total_issues_found']}")
+        print(f"🔴 Critical: {report['executive_summary']['critical_issues']}")
+        print(f"🟠 High: {report['executive_summary']['high_priority_issues']}")
+        print(f"🟡 Medium: {report['executive_summary']['medium_priority_issues']}")
+        print(f"🟢 Low: {report['executive_summary']['low_priority_issues']}")
+        print(f"💡 Overall System Health: {report['executive_summary']['overall_system_health']}")
+        print("\n📋 Detailed report saved to: comprehensive_qa_report.json")
+        print("="*80)
+        
+        # Print first few issues as examples
+        if report['detailed_issues']:
+            print("\n🔍 Sample Issues Found:")
+            for issue in report['detailed_issues'][:3]:  # Show first 3 issues
+                print(f"\n  ID: {issue['issue_id']}")
+                print(f"  Severity: {issue['severity']}")
+                print(f"  Location: {issue['location']}")
+                print(f"  Description: {issue['description']}")
+        
+        return report
+        
+    except Exception as e:
+        print(f"❌ QA Analysis failed with exception: {str(e)}")
+        print(f"Traceback: {traceback.format_exc()}")
+        return None
 
 if __name__ == "__main__":
-    # Generate comprehensive report
-    report = generate_comprehensive_qa_report()
-    
-    # Print executive summary to console
-    print_executive_summary(report)
-    
-    # Save full detailed report
-    with open("comprehensive_qa_report.json", "w") as f:
-        json.dump(report, f, indent=2)
-    
-    print(f"\n📋 Full detailed report saved to: comprehensive_qa_report.json")
-    print(f"📊 Analysis completed at: {datetime.utcnow().isoformat()}")
-    print("=" * 80)
+    report = main()
+    sys.exit(0 if report else 1)
