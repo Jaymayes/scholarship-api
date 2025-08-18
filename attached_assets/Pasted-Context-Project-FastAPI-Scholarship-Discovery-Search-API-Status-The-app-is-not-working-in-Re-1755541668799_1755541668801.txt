@@ -1,0 +1,73 @@
+Context
+Project: FastAPI “Scholarship Discovery & Search API”
+Status: The app is not working in Replit. Previously the preview showed a helpful JSON root response, but now routes are failing/unreachable. Diagnose and fix the Replit runtime issue without weakening any security controls or changing the unified error schema:
+{ code, message, status, timestamp, trace_id, details? }
+
+Constraints
+
+Keep middleware order and all security features (auth, CORS, rate limiting, size/URL guards, HSTS in prod).
+Do not log secrets; only log presence/length when needed.
+Development should be flexible; production strict.
+Your Goals
+
+Make the app reliably start and respond in Replit’s preview.
+Use the dynamic Replit port ($PORT) and correct import path.
+Ensure all endpoints work as expected in development mode.
+Step-by-step Diagnosis
+
+Show current run configuration
+Print contents of .replit and replit.nix (if present).
+Show the exact Run command Replit uses.
+Confirm the module path to the FastAPI app callable (e.g., app.main:app).
+2. Port/host/proxy setup
+
+Confirm $PORT is set: echo $PORT
+Ensure server binds: host=0.0.0.0, port=os.getenv("PORT", "8000")
+If using uvicorn/gunicorn, run with: --host 0.0.0.0 --port $PORT --proxy-headers --forwarded-allow-ips="*"
+Update .replit to use uvicorn with the correct app path. Avoid hardcoding port 5000.
+3. Dependency sanity
+
+pip freeze | sort
+Verify FastAPI/Starlette/Pydantic versions match code style; ensure passlib[bcrypt] and bcrypt==4.0.1 installed.
+If requirements.txt exists, run: pip install -r requirements.txt
+Fix any ImportError/VersionError.
+4. Environment and settings
+
+Print a sanitized config snapshot in dev (do NOT print secrets): ENVIRONMENT, effective host/port, DB engine type, rate-limit backend type, CORS mode, docs enabled?
+Ensure ENVIRONMENT=development in Replit secrets unless explicitly testing production.
+5. Start with debug logs
+
+Start uvicorn with --log-level debug and capture the first 100 lines of logs.
+Post any traceback if startup fails.
+6. Smoke test endpoints
+
+GET / (root) → should return the informative JSON with endpoints.
+GET /healthz, /health/database, /health/services → 200 (or 503 if a dep is down).
+OPTIONS preflight to a typical API route (e.g., /api/v1/search) with an Origin header → should succeed (not rate-limited).
+GET /api/v1/search?q=engineering without token → 401; with valid token → 200.
+7. Common Replit breakpoints to fix
+
+If port is hardcoded to 5000: change to os.getenv("PORT", 8000) everywhere (run cmd or app factory).
+If module path wrong: fix the app import path in the run command (e.g., src.api.main:app vs app.main:app).
+If middlewares block OPTIONS: ensure CORS runs before rate limiting and size guards; exclude OPTIONS from limiter.
+If DB not configured in dev: allow SQLite fallback (dev only) and log a warning; run SELECT 1 in health check.
+If limiter backend missing in dev: use in-memory fallback with a warning (never in prod).
+If docs missing in dev: ensure docs are enabled when ENVIRONMENT=development.
+8. Add a dev-only debug endpoint (if missing)
+
+GET /_debug/config (dev-only) returning sanitized config (no secrets).
+Acceptance Criteria
+
+App starts with no unhandled exceptions; logs show host 0.0.0.0 and port=$PORT.
+Replit preview loads the root endpoint with the informative JSON (status, message, version, endpoints).
+/healthz returns 200; protected routes return 401 without token and 200 with a valid token.
+OPTIONS preflight works and is not rate-limited.
+413, 414, and 429 behaviors still correct; 429 includes X-RateLimit-Limit, X-RateLimit-Remaining, Retry-After.
+All error responses use the unified error schema and include trace_id.
+Deliverables
+
+Updated .replit run command (and start script if used).
+Minimal code changes to app startup (port/host binding, import path), and dev fallbacks.
+A brief summary of the root cause and the exact fixes applied.
+First 50–100 lines of startup logs and sample curl/httpie responses to verify.
+Begin by printing the .replit file and the current run command, then start the app with debug logs and share the first error/traceback you see if it fails.
