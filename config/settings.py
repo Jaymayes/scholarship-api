@@ -39,9 +39,9 @@ class Settings(BaseSettings):
         alias="API_DESCRIPTION"
     )
     
-    # Server Configuration
+    # Server Configuration - Replit compatible
     host: str = Field("0.0.0.0", alias="HOST")
-    port: int = Field(5000, alias="PORT")
+    port: int = Field(default_factory=lambda: int(os.getenv("PORT", "8000")), alias="PORT")  # Replit dynamic port
     reload: bool = Field(True, alias="RELOAD")
     
     # Security Configuration - JWT
@@ -104,13 +104,24 @@ class Settings(BaseSettings):
             
             return origins
         else:
-            # Development/staging: Allow localhost + custom origins
+            # Development/staging: Allow localhost + Replit origins + custom origins
             dev_origins = [
                 "http://localhost:3000", 
                 "http://127.0.0.1:3000", 
                 "http://localhost:5000",
-                "http://localhost:8000"
+                "http://localhost:8000",
+                # Replit preview origins - development only
+                "https://*.replit.dev",
+                "https://*.repl.co"
             ]
+            
+            # Add dynamic Replit origin detection
+            replit_id = os.getenv("REPL_ID")
+            replit_owner = os.getenv("REPL_OWNER") 
+            if replit_id and replit_owner:
+                replit_origin = f"https://{replit_id}.{replit_owner}.repl.co"
+                dev_origins.append(replit_origin)
+                
             if self.cors_allowed_origins:
                 custom_origins = [origin.strip() for origin in self.cors_allowed_origins.split(",") if origin.strip()]
                 return dev_origins + custom_origins
@@ -369,6 +380,33 @@ class Settings(BaseSettings):
             return []
         return [key.strip() for key in self.jwt_previous_secret_keys.split(",") if key.strip()]
     
+    @property  
+    def get_rate_limiter_info(self) -> str:
+        """Get rate limiter diagnostic info for startup logging"""
+        try:
+            # Test Redis connectivity
+            import redis
+            r = redis.from_url(self.rate_limit_backend_url, socket_timeout=1)
+            r.ping()
+            return f"Redis backend ({self.rate_limit_backend_url})"
+        except:
+            return "in-memory fallback (Redis unavailable)"
+    
+    @property
+    def get_database_info(self) -> str:
+        """Get database diagnostic info for startup logging"""
+        if self.database_url:
+            if "postgresql" in self.database_url:
+                return "PostgreSQL"
+            elif "sqlite" in self.database_url:
+                return "SQLite" 
+            else:
+                return "Database configured"
+        elif self.is_development:
+            return "SQLite fallback (dev mode)"
+        else:
+            return "Not configured"
+
     def log_jwt_config(self):
         """Log JWT configuration status (without exposing secrets)"""
         logger = logging.getLogger(__name__)

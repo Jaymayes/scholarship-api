@@ -59,15 +59,16 @@ def get_client_identifier(request: Request) -> str:
 
 async def check_rate_limit(request: Request, limit_per_minute: int = 10):
     """
-    Dependency to check rate limiting
+    Dependency to check rate limiting with Replit-specific handling
     """
+    # Skip rate limiting for health checks and OPTIONS requests (Replit requirement)
+    if request.method == "OPTIONS" or request.url.path in ["/health", "/healthz", "/readiness", "/metrics"]:
+        return True
+        
     identifier = get_client_identifier(request)
     allowed, remaining = rate_limiter.is_allowed(identifier, limit_per_minute, 60)
     
     if not allowed:
-        # Create unified error response for rate limiting
-        from middleware.error_handlers import create_error_response
-        
         raise HTTPException(
             status_code=429,
             detail={

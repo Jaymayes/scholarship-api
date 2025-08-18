@@ -6,6 +6,7 @@ from fastapi.responses import HTMLResponse
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware as RateLimitMiddleware
 import uvicorn
+import os
 
 from routers.scholarships import router as scholarships_router
 from routers.search import router as search_router
@@ -16,6 +17,7 @@ from routers.database import router as database_router
 from routers.health import router as health_router
 from routers.ai import router as ai_router
 from routers.db_status import router as db_status_router
+from routers.replit_health import router as replit_health_router
 from middleware.error_handling import (
     api_error_handler, http_exception_handler, validation_exception_handler,
     rate_limit_exception_handler, general_exception_handler, trace_id_middleware,
@@ -63,11 +65,18 @@ from middleware.url_length import URLLengthMiddleware
 # 1. Security headers (outermost - applies to all responses)
 app.add_middleware(SecurityHeadersMiddleware)
 
-# 2. CORS (must be early to handle preflight requests)
+# 2. CORS (must be early to handle preflight requests) - Replit compatible
 cors_config = settings.get_cors_config
+cors_origins = cors_config["allow_origins"]
+
+# Log CORS configuration for Replit debugging
+logger.info(f"CORS origins configured: {len(cors_origins) if cors_origins != ['*'] else 'wildcard'} origins")
+if settings.is_development and "*" in cors_origins:
+    logger.info("Development mode: CORS wildcard enabled for Replit compatibility")
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=cors_config["allow_origins"],
+    allow_origins=cors_origins,
     allow_credentials=cors_config["allow_credentials"], 
     allow_methods=cors_config["allow_methods"],
     allow_headers=cors_config["allow_headers"],
@@ -141,6 +150,7 @@ app.include_router(eligibility_router, prefix="/api/v1", tags=["eligibility"])
 app.include_router(analytics_router, prefix="/api/v1", tags=["analytics"])
 app.include_router(database_router, tags=["database"])
 app.include_router(health_router)
+app.include_router(replit_health_router, tags=["health"])
 app.include_router(ai_router, tags=["ai"])
 app.include_router(db_status_router)
 
@@ -205,13 +215,25 @@ async def readiness_check():
     }
 
 if __name__ == "__main__":
+    # Replit-specific port handling - must use PORT environment variable
+    port = int(os.getenv("PORT", "8000"))  # Replit requirement: dynamic PORT
+    host = "0.0.0.0"  # Required for Replit accessibility
+    
+    # Startup logging for Replit diagnostics
     logger.info("Starting Scholarship Discovery API server")
+    logger.info(f"Environment: {settings.environment.value}")
+    logger.info(f"Host/Port: {host}:{port}")
+    logger.info(f"CORS mode: {'dev (wildcard)' if settings.is_development else 'prod (strict whitelist)'}")
+    logger.info(f"Rate limiter: {settings.get_rate_limiter_info}")
+    logger.info(f"Database: {settings.get_database_info}")
+    
     uvicorn.run(
         "main:app",
-        host="0.0.0.0",  # Explicit host binding for deployment
-        port=5000,       # Explicit port for deployment
+        host=host,
+        port=port,  # Use dynamic port from environment
         reload=settings.reload if settings.is_development else False,
-        log_level=settings.log_level.lower(),
+        log_level=settings.log_level.value.lower(),
         access_log=True,
-        workers=1 if settings.environment in [Environment.LOCAL, Environment.DEVELOPMENT] else 1  # Single worker for deployment simplicity
+        forwarded_allow_ips="*",  # Replit proxy requirement
+        workers=1  # Single worker for Replit stability
     )

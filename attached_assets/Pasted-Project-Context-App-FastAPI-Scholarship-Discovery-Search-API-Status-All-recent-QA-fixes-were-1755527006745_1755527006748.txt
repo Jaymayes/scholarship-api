@@ -1,0 +1,116 @@
+Project Context
+App: FastAPI “Scholarship Discovery & Search API”
+Status: All recent QA fixes were implemented (JWT secret hardening, DB health check, working rate limiting, unified error responses, CORS, request-size and URL-length guards, tests). However, the system is still not working correctly in the Replit environment.
+
+Observed Symptoms
+
+App starts but behavior is inconsistent in Replit:
+Health/status only shows a minimal JSON like {"status":"active"} yet other endpoints fail or time out.
+Possible 500s on DB health or during normal requests.
+Rate limiting may not trigger or may block unexpectedly.
+CORS/OPTIONS behavior in the Replit webview appears inconsistent.
+Tests may not run or may hang on external deps (e.g., Redis).
+Replit preview sometimes shows a blank page or never connects.
+Environment Notes (Replit-specific)
+
+Replit sets PORT dynamically. The app must bind to host 0.0.0.0 and port os.getenv("PORT", "8000").
+Redis or external services may not be available. The rate limiter must gracefully fall back to in-memory in dev/Replit.
+Preview requests originate from *.replit.dev domains; CORS must handle those in development without weakening prod rules.
+Goal
+Diagnose and fix the Replit runtime issues without weakening production security. Ensure the app reliably boots, serves endpoints, rate limits correctly, and exposes consistent unified error responses in the Replit environment.
+
+Tasks
+
+Server bootstrap and Replit run config
+Ensure uvicorn binds host=0.0.0.0 and port=int(os.getenv("PORT", 8000)).
+Check .replit or Replit “Run” command uses something like:
+uvicorn app.main:app --host 0.0.0.0 --port $PORT --forwarded-allow-ips="*"
+Adapt module path to this repo structure.
+Verify startup logs show the correct port and no unhandled exceptions.
+2. Settings and environment defaults (dev-safe, prod-strict)
+
+Keep production enforcement for JWT_SECRET_KEY (fail fast if missing/weak).
+In dev/Replit only:
+Generate an ephemeral JWT secret if none provided, log “ephemeral key generated” without printing the key.
+If RATE_LIMIT_BACKEND_URL is missing or unreachable, fall back to in-memory backend with a clear dev-mode log.
+If DATABASE_URL is absent, fall back to a local SQLite file in /tmp or project dir strictly in dev. Do not change prod rules.
+Never log secrets; only log presence/length.
+3. Database health check robustness
+
+Ensure health endpoint uses a short-lived SessionLocal() instance (not the factory) and executes a trivial query:
+session.execute(text("SELECT 1")) or session.scalar(select(1))
+Remove any dependency on user context in health. Return 200 on success, unified error on failure.
+Add timeouts and catch OperationalError to return 503 with unified error response, including trace_id.
+4. Rate limiter reliability in Replit
+
+Initialize the limiter using RATE_LIMIT_BACKEND_URL if set; otherwise in-memory fallback in dev.
+Ensure identifier function works in Replit:
+Prefer request.client.host; if behind a proxy, respect X-Forwarded-For only if allowed (use --forwarded-allow-ips="*" or trusted proxies list).
+Do not limit OPTIONS preflight requests.
+On limit exceed, return 429 using unified error schema and set headers: X-RateLimit-Limit, X-RateLimit-Remaining, Retry-After.
+5. CORS behavior in Replit dev
+
+In development, allow origins from:
+“*” OR
+Dynamic allowance that includes the Replit preview origin (e.g., https://<project>.<user>.repl.co or *.replit.dev) — dev only.
+In production, continue to use strict whitelist from CORS_ALLOWED_ORIGINS with no wildcard.
+Ensure OPTIONS preflight is handled before size/limit middleware to prevent false rejections.
+6. Middleware order and coverage
+
+Confirm order:
+Security/HTTPS/host headers
+CORS
+URL length guard
+Request size guard
+Rate limiting
+Routing
+Exclude WebSockets if needed; do not accidentally bypass core protections.
+Ensure health endpoints are either included or excluded consistently per current policy (document choice).
+7. Unified error responses everywhere
+
+Verify that 401, 403, 404, 413, 414, 422, 429, 500 all return:
+{ trace_id, code, message, status, timestamp }
+Ensure trace_id/request-id middleware is present and attached to responses and logs.
+Normalize HTTPException and RequestValidationError to the schema.
+8. Replit-focused diagnostics
+
+Add a dev-only “/_debug/config” endpoint guarded by ENVIRONMENT != "production", returning a sanitized snapshot:
+environment, selected origins count, rate-limiter backend type, database engine name, debug flags. No secrets.
+On startup, log:
+effective host/port
+environment
+rate limiter backend type
+DB engine type
+CORS mode (dev/prod) and whether wildcard is active
+Do not log secret values.
+9. Tests and scripts
+
+Ensure pytest runs in Replit:
+Parametrize env for dev with in-memory rate limiter and SQLite to avoid external deps.
+Add tests for health 200, rate limit 429 headers, 413/414, CORS preflight dev behavior, and unified error schema presence.
+Provide a simple shell script or Make target to run app and tests in Replit.
+10. Documentation
+
+Update README and .env.example:
+Replit quick start: required run command, ENVIRONMENT=development, PORT usage.
+Note on in-memory rate limiting fallback and SQLite fallback in dev only.
+Production rules remain strict with no wildcards and required JWT secret.
+Acceptance Criteria
+
+App starts on Replit and is reachable via the preview URL.
+/healthz and /status return 200 with expected payloads.
+Rate limiting in dev works with in-memory backend; exceeding threshold returns 429 with headers and unified error schema.
+CORS works in Replit preview in development; preflight requests succeed.
+All error responses adhere to the unified error schema and include trace_id.
+Tests run and pass in Replit; no secrets are logged.
+Troubleshooting Checklist (have the agent confirm each)
+
+Using os.getenv("PORT", "8000") and host 0.0.0.0
+No Redis required in dev; in-memory limiter engaged
+SQLite fallback active only in development when DATABASE_URL is unset
+OPTIONS not rate-limited
+CORS allows Replit preview origin only in dev
+Health endpoint uses SessionLocal() correctly and executes SELECT 1
+Unified error handlers wired and returning trace_id
+Please implement the fixes in-place, adapting to the project’s existing structure and Pydantic version, and add brief inline comments explaining Replit-specific choices.
+
