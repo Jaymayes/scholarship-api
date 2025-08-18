@@ -69,10 +69,26 @@ class Settings(BaseSettings):
     
     # Rate Limiting Configuration
     rate_limit_enabled: bool = Field(default=True, env="RATE_LIMIT_ENABLED")
-    rate_limit_default: str = Field(default="1000/hour", env="RATE_LIMIT_DEFAULT")
-    rate_limit_public: str = Field(default="60/minute", env="RATE_LIMIT_PUBLIC")
-    rate_limit_authenticated: str = Field(default="300/minute", env="RATE_LIMIT_AUTHENTICATED")
-    rate_limit_admin: str = Field(default="1000/minute", env="RATE_LIMIT_ADMIN")
+    rate_limit_redis_url: str = Field(default="redis://localhost:6379", env="RATE_LIMIT_REDIS_URL")
+    rate_limit_search: str = Field(default="30/minute", env="RATE_LIMIT_SEARCH")
+    rate_limit_eligibility: str = Field(default="15/minute", env="RATE_LIMIT_ELIGIBILITY") 
+    rate_limit_scholarships: str = Field(default="60/minute", env="RATE_LIMIT_SCHOLARSHIPS")
+    rate_limit_analytics: str = Field(default="10/minute", env="RATE_LIMIT_ANALYTICS")
+    
+    @field_validator('rate_limit_search', 'rate_limit_eligibility', 'rate_limit_scholarships', 'rate_limit_analytics')
+    @classmethod
+    def adjust_rate_limits_by_environment(cls, v, info):
+        """Adjust rate limits based on environment"""
+        environment = info.context.get('environment', Environment.LOCAL) if info.context else Environment.LOCAL
+        
+        if environment in [Environment.LOCAL, Environment.DEVELOPMENT]:
+            # Double the limits for dev environments
+            limit_parts = v.split('/')
+            if len(limit_parts) == 2:
+                count = int(limit_parts[0])
+                return f"{count * 2}/{limit_parts[1]}"
+        
+        return v
     
     # Endpoint-specific rate limits
     rate_limit_public_search: str = Field(default="60/minute", env="RATE_LIMIT_PUBLIC_SEARCH")

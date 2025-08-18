@@ -1,32 +1,18 @@
-from fastapi import APIRouter, Depends, Query, Request
+from fastapi import APIRouter, Depends, Query, Request, HTTPException
 from typing import List, Optional
 import time
 
 from models.user import UserProfile, EligibilityCheck, EligibilityResult
-from models.scholarship import FieldOfStudy
+from schemas.eligibility import EligibilityCheckRequest, GradeLevelEnum, CitizenshipEnum, FieldOfStudyEnum, StateEnum
 from services.eligibility_service import eligibility_service
 from services.scholarship_service import scholarship_service
 from middleware.auth import get_current_user
-from middleware.rate_limiting import limiter
+from middleware.rate_limiting import eligibility_rate_limit
 # from routers.interaction_wrapper import log_interaction  # Will implement if needed
 from utils.logger import get_logger
 
 logger = get_logger(__name__)
 router = APIRouter()
-
-# Pydantic models for eligibility requests
-from pydantic import BaseModel
-
-class EligibilityCheckRequest(BaseModel):
-    """Eligibility check request payload for POST endpoint"""
-    gpa: Optional[float] = None
-    grade_level: Optional[str] = None
-    field_of_study: Optional[str] = None
-    citizenship: Optional[str] = None
-    state_of_residence: Optional[str] = None
-    age: Optional[int] = None
-    financial_need: Optional[bool] = None
-    scholarship_ids: Optional[List[str]] = None
 
 async def execute_eligibility_check(
     gpa: Optional[float] = None,
@@ -37,12 +23,21 @@ async def execute_eligibility_check(
     age: Optional[int] = None,
     financial_need: Optional[bool] = None,
     scholarship_ids: Optional[List[str]] = None,
-    user_id: Optional[str] = None
+    user_id: Optional[str] = None,
+    require_params: bool = False
 ) -> dict:
     """Execute eligibility check logic shared between GET and POST endpoints"""
     start_time = time.time()
     
     try:
+        # Validate required parameters if specified
+        if require_params:
+            if not any([gpa, grade_level, field_of_study, citizenship, age]):
+                raise HTTPException(
+                    status_code=422,
+                    detail="At least one eligibility parameter (gpa, grade_level, field_of_study, citizenship, or age) is required"
+                )
+        
         # Create user profile from provided data
         user_profile = UserProfile(
             gpa=gpa,
@@ -90,60 +85,62 @@ async def execute_eligibility_check(
         raise
 
 @router.post("/eligibility/check")
-@limiter.limit("30/minute")
+@eligibility_rate_limit()
 async def check_eligibility_post(
-    request_data: EligibilityCheckRequest,
     request: Request,
-    current_user: Optional[dict] = Depends(get_current_user)
+    request_data: EligibilityCheckRequest
 ):
     """
-    Check scholarship eligibility using POST with request body
+    Check scholarship eligibility using POST with request body.
     
-    Returns detailed eligibility results with scoring and reasons.
+    Enhanced validation with strict input constraints.
     """
-    user_id = current_user.get("user_id") if current_user else None
-    
     return await execute_eligibility_check(
         gpa=request_data.gpa,
-        grade_level=request_data.grade_level,
-        field_of_study=request_data.field_of_study,
-        citizenship=request_data.citizenship,
-        state_of_residence=request_data.state_of_residence,
+        grade_level=request_data.grade_level.value if request_data.grade_level else None,
+        field_of_study=request_data.field_of_study.value if request_data.field_of_study else None,
+        citizenship=request_data.citizenship.value if request_data.citizenship else None,
+        state_of_residence=request_data.state_of_residence.value if request_data.state_of_residence else None,
         age=request_data.age,
         financial_need=request_data.financial_need,
         scholarship_ids=request_data.scholarship_ids,
-        user_id=user_id
+        user_id=None,
+        require_params=True
     )
 
 @router.get("/eligibility/check")
-@limiter.limit("30/minute")
+@eligibility_rate_limit()
 async def check_eligibility_get(
     request: Request,
-    gpa: Optional[float] = Query(None, ge=0.0, le=4.0, description="Student GPA"),
-    grade_level: Optional[str] = Query("undergraduate", description="Grade level (undergraduate, graduate, etc.)"),
-    field_of_study: Optional[str] = Query("other", description="Field of study"),
-    citizenship: Optional[str] = Query("US", description="Citizenship status"),
-    state_of_residence: Optional[str] = Query(None, description="State of residence"),
-    age: Optional[int] = Query(20, ge=16, le=100, description="Student age"),
-    financial_need: Optional[bool] = Query(False, description="Has financial need"),
-    scholarship_ids: Optional[List[str]] = Query(default=None, description="Specific scholarship IDs to check"),
-    current_user: Optional[dict] = Depends(get_current_user)
+    gpa: Optional[float] = Query(None, ge=0.0, le=4.0, description="GPA on 4.0 scale"),
+    grade_level: Optional[GradeLevelEnum] = Query(None, description="Grade level"),
+    field_of_study: Optional[FieldOfStudyEnum] = Query(None, description="Field of study"),
+    citizenship: Optional[CitizenshipEnum] = Query(None, description="Citizenship status"),
+    state_of_residence: Optional[StateEnum] = Query(None, description="State of residence"),
+    age: Optional[int] = Query(None, ge=13, le=120, description="Age"),
+    financial_need: Optional[bool] = Query(None, description="Financial need indicator"),
+    scholarship_ids: Optional[str] = Query(None, description="Comma-separated scholarship IDs"),
+    user_id: Optional[str] = Query(None, description="User ID for analytics")
 ):
     """
-    Check scholarship eligibility using GET with query parameters
+    Check scholarship eligibility using GET with query parameters.
     
-    Returns the same detailed eligibility results as POST endpoint.
+    Enhanced validation requires at least one eligibility parameter.
     """
-    user_id = current_user.get("user_id") if current_user else None
+    # Convert string scholarship_ids to list if provided
+    scholarship_ids_list = None
+    if scholarship_ids:
+        scholarship_ids_list = [s.strip() for s in scholarship_ids.split(",") if s.strip()]
     
     return await execute_eligibility_check(
         gpa=gpa,
-        grade_level=grade_level,
-        field_of_study=field_of_study,
-        citizenship=citizenship,
-        state_of_residence=state_of_residence,
+        grade_level=grade_level.value if grade_level else None,
+        field_of_study=field_of_study.value if field_of_study else None,
+        citizenship=citizenship.value if citizenship else None,
+        state_of_residence=state_of_residence.value if state_of_residence else None,
         age=age,
         financial_need=financial_need,
-        scholarship_ids=scholarship_ids,
-        user_id=user_id
+        scholarship_ids=scholarship_ids_list,
+        user_id=user_id,
+        require_params=True
     )

@@ -1,0 +1,153 @@
+Fix Auth Bypass, Restore DB Status Route, Tighten Eligibility Validation, and Enforce Rate Limiting
+
+Context
+
+Stack: FastAPI + Pydantic v2 + async SQLAlchemy + JWT auth + rate limiting + observability.
+Keep all existing response envelopes and successful behaviors unchanged.
+QA found 5 issues:
+Critical: Unauthorized access to /api/v1/scholarships (supposed to be protected).
+Critical: Unauthorized access to /api/v1/analytics/summary (supposed to be admin-only).
+High: /db/status returns 404.
+Medium: Eligibility endpoint accepts invalid payloads.
+Medium/Low: Rate limiting not enforcing limits (no 429 after 50 rapid requests).
+Objectives
+
+Enforce authentication and RBAC on protected routes:
+All /api/v1/scholarships endpoints require a valid JWT (role: user or above) for reads; write ops require elevated roles.
+/api/v1/analytics/summary requires admin role (or analytics scope).
+Return 401 for no/invalid token; 403 for insufficient role/scope.
+Restore/implement database status route:
+GET /db/status and GET /api/v1/db/status: return 200 with DB connectivity, counts (scholarships, interactions), and migration status if available. 503 if DB unreachable.
+Tighten eligibility validation:
+POST/GET /eligibility/check must reject invalid inputs with 422. Add proper Pydantic field constraints and enums; no silent coercion.
+Enforce rate limits:
+Ensure rate limiting returns 429 with Retry-After after configured thresholds. Use per-IP or per-token keys consistently.
+Configurable via env; sensible prod vs dev defaults; Redis-backed with in-memory fallback that still enforces limits.
+Keep observability and error schema intact:
+Unified error envelope on 401/403/422/429; logs with trace_id; metrics unaffected.
+Required Actions
+
+A) Authentication and RBAC
+
+security/auth.py (or equivalent):
+Ensure verify_jwt() validates signature, issuer, audience, expiry.
+Implement dependency require_auth(min_role="user", scopes: list[str] | None = None).
+Implement require_admin() or require_role("admin").
+routers/scholarships.py:
+Apply dependencies=[Depends(require_auth(min_role="user", scopes=["scholarships:read"]))] at router level for GET endpoints.
+For POST/PUT/PATCH/DELETE, require higher role or scopes=["scholarships:write"].
+routers/analytics.py:
+Apply dependencies=[Depends(require_admin)] for /analytics/summary (and any sensitive analytics endpoints).
+main.py/app.py:
+If include_router is used without dependencies, refactor so protected routers include the appropriate dependencies.
+Ensure OpenAPI reflects security on these routes (securitySchemes and security per operation).
+B) Database Status Route
+
+routers/db.py (new if missing):
+GET /db/status and GET /api/v1/db/status
+Implementation:
+Try an async DB ping (e.g., SELECT 1).
+Query counts: scholarships, interactions (if table exists).
+Return JSON: { status: "ok" | "degraded" | "down", database: { connected: bool, url:redacted, scholarships:int, interactions:int }, environment, took_ms }
+On DB failure: return 503 with unified error envelope; /healthz still 200; /readyz 503 when DB down.
+main.py/app.py: include_router(db_router).
+C) Eligibility Validation
+
+schemas/eligibility.py:
+Define strict models with constraints, e.g.:
+gpa: confloat(ge=0, le=4)
+age: conint(ge=13, le=120) if applicable
+major: Literal[...] or Enum of supported majors/fields
+citizenship: Literal["us", "intl", ...] if used
+income, credits, hours, etc.: non-negative constraints
+Provide clear field-level descriptions; examples.
+routers/eligibility.py:
+Ensure POST/GET use these schemas.
+Return 422 with detailed field errors on invalid input (don’t catch and rewrap as 200).
+D) Rate Limiting Enforcement
+
+Limiter setup (e.g., fastapi-limiter or slowapi):
+Initialize Redis connection at startup using env RATE_LIMIT_REDIS_URL; if missing, initialize an in-memory backend that still enforces limits.
+Use a consistent identifier function:
+Prefer token subject (user_id) when authenticated; otherwise, client IP (X-Forwarded-For aware).
+Apply @limiter.limit(...) decorators to:
+GET/POST /search: default 30/min in prod, 60/min in dev.
+GET/POST /eligibility/check: default 15/min in prod, 30/min in dev.
+/api/v1/scholarships listing/details: reasonable read limits (e.g., 60/min prod, 120/min dev).
+/analytics/summary: stricter (e.g., 10/min prod, 20/min dev).
+On exceed: return 429 with unified error envelope and Retry-After header.
+settings/config.py:
+Add typed settings: ENVIRONMENT, RATE_LIMIT_REDIS_URL, RATE_LIMIT_SEARCH, RATE_LIMIT_ELIGIBILITY, RATE_LIMIT_SCHOLARSHIPS, RATE_LIMIT_ANALYTICS with prod vs dev defaults.
+E) Error Schema and Observability
+
+Error handlers:
+Ensure 401/403/422/429 use the standard envelope: { trace_id, code, message, details?, status }.
+Logging:
+Confirm structured logs include trace_id, user_id (if auth), path, method, status, latency_ms; do not log secrets.
+Metrics:
+Keep /metrics; ensure counters/gauges for 429 and auth failures are emitted.
+Readiness:
+/readyz returns 503 when DB ping fails; /healthz always 200.
+Files to Edit/Create
+
+security/auth.py (or wherever auth deps live): require_auth, require_admin, scope checks.
+routers/scholarships.py: add dependencies for auth; scope separation for read vs write.
+routers/analytics.py: protect /analytics/summary with admin-only dependency.
+routers/db.py (new if missing): implement /db/status and /api/v1/db/status.
+routers/eligibility.py and schemas/eligibility.py: enforce strict validation models.
+settings/config.py: rate limit envs and Redis URL; ENVIRONMENT handling.
+main.py/app.py: include db router; ensure router dependencies and OpenAPI security are correct.
+middleware/limiter_setup.py (optional): centralize limiter initialization and identifier function.
+Tests to Add/Update
+
+tests/test_auth_protection.py
+GET /api/v1/scholarships without token → 401
+GET /api/v1/scholarships with valid token (role=user) → 200
+GET /api/v1/analytics/summary with role=user → 403; with role=admin → 200
+tests/test_db_status.py
+GET /db/status → 200 and contains counts
+Simulate DB down (e.g., invalid DSN) → /readyz 503 and /db/status 503
+tests/test_eligibility_validation.py
+POST /eligibility/check with gpa=5.1 → 422
+Negative values or invalid enums → 422
+Valid profile → 200
+tests/test_rate_limiting.py
+Rapid N requests to /search exceed RATE_LIMIT_SEARCH → 429 with Retry-After
+Authenticated requests key by user, unauth by IP
+Ensure existing tests continue to pass; do not change successful response envelopes.
+Acceptance Criteria
+
+Auth/RBAC:
+/api/v1/scholarships returns 401 without token; 200 with valid user token.
+/api/v1/analytics/summary returns 403 to non-admin; 200 to admin.
+OpenAPI marks these routes as secured.
+DB Status:
+/db/status and /api/v1/db/status return 200 with DB connected, counts present; return 503 if DB down.
+Eligibility:
+Invalid payloads return 422 with field-level errors; valid payloads still 200 with existing result schema.
+Rate Limiting:
+Configurable via env; 429 returned after threshold with Retry-After; logged and counted in metrics.
+Works with Redis; degrades to in-memory while still enforcing limits.
+No regressions:
+Existing successful behaviors and response envelopes unchanged.
+Logs/metrics/tracing remain operational.
+Tests:
+pytest -q passes entirely; coverage gate (>=85%) maintained if configured.
+Run/Verify
+
+Env: set ENVIRONMENT=prod or dev as needed; set RATE_LIMIT_* to small values in CI to trigger 429.
+Start: uvicorn main:app --host 0.0.0.0 --port 8000
+Quick checks:
+curl -i http://localhost:8000/db/status
+curl -i http://localhost:8000/api/v1/scholarships
+curl -i http://localhost:8000/api/v1/analytics/summary
+curl -i -X POST http://localhost:8000/eligibility/check -H "Content-Type: application/json" -d '{"gpa":5.1}'
+Flood /search to confirm 429 after threshold
+curl -i http://localhost:8000/docs
+Static checks: mypy . && ruff check . (if configured)
+Notes
+
+Do not weaken existing security; only strengthen.
+Preserve existing response shape for successful endpoints.
+Sanitize logs; no tokens or PII.
+If an interactions table exists, do not change its schema; only read for counts in /db/status.

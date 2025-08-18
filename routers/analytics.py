@@ -1,6 +1,7 @@
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Depends
 from typing import Optional
 from services.analytics_service import analytics_service
+from middleware.auth import require_admin, User
 from utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -8,7 +9,8 @@ router = APIRouter()
 
 @router.get("/analytics/summary")
 async def get_analytics_summary(
-    days: int = Query(7, ge=1, le=365, description="Number of days to analyze")
+    days: int = Query(7, ge=1, le=365, description="Number of days to analyze"),
+    current_user: User = Depends(require_admin())
 ):
     """
     Get analytics summary for the specified time period.
@@ -27,7 +29,8 @@ async def get_analytics_summary(
 @router.get("/analytics/user/{user_id}")
 async def get_user_analytics(
     user_id: str,
-    days: int = Query(30, ge=1, le=365, description="Number of days to analyze")
+    days: int = Query(30, ge=1, le=365, description="Number of days to analyze"),
+    current_user: User = Depends(require_admin())
 ):
     """
     Get analytics for a specific user.
@@ -46,7 +49,8 @@ async def get_user_analytics(
 @router.get("/analytics/interactions")
 async def get_recent_interactions(
     limit: int = Query(50, ge=1, le=200, description="Number of interactions to return"),
-    action: Optional[str] = Query(None, description="Filter by interaction type")
+    action: Optional[str] = Query(None, description="Filter by interaction type"),
+    current_user: User = Depends(require_admin())
 ):
     """
     Get recent user interactions with optional filtering.

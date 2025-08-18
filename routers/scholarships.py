@@ -12,6 +12,7 @@ from services.scholarship_service import scholarship_service
 from services.eligibility_service import eligibility_service
 from services.search_service import search_service
 from services.analytics_service import analytics_service
+from middleware.auth import require_auth, User
 from utils.logger import get_logger
 from datetime import datetime
 
@@ -32,7 +33,8 @@ async def search_scholarships(
     deadline_before: Optional[datetime] = Query(None, description="Deadlines before this date"),
     limit: int = Query(20, ge=1, le=100, description="Number of results to return"),
     offset: int = Query(0, ge=0, description="Number of results to skip"),
-    user_id: Optional[str] = Query(None, description="User ID for analytics")
+    user_id: Optional[str] = Query(None, description="User ID for analytics"),
+    current_user: User = Depends(require_auth(min_role="user", scopes=["scholarships:read"]))
 ):
     """
     Search scholarships with various filters and pagination support.

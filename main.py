@@ -12,12 +12,13 @@ from routers.auth import router as auth_router
 from routers.database import router as database_router
 from routers.health import router as health_router
 from routers.ai import router as ai_router
+from routers.db_status import router as db_status_router
 from middleware.error_handling import (
     api_error_handler, http_exception_handler, validation_exception_handler,
     rate_limit_exception_handler, general_exception_handler, trace_id_middleware,
     APIError
 )
-from middleware.rate_limiting import limiter, set_rate_limit_context
+from middleware.rate_limiting import limiter
 from middleware.request_id import RequestIDMiddleware
 from observability.metrics import setup_metrics
 from observability.tracing import tracing_service
@@ -50,7 +51,7 @@ app.add_middleware(SecurityHeadersMiddleware)
 app.add_middleware(BodySizeLimitMiddleware, max_size=settings.max_request_body_bytes)
 app.add_middleware(RequestIDMiddleware)
 app.middleware("http")(trace_id_middleware)
-app.middleware("http")(set_rate_limit_context)
+# Rate limiting middleware handled by decorators
 
 # Add CORS middleware with settings
 app.add_middleware(
@@ -92,6 +93,7 @@ app.include_router(analytics_router, prefix="/api/v1", tags=["analytics"])
 app.include_router(database_router, tags=["database"])
 app.include_router(health_router)
 app.include_router(ai_router, tags=["ai"])
+app.include_router(db_status_router)
 
 @app.get("/")
 async def root():

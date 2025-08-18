@@ -1,128 +1,106 @@
 """
-Rate Limiting Middleware
-Implements rate limiting using slowapi with Redis backend
+Enhanced Rate Limiting Middleware
+Using slowapi with Redis backend and proper environment-aware configuration
 """
 
-from typing import Optional
-from fastapi import Request, HTTPException, status
+import redis
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
-import redis
-import os
+from fastapi import Request, Response, HTTPException
+import time
+from config.settings import settings
+from utils.logger import get_logger
 
-# Redis configuration
-REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379")
+logger = get_logger(__name__)
 
-# Initialize Redis client (fallback to memory if Redis not available)
-try:
-    redis_client = redis.from_url(REDIS_URL, decode_responses=True, socket_connect_timeout=1)
-    redis_client.ping()  # Test connection
-    print("✅ Connected to Redis for rate limiting")
-    use_redis = True
-except (redis.ConnectionError, redis.TimeoutError, Exception):
-    print("⚠️  Redis not available, using in-memory rate limiting")
-    redis_client = None
-    use_redis = False
-
-def get_limiter_key(request: Request) -> str:
-    """
-    Generate rate limiting key based on user authentication or IP
-    Authenticated users get higher limits with user-based keys
-    """
-    # Check if user is authenticated (set by auth middleware)
-    user_id = getattr(request.state, "user_id", None)
-    if user_id:
-        return f"user:{user_id}"
+def get_user_identifier(request: Request) -> str:
+    """Get client identifier prioritizing authenticated user over IP"""
+    # Check if user is set in request state by auth middleware
+    if hasattr(request.state, 'user') and request.state.user:
+        return f"user:{request.state.user.user_id}"
     
-    # Fall back to IP-based limiting for unauthenticated requests
+    # Extract from JWT token if available
+    auth_header = request.headers.get("authorization", "")
+    if auth_header.startswith("Bearer "):
+        # Use token suffix as identifier
+        token = auth_header[7:]  # Remove "Bearer "
+        if len(token) > 20:
+            return f"token:{token[-20:]}"
+    
+    # Fall back to IP with X-Forwarded-For support
+    forwarded_for = request.headers.get("x-forwarded-for")
+    if forwarded_for:
+        ip = forwarded_for.split(",")[0].strip()
+        return f"ip:{ip}"
+    
     return f"ip:{get_remote_address(request)}"
 
-def get_user_from_request(request: Request) -> Optional[str]:
-    """Extract user ID from request state (set by auth middleware)"""
-    return getattr(request.state, "user_id", None)
+# Initialize limiter with Redis fallback to memory
+def create_rate_limiter():
+    """Create rate limiter with Redis or in-memory storage"""
+    try:
+        # Test Redis connection
+        redis_client = redis.Redis.from_url(settings.rate_limit_redis_url, socket_timeout=2)
+        redis_client.ping()
+        logger.info("✅ Redis connected for rate limiting")
+        
+        return Limiter(
+            key_func=get_user_identifier,
+            storage_uri=settings.rate_limit_redis_url
+        )
+        
+    except Exception as e:
+        logger.warning(f"⚠️  Redis not available, using in-memory rate limiting: {e}")
+        
+        return Limiter(
+            key_func=get_user_identifier,
+            storage_uri="memory://"
+        )
 
-# Initialize limiter
-limiter = Limiter(
-    key_func=get_limiter_key,
-    storage_uri=REDIS_URL if use_redis else "memory://",
-    default_limits=["1000 per hour"]  # Global default limit
-)
+# Create the limiter instance
+limiter = create_rate_limiter()
 
-# Rate limiting decorators for different access levels
-def public_rate_limit():
-    """Rate limit for public/unauthenticated endpoints"""
-    return limiter.limit("60/minute")
+def get_rate_limit_for_environment(base_limit: str) -> str:
+    """Adjust rate limits based on environment"""
+    if settings.environment.value in ["local", "development"]:
+        # Double the limits for dev environments
+        parts = base_limit.split("/")
+        if len(parts) == 2:
+            count = int(parts[0])
+            return f"{count * 2}/{parts[1]}"
+    return base_limit
 
-def authenticated_rate_limit():
-    """Rate limit for authenticated users (higher limits)"""
-    return limiter.limit("300/minute")
-
-def admin_rate_limit():
-    """Rate limit for admin users (highest limits)"""
-    return limiter.limit("1000/minute")
-
-def bulk_operation_rate_limit():
-    """Rate limit for expensive bulk operations"""
-    return limiter.limit("10/minute")
-
+# Environment-aware rate limit decorators
 def search_rate_limit():
-    """Rate limit for search operations"""
-    return limiter.limit("120/minute")
+    """Rate limit for search endpoints"""
+    limit = get_rate_limit_for_environment(settings.rate_limit_search)
+    return limiter.limit(limit)
 
-# Custom rate limit exceeded handler
-def custom_rate_limit_exceeded_handler(request: Request, exc: RateLimitExceeded):
-    """Custom handler for rate limit exceeded errors"""
-    response = HTTPException(
-        status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-        detail={
-            "error": "Rate limit exceeded",
-            "message": f"Too many requests. Limit: {exc.detail}",
-            "retry_after": exc.retry_after,
-            "type": "rate_limit_error"
-        }
-    )
-    
-    # Add headers for rate limiting info
-    response.headers = {
-        "Retry-After": str(exc.retry_after),
-        "X-RateLimit-Limit": str(exc.detail.split("/")[0]),
-        "X-RateLimit-Reset": str(exc.retry_after)
-    }
-    
-    return response
+def eligibility_rate_limit():
+    """Rate limit for eligibility check endpoints"""
+    limit = get_rate_limit_for_environment(settings.rate_limit_eligibility)
+    return limiter.limit(limit)
 
-# Middleware to set user context for rate limiting
-async def set_rate_limit_context(request: Request, call_next):
-    """Middleware to set user context for rate limiting"""
-    # This would extract user info from JWT token if present
-    # For now, we'll use a simple approach
-    
-    authorization = request.headers.get("Authorization")
-    if authorization and authorization.startswith("Bearer "):
-        # In a real implementation, decode JWT here
-        # For now, just extract a mock user ID for demonstration
-        token = authorization.split(" ")[1]
-        # This would be replaced with actual JWT decoding
-        request.state.user_id = "mock_user_from_token"
-    
-    response = await call_next(request)
-    return response
+def scholarships_rate_limit():
+    """Rate limit for scholarship endpoints"""
+    limit = get_rate_limit_for_environment(settings.rate_limit_scholarships)
+    return limiter.limit(limit)
 
-# Rate limiting policies by endpoint type
-RATE_LIMIT_POLICIES = {
-    "public_search": "60/minute",           # Public scholarship search
-    "public_detail": "120/minute",          # Public scholarship details
-    "authenticated_search": "300/minute",   # Authenticated search
-    "authenticated_write": "100/minute",    # Create/update operations
-    "bulk_operations": "10/minute",         # Bulk eligibility checks
-    "analytics": "60/minute",               # Analytics endpoints
-    "admin_operations": "1000/minute",      # Admin operations
-}
+def analytics_rate_limit():
+    """Rate limit for analytics endpoints"""
+    limit = get_rate_limit_for_environment(settings.rate_limit_analytics)
+    return limiter.limit(limit)
 
-def get_rate_limit_for_endpoint(endpoint_type: str, user_roles: Optional[list] = None) -> str:
-    """Get rate limit policy for specific endpoint type and user role"""
-    if user_roles and "admin" in user_roles:
-        return RATE_LIMIT_POLICIES.get("admin_operations", "1000/minute")
-    
-    return RATE_LIMIT_POLICIES.get(endpoint_type, "60/minute")
+# Generic rate limiters
+def public_rate_limit(limit: str = "60/minute"):
+    """Rate limit for public endpoints"""
+    return limiter.limit(get_rate_limit_for_environment(limit))
+
+def authenticated_rate_limit(limit: str = "300/minute"):
+    """Rate limit for authenticated endpoints"""
+    return limiter.limit(get_rate_limit_for_environment(limit))
+
+def admin_rate_limit(limit: str = "1000/minute"):
+    """Rate limit for admin endpoints"""
+    return limiter.limit(get_rate_limit_for_environment(limit))

@@ -127,22 +127,49 @@ async def get_current_user(credentials: Optional[HTTPAuthorizationCredentials] =
     
     return User(**user_data)
 
-def require_auth(request: Request, user: Optional[User] = Depends(get_current_user)) -> User:
-    """Require authentication for protected endpoints"""
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Authentication required",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
+def require_auth(min_role: str = "user", scopes: Optional[List[str]] = None):
+    """Require authentication with optional role and scope requirements"""
+    def auth_dependency(user: Optional[User] = Depends(get_current_user)) -> User:
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Authentication required",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+        
+        if not user.is_active:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="User account is disabled"
+            )
+        
+        # Check role requirements
+        role_hierarchy = {"user": 0, "partner": 1, "admin": 2}
+        user_level = max([role_hierarchy.get(role, -1) for role in user.roles])
+        required_level = role_hierarchy.get(min_role, 999)
+        
+        if user_level < required_level:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Insufficient permissions. Required role: {min_role} or higher"
+            )
+        
+        # Check scope requirements
+        if scopes:
+            for scope in scopes:
+                if scope not in user.scopes:
+                    raise HTTPException(
+                        status_code=status.HTTP_403_FORBIDDEN,
+                        detail=f"Insufficient permissions. Required scope: {scope}"
+                    )
+        
+        return user
     
-    if not user.is_active:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="User account is disabled"
-        )
-    
-    return user
+    return auth_dependency
+
+def require_admin():
+    """Require admin role"""
+    return require_auth(min_role="admin")
 
 def require_scopes(required_scopes: List[str]):
     """Require specific scopes for endpoint access"""

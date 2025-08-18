@@ -8,7 +8,7 @@ from models.user import UserProfile
 from services.scholarship_service import scholarship_service
 from services.analytics_service import analytics_service
 from middleware.auth import get_current_user
-from middleware.rate_limiting import limiter
+from middleware.rate_limiting import search_rate_limit
 # from routers.interaction_wrapper import log_interaction  # Will implement if needed
 from utils.logger import get_logger
 
@@ -101,10 +101,10 @@ async def execute_search(
         raise
 
 @router.post("/search")
-@limiter.limit("60/minute")
+@search_rate_limit()
 async def search_scholarships_post(
-    request_data: SearchRequest,
     request: Request,
+    request_data: SearchRequest,
     current_user: Optional[dict] = Depends(get_current_user)
 ):
     """
@@ -131,7 +131,7 @@ async def search_scholarships_post(
     )
 
 @router.get("/search")
-@limiter.limit("60/minute")
+@search_rate_limit()
 async def search_scholarships_get(
     request: Request,
     q: Optional[str] = Query(None, description="Search query"),
