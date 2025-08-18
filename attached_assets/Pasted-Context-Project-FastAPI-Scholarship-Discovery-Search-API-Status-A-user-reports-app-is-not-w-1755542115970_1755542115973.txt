@@ -1,0 +1,76 @@
+Context
+Project: FastAPI “Scholarship Discovery & Search API”
+Status: A user reports “app is not working” in Replit despite prior success. We need you to reproduce the issue, pinpoint the root cause, and fix it without weakening any security controls or changing the unified error schema:
+{ code, message, status, timestamp, trace_id, details? }
+
+Non‑negotiables
+
+Keep middleware order and all security features (auth, CORS, rate limiting, body/URL size guards, HSTS in prod).
+Do not log secrets; only log presence/length when needed.
+Development config should be flexible; production strict.
+Your Goal
+
+Reproduce the failure in Replit, identify the exact cause, apply the minimal fix, and provide a concise incident report with verification evidence.
+Step-by-step Diagnosis (run in order)
+
+Show run configuration
+Print .replit and the exact Run command used.
+Echo $PORT and confirm it’s used: host=0.0.0.0 and port=int(os.getenv("PORT", 8000)).
+If using uvicorn directly, ensure flags: --host 0.0.0.0 --port $PORT --proxy-headers --forwarded-allow-ips="*".
+Verify the correct app import path (e.g., app.main:app or src.api.main:app).
+2. Start with debug logs
+
+Start the app with DEBUG/INFO logs; capture the first 100 lines of startup output.
+Include any traceback if present.
+3. Quick runtime smoke in Replit
+
+curl -i http://localhost:$PORT/
+curl -i http://localhost:$PORT/healthz
+curl -i -X OPTIONS http://localhost:$PORT/api/v1/search -H "Origin: https://preview.replit.dev" -H "Access-Control-Request-Method: GET"
+curl -i "http://localhost:$PORT/api/v1/search?q=engineering"
+Note HTTP statuses, content-type, and if any request hangs.
+4. Environment snapshot (sanitized, dev only)
+
+Print a sanitized config: ENVIRONMENT, effective host/port, DB engine type, rate-limit backend type, CORS mode, docs enabled? Never print secrets.
+5. Dependency sanity
+
+pip freeze | sort
+Confirm FastAPI/Starlette/Pydantic versions match code style; verify passlib[bcrypt] and bcrypt==4.0.1 installed.
+If requirements.txt exists, run pip install -r requirements.txt to ensure sync.
+6. Common failure points to check and fix
+
+Port binding or wrong run command: hardcoded 5000 instead of $PORT; wrong app import path.
+CORS/OPTIONS blocked by limiter/size guards: ensure CORS first, OPTIONS not rate-limited.
+DB connectivity in dev: if DATABASE_URL missing, ensure SQLite fallback in dev and SELECT 1 in health; in prod fail fast.
+Limiter backend in dev: use in-memory fallback when RATE_LIMIT_BACKEND_URL missing; never fallback silently in prod.
+Docs visibility: dev enabled; prod disabled unless explicitly enabled.
+Error double-encoding: ensure JSONResponse receives dict (no json.dumps/str), content-type is application/json.
+7. Narrow down with targeted checks
+
+If 404 at root, verify router mounting and lifespan events.
+If 500s, capture traceback and link to offending router/middleware.
+If preview shows cached content, hard-reload and test locally via curl to avoid browser cache issues.
+8. Fix and verify
+
+Apply the minimal change (run command, import path, binding, middleware ordering, fallback toggles).
+Re-run the smoke tests above; include outputs.
+Validate protected route behavior: 401 without token; 200 with valid token.
+Validate 413, 414, 429 behaviors and headers (X-RateLimit-Limit, X-RateLimit-Remaining, Retry-After).
+Validate CORS: allowed origin returns ACAO; disallowed origin does not.
+Deliverables
+
+A short incident report with:
+Reproduction steps and observed behavior
+Root cause (file/line or config)
+Exact fix (diff or clear description)
+Verification evidence (command outputs, HTTP statuses, key headers)
+Updated .replit (if needed) and minimal code/config changes.
+A temporary dev-only /_debug/config endpoint output (sanitized) if helpful in diagnosis.
+Acceptance Criteria
+
+App starts cleanly; logs show host 0.0.0.0 and port=$PORT; no unhandled exceptions.
+Root JSON endpoint loads in preview; health endpoints 200.
+Protected routes return 401 without token and 200 with valid token.
+OPTIONS preflight succeeds and is not rate-limited.
+All errors use unified error schema with trace_id; content-type application/json.
+No changes weakening security or altering the error schema.

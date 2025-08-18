@@ -184,17 +184,16 @@ def require_auth(min_role: str = "user", scopes: Optional[List[str]] = None):
         
         if not user:
             raise APIError(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                code="AUTH_001",
                 message="Authentication required",
-                headers={"WWW-Authenticate": "Bearer"},
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                error_code="AUTH_001"
             )
         
         if not user.is_active:
             raise APIError(
+                message="User account is disabled",
                 status_code=status.HTTP_403_FORBIDDEN,
-                code="AUTH_002",
-                message="User account is disabled"
+                error_code="AUTH_002"
             )
         
         # Check role requirements
@@ -204,9 +203,9 @@ def require_auth(min_role: str = "user", scopes: Optional[List[str]] = None):
         
         if user_level < required_level:
             raise APIError(
+                message=f"Insufficient permissions. Required role: {min_role} or higher",
                 status_code=status.HTTP_403_FORBIDDEN,
-                code="AUTH_003",
-                message=f"Insufficient permissions. Required role: {min_role} or higher"
+                error_code="AUTH_003"
             )
         
         # Check scope requirements
@@ -214,9 +213,9 @@ def require_auth(min_role: str = "user", scopes: Optional[List[str]] = None):
             for scope in scopes:
                 if scope not in user.scopes:
                     raise APIError(
+                        message=f"Insufficient permissions. Required scope: {scope}",
                         status_code=status.HTTP_403_FORBIDDEN,
-                        code="AUTH_004",
-                        message=f"Insufficient permissions. Required scope: {scope}"
+                        error_code="AUTH_004"
                     )
         
         return user
@@ -234,9 +233,9 @@ def require_scopes(required_scopes: List[str]):
         for scope in required_scopes:
             if scope not in user.scopes:
                 raise APIError(
+                    message=f"Insufficient permissions. Required scope: {scope}",
                     status_code=status.HTTP_403_FORBIDDEN,
-                    code="AUTH_004",
-                    message=f"Insufficient permissions. Required scope: {scope}"
+                    error_code="AUTH_004"
                 )
         return user
     return scope_checker
@@ -248,9 +247,9 @@ def require_roles(required_roles: List[str]):
         user_has_required_role = any(role in user.roles for role in required_roles)
         if not user_has_required_role:
             raise APIError(
+                message=f"Insufficient permissions. Required roles: {required_roles}",
                 status_code=status.HTTP_403_FORBIDDEN,
-                code="AUTH_003",
-                message=f"Insufficient permissions. Required roles: {required_roles}"
+                error_code="AUTH_003"
             )
         return user
     return role_checker
