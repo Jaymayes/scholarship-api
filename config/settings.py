@@ -4,9 +4,9 @@ Using pydantic-settings for type-safe configuration
 """
 
 import os
-from typing import List, Optional
+from typing import List, Optional, Annotated
 from pydantic import Field, field_validator, ConfigDict
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 from enum import Enum
 
 class Environment(str, Enum):
@@ -26,54 +26,54 @@ class Settings(BaseSettings):
     """Application settings with environment-specific overrides"""
     
     # Environment
-    environment: Environment = Field(default=Environment.LOCAL, env="ENVIRONMENT")
-    debug: bool = Field(default=True, env="DEBUG")
+    environment: Environment = Field(Environment.LOCAL, alias="ENVIRONMENT")
+    debug: bool = Field(True, alias="DEBUG")
     
     # API Configuration
-    api_title: str = Field(default="Scholarship Discovery & Search API", env="API_TITLE")
-    api_version: str = Field(default="1.0.0", env="API_VERSION")
+    api_title: str = Field("Scholarship Discovery & Search API", alias="API_TITLE")
+    api_version: str = Field("1.0.0", alias="API_VERSION")
     api_description: str = Field(
-        default="A comprehensive API for scholarship discovery with advanced search and eligibility checking",
-        env="API_DESCRIPTION"
+        "A comprehensive API for scholarship discovery with advanced search and eligibility checking",
+        alias="API_DESCRIPTION"
     )
     
     # Server Configuration
-    host: str = Field(default="0.0.0.0", env="HOST")
-    port: int = Field(default=5000, env="PORT")
-    reload: bool = Field(default=True, env="RELOAD")
+    host: str = Field("0.0.0.0", alias="HOST")
+    port: int = Field(5000, alias="PORT")
+    reload: bool = Field(True, alias="RELOAD")
     
     # Security Configuration
-    jwt_secret_key: str = Field(default="your-secret-key-change-in-production", env="JWT_SECRET_KEY")
-    jwt_algorithm: str = Field(default="HS256", env="JWT_ALGORITHM")
-    access_token_expire_minutes: int = Field(default=30, env="ACCESS_TOKEN_EXPIRE_MINUTES")
+    jwt_secret_key: str = Field("your-secret-key-change-in-production", alias="JWT_SECRET_KEY")
+    jwt_algorithm: str = Field("HS256", alias="JWT_ALGORITHM")
+    access_token_expire_minutes: int = Field(30, alias="ACCESS_TOKEN_EXPIRE_MINUTES")
     
     # CORS Configuration
     cors_origins: List[str] = Field(
         default=["*"],
-        env="CORS_ORIGINS",
+        alias="CORS_ORIGINS",
         description="Comma-separated list of allowed origins"
     )
-    cors_allow_credentials: bool = Field(default=True, env="CORS_ALLOW_CREDENTIALS")
-    cors_allow_methods: List[str] = Field(default=["*"], env="CORS_ALLOW_METHODS")
-    cors_allow_headers: List[str] = Field(default=["*"], env="CORS_ALLOW_HEADERS")
+    cors_allow_credentials: bool = Field(True, alias="CORS_ALLOW_CREDENTIALS")
+    cors_allow_methods: List[str] = Field(["*"], alias="CORS_ALLOW_METHODS")
+    cors_allow_headers: List[str] = Field(["*"], alias="CORS_ALLOW_HEADERS")
     
     # Database Configuration
-    database_url: Optional[str] = Field(default=None, env="DATABASE_URL")
-    database_echo: bool = Field(default=False, env="DATABASE_ECHO")
-    database_pool_size: int = Field(default=5, env="DATABASE_POOL_SIZE")
-    database_max_overflow: int = Field(default=10, env="DATABASE_MAX_OVERFLOW")
+    database_url: Optional[str] = Field(None, alias="DATABASE_URL")
+    database_echo: bool = Field(False, alias="DATABASE_ECHO")
+    database_pool_size: int = Field(5, alias="DATABASE_POOL_SIZE")
+    database_max_overflow: int = Field(10, alias="DATABASE_MAX_OVERFLOW")
     
     # Redis Configuration
-    redis_url: str = Field(default="redis://localhost:6379", env="REDIS_URL")
-    redis_timeout: int = Field(default=5, env="REDIS_TIMEOUT")
+    redis_url: str = Field("redis://localhost:6379", alias="REDIS_URL")
+    redis_timeout: int = Field(5, alias="REDIS_TIMEOUT")
     
     # Rate Limiting Configuration
-    rate_limit_enabled: bool = Field(default=True, env="RATE_LIMIT_ENABLED")
-    rate_limit_redis_url: str = Field(default="redis://localhost:6379", env="RATE_LIMIT_REDIS_URL")
-    rate_limit_search: str = Field(default="30/minute", env="RATE_LIMIT_SEARCH")
-    rate_limit_eligibility: str = Field(default="15/minute", env="RATE_LIMIT_ELIGIBILITY") 
-    rate_limit_scholarships: str = Field(default="60/minute", env="RATE_LIMIT_SCHOLARSHIPS")
-    rate_limit_analytics: str = Field(default="10/minute", env="RATE_LIMIT_ANALYTICS")
+    rate_limit_enabled: bool = Field(True, alias="RATE_LIMIT_ENABLED")
+    rate_limit_redis_url: str = Field("redis://localhost:6379", alias="RATE_LIMIT_REDIS_URL")
+    rate_limit_search: str = Field("30/minute", alias="RATE_LIMIT_SEARCH")
+    rate_limit_eligibility: str = Field("15/minute", alias="RATE_LIMIT_ELIGIBILITY") 
+    rate_limit_scholarships: str = Field("60/minute", alias="RATE_LIMIT_SCHOLARSHIPS")
+    rate_limit_analytics: str = Field("10/minute", alias="RATE_LIMIT_ANALYTICS")
     
     @field_validator('rate_limit_search', 'rate_limit_eligibility', 'rate_limit_scholarships', 'rate_limit_analytics')
     @classmethod
@@ -91,8 +91,8 @@ class Settings(BaseSettings):
         return v
     
     # Endpoint-specific rate limits
-    rate_limit_public_search: str = Field(default="60/minute", env="RATE_LIMIT_PUBLIC_SEARCH")
-    rate_limit_public_eligibility: str = Field(default="30/minute", env="RATE_LIMIT_PUBLIC_ELIGIBILITY")
+    rate_limit_public_search: str = Field("60/minute", alias="RATE_LIMIT_PUBLIC_SEARCH")
+    rate_limit_public_eligibility: str = Field("30/minute", alias="RATE_LIMIT_PUBLIC_ELIGIBILITY")
     
     @property
     def get_search_rate_limit(self) -> str:
@@ -115,66 +115,66 @@ class Settings(BaseSettings):
             return "30/minute"
     
     # Logging Configuration
-    log_level: LogLevel = Field(default=LogLevel.INFO, env="LOG_LEVEL")
-    log_format: str = Field(default="json", env="LOG_FORMAT")  # json or text
-    log_file: Optional[str] = Field(default=None, env="LOG_FILE")
+    log_level: LogLevel = Field(LogLevel.INFO, alias="LOG_LEVEL")
+    log_format: str = Field("json", alias="LOG_FORMAT")  # json or text
+    log_file: Optional[str] = Field(None, alias="LOG_FILE")
     
     # Analytics Configuration
-    analytics_enabled: bool = Field(default=True, env="ANALYTICS_ENABLED")
-    analytics_retention_days: int = Field(default=90, env="ANALYTICS_RETENTION_DAYS")
+    analytics_enabled: bool = Field(True, alias="ANALYTICS_ENABLED")
+    analytics_retention_days: int = Field(90, alias="ANALYTICS_RETENTION_DAYS")
     
     # Search Configuration
-    search_default_limit: int = Field(default=20, env="SEARCH_DEFAULT_LIMIT")
-    search_max_limit: int = Field(default=100, env="SEARCH_MAX_LIMIT")
+    search_default_limit: int = Field(20, alias="SEARCH_DEFAULT_LIMIT")
+    search_max_limit: int = Field(100, alias="SEARCH_MAX_LIMIT")
     
     # Cache Configuration
-    cache_enabled: bool = Field(default=True, env="CACHE_ENABLED")
-    cache_ttl_seconds: int = Field(default=300, env="CACHE_TTL_SECONDS")  # 5 minutes
+    cache_enabled: bool = Field(True, alias="CACHE_ENABLED")
+    cache_ttl_seconds: int = Field(300, alias="CACHE_TTL_SECONDS")  # 5 minutes
     
     # External Services
-    notification_service_url: Optional[str] = Field(default=None, env="NOTIFICATION_SERVICE_URL")
-    email_service_api_key: Optional[str] = Field(default=None, env="EMAIL_SERVICE_API_KEY")
+    notification_service_url: Optional[str] = Field(None, alias="NOTIFICATION_SERVICE_URL")
+    email_service_api_key: Optional[str] = Field(None, alias="EMAIL_SERVICE_API_KEY")
     
     # Monitoring Configuration
-    metrics_enabled: bool = Field(default=True, env="METRICS_ENABLED")
-    tracing_enabled: bool = Field(default=False, env="TRACING_ENABLED")
-    tracing_endpoint: Optional[str] = Field(default=None, env="TRACING_ENDPOINT")
+    metrics_enabled: bool = Field(True, alias="METRICS_ENABLED")
+    tracing_enabled: bool = Field(False, alias="TRACING_ENABLED")
+    tracing_endpoint: Optional[str] = Field(None, alias="TRACING_ENDPOINT")
     
     # Feature Flags
-    feature_recommendations: bool = Field(default=True, env="FEATURE_RECOMMENDATIONS")
-    feature_analytics: bool = Field(default=True, env="FEATURE_ANALYTICS")
-    feature_bulk_operations: bool = Field(default=True, env="FEATURE_BULK_OPERATIONS")
+    feature_recommendations: bool = Field(True, alias="FEATURE_RECOMMENDATIONS")
+    feature_analytics: bool = Field(True, alias="FEATURE_ANALYTICS")
+    feature_bulk_operations: bool = Field(True, alias="FEATURE_BULK_OPERATIONS")
     
     # Security Configuration
     max_request_body_bytes: int = Field(
-        default=1024 * 1024,  # 1MB
-        env="MAX_REQUEST_BODY_BYTES",
+        1024 * 1024,  # 1MB
+        alias="MAX_REQUEST_BODY_BYTES",
         description="Maximum request body size in bytes"
     )
     allowed_origins: List[str] = Field(
         default=[],
-        env="ALLOWED_ORIGINS",
+        alias="ALLOWED_ORIGINS",
         description="Comma-separated list of allowed origins for production"
     )
     
     # Security Headers Configuration
     enable_hsts: bool = Field(
-        default=False,
-        env="ENABLE_HSTS",
+        False,
+        alias="ENABLE_HSTS",
         description="Enable HSTS header (only in production with HTTPS)"
     )
     hsts_max_age: int = Field(
-        default=63072000,  # 2 years
-        env="HSTS_MAX_AGE",
+        63072000,  # 2 years
+        alias="HSTS_MAX_AGE",
         description="HSTS max-age in seconds"
     )
     hsts_include_subdomains: bool = Field(
-        default=True,
-        env="HSTS_INCLUDE_SUBDOMAINS"
+        True,
+        alias="HSTS_INCLUDE_SUBDOMAINS"
     )
     hsts_preload: bool = Field(
-        default=True,
-        env="HSTS_PRELOAD"
+        True,
+        alias="HSTS_PRELOAD"
     )
     
     @field_validator("cors_origins", mode="before")
@@ -232,7 +232,7 @@ class Settings(BaseSettings):
         """Check if HSTS should be enabled based on environment"""
         return self.environment == Environment.PRODUCTION and self.enable_hsts
     
-    model_config = ConfigDict(
+    model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
         case_sensitive=False,
