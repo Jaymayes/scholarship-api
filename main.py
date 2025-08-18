@@ -22,7 +22,7 @@ from middleware.rate_limiting import limiter
 from middleware.request_id import RequestIDMiddleware
 from observability.metrics import setup_metrics
 from observability.tracing import tracing_service
-from config.settings import settings
+from config.settings import settings, Environment
 from utils.logger import setup_logger
 
 # Initialize logger
@@ -97,24 +97,19 @@ app.include_router(db_status_router)
 
 @app.get("/")
 async def root():
-    """Root endpoint providing API information"""
+    """Root endpoint providing API information - optimized for health checks"""
     return {
+        "status": "active",
         "message": "Scholarship Discovery & Search API",
         "version": settings.api_version,
-        "environment": settings.environment,
-        "docs": "/docs",
-        "status": "active",
-        "authentication": "JWT Bearer tokens required for protected endpoints"
+        "environment": settings.environment.value,
+        "docs": "/docs"
     }
 
 @app.get("/health")
 async def health_check():
-    """Health check endpoint"""
-    return {
-        "status": "healthy",
-        "version": settings.api_version,
-        "environment": settings.environment
-    }
+    """Health check endpoint - fast response for deployment monitoring"""
+    return {"status": "healthy"}
 
 @app.get("/readiness")
 async def readiness_check():
@@ -136,5 +131,7 @@ if __name__ == "__main__":
         host=settings.host,
         port=settings.port,
         reload=settings.reload,
-        log_level=settings.log_level.lower()
+        log_level=settings.log_level.lower(),
+        access_log=True,
+        workers=1 if settings.environment in [Environment.LOCAL, Environment.DEVELOPMENT] else 4
     )
