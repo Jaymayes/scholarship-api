@@ -25,19 +25,24 @@ from middleware.request_id import RequestIDMiddleware
 from observability.metrics import setup_metrics
 from observability.tracing import tracing_service
 from config.settings import settings, Environment
+from schemas.error_responses import ERROR_RESPONSES
 from utils.logger import setup_logger
 
 # Initialize logger
 logger = setup_logger()
 
-# Create FastAPI app with settings
+# Create FastAPI app with settings and error response documentation
 app = FastAPI(
     title=settings.api_title,
     description=settings.api_description,
     version=settings.api_version,
     docs_url="/docs",
     redoc_url="/redoc",
-    debug=settings.debug
+    debug=settings.debug,
+    responses={
+        status: {"model": resp["model"], "description": resp["description"]}
+        for status, resp in ERROR_RESPONSES.items()
+    }
 )
 
 # Mount static files
@@ -48,35 +53,47 @@ setup_metrics(app)
 tracing_service.setup_tracing()
 tracing_service.instrument_app(app)
 
-# Add middleware in correct order (middleware wraps the app)
+# Add middleware in correct order (outermost first)
+# Order: Security → CORS → Request Processing → Rate Limiting → Routing
 from middleware.security_headers import SecurityHeadersMiddleware
 from middleware.body_limit import BodySizeLimitMiddleware
 from middleware.url_length import URLLengthMiddleware
 
+# 1. Security headers (outermost - applies to all responses)
 app.add_middleware(SecurityHeadersMiddleware)
-app.add_middleware(URLLengthMiddleware, max_length=settings.max_url_length)
-app.add_middleware(BodySizeLimitMiddleware, max_size=settings.max_request_size_bytes)
-app.add_middleware(RequestIDMiddleware)
-app.middleware("http")(trace_id_middleware)
-# Rate limiting middleware handled by decorators
 
-# Add CORS middleware with settings
+# 2. CORS (must be early to handle preflight requests)
+cors_config = settings.get_cors_config
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.get_cors_origins,
-    allow_credentials=settings.cors_allow_credentials,
-    allow_methods=settings.cors_allow_methods,
-    allow_headers=settings.cors_allow_headers,
+    allow_origins=cors_config["allow_origins"],
+    allow_credentials=cors_config["allow_credentials"], 
+    allow_methods=cors_config["allow_methods"],
+    allow_headers=cors_config["allow_headers"],
+    max_age=cors_config["max_age"]
 )
+
+# 3. Request validation (check request before processing)
+app.add_middleware(URLLengthMiddleware, max_length=settings.max_url_length)
+app.add_middleware(BodySizeLimitMiddleware, max_size=settings.max_request_size_bytes)
+
+# 4. Request identification (for tracing/logging)
+app.add_middleware(RequestIDMiddleware)
+app.middleware("http")(trace_id_middleware)
+
+# 5. Rate limiting handled by decorators (applied at route level)
 
 # Add rate limiter
 app.state.limiter = limiter
 
-# Exception handlers - using proper type annotations for FastAPI
-@app.exception_handler(APIError)
-async def handle_api_error(request: Request, exc: APIError):
-    return await api_error_handler(request, exc)
+# Global exception handlers with unified error format
+from middleware.error_handlers import (
+    http_exception_handler, validation_exception_handler,
+    rate_limit_exception_handler, general_exception_handler,
+    not_found_handler, method_not_allowed_handler
+)
 
+# Unified error handlers (all return standardized format)
 @app.exception_handler(HTTPException)
 async def handle_http_exception(request: Request, exc: HTTPException):
     return await http_exception_handler(request, exc)
@@ -93,9 +110,7 @@ async def handle_rate_limit_error(request: Request, exc: RateLimitExceeded):
 async def handle_general_error(request: Request, exc: Exception):
     return await general_exception_handler(request, exc)
 
-# Additional handlers for standardized error format
-from middleware.error_handlers import not_found_handler, method_not_allowed_handler
-
+# Specific status code handlers
 @app.exception_handler(404)
 async def handle_not_found(request: Request, exc: HTTPException):
     return await not_found_handler(request, exc)

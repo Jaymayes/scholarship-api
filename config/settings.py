@@ -54,28 +54,64 @@ class Settings(BaseSettings):
         description="Comma-separated list of allowed origins for production"
     )
     cors_allow_credentials: bool = Field(True, alias="CORS_ALLOW_CREDENTIALS")
-    cors_allow_methods: List[str] = Field(["GET", "POST", "PUT", "DELETE", "OPTIONS"], alias="CORS_ALLOW_METHODS")
-    cors_allow_headers: List[str] = Field(["*"], alias="CORS_ALLOW_HEADERS")
+    cors_allow_methods: List[str] = Field(
+        ["GET", "POST", "PUT", "DELETE", "OPTIONS"], 
+        alias="CORS_ALLOW_METHODS"
+    )
+    cors_allow_headers: List[str] = Field(
+        ["Accept", "Accept-Language", "Content-Language", "Content-Type", "Authorization"],
+        alias="CORS_ALLOW_HEADERS"
+    )
+    cors_max_age: int = Field(600, alias="CORS_MAX_AGE")  # 10 minutes
     
     @property
     def get_cors_origins(self) -> List[str]:
-        """Get environment-appropriate CORS origins"""
+        """Get environment-appropriate CORS origins with production safety"""
         if self.environment == Environment.PRODUCTION:
-            # In production, require explicit whitelist
-            if self.cors_allowed_origins:
-                return [origin.strip() for origin in self.cors_allowed_origins.split(",")]
-            else:
-                # Fail safe - log warning and return empty list to prevent wildcard
+            # Production: MUST have explicit whitelist, no wildcards allowed
+            if not self.cors_allowed_origins:
                 import logging
-                logging.warning("Production environment detected but no CORS_ALLOWED_ORIGINS configured")
+                logging.critical(
+                    "PRODUCTION SECURITY ERROR: CORS_ALLOWED_ORIGINS not configured. "
+                    "This could allow any origin to access your API!"
+                )
+                # Fail safe: return empty list to block all CORS requests
                 return []
+            
+            origins = [origin.strip() for origin in self.cors_allowed_origins.split(",") if origin.strip()]
+            if "*" in origins:
+                import logging
+                logging.critical(
+                    "PRODUCTION SECURITY ERROR: Wildcard (*) origin detected in production. "
+                    "This is a security vulnerability!"
+                )
+                # Remove wildcard for production safety
+                origins = [o for o in origins if o != "*"]
+            
+            return origins
         else:
-            # Development/staging - allow localhost origins plus any specified
-            dev_origins = ["http://localhost:3000", "http://127.0.0.1:3000", "http://localhost:5000"]
+            # Development/staging: Allow localhost + custom origins
+            dev_origins = [
+                "http://localhost:3000", 
+                "http://127.0.0.1:3000", 
+                "http://localhost:5000",
+                "http://localhost:8000"
+            ]
             if self.cors_allowed_origins:
-                custom_origins = [origin.strip() for origin in self.cors_allowed_origins.split(",")]
+                custom_origins = [origin.strip() for origin in self.cors_allowed_origins.split(",") if origin.strip()]
                 return dev_origins + custom_origins
-            return ["*"]  # Fallback for development
+            return ["*"]  # Only allowed in development
+    
+    @property
+    def get_cors_config(self) -> dict:
+        """Get complete CORS configuration"""
+        return {
+            "allow_origins": self.get_cors_origins,
+            "allow_credentials": self.cors_allow_credentials,
+            "allow_methods": self.cors_allow_methods,
+            "allow_headers": self.cors_allow_headers,
+            "max_age": self.cors_max_age
+        }
     
     # Database Configuration
     database_url: Optional[str] = Field(None, alias="DATABASE_URL")
@@ -92,17 +128,35 @@ class Settings(BaseSettings):
     rate_limit_backend_url: str = Field("redis://localhost:6379/0", alias="RATE_LIMIT_BACKEND_URL")
     rate_limit_per_minute: int = Field(0, alias="RATE_LIMIT_PER_MINUTE")  # 0 = use defaults
     
+    # Healthcheck endpoint exemption
+    rate_limit_exempt_paths: List[str] = Field(
+        ["/health", "/readiness", "/metrics"],
+        alias="RATE_LIMIT_EXEMPT_PATHS"
+    )
+    
     @property
     def get_rate_limit_per_minute(self) -> int:
         """Get environment-appropriate rate limit per minute"""
         if self.rate_limit_per_minute > 0:
             return self.rate_limit_per_minute
         
-        # Default limits based on environment
-        if self.environment == Environment.PRODUCTION:
-            return 100
-        else:  # Development/staging
-            return 200
+        # Environment-specific defaults
+        return {
+            Environment.PRODUCTION: 100,
+            Environment.STAGING: 150,
+            Environment.DEVELOPMENT: 200,
+            Environment.LOCAL: 300
+        }.get(self.environment, 200)
+    
+    @property
+    def get_rate_limit_config(self) -> dict:
+        """Get complete rate limiting configuration"""
+        return {
+            "enabled": self.rate_limit_enabled,
+            "backend_url": self.rate_limit_backend_url,
+            "per_minute": self.get_rate_limit_per_minute,
+            "exempt_paths": self.rate_limit_exempt_paths
+        }
     
     # Legacy rate limiting fields (keep for backward compatibility)
     rate_limit_search: str = Field("30/minute", alias="RATE_LIMIT_SEARCH")

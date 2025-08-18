@@ -39,15 +39,21 @@ def get_user_identifier(request: Request) -> str:
 # Initialize limiter with Redis fallback to memory
 def create_rate_limiter():
     """Create rate limiter with Redis or in-memory storage"""
+    rate_config = settings.get_rate_limit_config
+    
+    if not rate_config["enabled"]:
+        logger.info("Rate limiting disabled")
+        return None
+    
     try:
         # Test Redis connection
-        redis_client = redis.Redis.from_url(settings.get_backend_url, socket_timeout=2)
+        redis_client = redis.Redis.from_url(rate_config["backend_url"], socket_timeout=2)
         redis_client.ping()
         logger.info("✅ Redis connected for rate limiting")
         
         return Limiter(
             key_func=get_user_identifier,
-            storage_uri=settings.get_backend_url
+            storage_uri=rate_config["backend_url"]
         )
         
     except Exception as e:

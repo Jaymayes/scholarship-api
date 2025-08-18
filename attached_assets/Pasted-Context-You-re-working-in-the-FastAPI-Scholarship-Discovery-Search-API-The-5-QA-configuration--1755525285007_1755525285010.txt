@@ -1,0 +1,84 @@
+Context
+You’re working in the FastAPI “Scholarship Discovery & Search API”. The 5 QA configuration fixes have been implemented and are reportedly working:
+
+Env-specific CORS with production whitelisting
+Env-driven rate limiting (prod: 100/min, dev: 200/min)
+Request body size middleware with 413
+URL length guard middleware with 414
+Unified error response schema: { trace_id, code, message, status, timestamp }
+Goal
+Review, harden, and fix any remaining issues around these features. Ensure production readiness, consistent behavior across the app, tests, docs, and CI all updated accordingly. Do not loosen security.
+
+Tasks
+
+Configuration and safety checks
+Centralize settings using the existing project pattern (Pydantic BaseSettings or pydantic_settings). Ensure these env vars are supported with defaults:
+ENVIRONMENT: development | production (default: development)
+CORS_ALLOWED_ORIGINS: comma-separated list (default: empty)
+RATE_LIMIT_PER_MINUTE: int (default: 100 if prod, 200 if dev)
+RATE_LIMIT_BACKEND_URL: string (default: current project default)
+MAX_REQUEST_SIZE_BYTES: int (default: 1048576)
+MAX_URL_LENGTH: int (default: 2048)
+In production, fail fast or warn loudly if CORS_ALLOWED_ORIGINS is empty; do not allow wildcard in prod.
+Ensure secrets and URLs are not logged.
+2. Middleware ordering and coverage
+
+Verify middleware order is correct: security/host/HTTPS redirect → CORS → URL length guard → request size guard → rate limiting → routing. Add comments explaining ordering.
+Ensure middlewares exclude WebSocket routes and healthchecks when appropriate, without bypassing security unintentionally.
+Preflight (OPTIONS) must pass CORS correctly and not trigger rate limiting or size checks unnecessarily.
+3. Unified error handling
+
+Confirm all error responses (413, 414, 429, 401, 403, 404, 422, 500) use the unified schema: trace_id, code, message, status, timestamp.
+Add/normalize global exception handlers for:
+RequestValidationError (422)
+HTTPException (all codes)
+Starlette/ASGI exceptions (e.g., 500)
+413 and 414 from custom middleware
+Ensure trace_id is present via a request-id middleware and propagated into logs and error responses.
+4. Rate limiting polish
+
+Keep the same library but initialize using RATE_LIMIT_BACKEND_URL and RATE_LIMIT_PER_MINUTE from env.
+Add standard headers when limited: X-RateLimit-Limit, X-RateLimit-Remaining, Retry-After.
+Exempt healthcheck/status endpoints if that matches current policy; otherwise, keep consistent across all public endpoints.
+Verify IPv6/Proxy handling (respecting X-Forwarded-For if the app is behind a proxy and this is already supported).
+5. CORS hardening
+
+In production: only whitelist origins from CORS_ALLOWED_ORIGINS. Explicitly set allow_methods, allow_headers, allow_credentials, and max_age. No wildcard in prod.
+Add robust preflight handling tests for allowed and disallowed origins.
+6. Tests
+
+Create/extend pytest suite (httpx TestClient or AsyncClient):
+CORS: allowed vs disallowed origins; OPTIONS preflight returns correct headers.
+Rate limiting: exceed threshold returns 429 with headers; threshold can be set via env in test.
+Request size: payload slightly over MAX_REQUEST_SIZE_BYTES returns 413 with unified error payload.
+URL length: overly long URL returns 414 with unified error payload.
+Validation errors (422), 401/403, 404, and an internal error (simulate) all return unified schema and include trace_id.
+Middleware order sanity: large payload + disallowed origin behaves predictably (CORS rejection first if applicable, or ensure no server crash).
+Ensure tests pass locally with pytest -q.
+7. OpenAPI and docs
+
+Document the unified error schema in OpenAPI: add reusable error response models and reference them for common errors (401, 403, 413, 414, 422, 429, 500).
+Update README:
+Document new env vars and defaults with examples
+Explain production configuration for CORS and rate limiting
+Show how to run tests and how to simulate 413/414/429 scenarios
+Add .env.example with safe defaults
+8. CI/Quality
+
+If repo has lint/type checks, ensure they pass. If CI is present, update to run tests. If not, add a simple workflow (only if project already uses CI).
+Keep changes non-breaking to existing endpoints and auth logic.
+Acceptance Criteria
+
+In production, wildcard CORS is never used; requests from non-whitelisted origins do not get Access-Control-Allow-Origin.
+Rate limit is environment-driven; exceeding limit returns 429 with standard headers.
+Oversized body returns 413; overly long URL returns 414; both use the unified error schema.
+All other errors (401, 403, 404, 422, 500) also use the unified schema and include trace_id.
+Middleware order is documented and correct; healthcheck and WebSocket behavior is sensible.
+Tests pass locally; README and OpenAPI are updated; no regression in existing functionality.
+Deliverables
+
+Updated code (settings, middleware, exception handlers, rate limiting init, CORS config)
+Comprehensive tests for the above
+Updated README and .env.example
+OpenAPI error responses documented
+Please implement or fix in-place based on the current project structure, adding brief inline comments where behavior is non-obvious.
