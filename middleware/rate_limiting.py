@@ -37,33 +37,68 @@ def get_user_identifier(request: Request) -> str:
     
     return f"ip:{get_remote_address(request)}"
 
-# Initialize limiter with Redis fallback to memory
+# Initialize limiter with environment-aware fallback
 def create_rate_limiter():
-    """Create rate limiter with test environment detection and Redis fallback"""
+    """Create rate limiter with environment-aware Redis fallback"""
     rate_config = settings.get_rate_limit_config
     
     if not rate_config["enabled"]:
-        logger.info("Rate limiting disabled")
+        logger.info("📝 Rate limiting disabled via configuration")
         return None
     
-    try:
-        # Test Redis connection
-        redis_client = redis.Redis.from_url(rate_config["backend_url"], socket_timeout=2)
-        redis_client.ping()
-        logger.info("✅ Redis connected for rate limiting")
-        
-        return Limiter(
-            key_func=get_user_identifier,
-            storage_uri=rate_config["backend_url"]
-        )
-        
-    except Exception as e:
-        logger.warning(f"⚠️  Redis not available, using in-memory rate limiting: {e}")
-        
+    # Check if Redis backend is explicitly disabled
+    if settings.disable_rate_limit_backend:
+        logger.info("📝 Redis rate limiting explicitly disabled - using in-memory fallback")
         return Limiter(
             key_func=get_user_identifier,
             storage_uri="memory://"
         )
+    
+    # Try Redis if configured
+    if rate_config["backend_url"] and rate_config["backend_url"] != "memory://":
+        try:
+            # Test Redis connection
+            redis_client = redis.Redis.from_url(rate_config["backend_url"], socket_timeout=2)
+            redis_client.ping()
+            logger.info("✅ Redis rate limiting backend connected successfully")
+            
+            return Limiter(
+                key_func=get_user_identifier,
+                storage_uri=rate_config["backend_url"]
+            )
+            
+        except Exception as e:
+            # Handle Redis connection failure based on environment
+            if settings.environment.value == "production":
+                logger.critical(
+                    f"💥 PRODUCTION ERROR: Redis rate limiting backend required but unavailable. "
+                    f"Error: {e}. Set DISABLE_RATE_LIMIT_BACKEND=true to bypass (NOT recommended)."
+                )
+                raise RuntimeError(
+                    f"Production environment requires Redis rate limiting backend. "
+                    f"Configure RATE_LIMIT_BACKEND_URL or set DISABLE_RATE_LIMIT_BACKEND=true. Error: {e}"
+                )
+            else:
+                # Development: clear warning with explicit fallback
+                logger.warning(
+                    f"⚠️  Development mode: Redis rate limiting unavailable, using in-memory fallback. "
+                    f"Error: {e}. This is acceptable for development but NOT for production."
+                )
+    else:
+        # No Redis URL configured
+        if settings.environment.value == "production":
+            logger.warning(
+                "⚠️  Production mode with no Redis rate limiting URL configured. "
+                "Using in-memory fallback. Set RATE_LIMIT_BACKEND_URL for distributed rate limiting."
+            )
+        else:
+            logger.info("📝 Development mode: Using in-memory rate limiting (Redis not configured)")
+    
+    # Fallback to in-memory limiter
+    return Limiter(
+        key_func=get_user_identifier,
+        storage_uri="memory://"
+    )
 
 # Create the limiter instance
 limiter = create_rate_limiter()
@@ -89,7 +124,7 @@ def get_rate_limit_for_environment(base_limit: str) -> str:
 
 # Rate limit exception handler with unified error schema
 async def rate_limit_handler(request: Request, exc: RateLimitExceeded) -> Response:
-    """Handle rate limit exceeded with unified error format"""
+    """Handle rate limit exceeded with unified error format and proper headers"""
     from middleware.error_handlers import create_error_response
     import time
     

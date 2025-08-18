@@ -3,13 +3,13 @@ Authentication and Authorization Middleware
 Implementation of JWT-based authentication with role-based access control
 """
 
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, Union
 from datetime import datetime, timedelta
 from fastapi import HTTPException, status, Depends, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from jose import JWTError, jwt
 from passlib.context import CryptContext
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 import os
 
 # Configuration - import from settings for secure JWT handling
@@ -38,10 +38,18 @@ class Token(BaseModel):
     access_token: str
     token_type: str
 
+class JWTPayload(BaseModel):
+    """JWT payload structure"""
+    sub: str = Field(..., description="Subject (user ID)")
+    exp: int = Field(..., description="Expiration timestamp")
+    roles: List[str] = Field(default=[], description="User roles")
+    scopes: List[str] = Field(default=[], description="User scopes")
+    iat: Optional[int] = Field(None, description="Issued at timestamp")
+
 class TokenData(BaseModel):
-    user_id: Optional[str] = None
-    roles: List[str] = []
-    scopes: List[str] = []
+    user_id: str = Field(..., description="User identifier")
+    roles: List[str] = Field(default=[], description="User roles")
+    scopes: List[str] = Field(default=[], description="User scopes")
 
 class User(BaseModel):
     user_id: str
@@ -97,36 +105,58 @@ def authenticate_user(username: str, password: str) -> Optional[User]:
     
     return User(**user_data)
 
-def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
-    """Create a JWT access token"""
-    to_encode = data.copy()
+def create_access_token(data: Dict[str, Any], expires_delta: Optional[timedelta] = None) -> str:
+    """Create a JWT access token with properly typed payload"""
+    now = datetime.utcnow()
     if expires_delta:
-        expire = datetime.utcnow() + expires_delta
+        expire = now + expires_delta
     else:
-        expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+        expire = now + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     
-    to_encode.update({"exp": expire})
+    # Create typed payload
+    payload = JWTPayload(
+        sub=str(data["sub"]),
+        exp=int(expire.timestamp()),
+        iat=int(now.timestamp()),
+        roles=data.get("roles", []),
+        scopes=data.get("scopes", [])
+    )
+    
     # Always use the current JWT secret for signing new tokens
-    encoded_jwt = jwt.encode(to_encode, get_jwt_secret_key(), algorithm=get_jwt_algorithm())
+    encoded_jwt = jwt.encode(payload.model_dump(), get_jwt_secret_key(), algorithm=get_jwt_algorithm())
     return encoded_jwt
 
 def decode_token(token: str) -> Optional[TokenData]:
     """Decode and validate a JWT token with rotation support"""
+    if not token or not isinstance(token, str):
+        return None
+        
     # Try current key first
     keys_to_try = [get_jwt_secret_key()] + get_jwt_previous_keys()
     
     for secret_key in keys_to_try:
+        if not secret_key:  # Skip empty keys
+            continue
+            
         try:
             payload = jwt.decode(token, secret_key, algorithms=[get_jwt_algorithm()])
-            user_id: str = payload.get("sub")
-            roles: List[str] = payload.get("roles", [])
-            scopes: List[str] = payload.get("scopes", [])
             
-            if user_id is None:
+            # Extract and validate required fields
+            user_id = payload.get("sub")
+            if not user_id or not isinstance(user_id, str):
                 continue
                 
+            roles = payload.get("roles", [])
+            scopes = payload.get("scopes", [])
+            
+            # Ensure roles and scopes are lists
+            if not isinstance(roles, list):
+                roles = []
+            if not isinstance(scopes, list):
+                scopes = []
+                
             return TokenData(user_id=user_id, roles=roles, scopes=scopes)
-        except JWTError:
+        except (JWTError, ValueError, KeyError):
             continue
     
     return None
@@ -140,7 +170,7 @@ async def get_current_user(credentials: Optional[HTTPAuthorizationCredentials] =
     if not token_data:
         return None
     
-    # Get user from mock database
+    # Get user from mock database - token_data.user_id is guaranteed to be str by TokenData model
     user_data = MOCK_USERS.get(token_data.user_id)
     if not user_data:
         return None
@@ -150,17 +180,21 @@ async def get_current_user(credentials: Optional[HTTPAuthorizationCredentials] =
 def require_auth(min_role: str = "user", scopes: Optional[List[str]] = None):
     """Require authentication with optional role and scope requirements"""
     def auth_dependency(user: Optional[User] = Depends(get_current_user)) -> User:
+        from middleware.error_handling import APIError
+        
         if not user:
-            raise HTTPException(
+            raise APIError(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Authentication required",
+                code="AUTH_001",
+                message="Authentication required",
                 headers={"WWW-Authenticate": "Bearer"},
             )
         
         if not user.is_active:
-            raise HTTPException(
+            raise APIError(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail="User account is disabled"
+                code="AUTH_002",
+                message="User account is disabled"
             )
         
         # Check role requirements
@@ -169,18 +203,20 @@ def require_auth(min_role: str = "user", scopes: Optional[List[str]] = None):
         required_level = role_hierarchy.get(min_role, 999)
         
         if user_level < required_level:
-            raise HTTPException(
+            raise APIError(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"Insufficient permissions. Required role: {min_role} or higher"
+                code="AUTH_003",
+                message=f"Insufficient permissions. Required role: {min_role} or higher"
             )
         
         # Check scope requirements
         if scopes:
             for scope in scopes:
                 if scope not in user.scopes:
-                    raise HTTPException(
+                    raise APIError(
                         status_code=status.HTTP_403_FORBIDDEN,
-                        detail=f"Insufficient permissions. Required scope: {scope}"
+                        code="AUTH_004",
+                        message=f"Insufficient permissions. Required scope: {scope}"
                     )
         
         return user
@@ -194,11 +230,13 @@ def require_admin():
 def require_scopes(required_scopes: List[str]):
     """Require specific scopes for endpoint access"""
     def scope_checker(user: User = Depends(require_auth)) -> User:
+        from middleware.error_handling import APIError
         for scope in required_scopes:
             if scope not in user.scopes:
-                raise HTTPException(
+                raise APIError(
                     status_code=status.HTTP_403_FORBIDDEN,
-                    detail=f"Insufficient permissions. Required scope: {scope}"
+                    code="AUTH_004",
+                    message=f"Insufficient permissions. Required scope: {scope}"
                 )
         return user
     return scope_checker
@@ -206,11 +244,13 @@ def require_scopes(required_scopes: List[str]):
 def require_roles(required_roles: List[str]):
     """Require specific roles for endpoint access"""
     def role_checker(user: User = Depends(require_auth)) -> User:
+        from middleware.error_handling import APIError
         user_has_required_role = any(role in user.roles for role in required_roles)
         if not user_has_required_role:
-            raise HTTPException(
+            raise APIError(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"Insufficient permissions. Required roles: {required_roles}"
+                code="AUTH_003",
+                message=f"Insufficient permissions. Required roles: {required_roles}"
             )
         return user
     return role_checker

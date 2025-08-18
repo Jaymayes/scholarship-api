@@ -1,0 +1,102 @@
+Context
+Project: FastAPI “Scholarship Discovery & Search API”
+Status: App is operational and secure. Senior QA found 6 real issues (1 High, 3 Medium, 2 Low) and many false positives. Fix these without weakening security. Preserve middleware order and the unified error schema:
+{ code, message, status, timestamp, trace_id, details? }
+
+Issues To Fix
+
+High (Auth type safety)
+Authentication type safety gaps (e.g., Optional/None handling, JWT payload typing, user_id type consistency) can cause runtime/type-check issues.
+Medium (Packages/CORS)
+Missing requirements.txt for environments without Poetry.
+CORS configuration needs environment-aware enforcement and tests.
+Any other missing packaging artifacts needed for deployment (e.g., .dockerignore already present; verify).
+Low (Operational warnings)
+Redis rate-limit backend fallback behavior needs a clean, explicit dev-only in-memory fallback with clear logging.
+bcrypt/passlib compatibility warnings; pin and configure properly.
+Non‑negotiables
+
+Keep all existing security controls in place (auth, rate limiting, CORS, size/URL guards, HSTS in prod).
+Do not change the unified error schema or relax protections.
+Do not re-enable docs in production unless explicitly opted in by existing setting.
+Tasks
+
+Authentication type safety (High)
+Define precise types for JWT payloads (e.g., sub: str or UUID), token claims, and the User model.
+Ensure get_current_user() returns a fully typed User object; guard Optional/None cases with explicit 401 errors using the unified error format.
+Normalize user_id type across the codebase (choose UUID or str); add conversion at the boundary (JWT decode/DB).
+Add mypy/pyright config and fix typing errors in auth, dependencies, and routers.
+Tests:
+Invalid/expired tokens → 401 unified error.
+Typed JWT payload round-trip (encode/decode) works with chosen user_id type.
+2. Packaging: requirements.txt (Medium)
+
+If using Poetry: add script/Make target to export: poetry export -f requirements.txt --output requirements.txt --without-hashes
+Else: generate requirements.txt pinned to current versions in pyproject/lock.
+Update Dockerfile and CI to prefer requirements.txt in environments without Poetry.
+Ensure .dockerignore excludes .env, secrets, tests if not needed in prod image.
+3. CORS configuration (Medium)
+
+Settings: ENVIRONMENT, CORS_ALLOWED_ORIGINS (comma-separated), ALLOW_CREDENTIALS, ALLOW_METHODS/HEADERS explicit.
+Production: require non-empty whitelist; no wildcard when credentials true.
+Development: allow “*” or dynamically allow Replit preview domains (dev only).
+Ensure OPTIONS preflight is handled before size/ratelimit middlewares and is not rate-limited.
+Tests:
+Allowed origin returns ACAO header; disallowed does not.
+OPTIONS preflight succeeds for allowed origin.
+4. Redis fallback for rate limiting (Low)
+
+Initialize limiter with RATE_LIMIT_BACKEND_URL when present and reachable.
+If missing/unreachable AND ENVIRONMENT != production: fallback to in-memory backend; log a clear WARNING (no secrets).
+Never fallback silently in production; fail fast with aggregated config error.
+Ensure 429 responses include headers: X-RateLimit-Limit, X-RateLimit-Remaining, Retry-After.
+OPTIONS requests excluded from limiting.
+Tests:
+Dev fallback path works; Prod requires backend or startup fails.
+5. bcrypt/passlib warnings (Low)
+
+Pin compatible versions in requirements.txt:
+passlib[bcrypt]==1.7.4
+bcrypt==4.0.1 (or a version known good for your environment)
+Configure a single CryptContext and ensure verify/needs_update paths work.
+Add a simple hash/verify unit test to prevent regressions.
+6. Config validation and messaging polish
+
+Ensure ENVIRONMENT defaults to “development” unless explicitly “production”.
+STRICT_CONFIG_VALIDATION defaults true only in production.
+Aggregate config errors into one clear RuntimeError in production; log warnings in dev. Never log secret values.
+Validate positive integers for timeouts/sizes/limits; reject zeros/negatives with clear messages.
+Cross‑checks
+
+Error responses for 401/403/404/413/414/422/429/500 use unified schema and include trace_id; content-type is application/json; no double encoding.
+Middleware order remains: Security/Host/HTTPS → CORS → URL-length guard → Body-size guard → Rate limiting → Routing.
+Docs are disabled in production unless explicitly enabled.
+Tests to Run/Add
+
+Auth typing + 401 cases; JWT payload typing invariant.
+CORS allowed/disallowed origin and preflight tests.
+Dev in-memory limiter fallback and Prod required backend behavior; 429 headers present.
+Config validation: prod fails fast on missing JWT secret or CORS whitelist; dev warns.
+bcrypt hash/verify sanity test.
+Ensure all existing tests remain green.
+Acceptance Criteria
+
+pytest -q fully passes; no flakiness.
+requirements.txt present, accurate, and used by Docker/CI when Poetry isn’t available.
+CORS behaves per environment with tests.
+Rate limiter fallback works in dev; prod strict; 429 headers included; OPTIONS not limited.
+No bcrypt-related warnings at runtime; hashing/verification test passes.
+Auth code is type-safe; no None/KeyError/TypeError paths; JWT/user_id typing consistent.
+Unified error schema and trace_id present on all error responses.
+Deliverables
+
+Updated auth typing and guards.
+requirements.txt and export script/Make target.
+CORS config refinements and tests.
+Rate limiter fallback improvements and tests.
+bcrypt/passlib pins and sanity test.
+Config validation polish and messages.
+CI/Docker updates if needed, plus brief inline comments for non-obvious choices.
+Execution
+
+Start by running pytest -q and static checks; paste the first failing traceback(s), fix root causes, and iterate until green while preserving all security guarantees.

@@ -106,8 +106,8 @@ async def check_eligibility_post(
         )
     return await execute_eligibility_check(
         gpa=request_data.gpa,
-        grade_level=request_data.grade_level.value if request_data.grade_level else None,
-        field_of_study=request_data.field_of_study.value if request_data.field_of_study else None,
+        grade_level=request_data.grade_level if request_data.grade_level else None,
+        field_of_study=request_data.field_of_study if request_data.field_of_study else None,
         citizenship=request_data.citizenship.value if request_data.citizenship else None,
         state_of_residence=request_data.state_of_residence.value if request_data.state_of_residence else None,
         age=request_data.age,
