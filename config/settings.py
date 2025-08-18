@@ -157,6 +157,26 @@ class Settings(BaseSettings):
         description="Comma-separated list of allowed origins for production"
     )
     
+    # Security Headers Configuration
+    enable_hsts: bool = Field(
+        default=False,
+        env="ENABLE_HSTS",
+        description="Enable HSTS header (only in production with HTTPS)"
+    )
+    hsts_max_age: int = Field(
+        default=63072000,  # 2 years
+        env="HSTS_MAX_AGE",
+        description="HSTS max-age in seconds"
+    )
+    hsts_include_subdomains: bool = Field(
+        default=True,
+        env="HSTS_INCLUDE_SUBDOMAINS"
+    )
+    hsts_preload: bool = Field(
+        default=True,
+        env="HSTS_PRELOAD"
+    )
+    
     @field_validator("cors_origins", mode="before")
     @classmethod
     def parse_cors_origins(cls, v):
@@ -207,6 +227,11 @@ class Settings(BaseSettings):
         """Check if running in development environment"""
         return self.environment in [Environment.LOCAL, Environment.DEVELOPMENT]
     
+    @property
+    def should_enable_hsts(self) -> bool:
+        """Check if HSTS should be enabled based on environment"""
+        return self.environment == Environment.PRODUCTION and self.enable_hsts
+    
     model_config = ConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
@@ -243,6 +268,7 @@ class ProductionSettings(Settings):
     cors_origins: List[str] = ["https://scholarship-api.com"]
     rate_limit_enabled: bool = True
     tracing_enabled: bool = True
+    enable_hsts: bool = True  # Enable HSTS in production
 
 def get_settings() -> Settings:
     """Get settings based on environment"""

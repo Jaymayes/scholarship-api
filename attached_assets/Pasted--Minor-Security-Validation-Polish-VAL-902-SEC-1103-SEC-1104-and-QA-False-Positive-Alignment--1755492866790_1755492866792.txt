@@ -1,0 +1,91 @@
+ Minor Security + Validation Polish (VAL-902, SEC-1103, SEC-1104) and QA False-Positive Alignment
+
+Context
+
+Stack: FastAPI + Pydantic v2 + async SQLAlchemy + JWT + rate limiting + observability.
+Status: Production-ready. All critical issues resolved. Remaining items are minor improvements and 2 documented false positives.
+Do not change existing successful response envelopes or endpoint behavior.
+Objectives
+
+VAL-902: Fix GPA “None” edge case handling in eligibility inputs (validation + behavior).
+SEC-1103: Add X-XSS-Protection header (for legacy compatibility).
+SEC-1104: Add Strict-Transport-Security (HSTS) header in production environments only.
+QA False Positives: Make tests reflect expected behaviors for SQL-like input and dev-mode rate limits; do not relax security.
+Changes to Implement
+
+A) GPA None Handling (Validation + Logic)
+
+schemas/eligibility.py
+Ensure the input model defines gpa: Optional[float] = None with constraints if provided: 0.0 <= gpa <= 4.0.
+In Pydantic v2: from typing import Optional, Annotated; gpa: Optional[Annotated[float, Field(ge=0, le=4)]] = None
+Add a model validator to ensure:
+If gpa is provided explicitly as null (None), keep it as None (don’t coerce), and do not violate constraints.
+If your business rules require GPA for certain checks, do not 500/422—allow request and let the service return “ineligible” with reason “GPA not provided” or similar (no schema change to successful envelope).
+services/eligibility_service.py (or wherever eligibility is computed)
+When gpa is None, ensure logic does not crash; include a reason in the result for any rule requiring GPA.
+routers/eligibility.py
+Keep 200 response with results; do not reclassify None to 422 unless your existing contract already mandates GPA. Maintain backward compatibility.
+B) Security Headers
+
+middleware/security_headers.py (new) or extend existing security middleware:
+Always set: X-XSS-Protection: "1; mode=block"
+Note: deprecated, retained for compatibility to satisfy QA.
+Conditionally set HSTS in production only (ENVIRONMENT in {"prod","production"}):
+Strict-Transport-Security: "max-age=63072000; includeSubDomains; preload"
+Only set if request scheme is https or if you know TLS termination is in front of the app (documented).
+main.py/app.py
+Add/ensure this middleware is registered after request ID middleware and before routes.
+settings/config.py
+Add ENABLE_HSTS: bool = True (default True in prod, False in dev/local)
+Add HSTS_MAX_AGE: int = 63072000
+Add HSTS_INCLUDE_SUBDOMAINS: bool = True
+Add HSTS_PRELOAD: bool = True
+C) QA False Positives: Tests and Docs Alignment
+
+tests/test_sql_injection_false_positive.py (new)
+Verify that search/filters accept SQL-like strings (e.g., "' OR 1=1 --") and return normal results, not errors or widened results due to injection. Assert 200 and normal behavior.
+tests/test_rate_limit_dev_mode.py (new or update existing)
+When ENVIRONMENT=dev/local and limits are higher, assert no 429 before the configured dev threshold (e.g., 60/min). If already tested, ensure test uses env-configured thresholds instead of hard-coded values.
+Documentation
+In replit.md or SECURITY.md, add a note:
+SQL-300: False positive—parameterized queries and ORM ensure no SQL injection; tests added.
+RATE-601: Dev-mode rate limits are intentionally higher; prod limits enforced in production env.
+Files to Edit/Create
+
+schemas/eligibility.py: Optional GPA with constraints + validator.
+services/eligibility_service.py: Safe handling for None GPA with reasoning in results.
+middleware/security_headers.py: Add X-XSS-Protection and conditional HSTS.
+settings/config.py: Add HSTS-related toggles and ENV-based defaults.
+main.py/app.py: Register security headers middleware.
+tests/test_sql_injection_false_positive.py: New test.
+tests/test_rate_limit_dev_mode.py: New or updated test.
+replit.md or SECURITY.md: Document the above clarifications.
+Acceptance Criteria
+
+Eligibility with gpa: null
+POST /eligibility/check with {"gpa": null, ...} returns 200; results do not crash; reasons include GPA missing when relevant.
+POST /eligibility/check with {"gpa": 4.3} returns 422 (constraint violation).
+POST /eligibility/check with gpa omitted behaves as today; no regressions.
+Headers
+All responses include X-XSS-Protection: 1; mode=block.
+In prod environment (ENVIRONMENT=prod): responses include Strict-Transport-Security with configured directives.
+In dev/local: HSTS is not set.
+Tests
+SQL-like input test passes and confirms no injection.
+Dev-mode rate limit test uses environment-configured thresholds; no 429 before dev threshold.
+Existing tests remain green; coverage threshold preserved.
+No behavior regressions: response envelopes, auth, RBAC, rate limits, metrics/tracing all unchanged.
+Run/Verify
+
+Set ENVIRONMENT=dev and run:
+pytest -q
+curl -i http://localhost:8000/healthz (check X-XSS-Protection)
+Repeat in ENVIRONMENT=prod to verify HSTS header present.
+Verify eligibility:
+curl -i -X POST http://localhost:8000/eligibility/check -H "Content-Type: application/json" -d '{"gpa": null}'
+curl -i -X POST http://localhost:8000/eligibility/check -H "Content-Type: application/json" -d '{"gpa": 4.3}'
+Notes
+
+Do not change existing successful response shapes.
+Keep logs sanitized; no tokens/PII.
+HSTS only for HTTPS/prod; ensure not added in local dev to avoid mixed-content issues.

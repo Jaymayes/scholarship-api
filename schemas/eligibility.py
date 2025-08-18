@@ -3,8 +3,8 @@ Strict eligibility validation schemas
 Enhanced input validation with proper constraints and enums
 """
 
-from pydantic import BaseModel, Field, field_validator
-from typing import Optional, List, Literal
+from pydantic import BaseModel, Field, field_validator, model_validator
+from typing import Optional, List, Literal, Annotated
 from enum import Enum
 
 class GradeLevelEnum(str, Enum):
@@ -94,11 +94,9 @@ class StateEnum(str, Enum):
 class EligibilityCheckRequest(BaseModel):
     """Strict eligibility check request with proper validation"""
     
-    gpa: Optional[float] = Field(
+    gpa: Optional[Annotated[float, Field(ge=0.0, le=4.0)]] = Field(
         None, 
-        ge=0.0, 
-        le=4.0, 
-        description="GPA on 4.0 scale (0.0-4.0)"
+        description="GPA on 4.0 scale (0.0-4.0), or null if not available"
     )
     
     grade_level: Optional[GradeLevelEnum] = Field(
@@ -151,12 +149,13 @@ class EligibilityCheckRequest(BaseModel):
         description="Specific scholarship IDs to check (optional)"
     )
     
-    @field_validator('gpa')
-    @classmethod
-    def validate_gpa(cls, v):
-        if v is not None and (v < 0.0 or v > 4.0):
-            raise ValueError('GPA must be between 0.0 and 4.0')
-        return v
+    @model_validator(mode='after')
+    def validate_gpa_constraints(self):
+        """Ensure GPA constraints are met when provided"""
+        if self.gpa is not None:
+            if self.gpa < 0.0 or self.gpa > 4.0:
+                raise ValueError('GPA must be between 0.0 and 4.0 when provided')
+        return self
     
     @field_validator('age')
     @classmethod
