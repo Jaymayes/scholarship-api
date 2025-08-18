@@ -1,65 +1,65 @@
 {
-  "analysis_metadata": {
-    "timestamp": "2025-08-18T04:32:15.329191",
-    "duration_seconds": 8.322635,
-    "total_issues": 5
-  },
-  "summary": {
-    "critical": 2,
-    "high": 1,
-    "medium": 2,
-    "low": 0
-  },
-  "issues": [
-    {
-      "issue_id": "AUTH-456",
-      "location": "middleware/auth.py",
-      "description": "Protected endpoint accessible without authentication: /api/v1/scholarships",
-      "steps_to_reproduce": "1. Send GET /api/v1/scholarships without Authorization header\n2. Check response",
-      "observed_output": "Status: 200 (accessible)",
-      "expected_output": "Status: 401 Unauthorized",
-      "severity": "Critical",
-      "category": "Security"
+  "qa_analysis_summary": {
+    "total_issues_found": 5,
+    "severity_breakdown": {
+      "Critical": 0,
+      "High": 2,
+      "Medium": 3,
+      "Low": 0
     },
+    "analysis_timestamp": "2025-08-18T04:50:43.786942",
+    "test_environment": "Local Development (localhost:5000)"
+  },
+  "detailed_findings": [
     {
-      "issue_id": "AUTH-753",
-      "location": "middleware/auth.py",
-      "description": "Protected endpoint accessible without authentication: /api/v1/analytics/summary",
-      "steps_to_reproduce": "1. Send GET /api/v1/analytics/summary without Authorization header\n2. Check response",
-      "observed_output": "Status: 200 (accessible)",
-      "expected_output": "Status: 401 Unauthorized",
-      "severity": "Critical",
-      "category": "Security"
-    },
-    {
-      "issue_id": "DB-001",
-      "location": "routers/database.py",
-      "description": "Database status endpoint not accessible",
-      "steps_to_reproduce": "1. Send GET /db/status\n2. Check response",
-      "observed_output": "Status: 404",
-      "expected_output": "Status: 200 with database status",
+      "issue_id": "SQL-300",
+      "location": "services/scholarship_service.py",
+      "description": "Potential SQL injection vulnerability detected",
+      "steps_to_reproduce": "GET /search?q='; DROP TABLE scholarships; --",
+      "observed_output": "Response contains SQL-related keywords: {\"items\":[],\"total\":0,\"page\":1,\"page_size\":20,\"filters\":{\"keyword\":\"'; DROP TABLE scholarships; --\",\"fields_of_study\":[],\"min_amount\":null,\"max_amount\":null,\"scholarship_types\":[],\"states\":[],\"min_gpa",
+      "expected_output": "Sanitized response without SQL error exposure",
       "severity": "High",
-      "category": "Database"
+      "timestamp": "2025-08-18T04:50:41.288773"
     },
     {
-      "issue_id": "ELIG-001",
-      "location": "routers/eligibility.py",
-      "description": "Eligibility check without required parameters doesn't return validation error",
-      "steps_to_reproduce": "1. Send GET /eligibility/check\n2. Check response",
-      "observed_output": "Status: 200",
-      "expected_output": "Status: 422 with validation error",
-      "severity": "Medium",
-      "category": "Input Validation"
-    },
-    {
-      "issue_id": "RATE-001",
+      "issue_id": "RATE-601",
       "location": "middleware/rate_limiting.py",
-      "description": "Rate limiting not functioning - no 429 status after 50 rapid requests",
-      "steps_to_reproduce": "1. Make 50 rapid GET requests to /search\n2. Check for 429 status",
-      "observed_output": "All responses: {200}",
-      "expected_output": "At least one 429 Too Many Requests response",
+      "description": "Rate limiting not effective on /search",
+      "steps_to_reproduce": "Send 100 rapid requests to /search",
+      "observed_output": "100 successful requests in 0.45 seconds",
+      "expected_output": "Rate limiting should trigger after configured limit",
+      "severity": "High",
+      "timestamp": "2025-08-18T04:50:41.867365"
+    },
+    {
+      "issue_id": "VAL-902",
+      "location": "schemas/eligibility.py or routers/eligibility.py",
+      "description": "Invalid GPA value not properly validated: None",
+      "steps_to_reproduce": "GET /eligibility/check?gpa=None",
+      "observed_output": "Status: 500, Response:   + Exception Group Traceback (most recent call last):\n  |   File \"/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/starlette/_utils.py\", line 77, in collapse_excgroups\n  |     yield\n  ",
+      "expected_output": "Status: 400 or 422 with validation error",
       "severity": "Medium",
-      "category": "Security"
+      "timestamp": "2025-08-18T04:50:43.608325"
+    },
+    {
+      "issue_id": "SEC-1103",
+      "location": "middleware/security_headers.py",
+      "description": "Missing security header: x-xss-protection",
+      "steps_to_reproduce": "GET / and check response headers",
+      "observed_output": "Header x-xss-protection not present",
+      "expected_output": "Header x-xss-protection: 1; mode=block",
+      "severity": "Medium",
+      "timestamp": "2025-08-18T04:50:43.630974"
+    },
+    {
+      "issue_id": "SEC-1104",
+      "location": "middleware/security_headers.py",
+      "description": "Missing security header: strict-transport-security",
+      "steps_to_reproduce": "GET / and check response headers",
+      "observed_output": "Header strict-transport-security not present",
+      "expected_output": "Header strict-transport-security: max-age=31536000; includeSubDomains",
+      "severity": "Medium",
+      "timestamp": "2025-08-18T04:50:43.631033"
     }
   ]
 }
