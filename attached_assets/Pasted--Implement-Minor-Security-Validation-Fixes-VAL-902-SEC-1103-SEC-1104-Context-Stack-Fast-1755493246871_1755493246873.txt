@@ -1,0 +1,97 @@
+ Implement Minor Security + Validation Fixes (VAL-902, SEC-1103, SEC-1104)
+
+Context
+
+Stack: FastAPI + Pydantic v2 + async SQLAlchemy + JWT + rate limiting + observability.
+Status: Production ready. All critical issues resolved. Remaining items:
+VAL-902: GPA None edge case in eligibility inputs.
+SEC-1103: Add X-XSS-Protection header for legacy compatibility.
+SEC-1104: Add HSTS (Strict-Transport-Security) in production only.
+Do not change existing successful response envelopes or endpoint behavior.
+Objectives
+
+Validation: Allow GPA to be None and handle it gracefully in eligibility logic; enforce bounds when provided.
+Security headers: Always add X-XSS-Protection; add HSTS only in production environments.
+Tests and docs: Add/update tests to verify the above; document behavior and environment toggles.
+Implementation Steps
+
+A) Eligibility GPA None Handling (VAL-902)
+
+File: schemas/eligibility.py
+Define GPA as optional with constraints when provided:
+Pydantic v2 style: from typing import Optional, Annotated; from pydantic import Field
+gpa: Optional[Annotated[float, Field(ge=0.0, le=4.0)]] = None
+If you use model validators, ensure None is accepted and not coerced to 0.0.
+File: services/eligibility_service.py (or equivalent eligibility computation module)
+Ensure the logic handles gpa is None without errors.
+If any rule requires GPA, return a normal 200 response with reasons including “GPA not provided” (do not change the existing success envelope or HTTP status).
+File: routers/eligibility.py
+Continue returning 422 for out-of-range GPA values (e.g., > 4.0 or < 0.0).
+Preserve current response structure and field names.
+B) Security Headers (SEC-1103, SEC-1104)
+
+File: middleware/security_headers.py (new) or extend existing security middleware
+For all responses, set:
+X-XSS-Protection: "1; mode=block" // legacy but requested by QA
+In production only (ENVIRONMENT in {"prod", "production"} and if ENABLE_HSTS is true), set:
+Strict-Transport-Security: "max-age=63072000; includeSubDomains; preload"
+Only set HSTS when behind HTTPS/TLS. If you cannot detect scheme reliably, guard with settings flag. Do not set HSTS in local/dev.
+File: settings/config.py
+Add typed settings with sensible defaults:
+ENVIRONMENT: Literal["local","dev","staging","prod"] = "local"
+ENABLE_HSTS: bool = (ENVIRONMENT in {"prod"})
+HSTS_MAX_AGE: int = 63072000
+HSTS_INCLUDE_SUBDOMAINS: bool = True
+HSTS_PRELOAD: bool = True
+File: main.py/app.py
+Register the security headers middleware after request ID middleware and before routes.
+Do not alter other middleware ordering or behaviors.
+C) Tests
+
+File: tests/test_eligibility_validation.py (add or update)
+POST /eligibility/check with {"gpa": null, ...} → 200, schema intact, includes a reason where GPA is required.
+POST /eligibility/check with {"gpa": 4.3} → 422 (constraint violation).
+POST /eligibility/check with {"gpa": -1} → 422.
+POST /eligibility/check with GPA omitted → 200 (current behavior preserved).
+File: tests/test_security_headers.py (new)
+In ENVIRONMENT=dev/local: response includes X-XSS-Protection, but NOT Strict-Transport-Security.
+In ENVIRONMENT=prod: response includes both X-XSS-Protection and Strict-Transport-Security with configured directives.
+Documentation
+
+File: SECURITY.md or replit.md (update)
+Document:
+VAL-902: GPA is optional; enforced bounds only when present. Business logic handles None with explanatory reasons.
+SEC-1103: X-XSS-Protection added for backward compatibility with older clients.
+SEC-1104: HSTS enabled only in production to avoid local/HTTP issues; configurable via ENABLE_HSTS and related settings.
+Acceptance Criteria
+
+Eligibility
+gpa=null → 200 OK, no crashes, results include reasoning for GPA-dependent rules.
+gpa outside [0, 4] → 422 with field error details.
+Omitted gpa → unchanged behavior; 200 OK with existing envelope.
+Headers
+All responses include X-XSS-Protection: 1; mode=block.
+In ENVIRONMENT=prod (and ENABLE_HSTS true), responses include:
+Strict-Transport-Security: max-age=63072000; includeSubDomains; preload
+In local/dev, HSTS is not set.
+No regressions:
+Response envelopes unchanged.
+Auth, RBAC, rate limiting, metrics, and tracing remain functional.
+Tests
+pytest -q passes.
+New tests verify headers and GPA validation behavior.
+Run/Verify
+
+Local/dev:
+ENVIRONMENT=local uvicorn main:app --host 0.0.0.0 --port 8000
+curl -i http://localhost:8000/healthz → contains X-XSS-Protection, no HSTS.
+curl -i -X POST http://localhost:8000/eligibility/check -H "Content-Type: application/json" -d '{"gpa": null}' → 200.
+curl -i -X POST http://localhost:8000/eligibility/check -H "Content-Type: application/json" -d '{"gpa": 4.3}' → 422.
+Prod-mode check:
+ENVIRONMENT=prod ENABLE_HSTS=true uvicorn main:app --host 0.0.0.0 --port 8000
+curl -I http://localhost:8000/healthz → includes both X-XSS-Protection and Strict-Transport-Security.
+Notes
+
+Do not modify existing successful response formats.
+Do not weaken any security controls.
+HSTS must only be active in production/TLS contexts to avoid local dev issues.
