@@ -1,0 +1,198 @@
+What this gives you
+
+A common message schema (task, result, event) across all apps
+Service registry + heartbeat
+Task dispatch, callbacks, and retries
+Secure inter-app calls (JWT + allowlist + rate limits)
+Optional relay so one app can invoke another through the Command Center
+Minimal code changes; bridges reuse your existing APIs
+Action names (canonical)
+
+auto_page_maker.generate_page
+provider_register.register_provider
+student_pilot.match_scholarships
+student_pilot.analyze_essay
+scholarship_api.search
+scholarship_sage.outreach_chat
+scholarship_agent.compliance_check
+Shared message schema (used by all prompts)
+
+Task (incoming to an agent)
+task_id: string (uuid)
+action: string (one of the above)
+payload: object
+reply_to: string (Command Center callback URL)
+trace_id: string
+requested_by: string
+resources: { priority: number, timeout_ms: number, retry: number }
+Result (agent -> Command Center)
+task_id, status: accepted|in_progress|succeeded|failed
+result: object
+error?: { code, message, details }
+trace_id: string
+Event (agent -> Command Center)
+event_id, type, source, data, time, trace_id
+Security
+
+Use JWT Authorization: Bearer <token> signed with SHARED_SECRET (HS256)
+Headers: X-Agent-Id, X-Trace-Id
+Allowlist the agent base URLs in the Command Center
+Reuse existing CORS, rate limiting, input validation
+Prompt for the Command Center (Auto Com Center) Paste this into Replit AI in auto-com-center-jamarrlmayes.replit.app.
+You are in the Auto Com Center app. Implement an Orchestrator and Event Bus to coordinate my other Replit apps (satellite agents). Requirements:
+
+Create an Orchestrator module with:
+Service Registry: in-memory store (plus optional file persistence) keyed by agent_id with fields: name, base_url, capabilities (action names), last_seen, status, public_key_or_none.
+Heartbeat: accept POST /orchestrator/heartbeat from agents; update last_seen; mark offline after 2 missed periods.
+Registration:
+POST /orchestrator/register: agent posts name, base_url, capabilities, and a signed JWT. Validate against SHARED_SECRET and AGENTS_ALLOWLIST.
+GET /orchestrator/agents: list agents and status.
+Task Dispatch:
+POST /orchestrator/tasks/dispatch: body { action, payload, requested_by, resources? }. Route to a matching agent by capabilities.
+Generate task_id and trace_id, persist task state (in-memory ok), and POST the Task to agent’s /agent/task with Authorization Bearer (JWT signed with SHARED_SECRET), X-Agent-Id, X-Trace-Id.
+Retry policy: configurable exponential backoff resources.retry times; mark failed on exhaustion.
+Callback endpoint: POST /orchestrator/tasks/:task_id/callback for agents to post Results; update status and store result.
+GET /orchestrator/tasks/:task_id for status/result.
+Event Bus:
+POST /orchestrator/events: accept agent Events; log and fan-out to subscribers (start with in-memory log).
+GET /orchestrator/events?since=timestamp for tailing logs.
+Relay:
+POST /orchestrator/relay: { target_agent_id or action, method, path, body, headers? } – proxy with auth; validate that caller is authorized (JWT + scopes).
+Security:
+ENV: SHARED_SECRET, AGENTS_ALLOWLIST (comma-separated base URLs), JWT_ISSUER, JWT_AUDIENCE.
+Verify JWTs on all orchestrator endpoints where appropriate; sign outgoing requests with the same SHARED_SECRET.
+Reuse existing middleware: rate limiting, input sanitization, CORS, security headers; add a stricter 5 req/min limit to dispatch and relay.
+Add X-Request-Id / trace_id propagation to logs and responses.
+Minimal UI and Docs:
+GET /orchestrator/ui: simple page listing agents, their status, capabilities, and recent tasks/events.
+Update README with: ENV vars, endpoints, message schema, curl examples, and a “Quickstart: Register agent and dispatch a task”.
+Tests / Validation:
+Add quick health: GET /orchestrator/health returns {status:"ok", time, agents_online}.
+Provide curl examples:
+Register agent
+Dispatch a task (e.g., action: scholarship_api.search)
+Callback result
+View events and task status
+Code quality:
+TypeScript types for Task, Result, Event, Agent.
+Input validation on all POSTs; return structured errors.
+Log with trace_id, agent_id, action, latency, and outcome.
+Done when:
+
+I can register a mock agent with curl, dispatch a task, receive a callback, and view it in /orchestrator/ui.
+Relay endpoint securely forwards a test GET to an agent path with JWT attached.
+README updated with exact curl commands.
+2. Prompt for Satellite Agents (Express/Node apps)
+Use this in each of these apps: Auto Page Maker, Provider Register, Student Pilot, Scholarship Sage, Scholarship Agent. Paste into Replit AI inside each app.
+
+Add an “Agent Bridge” to let this app register with the Auto Com Center and handle tasks. Requirements:
+
+Environment
+COMMAND_CENTER_URL: https://auto-com-center-jamarrlmayes.replit.app
+SHARED_SECRET: shared secret string
+AGENT_NAME: short name (e.g., auto_page_maker)
+AGENT_ID: stable id (e.g., auto-page-maker)
+AGENT_BASE_URL: this app’s public base URL
+Endpoints (new):
+POST /agent/register: Accepts JWT-signed registration from Command Center; verify and return capabilities and health.
+POST /agent/task: Accept Task envelope (see schema). Verify Authorization Bearer (HS256, SHARED_SECRET), X-Agent-Id matches; validate action and payload; respond 202 immediately then process async.
+POST /agent/events: Optional local endpoint to accept internal events; re-post out to COMMAND_CENTER_URL/orchestrator/events with JWT.
+GET /agent/capabilities: Return { agent_id, name, capabilities: [action strings], version, health }.
+GET /health: existing health if present; include agent_id and last_seen fields.
+Outbound calls:
+On startup (and every 60s), POST a registration heartbeat to COMMAND_CENTER_URL/orchestrator/register and /orchestrator/heartbeat with {agent_id, name, base_url, capabilities} signed with SHARED_SECRET.
+On task execution, POST Results to COMMAND_CENTER_URL/orchestrator/tasks/:task_id/callback with status (accepted|in_progress|succeeded|failed), including trace_id.
+Post notable Events to COMMAND_CENTER_URL/orchestrator/events (e.g., “page_generated”, “provider_registered”, “essay_analyzed”).
+Map actions to this app’s real capabilities:
+Determine the correct internal endpoints from this repo’s docs (e.g., PLATFORM_INVENTORY.md, SCHOLARYNC_INVENTORY.md, Features-Inventory.md) and wire them:
+For auto_page_maker.generate_page: call this app’s existing landing page generation endpoint with template, content, seo config; return the URL or HTML.
+For provider_register.register_provider: call the org/scholarship/provider creation endpoints; return created ids.
+For student_pilot.match_scholarships: call the matching endpoint; return matches and scores.
+For student_pilot.analyze_essay: call the essay analysis endpoint; return feedback.
+For scholarship_sage.outreach_chat: call chat/demo scheduling endpoints; return transcript or demo id.
+For scholarship_agent.compliance_check: call compliance validation endpoints; return result and score.
+Reuse this app’s existing auth/session where needed; the bridge should act as a privileged internal caller.
+Security:
+Verify inbound JWTs with SHARED_SECRET; reject if iss/aud don’t match.
+Rate limit /agent/task to 5 req/min (align with existing AI limits if applicable).
+Sanitize payload; enforce max body size consistent with app settings.
+Logging / tracing:
+Propagate trace_id; include in all logs; surface task duration and outcome.
+Docs:
+Update README with ENV vars, new endpoints, and an example curl for /agent/capabilities and a sample Task.
+Optional: If this repo uses TypeScript, add types for Task, Result, Event and keep strict mode happy.
+Done when:
+
+The app appears in Command Center /orchestrator/ui with capabilities.
+A dispatched task for one of this app’s actions returns a real result through the callback.
+Events appear in Command Center’s event log.
+3. Prompt for Scholarship API (FastAPI app)
+Paste into Replit AI in scholarship-api-jamarrlmayes.replit.app.
+
+Add a FastAPI “Agent Bridge” for the Auto Com Center. Requirements:
+
+ENV and Security same as other agents:
+COMMAND_CENTER_URL, SHARED_SECRET, AGENT_NAME, AGENT_ID, AGENT_BASE_URL
+Add FastAPI router /agent with:
+POST /agent/task: Pydantic models for Task/Result/Event; validate JWT (HS256, SHARED_SECRET) from Authorization; enforce rate limit 5 req/min for AI-heavy ops; respond 202 and process async (BackgroundTasks or asyncio.create_task).
+POST /agent/register and GET /agent/capabilities similar to Express agents.
+GET /health returns status and agent_id.
+Outbound:
+On startup event, POST register + heartbeat to COMMAND_CENTER_URL/orchestrator/register and /orchestrator/heartbeat (use httpx with timeouts and retries).
+On completion, POST Result callback to /orchestrator/tasks/:task_id/callback.
+Action mapping:
+Map scholarship_api.search to this service’s existing search/filter endpoint. Use the FEATURE_INVENTORY_REPORT.md and features.json to locate path, query params, and auth requirements. Accept payload { query, filters, pagination } and translate to the app’s native request. Return standardized result { items, total, page, took_ms }.
+Validation and Docs:
+Strict Pydantic schemas with field constraints; return structured errors; document in OpenAPI.
+Update README with environment, endpoints, sample Task.
+Done when:
+
+The service registers in Command Center and successfully handles scholarship_api.search tasks with real search results.
+How to use these prompts step-by-step
+
+Prepare the shared secret and allowlist
+
+Choose a SHARED_SECRET (long random string).
+Identify each agent’s base URL and put them into the Command Center AGENTS_ALLOWLIST (comma-separated).
+In Auto Com Center, set ENV:
+SHARED_SECRET
+AGENTS_ALLOWLIST=https://auto-page-maker-...app,https://provider-register-...app,https://student-pilot-...app,https://scholarship-api-...app,https://scholarship-sage-...app,https://scholarship-agent-...app
+JWT_ISSUER=auto-com-center
+JWT_AUDIENCE=scholar-sync-agents
+Implement the Command Center first
+
+Open auto-com-center-jamarrlmayes.replit.app, paste the Command Center prompt, let Replit AI implement.
+Set the env vars. Restart.
+Verify: GET /orchestrator/health and open /orchestrator/ui.
+Implement each agent
+
+For each app, open it in Replit and paste the appropriate agent prompt (Express or FastAPI).
+Set env vars in each app:
+COMMAND_CENTER_URL=https://auto-com-center-jamarrlmayes.replit.app
+SHARED_SECRET=<same as Command Center>
+AGENT_NAME, AGENT_ID, AGENT_BASE_URL=<its URL>
+Restart each app. Within ~1 minute they should self-register. You should see them in /orchestrator/ui.
+Sanity-test with curl
+
+Dispatch a scholarship search:
+POST {COMMAND_CENTER}/orchestrator/tasks/dispatch with body: { "action":"scholarship_api.search", "payload":{"query":"STEM", "filters":{"level":"undergrad"}, "pagination":{"page":1,"size":10}}, "requested_by":"ops" }
+Watch /orchestrator/tasks/{task_id} for status to change to succeeded; inspect result.
+Dispatch a landing page generation: action: "auto_page_maker.generate_page" payload: { template:"modern", title:"STEM Awards 2025", sections:[...], seo:{...} }
+Verify the Agent posts back a page URL or HTML.
+Try an end-to-end orchestration (example)
+
+From Command Center, create a composite task (or just dispatch in sequence):
+scholarship_api.search -> returns 20 top scholarships.
+student_pilot.match_scholarships -> send student profile + those scholarships; get matches and scores.
+auto_page_maker.generate_page -> build a landing page with the matched set; receive URL.
+provider_register.register_provider -> register the institution/partner for that campaign; receive org/scholarship ids.
+scholarship_sage.outreach_chat -> initiate campaign outreach; receive demo_id or transcript.
+scholarship_agent.compliance_check -> validate content and flows for COPPA and content safety.
+Each step posts events; you can tail them at /orchestrator/events.
+Production notes
+
+Put all services behind HTTPS (already the case on Replit).
+Tighten CORS to only the Command Center for /agent/*.
+Keep rate limits conservative on /agent/task and Command Center dispatch/relay.
+Rotate SHARED_SECRET periodically; support dual-secret validation during rotation.
+Persist registry/tasks/events to a small DB (e.g., Postgres) if you need durable logs.
