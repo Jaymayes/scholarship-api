@@ -168,8 +168,20 @@ app.include_router(interaction_wrapper_router, tags=["interactions"])
 
 @app.get("/")
 async def root():
-    """Root endpoint optimized for deployment health checks"""
-    return {"status": "active"}
+    """Root endpoint with helpful API information"""
+    return {
+        "status": "active",
+        "message": "Scholarship Discovery & Search API",
+        "version": settings.api_version,
+        "endpoints": {
+            "health": "/health",
+            "api_info": "/api", 
+            "search": "/api/v1/search?q=<query>",
+            "documentation": "/docs",
+            "debug": "/_debug/config"
+        },
+        "example": "Try: /api/v1/search?q=engineering"
+    }
 
 @app.head("/")
 async def root_head():

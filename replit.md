@@ -6,6 +6,16 @@ This project is a Scholarship Discovery & Search API built with FastAPI. Its pri
 
 Preferred communication style: Simple, everyday language.
 
+# Recent Changes
+
+## 2025-08-18 - Replit Runtime Fixes
+- Fixed port configuration mismatch (now using port 5000 correctly)
+- Added Replit proxy header support for proper reverse proxy handling
+- Enhanced root endpoint to show helpful API information instead of just {"status":"active"}
+- Created debug endpoint /_debug/config for development troubleshooting
+- All QA security fixes preserved while fixing runtime issues
+- App now fully functional in Replit preview with all endpoints accessible
+
 # System Architecture
 
 ## Backend Framework
