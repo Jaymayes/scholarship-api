@@ -50,13 +50,20 @@ uvicorn main:app --host 0.0.0.0 --port $PORT --proxy-headers --forwarded-allow-i
 - **Proxy Support**: Enabled `--proxy-headers` and `--forwarded-allow-ips="*"`
 
 ### 4. ✅ Enhanced ALLOWED_HOSTS Configuration
-**Updated:** `config/settings.py`
+**Updated:** `config/settings.py` and `middleware/trusted_host.py`
 ```python
 allowed_hosts: List[str] = Field(
-    default_factory=lambda: ["localhost", "127.0.0.1", "*.replit.app", "*.replit.dev"],
+    default_factory=lambda: [
+        "localhost", "127.0.0.1", 
+        "*.replit.app", "*.replit.dev", "*.repl.co",
+        # Dynamic Replit development domains pattern
+        "*.picard.replit.dev", "*.kirk.replit.dev", "*.spock.replit.dev"
+    ],
     alias="ALLOWED_HOSTS"
 )
 ```
+
+**Added:** Wildcard pattern matching support in TrustedHost middleware using `fnmatch`
 
 ### 5. ✅ Deployment Environment Variables
 **Required for Production:**
@@ -155,7 +162,14 @@ DATABASE_URL=postgresql://user:pass@host:port/db
 1. **`start.sh`** - New production start script ✅
 2. **`main.py`** - Added `/healthz` endpoint ✅ 
 3. **`config/settings.py`** - Enhanced ALLOWED_HOSTS defaults ✅
-4. **`README_DEPLOYMENT.md`** - Complete deployment guide ✅
+4. **`middleware/trusted_host.py`** - Added wildcard pattern matching ✅
+5. **`README_DEPLOYMENT.md`** - Complete deployment guide ✅
+
+## Critical Fix: Host Validation Issue
+**Problem:** TrustedHost middleware was blocking Replit development domains
+**Root Cause:** Exact string matching instead of wildcard pattern support
+**Solution:** Implemented fnmatch-based pattern matching in TrustedHost middleware
+**Result:** `83dfcf73-98cb-4164-b6f8-418c739faf3b-00-10wl0zocrf1wy.picard.replit.dev` now matches `*.picard.replit.dev` ✅
 
 ## Testing Commands
 

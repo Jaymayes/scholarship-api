@@ -10,6 +10,7 @@ from starlette.responses import Response
 from fastapi import HTTPException
 from config.settings import settings
 import time
+import fnmatch
 
 
 class TrustedHostMiddleware(BaseHTTPMiddleware):
@@ -36,8 +37,8 @@ class TrustedHostMiddleware(BaseHTTPMiddleware):
         if ":" in host:
             host = host.split(":")[0]
 
-        # Check against allowed hosts
-        if self.allowed_hosts and host not in [h.lower() for h in self.allowed_hosts]:
+        # Check against allowed hosts (supporting wildcards)
+        if self.allowed_hosts and not self._is_host_allowed(host):
             # Create error response using unified format
             error_detail = {
                 "trace_id": getattr(request.state, 'trace_id', 'host_validation'),
@@ -50,3 +51,20 @@ class TrustedHostMiddleware(BaseHTTPMiddleware):
             raise HTTPException(status_code=400, detail=error_detail)
 
         return await call_next(request)
+
+    def _is_host_allowed(self, host: str) -> bool:
+        """Check if host matches any allowed pattern (supports wildcards)"""
+        host_lower = host.lower()
+        
+        for allowed_host in self.allowed_hosts:
+            allowed_lower = allowed_host.lower()
+            
+            # Exact match
+            if host_lower == allowed_lower:
+                return True
+            
+            # Wildcard pattern match using fnmatch
+            if "*" in allowed_lower and fnmatch.fnmatch(host_lower, allowed_lower):
+                return True
+                
+        return False

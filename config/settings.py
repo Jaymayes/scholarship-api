@@ -61,7 +61,12 @@ class Settings(BaseSettings):
     
     # Production security requirements - fix parsing issues with proper JSON parsing
     allowed_hosts: List[str] = Field(
-        default_factory=lambda: ["localhost", "127.0.0.1", "*.replit.app", "*.replit.dev"],
+        default_factory=lambda: [
+            "localhost", "127.0.0.1", 
+            "*.replit.app", "*.replit.dev", "*.repl.co",
+            # Dynamic Replit development domains pattern
+            "*.picard.replit.dev", "*.kirk.replit.dev", "*.spock.replit.dev"
+        ],
         alias="ALLOWED_HOSTS"
     )
     trusted_proxy_ips: List[str] = Field(default_factory=list, alias="TRUSTED_PROXY_IPS")
