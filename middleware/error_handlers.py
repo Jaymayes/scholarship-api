@@ -182,7 +182,20 @@ async def not_found_handler(request: Request, exc: HTTPException) -> JSONRespons
 
 
 async def method_not_allowed_handler(request: Request, exc: HTTPException) -> JSONResponse:
-    """Handle 405 Method Not Allowed errors"""
+    """Handle 405 Method Not Allowed errors - but allow OPTIONS for CORS"""
+    # Special handling for OPTIONS method - allow it for CORS preflight
+    if request.method == "OPTIONS":
+        # This should not be reached due to CORS middleware, but just in case
+        from fastapi.responses import Response
+        return Response(
+            status_code=200,
+            headers={
+                "Access-Control-Allow-Origin": "*",
+                "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+                "Access-Control-Allow-Headers": "Content-Type, Authorization"
+            }
+        )
+    
     error_response = create_error_response(
         request, 405, "METHOD_NOT_ALLOWED",
         f"Method {request.method} not allowed for '{request.url.path}'"
@@ -196,66 +209,4 @@ async def method_not_allowed_handler(request: Request, exc: HTTPException) -> JS
     return JSONResponse(status_code=405, content=error_response)
 
 
-async def general_exception_handler(request: Request, exc: Exception) -> JSONResponse:
-    """Handle unexpected errors with appropriate logging"""
-    trace_id = getattr(request.state, "trace_id", "unknown")
-    
-    error_response = {
-        "trace_id": trace_id,
-        "code": "INTERNAL_SERVER_ERROR",
-        "message": "An unexpected error occurred",
-        "status": 500,
-        "timestamp": datetime.utcnow().isoformat()
-    }
-    
-    # Log the full exception for debugging
-    logger.error(
-        f"Unexpected error on {request.method} {request.url.path}: {str(exc)}",
-        extra={
-            "trace_id": trace_id,
-            "exception": str(exc),
-            "traceback": traceback.format_exc()
-        }
-    )
-    
-    return JSONResponse(status_code=500, content=error_response)
-
-
-async def not_found_handler(request: Request, exc: StarletteHTTPException) -> JSONResponse:
-    """Handle 404 errors with standardized format"""
-    trace_id = getattr(request.state, "trace_id", "unknown")
-    
-    error_response = {
-        "trace_id": trace_id,
-        "code": "NOT_FOUND",
-        "message": "The requested resource was not found",
-        "status": 404,
-        "timestamp": datetime.utcnow().isoformat()
-    }
-    
-    logger.info(
-        f"404 error on {request.method} {request.url.path}",
-        extra={"trace_id": trace_id}
-    )
-    
-    return JSONResponse(status_code=404, content=error_response)
-
-
-async def method_not_allowed_handler(request: Request, exc: StarletteHTTPException) -> JSONResponse:
-    """Handle 405 errors with standardized format"""
-    trace_id = getattr(request.state, "trace_id", "unknown")
-    
-    error_response = {
-        "trace_id": trace_id,
-        "code": "METHOD_NOT_ALLOWED",
-        "message": f"Method {request.method} not allowed for this endpoint",
-        "status": 405,
-        "timestamp": datetime.utcnow().isoformat()
-    }
-    
-    logger.warning(
-        f"405 error: {request.method} not allowed on {request.url.path}",
-        extra={"trace_id": trace_id}
-    )
-    
-    return JSONResponse(status_code=405, content=error_response)
+# Remove duplicate handlers - kept the unified versions above

@@ -73,7 +73,7 @@ async def execute_search(
             user_id=user_id,
             query=keyword or "",
             result_count=0,  # Will be updated after search
-            filters=filters.dict()
+            filters=filters.model_dump()
         )
         
         result = scholarship_service.search_scholarships(filters)
@@ -91,7 +91,7 @@ async def execute_search(
             "total": result.total_count,
             "page": result.page,
             "page_size": result.page_size,
-            "filters": filters.dict(),
+            "filters": filters.model_dump(),
             "took_ms": took_ms,
             "has_next": result.has_next,
             "has_previous": result.has_previous
@@ -123,18 +123,12 @@ async def search_scholarships_post(
     
     Returns metadata-rich response with items, total, pagination info, and timing.
     """
-    # QA-005 fix: Enforce authentication in production
+    # QA-005 fix: Enforce authentication in production  
     if not settings.public_read_endpoints and not current_user:
         from fastapi import HTTPException
         raise HTTPException(
             status_code=401,
-            detail={
-                "trace_id": getattr(request.state, 'trace_id', None),
-                "code": "AUTHENTICATION_REQUIRED",
-                "message": "Authentication required for search endpoints",
-                "status": 401,
-                "timestamp": int(time.time())
-            }
+            detail="Authentication required for search endpoints"
         )
     user_id = current_user.get("user_id") if current_user else None
     
@@ -183,13 +177,7 @@ async def search_scholarships_get(
         from fastapi import HTTPException
         raise HTTPException(
             status_code=401,
-            detail={
-                "trace_id": getattr(request.state, 'trace_id', None),
-                "code": "AUTHENTICATION_REQUIRED",
-                "message": "Authentication required for search endpoints",
-                "status": 401,
-                "timestamp": int(time.time())
-            }
+            detail="Authentication required for search endpoints"
         )
     
     user_id = current_user.get("user_id") if current_user else None

@@ -1,0 +1,91 @@
+Context
+Project: FastAPI “Scholarship Discovery & Search API”
+Status: Security, QA, and deployment hardening are complete and verified. Core and security tests are passing, app runs on port 5000, and unified error format is enforced. We now need a final error/bug-fix pass to catch any remaining defects, edge cases, and regressions that may not be covered by current tests or only appear in Replit/Container runtime.
+
+Do not loosen any security controls. Preserve unified error schema:
+{ code, message, status, timestamp, trace_id, details? }
+
+Your Objectives
+
+Find and fix all remaining errors/bugs (runtime, edge cases, test flakiness).
+Keep auth, CORS, rate limiting, middleware order, and docs protection intact.
+Ensure reliability across Replit dev and containerized production.
+Diagnostics (run in order)
+
+Run full tests and static checks
+pytest -q
+ruff/flake8 and mypy/pyright (as used in repo)
+Note failures, xfails, and any flakiness; fix root causes.
+2. Runtime smoke in Replit
+
+ENVIRONMENT=development; run the app.
+Verify:
+GET /healthz, /health/database, /health/services → 200
+GET/POST /search, /scholarships unauth → 401; with valid auth → 200
+Oversized body → 413; overly long URL → 414; rate limit exceeded → 429 (with standard headers)
+OPTIONS preflight succeeds and is not rate-limited
+CORS dev allows Replit preview domain; prod enforces whitelist with no wildcard
+Bug Hotspots to Audit and Fix
+
+Pydantic model mismatches
+
+Ensure response_model matches actual payloads; avoid 500s due to model validation.
+Confirm recent renames (recommendation_score vs match_score) are consistent across serializers, docs, and tests.
+Set extra="forbid" intentionally; add aliases or model tweaks if clients send snake/camelCase variants (document behavior).
+Dependency/session handling
+
+get_current_user and DB session dependencies use yield and close properly.
+No AttributeError on optional values; guard None for fields like user_id or optional query params.
+Ensure background tasks and async endpoints await correctly; fix “coroutine was never awaited” warnings.
+Rate limiting
+
+OPTIONS excluded; identifier function uses request.client.host or trusted X-Forwarded-For per settings.
+429 returns unified error and headers: X-RateLimit-Limit, X-RateLimit-Remaining, Retry-After.
+Confirm in-memory fallback in dev; Redis in prod initialized with backoff.
+Health and readiness
+
+Health endpoints do not parse bodies; reject extras if models used.
+Database check uses a short-lived SessionLocal() and SELECT 1 with timeouts; return 503 on dependency failures.
+Middleware order and behavior
+
+Security/Host/HTTPS → CORS → URL-length → Body-size → Rate limiting → Routing.
+WebSockets excluded sensibly; no accidental bypass of protections.
+Serialization edge cases
+
+Datetime timezone consistency (UTC ISO8601).
+Decimal/UUID/Enum JSON encoding; add custom encoders if needed.
+Large numeric IDs preserved as strings only if schema expects it.
+Pagination and query safety
+
+Validate pagination parameters (min/max limit, max page size).
+Validate sort fields and order; whitelist sortable fields to avoid ambiguous SQL or unexpected behaviors.
+Docs protection
+
+In production: /docs, /redoc, /openapi.json disabled unless ENABLE_DOCS=true; return 404 otherwise.
+Confirm OpenAPI reflects unified error responses.
+Targeted Fixes
+
+Align request/response models with real payloads; add enums, constraints, and field aliases if needed.
+Normalize all errors through global handlers to ensure unified schema always includes trace_id.
+Harden identifier/trusted proxies logic via settings; never default to “trust all” in prod.
+Ensure engine uses pool_pre_ping=True, proper timeouts, and graceful shutdown disposes resources.
+Add/Update Tests
+
+Response_model conformance tests for search, scholarships, and recommendations.
+OPTIONS preflight CORS tests (allowed vs disallowed).
+413/414/429 tests validate unified error payload and headers.
+Readiness 503 when DB/Redis down; 200 when healthy.
+Regression tests for renamed fields and strict extra="forbid" behavior.
+Acceptance Criteria
+
+pytest -q passes locally and in CI; no flakiness.
+No runtime 500s on valid requests; invalid requests return unified errors with trace_id.
+Protected routes consistently 401/403 without valid auth; succeed with valid auth.
+Rate limiting works with headers; CORS behaves per env; docs locked in prod.
+Replit and Docker prod both start cleanly; health checks pass; graceful shutdown cleanly disposes DB/Redis.
+Deliverables
+
+Code fixes with brief inline comments for non-obvious choices.
+Any new/updated tests and updated OpenAPI if models changed.
+README notes if request/response contracts or config flags changed.
+Begin by running the full test suite and paste any failures into your analysis to drive iterative fixes, ensuring no regression in security or unified error formatting.

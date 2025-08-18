@@ -114,7 +114,8 @@ async def rate_limit_handler(request: Request, exc: RateLimitExceeded) -> Respon
         except:
             retry_after = 60
     
-    response_data = create_error_response(
+    # Create proper error response data
+    error_data = create_error_response(
         request=request,
         status_code=429,
         error_code="RATE_LIMITED",
@@ -130,11 +131,13 @@ async def rate_limit_handler(request: Request, exc: RateLimitExceeded) -> Respon
         "X-RateLimit-Reset": str(int(time.time() + retry_after))
     }
     
-    return Response(
-        content=response_data.body.decode(),
+    # Import JSONResponse for proper response
+    from fastapi.responses import JSONResponse
+    
+    return JSONResponse(
+        content=error_data,
         status_code=429,
-        headers=headers,
-        media_type="application/json"
+        headers=headers
     )
 
 # Environment-aware rate limit decorators
