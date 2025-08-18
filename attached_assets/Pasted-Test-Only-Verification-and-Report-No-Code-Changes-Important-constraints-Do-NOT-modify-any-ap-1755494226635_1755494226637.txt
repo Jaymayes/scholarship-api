@@ -1,0 +1,107 @@
+Test-Only Verification and Report (No Code Changes)
+
+Important constraints
+
+Do NOT modify any application code, configuration, env vars, or deployment settings.
+Do NOT change the run command or redeploy.
+You MAY create read-only test scripts and reports. Create them under a temporary folder tests_tmp/ and top-level reports QA_VERIFICATION_REPORT.md and QA_VERIFICATION_REPORT.json.
+Goal
+Run a non-invasive verification of the live API and produce a concise report confirming health, security, validation, rate limiting behavior, and deployment readiness. Use the currently running instance visible in Preview.
+
+Test plan
+
+Detect base URL and status
+Use the Preview URL shown by Replit (the .repl.co or .replit.dev domain).
+Confirm root GET / returns 200 and JSON with keys:
+message, version, environment, docs, status, authentication
+Capture latency (ms) for root.
+Capture server port if discoverable, but do not change it.
+2. Public/operational endpoints
+
+GET /docs should be 200.
+GET /healthz should be 200 with a minimal ok body.
+GET /readyz should be 200 if DB reachable; otherwise 503. Record status.
+GET /metrics should be 200 with text/plain OpenMetrics content; record top 3 metric names.
+3. Database status
+
+GET /db/status and /api/v1/db/status (try both). Record:
+HTTP status
+connected flag
+scholarships count
+interactions count
+If either route not present, note as “not found (as designed)” without changing anything.
+4. Auth enforcement (no token path)
+
+GET /api/v1/scholarships without Authorization → expect 401.
+GET /api/v1/analytics/summary without Authorization → expect 401 or 403.
+Record statuses and error body (trace_id, code, message).
+5. Core functionality
+
+Search:
+GET /search (no params) → expect 200 with keys: items, total, page, page_size, filters, took_ms.
+POST /search with { "query": "merit" } → expect 200 with same schema.
+Eligibility:
+POST /eligibility/check with a valid minimal payload (e.g., { "gpa": 3.6 }) → 200; record keys in first result.
+POST /eligibility/check with { "gpa": 4.3 } → expect 422; capture validation error format.
+POST /eligibility/check with { "gpa": null } → expect 200 with safe handling and reasons (if applicable).
+6. Rate limiting (light probe)
+
+Burst GET /search 40 times as fast as possible. If a 429 occurs, record first 429 timestamp and Retry-After header.
+If no 429 within 40 requests, mark as “No 429 observed (likely dev thresholds)”.
+7. Security headers
+
+For GET /healthz and GET /search, record:
+X-XSS-Protection header (should be present).
+Strict-Transport-Security (present only if running in prod over TLS).
+X-Content-Type-Options and X-Frame-Options if available.
+Record CORS Access-Control-Allow-Origin (if present).
+8. Response envelope consistency
+
+Confirm standardized error envelope on 401/403/422 and 429 (if observed):
+{ trace_id, code, message, details?, status }
+9. Observability cross-checks
+
+Verify trace_id propagation:
+Send a request with X-Request-ID: test-trace-123 and confirm it’s echoed (if implemented).
+Confirm took_ms appears in search responses.
+Execution notes
+
+Use curl or a small Python script with httpx/requests under tests_tmp/ to run calls and collect results.
+Do not start/stop the app; rely on the currently running instance. If it is not running, report “service not running” and stop.
+Artifacts to produce
+
+QA_VERIFICATION_REPORT.md: human-readable summary with:
+Executive summary (pass/fail per category)
+Endpoint matrix table (method, path, status, latency, key headers)
+Security checks results (auth enforcement, headers)
+Validation checks (eligibility cases)
+Rate limit probe outcome
+DB status findings
+Recommendations only if something fails; otherwise “No action required”
+QA_VERIFICATION_REPORT.json: machine-readable results with fields:
+meta: { timestamp, base_url, environment_detected }
+endpoints: [{ method, path, status, latency_ms, headers_subset, body_sample_keys }]
+auth: { scholarships_no_token_status, analytics_no_token_status }
+db: { available: bool, scholarships_count: int|null, interactions_count: int|null, route_used }
+search: { get_status, post_status, schema_ok, took_ms_present }
+eligibility: { valid_status, over_max_status, null_gpa_status }
+rate_limit_probe: { requests_sent, first_429_index|null, retry_after|null }
+headers: { x_xss_protection_present: bool, hsts_present: bool }
+errors_observed: [ { path, status, envelope_ok } ]
+conclusion: "PASS" | "WARN" | "FAIL"
+Reporting format
+
+Print a short console summary at the end.
+Save the full outputs to QA_VERIFICATION_REPORT.md and QA_VERIFICATION_REPORT.json in the project root.
+Do not change or commit any application files.
+Optional helper snippet (Python; place under tests_tmp/verify.py if needed; do not import app code)
+
+Only use the live HTTP base URL and standard libraries or httpx/requests.
+Ensure timeouts and retries are reasonable (e.g., 5s timeout).
+Deliverables
+
+A console message with:
+Base URL used
+Overall PASS/WARN/FAIL
+Locations of QA_VERIFICATION_REPORT.md and QA_VERIFICATION_REPORT.json
+The two report files populated with the findings.
