@@ -1,6 +1,8 @@
 from fastapi import FastAPI, Request, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.exceptions import RequestValidationError
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import HTMLResponse
 from slowapi.errors import RateLimitExceeded
 import uvicorn
 
@@ -37,6 +39,9 @@ app = FastAPI(
     redoc_url="/redoc",
     debug=settings.debug
 )
+
+# Mount static files
+app.mount("/static", StaticFiles(directory="static"), name="static")
 
 # Setup observability
 setup_metrics(app)
@@ -95,17 +100,26 @@ app.include_router(health_router)
 app.include_router(ai_router, tags=["ai"])
 app.include_router(db_status_router)
 
-@app.get("/")
-@app.head("/")
+@app.get("/", response_class=HTMLResponse)
 async def root():
-    """Root endpoint providing API information - optimized for health checks"""
-    return {
-        "status": "active",
-        "message": "Scholarship Discovery & Search API",
-        "version": settings.api_version,
-        "environment": settings.environment.value,
-        "docs": "/docs"
-    }
+    """Root endpoint with HTML landing page for web preview"""
+    try:
+        with open("static/index.html", "r") as f:
+            return f.read()
+    except FileNotFoundError:
+        # Fallback to JSON if HTML file not found
+        return {
+            "status": "active",
+            "message": "Scholarship Discovery & Search API",
+            "version": settings.api_version,
+            "environment": settings.environment.value,
+            "docs": "/docs"
+        }
+
+@app.head("/")
+async def root_head():
+    """HEAD method for root endpoint health checks"""
+    return {"status": "active"}
 
 @app.get("/api")
 async def api_status():
@@ -130,6 +144,17 @@ async def api_status():
 async def health_check():
     """Health check endpoint - fast response for deployment monitoring"""
     return {"status": "healthy"}
+
+@app.get("/status")
+async def json_status():
+    """JSON status endpoint for deployment monitoring and API consumers"""
+    return {
+        "status": "active",
+        "message": "Scholarship Discovery & Search API",
+        "version": settings.api_version,
+        "environment": settings.environment.value,
+        "docs": "/docs"
+    }
 
 @app.get("/readiness")
 async def readiness_check():
