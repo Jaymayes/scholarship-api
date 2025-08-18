@@ -1,0 +1,85 @@
+Context
+Project: FastAPI “Scholarship Discovery & Search API”
+Status: All QA/security fixes were implemented and verified previously, but the app is NOT working correctly in Replit. Preview shows a minimal {"status":"active"} output while other routes appear unreachable or fail. We need you to diagnose and fix Replit runtime issues without weakening any security controls or changing the unified error schema:
+{ code, message, status, timestamp, trace_id, details? }
+
+Observed symptoms (to verify)
+
+Replit preview shows only {"status":"active"} or blank page; other endpoints 404/500/timeout
+Health endpoints may work sporadically; protected routes not reachable
+Possible startup/logging silence or import errors
+Potential port binding mismatch with Replit’s dynamic $PORT
+Dependencies may not have installed (requirements.txt/pyproject mismatch)
+Non‑negotiables
+
+Keep security posture unchanged: auth, rate limiting, CORS, size/URL guards, HSTS in prod, error schema, middleware order.
+Do not log secrets; do not re-enable docs in production unless explicitly enabled.
+Your goals
+
+Make the app reliably boot and respond on Replit preview URL.
+Ensure all endpoints behave as expected in development mode.
+Fix environment/run-command, dependency, and import issues.
+Keep production behavior untouched.
+Diagnosis and fixes (do these in order)
+
+Run configuration and server bootstrap
+Inspect .replit (or Replit “Run” command). Ensure the app starts with: uvicorn app.main:app --host 0.0.0.0 --port $PORT --proxy-headers --forwarded-allow-ips="*" Replace app.main:app with the actual module path in this repo.
+If there’s a custom entrypoint, confirm it sets port = int(os.getenv("PORT", 8000)) and host="0.0.0.0".
+Add clear startup logs: environment, effective host/port, DB engine type, rate-limit backend, CORS mode. Never log secrets.
+2. Environment defaults for Replit (development)
+
+Ensure ENVIRONMENT=development in Replit secrets by default.
+If DATABASE_URL is missing, allow SQLite dev fallback; log a warning only (not in prod).
+If RATE_LIMIT_BACKEND_URL is missing/unreachable, use in-memory rate limiter in dev; log a warning.
+Generate an ephemeral JWT secret in dev if not set; log “ephemeral key generated” without printing the key.
+3. Dependency installation
+
+Verify requirements are actually installed in Replit:
+If using requirements.txt: pip install -r requirements.txt
+If using pyproject/poetry: poetry export to requirements.txt or pip install .
+Pin/verify versions for fastapi/starlette/pydantic consistent with code; ensure passlib[bcrypt] and bcrypt==4.0.1 installed.
+Resolve any ImportError or version mismatch at startup.
+4. Import path and app factory
+
+Confirm the import path in the run command matches the repository layout (e.g., src package vs root package).
+If using an app factory, ensure init.py files exist (services/init.py, models/init.py already added).
+Fix any circular imports by moving settings initialization before router imports.
+5. Middleware order and options handling
+
+Keep order: Security/Host/HTTPS → CORS → URL-length guard → Body-size guard → Rate limiting → Routing
+Ensure OPTIONS preflight is not rate-limited and passes CORS before other checks.
+6. CORS for Replit preview (dev only)
+
+Allow the Replit preview origin (*.replit.dev or repl.co) in development.
+Production must remain strict whitelist (no wildcard when credentials are true).
+7. Health and readiness
+
+Verify /healthz, /health/database, /health/services return 200 in dev.
+If DB is down, readiness should return 503 with unified error; ensure SELECT 1 check uses a short-lived SessionLocal().
+8. Error handling sanity
+
+Confirm all errors return application/json and are not double-encoded.
+Ensure trace_id is attached to all errors.
+9. Quick test sanity (optional)
+
+Run pytest -q; if tests hang due to external services, mark Redis-dependent tests to use the in-memory backend in dev or skip conditionally.
+10. Add a temporary dev debug endpoint (if not already present)
+
+GET /_debug/config (dev-only) to show sanitized runtime config: environment, port, cors mode, rate-limiter backend type, db engine. No secrets.
+Acceptance criteria
+
+App boots in Replit with no unhandled exceptions; logs show host 0.0.0.0 and port=$PORT.
+Preview URL serves:
+/healthz and /status → 200
+Protected routes return 401 without token; 200 with valid token
+413 for oversized body; 414 for overly long URL; 429 for rate limit with headers
+OPTIONS preflight succeeds; CORS behaves: dev allows preview origin, prod strict whitelist.
+No double-encoded errors; all error responses include trace_id and application/json content-type.
+Dependencies install cleanly; no bcrypt/passlib or version mismatch warnings.
+Deliverables
+
+Updated .replit (or run command) and any start script changes.
+Minimal code fixes to ensure correct port binding, imports, and environment defaults in development.
+Dependency/install fixes (requirements.txt usage).
+Brief inline comments where behavior/order is non-obvious.
+Please begin by running the app inside Replit, paste the first 50 lines of startup logs and any traceback you see, then implement the above fixes iteratively until the acceptance criteria are met.

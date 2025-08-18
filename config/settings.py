@@ -50,7 +50,7 @@ class Settings(BaseSettings):
     
     # Server Configuration - Replit compatible
     host: str = Field("0.0.0.0", alias="HOST")
-    port: int = Field(default_factory=lambda: int(os.getenv("PORT", "8000")), alias="PORT")  # Replit dynamic port
+    port: int = Field(default_factory=lambda: int(os.getenv("PORT", "5000")), alias="PORT")  # Replit uses port 5000
     reload: bool = Field(True, alias="RELOAD")
     
     # Security Configuration - JWT with production validation

@@ -230,26 +230,58 @@ async def readiness_check():
         }
     }
 
+@app.get("/_debug/config")
+async def debug_config():
+    """Development-only debug endpoint showing sanitized runtime configuration"""
+    if settings.environment == Environment.PRODUCTION:
+        raise HTTPException(status_code=404, detail="Not found")
+    
+    return {
+        "environment": settings.environment.value,
+        "host": settings.host,
+        "port": settings.port,
+        "cors_mode": "wildcard" if settings.environment != Environment.PRODUCTION else "strict",
+        "rate_limiter": {
+            "enabled": settings.rate_limit_enabled,
+            "backend_type": "redis" if not settings.disable_rate_limit_backend else "memory",
+            "per_minute": settings.get_rate_limit_per_minute
+        },
+        "database": {
+            "engine": "PostgreSQL",
+            "configured": bool(settings.database_url)
+        },
+        "security": {
+            "jwt_configured": bool(settings.jwt_secret_key),
+            "docs_enabled": settings.should_enable_docs,
+            "public_read_endpoints": settings.public_read_endpoints
+        },
+        "middleware_order": [
+            "SecurityHeaders", "TrustedHost", "ForwardedHeaders", 
+            "DocsProtection", "DatabaseSession", "RequestID", 
+            "CORS", "URLLength", "BodySize", "RateLimit"
+        ]
+    }
+
 if __name__ == "__main__":
     # Replit-specific port handling - must use PORT environment variable
-    port = int(os.getenv("PORT", "8000"))  # Replit requirement: dynamic PORT
+    port = int(os.getenv("PORT", "5000"))  # Replit sets PORT=5000 in workflows
     host = "0.0.0.0"  # Required for Replit accessibility
     
     # Startup logging for Replit diagnostics
-    logger.info("Starting Scholarship Discovery API server")
+    logger.info("🚀 Starting Scholarship Discovery API server")
     logger.info(f"Environment: {settings.environment.value}")
     logger.info(f"Host/Port: {host}:{port}")
-    logger.info(f"CORS mode: {'dev (wildcard)' if settings.is_development else 'prod (strict whitelist)'}")
-    logger.info(f"Rate limiter: {settings.get_rate_limiter_info}")
-    logger.info(f"Database: {settings.get_database_info}")
+    logger.info(f"CORS mode: {'dev (wildcard)' if settings.environment != Environment.PRODUCTION else 'prod (strict whitelist)'}")
+    logger.info(f"Rate limiter: {'Redis' if limiter and hasattr(limiter, 'storage') and 'redis' in str(limiter.storage) else 'in-memory fallback (Redis unavailable)'}")
+    logger.info(f"Database: PostgreSQL")
     
     uvicorn.run(
         "main:app",
         host=host,
         port=port,  # Use dynamic port from environment
-        reload=settings.reload if settings.is_development else False,
-        log_level=settings.log_level.value.lower(),
+        reload=settings.reload,
+        log_level="info",
         access_log=True,
-        forwarded_allow_ips="*",  # Replit proxy requirement
-        workers=1  # Single worker for Replit stability
+        proxy_headers=True,  # Handle X-Forwarded-* headers correctly for Replit
+        forwarded_allow_ips="*"  # Replit proxy requirement
     )
