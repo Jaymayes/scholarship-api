@@ -212,12 +212,15 @@ async def rate_limit_exception_handler(request: Request, exc: RateLimitExceeded)
     """Handle rate limit exceeded errors"""
     trace_id = getattr(request.state, "trace_id", generate_trace_id())
     
+    # Get retry_after safely, with fallback
+    retry_after = getattr(exc, 'retry_after', 60)  # Default to 60 seconds
+    
     logger.warning(
         f"Rate Limit Exceeded: {exc.detail}",
         extra={
             "trace_id": trace_id,
             "limit": exc.detail,
-            "retry_after": exc.retry_after,
+            "retry_after": retry_after,
             "path": request.url.path,
             "method": request.method
         }
@@ -228,7 +231,7 @@ async def rate_limit_exception_handler(request: Request, exc: RateLimitExceeded)
         error_code="RATE_LIMIT_EXCEEDED",
         message=f"Rate limit exceeded: {exc.detail}",
         status_code=429,
-        details={"retry_after": exc.retry_after}
+        details={"retry_after": retry_after}
     )
     
     response = JSONResponse(
@@ -237,9 +240,12 @@ async def rate_limit_exception_handler(request: Request, exc: RateLimitExceeded)
     )
     
     # Add rate limiting headers
-    response.headers["Retry-After"] = str(exc.retry_after)
-    response.headers["X-RateLimit-Limit"] = str(exc.detail.split("/")[0])
-    response.headers["X-RateLimit-Reset"] = str(exc.retry_after)
+    response.headers["Retry-After"] = str(retry_after)
+    try:
+        response.headers["X-RateLimit-Limit"] = str(exc.detail.split("/")[0])
+    except (AttributeError, IndexError):
+        response.headers["X-RateLimit-Limit"] = "30"
+    response.headers["X-RateLimit-Reset"] = str(retry_after)
     
     return response
 

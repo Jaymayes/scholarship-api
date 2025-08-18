@@ -70,17 +70,37 @@ app.add_middleware(
 # Add rate limiter
 app.state.limiter = limiter
 
-# Exception handlers
-app.add_exception_handler(APIError, api_error_handler)
-app.add_exception_handler(HTTPException, http_exception_handler)
-app.add_exception_handler(RequestValidationError, validation_exception_handler)
-app.add_exception_handler(RateLimitExceeded, rate_limit_exception_handler)
-app.add_exception_handler(Exception, general_exception_handler)
+# Exception handlers - using proper type annotations for FastAPI
+@app.exception_handler(APIError)
+async def handle_api_error(request: Request, exc: APIError):
+    return await api_error_handler(request, exc)
+
+@app.exception_handler(HTTPException)
+async def handle_http_exception(request: Request, exc: HTTPException):
+    return await http_exception_handler(request, exc)
+
+@app.exception_handler(RequestValidationError)
+async def handle_validation_error(request: Request, exc: RequestValidationError):
+    return await validation_exception_handler(request, exc)
+
+@app.exception_handler(RateLimitExceeded)
+async def handle_rate_limit_error(request: Request, exc: RateLimitExceeded):
+    return await rate_limit_exception_handler(request, exc)
+
+@app.exception_handler(Exception)
+async def handle_general_error(request: Request, exc: Exception):
+    return await general_exception_handler(request, exc)
 
 # Additional handlers for standardized error format
 from middleware.error_handlers import not_found_handler, method_not_allowed_handler
-app.add_exception_handler(404, not_found_handler)
-app.add_exception_handler(405, method_not_allowed_handler)
+
+@app.exception_handler(404)
+async def handle_not_found(request: Request, exc: HTTPException):
+    return await not_found_handler(request, exc)
+
+@app.exception_handler(405)
+async def handle_method_not_allowed(request: Request, exc: HTTPException):
+    return await method_not_allowed_handler(request, exc)
 
 # Include routers
 app.include_router(auth_router)
@@ -100,21 +120,10 @@ app.include_router(health_router)
 app.include_router(ai_router, tags=["ai"])
 app.include_router(db_status_router)
 
-@app.get("/", response_class=HTMLResponse)
+@app.get("/")
 async def root():
-    """Root endpoint with HTML landing page for web preview"""
-    try:
-        with open("static/index.html", "r") as f:
-            return f.read()
-    except FileNotFoundError:
-        # Fallback to JSON if HTML file not found
-        return {
-            "status": "active",
-            "message": "Scholarship Discovery & Search API",
-            "version": settings.api_version,
-            "environment": settings.environment.value,
-            "docs": "/docs"
-        }
+    """Root endpoint optimized for deployment health checks"""
+    return {"status": "active"}
 
 @app.head("/")
 async def root_head():
@@ -145,6 +154,11 @@ async def health_check():
     """Health check endpoint - fast response for deployment monitoring"""
     return {"status": "healthy"}
 
+@app.get("/favicon.ico")
+async def favicon():
+    """Favicon endpoint to prevent 404 errors in browser requests"""
+    return {"status": "no favicon"}
+
 @app.get("/status")
 async def json_status():
     """JSON status endpoint for deployment monitoring and API consumers"""
@@ -159,13 +173,10 @@ async def json_status():
 @app.get("/readiness")
 async def readiness_check():
     """Readiness check endpoint for deployment"""
-    # Add database connectivity checks here when implemented
     return {
         "status": "ready",
         "services": {
-            "api": "ready",
-            "database": "ready" if settings.database_url else "not_configured",
-            "redis": "ready" if settings.redis_url else "not_configured"
+            "api": "ready"
         }
     }
 
@@ -173,10 +184,10 @@ if __name__ == "__main__":
     logger.info("Starting Scholarship Discovery API server")
     uvicorn.run(
         "main:app",
-        host=settings.host,
-        port=settings.port,
-        reload=settings.reload,
+        host="0.0.0.0",  # Explicit host binding for deployment
+        port=5000,       # Explicit port for deployment
+        reload=settings.reload if settings.is_development else False,
         log_level=settings.log_level.lower(),
         access_log=True,
-        workers=1 if settings.environment in [Environment.LOCAL, Environment.DEVELOPMENT] else 4
+        workers=1 if settings.environment in [Environment.LOCAL, Environment.DEVELOPMENT] else 1  # Single worker for deployment simplicity
     )
