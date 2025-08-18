@@ -6,7 +6,7 @@ Using pydantic-settings for type-safe configuration
 import os
 import secrets
 import logging
-from typing import List, Optional, Annotated, Set
+from typing import List, Optional, Annotated, Set, ClassVar
 from pydantic import Field, field_validator, ConfigDict
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from enum import Enum
@@ -29,6 +29,12 @@ class Settings(BaseSettings):
     Application settings with strict production validation
     Provides secure defaults for development, enforces requirements for production
     """
+    
+    # Security constants
+    BANNED_DEFAULT_SECRETS: ClassVar[Set[str]] = {
+        "your-secret-key-change-in-production",
+        "secret", "dev", "development", "test", "changeme", "default"
+    }
     
     # Environment
     environment: Environment = Field(Environment.LOCAL, alias="ENVIRONMENT")
@@ -402,10 +408,7 @@ class Settings(BaseSettings):
         # Only enable HSTS in production (assumes HTTPS termination)
         return self.environment == Environment.PRODUCTION and self.enable_hsts
     
-    @property
-    def should_enable_hsts(self) -> bool:
-        """Check if HSTS should be enabled based on environment"""
-        return self.environment == Environment.PRODUCTION and self.enable_hsts
+
     
     model_config = SettingsConfigDict(
         env_file=".env",

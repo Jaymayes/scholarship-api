@@ -17,7 +17,10 @@ class TestEnvironmentSpecificCORS:
         """Test production CORS with explicit whitelist"""
         with patch.dict(os.environ, {
             "ENVIRONMENT": "production",
-            "CORS_ALLOWED_ORIGINS": "https://app.example.com,https://admin.example.com"
+            "CORS_ALLOWED_ORIGINS": "https://app.example.com,https://admin.example.com",
+            "JWT_SECRET_KEY": "a" * 64,  # Required for production
+            "DATABASE_URL": "postgresql://user:pass@localhost/db",
+            "ALLOWED_HOSTS": '["app.example.com", "admin.example.com"]'
         }):
             settings = Settings()
             cors_origins = settings.get_cors_origins
@@ -29,7 +32,10 @@ class TestEnvironmentSpecificCORS:
         """Test production CORS without whitelist (should be empty for security)"""
         with patch.dict(os.environ, {
             "ENVIRONMENT": "production",
-            "CORS_ALLOWED_ORIGINS": ""
+            "CORS_ALLOWED_ORIGINS": "",
+            "JWT_SECRET_KEY": "a" * 64,  # Required for production
+            "DATABASE_URL": "postgresql://user:pass@localhost/db",
+            "ALLOWED_HOSTS": '["example.com"]'
         }), patch('logging.warning') as mock_warning:
             settings = Settings()
             cors_origins = settings.get_cors_origins
@@ -70,7 +76,11 @@ class TestEnvironmentSpecificRateLimiting:
         """Test production has stricter rate limits"""
         with patch.dict(os.environ, {
             "ENVIRONMENT": "production",
-            "RATE_LIMIT_PER_MINUTE": "0"  # Use defaults
+            "RATE_LIMIT_PER_MINUTE": "0",  # Use defaults
+            "JWT_SECRET_KEY": "a" * 64,  # Required for production
+            "DATABASE_URL": "postgresql://user:pass@localhost/db",
+            "CORS_ALLOWED_ORIGINS": "https://example.com",
+            "ALLOWED_HOSTS": '["example.com"]'
         }):
             settings = Settings()
             
@@ -92,7 +102,11 @@ class TestEnvironmentSpecificRateLimiting:
         """Test custom rate limit overrides defaults"""
         with patch.dict(os.environ, {
             "ENVIRONMENT": "production",
-            "RATE_LIMIT_PER_MINUTE": "50"
+            "RATE_LIMIT_PER_MINUTE": "50",
+            "JWT_SECRET_KEY": "a" * 64,  # Required for production
+            "DATABASE_URL": "postgresql://user:pass@localhost/db",
+            "CORS_ALLOWED_ORIGINS": "https://example.com",
+            "ALLOWED_HOSTS": '["example.com"]'
         }):
             settings = Settings()
             

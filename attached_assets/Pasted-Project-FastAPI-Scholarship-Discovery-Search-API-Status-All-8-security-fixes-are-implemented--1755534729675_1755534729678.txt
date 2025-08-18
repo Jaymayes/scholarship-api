@@ -1,0 +1,80 @@
+Project: FastAPI “Scholarship Discovery & Search API”
+Status: All 8 security fixes are implemented and verified (auth on search/scholarships, strict CORS, unified error schema, rate limiting, Docker hardening, security middleware first, strict Pydantic validation). We still need you to find and fix any remaining errors/bugs, stabilize edge cases, and ensure zero-regression on security.
+
+Do not loosen security. Preserve the unified error payload: { trace_id, code, message, status, timestamp }.
+
+Your Objectives
+
+Identify and fix all runtime errors, failing tests, and edge-case bugs.
+Keep authentication, CORS, rate limiting, and error schema intact.
+Ensure the app runs reliably in dev, Replit, and production containers.
+Improve developer ergonomics: clearer errors, better test coverage where gaps exist.
+Diagnostics (run in order)
+
+Test suite
+Run: pytest -q
+Capture failures and flakiness. Prioritize red tests in tests/security and any new failures from recent changes.
+2. Static checks
+
+Run lints/type checks used by repo (ruff/flake8, mypy/pyright). Fix import cycles, dead code, incorrect types, and unused deps.
+Verify pinned dependency versions in lockfile match code usage (FastAPI/Starlette/Pydantic versions).
+3. Local runtime smoke
+
+ENVIRONMENT=development; run app. Hit:
+GET /healthz, /health/database, /health/services → 200
+GET/POST /search and /scholarships without auth → 401
+Valid auth → 200
+Oversized body → 413; overly long URL → 414; rate limit exceeded → 429 (with headers)
+Confirm CORS preflight (OPTIONS) works and is not rate-limited.
+Common Bug Hotspots To Check and Fix
+
+Pydantic models
+extra="forbid" may now reject expected fields. Align request/response models with actual payloads; document required fields.
+Ensure response_model matches actual return shape to avoid 500/validation errors.
+Dependency injection
+Confirm get_current_user and DB session dependencies use “yield” pattern and close sessions.
+Remove any lingering references like object.user_id when object can be None.
+Rate limiting
+Ensure OPTIONS are excluded; identifier uses request.client.host or trusted X-Forwarded-For when configured.
+Standard headers on 429: X-RateLimit-Limit, X-RateLimit-Remaining, Retry-After.
+Health endpoints
+No request bodies; reject extraneous params. Database check uses SessionLocal() and SELECT 1 with timeouts; return 503 on dependency failures.
+CORS/docs
+Prod: whitelist only; docs closed unless ENABLE_DOCS=true.
+Dev/Replit: allow preview domains; ensure no wildcard in production.
+Error handlers
+Normalize HTTPException, RequestValidationError, 500s to unified schema and always include trace_id.
+Database
+Engine with pool_pre_ping=True; handle OperationalError; ensure commit/rollback semantics correct; dispose engine on shutdown.
+Docker/CI
+.dockerignore excludes secrets; Dockerfile copies only needed files.
+GitHub Actions: lint, type-check, tests, container build, smoke test hitting /healthz.
+Targeted Fixes (apply as needed)
+
+Align all routers with strict models; add enums/regex/min-max; ensure 422 for invalid input.
+Add/adjust response_model for endpoints returning dicts/lists; use field aliases if needed.
+Guard None values and optional query params to avoid AttributeError.
+Ensure middleware order remains: Security/Host/HTTPS → CORS → URL-length → Body-size → Rate limiting → Routing.
+Adjust trusted proxies and forwarded headers only via settings; never default to “trust all” in production.
+Add missing exception handlers to keep unified error payload on all errors.
+Tests To Add/Update
+
+Ensure 401/403 on protected routes without/with bad tokens.
+Validate response_model conformance (no pydantic validation errors).
+OPTIONS preflight works and not limited.
+413/414/429 return unified error, trace_id present, and 429 includes headers.
+Readiness returns 503 when DB/Redis is down; returns 200 when up.
+Docs endpoints 404 in production by default.
+Acceptance Criteria
+
+pytest -q passes locally and in CI; no flakiness.
+No runtime 500s on valid requests; clear unified errors on invalid requests.
+Security posture unchanged: auth required on protected routes; CORS strict in prod; rate limiting works; docs locked in prod.
+Replit dev and Docker prod both start cleanly; health endpoints OK.
+Deliverables
+
+Code fixes with brief inline comments where non-obvious.
+Any new/updated tests.
+Updated README notes if request/response contracts changed.
+CI green and container smoke test passes.
+Start by running the tests, pasting the failure logs back into this chat, and fix them iteratively while preserving the security guarantees above.
