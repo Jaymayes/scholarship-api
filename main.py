@@ -34,13 +34,13 @@ from utils.logger import setup_logger
 # Initialize logger
 logger = setup_logger()
 
-# Create FastAPI app with settings and error response documentation
+# Create FastAPI app with production-aware docs configuration
 app = FastAPI(
     title=settings.api_title,
     description=settings.api_description,
     version=settings.api_version,
-    docs_url="/docs",
-    redoc_url="/redoc",
+    docs_url="/docs" if settings.should_enable_docs else None,
+    redoc_url="/redoc" if settings.should_enable_docs else None,
     debug=settings.debug,
     responses={
         status: {"model": resp["model"], "description": resp["description"]}
@@ -61,9 +61,17 @@ tracing_service.instrument_app(app)
 from middleware.security_headers import SecurityHeadersMiddleware
 from middleware.body_limit import BodySizeLimitMiddleware
 from middleware.url_length import URLLengthMiddleware
+from middleware.trusted_host import TrustedHostMiddleware
+from middleware.forwarded_headers import ForwardedHeadersMiddleware
+from middleware.docs_protection import DocsProtectionMiddleware
+from middleware.database_session import DatabaseSessionMiddleware
 
-# 1. Security headers (outermost - applies to all responses)
-app.add_middleware(SecurityHeadersMiddleware)
+# 1. Production middleware stack (outermost - security & proxy handling)
+app.add_middleware(DocsProtectionMiddleware)  # Block docs in production
+app.add_middleware(TrustedHostMiddleware)     # Validate Host header  
+app.add_middleware(ForwardedHeadersMiddleware) # Handle X-Forwarded-* headers
+app.add_middleware(DatabaseSessionMiddleware) # Database lifecycle management
+app.add_middleware(SecurityHeadersMiddleware) # Security headers
 
 # 2. CORS (must be early to handle preflight requests) - Replit compatible
 cors_config = settings.get_cors_config

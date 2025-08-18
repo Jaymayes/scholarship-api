@@ -1,0 +1,137 @@
+Project: FastAPI “Scholarship Discovery & Search API”
+Status: App runs in Replit and basic health shows {"status":"active"}, but the system is NOT ready for production deployment. We need to remove remaining deployment blockers and harden the app for real-world prod environments without weakening security.
+
+Observed Gaps/Blockers
+
+No production containerization or process manager config (Gunicorn/Uvicorn) with graceful shutdown/timeouts.
+No prestart script to run DB migrations and readiness checks.
+Missing strict environment validation for production (secrets, origins, backends).
+Health endpoints exist but not wired to readiness/liveness semantics for orchestrators.
+Rate limiter backend not guaranteed for prod (Redis URL validation, retry/fallback strategy).
+Forwarded headers / proxy settings not production-safe by default.
+Incomplete observability: structured JSON logs, request_id propagation, error reporting (Sentry/OpenTelemetry) not finalized.
+CORS whitelist not enforced automatically on prod deploy if env misconfigured.
+OpenAPI/docs likely exposed in prod; need locking down.
+CI/CD and deployment artifacts incomplete (Dockerfile, startup scripts, .env.example, Make/poetry/uv lockfiles).
+Database: connection pooling and lifecycle/graceful shutdown not enforced; Alembic workflow not baked into deploy.
+Security headers need verification under a reverse proxy (HSTS, X-Content-Type-Options, frame-ancestors, etc.).
+Return codes and error schema good in dev, but need consistency validation under prod server and load.
+Goal
+Make the application deployment-ready for a containerized production environment (Docker/Kubernetes or similar) while preserving all existing security controls. Provide the artifacts, configuration, and tests to verify readiness.
+
+Tasks
+
+Production container and server process
+Add a multi-stage Dockerfile:
+Builder stage: install deps, compile wheels.
+Runtime stage: non-root user, only runtime deps, uvloop/httptools enabled.
+Add a Gunicorn config for Uvicorn workers:
+worker_class=uvicorn.workers.UvicornWorker
+workers = 2*CPU + 1 (env overrideable)
+timeout=60, graceful_timeout=30, keepalive=5, max_requests=2000, max_requests_jitter=200
+bind to 0.0.0.0:$PORT (default 8000)
+Provide start scripts:
+prestart.sh: wait-for DB/Redis, run Alembic migrations, run a quick DB “SELECT 1”.
+start.sh: run gunicorn with the config above.
+2. Environment validation (prod-strict, dev-flexible)
+
+Centralize settings with Pydantic (use project’s version). On ENVIRONMENT=production:
+Require non-default JWT_SECRET_KEY (reject common weak/defaults).
+Require DATABASE_URL and RATE_LIMIT_BACKEND_URL (Redis) or explicitly allow a documented in-memory fallback only if a DISABLE_RATE_LIMIT_BACKEND is true and ENVIRONMENT != production.
+Require CORS_ALLOWED_ORIGINS non-empty; no wildcard in prod.
+Require ALLOWED_HOSTS list; enforce using Starlette TrustedHostMiddleware.
+Add a startup check that fails fast in prod if any required setting is missing/invalid. Do not log secrets.
+3. Reverse proxy and headers
+
+Enable and document forwarded headers handling:
+Respect X-Forwarded-For/Proto only when behind trusted proxies (configurable TRUSTED_PROXY_IPS).
+Provide Uvicorn/Gunicorn args: --forwarded-allow-ips with trusted CIDRs.
+Ensure HTTPS/TLS is terminated at the proxy; add SecurityMiddleware with HSTS enabled in production.
+4. Readiness, liveness, and graceful shutdown
+
+Keep existing /healthz, /health/database, /health/services but:
+Map to Kubernetes-style checks: liveness=/healthz, readiness=/health/services (includes DB, rate limiter, outbound).
+Add timeouts and catch OperationalError; return 503 on readiness failures using the unified error schema.
+Ensure on shutdown: DB sessions/engine disposed, Redis/limiter closed, background tasks cancelled gracefully.
+5. Rate limiting (prod backend)
+
+Initialize limiter with RATE_LIMIT_BACKEND_URL (Redis). Add retry/backoff on connect.
+OPTIONS requests should not be limited.
+Return 429 with headers: X-RateLimit-Limit, X-RateLimit-Remaining, Retry-After and unified error schema.
+Provide a simple in-memory fallback allowed only in development.
+6. Database reliability
+
+SQLAlchemy engine with pool_pre_ping=True, pool_recycle=280, connect_args timeouts.
+Alembic:
+Ensure env.py uses DATABASE_URL.
+Add “alembic upgrade head” to prestart.sh.
+Add a smoke migration test in CI (create temp DB/schema if needed).
+Ensure SessionLocal() is used correctly in health checks and teardown.
+7. CORS and docs lockdown
+
+Production: enforce whitelist from CORS_ALLOWED_ORIGINS. No wildcard. Explicit methods/headers, credentials per policy.
+Hide Swagger/Redoc in production (or protect behind auth):
+Expose docs only if ENABLE_DOCS=true or ENVIRONMENT=development. Otherwise, return 404.
+8. Observability and error reporting
+
+Structured JSON logs with request_id/trace_id, level, timestamp, path, status, latency.
+Propagate trace_id into all error responses (already in place) and logs.
+Optional but preferred: SENTRY_DSN support; capture unhandled exceptions. Do not block startup if missing in dev.
+9. CI/CD and testing
+
+Add GitHub Actions (or current CI) workflow:
+Lint (ruff/flake8), type-check (mypy/pyright), test (pytest -q).
+Build container: docker build and docker run smoke test hitting /healthz.
+Tests to add/confirm:
+Startup fails in prod if required envs missing.
+Readiness returns 503 if DB/Redis unavailable.
+429 headers present and unified error schema.
+Docs are disabled in prod by default.
+Graceful shutdown closes DB/Redis without error.
+CORS rejects non-whitelisted origin in prod.
+Forwarded headers produce correct client IP when behind trusted proxy.
+10. Documentation and examples
+
+Update README and .env.example:
+Full list of required env vars for prod with examples.
+Docker build/run instructions; compose example for API + Redis + DB.
+Pre-deploy checklist (see below).
+Provide docker-compose.yml with:
+api, db (Postgres), redis services; healthchecks; depends_on with condition: service_healthy.
+Pre-Deploy Checklist (automate as a script if possible)
+
+ENVIRONMENT=production
+JWT_SECRET_KEY set and strong (≥ 64 chars, not default)
+DATABASE_URL and migrations applied (alembic upgrade head)
+RATE_LIMIT_BACKEND_URL reachable; limiter connected
+CORS_ALLOWED_ORIGINS set (no wildcard)
+ALLOWED_HOSTS set; TrustedHostMiddleware enabled
+Docs disabled (unless explicitly enabled)
+Health/readiness pass (200/503 semantics correct)
+CI green; container built successfully; smoke tests pass
+Acceptance Criteria
+
+docker build completes and produces a minimal runtime image (non-root).
+docker run (with required env) serves on 0.0.0.0:8000 and passes:
+/healthz → 200
+/health/services → 200 when all deps up; 503 when a dep is down
+Swagger/Redoc disabled by default in prod
+CORS strictly enforces configured origins
+Rate limiting returns 429 with headers and unified error
+App shuts down gracefully, closes DB/Redis, and leaves no unhandled tasks.
+CI pipeline passes lint, type-check, tests, and container smoke test.
+Deliverables
+
+Dockerfile (multi-stage, non-root)
+gunicorn_conf.py and start.sh / prestart.sh
+docker-compose.yml (API + DB + Redis) with healthchecks
+CI workflow file
+Updated settings, middleware, and startup checks
+Tests covering the above
+Updated README and .env.example
+Important Constraints
+
+Do not weaken any security control already implemented.
+Never log secrets. Fail fast on missing critical config in production.
+Keep unified error schema unchanged.
+Please implement all changes in-place, following the project’s structure and imports. Add brief inline comments where behavior or ordering is non-obvious.

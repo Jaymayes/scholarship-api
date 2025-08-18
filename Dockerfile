@@ -1,40 +1,66 @@
-FROM python:3.11-slim
+# Multi-stage Dockerfile for production deployment
+# Builder stage: install dependencies and compile wheels
+FROM python:3.11-slim as builder
 
-# Set environment variables
-ENV PYTHONDONTWRITEBYTECODE=1
-ENV PYTHONUNBUFFERED=1
-ENV ENVIRONMENT=production
-ENV HOST=0.0.0.0
-ENV PORT=5000
-
-# Create app directory
-WORKDIR /app
-
-# Install system dependencies
+# Install build dependencies
 RUN apt-get update && apt-get install -y \
-    gcc \
+    build-essential \
+    libpq-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy requirements and install Python dependencies
-COPY pyproject.toml ./
-RUN pip install --no-cache-dir --upgrade pip && \
-    pip install --no-cache-dir uv && \
-    uv pip install --system --no-cache-dir .
+# Set working directory
+WORKDIR /app
+
+# Copy dependency files
+COPY pyproject.toml uv.lock ./
+
+# Install uv for faster package management
+RUN pip install uv
+
+# Install dependencies and create wheels
+RUN uv pip install --system --no-cache-dir -r uv.lock
+
+# Runtime stage: minimal production image
+FROM python:3.11-slim as runtime
+
+# Install runtime dependencies only
+RUN apt-get update && apt-get install -y \
+    libpq5 \
+    curl \
+    && rm -rf /var/lib/apt/lists/* \
+    && apt-get clean
+
+# Create non-root user for security
+RUN groupadd -r appuser && useradd -r -g appuser appuser
+
+# Set working directory
+WORKDIR /app
+
+# Copy Python packages from builder
+COPY --from=builder /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
+COPY --from=builder /usr/local/bin /usr/local/bin
 
 # Copy application code
 COPY . .
 
-# Create non-root user
-RUN useradd --create-home --shell /bin/bash app && \
-    chown -R app:app /app
-USER app
+# Create necessary directories and set permissions
+RUN mkdir -p /app/logs /app/tmp \
+    && chown -R appuser:appuser /app
 
-# Expose port
-EXPOSE 5000
+# Copy startup scripts
+COPY scripts/prestart.sh scripts/start.sh ./
+RUN chmod +x prestart.sh start.sh \
+    && chown appuser:appuser prestart.sh start.sh
+
+# Switch to non-root user
+USER appuser
 
 # Health check
-HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:5000/ || exit 1
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:${PORT:-8000}/healthz || exit 1
 
-# Run the application
-CMD ["python", "main.py"]
+# Expose port (configurable via environment)
+EXPOSE ${PORT:-8000}
+
+# Default startup command
+CMD ["./start.sh"]

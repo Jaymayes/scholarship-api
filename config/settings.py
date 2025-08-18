@@ -25,7 +25,10 @@ class LogLevel(str, Enum):
     CRITICAL = "CRITICAL"
 
 class Settings(BaseSettings):
-    """Application settings with environment-specific overrides"""
+    """
+    Application settings with strict production validation
+    Provides secure defaults for development, enforces requirements for production
+    """
     
     # Environment
     environment: Environment = Field(Environment.LOCAL, alias="ENVIRONMENT")
@@ -44,11 +47,19 @@ class Settings(BaseSettings):
     port: int = Field(default_factory=lambda: int(os.getenv("PORT", "8000")), alias="PORT")  # Replit dynamic port
     reload: bool = Field(True, alias="RELOAD")
     
-    # Security Configuration - JWT
+    # Security Configuration - JWT with production validation
     jwt_secret_key: Optional[str] = Field(None, alias="JWT_SECRET_KEY")
     jwt_algorithm: str = Field("HS256", alias="JWT_ALGORITHM")
     jwt_previous_secret_keys: str = Field("", alias="JWT_PREVIOUS_SECRET_KEYS")
     access_token_expire_minutes: int = Field(30, alias="ACCESS_TOKEN_EXPIRE_MINUTES")
+    
+    # Production security requirements
+    allowed_hosts: List[str] = Field(default_factory=list, alias="ALLOWED_HOSTS")
+    trusted_proxy_ips: List[str] = Field(default_factory=list, alias="TRUSTED_PROXY_IPS")
+    enable_docs: Optional[bool] = Field(None, alias="ENABLE_DOCS")
+    
+    # Rate limiting backend requirements (production-aware)
+    disable_rate_limit_backend: bool = Field(False, alias="DISABLE_RATE_LIMIT_BACKEND")
     
     # Banned default secrets that cannot be used in production
     BANNED_DEFAULT_SECRETS: Set[str] = {
@@ -302,8 +313,69 @@ class Settings(BaseSettings):
     @field_validator("jwt_secret_key")
     @classmethod
     def validate_jwt_secret(cls, v, info):
-        """Validate JWT secret key in production"""
+        """Validate JWT secret key with production requirements"""
+        if not v:
+            return v  # Will be handled in model_post_init
+        
+        # Check against banned defaults
+        banned_secrets = {
+            "your-secret-key-change-in-production",
+            "secret", 
+            "dev",
+            "development", 
+            "test",
+            "changeme",
+            "default"
+        }
+        
+        if v.lower() in banned_secrets:
+            raise ValueError(f"JWT secret key '{v}' is a banned default value and cannot be used")
+        
         return v
+    
+    def model_post_init(self, __context):
+        """Production validation after model initialization"""
+        if self.environment == Environment.PRODUCTION:
+            self._validate_production_config()
+    
+    def _validate_production_config(self):
+        """Validate production-specific requirements"""
+        errors = []
+        
+        # JWT Secret validation
+        if not self.jwt_secret_key:
+            errors.append("JWT_SECRET_KEY is required in production")
+        elif len(self.jwt_secret_key) < 64:
+            errors.append("JWT_SECRET_KEY must be at least 64 characters in production")
+        
+        # Database validation
+        if not self.database_url:
+            errors.append("DATABASE_URL is required in production")
+        
+        # Rate limiting backend validation
+        if not self.rate_limit_backend_url and not self.disable_rate_limit_backend:
+            errors.append(
+                "RATE_LIMIT_BACKEND_URL is required in production, or set DISABLE_RATE_LIMIT_BACKEND=true"
+            )
+        
+        # CORS validation
+        if not self.cors_allowed_origins:
+            errors.append("CORS_ALLOWED_ORIGINS must be configured in production")
+        
+        # Allowed hosts validation
+        if not self.allowed_hosts:
+            errors.append("ALLOWED_HOSTS must be configured in production")
+        
+        # Trusted proxy IPs validation for forwarded headers
+        if not self.trusted_proxy_ips:
+            import logging
+            logging.warning(
+                "TRUSTED_PROXY_IPS not configured. Forwarded headers will not be trusted."
+            )
+        
+        if errors:
+            error_msg = "Production configuration validation failed:\n" + "\n".join(f"- {err}" for err in errors)
+            raise ValueError(error_msg)
     
     @property
     def is_production(self) -> bool:
@@ -314,6 +386,20 @@ class Settings(BaseSettings):
     def is_development(self) -> bool:
         """Check if running in development environment"""
         return self.environment in [Environment.LOCAL, Environment.DEVELOPMENT]
+    
+    @property
+    def should_enable_docs(self) -> bool:
+        """Determine if API docs should be enabled"""
+        if self.enable_docs is not None:
+            return self.enable_docs
+        # Default: enable in development, disable in production
+        return self.is_development
+    
+    @property
+    def should_enable_hsts(self) -> bool:
+        """Determine if HSTS should be enabled"""
+        # Only enable HSTS in production (assumes HTTPS termination)
+        return self.environment == Environment.PRODUCTION and self.enable_hsts
     
     @property
     def should_enable_hsts(self) -> bool:
