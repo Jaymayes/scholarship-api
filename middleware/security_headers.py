@@ -17,9 +17,16 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
         
         # Standard security headers
         response.headers["X-Content-Type-Options"] = "nosniff"
-        response.headers["X-Frame-Options"] = "DENY"
+        
+        # Allow iframe embedding in development for web preview
+        if settings.environment.value in ["local", "development"]:
+            response.headers["X-Frame-Options"] = "SAMEORIGIN"
+            response.headers["Content-Security-Policy"] = "default-src 'self' 'unsafe-inline'; frame-ancestors 'self'"
+        else:
+            response.headers["X-Frame-Options"] = "DENY"
+            response.headers["Content-Security-Policy"] = "default-src 'none'; frame-ancestors 'none'"
+            
         response.headers["Referrer-Policy"] = "no-referrer"
-        response.headers["Content-Security-Policy"] = "default-src 'none'; frame-ancestors 'none'"
         
         # X-XSS-Protection (deprecated but kept for legacy compatibility per SEC-1103)
         response.headers["X-XSS-Protection"] = "1; mode=block"

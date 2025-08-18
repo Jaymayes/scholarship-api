@@ -96,6 +96,7 @@ app.include_router(ai_router, tags=["ai"])
 app.include_router(db_status_router)
 
 @app.get("/")
+@app.head("/")
 async def root():
     """Root endpoint providing API information - optimized for health checks"""
     return {
@@ -106,7 +107,26 @@ async def root():
         "docs": "/docs"
     }
 
+@app.get("/api")
+async def api_status():
+    """Alternative API status endpoint with more detailed information"""
+    return {
+        "api": "Scholarship Discovery & Search API",
+        "version": settings.api_version,
+        "status": "running",
+        "environment": settings.environment.value,
+        "endpoints": {
+            "documentation": "/docs",
+            "health": "/health",
+            "search": "/search",
+            "scholarships": "/api/v1/scholarships",
+            "eligibility": "/eligibility/check"
+        },
+        "features": ["search", "eligibility", "ai", "analytics"]
+    }
+
 @app.get("/health")
+@app.head("/health")
 async def health_check():
     """Health check endpoint - fast response for deployment monitoring"""
     return {"status": "healthy"}
