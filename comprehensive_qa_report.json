@@ -1,65 +1,69 @@
 {
-  "qa_analysis_summary": {
-    "total_issues_found": 5,
-    "severity_breakdown": {
-      "Critical": 0,
-      "High": 2,
-      "Medium": 3,
-      "Low": 0
-    },
-    "analysis_timestamp": "2025-08-18T04:50:43.786942",
-    "test_environment": "Local Development (localhost:5000)"
+  "executive_summary": {
+    "total_issues": 5,
+    "critical_issues": 0,
+    "high_issues": 0,
+    "medium_issues": 5,
+    "low_issues": 0,
+    "test_timestamp": "2025-08-18T13:36:37.757669"
   },
   "detailed_findings": [
     {
-      "issue_id": "SQL-300",
-      "location": "services/scholarship_service.py",
-      "description": "Potential SQL injection vulnerability detected",
-      "steps_to_reproduce": "GET /search?q='; DROP TABLE scholarships; --",
-      "observed_output": "Response contains SQL-related keywords: {\"items\":[],\"total\":0,\"page\":1,\"page_size\":20,\"filters\":{\"keyword\":\"'; DROP TABLE scholarships; --\",\"fields_of_study\":[],\"min_amount\":null,\"max_amount\":null,\"scholarship_types\":[],\"states\":[],\"min_gpa",
-      "expected_output": "Sanitized response without SQL error exposure",
-      "severity": "High",
-      "timestamp": "2025-08-18T04:50:41.288773"
-    },
-    {
-      "issue_id": "RATE-601",
-      "location": "middleware/rate_limiting.py",
-      "description": "Rate limiting not effective on /search",
-      "steps_to_reproduce": "Send 100 rapid requests to /search",
-      "observed_output": "100 successful requests in 0.45 seconds",
-      "expected_output": "Rate limiting should trigger after configured limit",
-      "severity": "High",
-      "timestamp": "2025-08-18T04:50:41.867365"
-    },
-    {
-      "issue_id": "VAL-902",
-      "location": "schemas/eligibility.py or routers/eligibility.py",
-      "description": "Invalid GPA value not properly validated: None",
-      "steps_to_reproduce": "GET /eligibility/check?gpa=None",
-      "observed_output": "Status: 500, Response:   + Exception Group Traceback (most recent call last):\n  |   File \"/home/runner/workspace/.pythonlibs/lib/python3.11/site-packages/starlette/_utils.py\", line 77, in collapse_excgroups\n  |     yield\n  ",
-      "expected_output": "Status: 400 or 422 with validation error",
+      "issue_id": "VAL-002",
+      "location": "Router: /search",
+      "description": "Exception on long input: URL component 'query' too long",
+      "steps_to_reproduce": "Send long input to /search",
+      "observed_output": "Exception: URL component 'query' too long",
+      "expected_output": "Graceful handling of long inputs",
       "severity": "Medium",
-      "timestamp": "2025-08-18T04:50:43.608325"
+      "timestamp": "2025-08-18T13:36:36.547095"
     },
     {
-      "issue_id": "SEC-1103",
-      "location": "middleware/security_headers.py",
-      "description": "Missing security header: x-xss-protection",
-      "steps_to_reproduce": "GET / and check response headers",
-      "observed_output": "Header x-xss-protection not present",
-      "expected_output": "Header x-xss-protection: 1; mode=block",
+      "issue_id": "ELIG-002",
+      "location": "services/eligibility_service.py",
+      "description": "Eligibility logic test failed: 1 validation error for UserProfile\ngpa\n  Input should be less than or equal to 4 [type=less_than_equal, input_value=5.0, input_type=float]\n    For further information visit https://errors.pydantic.dev/2.11/v/less_than_equal",
+      "steps_to_reproduce": "Test eligibility with invalid profiles",
+      "observed_output": "Exception: 1 validation error for UserProfile\ngpa\n  Input should be less than or equal to 4 [type=less_than_equal, input_value=5.0, input_type=float]\n    For further information visit https://errors.pydantic.dev/2.11/v/less_than_equal",
+      "expected_output": "Proper validation handling",
       "severity": "Medium",
-      "timestamp": "2025-08-18T04:50:43.630974"
+      "timestamp": "2025-08-18T13:36:36.560440"
     },
     {
-      "issue_id": "SEC-1104",
-      "location": "middleware/security_headers.py",
-      "description": "Missing security header: strict-transport-security",
-      "steps_to_reproduce": "GET / and check response headers",
-      "observed_output": "Header strict-transport-security not present",
-      "expected_output": "Header strict-transport-security: max-age=31536000; includeSubDomains",
+      "issue_id": "RATE-001",
+      "location": "Router: /search",
+      "description": "Rate limiting not triggered after 50 rapid requests",
+      "steps_to_reproduce": "1. Send 50 rapid GET requests to /search\n2. Check for 429 responses",
+      "observed_output": "All responses: {200}",
+      "expected_output": "Some requests should return 429 Too Many Requests",
       "severity": "Medium",
-      "timestamp": "2025-08-18T04:50:43.631033"
+      "timestamp": "2025-08-18T13:36:37.179821"
+    },
+    {
+      "issue_id": "RATE-001",
+      "location": "Router: /eligibility/check",
+      "description": "Rate limiting not triggered after 50 rapid requests",
+      "steps_to_reproduce": "1. Send 50 rapid GET requests to /eligibility/check\n2. Check for 429 responses",
+      "observed_output": "All responses: {422}",
+      "expected_output": "Some requests should return 429 Too Many Requests",
+      "severity": "Medium",
+      "timestamp": "2025-08-18T13:36:37.670922"
+    },
+    {
+      "issue_id": "CORS-001",
+      "location": "main.py",
+      "description": "CORS configured to allow all origins (*)",
+      "steps_to_reproduce": "1. Send request with Origin: https://malicious-site.com\n2. Check Access-Control-Allow-Origin header",
+      "observed_output": "Access-Control-Allow-Origin: *",
+      "expected_output": "Specific origins only, not wildcard",
+      "severity": "Medium",
+      "timestamp": "2025-08-18T13:36:37.679205"
     }
-  ]
+  ],
+  "testing_methodology": {
+    "authentication_tests": "JWT validation, bypass attempts, authorization checks",
+    "security_tests": "SQL injection, XSS, CORS, sensitive data exposure",
+    "input_validation": "Size limits, null values, special characters, boundary cases",
+    "business_logic": "Data consistency, eligibility calculations, amount validations",
+    "api_testing": "Response formats, error handling, rate limiting"
+  }
 }
