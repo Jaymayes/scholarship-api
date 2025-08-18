@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, Query, Request
+from fastapi import APIRouter, Depends, Query, Request, HTTPException
 from typing import List, Optional
 from datetime import datetime
 import time
@@ -123,9 +123,8 @@ async def search_scholarships_post(
     
     Returns metadata-rich response with items, total, pagination info, and timing.
     """
-    # QA-005 fix: Enforce authentication in production  
+    # QA-005 fix: Enforce authentication in production - FIXED: Import added
     if not settings.public_read_endpoints and not current_user:
-        from fastapi import HTTPException
         raise HTTPException(
             status_code=401,
             detail="Authentication required for search endpoints"
@@ -172,9 +171,8 @@ async def search_scholarships_get(
     
     Returns the same metadata-rich response format as POST endpoint.
     """
-    # QA-005 fix: Enforce authentication in production
+    # QA-005 fix: Enforce authentication in production - FIXED: Import added
     if not settings.public_read_endpoints and not current_user:
-        from fastapi import HTTPException
         raise HTTPException(
             status_code=401,
             detail="Authentication required for search endpoints"

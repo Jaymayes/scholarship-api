@@ -114,13 +114,12 @@ async def rate_limit_handler(request: Request, exc: RateLimitExceeded) -> Respon
         except:
             retry_after = 60
     
-    # Create proper error response data
-    error_data = create_error_response(
-        request=request,
-        status_code=429,
-        error_code="RATE_LIMITED",
-        message=f"Rate limit exceeded: {exc}",
-        details={"retry_after_seconds": retry_after}
+    # CRITICAL FIX: Use central error builder to prevent double encoding
+    from utils.error_utils import build_rate_limit_error, get_trace_id
+    
+    error_data = build_rate_limit_error(
+        trace_id=get_trace_id(request),
+        retry_after_seconds=retry_after
     )
     
     # Add standard rate limiting headers

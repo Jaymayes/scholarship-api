@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 from services.interaction_service import InteractionService
 from models.database import get_db
 from schemas.interaction import InteractionRequest, BulkInteractionRequest, InteractionResponse
+from schemas.strict_validation import StrictInteractionRequest
 from utils.logger import get_logger
 from middleware.auth import get_current_user
 from config.settings import settings
@@ -134,13 +135,7 @@ async def log_interaction_endpoint(
         logger.error(f"Failed to log interaction: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail={
-                "trace_id": getattr(request.state, 'trace_id', None),
-                "code": "INTERACTION_LOG_FAILED",
-                "message": "Failed to log interaction",
-                "status": 500,
-                "timestamp": int(time.time())
-            }
+            detail="Failed to log interaction"  # Use simple string to avoid double encoding
         )
 
 @router.post("/bulk-log", response_model=dict)

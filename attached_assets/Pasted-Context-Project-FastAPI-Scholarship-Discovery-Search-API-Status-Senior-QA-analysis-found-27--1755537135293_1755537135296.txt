@@ -1,0 +1,135 @@
+Context
+Project: FastAPI “Scholarship Discovery & Search API”
+Status: Senior QA analysis found 27 issues with 53 failing tests. Critical problems include double-encoded error responses, inconsistent authentication enforcement, and widespread test regressions. You must fix these without weakening any existing security controls or changing the unified error schema:
+{ code, message, status, timestamp, trace_id, details? }
+
+Primary Goals
+
+Eliminate double-encoded error responses across the stack.
+Enforce consistent authentication on protected endpoints.
+Reduce test failures from 53 to 0; no flakiness.
+Tighten configuration and input validation.
+Make rate limiting, CORS, middleware ordering, and DB schema consistent across environments.
+Ensure trace_id appears on all error responses.
+Critical Issues To Fix First
+
+Double error encoding
+Root cause: some handlers/middleware json.dumps an error dict and then wrap it again in JSONResponse, or an exception handler re-serializes a response produced by another handler.
+Action:
+Centralize error building in a single helper build_error(code, message, status, details=None, trace_id=None) that returns a plain dict only.
+All exception handlers and middleware must call build_error and pass the dict directly to JSONResponse (never json.dumps or str()).
+Add exception handlers for:
+HTTPException (all status codes)
+RequestValidationError (422)
+Any rate-limit exception class used (e.g., RateLimitExceeded)
+Auth failures (OAuth2Error/InvalidCredentials) so they don’t return nested JSON strings
+If a handler receives a Response instance, return it unchanged (avoid re-wrapping).
+Add tests that assert application/json content-type and that response.json() returns a dict (not a JSON string).
+2. Authentication enforcement consistency
+
+Ensure all protected routers (scholarships, search, interactions, recommendations if applicable) require auth via a shared dependency, e.g., router-level dependencies=[Depends(get_current_user)].
+If PUBLIC_READ_ENDPOINTS is supported:
+Default false in production, and only allow true in dev.
+Add explicit tests: without token → 401, with invalid token → 401, with valid token → 200.
+Remove any “dev shortcuts” or route variants that bypass auth. Verify APIRouter includes only the protected routes in production.
+3. Test suite regressions
+
+Run pytest -q; group failures by:
+Double-encoded errors
+Auth enforcement
+Config validation
+Rate limiting behavior
+DB schema/KeyError
+Middleware ordering and error consistency
+Fix root causes, not tests, unless tests are outdated relative to agreed contracts. Keep unified error format intact.
+High/Medium Issues To Address
+4) Configuration validation
+
+Centralize settings with Pydantic (match project version).
+Validate and reject invalid values:
+Negative or zero timeouts, intervals, limits, or sizes
+Invalid CORS origins list when ENVIRONMENT=production
+Missing/weak JWT secrets in production
+Fail fast at startup in production; never log secret values.
+5. Input validation gaps
+
+Add/enforce strict Pydantic models with extra="forbid" (or v2 equivalent) for:
+interaction_wrapper endpoints
+replit_health and any other endpoints receiving params
+search/scholarship query/body payloads (min/max, enums, regex, PositiveInt, EmailStr, AnyUrl where applicable)
+Enforce server-side max items/length constraints; 422 for violations.
+6. Rate limiting consistency
+
+OPTIONS must not be rate limited.
+Consistent identifier (request.client.host or trusted X-Forwarded-For when configured).
+Ensure headers on 429: X-RateLimit-Limit, X-RateLimit-Remaining, Retry-After.
+Dev: in-memory backend fallback OK; Prod: require configured backend and fail fast if unreachable.
+7. Database schema inconsistencies (KeyError)
+
+Audit model-to-response mapping for renamed fields (e.g., recommendation_score vs match_score).
+Ensure API responses and DB schemas align; add migration or adapter mapping as needed.
+Fix KeyError by using explicit model serializers or dict construction with guaranteed keys.
+8. Middleware ordering and error uniformity
+
+Order should be:
+Security/Host/HTTPS
+CORS
+URL length guard
+Request size guard
+Rate limiting
+Routing
+Ensure exception handlers normalize ALL errors (401, 403, 404, 413, 414, 422, 429, 500) into the unified schema and always include trace_id.
+9. CORS enforcement
+
+Production: whitelist only; no wildcard when allow_credentials=true.
+Tests for allowed vs disallowed origins and OPTIONS preflight behavior.
+10. bcrypt compatibility warnings
+
+Pin compatible versions: passlib[bcrypt] and bcrypt (avoid deprecated pipelines).
+Use CryptContext with recommended settings; add a unit test for hashing/verification.
+Implementation Steps
+
+Introduce a central error_utils module:
+build_error(...)
+get_trace_id(request) helper that generates or extracts request.state.trace_id
+Update exception handlers to always:
+Build error dict via build_error
+Return JSONResponse(error_dict, status_code=...)
+Attach any rate-limit headers when applicable
+Normalize auth errors by adding a handler for the project’s auth exception types.
+Validate settings with Pydantic validators/field_validators; provide helpful error messages on startup.
+Align response_model with actual response shape. Where mismatch caused 500s, either adjust code or response model; add regression tests.
+Add tests for:
+No double-encoding: response.json() returns dict for 401/403/429
+Auth on protected routes (401/403 vs 200 with token)
+Config validation rejecting negative limits and invalid origins in prod
+Rate limit headers on 429
+CORS preflight allowed/disallowed
+DB mapping for renamed fields (recommendation_score) with a representative payload
+Trace_id presence across all errors
+Acceptance Criteria
+
+All tests pass (0 failures, 0 xfails unless documented).
+401/403/429/422/413/414/404/500 always return application/json with the unified schema and include trace_id.
+No error response is double-encoded; response.json() is always a dict.
+Protected endpoints cannot be accessed without valid auth in any environment unless PUBLIC_READ_ENDPOINTS=true explicitly (and not in production).
+Config validation rejects invalid values; production fails fast when misconfigured.
+Rate limiting consistent across environments with correct headers; OPTIONS not limited.
+CORS strict in prod; dev behavior unchanged; preflight works.
+No bcrypt warnings; password hash/verify test passes.
+Developer Notes
+
+Do not weaken security or change the unified error schema.
+Keep middleware order and docs protection as already designed.
+If you must change request/response contracts, update OpenAPI, tests, and README accordingly.
+Run Book
+
+Run pytest -q and paste the first failing traceback if any remain after your changes.
+Run ruff/flake8 and mypy/pyright; fix reported issues.
+Manual verification:
+401 unauthenticated /search and /scholarships
+429 rate limit with headers
+413 large body, 414 long URL
+CORS preflight pass/fail per origin
+Error decode check: ensure no nested JSON strings in error.message
+Please implement these fixes in-place, aligned with the repository’s structure and Pydantic/FastAPI versions, and include brief inline comments where behavior is non-obvious.

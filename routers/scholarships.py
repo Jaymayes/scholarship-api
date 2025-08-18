@@ -46,17 +46,11 @@ async def search_scholarships(
     This endpoint allows users to search through available scholarships using
     multiple criteria including keywords, fields of study, amount ranges, and more.
     """
-    # QA-004 fix: Enforce authentication in production
+    # QA-004 fix: Enforce authentication in production - FIXED: Use simple string detail
     if not settings.public_read_endpoints and not current_user:
         raise HTTPException(
             status_code=401,
-            detail={
-                "trace_id": f"scholarships_{int(time.time())}",
-                "code": "AUTHENTICATION_REQUIRED", 
-                "message": "Authentication required for scholarship endpoints",
-                "status": 401,
-                "timestamp": int(time.time())
-            }
+            detail="Authentication required for scholarship endpoints"
         )
     try:
         filters = SearchFilters(

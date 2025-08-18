@@ -1,6 +1,7 @@
 """
 Standardized error handlers for the Scholarship API
 All errors return unified schema: { trace_id, code, message, status, timestamp }
+CRITICAL FIX: Eliminates double-encoding by using central error builder
 """
 
 from fastapi import Request, HTTPException
@@ -13,6 +14,7 @@ from typing import Union, Dict, Any
 import traceback
 import time
 from utils.logger import get_logger
+from utils.error_utils import build_error, build_rate_limit_error, build_auth_error, build_validation_error, get_trace_id
 
 logger = get_logger(__name__)
 
@@ -24,21 +26,9 @@ def create_error_response(
     message: str,
     details: dict = None
 ) -> dict:
-    """Create standardized error response format"""
-    trace_id = getattr(request.state, "trace_id", "unknown")
-    
-    error_response = {
-        "trace_id": trace_id,
-        "code": error_code,
-        "message": message,
-        "status": status_code,
-        "timestamp": int(time.time())
-    }
-    
-    if details:
-        error_response["details"] = details
-    
-    return error_response
+    """Create standardized error response format - DEPRECATED: Use utils.error_utils.build_error instead"""
+    trace_id = get_trace_id(request)
+    return build_error(error_code, message, status_code, details, trace_id)
 
 
 async def http_exception_handler(request: Request, exc: HTTPException) -> JSONResponse:

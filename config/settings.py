@@ -57,7 +57,7 @@ class Settings(BaseSettings):
     jwt_secret_key: Optional[str] = Field(None, alias="JWT_SECRET_KEY")
     jwt_algorithm: str = Field("HS256", alias="JWT_ALGORITHM")
     jwt_previous_secret_keys: str = Field("", alias="JWT_PREVIOUS_SECRET_KEYS")
-    access_token_expire_minutes: int = Field(30, alias="ACCESS_TOKEN_EXPIRE_MINUTES")
+    access_token_expire_minutes: int = Field(30, alias="ACCESS_TOKEN_EXPIRE_MINUTES", gt=0)
     
     # Production security requirements
     allowed_hosts: List[str] = Field(default_factory=list, alias="ALLOWED_HOSTS")
@@ -150,8 +150,8 @@ class Settings(BaseSettings):
     # Database Configuration
     database_url: Optional[str] = Field(None, alias="DATABASE_URL")
     database_echo: bool = Field(False, alias="DATABASE_ECHO")
-    database_pool_size: int = Field(5, alias="DATABASE_POOL_SIZE")
-    database_max_overflow: int = Field(10, alias="DATABASE_MAX_OVERFLOW")
+    database_pool_size: int = Field(5, alias="DATABASE_POOL_SIZE", gt=0)
+    database_max_overflow: int = Field(10, alias="DATABASE_MAX_OVERFLOW", ge=0)
     
     # Redis Configuration
     redis_url: str = Field("redis://localhost:6379", alias="REDIS_URL")
@@ -227,17 +227,17 @@ class Settings(BaseSettings):
     log_format: str = Field("json", alias="LOG_FORMAT")  # json or text
     log_file: Optional[str] = Field(None, alias="LOG_FILE")
     
-    # Analytics Configuration
+    # Analytics Configuration with validation  
     analytics_enabled: bool = Field(True, alias="ANALYTICS_ENABLED")
-    analytics_retention_days: int = Field(90, alias="ANALYTICS_RETENTION_DAYS")
+    analytics_retention_days: int = Field(90, alias="ANALYTICS_RETENTION_DAYS", gt=0)
     
-    # Search Configuration
-    search_default_limit: int = Field(20, alias="SEARCH_DEFAULT_LIMIT")
-    search_max_limit: int = Field(100, alias="SEARCH_MAX_LIMIT")
+    # Search Configuration with validation
+    search_default_limit: int = Field(20, alias="SEARCH_DEFAULT_LIMIT", gt=0, le=100)
+    search_max_limit: int = Field(100, alias="SEARCH_MAX_LIMIT", gt=0, le=1000)
     
-    # Cache Configuration
+    # Cache Configuration with validation
     cache_enabled: bool = Field(True, alias="CACHE_ENABLED")
-    cache_ttl_seconds: int = Field(300, alias="CACHE_TTL_SECONDS")  # 5 minutes
+    cache_ttl_seconds: int = Field(300, alias="CACHE_TTL_SECONDS", gt=0)  # 5 minutes
     
     # External Services
     notification_service_url: Optional[str] = Field(None, alias="NOTIFICATION_SERVICE_URL")
