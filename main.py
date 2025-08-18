@@ -4,6 +4,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse
 from slowapi.errors import RateLimitExceeded
+from slowapi.middleware import SlowAPIMiddleware as RateLimitMiddleware
 import uvicorn
 
 from routers.scholarships import router as scholarships_router
@@ -83,8 +84,12 @@ app.middleware("http")(trace_id_middleware)
 
 # 5. Rate limiting handled by decorators (applied at route level)
 
-# Add rate limiter
-app.state.limiter = limiter
+# Add rate limiter middleware for proper enforcement
+if limiter:
+    app.state.limiter = limiter
+    app.add_middleware(RateLimitMiddleware)
+else:
+    print("⚠️ Rate limiter not configured")
 
 # Global exception handlers with unified error format
 from middleware.error_handlers import (
@@ -104,7 +109,9 @@ async def handle_validation_error(request: Request, exc: RequestValidationError)
 
 @app.exception_handler(RateLimitExceeded)
 async def handle_rate_limit_error(request: Request, exc: RateLimitExceeded):
-    return await rate_limit_exception_handler(request, exc)
+    # Import the updated rate limit handler
+    from middleware.rate_limiting import rate_limit_handler
+    return await rate_limit_handler(request, exc)
 
 @app.exception_handler(Exception)
 async def handle_general_error(request: Request, exc: Exception):

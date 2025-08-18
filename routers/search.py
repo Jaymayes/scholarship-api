@@ -8,7 +8,7 @@ from models.user import UserProfile
 from services.scholarship_service import scholarship_service
 from services.analytics_service import analytics_service
 from middleware.auth import get_current_user
-from middleware.rate_limiting import search_rate_limit
+from middleware.simple_rate_limiter import search_rate_limit
 # from routers.interaction_wrapper import log_interaction  # Will implement if needed
 from utils.logger import get_logger
 
@@ -101,11 +101,11 @@ async def execute_search(
         raise
 
 @router.post("/search")
-@search_rate_limit()
 async def search_scholarships_post(
     request: Request,
     request_data: SearchRequest,
-    current_user: Optional[dict] = Depends(get_current_user)
+    current_user: Optional[dict] = Depends(get_current_user),
+    _rate_limit: bool = Depends(search_rate_limit)
 ):
     """
     Search scholarships using POST with request body
@@ -131,10 +131,10 @@ async def search_scholarships_post(
     )
 
 @router.get("/search")
-@search_rate_limit()
 async def search_scholarships_get(
     request: Request,
     q: Optional[str] = Query(None, description="Search query"),
+    _rate_limit: bool = Depends(search_rate_limit),
     fields_of_study: List[FieldOfStudy] = Query(default=[], description="Filter by fields of study"),
     min_amount: Optional[float] = Query(None, ge=0, description="Minimum scholarship amount"),
     max_amount: Optional[float] = Query(None, ge=0, description="Maximum scholarship amount"),

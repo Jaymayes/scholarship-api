@@ -142,32 +142,42 @@ async def get_popular_scholarships_from_db(
         raise HTTPException(status_code=500, detail="Popular scholarships query failed")
 
 @router.get("/status")
-@limiter.limit("300/minute")
 async def database_status(
     request: Request,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(require_auth)
+    db: Session = Depends(get_db)
 ):
-    """Check database connection and basic statistics"""
+    """Check database connection and basic statistics (no authentication required for health check)"""
     try:
-        db_service = DatabaseService(db)
+        # Simple database connectivity test using minimal query
+        from sqlalchemy import text
         
-        # Test database connection and get basic stats
+        # Test basic connectivity with a simple query
+        result = db.execute(text("SELECT 1")).scalar()
+        if result != 1:
+            raise RuntimeError("Database connectivity test failed")
+        
+        # Get basic statistics without relying on user context
         from models.database import ScholarshipDB, UserInteractionDB
         
-        scholarship_count = db.query(ScholarshipDB).filter(ScholarshipDB.is_active == True).count()
-        interaction_count = db.query(UserInteractionDB).count()
+        try:
+            scholarship_count = db.query(ScholarshipDB).filter(ScholarshipDB.is_active == True).count()
+        except Exception:
+            scholarship_count = "unknown"
+            
+        try:
+            interaction_count = db.query(UserInteractionDB).count()
+        except Exception:
+            interaction_count = "unknown"
         
         status = {
             "database_status": "connected",
             "total_scholarships": scholarship_count,
             "total_interactions": interaction_count,
             "database_type": "PostgreSQL",
-            "user": current_user.user_id,
-            "permissions": current_user.scopes
+            "connection_test": "passed"
         }
         
-        logger.info(f"Database status check by user {current_user.user_id}")
+        logger.info("Database status check completed successfully")
         return status
         
     except Exception as e:

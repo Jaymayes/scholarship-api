@@ -1,0 +1,116 @@
+You’re working on the FastAPI “Scholarship Discovery & Search API”. A Senior QA report identified 3 verified issues to fix before production:
+
+SEC-001 (Critical): Default JWT secret key is still in use ("your-secret-key-change-in-production")
+DB-001 (High): Database status/health endpoint returns 500: 'function' object has no attribute 'user_id'
+RATE-001 (Medium): Rate limiting not taking effect (no 429 after rapid requests)
+What’s already good and must not regress:
+
+Env-specific CORS with production whitelisting
+Env-driven rate limiting structure (prod 100/min, dev 200/min)
+Request body size middleware (413)
+URL length guard middleware (414)
+Unified error schema: { trace_id, code, message, status, timestamp }
+Security headers, input validation, SQL injection protections
+Centralized settings via Pydantic (use whatever version the project already uses)
+Goals
+Fix the 3 issues, keep existing security features intact, and add tests/docs. Do not loosen any security controls.
+
+Tasks
+
+SEC-001: Remove default JWT secret and harden auth
+Settings:
+Add JWT_SECRET_KEY env var with no insecure default. In development you may allow a generated ephemeral key, but in production fail fast if missing or equals any banned defaults (e.g., "your-secret-key-change-in-production", "secret", "dev").
+Optional: Add JWT_ALGORITHM (default: HS256).
+Auth initialization:
+Use settings.JWT_SECRET_KEY for signing/verification.
+On startup, if ENVIRONMENT == "production" and the key is missing or matches a banned default, raise RuntimeError with a clear message.
+Log-safe: never log the secret; only log whether it is set and key length.
+Optional rotation support (if simple to add without breaking): support JWT_PREVIOUS_SECRET_KEYS as a comma-separated list used for verification only; always sign with current key.
+Tests:
+In production mode, with default/banned key, app startup should fail.
+Tokens signed with the configured secret verify; tokens with wrong secret fail with 401 using the unified error schema.
+Docs:
+Update README and .env.example to require a strong JWT secret and show how to generate one (e.g., Python secrets.token_urlsafe(64)).
+2. DB-001: Fix database health/status endpoint
+
+Symptom: 'function' object has no attribute 'user_id' indicates something is referencing a function instead of an instance (e.g., dependency function, model class, or session factory) within the health endpoint.
+Implementation:
+Refactor the DB health check to a minimal, deterministic connectivity check that doesn’t rely on request user context or model attributes:
+For SQLAlchemy 1.4/2.0 style, use a short-lived session and execute a trivial query:
+session.execute(text("SELECT 1")) or session.scalar(select(1)) and assert result is truthy.
+Ensure you are calling SessionLocal() (creating an instance), not referring to the SessionLocal function itself.
+Remove any references to current_user.user_id or similar from the health route; health should not depend on auth.
+Return HTTP 200 with a small JSON payload on success, or a unified error response if it fails.
+Tests:
+Health endpoint returns 200 JSON on success.
+If DB is intentionally misconfigured in a test, health endpoint returns unified error with 503 or 500.
+Logging:
+Log exceptions with trace_id, but do not leak credentials/URLs.
+3. RATE-001: Ensure rate limiting actually limits
+
+Keep the current rate-limiter library; fix configuration/placement so it works:
+Initialize limiter with RATE_LIMIT_BACKEND_URL from env (e.g., Redis) and ensure the app can reach it in tests/dev, or fall back to an in-memory backend if the library supports it.
+Verify the identifier function correctly extracts client IP. If the app is behind a proxy, and the project already supports it, respect X-Forwarded-For (but only if behind trusted proxy).
+Middleware/decorator:
+Ensure the limiter middleware is added after CORS and size/URL guards but before routing is acceptable; or, if the library requires decorator usage, confirm all public endpoints are covered (or add a shared APIRouter-level dependency).
+Do not limit OPTIONS preflight requests.
+Responses:
+On limit exceeded, return 429 using the unified error schema and include standard headers:
+X-RateLimit-Limit, X-RateLimit-Remaining, Retry-After (in seconds).
+Tests:
+Temporarily set RATE_LIMIT_PER_MINUTE to a small number via env in the test, call an endpoint repeatedly, assert 429 after threshold and correct headers present. Also test that health endpoint is excluded only if that is current policy; otherwise, keep consistent.
+Cross-cutting requirements
+
+Unified error schema:
+Ensure 401, 403, 404, 422, 429, 413, 414, 500 all respond with { trace_id, code, message, status, timestamp }.
+If needed, add/adjust global exception handlers for HTTPException, RequestValidationError, and generic 500s to normalize payloads. Propagate trace_id from request-id middleware.
+Middleware order:
+Recommended: security/HTTPS/host headers → CORS → URL length guard → request size guard → rate limiting → routing
+Ensure WebSocket and health routes are handled appropriately without bypassing core protections.
+Do not relax any existing security controls and do not reintroduce wildcard CORS in production.
+Deliverables
+
+Code changes:
+Settings: JWT secret handling with production enforcement; rate limiter backend config; keep existing env structure.
+Auth init: use secure JWT secret; optional verify with previous keys if rotation added.
+Health endpoint: simple DB connectivity check using a real session instance and a trivial query; no user context.
+Rate limiting: working limiter with correct identity function, backend, headers, and exclusion of OPTIONS.
+Exception handlers remain aligned with the unified error schema.
+Tests:
+JWT secret enforcement in production mode
+DB health success/failure
+Rate limiting returns 429 and headers after threshold
+Regression tests confirm 413/414 still work and error schema unchanged
+Docs:
+README and .env.example updates with:
+JWT_SECRET_KEY requirement and generation example
+RATE_LIMIT_BACKEND_URL notes and local dev setup
+How to run the new tests and simulate 429
+CI/lint:
+Ensure existing checks pass. If CI exists, tests should pass locally with pytest -q.
+Code sketches (adapt to project style)
+
+Settings (pydantic v1 or v2 per project):
+JWT_SECRET_KEY: str | None
+JWT_ALGORITHM: str = "HS256"
+ENVIRONMENT: str = "development"
+RATE_LIMIT_PER_MINUTE, RATE_LIMIT_BACKEND_URL as already used
+BANNED_DEFAULT_SECRETS = {"your-secret-key-change-in-production", "secret", "dev"}
+Startup check:
+if settings.ENVIRONMENT == "production":
+if not JWT_SECRET_KEY or JWT_SECRET_KEY in BANNED_DEFAULT_SECRETS: raise RuntimeError("Secure JWT secret required in production")
+Health endpoint:
+with SessionLocal() as session:
+result = session.execute(text("SELECT 1")).scalar() or session.scalar(select(1))
+if result != 1: raise RuntimeError("DB check failed")
+Rate limiting:
+Ensure identifier function uses request.client.host or forwarded header parser if behind a trusted proxy
+Add headers and unified error payload in the rate-limit exception handler
+Acceptance criteria
+
+App refuses to start in production without a strong, non-default JWT secret.
+Health endpoint returns 200 when DB is reachable and no longer raises 'function object...' errors.
+Rate limiting triggers 429 with proper headers after the configured number of requests; OPTIONS not limited.
+All error responses use the unified schema with trace_id.
+No regressions to CORS, size guard, URL guard, or other security features.
+Tests and docs updated and passing.

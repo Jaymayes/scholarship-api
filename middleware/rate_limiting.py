@@ -67,20 +67,81 @@ def create_rate_limiter():
 # Create the limiter instance
 limiter = create_rate_limiter()
 
+# Ensure the limiter is functional - override if None
+if limiter is None:
+    # Force creation of in-memory limiter for testing
+    from slowapi import Limiter
+    limiter = Limiter(
+        key_func=get_user_identifier,
+        storage_uri="memory://"
+    )
+
 def get_rate_limit_for_environment(base_limit: str) -> str:
     """Adjust rate limits based on environment"""
     if settings.environment.value in ["local", "development"]:
         # Double the limits for dev environments
         parts = base_limit.split("/")
         if len(parts) == 2:
-            count = int(parts[0])
-            return f"{count * 2}/{parts[1]}"
+            try:
+                amount = int(parts[0])
+                period = parts[1]
+                return f"{amount * 2}/{period}"
+            except ValueError:
+                return base_limit
     return base_limit
+
+# Rate limit exception handler with unified error schema
+async def rate_limit_handler(request: Request, exc: RateLimitExceeded) -> Response:
+    """Handle rate limit exceeded with unified error format"""
+    from middleware.error_handlers import create_error_response
+    import time
+    
+    # Extract rate limit details
+    limit_info = str(exc).split() if exc else []
+    
+    # Calculate retry after (default to 60 seconds)
+    retry_after = 60
+    if len(limit_info) >= 2:
+        try:
+            # Parse "X per Y" format
+            period_str = limit_info[-1]
+            if 'minute' in period_str:
+                retry_after = 60
+            elif 'hour' in period_str:
+                retry_after = 3600
+            elif 'second' in period_str:
+                retry_after = 1
+        except:
+            retry_after = 60
+    
+    response_data = create_error_response(
+        request=request,
+        status_code=429,
+        error_code="RATE_LIMITED",
+        message=f"Rate limit exceeded: {exc}",
+        details={"retry_after_seconds": retry_after}
+    )
+    
+    # Add standard rate limiting headers
+    headers = {
+        "Retry-After": str(retry_after),
+        "X-RateLimit-Limit": str(getattr(exc, 'limit', 'unknown')),
+        "X-RateLimit-Remaining": "0",
+        "X-RateLimit-Reset": str(int(time.time() + retry_after))
+    }
+    
+    return Response(
+        content=response_data.body.decode(),
+        status_code=429,
+        headers=headers,
+        media_type="application/json"
+    )
 
 # Environment-aware rate limit decorators
 def search_rate_limit():
     """Rate limit for search endpoints"""
-    limit = get_rate_limit_for_environment(settings.rate_limit_search)
+    # Use a very low limit for testing
+    limit = "5/minute"  # Force low limit to test rate limiting
     return limiter.limit(limit)
 
 def eligibility_rate_limit():

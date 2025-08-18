@@ -12,10 +12,23 @@ from passlib.context import CryptContext
 from pydantic import BaseModel
 import os
 
-# Configuration
-SECRET_KEY = os.getenv("JWT_SECRET_KEY", "your-secret-key-change-in-production")
-ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 30
+# Configuration - import from settings for secure JWT handling
+from config.settings import settings
+
+# JWT Configuration with rotation support
+def get_jwt_secret_key() -> str:
+    """Get JWT secret key securely"""
+    return settings.get_jwt_secret_key
+
+def get_jwt_algorithm() -> str:
+    """Get JWT algorithm"""
+    return settings.jwt_algorithm
+
+def get_jwt_previous_keys() -> List[str]:
+    """Get previous JWT keys for token rotation"""
+    return settings.get_jwt_previous_keys
+
+ACCESS_TOKEN_EXPIRE_MINUTES = settings.access_token_expire_minutes
 
 # Password hashing
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -90,26 +103,33 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -
     if expires_delta:
         expire = datetime.utcnow() + expires_delta
     else:
-        expire = datetime.utcnow() + timedelta(minutes=15)
+        expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     
     to_encode.update({"exp": expire})
-    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+    # Always use the current JWT secret for signing new tokens
+    encoded_jwt = jwt.encode(to_encode, get_jwt_secret_key(), algorithm=get_jwt_algorithm())
     return encoded_jwt
 
 def decode_token(token: str) -> Optional[TokenData]:
-    """Decode and validate a JWT token"""
-    try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        user_id: str = payload.get("sub")
-        roles: List[str] = payload.get("roles", [])
-        scopes: List[str] = payload.get("scopes", [])
-        
-        if user_id is None:
-            return None
+    """Decode and validate a JWT token with rotation support"""
+    # Try current key first
+    keys_to_try = [get_jwt_secret_key()] + get_jwt_previous_keys()
+    
+    for secret_key in keys_to_try:
+        try:
+            payload = jwt.decode(token, secret_key, algorithms=[get_jwt_algorithm()])
+            user_id: str = payload.get("sub")
+            roles: List[str] = payload.get("roles", [])
+            scopes: List[str] = payload.get("scopes", [])
             
-        return TokenData(user_id=user_id, roles=roles, scopes=scopes)
-    except JWTError:
-        return None
+            if user_id is None:
+                continue
+                
+            return TokenData(user_id=user_id, roles=roles, scopes=scopes)
+        except JWTError:
+            continue
+    
+    return None
 
 async def get_current_user(credentials: Optional[HTTPAuthorizationCredentials] = Depends(security)) -> Optional[User]:
     """Get the current authenticated user from JWT token"""

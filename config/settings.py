@@ -4,7 +4,9 @@ Using pydantic-settings for type-safe configuration
 """
 
 import os
-from typing import List, Optional, Annotated
+import secrets
+import logging
+from typing import List, Optional, Annotated, Set
 from pydantic import Field, field_validator, ConfigDict
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from enum import Enum
@@ -42,10 +44,22 @@ class Settings(BaseSettings):
     port: int = Field(5000, alias="PORT")
     reload: bool = Field(True, alias="RELOAD")
     
-    # Security Configuration
-    jwt_secret_key: str = Field("your-secret-key-change-in-production", alias="JWT_SECRET_KEY")
+    # Security Configuration - JWT
+    jwt_secret_key: Optional[str] = Field(None, alias="JWT_SECRET_KEY")
     jwt_algorithm: str = Field("HS256", alias="JWT_ALGORITHM")
+    jwt_previous_secret_keys: str = Field("", alias="JWT_PREVIOUS_SECRET_KEYS")
     access_token_expire_minutes: int = Field(30, alias="ACCESS_TOKEN_EXPIRE_MINUTES")
+    
+    # Banned default secrets that cannot be used in production
+    BANNED_DEFAULT_SECRETS: Set[str] = {
+        "your-secret-key-change-in-production",
+        "secret", 
+        "dev",
+        "development",
+        "test",
+        "changeme",
+        "default"
+    }
     
     # CORS Configuration - Environment-specific
     cors_allowed_origins: str = Field(
@@ -301,6 +315,70 @@ class Settings(BaseSettings):
         case_sensitive=False,
         extra="ignore"
     )
+    
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self._setup_jwt_secret()
+        self._validate_production_security()
+    
+    def _setup_jwt_secret(self):
+        """Setup JWT secret with environment-specific defaults"""
+        if not self.jwt_secret_key:
+            if self.environment == Environment.PRODUCTION:
+                # Production MUST have an explicit secret
+                pass  # Will be handled in validation
+            else:
+                # Development: generate ephemeral key
+                self.jwt_secret_key = secrets.token_urlsafe(64)
+                logger = logging.getLogger(__name__)
+                logger.info(f"Generated ephemeral JWT secret for {self.environment} (length: {len(self.jwt_secret_key)})")
+    
+    def _validate_production_security(self):
+        """Validate security configuration for production environment"""
+        if self.environment == Environment.PRODUCTION:
+            if not self.jwt_secret_key:
+                raise RuntimeError(
+                    "PRODUCTION SECURITY ERROR: JWT_SECRET_KEY environment variable is required in production. "
+                    "Generate a secure key with: python -c \"import secrets; print(secrets.token_urlsafe(64))\""
+                )
+            
+            if self.jwt_secret_key in self.BANNED_DEFAULT_SECRETS:
+                raise RuntimeError(
+                    f"PRODUCTION SECURITY ERROR: JWT secret cannot be a default/banned value in production. "
+                    f"Current secret matches banned pattern. Generate a secure key with: "
+                    f"python -c \"import secrets; print(secrets.token_urlsafe(64))\""
+                )
+            
+            if len(self.jwt_secret_key) < 32:
+                raise RuntimeError(
+                    "PRODUCTION SECURITY ERROR: JWT secret must be at least 32 characters long in production. "
+                    "Generate a secure key with: python -c \"import secrets; print(secrets.token_urlsafe(64))\""
+                )
+    
+    @property
+    def get_jwt_secret_key(self) -> str:
+        """Get the JWT secret key securely"""
+        if not self.jwt_secret_key:
+            raise RuntimeError("JWT secret key not configured")
+        return self.jwt_secret_key
+    
+    @property
+    def get_jwt_previous_keys(self) -> List[str]:
+        """Get previous JWT keys for token rotation support"""
+        if not self.jwt_previous_secret_keys:
+            return []
+        return [key.strip() for key in self.jwt_previous_secret_keys.split(",") if key.strip()]
+    
+    def log_jwt_config(self):
+        """Log JWT configuration status (without exposing secrets)"""
+        logger = logging.getLogger(__name__)
+        if self.jwt_secret_key:
+            logger.info(f"JWT secret configured: ✅ (length: {len(self.jwt_secret_key)}, algorithm: {self.jwt_algorithm})")
+        else:
+            logger.warning("JWT secret not configured: ❌")
+        
+        if self.get_jwt_previous_keys:
+            logger.info(f"JWT rotation keys configured: {len(self.get_jwt_previous_keys)} previous keys")
 
 # Environment-specific configurations
 class LocalSettings(Settings):
