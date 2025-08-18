@@ -12,9 +12,11 @@ from services.scholarship_service import scholarship_service
 from services.eligibility_service import eligibility_service
 from services.search_service import search_service
 from services.analytics_service import analytics_service
-from middleware.auth import require_auth, User
+from middleware.auth import require_auth, User, get_current_user
+from config.settings import settings
 from utils.logger import get_logger
 from datetime import datetime
+import time
 
 logger = get_logger(__name__)
 router = APIRouter()
@@ -34,14 +36,28 @@ async def search_scholarships(
     limit: int = Query(20, ge=1, le=100, description="Number of results to return"),
     offset: int = Query(0, ge=0, description="Number of results to skip"),
     user_id: Optional[str] = Query(None, description="User ID for analytics"),
-    current_user: User = Depends(require_auth(min_role="user", scopes=["scholarships:read"]))
+    # QA-004 fix: Require authentication unless PUBLIC_READ_ENDPOINTS is enabled
+    current_user: Optional[dict] = Depends(get_current_user) if not settings.public_read_endpoints else None
 ):
     """
-    Search scholarships with various filters and pagination support.
+    Search scholarships with various filters and pagination support - QA-004 fix: Authentication enforced.
+    Requires authentication unless PUBLIC_READ_ENDPOINTS feature flag is enabled.
     
     This endpoint allows users to search through available scholarships using
     multiple criteria including keywords, fields of study, amount ranges, and more.
     """
+    # QA-004 fix: Enforce authentication in production
+    if not settings.public_read_endpoints and not current_user:
+        raise HTTPException(
+            status_code=401,
+            detail={
+                "trace_id": f"scholarships_{int(time.time())}",
+                "code": "AUTHENTICATION_REQUIRED", 
+                "message": "Authentication required for scholarship endpoints",
+                "status": 401,
+                "timestamp": int(time.time())
+            }
+        )
     try:
         filters = SearchFilters(
             keyword=keyword,

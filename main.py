@@ -56,8 +56,8 @@ setup_metrics(app)
 tracing_service.setup_tracing()
 tracing_service.instrument_app(app)
 
-# Add middleware in correct order (outermost first)
-# Order: Security → CORS → Request Processing → Rate Limiting → Routing
+# QA-001 fix: Add middleware in correct order (outermost first, applied last)
+# Order: Security & Host Protection → CORS → Request Processing → Rate Limiting → Routing
 from middleware.security_headers import SecurityHeadersMiddleware
 from middleware.body_limit import BodySizeLimitMiddleware
 from middleware.url_length import URLLengthMiddleware
@@ -66,12 +66,12 @@ from middleware.forwarded_headers import ForwardedHeadersMiddleware
 from middleware.docs_protection import DocsProtectionMiddleware
 from middleware.database_session import DatabaseSessionMiddleware
 
-# 1. Production middleware stack (outermost - security & proxy handling)
-app.add_middleware(DocsProtectionMiddleware)  # Block docs in production
-app.add_middleware(TrustedHostMiddleware)     # Validate Host header  
-app.add_middleware(ForwardedHeadersMiddleware) # Handle X-Forwarded-* headers
-app.add_middleware(DatabaseSessionMiddleware) # Database lifecycle management
-app.add_middleware(SecurityHeadersMiddleware) # Security headers
+# 1. Security and host protection middleware (outermost - first line of defense)
+app.add_middleware(SecurityHeadersMiddleware)  # Security headers (must be first)
+app.add_middleware(TrustedHostMiddleware)      # Validate Host header against whitelist
+app.add_middleware(ForwardedHeadersMiddleware) # Handle X-Forwarded-* headers safely
+app.add_middleware(DocsProtectionMiddleware)   # Block docs in production
+app.add_middleware(DatabaseSessionMiddleware)  # Database lifecycle management
 
 # 2. CORS (must be early to handle preflight requests) - Replit compatible
 cors_config = settings.get_cors_config
@@ -161,6 +161,10 @@ app.include_router(health_router)
 app.include_router(replit_health_router, tags=["health"])
 app.include_router(ai_router, tags=["ai"])
 app.include_router(db_status_router)
+
+# QA-003 fix: Include interaction wrapper endpoints  
+from routers.interaction_wrapper import router as interaction_wrapper_router
+app.include_router(interaction_wrapper_router, tags=["interactions"])
 
 @app.get("/")
 async def root():

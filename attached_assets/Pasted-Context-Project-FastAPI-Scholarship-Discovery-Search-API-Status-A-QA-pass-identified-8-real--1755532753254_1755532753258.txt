@@ -1,0 +1,115 @@
+Context
+Project: FastAPI “Scholarship Discovery & Search API”
+Status: A QA pass identified 8 real issues that block production. Existing security features (unified error schema with trace_id, rate limiting, headers, CORS) must not regress.
+
+Issues to fix
+High severity
+
+QA-002: Hardcoded test secrets in config/settings.py
+QA-003: Missing input validation in routers/interaction_wrapper.py
+QA-006: Missing input validation in routers/replit_health.py
+QA-007: No dedicated security test suite
+Medium severity
+
+QA-001: Security middleware not first in stack
+QA-004: Scholarships endpoints may lack auth
+QA-005: Search endpoints accessible without auth
+QA-008: Dockerfile copies entire context (risk of leaking secrets)
+Non-functional confirmations from QA
+
+Search endpoint returns 200 without auth
+API docs exposed at /docs, /redoc, /openapi.json in production
+Goals
+
+Eliminate hardcoded secrets; enforce env-based secure config with production validation.
+Add strict input validation for affected routers.
+Ensure security middleware ordering is correct and enforced.
+Require authentication for scholarships and search endpoints (unless explicitly feature-flagged).
+Lock down API docs in production.
+Harden Docker build context to exclude sensitive files.
+Add a dedicated security test suite covering the above.
+Do not loosen any existing security controls. Preserve the unified error response schema: { trace_id, code, message, status, timestamp }.
+
+Tasks
+
+Secrets hardening (QA-002)
+Remove any hardcoded secrets, API keys, or test tokens from config/settings.py.
+Load via environment variables only. Ban weak defaults in production (e.g., “secret”, “dev”, “your-secret-key…”).
+On startup, if ENVIRONMENT=production and a required secret is missing/weak, fail fast with a clear log (do not log the secret).
+Update .env.example with placeholders and generation tips.
+2. Input validation for interaction_wrapper (QA-003)
+
+Introduce Pydantic request models for all POST/PUT endpoints in routers/interaction_wrapper.py.
+Add strict constraints: min/max lengths, regex where applicable, enums for known choices, PositiveInt/EmailStr/AnyUrl as appropriate.
+Set model_config/Config: extra="forbid" (v1) or model_config = {"extra": "forbid"} (v2) to reject unknown fields.
+Return 422 with the existing unified error schema via global handler.
+3. Input validation for replit_health (QA-006)
+
+Health routes should not accept arbitrary bodies. Ensure only expected query params are defined and typed.
+For endpoints that should take no input, do not parse request body; reject extraneous params (extra="forbid" if any model is used).
+Keep responses minimal and typed via response_model where applicable.
+4. Security middleware ordering (QA-001)
+
+Ensure the stack order is:
+Security and host protections (SecurityMiddleware, TrustedHostMiddleware, HTTPSRedirect if applicable)
+CORS
+URL length guard
+Request size guard
+Rate limiting
+Routing
+Add brief inline comments explaining the rationale.
+Confirm OPTIONS preflight is not blocked by size or rate limit middleware.
+5. Authentication enforcement (QA-004, QA-005)
+
+Require authentication on scholarships and search endpoints via a shared dependency (e.g., get_current_user / JWT dependency).
+If certain read endpoints must be public, gate them behind a feature flag PUBLIC_READ_ENDPOINTS (default false in production) and ensure they are rate-limited and return minimal, non-sensitive fields.
+Update OpenAPI security schemes and mark protected routes accordingly.
+Return 401/403 with the unified error schema.
+6. Lock down API docs in production
+
+Expose /docs, /redoc, /openapi.json only when ENVIRONMENT!=production or ENABLE_DOCS=true.
+In production default, these routes should return 404.
+7. Docker hardening (QA-008)
+
+Add a .dockerignore to exclude: .git, .github, tests, docs, .env, *.env, *.pem, *.key, node_modules, .DS_Store, coverage, pycache.
+In Dockerfile, avoid COPY . .; only copy pyproject/poetry.lock or requirements*, and the application source directories explicitly.
+Keep multi-stage build and non-root runtime user.
+8. Dedicated security test suite (QA-007)
+
+Add pytest tests that verify:
+Secrets: app fails to start in production mode with missing/weak secrets.
+Middleware order: security headers present; OPTIONS preflight not blocked.
+Auth enforcement: scholarships and search endpoints return 401/403 without valid JWT; succeed with valid JWT.
+Input validation: invalid payloads in interaction_wrapper and replit_health return 422 with unified error schema; unknown fields rejected.
+Docs protection: /docs, /redoc, /openapi.json return 404 in production by default.
+CORS: disallowed origin doesn’t receive ACAO header in production.
+Rate limit behavior unchanged and still returns 429 with headers and unified error schema after threshold.
+9. Documentation
+
+Update README and .env.example:
+Required env vars for production (secrets, CORS_ALLOWED_ORIGINS, ALLOWED_HOSTS, DATABASE_URL, RATE_LIMIT_BACKEND_URL).
+Docs protection behavior and how to enable explicitly.
+Auth requirements for scholarships and search routes.
+Input validation expectations and examples.
+Docker build instructions noting .dockerignore and minimal context copy.
+Acceptance criteria
+
+No hardcoded secrets remain; production startup fails if required secure settings are missing/weak.
+All interaction_wrapper and replit_health inputs are validated; unknown fields rejected; 422 uses unified error schema.
+Security middleware is first in the stack; OPTIONS preflight works; headers are present.
+Scholarships and search endpoints require auth (or are protected by the documented feature flag); unauthenticated requests get 401/403 with unified error schema.
+Swagger/Redoc/OpenAPI disabled by default in production; return 404.
+Docker build excludes sensitive files; only necessary app files are copied.
+New security tests pass; existing tests continue to pass; no regression to rate limiting, CORS, or unified error responses.
+Constraints
+
+Do not weaken any existing security control.
+Preserve the unified error schema and trace_id propagation.
+Follow the project’s Pydantic version and configuration style.
+Keep changes aligned with the current app structure and imports.
+Deliverables
+
+Code changes in routers, middleware registration, settings/config, and Dockerfile/.dockerignore.
+New/updated tests in a dedicated tests/security/ folder.
+Updated README and .env.example.
+Brief inline comments explaining non-obvious security decisions.

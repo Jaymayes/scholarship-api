@@ -58,19 +58,11 @@ class Settings(BaseSettings):
     trusted_proxy_ips: List[str] = Field(default_factory=list, alias="TRUSTED_PROXY_IPS")
     enable_docs: Optional[bool] = Field(None, alias="ENABLE_DOCS")
     
+    # Feature flag for public read endpoints (authentication bypass)
+    public_read_endpoints: bool = Field(False, alias="PUBLIC_READ_ENDPOINTS")
+    
     # Rate limiting backend requirements (production-aware)
     disable_rate_limit_backend: bool = Field(False, alias="DISABLE_RATE_LIMIT_BACKEND")
-    
-    # Banned default secrets that cannot be used in production
-    BANNED_DEFAULT_SECRETS: Set[str] = {
-        "your-secret-key-change-in-production",
-        "secret", 
-        "dev",
-        "development",
-        "test",
-        "changeme",
-        "default"
-    }
     
     # CORS Configuration - Environment-specific
     cors_allowed_origins: str = Field(
@@ -317,7 +309,7 @@ class Settings(BaseSettings):
         if not v:
             return v  # Will be handled in model_post_init
         
-        # Check against banned defaults
+        # Check against banned defaults - QA-002 fix
         banned_secrets = {
             "your-secret-key-change-in-production",
             "secret", 
@@ -329,12 +321,19 @@ class Settings(BaseSettings):
         }
         
         if v.lower() in banned_secrets:
-            raise ValueError(f"JWT secret key '{v}' is a banned default value and cannot be used")
+            raise ValueError(f"JWT secret key is a banned default value and cannot be used in production")
         
         return v
     
     def model_post_init(self, __context):
         """Production validation after model initialization"""
+        # Auto-generate JWT secret if not provided in development
+        if not self.jwt_secret_key and self.is_development:
+            import secrets
+            self.jwt_secret_key = secrets.token_urlsafe(64)
+            import logging
+            logging.info("Generated ephemeral JWT secret for development")
+        
         if self.environment == Environment.PRODUCTION:
             self._validate_production_config()
     
@@ -375,6 +374,8 @@ class Settings(BaseSettings):
         
         if errors:
             error_msg = "Production configuration validation failed:\n" + "\n".join(f"- {err}" for err in errors)
+            import logging
+            logging.critical("Production startup blocked due to configuration errors")
             raise ValueError(error_msg)
     
     @property

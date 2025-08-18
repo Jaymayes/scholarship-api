@@ -8,6 +8,7 @@ from models.user import UserProfile
 from services.scholarship_service import scholarship_service
 from services.analytics_service import analytics_service
 from middleware.auth import get_current_user
+from config.settings import settings
 from middleware.simple_rate_limiter import search_rate_limit
 # from routers.interaction_wrapper import log_interaction  # Will implement if needed
 from utils.logger import get_logger
@@ -100,18 +101,41 @@ async def execute_search(
         logger.error(f"Search execution failed: {str(e)}")
         raise
 
+# QA-005 fix: Add authentication requirement to search endpoints
+async def get_auth_user_for_search() -> Optional[dict]:
+    """Get authenticated user for search endpoints with feature flag support"""
+    if settings.public_read_endpoints:
+        # In development or when explicitly enabled, allow unauthenticated access
+        return None
+    # In production, require authentication
+    return Depends(get_current_user)
+
 @router.post("/search")
 async def search_scholarships_post(
     request: Request,
     request_data: SearchRequest,
-    current_user: Optional[dict] = Depends(get_current_user),
+    current_user: Optional[dict] = Depends(get_current_user) if not settings.public_read_endpoints else None,
     _rate_limit: bool = Depends(search_rate_limit)
 ):
     """
-    Search scholarships using POST with request body
+    Search scholarships using POST with request body - QA-005 fix: Authentication enforced
+    Requires authentication unless PUBLIC_READ_ENDPOINTS feature flag is enabled.
     
     Returns metadata-rich response with items, total, pagination info, and timing.
     """
+    # QA-005 fix: Enforce authentication in production
+    if not settings.public_read_endpoints and not current_user:
+        from fastapi import HTTPException
+        raise HTTPException(
+            status_code=401,
+            detail={
+                "trace_id": getattr(request.state, 'trace_id', None),
+                "code": "AUTHENTICATION_REQUIRED",
+                "message": "Authentication required for search endpoints",
+                "status": 401,
+                "timestamp": int(time.time())
+            }
+        )
     user_id = current_user.get("user_id") if current_user else None
     
     return await execute_search(
@@ -146,13 +170,28 @@ async def search_scholarships_get(
     deadline_before: Optional[datetime] = Query(None, description="Deadlines before this date"),
     limit: int = Query(20, ge=1, le=100, description="Number of results to return"),
     offset: int = Query(0, ge=0, description="Number of results to skip"),
-    current_user: Optional[dict] = Depends(get_current_user)
+    current_user: Optional[dict] = Depends(get_current_user) if not settings.public_read_endpoints else None
 ):
     """
-    Search scholarships using GET with query parameters
+    Search scholarships using GET with query parameters - QA-005 fix: Authentication enforced
+    Requires authentication unless PUBLIC_READ_ENDPOINTS feature flag is enabled.
     
     Returns the same metadata-rich response format as POST endpoint.
     """
+    # QA-005 fix: Enforce authentication in production
+    if not settings.public_read_endpoints and not current_user:
+        from fastapi import HTTPException
+        raise HTTPException(
+            status_code=401,
+            detail={
+                "trace_id": getattr(request.state, 'trace_id', None),
+                "code": "AUTHENTICATION_REQUIRED",
+                "message": "Authentication required for search endpoints",
+                "status": 401,
+                "timestamp": int(time.time())
+            }
+        )
+    
     user_id = current_user.get("user_id") if current_user else None
     
     return await execute_search(

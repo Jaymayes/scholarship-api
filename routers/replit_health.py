@@ -1,5 +1,5 @@
 """
-Replit-specific health check endpoints
+Replit-specific health check endpoints with Input Validation - QA-006 fix
 Robust health checks designed for Replit deployment environment
 """
 
@@ -7,25 +7,31 @@ from fastapi import APIRouter, Request, HTTPException
 from sqlalchemy import text
 from utils.logger import get_logger
 from config.settings import settings
+from schemas.health import (
+    BasicHealthResponse, DatabaseHealthResponse, ServicesHealthResponse, 
+    DebugConfigResponse, ServiceInfo, HealthStatus, ServiceStatus,
+    CorsConfig, RateLimitConfig, DatabaseConfig, JwtConfig, FeatureConfig, ReplitEnvConfig
+)
 import time
 import os
 
 logger = get_logger(__name__)
 router = APIRouter()
 
-@router.get("/healthz")
+@router.get("/healthz", response_model=BasicHealthResponse)
 async def health_check_replit():
     """
     Replit-optimized health check endpoint
     Returns simple JSON for deployment health monitoring
+    QA-006 fix: Strict response model, no input parameters accepted
     """
-    return {
-        "status": "healthy",
-        "timestamp": int(time.time()),
-        "environment": settings.environment.value
-    }
+    return BasicHealthResponse(
+        status="healthy",
+        timestamp=int(time.time()),
+        environment=settings.environment.value
+    )
 
-@router.get("/health/database")
+@router.get("/health/database", response_model=DatabaseHealthResponse)
 async def database_health_check():
     """
     Database connectivity health check with Replit-specific handling
@@ -49,24 +55,24 @@ async def database_health_check():
                 result = session.execute(text("SELECT 1")).scalar()
                 
                 if result == 1:
-                    return {
-                        "status": "healthy",
-                        "database": "connected",
-                        "type": settings.get_database_info,
-                        "timestamp": int(time.time())
-                    }
+                    return DatabaseHealthResponse(
+                        status="healthy",
+                        database="connected",
+                        type=getattr(settings, 'get_database_info', 'PostgreSQL'),
+                        timestamp=int(time.time())
+                    )
                 else:
                     raise Exception("Database connectivity test failed")
         else:
             # Development fallback (Replit without DATABASE_URL)
             if settings.is_development:
-                return {
-                    "status": "healthy", 
-                    "database": "development_mode",
-                    "type": "SQLite fallback",
-                    "note": "Using in-memory database for development",
-                    "timestamp": int(time.time())
-                }
+                return DatabaseHealthResponse(
+                    status="healthy", 
+                    database="development_mode",
+                    type="SQLite fallback",
+                    note="Using in-memory database for development",
+                    timestamp=int(time.time())
+                )
             else:
                 raise Exception("No database configured")
                 
@@ -85,7 +91,7 @@ async def database_health_check():
             }
         )
 
-@router.get("/health/services")
+@router.get("/health/services", response_model=ServicesHealthResponse)
 async def services_health_check():
     """
     Comprehensive services health check for Replit deployment
@@ -96,53 +102,53 @@ async def services_health_check():
     
     # Check rate limiter
     try:
-        limiter_info = settings.get_rate_limiter_info
-        services_status["rate_limiter"] = {
-            "status": "healthy",
-            "backend": limiter_info
-        }
+        limiter_info = getattr(settings, 'get_rate_limiter_info', 'Redis')
+        services_status["rate_limiter"] = ServiceInfo(
+            status=ServiceStatus.HEALTHY,
+            backend=limiter_info
+        )
     except Exception as e:
-        services_status["rate_limiter"] = {
-            "status": "degraded",
-            "backend": "in-memory fallback",
-            "note": "Redis unavailable, using memory backend"
-        }
+        services_status["rate_limiter"] = ServiceInfo(
+            status=ServiceStatus.DEGRADED,
+            backend="in-memory fallback",
+            note="Redis unavailable, using memory backend"
+        )
     
     # Check database
     try:
-        db_info = settings.get_database_info
-        services_status["database"] = {
-            "status": "healthy",
-            "type": db_info
-        }
+        db_info = getattr(settings, 'get_database_info', 'PostgreSQL')
+        services_status["database"] = ServiceInfo(
+            status=ServiceStatus.HEALTHY,
+            type=db_info
+        )
     except Exception as e:
-        services_status["database"] = {
-            "status": "unhealthy",
-            "error": str(e)
-        }
+        services_status["database"] = ServiceInfo(
+            status=ServiceStatus.UNHEALTHY,
+            error=str(e)
+        )
         overall_healthy = False
     
     # Check OpenAI (if configured)
     openai_key = os.getenv("OPENAI_API_KEY")
     if openai_key:
-        services_status["openai"] = {
-            "status": "configured",
-            "note": "API key present"
-        }
+        services_status["openai"] = ServiceInfo(
+            status=ServiceStatus.CONFIGURED,
+            note="API key present"
+        )
     else:
-        services_status["openai"] = {
-            "status": "not_configured",
-            "note": "API key not provided"
-        }
+        services_status["openai"] = ServiceInfo(
+            status=ServiceStatus.NOT_CONFIGURED,
+            note="API key not provided"
+        )
     
-    return {
-        "status": "healthy" if overall_healthy else "degraded",
-        "services": services_status,
-        "timestamp": int(time.time()),
-        "environment": settings.environment.value
-    }
+    return ServicesHealthResponse(
+        status=HealthStatus.HEALTHY if overall_healthy else HealthStatus.DEGRADED,
+        services=services_status,
+        timestamp=int(time.time()),
+        environment=settings.environment.value
+    )
 
-@router.get("/_debug/config")
+@router.get("/_debug/config", response_model=DebugConfigResponse)
 async def debug_config():
     """
     Development-only configuration diagnostics
@@ -158,36 +164,36 @@ async def debug_config():
     # Sanitized config info for debugging
     cors_origins = settings.get_cors_origins
     
-    return {
-        "environment": settings.environment.value,
-        "debug_mode": settings.debug,
-        "cors": {
-            "origins_count": len(cors_origins) if cors_origins != ["*"] else "wildcard",
-            "wildcard_enabled": "*" in cors_origins,
-            "replit_origin_detected": any("replit" in origin for origin in cors_origins if isinstance(origin, str))
-        },
-        "rate_limiting": {
-            "backend_type": settings.get_rate_limiter_info,
-            "per_minute_limit": settings.get_rate_limit_per_minute,
-            "enabled": settings.rate_limit_enabled
-        },
-        "database": {
-            "type": settings.get_database_info,
-            "configured": bool(settings.database_url)
-        },
-        "jwt": {
-            "algorithm": settings.jwt_algorithm,
-            "secret_configured": bool(settings.jwt_secret_key),
-            "secret_length": len(settings.jwt_secret_key) if settings.jwt_secret_key else 0
-        },
-        "features": {
-            "analytics": settings.analytics_enabled,
-            "metrics": settings.metrics_enabled,
-            "tracing": settings.tracing_enabled
-        },
-        "replit_env": {
-            "repl_id": os.getenv("REPL_ID", "not_set"),
-            "repl_owner": os.getenv("REPL_OWNER", "not_set"),
-            "port": os.getenv("PORT", "not_set")
-        }
-    }
+    return DebugConfigResponse(
+        environment=settings.environment.value,
+        debug_mode=settings.debug,
+        cors=CorsConfig(
+            origins_count=len(cors_origins) if cors_origins != ["*"] else "wildcard",
+            wildcard_enabled="*" in cors_origins,
+            replit_origin_detected=any("replit" in origin for origin in cors_origins if isinstance(origin, str))
+        ),
+        rate_limiting=RateLimitConfig(
+            backend_type=getattr(settings, 'get_rate_limiter_info', 'Redis'),
+            per_minute_limit=settings.get_rate_limit_per_minute,
+            enabled=settings.rate_limit_enabled
+        ),
+        database=DatabaseConfig(
+            type=getattr(settings, 'get_database_info', 'PostgreSQL'),
+            configured=bool(settings.database_url)
+        ),
+        jwt=JwtConfig(
+            algorithm=settings.jwt_algorithm,
+            secret_configured=bool(settings.jwt_secret_key),
+            secret_length=len(settings.jwt_secret_key) if settings.jwt_secret_key else 0
+        ),
+        features=FeatureConfig(
+            analytics=settings.analytics_enabled,
+            metrics=settings.metrics_enabled,
+            tracing=settings.tracing_enabled
+        ),
+        replit_env=ReplitEnvConfig(
+            repl_id=os.getenv("REPL_ID", "not_set"),
+            repl_owner=os.getenv("REPL_OWNER", "not_set"),
+            port=os.getenv("PORT", "not_set")
+        )
+    )

@@ -40,8 +40,20 @@ WORKDIR /app
 COPY --from=builder /usr/local/lib/python3.11/site-packages /usr/local/lib/python3.11/site-packages
 COPY --from=builder /usr/local/bin /usr/local/bin
 
-# Copy application code
-COPY . .
+# QA-008 fix: Copy only necessary application files (not entire context)
+# Copy application source directories explicitly (leveraging .dockerignore)
+COPY config/ ./config/
+COPY database/ ./database/
+COPY middleware/ ./middleware/
+COPY models/ ./models/
+COPY routers/ ./routers/
+COPY schemas/ ./schemas/
+COPY services/ ./services/
+COPY utils/ ./utils/
+COPY observability/ ./observability/
+COPY static/ ./static/
+COPY main.py ./
+COPY gunicorn_conf.py ./
 
 # Create necessary directories and set permissions
 RUN mkdir -p /app/logs /app/tmp \

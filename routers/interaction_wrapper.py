@@ -1,15 +1,22 @@
 """
-Interaction Logging Wrapper Functions
+Interaction Logging Wrapper Functions with Input Validation - QA-003 fix
 """
 
 from typing import Optional
-from fastapi import Request, Response
+from fastapi import APIRouter, Request, Response, Depends, HTTPException, status
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
 from services.interaction_service import InteractionService
 from models.database import get_db
+from schemas.interaction import InteractionRequest, BulkInteractionRequest, InteractionResponse
 from utils.logger import get_logger
+from middleware.auth import get_current_user
+from config.settings import settings
+import time
 
 logger = get_logger("interaction_wrapper")
+router = APIRouter(prefix="/interactions", tags=["interactions"])
+security = HTTPBearer(auto_error=False)
 
 async def log_scholarship_interaction(
     request: Request,
@@ -83,3 +90,117 @@ def with_interaction_logging(event_type: str, scholarship_id_param: Optional[str
         
         return wrapper
     return decorator
+
+# QA-003 fix: Add properly validated endpoints with authentication
+@router.post("/log", response_model=InteractionResponse)
+async def log_interaction_endpoint(
+    interaction: InteractionRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user) if not settings.public_read_endpoints else None
+):
+    """
+    Log a single interaction event with strict input validation
+    Requires authentication unless PUBLIC_READ_ENDPOINTS is enabled
+    """
+    try:
+        interaction_service = InteractionService(db)
+        
+        # Create mock response for logging
+        mock_response = type('MockResponse', (), {'status_code': 200})()
+        
+        # Log the interaction with validated data
+        await interaction_service.log_interaction(
+            event_type=interaction.event_type.value,
+            request=request,
+            response=mock_response,
+            user_id=interaction.user_id or (current_user.get("user_id") if current_user else None),
+            scholarship_id=interaction.scholarship_id,
+            trace_id=getattr(request.state, 'trace_id', None),
+            metadata={
+                "search_query": interaction.search_query,
+                "filters": interaction.filters,
+                "custom_metadata": interaction.metadata
+            }
+        )
+        
+        return InteractionResponse(
+            success=True,
+            interaction_id=getattr(request.state, 'trace_id', None),
+            message="Interaction logged successfully"
+        )
+        
+    except Exception as e:
+        logger.error(f"Failed to log interaction: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail={
+                "trace_id": getattr(request.state, 'trace_id', None),
+                "code": "INTERACTION_LOG_FAILED",
+                "message": "Failed to log interaction",
+                "status": 500,
+                "timestamp": int(time.time())
+            }
+        )
+
+@router.post("/bulk-log", response_model=dict)
+async def bulk_log_interactions_endpoint(
+    bulk_request: BulkInteractionRequest,
+    request: Request,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user) if not settings.public_read_endpoints else None
+):
+    """
+    Log multiple interaction events with strict input validation
+    Requires authentication unless PUBLIC_READ_ENDPOINTS is enabled
+    """
+    try:
+        interaction_service = InteractionService(db)
+        logged_count = 0
+        errors = []
+        
+        for interaction in bulk_request.interactions:
+            try:
+                # Create mock response for logging
+                mock_response = type('MockResponse', (), {'status_code': 200})()
+                
+                # Log each interaction with validated data
+                await interaction_service.log_interaction(
+                    event_type=interaction.event_type.value,
+                    request=request,
+                    response=mock_response,
+                    user_id=interaction.user_id or (current_user.get("user_id") if current_user else None),
+                    scholarship_id=interaction.scholarship_id,
+                    trace_id=getattr(request.state, 'trace_id', None),
+                    metadata={
+                        "search_query": interaction.search_query,
+                        "filters": interaction.filters,
+                        "custom_metadata": interaction.metadata
+                    }
+                )
+                logged_count += 1
+                
+            except Exception as e:
+                errors.append(f"Failed to log interaction {logged_count + 1}: {str(e)}")
+                logger.warning(f"Failed to log bulk interaction: {str(e)}")
+        
+        return {
+            "success": logged_count > 0,
+            "logged_count": logged_count,
+            "total_requested": len(bulk_request.interactions),
+            "errors": errors[:10],  # Limit error reporting
+            "message": f"Successfully logged {logged_count}/{len(bulk_request.interactions)} interactions"
+        }
+        
+    except Exception as e:
+        logger.error(f"Failed to process bulk interaction logging: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail={
+                "trace_id": getattr(request.state, 'trace_id', None),
+                "code": "BULK_INTERACTION_LOG_FAILED",
+                "message": "Failed to process bulk interaction logging",
+                "status": 500,
+                "timestamp": int(time.time())
+            }
+        )
