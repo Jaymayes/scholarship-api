@@ -1,0 +1,104 @@
+Context
+Project: FastAPI “Scholarship Discovery & Search API”
+Status: Major QA/security fixes are reported complete (double-encoding removed, consistent auth, unified error with trace_id, proper rate limiting headers, health checks public). We need a final “fix-all-issues” pass to ensure zero regressions, flawless runtime in Replit and Docker, and a fully green test suite.
+
+Do not loosen any security controls. Preserve the unified error schema:
+{ code, message, status, timestamp, trace_id, details? }
+
+Goals
+
+Drive test failures to 0, remove any flakiness.
+Verify no double-encoded errors remain anywhere.
+Ensure consistent auth enforcement and CORS across environments.
+Stabilize rate limiting, middleware ordering, and input/config validation.
+Guarantee trace_id on every error and JSON content-type correctness.
+Finalize container/CI readiness.
+Immediate Steps
+
+Run checks and capture failures
+pytest -q (paste failing test names and tracebacks; fix root causes)
+Run lints/type checks configured in repo (ruff/flake8, mypy/pyright); fix errors/warnings
+If any test uses network deps (Redis/DB), ensure dev fallbacks or proper test fixtures are set
+2. Runtime smoke (dev)
+
+ENVIRONMENT=development; run the app and confirm:
+/healthz, /health/database, /health/services → 200
+/search and /scholarships unauth → 401; with valid token → 200
+Oversized body → 413; overly long URL → 414
+Exceed limit → 429 with headers: X-RateLimit-Limit, X-RateLimit-Remaining, Retry-After
+OPTIONS preflight succeeds and is not rate-limited
+CORS allows Replit preview domain; no wildcard in prod
+Fix/Verify The Following
+A) Centralized error handling (prevent double encoding)
+
+Ensure every exception handler and security/rate-limit path uses one helper (e.g., build_error_dict) and passes dict directly to JSONResponse (no json.dumps/str of JSON)
+Ensure content-type is application/json; response.json() returns a dict (not a JSON string)
+Handlers to cover: HTTPException, RequestValidationError, auth/OAuth errors, rate-limit exceptions, generic 500s
+Always include trace_id
+B) Authentication consistency
+
+Protected routers (scholarships, search, interactions, recommendations if present) must use a router-level dependency Depends(get_current_user)
+If PUBLIC_READ_ENDPOINTS is supported, default false in production and guarded in code; add tests for all permutations
+Remove any dev-only unprotected routes or ensure they are excluded from prod via feature flags
+C) Configuration validation
+
+Pydantic settings validators must reject invalid values: negative/zero limits/timeouts/sizes, invalid CORS origins in production, weak/missing JWT secret in production
+Fail fast at startup in production; never log secrets
+Ensure PORT, HOST, RATE_LIMIT_BACKEND_URL, DATABASE_URL handled correctly per env
+D) Input validation hardening
+
+Pydantic models with extra="forbid" (or v2 equivalent) for all bodies; enforce length/min/max/regex/enum constraints
+Health endpoints: no bodies; reject extraneous params
+Response models must match actual payloads (avoid Pydantic response validation 500s)
+E) Rate limiting correctness
+
+OPTIONS excluded from limiting
+Identifier uses request.client.host; honor X-Forwarded-For only if trusted proxies enabled
+429 always returns unified error and standard headers
+Dev: in-memory limiter fallback OK; Prod: require configured backend and fail fast if unreachable
+F) Middleware ordering
+
+Security/Host/HTTPS → CORS → URL-length guard → Body-size guard → Rate limiting → Routing
+Add inline comments and tests to confirm ordering effects
+G) Database schema/serialization
+
+Ensure API field names match schema (e.g., recommendation_score vs match_score)
+Avoid KeyError by explicit serialization; add migration or adapter mapping as needed
+Use pool_pre_ping=True, timeouts, and dispose engine on shutdown
+H) CORS and docs
+
+Production: strict origin whitelist; no wildcard when credentials allowed
+OPTIONS preflight works for allowed origins; disallowed origins get no ACAO
+Docs disabled by default in production unless ENABLE_DOCS=true
+I) bcrypt/passlib compatibility
+
+Pin compatible versions and configure CryptContext; add a quick hash/verify test to avoid runtime warnings
+J) Container/CI polish
+
+.dockerignore excludes secrets and large/unneeded directories
+Dockerfile copies only required files; non-root runtime
+CI: lint, type-check, tests, container build, and smoke test hitting /healthz
+Tests to Add/Update
+
+No double-encoding: for 401/403/429, assert response.headers["content-type"] is application/json and response.json() is a dict with trace_id
+Auth on protected routes: 401/403 without token/bad token; 200 with valid token
+Config validation: reject negative sizes/limits, invalid CORS in prod, weak JWT secret in prod
+CORS preflight: allowed vs disallowed origins
+413/414/429 unified error payload and 429 headers
+Readiness returns 503 when DB/Redis down; 200 when healthy
+Field name mapping regression tests (e.g., recommendation_score)
+Acceptance Criteria
+
+pytest -q passes fully; no flakiness
+0 double-encoded responses; all errors include trace_id and correct content-type
+Auth consistently enforced; PUBLIC_READ_ENDPOINTS respected and secure by default in production
+Rate limiting consistent across envs; OPTIONS excluded; headers present on 429
+Strict config/input validation; production fails fast on misconfig
+CORS strict in prod; docs locked down; middleware order correct
+Docker image builds/run; CI pipeline green with smoke tests
+Instructions
+
+Implement changes in-place to match the repository structure and Pydantic/FastAPI versions already in use
+Keep the unified error schema unchanged
+Add brief inline comments where behavior/order is non-obvious
+Start by running pytest -q, paste the first failing traceback, and fix iteratively until green

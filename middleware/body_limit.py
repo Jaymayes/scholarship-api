@@ -30,18 +30,20 @@ class BodySizeLimitMiddleware(BaseHTTPMiddleware):
                 f"Request body size exceeded: {content_length} > {self.max_size} for {request.method} {request.url.path}"
             )
             
-            # Return standardized error response
-            error_response = {
-                "trace_id": getattr(request.state, "trace_id", "unknown"),
-                "code": "PAYLOAD_TOO_LARGE",
-                "message": f"Request body size ({content_length}) exceeds maximum allowed size ({self.max_size} bytes)",
-                "status": 413,
-                "timestamp": int(time.time())
-            }
+            # Return unified error response format
+            from utils.error_utils import build_error_response
+            
+            error_data = build_error_response(
+                trace_id=getattr(request.state, "trace_id", "unknown"),
+                code="PAYLOAD_TOO_LARGE",
+                message=f"Request body size ({content_length}) exceeds maximum allowed size ({self.max_size} bytes)",
+                status=413
+            )
             
             return JSONResponse(
                 status_code=413,
-                content={"detail": error_response}
+                content=error_data,
+                headers={"Content-Type": "application/json"}
             )
         
         response = await call_next(request)

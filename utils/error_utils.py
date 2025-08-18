@@ -85,3 +85,23 @@ def build_validation_error(
         details=details,
         trace_id=trace_id
     )
+
+
+def build_error_response(
+    trace_id: str,
+    code: str,
+    message: str,
+    status: int,
+    details: Optional[Dict[str, Any]] = None
+) -> Dict[str, Any]:
+    """
+    Build error response - alias for build_error with specific parameter order
+    Used by middleware for consistent error format
+    """
+    return build_error(
+        code=code,
+        message=message,
+        status=status,
+        details=details,
+        trace_id=trace_id
+    )

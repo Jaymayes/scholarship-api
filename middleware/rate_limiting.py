@@ -3,6 +3,7 @@ Enhanced Rate Limiting Middleware
 Using slowapi with Redis backend and proper environment-aware configuration
 """
 
+import os
 import redis
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
@@ -67,14 +68,18 @@ def create_rate_limiter():
 # Create the limiter instance
 limiter = create_rate_limiter()
 
-# Ensure the limiter is functional - override if None
-if limiter is None:
-    # Force creation of in-memory limiter for testing
-    from slowapi import Limiter
-    limiter = Limiter(
-        key_func=get_user_identifier,
-        storage_uri="memory://"
-    )
+# Ensure the limiter is functional - override if None or disabled for testing
+if limiter is None or os.getenv('RATE_LIMIT_ENABLED', 'true').lower() == 'false':
+    # In test environment with RATE_LIMIT_ENABLED=false, create a no-op limiter
+    if os.getenv('RATE_LIMIT_ENABLED', 'true').lower() == 'false':
+        logger.info("Rate limiting explicitly disabled via RATE_LIMIT_ENABLED=false")
+        limiter = None  # No rate limiting in test mode
+    else:
+        # Force creation of in-memory limiter for normal operation
+        limiter = Limiter(
+            key_func=get_user_identifier,
+            storage_uri="memory://"
+        )
 
 def get_rate_limit_for_environment(base_limit: str) -> str:
     """Adjust rate limits based on environment"""
@@ -142,22 +147,42 @@ async def rate_limit_handler(request: Request, exc: RateLimitExceeded) -> Respon
 # Environment-aware rate limit decorators
 def search_rate_limit():
     """Rate limit for search endpoints"""
+    if limiter is None:
+        # Return no-op decorator when rate limiting is disabled
+        def no_op_decorator(func):
+            return func
+        return no_op_decorator
     # Use a very low limit for testing
     limit = "5/minute"  # Force low limit to test rate limiting
     return limiter.limit(limit)
 
 def eligibility_rate_limit():
     """Rate limit for eligibility check endpoints"""
+    if limiter is None:
+        # Return no-op decorator when rate limiting is disabled
+        def no_op_decorator(func):
+            return func
+        return no_op_decorator
     limit = get_rate_limit_for_environment(settings.rate_limit_eligibility)
     return limiter.limit(limit)
 
 def scholarships_rate_limit():
     """Rate limit for scholarship endpoints"""
+    if limiter is None:
+        # Return no-op decorator when rate limiting is disabled
+        def no_op_decorator(func):
+            return func
+        return no_op_decorator
     limit = get_rate_limit_for_environment(settings.rate_limit_scholarships)
     return limiter.limit(limit)
 
 def analytics_rate_limit():
     """Rate limit for analytics endpoints"""
+    if limiter is None:
+        # Return no-op decorator when rate limiting is disabled
+        def no_op_decorator(func):
+            return func
+        return no_op_decorator
     limit = get_rate_limit_for_environment(settings.rate_limit_analytics)
     return limiter.limit(limit)
 

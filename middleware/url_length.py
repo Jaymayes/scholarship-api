@@ -32,18 +32,20 @@ class URLLengthMiddleware(BaseHTTPMiddleware):
                 f"URL length exceeded: {url_length} > {self.max_length} for {request.method} {request.url.path}"
             )
             
-            # Return standardized error response
-            error_response = {
-                "trace_id": getattr(request.state, "trace_id", "unknown"),
-                "code": "URI_TOO_LONG",
-                "message": f"URL length ({url_length}) exceeds maximum allowed length ({self.max_length})",
-                "status": 414,
-                "timestamp": int(time.time())
-            }
+            # Return unified error response format
+            from utils.error_utils import build_error_response
+            
+            error_data = build_error_response(
+                trace_id=getattr(request.state, "trace_id", "unknown"),
+                code="URI_TOO_LONG",
+                message=f"URL length ({url_length}) exceeds maximum allowed length ({self.max_length})",
+                status=414
+            )
             
             return JSONResponse(
                 status_code=414,
-                content={"detail": error_response}
+                content=error_data,
+                headers={"Content-Type": "application/json"}
             )
         
         response = await call_next(request)

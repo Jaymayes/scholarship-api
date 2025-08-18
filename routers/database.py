@@ -10,14 +10,14 @@ from typing import List, Optional, Dict, Any
 from models.database import get_db
 from services.database_service import DatabaseService
 from middleware.auth import require_auth, require_scopes, User
-from middleware.rate_limiting import limiter
+from middleware.rate_limit_decorators import database_rate_limit, low_database_rate_limit, moderate_rate_limit
 from utils.logger import get_logger
 
 logger = get_logger("database_router")
 router = APIRouter(prefix="/api/v1/database", tags=["Database Operations"])
 
 @router.get("/scholarships")
-@limiter.limit("300/minute")
+@database_rate_limit()
 async def get_scholarships_from_db(
     request: Request,
     keyword: Optional[str] = Query(None, description="Search keyword"),
@@ -47,7 +47,7 @@ async def get_scholarships_from_db(
         raise HTTPException(status_code=500, detail="Database query failed")
 
 @router.get("/scholarships/{scholarship_id}")
-@limiter.limit("300/minute")
+@database_rate_limit()
 async def get_scholarship_from_db(
     request: Request,
     scholarship_id: str,
@@ -72,7 +72,7 @@ async def get_scholarship_from_db(
         raise HTTPException(status_code=500, detail="Database query failed")
 
 @router.post("/interactions")
-@limiter.limit("100/minute")
+@low_database_rate_limit()
 async def log_interaction_to_db(
     request: Request,
     interaction_data: Dict[str, Any],
@@ -103,7 +103,7 @@ async def log_interaction_to_db(
         raise HTTPException(status_code=500, detail="Failed to log interaction")
 
 @router.get("/analytics/summary")
-@limiter.limit("60/minute")
+@moderate_rate_limit()
 async def get_analytics_from_db(
     request: Request,
     db: Session = Depends(get_db),
@@ -122,7 +122,7 @@ async def get_analytics_from_db(
         raise HTTPException(status_code=500, detail="Analytics query failed")
 
 @router.get("/analytics/popular")
-@limiter.limit("60/minute")
+@moderate_rate_limit()
 async def get_popular_scholarships_from_db(
     request: Request,
     limit: int = Query(10, ge=1, le=50, description="Number of popular scholarships"),

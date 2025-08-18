@@ -74,7 +74,7 @@ class ScholarshipService:
                 not sch.eligibility_criteria.residency_states  # No state restriction
             ]
         
-        # Apply GPA filter
+        # Apply GPA filter - user qualifies if they meet or exceed scholarship requirement
         if filters.min_gpa is not None:
             results = [
                 sch for sch in results
@@ -119,7 +119,8 @@ class ScholarshipService:
                 amount=sch.amount,
                 application_deadline=sch.application_deadline,
                 scholarship_type=sch.scholarship_type,
-                description=sch.description[:197] + "..." if len(sch.description) > 200 else sch.description
+                description=sch.description[:197] + "..." if len(sch.description) > 200 else sch.description,
+                eligibility_criteria=sch.eligibility_criteria
             )
             for sch in paginated_results
         ]

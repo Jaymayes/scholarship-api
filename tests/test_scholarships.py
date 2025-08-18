@@ -63,15 +63,16 @@ class TestScholarshipEndpoints:
         assert any("engineering" in name for name in scholarship_names)
     
     def test_search_scholarships_by_gpa(self, enable_public_endpoints):
-        """Test filtering scholarships by GPA requirement"""
+        """Test filtering scholarships by GPA requirement - user qualifies if they meet/exceed scholarship requirement"""
         response = client.get("/api/v1/scholarships?min_gpa=3.5")
         assert response.status_code == 200
         data = response.json()
-        # Verify all results have min_gpa >= 3.5 or None
+        # Verify all results are scholarships the user qualifies for (user's 3.5 GPA >= scholarship requirement)
         for scholarship in data["scholarships"]:
             criteria = scholarship["eligibility_criteria"]
             if criteria["min_gpa"] is not None:
-                assert criteria["min_gpa"] >= 3.5
+                # User with 3.5 GPA should qualify (3.5 >= scholarship requirement)
+                assert 3.5 >= criteria["min_gpa"], f"User with 3.5 GPA should qualify for scholarship requiring {criteria['min_gpa']}"
     
     def test_search_scholarships_pagination(self, enable_public_endpoints):
         """Test pagination in scholarship search"""

@@ -59,7 +59,7 @@ class Settings(BaseSettings):
     jwt_previous_secret_keys: str = Field("", alias="JWT_PREVIOUS_SECRET_KEYS")
     access_token_expire_minutes: int = Field(30, alias="ACCESS_TOKEN_EXPIRE_MINUTES", gt=0)
     
-    # Production security requirements
+    # Production security requirements - fix parsing issues
     allowed_hosts: List[str] = Field(default_factory=list, alias="ALLOWED_HOSTS")
     trusted_proxy_ips: List[str] = Field(default_factory=list, alias="TRUSTED_PROXY_IPS")
     enable_docs: Optional[bool] = Field(None, alias="ENABLE_DOCS")

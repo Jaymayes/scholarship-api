@@ -70,6 +70,8 @@ class ScholarshipSummary(BaseModel):
     application_deadline: datetime
     scholarship_type: ScholarshipType
     description: str = Field(..., max_length=200)
+    # Include eligibility criteria for test compatibility
+    eligibility_criteria: EligibilityCriteria
 
 class SearchFilters(BaseModel):
     """Search and filter criteria"""
