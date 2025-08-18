@@ -12,9 +12,8 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 from enum import Enum
 
 class Environment(str, Enum):
-    LOCAL = "local"
     DEVELOPMENT = "development"
-    STAGING = "staging"
+    STAGING = "staging" 
     PRODUCTION = "production"
 
 class LogLevel(str, Enum):
@@ -36,8 +35,9 @@ class Settings(BaseSettings):
         "secret", "dev", "development", "test", "changeme", "default"
     }
     
-    # Environment
-    environment: Environment = Field(Environment.LOCAL, alias="ENVIRONMENT")
+    # Environment - defaults to development to avoid production validation issues
+    environment: Environment = Field(Environment.DEVELOPMENT, alias="ENVIRONMENT")
+    strict_config_validation: Optional[bool] = Field(None, alias="STRICT_CONFIG_VALIDATION")
     debug: bool = Field(True, alias="DEBUG")
     
     # API Configuration
@@ -179,7 +179,7 @@ class Settings(BaseSettings):
             Environment.PRODUCTION: 100,
             Environment.STAGING: 150,
             Environment.DEVELOPMENT: 200,
-            Environment.LOCAL: 300
+
         }.get(self.environment, 200)
     
     @property
@@ -205,7 +205,7 @@ class Settings(BaseSettings):
     def get_search_rate_limit(self) -> str:
         """Get environment-appropriate search rate limit"""
         base_limit = int(self.rate_limit_search.split('/')[0])
-        if self.environment in [Environment.LOCAL, Environment.DEVELOPMENT]:
+        if self.environment == Environment.DEVELOPMENT:
             return f"{base_limit * 2}/minute"
         return self.rate_limit_search
     
@@ -213,7 +213,7 @@ class Settings(BaseSettings):
     def get_eligibility_rate_limit(self) -> str:
         """Get environment-appropriate eligibility rate limit"""
         base_limit = int(self.rate_limit_eligibility.split('/')[0])
-        if self.environment in [Environment.LOCAL, Environment.DEVELOPMENT]:
+        if self.environment == Environment.DEVELOPMENT:
             return f"{base_limit * 2}/minute"
         return self.rate_limit_eligibility
     
@@ -392,7 +392,15 @@ class Settings(BaseSettings):
     @property
     def is_development(self) -> bool:
         """Check if running in development environment"""
-        return self.environment in [Environment.LOCAL, Environment.DEVELOPMENT]
+        return self.environment == Environment.DEVELOPMENT
+    
+    @property
+    def should_enforce_strict_validation(self) -> bool:
+        """Determine if strict configuration validation should be enforced"""
+        if self.strict_config_validation is not None:
+            return self.strict_config_validation
+        # Default: only enforce in production
+        return self.environment == Environment.PRODUCTION
     
     @property
     def should_enable_docs(self) -> bool:
@@ -420,41 +428,69 @@ class Settings(BaseSettings):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self._setup_jwt_secret()
-        self._validate_production_security()
+        # Only validate if in production or explicitly enabled
+        if self.should_enforce_strict_validation:
+            self._validate_production_security()
     
     def _setup_jwt_secret(self):
         """Setup JWT secret with environment-specific defaults"""
         if not self.jwt_secret_key:
-            if self.environment == Environment.PRODUCTION:
-                # Production MUST have an explicit secret
+            if self.should_enforce_strict_validation:
+                # Strict mode: MUST have an explicit secret
                 pass  # Will be handled in validation
             else:
-                # Development: generate ephemeral key
+                # Development: generate ephemeral key with warning
                 self.jwt_secret_key = secrets.token_urlsafe(64)
                 logger = logging.getLogger(__name__)
-                logger.info(f"Generated ephemeral JWT secret for {self.environment} (length: {len(self.jwt_secret_key)})")
+                logger.warning(
+                    f"⚠️  Using generated JWT secret for {self.environment} environment. "
+                    f"Set JWT_SECRET_KEY environment variable for production."
+                )
+    
+    def validate(self) -> None:
+        """Validate configuration with aggregated error reporting"""
+        if not self.should_enforce_strict_validation:
+            return
+        
+        errors = []
+        
+        # JWT Secret validation
+        if not self.jwt_secret_key:
+            errors.append("JWT_SECRET_KEY must be configured")
+        elif self.jwt_secret_key in self.BANNED_DEFAULT_SECRETS:
+            errors.append("JWT_SECRET_KEY cannot be a default/banned value")
+        elif len(self.jwt_secret_key) < 64:
+            errors.append("JWT_SECRET_KEY must be at least 64 characters in production")
+        
+        # CORS validation  
+        if not self.cors_allowed_origins or self.cors_allowed_origins.strip() == "":
+            errors.append("CORS_ALLOWED_ORIGINS must be configured in production")
+        elif self.cors_allowed_origins == "*" and self.cors_allow_credentials:
+            errors.append("CORS wildcard origin cannot be used with credentials")
+        
+        # Host validation
+        if not self.allowed_hosts:
+            errors.append("ALLOWED_HOSTS must be configured in production")
+        
+        # Database validation
+        if not self.database_url or self.database_url == "sqlite:///dev.db":
+            errors.append("DATABASE_URL must be configured for production")
+        
+        # Numeric configuration validation
+        if self.access_token_expire_minutes <= 0:
+            errors.append("ACCESS_TOKEN_EXPIRE_MINUTES must be positive")
+        if self.database_pool_size <= 0:
+            errors.append("DATABASE_POOL_SIZE must be positive")
+        if self.database_max_overflow < 0:
+            errors.append("DATABASE_MAX_OVERFLOW cannot be negative")
+        
+        if errors:
+            error_msg = "Invalid configuration:\n" + "\n".join(f"- {err}" for err in errors)
+            raise RuntimeError(error_msg)
     
     def _validate_production_security(self):
-        """Validate security configuration for production environment"""
-        if self.environment == Environment.PRODUCTION:
-            if not self.jwt_secret_key:
-                raise RuntimeError(
-                    "PRODUCTION SECURITY ERROR: JWT_SECRET_KEY environment variable is required in production. "
-                    "Generate a secure key with: python -c \"import secrets; print(secrets.token_urlsafe(64))\""
-                )
-            
-            if self.jwt_secret_key in self.BANNED_DEFAULT_SECRETS:
-                raise RuntimeError(
-                    f"PRODUCTION SECURITY ERROR: JWT secret cannot be a default/banned value in production. "
-                    f"Current secret matches banned pattern. Generate a secure key with: "
-                    f"python -c \"import secrets; print(secrets.token_urlsafe(64))\""
-                )
-            
-            if len(self.jwt_secret_key) < 32:
-                raise RuntimeError(
-                    "PRODUCTION SECURITY ERROR: JWT secret must be at least 32 characters long in production. "
-                    "Generate a secure key with: python -c \"import secrets; print(secrets.token_urlsafe(64))\""
-                )
+        """Legacy method - calls new validate method"""
+        self.validate()
     
     @property
     def get_jwt_secret_key(self) -> str:

@@ -1,0 +1,120 @@
+Context
+Project: FastAPI “Scholarship Discovery & Search API”
+Status: Security and functionality are strong, but QA found 6 issues (0 Critical, 5 High, 1 Medium), mostly around configuration validation and deployment ergonomics. Tests: 17 executed; config-related checks are failing. Keep all existing security guarantees and the unified error schema: { code, message, status, timestamp, trace_id, details? }.
+
+Problems to Fix
+
+CONFIG-001-1..6 (High): Production config validation is too strict; defaults/environment detection cause production rules to trigger with partial configs. Result: valid deploys are blocked.
+STRUCT-001-requirements.txt (Medium): requirements.txt is missing, complicating deploys where Poetry isn’t available.
+Type safety issues in database router: potential typing/None-guards/KeyError risks (tighten types and response models).
+Minor: HSTS not enabled for HTTPS (low priority but quick win).
+Improve configuration error messaging (aggregate, human-readable).
+Optional for DX: Provide environment-specific config templates and CI guardrails.
+Do not loosen security; do not change the unified error payload or middleware security order.
+
+Goals
+
+Make configuration validation environment-aware and flexible in dev/test; strictly enforced only in production.
+Provide a pinned requirements.txt generated from the project’s dependency definition.
+Fix type-safety and KeyError risks in database-related routers.
+Add HSTS in production behind HTTPS.
+Improve configuration error messages and developer experience.
+Keep all tests green; add tests for the new behavior.
+Tasks
+
+Environment-aware settings and validation
+In the settings module (use the current Pydantic version used by the project):
+ENVIRONMENT: "development" | "staging" | "production" (default: development)
+STRICT_CONFIG_VALIDATION: bool (default: ENVIRONMENT == "production")
+Validation rules:
+If STRICT_CONFIG_VALIDATION is true:
+Require strong JWT_SECRET_KEY (reject banned defaults).
+Require DATABASE_URL and rate-limit backend if your prod policy needs it.
+Require non-empty CORS_ALLOWED_ORIGINS (no wildcard if allow_credentials).
+Validate all numeric config: positive integers for timeouts, limits, sizes; reasonable upper bounds.
+If STRICT_CONFIG_VALIDATION is false:
+Allow safe dev defaults and fallbacks (e.g., in-memory rate limiter, SQLite), but log clear WARNINGS.
+Fix default environment detection so the app is NOT “production” unless ENVIRONMENT explicitly equals "production".
+Add a settings.validate() method called at startup to aggregate and raise a single RuntimeError in production with a concise list of problems; in dev, only log warnings.
+2. Improve configuration error messaging
+
+Implement a helper that collects validation errors into a single message block:
+Example: “Invalid config: - DATABASE_URL missing - CORS_ALLOWED_ORIGINS empty in production - RATE_LIMIT_PER_MINUTE must be > 0”
+Ensure secrets are never logged; show only presence/length info where applicable.
+3. requirements.txt generation (STRUCT-001)
+
+If the repo uses Poetry:
+Add a Make target or script to generate requirements.txt: poetry export -f requirements.txt --output requirements.txt --without-hashes
+If not using Poetry, create requirements.txt pinned to versions currently used by the app (align with pyproject/lock).
+Include known-compatible versions for passlib[bcrypt] and bcrypt to avoid runtime warnings.
+Update Dockerfile/CI to use requirements.txt when Poetry is unavailable.
+4. Database router type safety
+
+Audit database-related routers/services:
+Add precise type hints to functions and return values.
+Guard against None for optional values (e.g., current_user or optional query params).
+Replace dict[...] access that can KeyError with safer model serialization or .get defaults; ensure response_model matches shape.
+Ensure session handling uses yield and closes properly; add try/except for OperationalError returning unified error (503) where appropriate.
+Add tests for a couple of edge cases that previously caused KeyError/TypeError.
+5. HSTS header (production)
+
+Enable HSTS via Starlette/FastAPI SecurityMiddleware or a small custom middleware only when:
+ENVIRONMENT == "production"
+and a setting like ENABLE_HSTS=true (default true in production)
+Use include_subdomains=true and preload configurable; document that HSTS requires HTTPS termination.
+6. Tests for config flexibility and production strictness
+
+Add/adjust tests:
+Dev mode with partial config: app starts; warnings emitted; endpoints respond; docs behavior per current policy.
+Production mode with missing/invalid critical configs: startup fails fast with aggregated error message.
+Numeric validations reject zero/negative (e.g., timeouts, limits, sizes).
+CORS production: disallowed origin gets no ACAO header.
+Confirm unified error schema and trace_id still present on all errors.
+7. Documentation and templates
+
+Create .env.example files:
+.env.development.example (safe defaults, dev fallbacks)
+.env.staging.example (near-prod with sane defaults)
+.env.production.example (placeholders, all required vars, no defaults)
+Update README:
+Explain ENVIRONMENT and STRICT_CONFIG_VALIDATION behavior.
+How to generate requirements.txt.
+HSTS note (prod only, requires HTTPS).
+Clear table of config variables, defaults per environment, and validation rules.
+8. CI updates (if present)
+
+Add a job to verify:
+Production startup with intentionally missing configs fails as expected.
+Dev startup with partial configs succeeds.
+Build and run container smoke test hitting /healthz.
+Ensure CI uses requirements.txt (or Poetry) consistently.
+Guardrails
+
+Do not loosen any existing security controls.
+Do not change the unified error format or the existing middleware order.
+Keep docs locked down in production unless explicitly enabled by a setting already supported.
+Maintain rate limiting behavior and headers; OPTIONS not limited.
+Preserve current CORS behavior: strict in production, dev flexibility preserved.
+Acceptance Criteria
+
+App only enforces strict config rules when ENVIRONMENT == "production" (or STRICT_CONFIG_VALIDATION=true).
+Dev/test can start with partial config; warnings emitted; no secrets logged.
+requirements.txt present and accurate; Docker/CI can install deps without Poetry.
+DB router type-safety issues resolved; no KeyErrors from serialization; response_model conforms to actual payloads.
+HSTS enabled in production when configured; disabled in dev/test.
+New tests pass; existing tests remain green; CI smoke test passes.
+README and .env.example templates updated.
+Deliverables
+
+Updated settings/config with environment-aware validation and aggregated error messages.
+requirements.txt and generation script/Make target.
+Router/service fixes for type safety and KeyError avoidance.
+Optional SecurityMiddleware/HSTS enablement in production via settings.
+Tests covering dev vs prod validation behavior, numeric validations, CORS behavior, and DB router edge cases.
+Updated README and .env.*.example files.
+CI workflow adjustments if applicable.
+Execution Notes
+
+Keep pydantic version usage consistent with the project (v1 vs v2 APIs).
+Add brief inline comments where behavior is non-obvious (e.g., why HSTS is prod-only).
+Start by running pytest -q and paste any failures to drive iterative fixes; then verify dev/prod startup behavior.
