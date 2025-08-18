@@ -1,0 +1,189 @@
+{
+  "meta": {
+    "api_title": "Scholarship Discovery & Search API",
+    "version": "1.0.0", 
+    "generated": "2025-08-18T21:24:00Z",
+    "environment": "development",
+    "deployment_ready": true
+  },
+  "endpoints": [
+    {
+      "method": "GET",
+      "path": "/",
+      "summary": "API overview and directory",
+      "auth": false,
+      "rate_limited": false,
+      "response_model": "APIInfo"
+    },
+    {
+      "method": "GET", 
+      "path": "/healthz",
+      "summary": "Fast health check for deployment probes",
+      "auth": false,
+      "rate_limited": false,
+      "response_model": "HealthStatus"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/search", 
+      "summary": "Scholarship search with filters",
+      "auth": "optional",
+      "rate_limited": true,
+      "query_params": ["q", "fields_of_study", "min_amount", "max_amount", "limit", "offset"],
+      "response_model": "SearchResponse"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/search",
+      "summary": "Advanced search with request body",
+      "auth": "optional", 
+      "rate_limited": true,
+      "request_model": "SearchRequest",
+      "response_model": "SearchResponse"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/eligibility/check",
+      "summary": "Eligibility analysis",
+      "auth": "optional",
+      "rate_limited": true,
+      "request_model": "EligibilityRequest", 
+      "response_model": "EligibilityResult"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/scholarships/{scholarship_id}",
+      "summary": "Get scholarship details",
+      "auth": "optional",
+      "rate_limited": true,
+      "path_params": ["scholarship_id"],
+      "response_model": "Scholarship"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/auth/login",
+      "summary": "JWT authentication",
+      "auth": false,
+      "rate_limited": true,
+      "request_model": "LoginRequest",
+      "response_model": "TokenResponse"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/auth/me", 
+      "summary": "User profile (protected)",
+      "auth": true,
+      "rate_limited": true,
+      "response_model": "UserProfile"
+    },
+    {
+      "method": "POST",
+      "path": "/ai/enhance-search",
+      "summary": "AI-powered search enhancement",
+      "auth": "optional",
+      "rate_limited": true,
+      "request_model": "SearchEnhanceRequest",
+      "response_model": "EnhancedSearchResponse"
+    }
+  ],
+  "security": {
+    "auth_type": "JWT",
+    "algorithm": "HS256", 
+    "token_expiry_minutes": 30,
+    "public_read_endpoints": true,
+    "cors": {
+      "development": "wildcard",
+      "production": "restricted_origins"
+    },
+    "rate_limit": {
+      "enabled": true,
+      "backend": "redis_with_memory_fallback",
+      "default_per_minute": 100,
+      "headers": ["X-RateLimit-Limit", "X-RateLimit-Remaining", "Retry-After"]
+    },
+    "request_validation": {
+      "max_body_size": "configurable",
+      "max_url_length": "configurable", 
+      "size_limit_status": 413,
+      "url_limit_status": 414
+    },
+    "error_schema": {
+      "fields": ["trace_id", "code", "message", "status", "timestamp"],
+      "trace_id_tracking": true
+    }
+  },
+  "config_vars": [
+    {
+      "name": "ENVIRONMENT",
+      "required_in_prod": true,
+      "default": "development",
+      "description": "Application environment"
+    },
+    {
+      "name": "JWT_SECRET_KEY", 
+      "required_in_prod": true,
+      "default": null,
+      "description": "JWT signing secret (64+ chars)"
+    },
+    {
+      "name": "DATABASE_URL",
+      "required_in_prod": true, 
+      "default": "postgresql://localhost",
+      "description": "PostgreSQL connection string"
+    },
+    {
+      "name": "CORS_ALLOWED_ORIGINS",
+      "required_in_prod": true,
+      "default": "",
+      "description": "Comma-separated allowed origins"
+    },
+    {
+      "name": "ALLOWED_HOSTS",
+      "required_in_prod": false,
+      "default": ["localhost", "*.replit.app", "*.replit.dev"],
+      "description": "Trusted host patterns"
+    },
+    {
+      "name": "PUBLIC_READ_ENDPOINTS",
+      "required_in_prod": false,
+      "default": true,
+      "description": "Allow unauthenticated read access"
+    },
+    {
+      "name": "ENABLE_DOCS",
+      "required_in_prod": false,
+      "default": false,
+      "description": "Enable API docs in production"
+    }
+  ],
+  "models": [
+    {
+      "name": "SearchResponse",
+      "fields": ["items", "total", "page", "page_size", "filters", "took_ms", "has_next", "has_previous"]
+    },
+    {
+      "name": "Scholarship", 
+      "fields": ["id", "name", "organization", "amount", "deadline", "type", "description", "eligibility_criteria"]
+    },
+    {
+      "name": "EligibilityResult",
+      "fields": ["eligible", "score", "reasons", "requirements_met", "missing_requirements"]
+    },
+    {
+      "name": "ErrorResponse",
+      "fields": ["trace_id", "code", "message", "status", "timestamp"]
+    }
+  ],
+  "operational": {
+    "health_checks": ["/healthz", "/health", "/health/database", "/health/services"],
+    "metrics_endpoint": "/metrics",
+    "documentation": ["/docs", "/redoc"],
+    "debug_endpoint": "/_debug/config",
+    "deployment": {
+      "replit_compatible": true,
+      "start_command": "./start.sh",
+      "health_check_path": "/healthz",
+      "port_config": "$PORT"
+    }
+  }
+}
