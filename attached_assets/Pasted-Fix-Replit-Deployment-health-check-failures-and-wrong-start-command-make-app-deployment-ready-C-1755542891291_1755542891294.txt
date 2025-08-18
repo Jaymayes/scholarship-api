@@ -1,0 +1,84 @@
+Fix Replit Deployment: health check failures and wrong start command; make app deployment-ready
+
+Context
+Project: FastAPI “Scholarship Discovery & Search API”
+Problem: Replit Deployment build fails
+
+Health checks failing: root (/) not returning 200 to the deployment probe
+Start command is wrong: using python3 $file instead of launching the ASGI server
+Likely port binding mismatch: deployment requires $PORT, not a hardcoded 5000 Constraints
+Do NOT weaken security controls or change the unified error schema {code, message, status, timestamp, trace_id, details?}
+Keep middleware order and protections (auth, CORS, rate limiting, body/URL-size guards, HSTS in prod)
+Do not log secrets
+Goals
+
+Correct the start/run command for Replit Deployments (uvicorn with $PORT and proxy headers)
+Ensure health check endpoint responds 200 fast and without redirects
+Bind to 0.0.0.0:$PORT in deployment
+Allow deployed hostname in TrustedHost/ALLOWED_HOSTS
+Keep production validation strict; provide clear deployment instructions
+Tasks
+
+Fix the deployment start command
+Replace any “python3 $file” or IDE-oriented run command with uvicorn: uvicorn <module_path_to_app>:app --host 0.0.0.0 --port $PORT --proxy-headers --forwarded-allow-ips="*"
+Use the actual module path for this repo (e.g., app.main:app or src.api.main:app). Verify it.
+If the Deployment UI requires a single string, use the line above. If a script is preferred, create start.sh: #!/usr/bin/env bash set -euo pipefail exec uvicorn <module_path_to_app>:app --host 0.0.0.0 --port "${PORT:-8000}" --proxy-headers --forwarded-allow-ips="*"
+Make it executable: chmod +x start.sh and set start command to ./start.sh
+2. Ensure the app listens on $PORT
+
+Confirm there is no hardcoded 5000 in code paths that start the server (if any app factory is used). The server must rely on uvicorn’s --port $PORT.
+Keep 5000 only for local preview if ENVIRONMENT=development and PORT is unset; otherwise always use $PORT.
+3. Health check endpoint and probe configuration
+
+Keep the root (/) route returning a fast 200 JSON (no DB, no auth).
+Also expose /healthz (already present) returning 200 quickly.
+In Replit Deployment health check settings, set the health path to /healthz (preferred) or / and method GET; interval 10s, timeout ≥ 5s.
+Ensure HTTPSRedirect or other middlewares do not redirect /healthz. If you have HTTPS redirect middleware, respect X-Forwarded-Proto and skip redirect when header indicates https; never disable the middleware globally.
+4. Proxy and host headers
+
+Start uvicorn with --proxy-headers and --forwarded-allow-ips="*".
+Ensure TrustedHost/ALLOWED_HOSTS includes the deployed hostname:
+Add the Replit deployed domain (e.g., *.replit.app, *.replit.dev or the exact deployment domain) to ALLOWED_HOSTS in settings or env.
+If ALLOWED_HOSTS is env-based, set it in deployment env vars.
+5. Environment variables for deployment (production)
+
+Set via Replit Deployment environment:
+ENVIRONMENT=production
+JWT_SECRET_KEY=<strong_random_64+ chars>
+CORS_ALLOWED_ORIGINS=<your public domain(s)>
+ALLOWED_HOSTS=<your deployed hostname(s)>
+RATE_LIMIT_BACKEND_URL=<redis url> or disable fallback in prod according to policy
+If any of these are missing, the app should fail fast with aggregated config errors. Configure them now.
+6. CORS and preflight in deployment
+
+In production, CORS must use a whitelist (CORS_ALLOWED_ORIGINS). No wildcard with credentials.
+Ensure preflight OPTIONS is not rate-limited and passes CORS middleware first.
+7. Verification commands (run in Replit shell after deploy build starts the container)
+
+Check port: echo $PORT
+Smoke:
+curl -si "http://127.0.0.1:$PORT/healthz" -> Expect 200
+curl -si "http://127.0.0.1:$PORT/" -> Expect 200 (root JSON)
+Preflight:
+curl -si -X OPTIONS "http://127.0.0.1:$PORT/api/v1/search" -H "Origin: https://your.domain" -H "Access-Control-Request-Method: GET" -> Expect 204/200 with ACAO header for allowed origin
+8. Document the change
+
+In README Deployment section, add:
+Required env vars
+Start command used by Replit Deployment
+Health check path (/healthz) and expected 200 response
+Note on ALLOWED_HOSTS and CORS_ALLOWED_ORIGINS configuration
+Provide a short incident summary in the PR:
+Root cause: wrong start command and health check path caused failing probe; app not listening on $PORT for deployment
+Fix: corrected start command (uvicorn with $PORT, proxy headers), ensured root/health endpoints return 200 quickly, configured ALLOWED_HOSTS and CORS for deployed domain
+Verification: include curl outputs with HTTP 200, plus Replit Deployment green status
+Acceptance criteria
+
+Replit Deployment “Start command” uses uvicorn <module_path>:app with --host 0.0.0.0 --port $PORT --proxy-headers --forwarded-allow-ips="*"
+Health check passes within 10–20s; /healthz returns 200 consistently
+Root (/) returns 200 JSON (fast) and is not redirected
+App serves on $PORT (not hardcoded 5000); no unhandled exceptions on startup
+ALLOWED_HOSTS includes deployed domain; CORS whitelist set; protected routes remain protected
+No security controls weakened; unified error schema unchanged
+Please implement the start command change, confirm the correct module path, set the deployment env vars, and update the Replit Deployment health check to /healthz. Then redeploy and attach the green health status plus curl outputs as verification.
+

@@ -60,7 +60,10 @@ class Settings(BaseSettings):
     access_token_expire_minutes: int = Field(30, alias="ACCESS_TOKEN_EXPIRE_MINUTES", gt=0)
     
     # Production security requirements - fix parsing issues with proper JSON parsing
-    allowed_hosts: List[str] = Field(default_factory=list, alias="ALLOWED_HOSTS")
+    allowed_hosts: List[str] = Field(
+        default_factory=lambda: ["localhost", "127.0.0.1", "*.replit.app", "*.replit.dev"],
+        alias="ALLOWED_HOSTS"
+    )
     trusted_proxy_ips: List[str] = Field(default_factory=list, alias="TRUSTED_PROXY_IPS")
     
     @field_validator('allowed_hosts', mode='before')
@@ -99,7 +102,7 @@ class Settings(BaseSettings):
     # Feature flag for public read endpoints (authentication bypass)
     public_read_endpoints: bool = Field(True, alias="PUBLIC_READ_ENDPOINTS")  # Default to True for dev
     
-    # Rate limiting backend requirements (production-aware)
+    # Rate limiting backend requirements (production-aware)  
     disable_rate_limit_backend: bool = Field(False, alias="DISABLE_RATE_LIMIT_BACKEND")
     
     # CORS Configuration - Environment-specific
@@ -194,9 +197,9 @@ class Settings(BaseSettings):
     rate_limit_backend_url: str = Field("redis://localhost:6379/0", alias="RATE_LIMIT_BACKEND_URL")
     rate_limit_per_minute: int = Field(0, alias="RATE_LIMIT_PER_MINUTE")  # 0 = use defaults
     
-    # Healthcheck endpoint exemption
+    # Health check endpoint exemption for deployment probes
     rate_limit_exempt_paths: List[str] = Field(
-        ["/health", "/readiness", "/metrics"],
+        ["/health", "/healthz", "/readiness", "/metrics", "/"],
         alias="RATE_LIMIT_EXEMPT_PATHS"
     )
     

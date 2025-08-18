@@ -174,7 +174,7 @@ async def root():
         "message": "Scholarship Discovery & Search API",
         "version": settings.api_version,
         "endpoints": {
-            "health": "/health",
+            "health": "/healthz",
             "api_info": "/api", 
             "search": "/api/v1/search?q=<query>",
             "documentation": "/docs",
@@ -215,6 +215,12 @@ async def health_check(request: Request):
         "status": "healthy",
         "trace_id": get_trace_id(request)
     }
+
+@app.get("/healthz")
+@app.head("/healthz")
+async def kubernetes_health_check():
+    """Kubernetes/deployment-style health check endpoint - minimal dependencies"""
+    return {"status": "healthy"}
 
 @app.get("/favicon.ico")
 async def favicon():

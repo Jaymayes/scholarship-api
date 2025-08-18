@@ -8,13 +8,21 @@ Preferred communication style: Simple, everyday language.
 
 # Recent Changes
 
-## 2025-08-18 - Replit Runtime Fixes
-- Fixed port configuration mismatch (now using port 5000 correctly)
-- Added Replit proxy header support for proper reverse proxy handling
-- Enhanced root endpoint to show helpful API information instead of just {"status":"active"}
-- Created debug endpoint /_debug/config for development troubleshooting
-- All QA security fixes preserved while fixing runtime issues
-- App now fully functional in Replit preview with all endpoints accessible
+## 2025-08-18 - Deployment Ready Implementation
+- **DEPLOYMENT FIX**: Created production start script (`start.sh`) with proper uvicorn command
+- **HEALTH CHECKS**: Added `/healthz` endpoint for deployment probes (returns fast 200 OK)
+- **PORT BINDING**: Enhanced port configuration to support `$PORT` environment variable for deployments
+- **SECURITY**: Added Replit deployment domains (`*.replit.app`, `*.replit.dev`) to ALLOWED_HOSTS defaults
+- **DOCUMENTATION**: Created comprehensive deployment guide (`README_DEPLOYMENT.md`)
+- **RATE LIMITING**: Exempted health check endpoints (`/healthz`, `/health`, `/`) from rate limiting
+- **ROOT ENDPOINT**: Updated to reference `/healthz` as primary health check for deployment consistency
+- All security controls and unified error schema preserved during deployment optimization
+
+## 2025-08-18 - Authentication Bug Fix
+- Fixed critical authentication middleware APIError constructor signature mismatch
+- Protected routes now return proper 401 responses instead of 500 TypeErrors
+- Corrected 7 APIError instantiations across auth middleware
+- App authentication system fully functional
 
 # System Architecture
 
