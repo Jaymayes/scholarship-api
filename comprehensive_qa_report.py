@@ -1,816 +1,812 @@
 #!/usr/bin/env python3
 """
-Comprehensive QA Analysis and Testing Suite
-Senior QA Engineer Report Generation
+Comprehensive QA Analysis Report Generator
+Senior QA Engineer Analysis - Bug Detection and Vulnerability Assessment
 """
 
-import os
-import sys
-import json
-import traceback
 import requests
-import subprocess
-from datetime import datetime
+import json
+import time
+import traceback
 from typing import Dict, List, Any, Optional
-import pytest
-import asyncio
-from sqlalchemy import text
-from fastapi.testclient import TestClient
+from dataclasses import dataclass
+from datetime import datetime
+import sys
+import os
 
-# Add project root to path
-sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+@dataclass
+class QAIssue:
+    """Data class for tracking QA issues"""
+    issue_id: str
+    location: str
+    description: str
+    steps_to_reproduce: str
+    observed_output: str
+    expected_output: str
+    severity: str  # Low, Medium, High, Critical
+    category: str  # Bug, Security, Performance, Logic, etc.
 
-try:
-    from main import app
-    from models.database import SessionLocal, get_db
-    from services.scholarship_service import ScholarshipService
-    from services.eligibility_service import EligibilityService
-    from models.scholarship import Scholarship
-    from config.settings import settings
-except ImportError as e:
-    print(f"Critical Import Error: {e}")
-    sys.exit(1)
-
-class QAReportGenerator:
-    """Comprehensive QA Analysis and Bug Reporting System"""
+class ComprehensiveQAAnalyzer:
+    """Senior QA Engineer - Comprehensive Bug Detection System"""
     
     def __init__(self):
-        self.issues = []
-        self.test_results = {}
-        self.client = TestClient(app)
         self.base_url = "http://localhost:5000"
+        self.issues: List[QAIssue] = []
+        self.test_results = {}
+        self.start_time = datetime.now()
         
     def add_issue(self, issue_id: str, location: str, description: str, 
-                  steps_to_reproduce: str, observed_output: str, 
-                  expected_output: str, severity: str, category: str = "Bug"):
-        """Add an issue to the report"""
-        self.issues.append({
-            "issue_id": issue_id,
-            "location": location,
-            "description": description,
-            "steps_to_reproduce": steps_to_reproduce,
-            "observed_output": observed_output,
-            "expected_output": expected_output,
-            "severity": severity,
-            "category": category,
-            "timestamp": datetime.now().isoformat()
-        })
-    
-    def test_basic_connectivity(self):
-        """Test basic API connectivity and health"""
-        print("🔍 Testing Basic Connectivity...")
-        
+                  steps: str, observed: str, expected: str, severity: str, category: str = "Bug"):
+        """Add a new issue to the report"""
+        issue = QAIssue(
+            issue_id=issue_id,
+            location=location,
+            description=description,
+            steps_to_reproduce=steps,
+            observed_output=observed,
+            expected_output=expected,
+            severity=severity,
+            category=category
+        )
+        self.issues.append(issue)
+
+    def test_server_availability(self):
+        """Test if server is accessible"""
+        print("🔍 Testing server availability...")
         try:
-            # Test root endpoint
-            response = self.client.get("/")
+            response = requests.get(f"{self.base_url}/", timeout=5)
             if response.status_code != 200:
                 self.add_issue(
-                    "CONN-001",
-                    "main.py root endpoint",
-                    "Root endpoint returns non-200 status code",
-                    "Send GET request to /",
-                    f"Status: {response.status_code}, Response: {response.text}",
-                    "Status: 200 with valid JSON response",
-                    "High"
+                    "SERV-001",
+                    "main.py:95-105",
+                    "Root endpoint returns unexpected status code",
+                    "1. Send GET request to / \n2. Check status code",
+                    f"Status: {response.status_code}",
+                    "Status: 200",
+                    "High",
+                    "Server"
                 )
-            
-            # Test health endpoints
-            health_response = self.client.get("/healthz")
-            if health_response.status_code != 200:
-                self.add_issue(
-                    "HEALTH-001",
-                    "routers/health.py /healthz",
-                    "Liveness probe endpoint failing",
-                    "Send GET request to /healthz",
-                    f"Status: {health_response.status_code}",
-                    "Status: 200 with {'status': 'ok'}",
-                    "Critical"
-                )
-                
+        except requests.exceptions.ConnectionError:
+            self.add_issue(
+                "SERV-002",
+                "main.py or server configuration",
+                "Server is not accessible",
+                "1. Start server\n2. Send GET request to /",
+                "Connection refused",
+                "Successful connection",
+                "Critical",
+                "Server"
+            )
+            return False
         except Exception as e:
             self.add_issue(
-                "CONN-002",
-                "FastAPI application startup",
-                "Application fails to start or respond",
-                "Start FastAPI application and send basic requests",
-                f"Exception: {str(e)}",
-                "Application starts successfully and responds to requests",
-                "Critical"
+                "SERV-003",
+                "main.py",
+                f"Unexpected error accessing server: {str(e)}",
+                "1. Send GET request to /",
+                str(e),
+                "Successful response",
+                "High",
+                "Server"
             )
-    
-    def test_authentication_system(self):
-        """Test authentication and authorization"""
-        print("🔍 Testing Authentication System...")
+        return True
+
+    def test_api_documentation(self):
+        """Test OpenAPI documentation endpoints"""
+        print("📚 Testing API documentation...")
         
+        # Test /docs endpoint
         try:
-            # Test login with invalid credentials
-            invalid_login = self.client.post(
-                "/api/v1/auth/login-simple",
-                json={"username": "invalid", "password": "invalid"}
-            )
-            
-            if invalid_login.status_code != 401:
+            response = requests.get(f"{self.base_url}/docs")
+            if response.status_code != 200:
                 self.add_issue(
-                    "AUTH-001",
-                    "routers/auth.py login endpoint",
-                    "Invalid credentials don't return 401 status",
-                    "POST to /api/v1/auth/login-simple with invalid credentials",
-                    f"Status: {invalid_login.status_code}",
-                    "Status: 401 Unauthorized",
-                    "Medium"
+                    "DOC-001",
+                    "FastAPI auto-generated docs",
+                    "API documentation endpoint not accessible",
+                    "1. Navigate to /docs\n2. Check response",
+                    f"Status: {response.status_code}",
+                    "Status: 200 with Swagger UI",
+                    "Medium",
+                    "Documentation"
                 )
-            
-            # Test login with valid credentials
-            valid_login = self.client.post(
-                "/api/v1/auth/login-simple",
-                json={"username": "admin", "password": "admin123"}
-            )
-            
-            if valid_login.status_code != 200:
-                self.add_issue(
-                    "AUTH-002",
-                    "routers/auth.py login endpoint",
-                    "Valid credentials don't return 200 status",
-                    "POST to /api/v1/auth/login-simple with admin/admin123",
-                    f"Status: {valid_login.status_code}, Response: {valid_login.text}",
-                    "Status: 200 with access_token",
-                    "High"
-                )
-                return None
-            
-            token_data = valid_login.json()
-            if "access_token" not in token_data:
-                self.add_issue(
-                    "AUTH-003",
-                    "routers/auth.py login response",
-                    "Login response missing access_token",
-                    "Successful login should return token",
-                    f"Response: {token_data}",
-                    "Response includes 'access_token' field",
-                    "High"
-                )
-                return None
-                
-            return token_data["access_token"]
-            
         except Exception as e:
             self.add_issue(
-                "AUTH-004",
-                "routers/auth.py authentication system",
-                "Authentication system throws unexpected exception",
-                "Attempt to authenticate with API",
-                f"Exception: {str(e)}\nTraceback: {traceback.format_exc()}",
-                "Authentication works without exceptions",
-                "Critical"
+                "DOC-002",
+                "FastAPI configuration",
+                f"Error accessing API docs: {str(e)}",
+                "1. Navigate to /docs",
+                str(e),
+                "Swagger UI loads successfully",
+                "Medium",
+                "Documentation"
             )
-            return None
-    
-    def test_database_integration(self):
-        """Test database connectivity and operations"""
-        print("🔍 Testing Database Integration...")
+
+    def test_search_functionality(self):
+        """Comprehensive search endpoint testing"""
+        print("🔍 Testing search functionality...")
         
+        # Test basic search
         try:
-            db = SessionLocal()
-            
-            # Test basic database connectivity
-            try:
-                result = db.execute(text("SELECT 1"))
-                result.fetchone()
-            except Exception as e:
-                self.add_issue(
-                    "DB-001",
-                    "models/database.py database connection",
-                    "Database connection fails",
-                    "Execute basic SELECT 1 query",
-                    f"Exception: {str(e)}",
-                    "Query executes successfully",
-                    "Critical"
-                )
-                return
-            
-            # Test scholarships table
-            try:
-                scholarship_count = db.execute(text("SELECT COUNT(*) FROM scholarships")).scalar()
-                if scholarship_count == 0:
-                    self.add_issue(
-                        "DB-002",
-                        "data/scholarship_data.py",
-                        "No scholarships found in database",
-                        "Query scholarships table for count",
-                        f"Count: {scholarship_count}",
-                        "Count > 0 (expected 15 scholarships)",
-                        "Medium"
-                    )
-            except Exception as e:
-                self.add_issue(
-                    "DB-003",
-                    "models/database.py scholarships table",
-                    "Scholarships table query fails",
-                    "SELECT COUNT(*) FROM scholarships",
-                    f"Exception: {str(e)}",
-                    "Query executes successfully",
-                    "High"
-                )
-            
-            # Test interactions table
-            try:
-                interaction_count = db.execute(text("SELECT COUNT(*) FROM interactions")).scalar()
-                print(f"Interactions table has {interaction_count} records")
-            except Exception as e:
-                self.add_issue(
-                    "DB-004",
-                    "models/interaction.py interactions table",
-                    "Interactions table query fails",
-                    "SELECT COUNT(*) FROM interactions",
-                    f"Exception: {str(e)}",
-                    "Query executes successfully",
-                    "Medium"
-                )
-            
-            db.close()
-            
-        except Exception as e:
-            self.add_issue(
-                "DB-005",
-                "models/database.py SessionLocal",
-                "Database session creation fails",
-                "Create database session using SessionLocal()",
-                f"Exception: {str(e)}",
-                "Session created successfully",
-                "Critical"
-            )
-    
-    def test_scholarship_endpoints(self, token: Optional[str] = None):
-        """Test scholarship-related endpoints"""
-        print("🔍 Testing Scholarship Endpoints...")
-        
-        headers = {"Authorization": f"Bearer {token}"} if token else {}
-        
-        # Test get all scholarships
-        try:
-            scholarships_response = self.client.get("/api/v1/scholarships", headers=headers)
-            
-            if scholarships_response.status_code != 200:
-                self.add_issue(
-                    "SCHOLAR-001",
-                    "routers/scholarships.py get_scholarships",
-                    "Get scholarships endpoint returns non-200 status",
-                    "GET /api/v1/scholarships",
-                    f"Status: {scholarships_response.status_code}, Response: {scholarships_response.text}",
-                    "Status: 200 with scholarship list",
-                    "High"
-                )
-            else:
-                data = scholarships_response.json()
-                if not isinstance(data, list):
-                    self.add_issue(
-                        "SCHOLAR-002",
-                        "routers/scholarships.py get_scholarships response",
-                        "Scholarships endpoint doesn't return a list",
-                        "GET /api/v1/scholarships and check response type",
-                        f"Response type: {type(data)}, Data: {data}",
-                        "Response should be a list of scholarships",
-                        "Medium"
-                    )
-                elif len(data) == 0:
-                    self.add_issue(
-                        "SCHOLAR-003",
-                        "services/scholarship_service.py",
-                        "No scholarships returned from API",
-                        "GET /api/v1/scholarships",
-                        "Empty list returned",
-                        "List of 15 scholarships",
-                        "Medium"
-                    )
-        
-        except Exception as e:
-            self.add_issue(
-                "SCHOLAR-004",
-                "routers/scholarships.py",
-                "Scholarships endpoint throws unexpected exception",
-                "GET /api/v1/scholarships",
-                f"Exception: {str(e)}\nTraceback: {traceback.format_exc()}",
-                "Endpoint responds without exceptions",
-                "High"
-            )
-        
-        # Test search functionality
-        try:
-            search_response = self.client.get(
-                "/api/v1/scholarships/search",
-                params={"q": "engineering", "limit": 5},
-                headers=headers
-            )
-            
-            if search_response.status_code != 200:
+            response = requests.get(f"{self.base_url}/search?q=engineering")
+            if response.status_code != 200:
                 self.add_issue(
                     "SEARCH-001",
-                    "routers/scholarships.py search_scholarships",
-                    "Search endpoint returns non-200 status",
-                    "GET /api/v1/scholarships/search?q=engineering&limit=5",
-                    f"Status: {search_response.status_code}",
+                    "routers/search.py",
+                    "Basic search query fails",
+                    "1. Send GET /search?q=engineering\n2. Check response",
+                    f"Status: {response.status_code}, Response: {response.text}",
                     "Status: 200 with search results",
-                    "High"
-                )
-        
-        except Exception as e:
-            self.add_issue(
-                "SEARCH-002",
-                "routers/scholarships.py search endpoint",
-                "Search endpoint throws unexpected exception",
-                "GET /api/v1/scholarships/search?q=engineering",
-                f"Exception: {str(e)}",
-                "Search completes without exceptions",
-                "High"
-            )
-        
-        # Test individual scholarship retrieval
-        try:
-            individual_response = self.client.get(
-                "/api/v1/scholarships/merit-excellence-scholarship",
-                headers=headers
-            )
-            
-            if individual_response.status_code not in [200, 404]:
-                self.add_issue(
-                    "SCHOLAR-005",
-                    "routers/scholarships.py get_scholarship",
-                    "Individual scholarship endpoint returns unexpected status",
-                    "GET /api/v1/scholarships/merit-excellence-scholarship",
-                    f"Status: {individual_response.status_code}",
-                    "Status: 200 (found) or 404 (not found)",
-                    "Medium"
-                )
-        
-        except Exception as e:
-            self.add_issue(
-                "SCHOLAR-006",
-                "routers/scholarships.py get_scholarship",
-                "Individual scholarship endpoint throws exception",
-                "GET /api/v1/scholarships/merit-excellence-scholarship",
-                f"Exception: {str(e)}",
-                "Endpoint responds without exceptions",
-                "Medium"
-            )
-    
-    def test_eligibility_system(self, token: Optional[str] = None):
-        """Test eligibility checking functionality"""
-        print("🔍 Testing Eligibility System...")
-        
-        headers = {"Authorization": f"Bearer {token}"} if token else {}
-        
-        # Test eligibility check endpoint
-        try:
-            eligibility_payload = {
-                "user_profile": {
-                    "gpa": 3.5,
-                    "grade_level": "undergraduate",
-                    "field_of_study": "engineering",
-                    "citizenship": "US",
-                    "state_of_residence": "CA",
-                    "age": 20,
-                    "financial_need": True
-                },
-                "scholarship_ids": ["merit-excellence-scholarship"]
-            }
-            
-            eligibility_response = self.client.post(
-                "/api/v1/scholarships/eligibility/check",
-                json=eligibility_payload,
-                headers=headers
-            )
-            
-            if eligibility_response.status_code != 200:
-                self.add_issue(
-                    "ELIGIBILITY-001",
-                    "routers/scholarships.py check_eligibility",
-                    "Eligibility check endpoint returns non-200 status",
-                    f"POST /api/v1/scholarships/eligibility/check with payload: {eligibility_payload}",
-                    f"Status: {eligibility_response.status_code}, Response: {eligibility_response.text}",
-                    "Status: 200 with eligibility results",
-                    "High"
+                    "High",
+                    "Search"
                 )
             else:
-                data = eligibility_response.json()
-                if not isinstance(data, dict) or "results" not in data:
+                data = response.json()
+                if "items" not in data:
                     self.add_issue(
-                        "ELIGIBILITY-002",
-                        "services/eligibility_service.py",
-                        "Eligibility response missing 'results' field",
-                        "Check eligibility response structure",
-                        f"Response: {data}",
-                        "Response should contain 'results' field",
-                        "Medium"
+                        "SEARCH-002",
+                        "services/search_service.py or routers/search.py",
+                        "Search response missing 'items' field",
+                        "1. Send GET /search?q=engineering\n2. Check response structure",
+                        f"Response keys: {list(data.keys())}",
+                        "Response should contain 'items' field",
+                        "Medium",
+                        "Search"
                     )
-        
         except Exception as e:
             self.add_issue(
-                "ELIGIBILITY-003",
-                "routers/scholarships.py or services/eligibility_service.py",
-                "Eligibility check throws unexpected exception",
-                "POST eligibility check with valid payload",
-                f"Exception: {str(e)}\nTraceback: {traceback.format_exc()}",
-                "Eligibility check completes without exceptions",
-                "High"
+                "SEARCH-003",
+                "routers/search.py",
+                f"Search endpoint throws exception: {str(e)}",
+                "1. Send GET /search?q=engineering",
+                str(e),
+                "Successful search response",
+                "High",
+                "Search"
             )
-    
-    def test_edge_cases_and_input_validation(self, token: Optional[str] = None):
-        """Test edge cases and input validation"""
-        print("🔍 Testing Edge Cases and Input Validation...")
-        
-        headers = {"Authorization": f"Bearer {token}"} if token else {}
-        
-        # Test with extremely long query string
+
+        # Test empty search query
         try:
-            long_query = "a" * 10000  # 10k character query
-            long_search_response = self.client.get(
-                "/api/v1/scholarships/search",
-                params={"q": long_query},
-                headers=headers
-            )
-            
-            if long_search_response.status_code == 500:
+            response = requests.get(f"{self.base_url}/search?q=")
+            if response.status_code == 500:
                 self.add_issue(
-                    "EDGE-001",
-                    "routers/scholarships.py search validation",
-                    "Long query string causes internal server error",
-                    f"Search with {len(long_query)} character query",
-                    f"Status: 500, Server Error",
-                    "Status: 400 (bad request) or graceful handling",
-                    "Medium"
+                    "SEARCH-004",
+                    "services/search_service.py",
+                    "Empty search query causes server error",
+                    "1. Send GET /search?q=\n2. Check response",
+                    f"Status: {response.status_code}",
+                    "Status: 200 with empty results or 400 with validation error",
+                    "Medium",
+                    "Input Validation"
                 )
-        
         except Exception as e:
             self.add_issue(
-                "EDGE-002",
-                "routers/scholarships.py search endpoint",
-                "Long query causes unexpected exception",
-                "Search with very long query string",
-                f"Exception: {str(e)}",
-                "Graceful error handling or input validation",
-                "Medium"
+                "SEARCH-005",
+                "routers/search.py",
+                f"Empty search causes exception: {str(e)}",
+                "1. Send GET /search?q=",
+                str(e),
+                "Graceful handling of empty search",
+                "Medium",
+                "Input Validation"
             )
+
+        # Test malicious input
+        malicious_inputs = [
+            "'; DROP TABLE scholarships; --",
+            "<script>alert('xss')</script>",
+            "../../../../etc/passwd",
+            "\\x00\\x01\\x02",
+            "A" * 10000  # Very long input
+        ]
         
-        # Test with special characters
+        for malicious_input in malicious_inputs:
+            try:
+                response = requests.get(f"{self.base_url}/search", params={"q": malicious_input})
+                if response.status_code == 500:
+                    self.add_issue(
+                        f"SEARCH-SEC-{hash(malicious_input) % 1000:03d}",
+                        "services/search_service.py or routers/search.py",
+                        f"Malicious input causes server error: {malicious_input[:50]}...",
+                        f"1. Send GET /search?q={malicious_input[:50]}...\n2. Check response",
+                        f"Status: {response.status_code}",
+                        "Status: 200 with sanitized results or 400 with validation error",
+                        "High",
+                        "Security"
+                    )
+            except Exception as e:
+                self.add_issue(
+                    f"SEARCH-SEC-EXC-{hash(malicious_input) % 1000:03d}",
+                    "routers/search.py",
+                    f"Malicious input causes exception: {str(e)}",
+                    f"1. Send GET /search?q={malicious_input[:50]}...",
+                    str(e),
+                    "Graceful error handling",
+                    "High",
+                    "Security"
+                )
+
+    def test_eligibility_functionality(self):
+        """Test eligibility checking endpoints"""
+        print("🎯 Testing eligibility functionality...")
+        
+        # Test eligibility check without parameters
         try:
-            special_chars_query = "'; DROP TABLE scholarships; --"
-            sql_injection_response = self.client.get(
-                "/api/v1/scholarships/search",
-                params={"q": special_chars_query},
-                headers=headers
-            )
-            
-            # Should not return 500 error - should handle gracefully
-            if sql_injection_response.status_code == 500:
+            response = requests.get(f"{self.base_url}/eligibility/check")
+            if response.status_code != 422:  # Expected validation error
                 self.add_issue(
-                    "SECURITY-001",
-                    "routers/scholarships.py search input validation",
-                    "Special characters in search query cause server error",
-                    f"Search with SQL injection attempt: {special_chars_query}",
-                    "Status: 500, Internal Server Error",
-                    "Graceful handling with proper input sanitization",
-                    "High"
+                    "ELIG-001",
+                    "routers/eligibility.py",
+                    "Eligibility check without required parameters doesn't return validation error",
+                    "1. Send GET /eligibility/check\n2. Check response",
+                    f"Status: {response.status_code}",
+                    "Status: 422 with validation error",
+                    "Medium",
+                    "Input Validation"
                 )
-        
         except Exception as e:
             self.add_issue(
-                "SECURITY-002",
-                "routers/scholarships.py input validation",
-                "SQL injection attempt causes unexpected exception",
-                "Search with SQL injection characters",
-                f"Exception: {str(e)}",
-                "Proper input validation and sanitization",
-                "High"
+                "ELIG-002",
+                "routers/eligibility.py",
+                f"Eligibility endpoint throws exception: {str(e)}",
+                "1. Send GET /eligibility/check",
+                str(e),
+                "Validation error response",
+                "Medium",
+                "Eligibility"
             )
-        
-        # Test with null/empty inputs in eligibility check
+
+        # Test POST eligibility with invalid JSON
         try:
-            null_eligibility_payload = {
-                "user_profile": {
-                    "gpa": None,
-                    "grade_level": "",
-                    "field_of_study": None,
-                    "citizenship": "",
-                    "state_of_residence": None,
-                    "age": None,
-                    "financial_need": None
-                },
-                "scholarship_ids": []
-            }
-            
-            null_response = self.client.post(
-                "/api/v1/scholarships/eligibility/check",
-                json=null_eligibility_payload,
-                headers=headers
+            response = requests.post(
+                f"{self.base_url}/eligibility/check",
+                json={"invalid": "data"}
             )
-            
-            if null_response.status_code == 500:
+            if response.status_code == 500:
                 self.add_issue(
-                    "EDGE-003",
-                    "services/eligibility_service.py null handling",
-                    "Null values in eligibility check cause server error",
-                    f"Eligibility check with null payload: {null_eligibility_payload}",
-                    "Status: 500, Internal Server Error",
-                    "Status: 400 with validation error or graceful handling",
-                    "Medium"
+                    "ELIG-003",
+                    "routers/eligibility.py",
+                    "Invalid JSON for eligibility check causes server error",
+                    "1. Send POST /eligibility/check with invalid JSON\n2. Check response",
+                    f"Status: {response.status_code}",
+                    "Status: 422 with validation error",
+                    "Medium",
+                    "Input Validation"
                 )
-        
         except Exception as e:
             self.add_issue(
-                "EDGE-004",
-                "services/eligibility_service.py",
-                "Null values cause unexpected exception in eligibility check",
-                "Eligibility check with null/empty values",
-                f"Exception: {str(e)}",
-                "Proper null value handling and validation",
-                "Medium"
+                "ELIG-004",
+                "routers/eligibility.py",
+                f"Invalid eligibility JSON causes exception: {str(e)}",
+                "1. Send POST /eligibility/check with invalid JSON",
+                str(e),
+                "Validation error response",
+                "Medium",
+                "Eligibility"
             )
-    
-    def test_rate_limiting(self, token: Optional[str] = None):
+
+    def test_ai_functionality(self):
+        """Test AI-powered endpoints"""
+        print("🤖 Testing AI functionality...")
+        
+        # Test AI status
+        try:
+            response = requests.get(f"{self.base_url}/ai/status")
+            if response.status_code != 200:
+                self.add_issue(
+                    "AI-001",
+                    "routers/ai.py",
+                    "AI status endpoint not accessible",
+                    "1. Send GET /ai/status\n2. Check response",
+                    f"Status: {response.status_code}",
+                    "Status: 200 with AI service status",
+                    "Medium",
+                    "AI"
+                )
+        except Exception as e:
+            self.add_issue(
+                "AI-002",
+                "routers/ai.py",
+                f"AI status endpoint throws exception: {str(e)}",
+                "1. Send GET /ai/status",
+                str(e),
+                "AI service status response",
+                "Medium",
+                "AI"
+            )
+
+        # Test AI search enhancement with missing data
+        try:
+            response = requests.post(f"{self.base_url}/ai/enhance-search", json={})
+            if response.status_code == 500:
+                self.add_issue(
+                    "AI-003",
+                    "routers/ai.py",
+                    "AI search enhancement with empty JSON causes server error",
+                    "1. Send POST /ai/enhance-search with empty JSON\n2. Check response",
+                    f"Status: {response.status_code}",
+                    "Status: 422 with validation error",
+                    "Medium",
+                    "Input Validation"
+                )
+        except Exception as e:
+            self.add_issue(
+                "AI-004",
+                "routers/ai.py",
+                f"AI search enhancement throws exception: {str(e)}",
+                "1. Send POST /ai/enhance-search with empty JSON",
+                str(e),
+                "Validation error response",
+                "Medium",
+                "AI"
+            )
+
+        # Test AI with very long input
+        try:
+            long_query = "A" * 50000  # Very long query
+            response = requests.post(
+                f"{self.base_url}/ai/enhance-search",
+                json={"query": long_query}
+            )
+            if response.status_code == 500:
+                self.add_issue(
+                    "AI-005",
+                    "services/openai_service.py",
+                    "Very long AI query causes server error",
+                    f"1. Send POST /ai/enhance-search with 50k character query\n2. Check response",
+                    f"Status: {response.status_code}",
+                    "Status: 400 with length validation error or 200 with truncated processing",
+                    "Medium",
+                    "Input Validation"
+                )
+        except Exception as e:
+            self.add_issue(
+                "AI-006",
+                "services/openai_service.py",
+                f"Long AI query causes exception: {str(e)}",
+                "1. Send POST /ai/enhance-search with very long query",
+                str(e),
+                "Graceful handling of long input",
+                "Medium",
+                "AI"
+            )
+
+    def test_database_endpoints(self):
+        """Test database-related endpoints"""
+        print("🗄️ Testing database functionality...")
+        
+        # Test database status
+        try:
+            response = requests.get(f"{self.base_url}/db/status")
+            if response.status_code != 200:
+                self.add_issue(
+                    "DB-001",
+                    "routers/database.py",
+                    "Database status endpoint not accessible",
+                    "1. Send GET /db/status\n2. Check response",
+                    f"Status: {response.status_code}",
+                    "Status: 200 with database status",
+                    "High",
+                    "Database"
+                )
+        except Exception as e:
+            self.add_issue(
+                "DB-002",
+                "routers/database.py",
+                f"Database status throws exception: {str(e)}",
+                "1. Send GET /db/status",
+                str(e),
+                "Database status response",
+                "High",
+                "Database"
+            )
+
+        # Test SQL injection attempts
+        sql_injections = [
+            "1'; DROP TABLE scholarships; --",
+            "1' OR '1'='1",
+            "'; UNION SELECT * FROM users; --"
+        ]
+        
+        for injection in sql_injections:
+            try:
+                response = requests.get(f"{self.base_url}/scholarships/{injection}")
+                if response.status_code == 500:
+                    self.add_issue(
+                        f"DB-SQL-{hash(injection) % 1000:03d}",
+                        "services/scholarship_service.py or models/",
+                        f"SQL injection attempt causes server error: {injection}",
+                        f"1. Send GET /scholarships/{injection}\n2. Check response",
+                        f"Status: {response.status_code}",
+                        "Status: 404 or 400 with safe error handling",
+                        "Critical",
+                        "Security"
+                    )
+            except Exception as e:
+                self.add_issue(
+                    f"DB-SQL-EXC-{hash(injection) % 1000:03d}",
+                    "services/scholarship_service.py",
+                    f"SQL injection causes exception: {str(e)}",
+                    f"1. Send GET /scholarships/{injection}",
+                    str(e),
+                    "Safe error handling",
+                    "Critical",
+                    "Security"
+                )
+
+    def test_authentication_security(self):
+        """Test authentication and security"""
+        print("🔐 Testing authentication and security...")
+        
+        # Test protected endpoints without authentication
+        protected_endpoints = [
+            "/api/v1/scholarships",
+            "/api/v1/analytics/summary"
+        ]
+        
+        for endpoint in protected_endpoints:
+            try:
+                response = requests.get(f"{self.base_url}{endpoint}")
+                if response.status_code == 200:
+                    self.add_issue(
+                        f"AUTH-{hash(endpoint) % 1000:03d}",
+                        "middleware/auth.py",
+                        f"Protected endpoint accessible without authentication: {endpoint}",
+                        f"1. Send GET {endpoint} without Authorization header\n2. Check response",
+                        f"Status: {response.status_code} (accessible)",
+                        "Status: 401 Unauthorized",
+                        "Critical",
+                        "Security"
+                    )
+            except Exception as e:
+                self.add_issue(
+                    f"AUTH-EXC-{hash(endpoint) % 1000:03d}",
+                    "middleware/auth.py",
+                    f"Authentication check throws exception: {str(e)}",
+                    f"1. Send GET {endpoint} without auth",
+                    str(e),
+                    "401 Unauthorized response",
+                    "High",
+                    "Security"
+                )
+
+        # Test with invalid JWT token
+        try:
+            headers = {"Authorization": "Bearer invalid_token_here"}
+            response = requests.get(f"{self.base_url}/api/v1/scholarships", headers=headers)
+            if response.status_code == 500:
+                self.add_issue(
+                    "AUTH-002",
+                    "middleware/auth.py",
+                    "Invalid JWT token causes server error",
+                    "1. Send request with Authorization: Bearer invalid_token_here\n2. Check response",
+                    f"Status: {response.status_code}",
+                    "Status: 401 with token validation error",
+                    "High",
+                    "Security"
+                )
+        except Exception as e:
+            self.add_issue(
+                "AUTH-003",
+                "middleware/auth.py",
+                f"Invalid JWT token causes exception: {str(e)}",
+                "1. Send request with invalid JWT token",
+                str(e),
+                "401 Unauthorized response",
+                "High",
+                "Security"
+            )
+
+    def test_rate_limiting(self):
         """Test rate limiting functionality"""
-        print("🔍 Testing Rate Limiting...")
+        print("⏱️ Testing rate limiting...")
         
-        headers = {"Authorization": f"Bearer {token}"} if token else {}
-        
+        # Test rate limiting by making rapid requests
         try:
-            # Send many requests rapidly to test rate limiting
             responses = []
-            for i in range(50):  # Send 50 requests rapidly
-                response = self.client.get("/api/v1/scholarships", headers=headers)
+            for i in range(50):  # Make 50 rapid requests
+                response = requests.get(f"{self.base_url}/search?q=test{i}")
                 responses.append(response.status_code)
-                if response.status_code == 429:  # Rate limited
+                if response.status_code == 429:
                     break
             
-            # Check if rate limiting is working
+            # Check if rate limiting kicked in
             if 429 not in responses:
                 self.add_issue(
                     "RATE-001",
                     "middleware/rate_limiting.py",
-                    "Rate limiting not enforced under load",
-                    "Send 50 rapid requests to /api/v1/scholarships",
+                    "Rate limiting not functioning - no 429 status after 50 rapid requests",
+                    "1. Make 50 rapid GET requests to /search\n2. Check for 429 status",
                     f"All responses: {set(responses)}",
-                    "At least some requests should return 429 (Too Many Requests)",
-                    "Low"  # Low severity as it might be configured for high limits
+                    "At least one 429 Too Many Requests response",
+                    "Medium",
+                    "Security"
                 )
-        
         except Exception as e:
             self.add_issue(
                 "RATE-002",
                 "middleware/rate_limiting.py",
-                "Rate limiting middleware causes unexpected exception",
-                "Send multiple rapid requests",
-                f"Exception: {str(e)}",
-                "Rate limiting works without exceptions",
-                "Medium"
+                f"Rate limiting test causes exception: {str(e)}",
+                "1. Make rapid requests to test rate limiting",
+                str(e),
+                "Rate limiting responses",
+                "Medium",
+                "Rate Limiting"
             )
-    
-    def test_observability_features(self):
-        """Test observability and monitoring features"""
-        print("🔍 Testing Observability Features...")
+
+    def test_error_handling(self):
+        """Test error handling across endpoints"""
+        print("⚠️ Testing error handling...")
         
-        # Test metrics endpoint
+        # Test 404 handling
         try:
-            metrics_response = self.client.get("/metrics")
-            if metrics_response.status_code != 200:
+            response = requests.get(f"{self.base_url}/nonexistent-endpoint")
+            if response.status_code != 404:
                 self.add_issue(
-                    "OBS-001",
-                    "observability/metrics.py metrics endpoint",
-                    "Metrics endpoint not accessible",
-                    "GET /metrics",
-                    f"Status: {metrics_response.status_code}",
-                    "Status: 200 with Prometheus metrics",
-                    "Medium"
-                )
-            elif "# HELP" not in metrics_response.text:
-                self.add_issue(
-                    "OBS-002",
-                    "observability/metrics.py metrics format",
-                    "Metrics endpoint doesn't return Prometheus format",
-                    "GET /metrics and check response format",
-                    f"Response doesn't contain '# HELP'",
-                    "Response should be in Prometheus format",
-                    "Low"
-                )
-        
-        except Exception as e:
-            self.add_issue(
-                "OBS-003",
-                "observability/metrics.py",
-                "Metrics endpoint throws unexpected exception",
-                "GET /metrics",
-                f"Exception: {str(e)}",
-                "Metrics endpoint responds without exceptions",
-                "Medium"
-            )
-        
-        # Test readiness probe
-        try:
-            readiness_response = self.client.get("/readyz")
-            if readiness_response.status_code not in [200, 503]:
-                self.add_issue(
-                    "OBS-004",
-                    "routers/health.py readiness probe",
-                    "Readiness probe returns unexpected status",
-                    "GET /readyz",
-                    f"Status: {readiness_response.status_code}",
-                    "Status: 200 (ready) or 503 (not ready)",
-                    "Medium"
-                )
-        
-        except Exception as e:
-            self.add_issue(
-                "OBS-005",
-                "routers/health.py",
-                "Readiness probe throws unexpected exception",
-                "GET /readyz",
-                f"Exception: {str(e)}",
-                "Readiness probe responds without exceptions",
-                "Medium"
-            )
-        
-        # Test X-Request-ID header presence
-        try:
-            response = self.client.get("/")
-            if "X-Request-ID" not in response.headers:
-                self.add_issue(
-                    "OBS-006",
-                    "middleware/request_id.py",
-                    "X-Request-ID header missing from responses",
-                    "Send any request and check response headers",
-                    f"Headers: {dict(response.headers)}",
-                    "Response should include X-Request-ID header",
-                    "Low"
-                )
-        
-        except Exception as e:
-            self.add_issue(
-                "OBS-007",
-                "middleware/request_id.py",
-                "Request ID middleware causes unexpected exception",
-                "Send request and check for X-Request-ID header",
-                f"Exception: {str(e)}",
-                "Request ID middleware works without exceptions",
-                "Medium"
-            )
-    
-    def test_configuration_and_environment(self):
-        """Test configuration and environment setup"""
-        print("🔍 Testing Configuration and Environment...")
-        
-        try:
-            # Test if required environment variables are set
-            required_vars = ["DATABASE_URL"]
-            missing_vars = []
-            
-            for var in required_vars:
-                if not os.getenv(var):
-                    missing_vars.append(var)
-            
-            if missing_vars:
-                self.add_issue(
-                    "CONFIG-001",
-                    "config/settings.py environment variables",
-                    "Required environment variables are missing",
-                    f"Check for environment variables: {required_vars}",
-                    f"Missing variables: {missing_vars}",
-                    "All required environment variables should be set",
-                    "High"
+                    "ERR-001",
+                    "middleware/error_handlers.py",
+                    "Non-existent endpoint doesn't return 404",
+                    "1. Send GET /nonexistent-endpoint\n2. Check response",
+                    f"Status: {response.status_code}",
+                    "Status: 404",
+                    "Low",
+                    "Error Handling"
                 )
             
-            # Test settings loading
-            try:
-                from config.settings import settings
-                if not hasattr(settings, 'database_url'):
+            # Check if error response has proper structure
+            if response.status_code == 404:
+                try:
+                    error_data = response.json()
+                    required_fields = ["message", "status", "timestamp"]
+                    missing_fields = [field for field in required_fields if field not in error_data]
+                    if missing_fields:
+                        self.add_issue(
+                            "ERR-002",
+                            "middleware/error_handlers.py",
+                            f"404 error response missing required fields: {missing_fields}",
+                            "1. Send GET /nonexistent-endpoint\n2. Check error response structure",
+                            f"Response fields: {list(error_data.keys())}",
+                            f"Should include: {required_fields}",
+                            "Low",
+                            "Error Handling"
+                        )
+                except ValueError:
                     self.add_issue(
-                        "CONFIG-002",
-                        "config/settings.py settings class",
-                        "Settings object missing database_url attribute",
-                        "Load settings and check for database_url",
-                        "database_url attribute not found",
-                        "Settings should have database_url attribute",
-                        "High"
+                        "ERR-003",
+                        "middleware/error_handlers.py",
+                        "404 error response is not valid JSON",
+                        "1. Send GET /nonexistent-endpoint\n2. Parse JSON response",
+                        "Non-JSON response",
+                        "Valid JSON error response",
+                        "Medium",
+                        "Error Handling"
+                    )
+        except Exception as e:
+            self.add_issue(
+                "ERR-004",
+                "middleware/error_handlers.py",
+                f"Error handling test causes exception: {str(e)}",
+                "1. Send GET /nonexistent-endpoint",
+                str(e),
+                "404 error response",
+                "Medium",
+                "Error Handling"
+            )
+
+    def test_input_validation(self):
+        """Test input validation across endpoints"""
+        print("✅ Testing input validation...")
+        
+        # Test various invalid inputs
+        invalid_inputs = [
+            {"endpoint": "/search", "params": {"limit": -1}, "expected_issue": "Negative limit accepted"},
+            {"endpoint": "/search", "params": {"limit": "invalid"}, "expected_issue": "Non-numeric limit accepted"},
+            {"endpoint": "/search", "params": {"offset": -1}, "expected_issue": "Negative offset accepted"},
+            {"endpoint": "/scholarships/", "params": {}, "expected_issue": "Empty scholarship ID accepted"}
+        ]
+        
+        for test_case in invalid_inputs:
+            try:
+                response = requests.get(f"{self.base_url}{test_case['endpoint']}", params=test_case['params'])
+                if response.status_code == 200:
+                    self.add_issue(
+                        f"VAL-{hash(str(test_case)) % 1000:03d}",
+                        "Input validation",
+                        test_case['expected_issue'],
+                        f"1. Send GET {test_case['endpoint']} with params {test_case['params']}\n2. Check response",
+                        f"Status: {response.status_code} (accepted invalid input)",
+                        "Status: 422 with validation error",
+                        "Medium",
+                        "Input Validation"
                     )
             except Exception as e:
-                self.add_issue(
-                    "CONFIG-003",
-                    "config/settings.py",
-                    "Settings loading throws exception",
-                    "Import and instantiate settings",
-                    f"Exception: {str(e)}",
-                    "Settings load without exceptions",
-                    "Critical"
-                )
+                pass  # Expected for some invalid inputs
+
+    def test_performance_edge_cases(self):
+        """Test performance and edge cases"""
+        print("⚡ Testing performance edge cases...")
         
+        # Test very large response handling
+        try:
+            response = requests.get(f"{self.base_url}/search?limit=10000")
+            if response.status_code == 500:
+                self.add_issue(
+                    "PERF-001",
+                    "services/search_service.py",
+                    "Very large limit causes server error",
+                    "1. Send GET /search?limit=10000\n2. Check response",
+                    f"Status: {response.status_code}",
+                    "Status: 200 with results or 400 with limit validation",
+                    "Medium",
+                    "Performance"
+                )
         except Exception as e:
             self.add_issue(
-                "CONFIG-004",
-                "Configuration system",
-                "Configuration testing throws unexpected exception",
-                "Test configuration and environment setup",
-                f"Exception: {str(e)}",
-                "Configuration testing completes without exceptions",
-                "Medium"
+                "PERF-002",
+                "services/search_service.py",
+                f"Large limit causes exception: {str(e)}",
+                "1. Send GET /search?limit=10000",
+                str(e),
+                "Graceful handling of large limits",
+                "Medium",
+                "Performance"
             )
-    
+
+    def test_cors_security(self):
+        """Test CORS configuration"""
+        print("🌐 Testing CORS security...")
+        
+        try:
+            headers = {
+                "Origin": "https://malicious-site.com",
+                "Access-Control-Request-Method": "GET"
+            }
+            response = requests.options(f"{self.base_url}/search", headers=headers)
+            
+            # Check CORS headers
+            cors_headers = response.headers.get("Access-Control-Allow-Origin", "")
+            if cors_headers == "*":
+                self.add_issue(
+                    "CORS-001",
+                    "main.py CORS configuration",
+                    "CORS allows all origins (*) which is a security risk",
+                    "1. Send OPTIONS request with malicious origin\n2. Check CORS headers",
+                    f"Access-Control-Allow-Origin: {cors_headers}",
+                    "Specific allowed origins, not wildcard",
+                    "High",
+                    "Security"
+                )
+        except Exception as e:
+            self.add_issue(
+                "CORS-002",
+                "CORS configuration",
+                f"CORS test causes exception: {str(e)}",
+                "1. Send OPTIONS request to test CORS",
+                str(e),
+                "CORS headers response",
+                "Medium",
+                "Security"
+            )
+
+    def run_comprehensive_analysis(self):
+        """Run all QA tests and generate comprehensive report"""
+        print("🚀 Starting Comprehensive QA Analysis")
+        print("=" * 80)
+        
+        if not self.test_server_availability():
+            print("❌ Server not available - stopping analysis")
+            return
+        
+        # Run all test categories
+        test_methods = [
+            self.test_api_documentation,
+            self.test_search_functionality,
+            self.test_eligibility_functionality,
+            self.test_ai_functionality,
+            self.test_database_endpoints,
+            self.test_authentication_security,
+            self.test_rate_limiting,
+            self.test_error_handling,
+            self.test_input_validation,
+            self.test_performance_edge_cases,
+            self.test_cors_security
+        ]
+        
+        for test_method in test_methods:
+            try:
+                test_method()
+                time.sleep(0.1)  # Brief pause between tests
+            except Exception as e:
+                self.add_issue(
+                    f"TEST-{hash(test_method.__name__) % 1000:03d}",
+                    test_method.__name__,
+                    f"Test method failed with exception: {str(e)}",
+                    f"1. Run {test_method.__name__}",
+                    str(e),
+                    "Successful test execution",
+                    "High",
+                    "Test Framework"
+                )
+        
+        self.generate_report()
+
     def generate_report(self):
         """Generate comprehensive QA report"""
+        end_time = datetime.now()
+        duration = end_time - self.start_time
         
-        # Execute all test suites
-        print("🚀 Starting Comprehensive QA Analysis...")
+        # Categorize issues by severity
+        critical_issues = [i for i in self.issues if i.severity == "Critical"]
+        high_issues = [i for i in self.issues if i.severity == "High"]
+        medium_issues = [i for i in self.issues if i.severity == "Medium"]
+        low_issues = [i for i in self.issues if i.severity == "Low"]
         
-        self.test_basic_connectivity()
-        token = self.test_authentication_system()
-        self.test_database_integration()
-        self.test_scholarship_endpoints(token)
-        self.test_eligibility_system(token)
-        self.test_edge_cases_and_input_validation(token)
-        self.test_rate_limiting(token)
-        self.test_observability_features()
-        self.test_configuration_and_environment()
+        # Generate summary
+        print("\n" + "=" * 80)
+        print("📋 COMPREHENSIVE QA ANALYSIS REPORT")
+        print("=" * 80)
+        print(f"Analysis Duration: {duration}")
+        print(f"Total Issues Found: {len(self.issues)}")
+        print(f"Critical: {len(critical_issues)} | High: {len(high_issues)} | Medium: {len(medium_issues)} | Low: {len(low_issues)}")
+        print("\n" + "=" * 80)
         
-        # Generate summary statistics
-        total_issues = len(self.issues)
-        severity_counts = {}
-        category_counts = {}
-        
-        for issue in self.issues:
-            severity = issue['severity']
-            category = issue['category']
-            
-            severity_counts[severity] = severity_counts.get(severity, 0) + 1
-            category_counts[category] = category_counts.get(category, 0) + 1
-        
-        # Generate report
-        report = {
-            "qa_analysis_metadata": {
-                "analysis_date": datetime.now().isoformat(),
-                "total_issues_found": total_issues,
-                "severity_breakdown": severity_counts,
-                "category_breakdown": category_counts,
-                "qa_engineer": "Senior QA Engineer (Automated Analysis)",
-                "analysis_scope": "Full codebase analysis with comprehensive testing"
+        # Generate detailed report
+        report_data = {
+            "analysis_metadata": {
+                "timestamp": self.start_time.isoformat(),
+                "duration_seconds": duration.total_seconds(),
+                "total_issues": len(self.issues)
             },
-            "executive_summary": {
-                "critical_issues": len([i for i in self.issues if i['severity'] == 'Critical']),
-                "high_priority_issues": len([i for i in self.issues if i['severity'] == 'High']),
-                "medium_priority_issues": len([i for i in self.issues if i['severity'] == 'Medium']),
-                "low_priority_issues": len([i for i in self.issues if i['severity'] == 'Low']),
-                "overall_system_health": "Needs Review" if total_issues > 0 else "Healthy"
+            "summary": {
+                "critical": len(critical_issues),
+                "high": len(high_issues),
+                "medium": len(medium_issues),
+                "low": len(low_issues)
             },
-            "detailed_issues": self.issues,
-            "recommendations": [
-                "Address all Critical and High severity issues immediately",
-                "Implement comprehensive input validation for all endpoints",
-                "Add missing error handling for edge cases",
-                "Ensure proper security measures against injection attacks",
-                "Verify all environment variables are properly configured",
-                "Consider implementing more robust rate limiting",
-                "Add comprehensive logging for debugging purposes"
-            ]
+            "issues": []
         }
         
-        return report
+        # Print and collect detailed issues
+        for severity, issues in [("Critical", critical_issues), ("High", high_issues), 
+                               ("Medium", medium_issues), ("Low", low_issues)]:
+            if issues:
+                print(f"\n🚨 {severity.upper()} SEVERITY ISSUES:")
+                print("-" * 50)
+                
+                for issue in issues:
+                    print(f"\nIssue ID: {issue.issue_id}")
+                    print(f"Location: {issue.location}")
+                    print(f"Category: {issue.category}")
+                    print(f"Description: {issue.description}")
+                    print(f"Steps to Reproduce:\n{issue.steps_to_reproduce}")
+                    print(f"Observed Output: {issue.observed_output}")
+                    print(f"Expected Output: {issue.expected_output}")
+                    print("-" * 30)
+                    
+                    # Add to JSON report
+                    report_data["issues"].append({
+                        "issue_id": issue.issue_id,
+                        "location": issue.location,
+                        "description": issue.description,
+                        "steps_to_reproduce": issue.steps_to_reproduce,
+                        "observed_output": issue.observed_output,
+                        "expected_output": issue.expected_output,
+                        "severity": issue.severity,
+                        "category": issue.category
+                    })
+        
+        # Save JSON report
+        with open("comprehensive_qa_report.json", "w") as f:
+            json.dump(report_data, f, indent=2)
+        
+        print(f"\n📄 Detailed report saved to: comprehensive_qa_report.json")
+        print("=" * 80)
+        
+        return report_data
 
 def main():
-    """Main QA analysis execution"""
-    qa_generator = QAReportGenerator()
-    
-    try:
-        report = qa_generator.generate_report()
-        
-        # Save report to file
-        with open("comprehensive_qa_report.json", "w") as f:
-            json.dump(report, f, indent=2)
-        
-        # Print summary
-        print("\n" + "="*80)
-        print("🎯 COMPREHENSIVE QA ANALYSIS REPORT")
-        print("="*80)
-        print(f"📊 Total Issues Found: {report['qa_analysis_metadata']['total_issues_found']}")
-        print(f"🔴 Critical: {report['executive_summary']['critical_issues']}")
-        print(f"🟠 High: {report['executive_summary']['high_priority_issues']}")
-        print(f"🟡 Medium: {report['executive_summary']['medium_priority_issues']}")
-        print(f"🟢 Low: {report['executive_summary']['low_priority_issues']}")
-        print(f"💡 Overall System Health: {report['executive_summary']['overall_system_health']}")
-        print("\n📋 Detailed report saved to: comprehensive_qa_report.json")
-        print("="*80)
-        
-        # Print first few issues as examples
-        if report['detailed_issues']:
-            print("\n🔍 Sample Issues Found:")
-            for issue in report['detailed_issues'][:3]:  # Show first 3 issues
-                print(f"\n  ID: {issue['issue_id']}")
-                print(f"  Severity: {issue['severity']}")
-                print(f"  Location: {issue['location']}")
-                print(f"  Description: {issue['description']}")
-        
-        return report
-        
-    except Exception as e:
-        print(f"❌ QA Analysis failed with exception: {str(e)}")
-        print(f"Traceback: {traceback.format_exc()}")
-        return None
+    """Run comprehensive QA analysis"""
+    analyzer = ComprehensiveQAAnalyzer()
+    analyzer.run_comprehensive_analysis()
 
 if __name__ == "__main__":
-    report = main()
-    sys.exit(0 if report else 1)
+    main()
