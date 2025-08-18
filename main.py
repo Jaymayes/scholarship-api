@@ -18,6 +18,7 @@ from routers.health import router as health_router
 from routers.ai import router as ai_router
 from routers.db_status import router as db_status_router
 from routers.replit_health import router as replit_health_router
+from routers.agent import router as agent_router
 from middleware.error_handling import (
     api_error_handler, http_exception_handler, validation_exception_handler,
     rate_limit_exception_handler, general_exception_handler, trace_id_middleware,
@@ -161,6 +162,30 @@ app.include_router(health_router)
 app.include_router(replit_health_router, tags=["health"])
 app.include_router(ai_router, tags=["ai"])
 app.include_router(db_status_router)
+app.include_router(agent_router, tags=["agent"])  # Agent Bridge for Command Center integration
+
+# Agent Bridge startup event
+@app.on_event("startup")
+async def startup_event():
+    """Initialize agent bridge and register with Command Center"""
+    from services.orchestrator_service import orchestrator_service
+    
+    logger.info("🔗 Initializing Agent Bridge for Command Center integration")
+    
+    # Register with Command Center on startup
+    try:
+        await orchestrator_service.register_with_command_center()
+        logger.info("✅ Agent Bridge startup completed")
+    except Exception as e:
+        logger.warning(f"⚠️ Command Center registration failed (will retry): {e}")
+
+@app.on_event("shutdown") 
+async def shutdown_event():
+    """Clean up agent bridge resources"""
+    from services.orchestrator_service import orchestrator_service
+    
+    logger.info("🔌 Shutting down Agent Bridge")
+    await orchestrator_service.close()
 
 # QA-003 fix: Include interaction wrapper endpoints  
 from routers.interaction_wrapper import router as interaction_wrapper_router

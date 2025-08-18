@@ -1,6 +1,10 @@
 # Overview
 
-This project is a Scholarship Discovery & Search API built with FastAPI. Its primary purpose is to serve as a system-of-record for scholarships, offering advanced search, filtering, and eligibility checking. The system uses semantic and keyword search to match user profiles against eligibility criteria, provides analytics on user interactions, and feeds APIs for Student Dashboards and Landing Pages. The business vision is to provide a comprehensive, intelligent platform that connects students with relevant scholarships, aiming to become a leading solution in the scholarship search market.
+This project is a Scholarship Discovery & Search API built with FastAPI. Its primary purpose is to serve as a system-of-record for scholarships, offering advanced search, filtering, and eligibility checking. The system uses semantic and keyword search to match user profiles against eligibility criteria, provides analytics on user interactions, and feeds APIs for Student Dashboards and Landing Pages. 
+
+**NEW: Agent Bridge Integration** - The API now includes orchestration capabilities through the Agent Bridge, enabling it to participate in distributed workflows coordinated by the Auto Command Center. This allows the scholarship service to be orchestrated alongside other services like Auto Page Maker, Student Pilot, and Scholarship Sage for complex multi-service workflows.
+
+The business vision is to provide a comprehensive, intelligent platform that connects students with relevant scholarships, aiming to become a leading solution in the scholarship search market with enterprise-grade orchestration capabilities.
 
 # User Preferences
 
@@ -8,15 +12,16 @@ Preferred communication style: Simple, everyday language.
 
 # Recent Changes
 
-## 2025-08-18 - Deployment Ready Implementation
-- **DEPLOYMENT FIX**: Created production start script (`start.sh`) with proper uvicorn command
-- **HEALTH CHECKS**: Added `/healthz` endpoint for deployment probes (returns fast 200 OK)
-- **PORT BINDING**: Enhanced port configuration to support `$PORT` environment variable for deployments
-- **SECURITY**: Added Replit deployment domains (`*.replit.app`, `*.replit.dev`) to ALLOWED_HOSTS defaults
-- **DOCUMENTATION**: Created comprehensive deployment guide (`README_DEPLOYMENT.md`)
-- **RATE LIMITING**: Exempted health check endpoints (`/healthz`, `/health`, `/`) from rate limiting
-- **ROOT ENDPOINT**: Updated to reference `/healthz` as primary health check for deployment consistency
-- All security controls and unified error schema preserved during deployment optimization
+## 2025-08-18 - Agent Bridge Implementation for Command Center Integration  
+- **ORCHESTRATION**: Implemented FastAPI Agent Bridge for Auto Command Center integration
+- **TASK EXECUTION**: Added `/agent/task` endpoint for receiving and executing orchestrated tasks
+- **SERVICE REGISTRY**: Added `/agent/capabilities` and `/agent/health` endpoints for service discovery
+- **JWT SECURITY**: JWT-based authentication for secure inter-service communication with Command Center
+- **ASYNC PROCESSING**: Background task execution with result callbacks to Command Center
+- **EVENT PUBLISHING**: Event bus integration for task lifecycle and execution metrics
+- **SEARCH INTEGRATION**: Map `scholarship_api.search` action to existing search functionality
+- **BACKWARD COMPATIBILITY**: All existing endpoints preserved, Agent Bridge is additive enhancement
+- **DOCUMENTATION**: Complete Agent Bridge integration guide and configuration documentation
 
 ## 2025-08-18 - Authentication Bug Fix
 - Fixed critical authentication middleware APIError constructor signature mismatch

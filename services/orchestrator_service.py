@@ -1,0 +1,431 @@
+"""
+Orchestrator Service for Agent Bridge functionality
+Handles task execution, heartbeat registration, and event publishing
+"""
+
+import asyncio
+import time
+import uuid
+from datetime import datetime
+from typing import Dict, Any, Optional
+import httpx
+import jwt
+from fastapi import BackgroundTasks
+from pydantic import ValidationError
+
+from config.settings import settings
+from schemas.orchestrator import (
+    Task, TaskResult, Event, TaskStatus, EventType, 
+    SearchTaskPayload, AgentCapabilities, HeartbeatRequest
+)
+from services.search_service import SearchService
+from services.eligibility_service import EligibilityService
+from utils.logger import setup_logger
+
+logger = setup_logger()
+
+
+class OrchestratorService:
+    """Service for handling orchestrator integration"""
+    
+    def __init__(self):
+        # Initialize services lazily to avoid circular imports
+        self._search_service = None
+        self._eligibility_service = None
+        self.agent_capabilities = [
+            "scholarship_api.search",
+            "scholarship_api.eligibility_check", 
+            "scholarship_api.recommendations"
+        ]
+        self._http_client: Optional[httpx.AsyncClient] = None
+    
+    async def get_http_client(self) -> httpx.AsyncClient:
+        """Get or create async HTTP client"""
+        if self._http_client is None:
+            self._http_client = httpx.AsyncClient(
+                timeout=httpx.Timeout(30.0),
+                limits=httpx.Limits(max_connections=10, max_keepalive_connections=5)
+            )
+        return self._http_client
+    
+    @property
+    def search_service(self):
+        """Lazy loading of search service"""
+        if self._search_service is None:
+            from services.search_service import SearchService
+            self._search_service = SearchService()
+        return self._search_service
+    
+    @property  
+    def eligibility_service(self):
+        """Lazy loading of eligibility service"""
+        if self._eligibility_service is None:
+            from services.eligibility_service import EligibilityService
+            self._eligibility_service = EligibilityService()
+        return self._eligibility_service
+
+    async def close(self):
+        """Close HTTP client connection"""
+        if self._http_client:
+            await self._http_client.aclose()
+            self._http_client = None
+    
+    def get_capabilities(self) -> AgentCapabilities:
+        """Get agent capabilities and status"""
+        return AgentCapabilities(
+            agent_id=settings.agent_id,
+            name=settings.api_title,
+            capabilities=self.agent_capabilities,
+            version=settings.api_version,
+            health="healthy"
+        )
+    
+    def create_jwt_token(self, payload: Dict[str, Any]) -> str:
+        """Create JWT token for Command Center authentication"""
+        if not settings.agent_shared_secret:
+            raise ValueError("SHARED_SECRET not configured for agent authentication")
+        
+        token_payload = {
+            **payload,
+            "iss": settings.jwt_issuer,
+            "aud": settings.jwt_audience,
+            "iat": int(time.time()),
+            "exp": int(time.time()) + 300  # 5 minute expiry
+        }
+        
+        return jwt.encode(
+            token_payload,
+            settings.agent_shared_secret,
+            algorithm="HS256"
+        )
+    
+    def verify_jwt_token(self, token: str) -> Dict[str, Any]:
+        """Verify incoming JWT token from Command Center"""
+        if not settings.agent_shared_secret:
+            raise ValueError("SHARED_SECRET not configured for agent authentication")
+        
+        try:
+            payload = jwt.decode(
+                token,
+                settings.agent_shared_secret,
+                algorithms=["HS256"],
+                issuer=settings.jwt_issuer,
+                audience=settings.jwt_audience
+            )
+            return payload
+        except jwt.InvalidTokenError as e:
+            logger.error(f"JWT token verification failed: {e}")
+            raise ValueError(f"Invalid JWT token: {e}")
+    
+    async def register_with_command_center(self):
+        """Register agent with Command Center"""
+        if not settings.command_center_url or not settings.agent_shared_secret:
+            logger.warning("Command Center URL or shared secret not configured, skipping registration")
+            return
+        
+        try:
+            client = await self.get_http_client()
+            
+            # Create registration payload
+            registration = HeartbeatRequest(
+                agent_id=settings.agent_id,
+                name=settings.agent_name,
+                base_url=settings.agent_base_url or f"http://localhost:{settings.port}",
+                capabilities=self.agent_capabilities
+            )
+            
+            # Create JWT token for authentication
+            token = self.create_jwt_token({
+                "agent_id": settings.agent_id,
+                "action": "register"
+            })
+            
+            headers = {
+                "Authorization": f"Bearer {token}",
+                "Content-Type": "application/json",
+                "X-Agent-Id": settings.agent_id
+            }
+            
+            # Register with Command Center
+            register_url = f"{settings.command_center_url.rstrip('/')}/orchestrator/register"
+            response = await client.post(
+                register_url,
+                json=registration.model_dump(),
+                headers=headers
+            )
+            
+            if response.status_code == 200:
+                logger.info(f"Successfully registered with Command Center at {register_url}")
+            else:
+                logger.error(f"Registration failed: {response.status_code} - {response.text}")
+                
+        except Exception as e:
+            logger.error(f"Failed to register with Command Center: {e}")
+    
+    async def send_heartbeat(self):
+        """Send heartbeat to Command Center"""
+        if not settings.command_center_url or not settings.agent_shared_secret:
+            return
+        
+        try:
+            client = await self.get_http_client()
+            
+            heartbeat = HeartbeatRequest(
+                agent_id=settings.agent_id,
+                name=settings.agent_name,
+                base_url=settings.agent_base_url or f"http://localhost:{settings.port}",
+                capabilities=self.agent_capabilities
+            )
+            
+            token = self.create_jwt_token({
+                "agent_id": settings.agent_id,
+                "action": "heartbeat"
+            })
+            
+            headers = {
+                "Authorization": f"Bearer {token}",
+                "Content-Type": "application/json",
+                "X-Agent-Id": settings.agent_id
+            }
+            
+            heartbeat_url = f"{settings.command_center_url.rstrip('/')}/orchestrator/heartbeat"
+            response = await client.post(
+                heartbeat_url,
+                json=heartbeat.model_dump(),
+                headers=headers
+            )
+            
+            if response.status_code != 200:
+                logger.warning(f"Heartbeat failed: {response.status_code} - {response.text}")
+                
+        except Exception as e:
+            logger.warning(f"Failed to send heartbeat: {e}")
+    
+    async def send_task_result(self, result: TaskResult):
+        """Send task result back to Command Center"""
+        if not settings.command_center_url or not settings.agent_shared_secret:
+            logger.warning("Command Center not configured, cannot send result")
+            return
+        
+        try:
+            client = await self.get_http_client()
+            
+            token = self.create_jwt_token({
+                "agent_id": settings.agent_id,
+                "action": "callback",
+                "task_id": result.task_id
+            })
+            
+            headers = {
+                "Authorization": f"Bearer {token}",
+                "Content-Type": "application/json",
+                "X-Agent-Id": settings.agent_id,
+                "X-Trace-Id": result.trace_id
+            }
+            
+            callback_url = f"{settings.command_center_url.rstrip('/')}/orchestrator/tasks/{result.task_id}/callback"
+            response = await client.post(
+                callback_url,
+                json=result.model_dump(),
+                headers=headers
+            )
+            
+            if response.status_code == 200:
+                logger.info(f"Task result sent for {result.task_id}: {result.status}")
+            else:
+                logger.error(f"Failed to send task result: {response.status_code} - {response.text}")
+                
+        except Exception as e:
+            logger.error(f"Failed to send task result: {e}")
+    
+    async def publish_event(self, event: Event):
+        """Publish event to Command Center"""
+        if not settings.command_center_url or not settings.agent_shared_secret:
+            return
+        
+        try:
+            client = await self.get_http_client()
+            
+            token = self.create_jwt_token({
+                "agent_id": settings.agent_id,
+                "action": "event",
+                "event_id": event.event_id
+            })
+            
+            headers = {
+                "Authorization": f"Bearer {token}",
+                "Content-Type": "application/json",
+                "X-Agent-Id": settings.agent_id,
+                "X-Trace-Id": event.trace_id or ""
+            }
+            
+            events_url = f"{settings.command_center_url.rstrip('/')}/orchestrator/events"
+            response = await client.post(
+                events_url,
+                json=event.model_dump(),
+                headers=headers
+            )
+            
+            if response.status_code != 200:
+                logger.warning(f"Failed to publish event: {response.status_code} - {response.text}")
+                
+        except Exception as e:
+            logger.warning(f"Failed to publish event: {e}")
+    
+    async def execute_task(self, task: Task) -> TaskResult:
+        """Execute incoming task and return result"""
+        start_time = time.time()
+        
+        # Publish task received event
+        await self.publish_event(Event(
+            event_id=str(uuid.uuid4()),
+            type=EventType.TASK_RECEIVED,
+            source=settings.agent_id,
+            data={
+                "task_id": task.task_id,
+                "action": task.action,
+                "requested_by": task.requested_by
+            },
+            trace_id=task.trace_id
+        ))
+        
+        try:
+            # Route task to appropriate handler
+            if task.action == "scholarship_api.search":
+                result_data = await self._handle_search_task(task)
+            elif task.action == "scholarship_api.eligibility_check":
+                result_data = await self._handle_eligibility_task(task)
+            elif task.action == "scholarship_api.recommendations":
+                result_data = await self._handle_recommendations_task(task)
+            else:
+                raise ValueError(f"Unsupported action: {task.action}")
+            
+            execution_time = int((time.time() - start_time) * 1000)
+            
+            # Create successful result
+            result = TaskResult(
+                task_id=task.task_id,
+                status=TaskStatus.SUCCEEDED,
+                result=result_data,
+                trace_id=task.trace_id,
+                execution_time_ms=execution_time
+            )
+            
+            # Publish task completed event
+            await self.publish_event(Event(
+                event_id=str(uuid.uuid4()),
+                type=EventType.TASK_COMPLETED,
+                source=settings.agent_id,
+                data={
+                    "task_id": task.task_id,
+                    "action": task.action,
+                    "execution_time_ms": execution_time,
+                    "result_size": len(str(result_data))
+                },
+                trace_id=task.trace_id
+            ))
+            
+            return result
+            
+        except Exception as e:
+            execution_time = int((time.time() - start_time) * 1000)
+            
+            logger.error(f"Task execution failed for {task.task_id}: {e}")
+            
+            # Create failed result
+            result = TaskResult(
+                task_id=task.task_id,
+                status=TaskStatus.FAILED,
+                error={
+                    "code": "EXECUTION_ERROR",
+                    "message": str(e),
+                    "details": {"action": task.action}
+                },
+                trace_id=task.trace_id,
+                execution_time_ms=execution_time
+            )
+            
+            # Publish task failed event
+            await self.publish_event(Event(
+                event_id=str(uuid.uuid4()),
+                type=EventType.TASK_FAILED,
+                source=settings.agent_id,
+                data={
+                    "task_id": task.task_id,
+                    "action": task.action,
+                    "error": str(e),
+                    "execution_time_ms": execution_time
+                },
+                trace_id=task.trace_id
+            ))
+            
+            return result
+    
+    async def _handle_search_task(self, task: Task) -> Dict[str, Any]:
+        """Handle scholarship search task"""
+        try:
+            # Validate and parse search payload
+            search_payload = SearchTaskPayload(**task.payload)
+            
+            # Execute search using existing service
+            # For now, use synchronous search - can be made async later
+            from services.scholarship_service import scholarship_service
+            search_result = scholarship_service.search_scholarships(
+                keyword=search_payload.query,
+                fields_of_study=search_payload.filters.get("fields_of_study", []),
+                min_amount=search_payload.filters.get("min_amount"),
+                max_amount=search_payload.filters.get("max_amount"),
+                scholarship_types=search_payload.filters.get("scholarship_types", []),
+                states=search_payload.filters.get("states", []),
+                min_gpa=search_payload.filters.get("min_gpa"),
+                citizenship=search_payload.filters.get("citizenship"),
+                deadline_after=search_payload.filters.get("deadline_after"),
+                deadline_before=search_payload.filters.get("deadline_before"),
+                limit=search_payload.pagination.get("size", 10),
+                offset=(search_payload.pagination.get("page", 1) - 1) * search_payload.pagination.get("size", 10)
+            )
+            
+            # Publish search executed event
+            await self.publish_event(Event(
+                event_id=str(uuid.uuid4()),
+                type=EventType.SEARCH_EXECUTED,
+                source=settings.agent_id,
+                data={
+                    "query": search_payload.query,
+                    "filters": search_payload.filters,
+                    "results_count": len(search_result.get("items", [])),
+                    "total_available": search_result.get("total", 0)
+                },
+                trace_id=task.trace_id
+            ))
+            
+            return search_result
+            
+        except ValidationError as e:
+            raise ValueError(f"Invalid search payload: {e}")
+        except Exception as e:
+            raise ValueError(f"Search execution failed: {e}")
+    
+    async def _handle_eligibility_task(self, task: Task) -> Dict[str, Any]:
+        """Handle eligibility check task"""
+        # Placeholder for eligibility checking
+        # Would integrate with existing eligibility service
+        return {
+            "eligible": True,
+            "score": 0.85,
+            "reasons": ["GPA meets requirements", "Field of study matches"]
+        }
+    
+    async def _handle_recommendations_task(self, task: Task) -> Dict[str, Any]:
+        """Handle recommendations task"""
+        # Placeholder for recommendations
+        # Would integrate with existing recommendation service
+        return {
+            "recommendations": [],
+            "total": 0,
+            "algorithm": "content_based"
+        }
+
+
+# Global orchestrator service instance
+orchestrator_service = OrchestratorService()

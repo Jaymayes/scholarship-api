@@ -8,6 +8,7 @@ The Scholarship Discovery & Search API is a production-ready FastAPI application
 • Advanced semantic and keyword scholarship search with filtering
 • AI-powered eligibility analysis, search enhancement, and trend insights  
 • Comprehensive analytics and user interaction tracking
+• **Agent Bridge for Command Center orchestration and multi-service workflows**
 • Multi-layered security with JWT authentication, rate limiting, and request validation
 • Production-ready deployment with health checks and monitoring
 • RESTful API with OpenAPI documentation and unified error handling
@@ -88,6 +89,14 @@ The Scholarship Discovery & Search API is a production-ready FastAPI application
 - **GET /docs** - Interactive OpenAPI documentation (Swagger UI)
 - **GET /redoc** - Alternative API documentation (ReDoc)
 - **GET /_debug/config** - Configuration debug (development only)
+
+### Agent Bridge Endpoints (NEW)
+
+- **POST /agent/task** - Receive tasks from Command Center (JWT protected)
+- **GET /agent/capabilities** - Return agent capabilities and status
+- **GET /agent/health** - Agent health with orchestrator context
+- **POST /agent/register** - Handle Command Center registration (JWT protected)
+- **POST /agent/events** - Accept events for Command Center forwarding
 
 ### Legacy/Compatibility Endpoints
 

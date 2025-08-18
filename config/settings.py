@@ -107,6 +107,15 @@ class Settings(BaseSettings):
     # Feature flag for public read endpoints (authentication bypass)
     public_read_endpoints: bool = Field(True, alias="PUBLIC_READ_ENDPOINTS")  # Default to True for dev
     
+    # Agent Orchestration Configuration
+    command_center_url: Optional[str] = Field(None, alias="COMMAND_CENTER_URL")
+    agent_shared_secret: Optional[str] = Field(None, alias="SHARED_SECRET") 
+    agent_name: str = Field("scholarship_api", alias="AGENT_NAME")
+    agent_id: str = Field("scholarship_api", alias="AGENT_ID")
+    agent_base_url: Optional[str] = Field(None, alias="AGENT_BASE_URL")
+    jwt_issuer: str = Field("auto-com-center", alias="JWT_ISSUER")
+    jwt_audience: str = Field("scholar-sync-agents", alias="JWT_AUDIENCE")
+    
     # Rate limiting backend requirements (production-aware)  
     disable_rate_limit_backend: bool = Field(False, alias="DISABLE_RATE_LIMIT_BACKEND")
     
