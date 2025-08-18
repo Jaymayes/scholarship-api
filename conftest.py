@@ -17,9 +17,9 @@ def setup_test_environment():
         'PUBLIC_READ_ENDPOINTS': 'true',
         'DEBUG': 'true',
         'JWT_SECRET_KEY': 'test-secret-key-at-least-32-chars-long-for-testing-purposes',
-        'ALLOWED_HOSTS': '',
-        'TRUSTED_PROXY_IPS': '',
-        'CORS_ALLOWED_ORIGINS': ''
+        'ALLOWED_HOSTS': '[]',
+        'TRUSTED_PROXY_IPS': '[]',
+        'CORS_ALLOWED_ORIGINS': '*'
     }
     
     # Save originals and set test values

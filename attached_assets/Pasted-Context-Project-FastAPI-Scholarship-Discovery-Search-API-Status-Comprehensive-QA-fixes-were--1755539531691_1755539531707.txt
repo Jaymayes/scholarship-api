@@ -1,0 +1,99 @@
+Context
+Project: FastAPI “Scholarship Discovery & Search API”
+Status: Comprehensive QA fixes were implemented (env-aware config, aggregated config errors, templates, HSTS, type-safety, zero-config dev). Current verification shows 6/7 tests passing (≈85.7%); at least one failing test remains. Screenshot shows a minimal status payload {"status":"active"} but we need full functional verification and to resolve the remaining issues.
+
+Non‑negotiables
+
+Do not loosen any security controls.
+Preserve middleware order and behavior.
+Preserve the unified error schema: { code, message, status, timestamp, trace_id, details? }
+Keep production rules strict; development flexible.
+Your Goals
+
+Identify and fix all remaining errors/bugs causing the test failure(s) and any runtime edge cases.
+Ensure configuration detection is correct and stable across dev/prod.
+Keep docs accessibility behavior: dev allowed, prod disabled unless explicitly enabled.
+Guarantee trace_id is present on all error responses; no double-encoding anywhere.
+Finalize dependency and deployment ergonomics.
+Immediate Actions
+
+Run full tests and static checks
+pytest -q
+If the repo uses ruff/flake8 and mypy/pyright, run them and fix reported issues.
+Paste the first failing traceback(s) and fix the root cause, not the test, unless the test contradicts the documented contract.
+2. Runtime smoke (development)
+
+Start app with ENVIRONMENT=development.
+Verify:
+/healthz, /health/database, /health/services → 200
+/search and /scholarships without auth → 401; with valid token → 200
+Oversized body → 413; overly long URL → 414
+Exceed rate limit → 429 with headers (X-RateLimit-Limit, X-RateLimit-Remaining, Retry-After)
+OPTIONS preflight succeeds and is not rate-limited
+CORS allows Replit preview origin in dev; in prod, strict whitelist and no wildcard
+Bug Hotspots to Audit and Fix
+
+Remaining failing test
+
+Align response models with actual payloads (avoid Pydantic response validation errors).
+Confirm recent field renames (e.g., recommendation_score vs match_score) are consistent in serializers, schemas, and tests.
+Error handling
+
+Ensure centralized error builder is used; no json.dumps or str() double-encoding.
+All error responses include trace_id and application/json content-type.
+Config and environment detection
+
+Ensure ENVIRONMENT defaults to “development” unless explicitly set to “production”.
+STRICT_CONFIG_VALIDATION only true in production (or when explicitly enabled).
+Aggregated error messages in prod startup failures; warnings (not failures) in dev.
+Docs access
+
+Dev: /docs, /redoc, /openapi.json accessible.
+Prod: disabled unless ENABLE_DOCS=true (return 404 otherwise). Add tests if missing.
+HSTS and security headers
+
+HSTS enabled only when ENVIRONMENT=production and ENABLE_HSTS=true; document that HTTPS termination is required.
+Verify no duplicate or conflicting headers.
+Rate limiter behavior
+
+OPTIONS excluded from limiting.
+Identity function uses request.client.host and respects X-Forwarded-For only if trusted proxies configured.
+429 uses unified error schema and includes standard headers.
+Database/session safety
+
+Health check uses SessionLocal() and SELECT 1; catches OperationalError and returns 503 with unified error.
+Dependencies use yield and close sessions; avoid KeyError by explicit serialization or .get defaults.
+Dependency management
+
+Ensure requirements.txt exists and is in sync with pyproject (export if using Poetry).
+Pin compatible passlib[bcrypt] and bcrypt to avoid runtime warnings.
+Port binding and run config
+
+Bind host 0.0.0.0 and port int(os.getenv("PORT", 8000)) for Replit/containers.
+Tests to Add/Adjust
+
+The failing test’s area: add/adjust unit/integration tests to reflect the intended, documented contract.
+Dev vs prod config behavior:
+Dev with partial config starts and warns.
+Prod missing critical config fails fast with aggregated error message.
+Docs access behavior: dev allowed; prod 404 unless enabled.
+Error responses: 401/403/404/413/414/422/429/500 return unified schema with trace_id; response.json() returns a dict.
+CORS preflight allowed/disallowed origin cases.
+Rate limit headers presence and OPTIONS exclusion.
+Acceptance Criteria
+
+pytest -q passes 100% locally and in Replit; no flakiness.
+No error response is double-encoded; all errors include trace_id with application/json content-type.
+ENVIRONMENT detection correct; STRICT_CONFIG_VALIDATION only on in production (or when forced).
+Docs behavior correct per environment.
+HSTS enabled in production only when configured.
+Rate limiting consistent across environments; 429 includes standard headers; OPTIONS not limited.
+requirements.txt present and accurate; Docker/CI can install deps without Poetry.
+No regressions to authentication, CORS, or unified error format.
+Deliverables
+
+Code fixes with brief inline comments for non-obvious choices.
+Updated/added tests covering the fixed areas.
+requirements.txt (exported or aligned with pyproject).
+README notes if any behavior or configuration flags changed.
+Start by running pytest -q, paste the first failing traceback, and fix iteratively until the suite is fully green while keeping all security guarantees unchanged.

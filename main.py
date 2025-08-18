@@ -195,10 +195,14 @@ async def api_status():
     }
 
 @app.get("/health")
-@app.head("/health")
-async def health_check():
+@app.head("/health") 
+async def health_check(request: Request):
     """Health check endpoint - fast response for deployment monitoring"""
-    return {"status": "healthy"}
+    from utils.error_utils import get_trace_id
+    return {
+        "status": "healthy",
+        "trace_id": get_trace_id(request)
+    }
 
 @app.get("/favicon.ico")
 async def favicon():

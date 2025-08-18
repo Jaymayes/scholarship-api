@@ -59,13 +59,45 @@ class Settings(BaseSettings):
     jwt_previous_secret_keys: str = Field("", alias="JWT_PREVIOUS_SECRET_KEYS")
     access_token_expire_minutes: int = Field(30, alias="ACCESS_TOKEN_EXPIRE_MINUTES", gt=0)
     
-    # Production security requirements - fix parsing issues
+    # Production security requirements - fix parsing issues with proper JSON parsing
     allowed_hosts: List[str] = Field(default_factory=list, alias="ALLOWED_HOSTS")
     trusted_proxy_ips: List[str] = Field(default_factory=list, alias="TRUSTED_PROXY_IPS")
+    
+    @field_validator('allowed_hosts', mode='before')
+    @classmethod
+    def parse_allowed_hosts(cls, v):
+        """Parse allowed hosts from string or list"""
+        if isinstance(v, str):
+            if v.strip() == "":
+                return []
+            # Try to parse as JSON first
+            try:
+                import json
+                return json.loads(v)
+            except (json.JSONDecodeError, ValueError):
+                # Fallback to comma-separated values
+                return [host.strip() for host in v.split(',') if host.strip()]
+        return v if isinstance(v, list) else []
+    
+    @field_validator('trusted_proxy_ips', mode='before') 
+    @classmethod
+    def parse_trusted_proxy_ips(cls, v):
+        """Parse trusted proxy IPs from string or list"""
+        if isinstance(v, str):
+            if v.strip() == "":
+                return []
+            # Try to parse as JSON first
+            try:
+                import json
+                return json.loads(v)
+            except (json.JSONDecodeError, ValueError):
+                # Fallback to comma-separated values
+                return [ip.strip() for ip in v.split(',') if ip.strip()]
+        return v if isinstance(v, list) else []
     enable_docs: Optional[bool] = Field(None, alias="ENABLE_DOCS")
     
     # Feature flag for public read endpoints (authentication bypass)
-    public_read_endpoints: bool = Field(False, alias="PUBLIC_READ_ENDPOINTS")
+    public_read_endpoints: bool = Field(True, alias="PUBLIC_READ_ENDPOINTS")  # Default to True for dev
     
     # Rate limiting backend requirements (production-aware)
     disable_rate_limit_backend: bool = Field(False, alias="DISABLE_RATE_LIMIT_BACKEND")

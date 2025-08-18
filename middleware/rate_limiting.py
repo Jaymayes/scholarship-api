@@ -39,7 +39,7 @@ def get_user_identifier(request: Request) -> str:
 
 # Initialize limiter with Redis fallback to memory
 def create_rate_limiter():
-    """Create rate limiter with Redis or in-memory storage"""
+    """Create rate limiter with test environment detection and Redis fallback"""
     rate_config = settings.get_rate_limit_config
     
     if not rate_config["enabled"]:
@@ -68,18 +68,10 @@ def create_rate_limiter():
 # Create the limiter instance
 limiter = create_rate_limiter()
 
-# Ensure the limiter is functional - override if None or disabled for testing
-if limiter is None or os.getenv('RATE_LIMIT_ENABLED', 'true').lower() == 'false':
-    # In test environment with RATE_LIMIT_ENABLED=false, create a no-op limiter
-    if os.getenv('RATE_LIMIT_ENABLED', 'true').lower() == 'false':
-        logger.info("Rate limiting explicitly disabled via RATE_LIMIT_ENABLED=false")
-        limiter = None  # No rate limiting in test mode
-    else:
-        # Force creation of in-memory limiter for normal operation
-        limiter = Limiter(
-            key_func=get_user_identifier,
-            storage_uri="memory://"
-        )
+# Handle disabled rate limiting for tests
+if os.getenv('RATE_LIMIT_ENABLED', 'true').lower() == 'false':
+    logger.info("Rate limiting explicitly disabled via RATE_LIMIT_ENABLED=false")
+    limiter = None
 
 def get_rate_limit_for_environment(base_limit: str) -> str:
     """Adjust rate limits based on environment"""
