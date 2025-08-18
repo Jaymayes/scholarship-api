@@ -47,15 +47,35 @@ class Settings(BaseSettings):
     jwt_algorithm: str = Field("HS256", alias="JWT_ALGORITHM")
     access_token_expire_minutes: int = Field(30, alias="ACCESS_TOKEN_EXPIRE_MINUTES")
     
-    # CORS Configuration
-    cors_origins: List[str] = Field(
-        default=["*"],
-        alias="CORS_ORIGINS",
-        description="Comma-separated list of allowed origins"
+    # CORS Configuration - Environment-specific
+    cors_allowed_origins: str = Field(
+        default="",
+        alias="CORS_ALLOWED_ORIGINS",
+        description="Comma-separated list of allowed origins for production"
     )
     cors_allow_credentials: bool = Field(True, alias="CORS_ALLOW_CREDENTIALS")
-    cors_allow_methods: List[str] = Field(["*"], alias="CORS_ALLOW_METHODS")
+    cors_allow_methods: List[str] = Field(["GET", "POST", "PUT", "DELETE", "OPTIONS"], alias="CORS_ALLOW_METHODS")
     cors_allow_headers: List[str] = Field(["*"], alias="CORS_ALLOW_HEADERS")
+    
+    @property
+    def get_cors_origins(self) -> List[str]:
+        """Get environment-appropriate CORS origins"""
+        if self.environment == Environment.PRODUCTION:
+            # In production, require explicit whitelist
+            if self.cors_allowed_origins:
+                return [origin.strip() for origin in self.cors_allowed_origins.split(",")]
+            else:
+                # Fail safe - log warning and return empty list to prevent wildcard
+                import logging
+                logging.warning("Production environment detected but no CORS_ALLOWED_ORIGINS configured")
+                return []
+        else:
+            # Development/staging - allow localhost origins plus any specified
+            dev_origins = ["http://localhost:3000", "http://127.0.0.1:3000", "http://localhost:5000"]
+            if self.cors_allowed_origins:
+                custom_origins = [origin.strip() for origin in self.cors_allowed_origins.split(",")]
+                return dev_origins + custom_origins
+            return ["*"]  # Fallback for development
     
     # Database Configuration
     database_url: Optional[str] = Field(None, alias="DATABASE_URL")
@@ -67,52 +87,52 @@ class Settings(BaseSettings):
     redis_url: str = Field("redis://localhost:6379", alias="REDIS_URL")
     redis_timeout: int = Field(5, alias="REDIS_TIMEOUT")
     
-    # Rate Limiting Configuration
+    # Rate Limiting Configuration - Environment-specific
     rate_limit_enabled: bool = Field(True, alias="RATE_LIMIT_ENABLED")
-    rate_limit_redis_url: str = Field("redis://localhost:6379", alias="RATE_LIMIT_REDIS_URL")
+    rate_limit_backend_url: str = Field("redis://localhost:6379/0", alias="RATE_LIMIT_BACKEND_URL")
+    rate_limit_per_minute: int = Field(0, alias="RATE_LIMIT_PER_MINUTE")  # 0 = use defaults
+    
+    @property
+    def get_rate_limit_per_minute(self) -> int:
+        """Get environment-appropriate rate limit per minute"""
+        if self.rate_limit_per_minute > 0:
+            return self.rate_limit_per_minute
+        
+        # Default limits based on environment
+        if self.environment == Environment.PRODUCTION:
+            return 100
+        else:  # Development/staging
+            return 200
+    
+    # Legacy rate limiting fields (keep for backward compatibility)
     rate_limit_search: str = Field("30/minute", alias="RATE_LIMIT_SEARCH")
     rate_limit_eligibility: str = Field("15/minute", alias="RATE_LIMIT_ELIGIBILITY") 
     rate_limit_scholarships: str = Field("60/minute", alias="RATE_LIMIT_SCHOLARSHIPS")
     rate_limit_analytics: str = Field("10/minute", alias="RATE_LIMIT_ANALYTICS")
     
-    @field_validator('rate_limit_search', 'rate_limit_eligibility', 'rate_limit_scholarships', 'rate_limit_analytics')
-    @classmethod
-    def adjust_rate_limits_by_environment(cls, v, info):
-        """Adjust rate limits based on environment"""
-        environment = info.context.get('environment', Environment.LOCAL) if info.context else Environment.LOCAL
-        
-        if environment in [Environment.LOCAL, Environment.DEVELOPMENT]:
-            # Double the limits for dev environments
-            limit_parts = v.split('/')
-            if len(limit_parts) == 2:
-                count = int(limit_parts[0])
-                return f"{count * 2}/{limit_parts[1]}"
-        
-        return v
+    # Remove problematic field_validator for now - we'll handle environment adjustment in properties
     
-    # Endpoint-specific rate limits
-    rate_limit_public_search: str = Field("60/minute", alias="RATE_LIMIT_PUBLIC_SEARCH")
-    rate_limit_public_eligibility: str = Field("30/minute", alias="RATE_LIMIT_PUBLIC_ELIGIBILITY")
-    
-    @property
+    # Environment-aware rate limit properties
+    @property 
     def get_search_rate_limit(self) -> str:
         """Get environment-appropriate search rate limit"""
-        if self.environment == Environment.PRODUCTION:
-            return "30/minute"
-        elif self.environment == Environment.STAGING:
-            return "45/minute"
-        else:  # LOCAL, DEVELOPMENT
-            return "60/minute"
+        base_limit = int(self.rate_limit_search.split('/')[0])
+        if self.environment in [Environment.LOCAL, Environment.DEVELOPMENT]:
+            return f"{base_limit * 2}/minute"
+        return self.rate_limit_search
     
     @property
     def get_eligibility_rate_limit(self) -> str:
         """Get environment-appropriate eligibility rate limit"""
-        if self.environment == Environment.PRODUCTION:
-            return "15/minute"
-        elif self.environment == Environment.STAGING:
-            return "20/minute"
-        else:  # LOCAL, DEVELOPMENT
-            return "30/minute"
+        base_limit = int(self.rate_limit_eligibility.split('/')[0])
+        if self.environment in [Environment.LOCAL, Environment.DEVELOPMENT]:
+            return f"{base_limit * 2}/minute"
+        return self.rate_limit_eligibility
+    
+    @property
+    def get_backend_url(self) -> str:
+        """Get rate limiting backend URL"""
+        return self.rate_limit_backend_url
     
     # Logging Configuration
     log_level: LogLevel = Field(LogLevel.INFO, alias="LOG_LEVEL")
@@ -145,16 +165,23 @@ class Settings(BaseSettings):
     feature_analytics: bool = Field(True, alias="FEATURE_ANALYTICS")
     feature_bulk_operations: bool = Field(True, alias="FEATURE_BULK_OPERATIONS")
     
-    # Security Configuration
-    max_request_body_bytes: int = Field(
-        1024 * 1024,  # 1MB
-        alias="MAX_REQUEST_BODY_BYTES",
+    # Request/Response Size and URL Length Limits
+    max_request_size_bytes: int = Field(
+        1048576,  # 1 MiB
+        alias="MAX_REQUEST_SIZE_BYTES",
         description="Maximum request body size in bytes"
     )
-    allowed_origins: List[str] = Field(
-        default=[],
-        alias="ALLOWED_ORIGINS",
-        description="Comma-separated list of allowed origins for production"
+    max_url_length: int = Field(
+        2048,
+        alias="MAX_URL_LENGTH", 
+        description="Maximum URL length (path + query) in characters"
+    )
+    
+    # Legacy field for backward compatibility
+    max_request_body_bytes: int = Field(
+        1048576,  # 1 MiB
+        alias="MAX_REQUEST_BODY_BYTES",
+        description="Maximum request body size in bytes (legacy)"
     )
     
     # Security Headers Configuration
@@ -177,14 +204,6 @@ class Settings(BaseSettings):
         alias="HSTS_PRELOAD"
     )
     
-    @field_validator("cors_origins", mode="before")
-    @classmethod
-    def parse_cors_origins(cls, v):
-        """Parse CORS origins from comma-separated string"""
-        if isinstance(v, str):
-            return [origin.strip() for origin in v.split(",")]
-        return v
-    
     @field_validator("cors_allow_methods", mode="before")
     @classmethod
     def parse_cors_methods(cls, v):
@@ -205,16 +224,6 @@ class Settings(BaseSettings):
     @classmethod
     def validate_jwt_secret(cls, v, info):
         """Validate JWT secret key in production"""
-        # Note: In Pydantic v2, we can't access other field values in field_validator
-        # This validation will be moved to model_validator if needed
-        return v
-    
-    @field_validator("allowed_origins", mode="before")
-    @classmethod
-    def parse_allowed_origins(cls, v):
-        """Parse allowed origins from comma-separated string"""
-        if isinstance(v, str):
-            return [origin.strip() for origin in v.split(",")]
         return v
     
     @property

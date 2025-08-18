@@ -51,9 +51,11 @@ tracing_service.instrument_app(app)
 # Add middleware in correct order (middleware wraps the app)
 from middleware.security_headers import SecurityHeadersMiddleware
 from middleware.body_limit import BodySizeLimitMiddleware
+from middleware.url_length import URLLengthMiddleware
 
 app.add_middleware(SecurityHeadersMiddleware)
-app.add_middleware(BodySizeLimitMiddleware, max_size=settings.max_request_body_bytes)
+app.add_middleware(URLLengthMiddleware, max_length=settings.max_url_length)
+app.add_middleware(BodySizeLimitMiddleware, max_size=settings.max_request_size_bytes)
 app.add_middleware(RequestIDMiddleware)
 app.middleware("http")(trace_id_middleware)
 # Rate limiting middleware handled by decorators
@@ -61,7 +63,7 @@ app.middleware("http")(trace_id_middleware)
 # Add CORS middleware with settings
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.cors_origins,
+    allow_origins=settings.get_cors_origins,
     allow_credentials=settings.cors_allow_credentials,
     allow_methods=settings.cors_allow_methods,
     allow_headers=settings.cors_allow_headers,

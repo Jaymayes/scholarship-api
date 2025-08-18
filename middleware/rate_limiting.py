@@ -41,13 +41,13 @@ def create_rate_limiter():
     """Create rate limiter with Redis or in-memory storage"""
     try:
         # Test Redis connection
-        redis_client = redis.Redis.from_url(settings.rate_limit_redis_url, socket_timeout=2)
+        redis_client = redis.Redis.from_url(settings.get_backend_url, socket_timeout=2)
         redis_client.ping()
         logger.info("✅ Redis connected for rate limiting")
         
         return Limiter(
             key_func=get_user_identifier,
-            storage_uri=settings.rate_limit_redis_url
+            storage_uri=settings.get_backend_url
         )
         
     except Exception as e:

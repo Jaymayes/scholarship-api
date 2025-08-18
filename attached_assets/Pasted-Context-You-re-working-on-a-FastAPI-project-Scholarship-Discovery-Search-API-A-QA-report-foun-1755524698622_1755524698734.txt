@@ -1,0 +1,106 @@
+Context
+You’re working on a FastAPI project: “Scholarship Discovery & Search API”. A QA report found 5 medium-priority configuration issues. Security posture is excellent; no code-level vulns were found. Your task is to implement safe, environment-specific configuration for CORS and rate limiting, and add graceful request-size and URL-length handling.
+
+Goals
+
+Environment-specific CORS
+In production, only allow a whitelist of origins from an environment variable.
+In development, you may allow all origins for ease of testing.
+Ensure credentials, allowed methods, and headers are explicitly set.
+Add tests to verify CORS behavior for allowed vs disallowed origins.
+2. Environment-specific rate limiting (do not change the library already in use)
+
+Keep the existing rate-limiter library but make limits configurable via environment variables.
+Defaults:
+DEV: relaxed limits (e.g., 200/min per IP).
+PROD: stricter defaults (e.g., 100/min per IP), unless overridden by env.
+Ensure a Redis (or the app’s current backend) URL is configurable via env.
+Add tests that assert 429s are returned after exceeding the configured threshold.
+3. Request body size validation middleware
+
+Implement an ASGI/FastAPI middleware that rejects requests with bodies larger than a configurable MAX_REQUEST_SIZE_BYTES env var.
+Default: 1_048_576 bytes (1 MiB).
+Return a JSON error with HTTP 413 Payload Too Large and a consistent error schema.
+Add tests that assert large payloads return 413 without crashing the server.
+4. URL length guard with graceful failure
+
+Implement middleware that checks the full URL length (path + query) against a configurable MAX_URL_LENGTH env var.
+Default: 2048 characters.
+If exceeded, return JSON with HTTP 414 URI Too Long, using the same error schema as other errors.
+Add tests that construct an overly long query string and assert a 414 with a JSON error.
+5. Unified error responses
+
+Ensure error responses for 413 and 414 use a consistent JSON schema, e.g.: { "detail": "...", "code": "payload_too_large" } or "uri_too_long"
+Add global handlers if needed to normalize error payloads.
+Implementation Details
+
+Do not loosen any existing security measures.
+Keep rate-limiter library as-is; only refactor to be environment-driven.
+Add or update a settings/config module. If the repo is on Pydantic v1, use pydantic.BaseSettings; if on v2, use pydantic_settings.BaseSettings. Detect and use what the project already uses.
+New environment variables (document defaults in README):
+ENVIRONMENT: "development" | "production" (default: development)
+CORS_ALLOWED_ORIGINS: comma-separated list, e.g. https://app.example.com,https://admin.example.com (default: empty)
+RATE_LIMIT_PER_MINUTE: int (default: 100 in prod, 200 in dev)
+RATE_LIMIT_BACKEND_URL: e.g. redis://localhost:6379/0 (default: current project default)
+MAX_REQUEST_SIZE_BYTES: int (default: 1048576)
+MAX_URL_LENGTH: int (default: 2048)
+Suggested Code Sketches (adapt to the project’s structure and imports)
+
+settings.py (or existing config module):
+
+Define BaseSettings class with the env vars above.
+Expose a get_settings() dependency or a singleton settings instance.
+CORS in app startup (e.g., main.py):
+
+If ENVIRONMENT == "production":
+If CORS_ALLOWED_ORIGINS provided: set allow_origins accordingly.
+Else: fail fast or log a warning to prevent wildcard in prod.
+Else (dev): allow_origins=["*"] is OK.
+Request size middleware:
+
+A custom ASGI middleware that checks content-length header if present.
+If missing, wrap receive() to count bytes and abort if exceeding limit.
+On exceed: return 413 with JSON error and do not read full body.
+URL length middleware:
+
+On each request, compute len(str(request.url)) or len(request.url.path) + len(request.url.query).
+If exceeds max: return 414 JSON error.
+Rate limiting:
+
+Read RATE_LIMIT_PER_MINUTE from env and apply to the existing rate limiter decorator/middleware.
+Ensure the backend URL comes from RATE_LIMIT_BACKEND_URL and initialize the limiter at startup with it.
+Keep dev relaxed and prod stricter by default; allow overrides.
+Testing
+
+Add pytest tests using httpx.AsyncClient or TestClient:
+CORS:
+Request with Origin in whitelist returns Access-Control-Allow-Origin header.
+Disallowed origin does not echo CORS header.
+Rate limiting:
+Hit a simple endpoint more than RATE_LIMIT_PER_MINUTE and assert 429.
+Request size:
+POST with body > MAX_REQUEST_SIZE_BYTES returns 413 with JSON error.
+URL length:
+GET with very long query returns 414 with JSON error.
+Ensure tests pass locally with pytest -q.
+Deliverables
+
+Updated code with:
+Settings/config module
+CORS setup
+Request size middleware
+URL length middleware
+Rate limiting configuration refactor
+Unit tests covering all new behaviors
+Updated README:
+New env vars with defaults and examples
+Notes on production configuration
+No breaking changes to existing endpoints or authentication/authorization logic
+Acceptance Criteria
+
+In production mode, wildcard CORS is not used; only the configured whitelist is allowed.
+Exceeding the per-minute request threshold yields 429, and limits are configurable by env.
+Oversized body returns 413 JSON; overly long URL returns 414 JSON; both use a consistent error schema.
+All new tests pass; existing tests continue to pass.
+Lint/type checks (if present in repo) pass.
+Please implement these changes in-place, adapting file names and imports to this repository’s structure, and provide brief inline comments where behavior is non-obvious.
