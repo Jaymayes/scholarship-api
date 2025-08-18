@@ -1,0 +1,90 @@
+Context
+Project: FastAPI “Scholarship Discovery & Search API”
+Task: Verify that the app is working end-to-end in Replit and produce a concise verification report. Do not change code or weaken security. Keep the unified error schema unchanged: { code, message, status, timestamp, trace_id, details? }.
+
+What to keep intact
+
+Middleware order and all security features (auth, CORS, rate limiting, body/URL size guards, HSTS in prod)
+No secrets in logs; only presence/length hints
+Development flexible; production strict
+Your goal
+
+Prove the app is running correctly in Replit and all key behaviors work in development mode
+Provide command outputs and a brief PASS/FAIL report for each check
+Steps
+
+Show run configuration
+Print .replit contents and the exact Run command
+Echo $PORT and confirm it’s used by the run command (host=0.0.0.0, port=$PORT)
+Confirm the app import path (e.g., app.main:app)
+2. Start with debug logs
+
+Start the app with INFO/DEBUG logs (use existing Run command)
+Capture the first 50–100 lines of startup logs
+Confirm lines indicate: environment=development, host=0.0.0.0, port=$PORT, CORS mode, DB engine, rate-limiter backend
+No secrets should appear
+3. Quick runtime smoke (use shell in the Replit VM)
+
+Set BASE="http://127.0.0.1:${PORT}"
+Root
+curl -si "$BASE/"
+Expect 200 and JSON with keys: status, message, version, endpoints
+Health
+curl -si "$BASE/healthz"
+Expect 200
+CORS preflight (dev)
+curl -si -X OPTIONS "$BASE/api/v1/search" -H "Origin: https://preview.replit.dev" -H "Access-Control-Request-Method: GET"
+Expect 204 or 200 with Access-Control-Allow-Origin returned
+Protected route without token
+curl -si "$BASE/api/v1/search?q=engineering"
+Expect 401 with unified error JSON and a trace_id
+Protected route with token (dev)
+Generate a short-lived token without printing the secret value:
+python - <<'PY' import os, time, jwt secret = os.environ.get("JWT_SECRET_KEY") or "ephemeral-dev-only" alg = os.environ.get("JWT_ALGORITHM","HS256") payload = {"sub":"qa-user","iat":int(time.time()),"exp":int(time.time())+600} print(jwt.encode(payload, secret, algorithm=alg)) PY
+TOKEN=$(python token_gen.py) or from the snippet above
+curl -si "$BASE/api/v1/search?q=engineering" -H "Authorization: Bearer $TOKEN"
+Expect 200 JSON results
+4. Limits and guards
+
+413 payload test
+dd if=/dev/zero bs=1100000 count=1 2>/dev/null | tr '\0' 'A' | curl -si -X POST "$BASE/api/v1/search" -H "Content-Type: application/json" --data-binary @-
+Expect 413 with unified error JSON and trace_id
+414 URL length test
+LONG=$(python -c "print('a'*3000)")
+curl -si "$BASE/api/v1/search?q=$LONG"
+Expect 414 with unified error JSON and trace_id
+Rate limit test (dev)
+LIMIT=${RATE_LIMIT_PER_MINUTE:-200}
+for i in $(seq 1 $((LIMIT+5))); do curl -s -o /dev/null -w "%{http_code}\n" "$BASE/healthz"; done | tail -n 5
+Expect at least one 429 after the threshold
+Make one more request with -i and confirm headers: X-RateLimit-Limit, X-RateLimit-Remaining, Retry-After
+5. Optional debug snapshot (dev only)
+
+If /_debug/config exists:
+curl -si "$BASE/_debug/config"
+Confirm sanitized fields only (environment, port, cors mode, limiter backend type, db engine). No secrets.
+6. Produce a verification report
+
+For each check above, list:
+Endpoint/Action
+Expected vs Observed (HTTP status, key headers)
+PASS/FAIL
+Include the first 50–100 lines of startup logs and 1 example of the unified error JSON showing trace_id
+Conclude with “Verified: App is working in Replit” only if all checks pass
+Acceptance criteria
+
+App starts cleanly; logs show host 0.0.0.0 and port=$PORT
+Root JSON endpoint returns the informative payload
+/healthz returns 200
+Protected routes:
+401 without token (with unified error and trace_id)
+200 with a valid token
+OPTIONS preflight succeeds and is not rate-limited
+413, 414, and 429 behaviors function as designed; 429 includes rate-limit headers
+All error responses are application/json with the unified schema and a trace_id
+No security controls were altered during verification
+Deliverables
+
+Terminal outputs for the commands above
+A concise PASS/FAIL report with any discrepancies clearly noted
+If any check fails, provide the first traceback and a short root-cause hypothesis without changing code unless asked to fix it
