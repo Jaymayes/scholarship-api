@@ -60,12 +60,14 @@ async def verify_agent_auth(authorization: Optional[str] = Header(None)) -> dict
 
 
 @router.post("/task", response_model=dict, status_code=202)
+@limiter.limit("50/minute")  # Production rate limit
 async def receive_task(
     request: Request,
     task_request: Task,
     background_tasks: BackgroundTasks,
     x_agent_id: Optional[str] = Header(None),
     x_trace_id: Optional[str] = Header(None),
+    x_correlation_id: Optional[str] = Header(None),
     auth_payload: dict = Depends(verify_agent_auth)
 ):
     """
@@ -74,7 +76,16 @@ async def receive_task(
     Accepts task envelope, validates JWT authentication, and executes asynchronously.
     Returns 202 immediately and processes task in background.
     """
-    logger.info(f"Received task {task_request.task_id} with action {task_request.action}")
+    correlation_id = x_correlation_id or task_request.trace_id
+    logger.info(
+        f"Received task {task_request.task_id} with action {task_request.action}",
+        extra={
+            "task_id": task_request.task_id,
+            "action": task_request.action,
+            "correlation_id": correlation_id,
+            "requested_by": task_request.requested_by
+        }
+    )
     
     # Validate agent ID matches
     if x_agent_id and x_agent_id != task_request.trace_id.split('-')[0]:  # Basic validation

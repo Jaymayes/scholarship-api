@@ -1,0 +1,497 @@
+{
+  "info": {
+    "name": "Scholarship API - Production Agent Bridge Tests",
+    "description": "Production-ready test suite for Agent Bridge integration with Command Center",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "https://scholarship-api-jamarrlmayes.replit.app",
+      "type": "string"
+    },
+    {
+      "key": "commandCenterUrl",
+      "value": "https://auto-com-center-jamarrlmayes.replit.app",
+      "type": "string"
+    },
+    {
+      "key": "sharedSecret",
+      "value": "{{SHARED_SECRET}}",
+      "type": "string"
+    },
+    {
+      "key": "jwtToken",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "taskId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "correlationId",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{jwtToken}}",
+        "type": "string"
+      }
+    ]
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// JWT Token Generation for Agent Bridge Authentication",
+          "const crypto = require('crypto-js');",
+          "",
+          "function generateJWT() {",
+          "    const header = {",
+          "        'alg': 'HS256',",
+          "        'typ': 'JWT',",
+          "        'kid': 'shared-secret-v1'",
+          "    };",
+          "    ",
+          "    const now = Math.floor(Date.now() / 1000);",
+          "    const payload = {",
+          "        'iss': 'auto-com-center',",
+          "        'aud': 'scholar-sync-agents',",
+          "        'iat': now,",
+          "        'exp': now + 300,", 
+          "        'nbf': now - 5,",
+          "        'jti': pm.variables.replaceIn('{{$guid}}'),",
+          "        'agent_id': 'scholarship_api',",
+          "        'action': 'orchestration'",
+          "    };",
+          "    ",
+          "    const encodedHeader = CryptoJS.enc.Base64url.stringify(CryptoJS.enc.Utf8.parse(JSON.stringify(header)));",
+          "    const encodedPayload = CryptoJS.enc.Base64url.stringify(CryptoJS.enc.Utf8.parse(JSON.stringify(payload)));",
+          "    ",
+          "    const signature = CryptoJS.HmacSHA256(encodedHeader + '.' + encodedPayload, pm.variables.get('sharedSecret'));",
+          "    const encodedSignature = CryptoJS.enc.Base64url.stringify(signature);",
+          "    ",
+          "    return encodedHeader + '.' + encodedPayload + '.' + encodedSignature;",
+          "}",
+          "",
+          "// Generate correlation ID if not set",
+          "if (!pm.variables.get('correlationId')) {",
+          "    pm.variables.set('correlationId', 'corr-' + pm.variables.replaceIn('{{$guid}}'));",
+          "}",
+          "",
+          "// Generate task ID if not set",
+          "if (!pm.variables.get('taskId')) {",
+          "    pm.variables.set('taskId', 'task-' + pm.variables.replaceIn('{{$guid}}'));",
+          "}",
+          "",
+          "// Generate JWT token if shared secret is available",
+          "if (pm.variables.get('sharedSecret')) {",
+          "    const token = generateJWT();",
+          "    pm.variables.set('jwtToken', token);",
+          "    console.log('Generated JWT token for request');",
+          "} else {",
+          "    console.log('SHARED_SECRET not set - JWT authentication will fail');",
+          "}"
+        ]
+      }
+    }
+  ],
+  "item": [
+    {
+      "name": "Agent Bridge Health & Security",
+      "item": [
+        {
+          "name": "1. Agent Health (No Auth)",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/agent/health",
+              "host": ["{{baseUrl}}"],
+              "path": ["agent", "health"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Agent health returns 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Health status is healthy', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.status).to.equal('healthy');",
+                  "});",
+                  "",
+                  "pm.test('Command Center configuration present', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData).to.have.property('command_center_configured');",
+                  "    pm.expect(jsonData).to.have.property('shared_secret_configured');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "2. Agent Capabilities (Authenticated)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "X-Correlation-Id",
+                "value": "{{correlationId}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/agent/capabilities",
+              "host": ["{{baseUrl}}"],
+              "path": ["agent", "capabilities"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Capabilities returns 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Has required capabilities', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.capabilities).to.include('scholarship_api.search');",
+                  "    pm.expect(jsonData.capabilities).to.include('scholarship_api.eligibility_check');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "3. Task Submission (No Auth - Should Fail)",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"task_id\": \"unauthorized-test\",\n  \"action\": \"scholarship_api.search\",\n  \"payload\": {\n    \"query\": \"test\",\n    \"filters\": {},\n    \"pagination\": {\"page\": 1, \"size\": 5}\n  },\n  \"reply_to\": \"{{commandCenterUrl}}/callback\",\n  \"trace_id\": \"trace-unauthorized\",\n  \"requested_by\": \"security_test\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/agent/task",
+              "host": ["{{baseUrl}}"],
+              "path": ["agent", "task"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Unauthorized request rejected', function () {",
+                  "    pm.response.to.have.status(401);",
+                  "});",
+                  "",
+                  "pm.test('Error response formatted correctly', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData).to.have.property('code');",
+                  "    pm.expect(jsonData).to.have.property('trace_id');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Production Task Execution",
+      "item": [
+        {
+          "name": "4. Submit Search Task (Authenticated)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Agent-Id",
+                "value": "scholarship_api"
+              },
+              {
+                "key": "X-Correlation-Id",
+                "value": "{{correlationId}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"task_id\": \"{{taskId}}\",\n  \"action\": \"scholarship_api.search\",\n  \"payload\": {\n    \"query\": \"computer science scholarships\",\n    \"filters\": {\n      \"min_amount\": 5000,\n      \"fields_of_study\": [\"computer_science\", \"engineering\"],\n      \"min_gpa\": 3.0\n    },\n    \"pagination\": {\n      \"page\": 1,\n      \"size\": 10\n    }\n  },\n  \"reply_to\": \"{{commandCenterUrl}}/orchestrator/tasks/{{taskId}}/callback\",\n  \"trace_id\": \"{{correlationId}}\",\n  \"requested_by\": \"command_center\",\n  \"resources\": {\n    \"priority\": 5,\n    \"timeout_ms\": 30000,\n    \"retry\": 3\n  }\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/agent/task",
+              "host": ["{{baseUrl}}"],
+              "path": ["agent", "task"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Task accepted', function () {",
+                  "    pm.response.to.have.status(202);",
+                  "});",
+                  "",
+                  "pm.test('Response contains task details', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.task_id).to.equal(pm.variables.get('taskId'));",
+                  "    pm.expect(jsonData.status).to.equal('accepted');",
+                  "});",
+                  "",
+                  "pm.test('Response time acceptable', function () {",
+                  "    pm.expect(pm.response.responseTime).to.be.below(300);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "5. Submit Eligibility Task",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Agent-Id",
+                "value": "scholarship_api"
+              },
+              {
+                "key": "X-Correlation-Id",
+                "value": "{{correlationId}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"task_id\": \"{{$guid}}\",\n  \"action\": \"scholarship_api.eligibility_check\",\n  \"payload\": {\n    \"student_profile\": {\n      \"gpa\": 3.7,\n      \"field_of_study\": \"computer_science\",\n      \"graduation_year\": 2025,\n      \"citizenship\": \"US\"\n    },\n    \"scholarship_ids\": [\"sch_001\", \"sch_006\"]\n  },\n  \"reply_to\": \"{{commandCenterUrl}}/orchestrator/tasks/{{$guid}}/callback\",\n  \"trace_id\": \"{{correlationId}}\",\n  \"requested_by\": \"command_center\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/agent/task",
+              "host": ["{{baseUrl}}"],
+              "path": ["agent", "task"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Negative Tests & Security",
+      "item": [
+        {
+          "name": "6. Malformed Task Payload",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Agent-Id",
+                "value": "scholarship_api"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"invalid_field\": \"test\",\n  \"missing_required_fields\": true\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/agent/task",
+              "host": ["{{baseUrl}}"],
+              "path": ["agent", "task"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Malformed payload rejected', function () {",
+                  "    pm.expect(pm.response.code).to.be.oneOf([400, 422]);",
+                  "});",
+                  "",
+                  "pm.test('Error details provided', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData).to.have.property('code');",
+                  "    pm.expect(jsonData).to.have.property('message');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "7. Invalid Action",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-Agent-Id",
+                "value": "scholarship_api"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"task_id\": \"invalid-action-test\",\n  \"action\": \"unsupported_action.invalid\",\n  \"payload\": {},\n  \"reply_to\": \"{{commandCenterUrl}}/callback\",\n  \"trace_id\": \"trace-invalid\",\n  \"requested_by\": \"security_test\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/agent/task",
+              "host": ["{{baseUrl}}"],
+              "path": ["agent", "task"]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Task accepted (validation happens async)', function () {",
+                  "    pm.response.to.have.status(202);",
+                  "});",
+                  "",
+                  "console.log('Note: Invalid action will fail during execution, not submission');"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Backward Compatibility",
+      "item": [
+        {
+          "name": "8. Original Search API Still Works",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/search?q=engineering&limit=5&min_amount=1000",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "search"],
+              "query": [
+                {
+                  "key": "q",
+                  "value": "engineering"
+                },
+                {
+                  "key": "limit",
+                  "value": "5"
+                },
+                {
+                  "key": "min_amount",
+                  "value": "1000"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Original API unchanged', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Search results returned', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    pm.expect(jsonData).to.have.property('items');",
+                  "    pm.expect(jsonData).to.have.property('total');",
+                  "});",
+                  "",
+                  "pm.test('Performance maintained', function () {",
+                  "    pm.expect(pm.response.responseTime).to.be.below(2000);",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "9. Scholarships Listing Works",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/v1/scholarships?limit=3",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "v1", "scholarships"],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "3"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Scholarships API works', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('Scholarships data structure preserved', function () {",
+                  "    const jsonData = pm.response.json();",
+                  "    const scholarships = jsonData.items || jsonData.scholarships;",
+                  "    pm.expect(Array.isArray(scholarships)).to.be.true;",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

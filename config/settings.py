@@ -116,6 +116,17 @@ class Settings(BaseSettings):
     jwt_issuer: str = Field("auto-com-center", alias="JWT_ISSUER")
     jwt_audience: str = Field("scholar-sync-agents", alias="JWT_AUDIENCE")
     
+    # Agent Bridge feature flags
+    orchestration_enabled: bool = Field(True, alias="ORCHESTRATION_ENABLED")
+    orchestration_traffic_percentage: int = Field(100, alias="ORCHESTRATION_TRAFFIC_PERCENTAGE")
+    agent_health_enabled: bool = Field(True, alias="AGENT_HEALTH_ENABLED")
+    agent_capabilities_enabled: bool = Field(True, alias="AGENT_CAPABILITIES_ENABLED")
+    
+    # Production security enhancements
+    jwt_clock_skew_seconds: int = Field(10, alias="JWT_CLOCK_SKEW_SECONDS")
+    jwt_require_jti: bool = Field(True, alias="JWT_REQUIRE_JTI")
+    agent_rate_limit_per_minute: int = Field(50, alias="AGENT_RATE_LIMIT_PER_MINUTE")
+    
     # Rate limiting backend requirements (production-aware)  
     disable_rate_limit_backend: bool = Field(False, alias="DISABLE_RATE_LIMIT_BACKEND")
     

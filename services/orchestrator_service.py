@@ -90,29 +90,64 @@ class OrchestratorService:
             "iss": settings.jwt_issuer,
             "aud": settings.jwt_audience,
             "iat": int(time.time()),
-            "exp": int(time.time()) + 300  # 5 minute expiry
+            "exp": int(time.time()) + 300,  # 5 minute expiry
+            "nbf": int(time.time()) - 5,    # Not before (with 5s clock skew)
+            "jti": str(uuid.uuid4())        # Unique token ID for replay protection
+        }
+        
+        headers = {
+            "kid": "shared-secret-v1"  # Key ID for future rotation support
         }
         
         return jwt.encode(
             token_payload,
             settings.agent_shared_secret,
-            algorithm="HS256"
+            algorithm="HS256",
+            headers=headers
         )
     
     def verify_jwt_token(self, token: str) -> Dict[str, Any]:
-        """Verify incoming JWT token from Command Center"""
+        """Verify incoming JWT token from Command Center with security hardening"""
         if not settings.agent_shared_secret:
             raise ValueError("SHARED_SECRET not configured for agent authentication")
         
         try:
+            # Decode with strict validation
             payload = jwt.decode(
                 token,
                 settings.agent_shared_secret,
                 algorithms=["HS256"],
                 issuer=settings.jwt_issuer,
-                audience=settings.jwt_audience
+                audience=settings.jwt_audience,
+                options={
+                    "verify_exp": True,
+                    "verify_nbf": True,
+                    "verify_iat": True,
+                    "require": ["exp", "nbf", "iat", "jti", "iss", "aud"],
+                    "verify_signature": True
+                },
+                leeway=10  # 10 second clock skew tolerance
             )
+            
+            # Additional security checks
+            if not payload.get("jti"):
+                raise ValueError("Missing jti claim - required for replay protection")
+                
+            # TODO: Implement jti cache for replay protection in production
+            # if self._is_token_replayed(payload["jti"]):
+            #     raise ValueError("Token replay detected")
+            
             return payload
+            
+        except jwt.ExpiredSignatureError:
+            logger.warning("JWT token expired")
+            raise ValueError("Token expired")
+        except jwt.InvalidAudienceError:
+            logger.warning("JWT token has invalid audience")
+            raise ValueError("Invalid token audience")
+        except jwt.InvalidIssuerError:
+            logger.warning("JWT token has invalid issuer")
+            raise ValueError("Invalid token issuer")
         except jwt.InvalidTokenError as e:
             logger.error(f"JWT token verification failed: {e}")
             raise ValueError(f"Invalid JWT token: {e}")
