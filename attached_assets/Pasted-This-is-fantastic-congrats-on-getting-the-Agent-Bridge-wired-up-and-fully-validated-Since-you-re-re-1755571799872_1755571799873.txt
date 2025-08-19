@@ -1,0 +1,81 @@
+This is fantastic—congrats on getting the Agent Bridge wired up and fully validated. Since you’re ready for production, here’s a concise activation + verification plan tailored to your setup, along with recommended ops guardrails and next steps.
+
+Activation checklist
+
+Config
+COMMAND_CENTER_URL: point to ACC (staging → prod)
+SHARED_SECRET: provision via secrets manager; rotate a non-zero downtime plan
+AGENT_BASE_URL: public URL where ACC reaches your bridge
+Network/security
+Allowlist ACC egress IPs to your AGENT_BASE_URL (and any webhook targets)
+Enforce HTTPS/TLS; set HSTS and appropriate TLS version
+JWT validation: exp/nbf/aud/iss checks; reject tokens without jti; set small clock skew window
+Backward compatibility
+Confirm all existing clients continue to work with orchestration enabled
+If needed, keep a simple kill switch: unsetting COMMAND_CENTER_URL disables orchestration
+Post-deploy smoke tests (staging → prod)
+
+Health and auth behavior
+GET /agent/health → 200
+GET /agent/health without JWT (if required) → 401/403
+Capability discovery
+GET /agent/capabilities (authorized) → includes actions like scholarship_api.search
+Task execution
+POST /agent/task with a realistic payload (authorized) → 202/200 with task ID
+Verify status updates are published (logs/metrics/event bus) and any callbacks hit ACC
+Core API unchanged
+Run existing user flows: search, eligibility, scholarships; latencies remain within threshold
+Webhooks/events
+ACC receives lifecycle events; signatures verified; 2xx responses
+Negative and resilience
+Invalid JWT → 401/403
+Expired JWT → 401
+Malformed task → 4xx with clear error
+Temporarily stop ACC: bridge queues or gracefully handles failures; retries/backoff work
+Quick cURL examples
+
+Health:
+curl -H "Authorization: Bearer <JWT>" https://your-agent-url/agent/health
+Capabilities:
+curl -H "Authorization: Bearer <JWT>" https://your-agent-url/agent/capabilities
+Submit task:
+curl -X POST https://your-agent-url/agent/task -H "Authorization: Bearer <JWT>" -H "Content-Type: application/json" -d '{"action":"scholarship_api.search","params":{"query":"computer science","limit":5},"correlationId":"acc-123"}'
+JWT test token guidance
+
+Use HS256 with SHARED_SECRET for local/staging tests.
+Include claims: iss=command-center, aud=scholarship-agent, exp (short-lived), nbf, iat, jti.
+Add kid in header to support future key rotation.
+Production rollout plan
+
+Canary
+Enable orchestration for a small ACC-controlled segment (e.g., a single workflow or 5% of tasks).
+Observe error rate, p95 latency, and queue depth for 30–60 minutes before ramping up.
+SLOs and alerts
+Availability: 99.9% for /agent/* endpoints
+Latency targets: p95 < 500 ms for health/capabilities; task enqueue < 300 ms
+Alerts: JWT auth failures spike, task_failed_total, task_latency_ms p95/p99, event_delivery_failures, ACC unreachability
+Observability
+Propagate correlation IDs (X-Correlation-Id) from ACC → Bridge → API → back
+Structured logs with taskId, correlationId, action, status, duration_ms, error_code
+Dashboards: tasks_received/succeeded/failed; in-flight tasks; retries; webhook outcomes
+Security hardening
+
+Replay protection: enforce unique jti and maintain a short TTL cache
+Scope-based auth: limit JWT to the minimal action scopes (e.g., scholarship_api.search)
+Rate limiting: per-issuer and per-IP on /agent/*; enable idempotency keys for POST /agent/task
+Key rotation: plan for rolling SHARED_SECRET with overlapping acceptance windows; consider moving to JWKS (RS256/ES256) longer-term
+What I can update for you
+
+Extend the existing Postman collection with:
+/agent/health, /agent/capabilities, /agent/task (with JWT pre-request script)
+Negative tests: expired JWT, wrong audience/issuer, missing jti
+Orchestration E2E: “Search → Match → Generate” scenario with saved variables and event assertions
+Add Newman CI examples with environment-driven JWT creation
+Add k6 scenarios for /agent/* with thresholds and lightweight soak
+If you’d like, I’ll generate and attach an updated Postman collection and CI-ready Newman command set for the Agent Bridge endpoints using your current action names and payload shapes. Just confirm:
+
+Final AGENT_BASE_URL for staging/prod
+Expected JWT claims (aud/iss) and header (kid) format
+Example payload(s) for scholarship_api.search, eligibility checks, and any “Generate” step
+Congratulations again—this is well set up for Command Center orchestration and production deployment.
+
