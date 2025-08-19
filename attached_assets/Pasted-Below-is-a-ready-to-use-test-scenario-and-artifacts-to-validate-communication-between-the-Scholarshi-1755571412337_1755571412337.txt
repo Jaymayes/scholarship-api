@@ -1,0 +1,54 @@
+Below is a ready-to-use test scenario and artifacts to validate communication between the Scholarship API and Auto Command Center (ACC) and other apps. Import the Postman files, update variables, and run the suite. I also included a small k6 script for a quick smoke test.
+
+Downloads
+
+Postman collection: Download
+Postman environment: Download
+k6 smoke test: Download
+README (quick steps): Download
+What this validates
+
+Inbound calls from ACC/other apps to Scholarship API: health, list scholarships, create and fetch application, CORS preflight, invalid payload handling.
+Outbound events from Scholarship API to ACC: a simulated webhook delivery to an ACC endpoint (or a temporary webhook receiver).
+How to run
+
+Import into Postman
+Import the collection and environment JSONs.
+In the environment, set:
+baseUrl = https://scholarship-api-jamarrlmayes.replit.app
+apiKey (if your API needs it; enable the header if required)
+accWebhookUrl = your ACC webhook endpoint (or a temporary receiver like webhook.site)
+webhookSecret = shared secret for signature verification (if applicable)
+2. Execute the sequence in Postman
+
+Healthcheck: Verifies the API is up (GET /health).
+2. OpenAPI (optional): Attempts to fetch /openapi.json (ok if 404).
+3. List Scholarships: GET /scholarships?limit=5; persists a scholarshipId if present.
+4. CORS preflight: OPTIONS /scholarships to confirm access-control-allow-origin.
+5. Create Application: POST /applications with a test payload; captures applicationId.
+6. Get Application by ID: GET /applications/{{applicationId}}.
+7. ACC Webhook Registration (optional): POST /webhooks to register an ACC listener (if your API supports it).
+8. Simulate Webhook Delivery: POST a sample event to {{accWebhookUrl}} to validate ACC’s receiver and signature handling.
+9. Negative Test: POST /applications with invalid payload; expect 400/409/422.
+10. Rate limit: Checks for rate limit headers if present.
+3. k6 smoke/load test (optional)
+
+Run locally:
+API_KEY=your_key k6 run k6_smoke.js
+This does a light concurrent check of /health and /scholarships.
+Acceptance criteria (suggested)
+
+Health returns 200; scholarships list returns 200 and an array.
+Application create returns 200/201 and an ID; fetch by ID returns 200 and the same ID.
+CORS preflight returns appropriate Access-Control-Allow-Origin for your ACC origin.
+Webhook registration succeeds or is correctly unsupported; simulated webhook delivery receives 2xx from ACC with valid signature handling.
+Invalid payload returns a 4xx with clear error details.
+Optional: Rate limit headers are present and sane; error responses include correlation IDs.
+Notes and assumptions
+
+Endpoints (e.g., /scholarships, /applications, /webhooks) are common patterns. If your API differs, adjust the paths and JSON fields in the Postman requests.
+Authentication: Enable x-api-key header or add Authorization in Postman if you use OAuth/Bearer tokens.
+Webhooks: The simulation in step 8 sends a test webhook to your ACC endpoint. Use your real signing method (HMAC, etc.) and replace x-webhook-signature logic accordingly.
+CI: You can run this in CI with Newman:
+newman run scholarship_api_postman_collection.json -e scholarship_api_env.json --reporters cli,junit
+If you share the real OpenAPI spec or exact endpoints/auth method, I can tailor the collection and tests precisely to your API.

@@ -1,0 +1,398 @@
+{
+  "info": {
+    "name": "Scholarship API Integration Tests",
+    "description": "Comprehensive test suite for Scholarship API and Auto Command Center integration",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:5000",
+      "type": "string"
+    },
+    {
+      "key": "apiKey",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "accWebhookUrl",
+      "value": "https://webhook.site/unique-id",
+      "type": "string"
+    },
+    {
+      "key": "webhookSecret",
+      "value": "test-webhook-secret",
+      "type": "string"
+    },
+    {
+      "key": "scholarshipId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "applicationId",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "1. Health Check",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/healthz",
+          "host": ["{{baseUrl}}"],
+          "path": ["healthz"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Health check returns 200', function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test('Response contains status', function () {",
+              "    const jsonData = pm.response.json();",
+              "    pm.expect(jsonData).to.have.property('status');",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. OpenAPI Specification",
+      "request": {
+        "method": "GET", 
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/openapi.json",
+          "host": ["{{baseUrl}}"],
+          "path": ["openapi.json"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('OpenAPI spec available', function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test('Contains API paths', function () {",
+              "    const jsonData = pm.response.json();",
+              "    pm.expect(jsonData).to.have.property('paths');",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. List Scholarships",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/scholarships?limit=5",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "scholarships"],
+          "query": [
+            {
+              "key": "limit",
+              "value": "5"
+            }
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Scholarships list returns 200', function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test('Response contains scholarships array', function () {",
+              "    const jsonData = pm.response.json();",
+              "    const scholarships = jsonData.items || jsonData.scholarships || [];",
+              "    pm.expect(Array.isArray(scholarships)).to.be.true;",
+              "    ",
+              "    if (scholarships.length > 0) {",
+              "        pm.collectionVariables.set('scholarshipId', scholarships[0].id);",
+              "    }",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. CORS Preflight",
+      "request": {
+        "method": "OPTIONS",
+        "header": [
+          {
+            "key": "Origin",
+            "value": "https://auto-com-center-jamarrlmayes.replit.app"
+          },
+          {
+            "key": "Access-Control-Request-Method",
+            "value": "POST"
+          },
+          {
+            "key": "Access-Control-Request-Headers",
+            "value": "Content-Type, Authorization"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/scholarships",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "scholarships"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('CORS preflight succeeds', function () {",
+              "    pm.expect(pm.response.code).to.be.oneOf([200, 204]);",
+              "});",
+              "",
+              "pm.test('CORS headers present', function () {",
+              "    pm.expect(pm.response.headers.get('Access-Control-Allow-Origin')).to.exist;",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "5. Agent Capabilities",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/agent/capabilities",
+          "host": ["{{baseUrl}}"],
+          "path": ["agent", "capabilities"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Agent capabilities returns 200', function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test('Agent has capabilities', function () {",
+              "    const jsonData = pm.response.json();",
+              "    pm.expect(jsonData).to.have.property('capabilities');",
+              "    pm.expect(Array.isArray(jsonData.capabilities)).to.be.true;",
+              "    pm.expect(jsonData.capabilities.length).to.be.greaterThan(0);",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "6. Agent Health",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/agent/health",
+          "host": ["{{baseUrl}}"],
+          "path": ["agent", "health"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Agent health returns 200', function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test('Agent status is healthy', function () {",
+              "    const jsonData = pm.response.json();",
+              "    pm.expect(jsonData.status).to.equal('healthy');",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "7. Search Functionality", 
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/search?q=engineering&limit=3&min_amount=1000",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "search"],
+          "query": [
+            {
+              "key": "q",
+              "value": "engineering"
+            },
+            {
+              "key": "limit",
+              "value": "3"
+            },
+            {
+              "key": "min_amount",
+              "value": "1000"
+            }
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Search returns 200', function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test('Search returns results', function () {",
+              "    const jsonData = pm.response.json();",
+              "    pm.expect(jsonData).to.have.property('total');",
+              "    pm.expect(jsonData.total).to.be.a('number');",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "8. Eligibility Check",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"student_profile\": {\n    \"gpa\": 3.5,\n    \"field_of_study\": \"engineering\",\n    \"graduation_year\": 2025,\n    \"citizenship\": \"US\"\n  },\n  \"scholarship_id\": \"{{scholarshipId}}\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/eligibility/check",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "eligibility", "check"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Eligibility check returns 200', function () {",
+              "    pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.test('Response contains eligibility info', function () {",
+              "    const jsonData = pm.response.json();",
+              "    pm.expect(jsonData).to.have.property('eligible');",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "9. Invalid Payload Test",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"invalid_field\": \"test\",\n  \"malformed_data\": {\n    \"nested\": {\n      \"too\": {\n        \"deep\": \"structure\"\n      }\n    }\n  }\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/api/v1/search",
+          "host": ["{{baseUrl}}"],
+          "path": ["api", "v1", "search"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Invalid payload rejected', function () {",
+              "    pm.expect(pm.response.code).to.be.oneOf([400, 405, 422]);",
+              "});",
+              "",
+              "pm.test('Error response contains details', function () {",
+              "    const jsonData = pm.response.json();",
+              "    pm.expect(jsonData).to.have.property('code');",
+              "});"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "10. Agent Task (No Auth - Should Fail)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"task_id\": \"test-task-123\",\n  \"action\": \"scholarship_api.search\",\n  \"payload\": {\n    \"query\": \"test search\",\n    \"filters\": {},\n    \"pagination\": {\n      \"page\": 1,\n      \"size\": 5\n    }\n  },\n  \"reply_to\": \"http://example.com/callback\",\n  \"trace_id\": \"test-trace-456\",\n  \"requested_by\": \"postman_test\"\n}"
+        },
+        "url": {
+          "raw": "{{baseUrl}}/agent/task",
+          "host": ["{{baseUrl}}"],
+          "path": ["agent", "task"]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "exec": [
+              "pm.test('Task without auth is rejected', function () {",
+              "    pm.response.to.have.status(401);",
+              "});",
+              "",
+              "pm.test('Error response is formatted', function () {",
+              "    const jsonData = pm.response.json();",
+              "    pm.expect(jsonData).to.have.property('code');",
+              "});"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}
