@@ -1,0 +1,81 @@
+# Helm overlay for Replit Command Center integration
+# Use: helm upgrade --install scholarship-agent deploy/helm/scholarship-agent -n prod 
+#      -f deploy/helm/scholarship-agent/values.yaml -f values-replit.yaml
+
+env:
+  # Replit Command Center Integration
+  BASE_URL: "https://scholarship-api-jamarrlmayes.replit.app"
+  COMMAND_CENTER_URL: "https://auto-com-center-jamarrlmayes.replit.app"
+  CORS_ALLOWED_ORIGINS: "https://auto-com-center-jamarrlmayes.replit.app"
+  
+  # Production Security Configuration
+  CLOCK_SKEW_SECONDS: "10"
+  JWT_ISSUER: "https://auto-com-center-jamarrlmayes.replit.app"
+  JWT_AUDIENCE: "scholarship-agent"
+  JWT_REQUIRE_JTI: "true"
+  
+  # Agent Configuration
+  AGENT_NAME: "scholarship_api"
+  AGENT_ID: "scholarship_api"
+  ORCHESTRATION_ENABLED: "true"
+  ORCHESTRATION_TRAFFIC_PERCENTAGE: "100"
+  
+  # Rate Limiting (Production)
+  AGENT_RATE_LIMIT_PER_MINUTE: "50"
+  DISABLE_RATE_LIMIT_BACKEND: "false"
+  
+  # Feature Flags
+  AGENT_HEALTH_ENABLED: "true"
+  AGENT_CAPABILITIES_ENABLED: "true"
+  PUBLIC_READ_ENDPOINTS: "false"  # Production security
+
+# Ingress annotations for edge-level rate limiting
+ingress:
+  annotations:
+    nginx.ingress.kubernetes.io/limit-rps: "1"  # ~60 rpm approximation
+    nginx.ingress.kubernetes.io/limit-burst: "20"
+    nginx.ingress.kubernetes.io/limit-connections: "10"
+    nginx.ingress.kubernetes.io/rate-limit: "50"
+    nginx.ingress.kubernetes.io/rate-limit-window: "1m"
+
+# ServiceMonitor for Prometheus
+serviceMonitor:
+  enabled: true
+  namespace: prod
+  labels:
+    app: scholarship-agent
+  endpoints:
+    - port: metrics
+      path: /metrics
+      interval: 30s
+      
+# PrometheusRule for SLO monitoring
+prometheusRule:
+  enabled: true
+  namespace: prod
+  labels:
+    app: scholarship-agent
+  rules:
+    - alert: AgentP95LatencyHigh
+      expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{job="scholarship-agent"}[5m])) > 0.5
+      for: 2m
+      labels:
+        severity: warning
+      annotations:
+        summary: "Agent p95 latency above 500ms"
+        
+    - alert: AgentTaskFailureRateHigh  
+      expr: rate(agent_tasks_failed_total[5m]) / rate(agent_tasks_received_total[5m]) > 0.01
+      for: 1m
+      labels:
+        severity: critical
+      annotations:
+        summary: "Agent task failure rate above 1%"
+        
+    - alert: JWTAuthFailureSpike
+      expr: rate(jwt_auth_failures_total[2m]) > 5
+      for: 1m
+      labels:
+        severity: warning
+      annotations:
+        summary: "JWT authentication failures spiking"
