@@ -1,0 +1,55 @@
+Excellent—thanks for the detailed alignment. I’ve incorporated your final touches into the deployment bundle and added the artifacts you referenced so you can apply them directly.
+
+What I added and tuned:
+
+Dual clock-skew env support
+Deployment now sets both CLOCK_SKEW_SECONDS and JWT_CLOCK_SKEW_SECONDS (defaulting to 10s) for compatibility.
+Capabilities passthrough
+AGENT_CAPABILITIES env added to the chart; defaults to your four capabilities:
+scholarship_api.search
+scholarship_api.eligibility_check
+scholarship_api.recommendations
+scholarship_api.analytics
+Replit overlay
+values-replit.yaml with BASE_URL/COMMAND_CENTER_URL/CORS and 10s skew.
+Ingress rate limiting annotations: limit-rps="1" (~60 rpm) and limit-burst="20".
+Prometheus SLO alerts
+prometheus-rules.yaml for p95 latency, error rate, JWT 401 spikes, and Agent Bridge heartbeat missing.
+Command quick-start
+KUBERNETES_DEPLOYMENT_COMMANDS.md with exact helm/kubectl commands.
+Download the updated bundle:
+
+Download scholarship-agent-prod-bundle-v2.zip
+Highlights inside:
+
+deploy/helm/scholarship-agent/templates/deployment.yaml
+Includes JWT_CLOCK_SKEW_SECONDS and AGENT_CAPABILITIES env vars
+values-replit.yaml
+Replit integration and ingress rate limiting overlay
+prometheus-rules.yaml
+PrometheusRule for SLO-driven alerting
+KUBERNETES_DEPLOYMENT_COMMANDS.md
+Copy/paste commands for base prod and Replit overlay
+secrets-template.yaml
+Ensure you replace secrets before applying
+Apply sequence (quick):
+
+Secrets and SLOs
+kubectl apply -f secrets-template.yaml
+kubectl -n prod apply -f prometheus-rules.yaml
+2. Deploy (Replit overlay)
+
+helm upgrade --install scholarship-agent deploy/helm/scholarship-agent -n prod -f deploy/helm/scholarship-agent/values.yaml -f values-replit.yaml
+3. Verify and smoke test
+
+kubectl -n prod rollout status deploy/scholarship-agent --timeout=5m
+curl -I https://scholarship-agent.scholarshipai.com/health
+BASE_URL=https://scholarship-agent.scholarshipai.com SHARED_SECRET=<your-production-secret> ISSUER=https://auto-com-center-jamarrlmayes.replit.app AUDIENCE=scholarship-agent k6 run deploy/k6/smoke.js
+One note on capabilities
+
+I’ve wired AGENT_CAPABILITIES into the Deployment. If your Agent Bridge reads capabilities dynamically or via registration payload, it will now reflect the four scholarship_api.* capabilities you listed. If you also want the previous sales-focused capabilities (compliance_check, outreach_chat, lead_qualification, demo_scheduling) available under a separate agent profile, I can add a second overlay file to register those under a different AGENT_ID.
+Optional next enhancements
+
+Add ExternalSecrets/SOPS integration
+NGINX tighter rate-limiting (per IP) or token-bucket tuning
+Canary values overlay (10% traffic) for progressive rollouts
