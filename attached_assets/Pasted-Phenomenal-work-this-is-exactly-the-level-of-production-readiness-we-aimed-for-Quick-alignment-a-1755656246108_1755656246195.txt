@@ -1,0 +1,67 @@
+Phenomenal work—this is exactly the level of production-readiness we aimed for.
+
+Quick alignment and next actions
+
+Clock skew: you’ve set 10s; current chart default is 30s. I’ll show you the one-liner to switch to 10s.
+Capabilities: you mention 3 production-ready actions; earlier we had 4. Which one is disabled? If it’s intentional (e.g., demo_scheduling behind a feature flag), I can wire the flag into the chart so registration reflects the active set.
+Replit integration URLs: I’ll keep the primary prod config on scholarshipai.com and provide a simple Helm overlay for the Replit Command Center/Agent URLs so you can flip environments without changing the base values.
+Flip to your Replit Command Center integration (no repackage needed)
+If you want the Kubernetes deployment to talk to your Replit Command Center right away, run:
+
+helm upgrade --install scholarship-agent deploy/helm/scholarship-agent 
+-n prod 
+-f deploy/helm/scholarship-agent/values.yaml 
+--set env.COMMAND_CENTER_URL=https://auto-com-center-jamarrlmayes.replit.app 
+--set env.BASE_URL=https://scholarship-api-jamarrlmayes.replit.app 
+--set env.CORS_ALLOWED_ORIGINS=https://auto-com-center-jamarrlmayes.replit.app 
+--set env.CLOCK_SKEW_SECONDS=10
+
+Make sure your Kubernetes Secret has the production HS256 secret:
+kubectl -n prod get secret scholarship-agent-secrets >/dev/null || echo "Secret missing"
+
+Update secret if needed:
+kubectl -n prod create secret generic scholarship-agent-secrets 
+--from-literal=HS256_SHARED_SECRET='<your-production-secret>' 
+--from-literal=DATABASE_URL='postgresql://username:password@postgres.scholarshipai.com:5432/scholarship_agent_prod' 
+--from-literal=REDIS_URL='redis://redis.scholarshipai.com:6379/0' 
+--from-literal=JTI_REDIS_URL='redis://redis.scholarshipai.com:6379/1' 
+--from-literal=AGENT_REGISTRATION_TOKEN='<agent-bridge-token>' 
+--dry-run=client -o yaml | kubectl apply -f -
+
+Optional: create a small overlay file for Replit integration
+Save as values-replit.yaml:
+env:
+BASE_URL: "https://scholarship-api-jamarrlmayes.replit.app"
+COMMAND_CENTER_URL: "https://auto-com-center-jamarrlmayes.replit.app"
+CORS_ALLOWED_ORIGINS: "https://auto-com-center-jamarrlmayes.replit.app"
+CLOCK_SKEW_SECONDS: "10"
+
+Then deploy with:
+helm upgrade --install scholarship-agent deploy/helm/scholarship-agent -n prod 
+-f deploy/helm/scholarship-agent/values.yaml -f values-replit.yaml
+
+Rate limiting note
+
+You’ve implemented 50 requests/min at the app level—great.
+If you also want edge-level limits via nginx ingress, the controller natively limits in rps. A practical approximation is:
+limit-rps: "1" (≈60 rpm) with a limit-burst (e.g., "20") to keep within your effective 50 rpm policy. If you need exact rpm enforcement, we can add a dedicated rate-limit service or Envoy/NGINX plus custom config.
+I can add ingress annotations for this if you want them baked into the chart.
+Go-live verification
+
+Health: curl -I https://scholarship-agent.scholarshipai.com/health
+Agent Bridge registration and heartbeat: kubectl -n prod logs deploy/scholarship-agent | grep -Ei "registered|heartbeat|capabilities"
+Smoke test (uses HS256 JWT with iss/aud/exp/nbf/jti): BASE_URL=https://scholarship-agent.scholarshipai.com SHARED_SECRET=<your-production-secret> ISSUER=https://auto-com-center-jamarrlmayes.replit.app AUDIENCE=scholarship-agent k6 run deploy/k6/smoke.js
+Postman: run “Agent Bridge” folder; confirm 202 Accepted for valid tasks and expected 4xx for negative cases.
+Prometheus/SLOs
+
+ServiceMonitor is enabled; ensure Prometheus Operator is present.
+If you’d like, I can generate a PrometheusRule with:
+p95 latency SLO breaches
+5xx rate spikes
+heartbeat liveness gap
+JWT auth failure surge Just say the thresholds and I’ll produce the CR for you.
+Open questions to finalize
+
+Which three capabilities are currently enabled? Do you want the fourth gated behind a feature flag or fully enabled?
+Do you want ingress-level rate limiting annotations added now, and at what exact burst you prefer?
+Should we pin the clock skew to 10s permanently in your values.yaml, or keep it only in the Replit overlay?
