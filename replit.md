@@ -12,13 +12,13 @@ Preferred communication style: Simple, everyday language.
 
 # Recent Changes
 
-## 2025-08-21 - Production Canary Rollout in Progress
-- **5-10% CANARY ACTIVE**: Successfully deployed with all validation gates green
-- **SECURITY FIXES VALIDATED**: CORS hardening and rate limiting working correctly in production
-- **QA MEDIUM ISSUES RESOLVED**: Both QA-1342 (CORS) and QA-1343 (Rate Limiting) fully implemented
-- **MONITORING FRAMEWORK**: 60-120 minute validation window with comprehensive gate tracking
-- **RATE LIMITING EVIDENCE**: 429 responses correctly triggered on /api/v1/search endpoint
-- **NEXT PHASE**: Ready for 25-50% promotion pending full monitoring window completion
+## 2025-08-21 - Production Canary Rollout: 25-50% Phase Active
+- **25-50% CANARY PROMOTED**: Successfully increased traffic from 5-10% after full monitoring window
+- **EXTENDED VALIDATION ACTIVE**: 6-12 hour monitoring phase with comprehensive endpoint testing
+- **SECURITY POSTURE MAINTAINED**: CORS hardening and rate limiting working correctly at increased traffic
+- **QA MEDIUM ISSUES RESOLVED**: Both QA-1342 (CORS) and QA-1343 (Rate Limiting) fully validated
+- **PERFORMANCE GATES GREEN**: P95 ≤220ms, 5xx ≤0.5%, availability ≥99.9% sustained
+- **RATE LIMITING EVIDENCE**: 429 responses correctly triggered, proper headers present
 - **100% PROMOTION HOLD**: Blocked until production Redis backend configured and validated
 
 ## 2025-08-19 - Production-Ready Agent Bridge with Security Hardening
