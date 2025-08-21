@@ -1,0 +1,74 @@
+Outstanding work. You can proceed with a canary now, but block promotion to 100% until the two medium findings are remediated and validated in prod. Below is a concise, actionable fix plan with validation steps.
+
+Action plan to remediate medium issues before full rollout
+
+CORS hardening (replace wildcard)
+Goal: Allow only trusted production origins; ensure correct preflight and cacheable responses; no wildcard with credentials.
+Implementation
+Configure an allowlist via env:
+ALLOWED_ORIGINS=https://app.yourdomain.com,https://admin.yourdomain.com (staging and QA can have their own lists)
+ALLOW_CREDENTIALS=false (set true only if you require cookies/Authorization in browsers)
+ALLOWED_METHODS=GET,POST,PUT,PATCH,DELETE,OPTIONS
+ALLOWED_HEADERS=Authorization,Content-Type,Accept,X-Request-Id
+MAX_AGE=600
+App behavior:
+If Origin matches allowlist: set Access-Control-Allow-Origin to the exact origin and set Vary: Origin. If not matched: return 403 to preflight or omit CORS headers.
+Do not use wildcard when credentials are enabled.
+Optional (edge): If using NGINX/Cloud gateway CORS, ensure only one layer is authoritative and that it mirrors the same allowlist.
+Validation
+Preflight from a bad origin: Expect 403 or no CORS headers.
+curl -i -X OPTIONS https://api.yourdomain.com/api/v1/scholarships -H "Origin: https://evil.test" -H "Access-Control-Request-Method: GET"
+Preflight from allowed origin: Expect 200 and Access-Control-Allow-Origin: https://app.yourdomain.com plus Vary: Origin and Max-Age.
+Confirm no Access-Control-Allow-Origin: * in any response.
+2. Rate limiting enforcement (layered: app + edge)
+
+Root causes commonly seen
+In-memory counters per worker (no shared state) or middleware mis-order.
+Real client identity not detected behind a proxy (X-Forwarded-For not trusted); all traffic appears from the ingress IP.
+Missing Redis backend or wrong Redis URL.
+Recommended design
+App-level limiter with shared Redis, keyed by JWT subject when authenticated, else by client IP. Provide endpoint-specific limits and a default global.
+Edge-level limiter at the ingress/gateway for coarse protection and burst absorption.
+App-level configuration
+Ensure Redis-backed limiter is initialized at startup and middleware is registered before routers.
+Trust proxy headers: set trusted proxies/hops so client IP is read from X-Forwarded-For.
+Policies (example starting point; tune to your traffic):
+Global default: 100 requests/min sustained, burst 200.
+/api/v1/scholarships and /api/v1/search: 60 requests/min per token or IP.
+Write endpoints (if any): 30 requests/min.
+Return 429 with Retry-After and include rate-limit headers (limit, remaining, reset) for visibility.
+Edge-level configuration (NGINX Ingress example)
+Per-IP limit: 10 requests/sec with small burst (e.g., burst 20, nodelay off).
+Separate location for expensive endpoints if needed (e.g., recommendations).
+Whitelist monitoring IPs and internal service accounts to avoid false positives.
+Validation
+Verify identity keying:
+Authenticated test: Send 20 rapid requests with the same JWT. Expect some 429s per policy.
+Unauthenticated test: Same from a single IP. Expect 429s per IP policy.
+Verify Retry-After present on 429.
+Confirm limiter counts persist across workers (restart one pod; limits should still apply due to Redis).
+Confirm client IP is correct in logs/limiter when behind the ingress (no single IP dominating unless it’s the proxy).
+Quick fixes for the two noted TODOs (non-blocking but valuable)
+
+JWT replay protection cache
+Require jti in all access tokens. On successful auth, perform SETNX jti:{id} with TTL equal to token expiry in Redis. Reject if key exists. Allow small clock skew (e.g., 60s leeway).
+Add metric: jwt_replays_prevented and alert on spikes.
+Agent event forwarding to Command Center
+Buffer events locally and forward asynchronously with retries/backoff and a circuit breaker. Ensure idempotency via event_id to prevent duplicates downstream.
+Include correlation IDs; redact PII; add drop-on-shutdown flush with a bounded queue.
+Observability and alerts to add/tune with these changes
+
+CORS: Count of denied origins; alert if sudden spike or if wildcard detected in headers.
+Rate limiting: Count of 429s by endpoint and principal; alert if 429 rate >2% sustained for 10 min (excluding known load tests).
+Redis limiter health: connection errors and timeouts.
+JWT replay: prevented count anomaly detection.
+Promotion plan incorporating fixes
+
+Apply CORS and rate-limiting changes to staging; run your validation script plus the CORS/rate tests above.
+Roll to prod canary at 5–10% with fixes enabled.
+Hold at 25–50% for 6–12 hours; verify:
+p95 ≤220 ms, 5xx ≤0.5%
+429 rate ≤1% overall (excluding testers), Retry-After present
+No CORS wildcard responses; denied-origin count low and expected
+Redis limiter healthy; accurate client IPs
+Promote to 100% once gates remain green.

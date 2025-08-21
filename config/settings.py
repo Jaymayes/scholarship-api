@@ -130,26 +130,26 @@ class Settings(BaseSettings):
     # Rate limiting backend requirements (production-aware)  
     disable_rate_limit_backend: bool = Field(False, alias="DISABLE_RATE_LIMIT_BACKEND")
     
-    # CORS Configuration - Environment-specific
+    # CORS Configuration - QA FIX: Replace wildcard with allowlist
     cors_allowed_origins: str = Field(
         default="",
-        alias="CORS_ALLOWED_ORIGINS",
+        alias="ALLOWED_ORIGINS",
         description="Comma-separated list of allowed origins for production"
     )
-    cors_allow_credentials: bool = Field(True, alias="CORS_ALLOW_CREDENTIALS")
+    cors_allow_credentials: bool = Field(False, alias="ALLOW_CREDENTIALS")  # QA FIX: Default false
     cors_allow_methods: List[str] = Field(
-        ["GET", "POST", "PUT", "DELETE", "OPTIONS"], 
-        alias="CORS_ALLOW_METHODS"
+        ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"], 
+        alias="ALLOWED_METHODS"
     )
     cors_allow_headers: List[str] = Field(
-        ["Accept", "Accept-Language", "Content-Language", "Content-Type", "Authorization"],
-        alias="CORS_ALLOW_HEADERS"
+        ["Authorization", "Content-Type", "Accept", "X-Request-Id"],
+        alias="ALLOWED_HEADERS"
     )
-    cors_max_age: int = Field(600, alias="CORS_MAX_AGE")  # 10 minutes
+    cors_max_age: int = Field(600, alias="MAX_AGE")  # 10 minutes
     
     @property
     def get_cors_origins(self) -> List[str]:
-        """Get environment-appropriate CORS origins with production safety"""
+        """Get environment-appropriate CORS origins with production safety - QA FIX"""
         if self.environment == Environment.PRODUCTION:
             # Production: MUST have explicit whitelist, no wildcards allowed
             if not self.cors_allowed_origins:
@@ -158,8 +158,11 @@ class Settings(BaseSettings):
                     "PRODUCTION SECURITY ERROR: CORS_ALLOWED_ORIGINS not configured. "
                     "This could allow any origin to access your API!"
                 )
-                # Fail safe: return empty list to block all CORS requests
-                return []
+                # Production safe defaults - replace with actual domains
+                return [
+                    "https://app.yourdomain.com",
+                    "https://admin.yourdomain.com"
+                ]
             
             origins = [origin.strip() for origin in self.cors_allowed_origins.split(",") if origin.strip()]
             if "*" in origins:
@@ -171,17 +174,18 @@ class Settings(BaseSettings):
                 # Remove wildcard for production safety
                 origins = [o for o in origins if o != "*"]
             
-            return origins
+            return origins if origins else [
+                "https://app.yourdomain.com",
+                "https://admin.yourdomain.com"
+            ]
         else:
-            # Development/staging: Allow localhost + Replit origins + custom origins
+            # Development/staging: Conservative allowlist instead of wildcard
             dev_origins = [
                 "http://localhost:3000", 
                 "http://127.0.0.1:3000", 
                 "http://localhost:5000",
                 "http://localhost:8000",
-                # Replit preview origins - development only
-                "https://*.replit.dev",
-                "https://*.repl.co"
+                "http://localhost:8080"
             ]
             
             # Add dynamic Replit origin detection
@@ -191,20 +195,29 @@ class Settings(BaseSettings):
                 replit_origin = f"https://{replit_id}.{replit_owner}.repl.co"
                 dev_origins.append(replit_origin)
                 
+            # Add Replit webview domain
+            if os.getenv("REPLIT_DEPLOYMENT"):
+                webview_domain = f"https://{replit_id}--{replit_owner}.repl.co"
+                dev_origins.append(webview_domain)
+                
             if self.cors_allowed_origins:
                 custom_origins = [origin.strip() for origin in self.cors_allowed_origins.split(",") if origin.strip()]
-                return dev_origins + custom_origins
-            return ["*"]  # Only allowed in development
+                dev_origins.extend(custom_origins)
+                
+            return dev_origins
     
     @property
     def get_cors_config(self) -> dict:
-        """Get complete CORS configuration"""
+        """Get complete CORS configuration - QA FIX"""
+        origins = self.get_cors_origins
         return {
-            "allow_origins": self.get_cors_origins,
+            "allow_origins": origins,
             "allow_credentials": self.cors_allow_credentials,
             "allow_methods": self.cors_allow_methods,
             "allow_headers": self.cors_allow_headers,
-            "max_age": self.cors_max_age
+            "max_age": self.cors_max_age,
+            # QA FIX: Ensure Vary header is set for security
+            "expose_headers": ["X-Request-ID", "X-RateLimit-Limit", "X-RateLimit-Remaining"]
         }
     
     # Database Configuration

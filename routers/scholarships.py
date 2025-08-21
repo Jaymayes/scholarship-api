@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, Query, Depends
+from fastapi import APIRouter, HTTPException, Query, Depends, Request
 from typing import List, Optional
 from models.scholarship import (
     Scholarship, ScholarshipSummary, SearchFilters, SearchResponse, 
@@ -13,6 +13,7 @@ from services.eligibility_service import eligibility_service
 from services.search_service import search_service
 from services.analytics_service import analytics_service
 from middleware.auth import require_auth, User, get_current_user
+from middleware.enhanced_rate_limiting import general_rate_limit, search_rate_limit
 from config.settings import settings
 from utils.logger import get_logger
 from datetime import datetime
@@ -22,7 +23,9 @@ logger = get_logger(__name__)
 router = APIRouter()
 
 @router.get("/scholarships", response_model=SearchResponse)
+@search_rate_limit()  # QA FIX: Apply rate limiting to scholarships endpoint
 async def search_scholarships(
+    request: Request,  # QA FIX: Add request parameter for rate limiting
     keyword: Optional[str] = Query(None, description="Search keyword"),
     fields_of_study: List[FieldOfStudy] = Query(default=[], description="Filter by fields of study"),
     min_amount: Optional[float] = Query(None, ge=0, description="Minimum scholarship amount"),
@@ -89,7 +92,9 @@ async def search_scholarships(
         raise HTTPException(status_code=500, detail="Internal server error during search")
 
 @router.get("/scholarships/smart-search")
+@search_rate_limit()  # QA FIX: Apply rate limiting to smart search endpoint
 async def smart_search_scholarships(
+    request: Request,  # QA FIX: Add request parameter for rate limiting
     keyword: Optional[str] = Query(None, description="Search keyword"),
     fields_of_study: List[FieldOfStudy] = Query(default=[], description="Filter by fields of study"),
     min_amount: Optional[float] = Query(None, ge=0, description="Minimum scholarship amount"),
@@ -147,7 +152,9 @@ async def smart_search_scholarships(
         raise HTTPException(status_code=500, detail="Internal server error during smart search")
 
 @router.get("/scholarships/{scholarship_id}", response_model=Scholarship)
+@general_rate_limit()  # QA FIX: Apply rate limiting to scholarship detail endpoint
 async def get_scholarship(
+    request: Request,  # QA FIX: Add request parameter for rate limiting
     scholarship_id: str,
     user_id: Optional[str] = Query(None, description="User ID for analytics")
 ):
