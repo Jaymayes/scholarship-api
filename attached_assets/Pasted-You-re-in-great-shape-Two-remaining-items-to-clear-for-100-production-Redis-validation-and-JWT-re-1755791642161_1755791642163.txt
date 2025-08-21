@@ -1,0 +1,68 @@
+You’re in great shape. Two remaining items to clear for 100%: production Redis validation and JWT replay protection verification. Here’s a concise, operator-ready plan to finish and promote.
+
+Redis production validation (blocker 1 of 2)
+
+Connectivity and security
+Use rediss:// with TLS and AUTH; verify NetworkPolicy allows app → Redis only.
+Timeouts: connect ≤100 ms, read ≤200 ms; TCP keepalive on; retry with jitter.
+Pool size targets: max 2–4× replicas × peak RPS/limit window; monitor pool utilization <80%.
+Limiter behavior
+Keys: namespace rate:app:<endpoint>:<principal>, TTL aligned to window (e.g., 60s).
+Eviction policy: allkeys-lru; memory sized so limiter keys don’t thrash; watch evictions=0.
+Identity: use JWT sub for authenticated, client IP for anonymous (via trusted proxy headers).
+Observability gates
+limiter_redis_errors = 0
+Redis p95 latency <10 ms; ops/sec stable; memory fragmentation <1.5; hit rate high (if caching used).
+429s ≤1% overall (exclude testers); RateLimit-* and Retry-After present on 429s.
+Cross-pod consistency test
+Send bursts to protected endpoints from one principal across at least two pods; confirm counters aggregate (429s appear as expected).
+Restart one pod and repeat; limits persist.
+Failover drill (10–15 minutes, low-traffic window)
+Trigger managed Redis failover.
+Expect brief increase in latency but no app 5xx; limiter degrades open (no 500s), edge rate limits remain active.
+Post-failover: limiter_redis_errors returns to 0; no sustained 429 anomalies.
+JWT replay protection verification (blocker 2 of 2)
+
+Enforcement
+Require jti in access tokens; reject tokens without jti in production.
+On first use: SETNX jwt:jti:<id> with TTL = token exp + skew (e.g., 60s); subsequent uses rejected.
+Tests
+Concurrent reuse: fire two requests with same token; one 200, one 401/403; jwt_replay_prevented_total increments.
+Cross-pod: perform the same test hitting different pods; still rejected.
+Expiry: after token exp + skew, reuse should be allowed only with a new token; old jti no longer present.
+JWKS rotation: rotate keys in IdP, confirm seamless validation (cache TTLs reasonable; iss/aud checks strict).
+Monitoring
+Alert on abnormal spikes of jwt_replay_prevented_total; correlate with source IPs/subjects.
+Go/No-Go for 100% promotion
+
+Last 6–12 hours at 25–50% were green on all SLIs (availability ≥99.9%, p95 ≤220 ms, 5xx ≤0.5%).
+Redis validated:
+HA/TLS/auth active; p95 <10 ms; limiter_redis_errors = 0; failover drill passed.
+Cross-pod limiting verified; correct rate-limit headers on 200/429.
+JWT replay protection validated in prod; metrics/logs confirmed.
+Security posture unchanged (no wildcard CORS), OpenAI fallback <5%, DB pool <75%, CPU/mem <70%.
+Recommendations endpoint contract finalized (feature_disabled response documented); eligibility endpoints validated.
+Promotion to 100% (pick your tooling)
+
+Helm
+Disable canary and set stable image tag to vX.Y.Z
+helm upgrade --install scholarship-api ./charts/scholarship-api --set image.tag=vX.Y.Z --set canary.enabled=false
+Argo Rollouts
+kubectl argo rollouts promote scholarship-api --full
+NGINX Ingress
+Remove canary ingress or set canary-weight to 100, then consolidate to a single stable route.
+Rollback criteria (unchanged)
+
+p95 >250 ms for 10 min, 5xx >1% for 10 min
+limiter_redis_errors >0 for 5 min or Redis latency spike
+Overall 429s >2% for 10 min (excluding testers)
+OpenAI fallback >10% for 10 min, DB pool >85% for 5 min, or security anomaly spikes
+Post-promotion (48 hours)
+
+Heightened monitoring; synthetic journeys from multiple regions.
+Game day: kill a pod, brief Redis failover, throttle OpenAI; verify graceful degradation and alerts.
+Optional quick wins before 100%
+
+Enforce pagination defaults/max on list endpoints; add ETag/Cache-Control where safe.
+Idempotency keys for any write endpoints; ensure request/response size caps.
+Tag all logs with correlation IDs; confirm PII redaction.
