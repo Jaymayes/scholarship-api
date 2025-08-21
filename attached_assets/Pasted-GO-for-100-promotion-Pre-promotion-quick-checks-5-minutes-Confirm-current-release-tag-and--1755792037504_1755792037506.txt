@@ -1,0 +1,42 @@
+GO for 100% promotion.
+
+Pre-promotion quick checks (5 minutes)
+
+Confirm current release tag and image digest to promote.
+Ensure canary and stable use identical config (CORS allowlist, Redis URL, timeouts, feature flags).
+Verify HPA targets and min replicas set for full load; PDB minAvailable ≥2.
+Execute the cutover (choose your tooling)
+
+Helm
+helm upgrade --install scholarship-api ./charts/scholarship-api --set image.tag=vX.Y.Z --set canary.enabled=false
+Optionally set replicas for steady state: --set replicaCount=>=3
+Argo Rollouts
+kubectl argo rollouts promote scholarship-api --full
+kubectl argo rollouts get rollout scholarship-api --watch
+NGINX/Ingress
+Remove the canary Ingress (or set canary: "false") and route all traffic to stable Service.
+Immediate post-promotion verification (first 10–15 minutes)
+
+SLIs: availability ≥99.9%, p95 ≤220 ms, p99 stable, 5xx ≤0.5%.
+Rate limiting: 429s ≤1% overall (exclude testers); RateLimit-* and Retry-After on 429s.
+Redis limiter: errors = 0; p95 <10 ms; cross-pod counters consistent.
+JWT replay: run one replay test; ensure prevention metric increments.
+Health: readiness/liveness green; DB pool ≤75%; CPU/mem <70%; no wildcard CORS.
+Smoke tests (representative)
+
+GET /healthz (200) and /readyz (200)
+GET /api/v1/search (200, with RateLimit-* headers)
+GET /api/v1/scholarships (200)
+GET or POST /api/v1/eligibility/check with valid params/body (200)
+GET /api/v1/recommendations (200, feature_status=disabled)
+Rollback criteria and commands
+
+Triggers: p95 >250 ms for 10 min, 5xx >1% for 10 min, limiter_redis_errors >0 for 5 min, 429s >2% for 10 min (excluding testers), DB pool >85%, or security anomalies.
+Helm: helm rollback scholarship-api <last_good_revision>
+Argo: kubectl argo rollouts abort scholarship-api
+Ingress: reinstate canary or revert route to previous stable Service
+Post-promotion (48 hours)
+
+Maintain heightened monitoring and synthetic journeys from multiple regions.
+Run a short game day: pod kill, brief Redis failover, throttle OpenAI; verify graceful degradation and alerts.
+Capture metrics snapshots, finalize release notes/runbook updates, and close the change ticket.
