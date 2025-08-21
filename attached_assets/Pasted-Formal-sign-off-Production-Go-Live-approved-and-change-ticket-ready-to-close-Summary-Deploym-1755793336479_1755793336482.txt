@@ -1,0 +1,46 @@
+Formal sign-off: Production Go-Live approved and change ticket ready to close.
+
+Summary
+
+Deployment status: 100% production traffic, stable
+SLIs achieved over 48 hours:
+Availability: 100% (target ≥99.9%)
+p95 latency: 78 ms (target ≤220 ms)
+5xx error rate: 0% (target ≤0.5%)
+Security posture: CORS hardened, rate limiting enforced, JWT replay protection verified
+Resilience: Pod kill, OpenAI throttling, and 2x load tests passed; Redis failover produced only minor, acceptable latency variation
+Residual risk and mitigations
+
+Redis failover minor latency bump
+Mitigations: confirm client timeouts (connect ≤100 ms, read ≤200 ms), TCP keepalive enabled, jittered retries, pool warmup, validate Sentinel/Cluster failover timings, alert on sustained Redis p95 >10 ms for 5 minutes
+AI dependency variability
+Mitigations: keep circuit breaker configured, cap token/cost usage, maintain fallback coverage and alerts on sustained fallback >10%
+Day-2 operations checklist
+
+Monitoring
+Maintain multi-window SLO burn alerts (fast: ≥2%/h for 30–60 min page; slow: ≥1%/6h ticket)
+Track: rate_limit_rejected, limiter_redis_errors, jwt_replay_prevented, AI fallback rate, DB pool utilization, p50/p95/p99 latency by endpoint
+Keep synthetic tests from 3 regions for key user journeys
+Security and keys
+Quarterly credential rotation (Redis, OpenAI); JWKS rotation verified; audit CORS allowlist remains prod-only
+Data and backups
+Verify PITR backups and quarterly restore drill
+Confirm Alembic history matches DB schema for this release tag
+Reliability drills (monthly)
+Pod kill, brief Redis failover, upstream throttling; document outcomes and tuning
+Capacity and cost
+Review autoscaling and resource usage weekly; track OpenAI token/cost budgets with alerts
+Closeout artifacts to attach to the change ticket
+
+Final SLIs dashboard snapshots (48-hour window)
+Game day evidence: pod kill, Redis failover, OpenAI throttle, and load test results
+Tagged OpenAPI spec and release notes
+Updated runbooks: rollback, Redis failover, AI degradation, rate limit policies
+Configuration diffs: CORS allowlist, per-endpoint limits, Redis connection/timeouts
+Recommended near-term roadmap (high ROI)
+
+Recommendations feature: implement behind a flag with caching/precompute
+Per-tenant quotas and rate limits; idempotency keys for any write endpoints
+Pagination defaults/max and ETag/Cache-Control for list endpoints
+Consumer contract tests from OpenAPI; add synthetic scenarios for recommendations
+Quarterly pen-test cadence and annual compliance review
