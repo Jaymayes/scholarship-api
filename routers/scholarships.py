@@ -311,7 +311,8 @@ async def get_scholarships_by_organization(
                 amount=sch.amount,
                 application_deadline=sch.application_deadline,
                 scholarship_type=sch.scholarship_type,
-                description=sch.description[:197] + "..." if len(sch.description) > 200 else sch.description
+                description=sch.description[:197] + "..." if len(sch.description) > 200 else sch.description,
+                eligibility_criteria=sch.eligibility_criteria
             )
             for sch in scholarships
         ]

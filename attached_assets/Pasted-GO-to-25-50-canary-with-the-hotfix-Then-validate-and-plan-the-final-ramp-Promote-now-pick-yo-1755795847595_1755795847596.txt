@@ -1,0 +1,52 @@
+GO to 25–50% canary with the hotfix. Then validate, and plan the final ramp.
+
+Promote now (pick your tooling)
+
+Helm: helm upgrade --install scholarship-api ./charts/scholarship-api --set image.tag=<hotfix-tag> --set canary.enabled=true --set canary.weight=50
+Argo Rollouts: kubectl argo rollouts promote scholarship-api --to-step=2
+Ingress: set canary-weight: "50" on the canary Ingress
+25–50% acceptance gates (first 60–120 minutes)
+
+SLIs: availability ≥99.9%, p95 ≤220 ms, 5xx ≤0.5%, p99 stable
+Auth security: protected endpoints without Authorization → 401; malformed/alg=none/expired/wrong iss/aud → 401; valid token → 200
+CORS: only allowlisted origins receive ACAO; disallowed origins get 400/403 and no CORS headers
+WAF: SQLi probes blocked with 403, no app 5xx; waf_sqli_block_count increments; limiter_redis_errors = 0
+Headers: RateLimit-* on 200, Retry-After on 429
+Logs: no stack traces or schema leakage; jwt_replay_prevented increments on replay test
+Important: close the SQLi root cause
+Blocking at auth is defense-in-depth, not a fix. Before 100%:
+
+Ensure all dynamic queries use parameterized statements (SQLAlchemy bound params or text() + params()).
+Whitelist fields for ORDER BY/LIMIT/OFFSET; validate inputs via Pydantic schemas.
+Verify DB role is least-privilege and cannot perform DDL.
+Test with a valid token: SQLi payloads return safe 4xx/200; DB logs show bind parameters; no schema in responses.
+Keep WAF SQLi rules in block mode permanently.
+Parallel tasks during the 25–50% window
+
+Credential hygiene: complete JWT signing key rotation (disable old kid after grace), rotate DB credentials, confirm clients re-auth.
+Remove the PUBLIC_READ_ENDPOINTS flag from prod code paths (or make it compile-time dev-only).
+Lock CORS to prod domains; keep Vary: Origin; credentials=false unless required.
+Disable/guard /docs and /openapi.json as per policy for prod.
+Forensics: review API/WAF/DB logs during the vulnerable window for suspicious access and potential data exfiltration; follow breach notification policy if needed.
+Go/No-Go for 100%
+
+25–50% hold green for ≥60–120 minutes
+SQLi remediation verified at code level (not only via auth/WAF)
+WAF in block mode with clean app logs (no 5xx on probes)
+JWT hardening confirmed (alg pinned, iss/aud/exp/nbf/jti) and replay cache active
+Redis limiter healthy (errors = 0), DB pool <75%, CPU/mem <70%
+Rollback triggers (abort and revert)
+
+p95 >250 ms for 10 min, 5xx >1% for 10 min
+Unexpected 200s on malformed tokens; WAF/app error spikes
+Any schema leakage or stack traces in responses
+limiter_redis_errors >0 for 5 min; DB pool >85%
+Prevent recurrence (implement within 72 hours)
+
+Admission/GitOps policy (OPA/Kyverno) to block prod deploys if:
+PUBLIC_READ_ENDPOINTS=true or DEBUG=true
+CORS contains wildcard/dev origins
+Ingress exposes debug endpoints without auth
+CI/CD security gates: bandit, pip-audit, secret scan, SBOM; security unit tests for JWT validation, route guards, CORS allowlist, parameterized SQL; pre-prod DAST using your PoCs.
+Update runbooks (JWT rotation, WAF ops, incident response) and finalize RCA with timeline, impact, and corrective actions.
+If you confirm your deploy method and the hotfix image tag, I can provide the exact command set and a one-page verification checklist for the 25–50% window and the final 100% ramp.

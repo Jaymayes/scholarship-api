@@ -163,8 +163,7 @@ def decode_token(token: str) -> Optional[TokenData]:
                     "verify_exp": True,
                     "verify_iat": True,
                     "verify_signature": True
-                },
-                leeway=10  # Max 10 seconds clock skew
+                }
             )
             
             # Extract and validate required fields
