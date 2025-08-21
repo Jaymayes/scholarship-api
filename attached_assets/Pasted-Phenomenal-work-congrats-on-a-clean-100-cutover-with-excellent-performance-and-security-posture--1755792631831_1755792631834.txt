@@ -1,0 +1,50 @@
+Phenomenal work—congrats on a clean 100% cutover with excellent performance and security posture.
+
+Operate the next 48 hours with intent. Use this concise plan to validate resilience, then close out the change.
+
+Game day success criteria and checks
+
++2h Pod kill
+Expected: no 5xx spike, p95 ≤220 ms, HPA stabilizes, readiness gates work, graceful termination drains in-flight requests.
+Watch: pod eviction/surge events, DB pool ≤75%, no connection reset bursts.
++6h Redis failover
+Expected: brief latency bump only; limiter_redis_errors returns to 0; rate-limits remain consistent; 429 rate stable.
+Watch: Redis p95 <10 ms post-failover, pool utilization <80%, no key TTL anomalies, no app 5xx.
++12h OpenAI throttling
+Expected: graceful degradation; user-visible errors ≤0.5%; fallback/circuit breaker metrics clean; costs within budget.
+Watch: retry storms, elevated latency, sustained fallback >10%.
++24h Load step (≥1.5–2.0x steady RPS)
+Expected: p95 ≤220 ms, 5xx ≤0.5%, DB/Redis stable, autoscaling without thrash; no cache thundering herd.
+Watch: queue backlogs, CPU/mem <70%, DB pool <75%, p99 stability.
+Alerting and SLO burn tuning
+
+Keep multi-window SLO burn alerts:
+Fast burn ≥2%/hour for 30–60 min → page on-call.
+Slow burn ≥1%/6 hours → create ticket and investigate.
+Separate 4xx from server error SLIs; keep 429 rate ≤1% overall (exclude testers).
+Page if limiter_redis_errors >0 for 5 min or Redis latency spike persists >5 min.
+Security confirmation points
+
+JWT replay protection: perform one controlled replay test; verify rejection and metric increment with correlation IDs.
+CORS: confirm allowlist remains prod-only; Vary: Origin present; no wildcard in any response.
+Secrets: Redis/OpenAI credentials in secrets manager with rotation dates; JWKS cache TTL documented.
+Closeout checklist after 48 hours
+
+Verify SLIs met: availability ≥99.9%, p95 ≤220 ms, 5xx ≤0.5%, error budget healthy.
+Attach evidence: dashboards for each game day scenario, logs, traces, limiter metrics, OpenAI fallback metrics.
+Publish:
+Release notes with canary timeline, metrics snapshots, and final OpenAPI spec tag.
+Updated runbooks (rollback, Redis failover, AI degradation).
+SLO/SLA page and public status monitors (if applicable).
+Hygiene:
+Lock final config in Git (values, limits, CORS domains).
+Tag image + schema version; archive load test artifacts.
+Schedule quarterly key/secret rotation and an annual pen test.
+High-ROI next steps (backlog)
+
+Build the recommendations feature behind a flag with precompute/caching.
+Per-tenant quota/rate limits; idempotency keys for write paths.
+Enforce pagination defaults/max, add ETag/Cache-Control where safe.
+Contract tests from OpenAPI; consumer-driven tests with downstreams.
+Regular chaos drills (monthly): pod kill, Redis failover, upstream throttling.
+Consider read replicas or multi-AZ/region strategy as traffic grows.

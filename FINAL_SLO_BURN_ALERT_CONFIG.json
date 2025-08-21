@@ -1,0 +1,60 @@
+{
+  "slo_burn_alerts": {
+    "description": "Multi-window SLO burn rate alerting configuration",
+    "fast_burn": {
+      "threshold": "2%/hour",
+      "duration": "30-60 minutes",
+      "action": "page on-call immediately",
+      "severity": "critical"
+    },
+    "slow_burn": {
+      "threshold": "1%/6 hours", 
+      "duration": "6+ hours",
+      "action": "create ticket and investigate",
+      "severity": "warning"
+    }
+  },
+  "error_classification": {
+    "server_errors": {
+      "codes": ["5xx"],
+      "include_in_sli": true,
+      "target": "≤0.5%"
+    },
+    "client_errors": {
+      "codes": ["4xx"],
+      "include_in_sli": false,
+      "note": "Separate from server error SLIs"
+    },
+    "rate_limiting": {
+      "codes": ["429"],
+      "target": "≤1% overall",
+      "exclusions": ["test traffic", "load testing"]
+    }
+  },
+  "redis_alerting": {
+    "limiter_redis_errors": {
+      "threshold": ">0 errors",
+      "duration": "5 minutes",
+      "action": "page immediately",
+      "severity": "critical"
+    },
+    "redis_latency_spike": {
+      "threshold": ">10ms p95",
+      "duration": "5 minutes sustained", 
+      "action": "investigate and alert",
+      "severity": "warning"
+    }
+  },
+  "availability_targets": {
+    "sli": "availability ≥99.9%",
+    "error_budget": "0.1% monthly",
+    "measurement": "successful responses / total responses",
+    "exclusions": ["health checks", "internal monitoring"]
+  },
+  "latency_targets": {
+    "p95": "≤220ms",
+    "p99": "≤500ms", 
+    "measurement": "request duration from ingress to response",
+    "exclusions": ["OPTIONS requests", "static assets"]
+  }
+}
