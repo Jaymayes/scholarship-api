@@ -1,0 +1,87 @@
+Acknowledged. Treating this as a SEV‑1 security incident until disproven. Because these findings contradict prior results, we’ll do two things in parallel: immediate containment to protect users/data, and rapid verification to reproduce each issue and patch.
+
+Immediate containment (start now)
+
+Freeze deploys and page on-call security/engineering.
+Gateway hard block
+Require Authorization: Bearer on all non-health endpoints; drop requests without it.
+Enforce strict CORS at the edge (allowlist only); block unexpected preflights.
+Enable WAF managed SQLi rules (and bot/OWASP rules) on your edge. Log-only for 5 min, then enforce.
+Access restriction (temporary)
+If feasible, restrict API to known client IPs/service accounts while we verify.
+Switch any write endpoints to read-only or require stronger auth (mTLS/service-to-service) temporarily.
+Secrets and keys
+Invalidate active sessions where possible; rotate JWT signing keys at the IdP and force re-auth for risky scopes.
+Rotate DB credentials; ensure least-privilege roles for the API.
+Observability
+Turn on high-signal audit logs for auth decisions; redact tokens/PII.
+Alerts: spike in 401/403, WAF SQLi blocks, and unusual origins; anomaly on jwt_replay_prevented.
+Request for artifacts (to reproduce and prioritize)
+Please share (or confirm):
+
+PoC requests for each critical item (exact HTTP method, path, headers, body), sample tokens used, and expected vs observed results.
+Impacted endpoints, commit/branch or image tag, and whether the issues reproduce on current prod.
+DB object(s) affected by SQLi (tables/columns), and any evidence of exploitation.
+Your OpenAPI snippet for auth guards and any custom auth middleware.
+Rapid verification and remediation plan
+
+JWT validation bypass
+Likely causes
+Accepting alg=none or HS256 with an RSA public key (algorithm confusion).
+Missing iss/aud/exp/nbf checks; excessive leeway.
+Unpinned JWKS issuer or trusting kid without fetching from the configured issuer only.
+Fixes
+Pin algorithms (e.g., RS256 only); reject alg from header if not expected.
+Validate iss and aud against exact values; require exp and nbf; leeway ≤60s.
+Fetch JWKS only from the configured issuer’s jwks_uri over TLS; on kid miss, refetch once; otherwise reject.
+Require jti; keep replay cache active; deny tokens without jti in prod.
+Deny tokens with none, missing signature, or malformed base64; reject “x5u/jku” or external key references if any library supports them.
+Tests
+alg=none token → 401.
+HS256 token signed with RSA public key → 401.
+Wrong iss/aud → 401.
+Expired/nbf-in-future → 401.
+Same jti reused concurrently → one 200, one 401/403; metric increments.
+2. SQL injection
+
+Likely locations: search/filters built via string concat or f-strings.
+Fixes
+Replace all raw SQL string interpolation with parameterized queries (SQLAlchemy Core/ORM with bound params or text() + params()).
+Whitelistable fields: map user-provided sort/filter to known column names; no direct injection into ORDER BY/LIMIT/OFFSET without validation.
+Escape/normalize wildcard inputs for LIKE/ILIKE; consider tsvector/FTS for search.
+Principle of least privilege on DB role; revoke CREATE/ALTER/DROP; read-only for GET paths.
+Tests
+Payloads: ' OR 1=1 --, '); DROP TABLE t; --, JSON injections in filters, boolean tautologies in query params.
+Verify WAF blocks and app stays 200/4xx (no 5xx), and queries parameterize correctly (enable DB log to confirm bind params).
+3. CORS vulnerabilities
+
+Confirm you’re sending exact Access-Control-Allow-Origin for allowlisted domains with Vary: Origin; no wildcard anywhere. Ensure ALLOW-CREDENTIALS is off unless needed. Validate OPTIONS rejection for malicious Origin.
+4. Sensitive data exposure
+
+Remove PII/secrets from logs; mask tokens to short prefix. Disable debug in prod; send generic error messages with correlation IDs. Ensure /docs and /openapi.json expose no secrets.
+5. Auth bypass (non-JWT)
+
+Ensure every protected route is behind dependency/guard. Add route-level tests that assert 401/403 without valid Authorization. Gateway should also block anonymous requests to protected paths.
+6. Race conditions
+
+Typical spots: rate limiter or idempotency. Make Redis operations atomic (e.g., INCR with TTL set via Lua or SET with EX/NX). Add idempotency keys for write endpoints. Add tests with parallel requests.
+7. Build/compilation errors
+
+Fail CI on type errors (mypy/pyright), lint (ruff), and security scans (bandit, pip-audit). Block release until green. Create SBOM and run SAST/DAST in pipeline.
+Operational flow to safe state
+
+T0–30 min: Contain at the edge (WAF + auth header requirement + CORS lock), rotate keys, raise monitoring.
+T30–90 min: Reproduce PoCs in staging against current image. Begin hotfix branch; patch JWT guard and SQL usage.
+T90–180 min: Canary hotfix (5–10% → 25–50% → 100%) with tight gates. Keep WAF in block mode until code fixes verified.
+Post-fix: Run your automated security validation suite; archive evidence; update runbooks and OpenAPI.
+Evidence you’ll get after fixes
+
+Unit/integration tests for JWT verification (alg pinning, iss/aud/exp/nbf/jti).
+SQL layer tests proving parameterization (no query string interpolation).
+WAF logs showing attempted SQLi blocked; app logs show 4xx (not 5xx).
+Security dashboard with jwt_replay_prevented, auth_failures_total, rate_limit_rejected_total, and zero info disclosure events.
+Decision point
+
+If any PoC reproduces on production right now, immediately restrict traffic (IP allowlist or maintenance mode for non-essential endpoints) until hotfix is live.
+If all PoCs fail on production but succeed on a different build/config, reconcile environment diffs (libraries, config flags, gateway rules).
+Share the PoC details (redacted as needed) and your current image tag/config. I’ll produce exact patch diffs, WAF rules to deploy now, and a step-by-step hotfix rollout with verification commands.

