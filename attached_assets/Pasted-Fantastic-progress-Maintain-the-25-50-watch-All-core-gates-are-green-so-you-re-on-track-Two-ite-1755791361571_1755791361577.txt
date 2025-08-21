@@ -1,0 +1,34 @@
+Fantastic progress. Maintain the 25–50% watch. All core gates are green, so you’re on track. Two items to decide/address during this window before planning 100%:
+
+Recommendations endpoint (404)
+Choose one:
+De-scope for this release: hide/remove from OpenAPI, exclude from synthetic checks, and keep 404 as the explicit contract (or return 410/501 with a clear message). Ensure monitors don’t count it in availability SLI.
+Implement a minimal, feature-flagged stub now:
+Auth required; rate-limit (e.g., 30 rpm per token/IP).
+Return 200 with an empty array and a “feature_disabled” flag, or 501 Not Implemented.
+Add to OpenAPI and include RateLimit-* headers.
+Either choice: adjust the validation script accordingly so it doesn’t flag expected 404s.
+2. Eligibility check (422)
+
+This is a contract/parameter issue, not a service failure. Action:
+Confirm the exact contract in /docs or /openapi.json (method, path, required body/query fields).
+Update your test to match the schema. Typical pattern is POST with JSON body, not GET.
+Validate with a sample that includes all required fields; ensure you see 200 and correct headers.
+If the endpoint is intended to be GET with query params, update the router or schema for clarity and ensure proper validation errors.
+Monitoring/SLI guidance during 25–50%
+
+Keep 4xx (client) errors out of availability/error-rate SLIs; track them separately with their own alerts (spike detection).
+Continue cross-pod limiter checks after a pod restart; confirm counters persist (Redis-backed).
+Verify RateLimit-* and Retry-After headers on both 200 and 429 responses for all protected endpoints.
+Blockers for 100% promotion (unchanged)
+
+Production Redis: HA + TLS/auth, low latency (p95 <10 ms), limiter_redis_errors = 0, brief failover drill passes.
+Endpoint scope decision:
+Recommendations: implemented or explicitly de-scoped (and reflected in OpenAPI/docs/monitors).
+Eligibility: contract validated with green tests.
+Next concrete steps
+
+Keep the 25–50% canary running for 6–12 hours with your extended validation.
+Decide on recommendations endpoint handling and fix the eligibility test per the spec.
+When prod Redis is ready, run the failover drill and cross-pod limit tests, then we’ll proceed to the final 100% promotion.
+If you paste the OpenAPI snippet for /eligibility and your current route map, I’ll provide an exact curl payload and a ready-to-run validation command, plus a minimal stub for /recommendations if you choose to implement it now.

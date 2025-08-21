@@ -11,6 +11,7 @@ import os
 from routers.scholarships import router as scholarships_router
 from routers.search import router as search_router
 from routers.eligibility import router as eligibility_router
+from routers.recommendations import router as recommendations_router
 from routers.analytics import router as analytics_router
 from routers.auth import router as auth_router
 from routers.database import router as database_router
@@ -180,6 +181,9 @@ app.include_router(search_router, prefix="/api/v1", tags=["search"])
 # Eligibility endpoints - available at both root and /api/v1 for backward compatibility
 app.include_router(eligibility_router, tags=["eligibility"])
 app.include_router(eligibility_router, prefix="/api/v1", tags=["eligibility"])
+
+# Recommendations endpoint
+app.include_router(recommendations_router, tags=["recommendations"])
 
 app.include_router(analytics_router, prefix="/api/v1", tags=["analytics"])
 app.include_router(database_router, tags=["database"])

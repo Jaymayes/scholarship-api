@@ -76,7 +76,7 @@ test_rate_limiting_coverage() {
         "/api/v1/scholarships"
         "/api/v1/search"
         "/api/v1/recommendations"
-        "/api/v1/eligibility/check"
+        "/api/v1/eligibility/check?gpa=3.5&grade_level=undergraduate"
     )
     
     local overall_pass=0
