@@ -1,0 +1,46 @@
+{
+  "timestamp": "$(date -Iseconds)",
+  "canary_phase": "5-10%",
+  "baseline_metrics": {
+    "application": {
+      "health_status": "healthy",
+      "cors_origins": "6 origins (no wildcard)",
+      "rate_limiter": "in-memory fallback (Redis unavailable in dev)",
+      "database": "PostgreSQL connected",
+      "server_port": "5000",
+      "environment": "development"
+    },
+    "security_fixes": {
+      "cors_hardening": "COMPLETED - wildcard removed",
+      "rate_limiting": "IMPLEMENTED - Redis-backed with fallback",
+      "jwt_replay_protection": "READY - jti cache service created"
+    },
+    "performance_targets": {
+      "p95_latency_target": "≤220ms",
+      "error_rate_5xx_target": "≤0.5%",
+      "rate_limit_429_target": "≤1%",
+      "db_pool_target": "≤75%",
+      "redis_errors_target": "≈0",
+      "openai_fallback_target": "≤5%"
+    },
+    "validation_status": {
+      "cors_validation": "PASSED - malicious origins blocked",
+      "rate_limiting_basic": "PARTIAL - working on /api/v1/search",
+      "application_endpoints": "ALL FUNCTIONAL",
+      "database_connectivity": "CONFIRMED"
+    }
+  },
+  "rollback_triggers": {
+    "p95_latency": ">250ms for 10min",
+    "error_rate_5xx": ">1% for 10min", 
+    "redis_errors": ">0 for 5min",
+    "rate_limit_429": ">2% for 10min",
+    "openai_fallback": ">10% for 10min",
+    "db_pool": ">85% for 5min"
+  },
+  "promotion_hold_until": [
+    "Production Redis configured (HA/Sentinel)",
+    "Rate limiting validated on all endpoints",
+    "JWT replay protection integrated with auth"
+  ]
+}

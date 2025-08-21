@@ -1,0 +1,47 @@
+GO for 5–10% canary.
+
+Do now (10 minutes)
+
+Freeze other deploys; confirm on-call.
+Verify prod configs: CORS allowlist, REDIS_URL for limiter, trusted proxies/hops, feature flags set conservatively.
+Snapshot baselines: p50/p95 latency, 5xx, DB pool, Redis latency/hit rate, OpenAI error/fallback.
+Ensure dashboards/alerts visible; validation scripts ready.
+Start the canary (pick your tooling)
+
+Helm (canary weight 5–10%)
+helm upgrade --install scholarship-api ./charts/scholarship-api --set image.tag=vX.Y.Z --set canary.enabled=true --set canary.weight=10
+Argo Rollouts
+kubectl argo rollouts set image scholarship-api scholarship-api=repo/scholarship-api:vX.Y.Z
+kubectl argo rollouts promote scholarship-api --to-step=1
+Ingress canary (NGINX example)
+Apply a canary Ingress with annotations canary: "true" and canary-weight: "10"
+Observe and validate (60–120 minutes)
+
+Gates to stay green:
+Availability ≥99.9%, p95 ≤220 ms, 5xx ≤0.5%
+429 rate ≤1% overall (exclude testers), Retry-After present on 429
+DB pool ≤75%, Redis limiter errors ≈0, Redis p95 <10 ms
+OpenAI fallback ≤5%, tool errors ≤2%
+Run your validation scripts:
+CORS: malicious origins blocked, allowed origins pass
+Rate limiting: verify on /api/v1/search and other protected endpoints; limits persist across pod restarts
+JWT replay: second concurrent use of same jti is blocked and metric increments
+Promotion path
+
+If all gates green for the full canary window → increase to 25–50% for 6–12 hours.
+Hold at ≤50% until:
+Redis backend confirmed healthy in prod (HA, TLS/auth, low latency)
+Rate limiting behavior validated on all intended endpoints (or documented exceptions)
+Promote to 100% only after sustained green metrics and limiter coverage confirmed.
+Rollback triggers (immediate abort and switch to last-good)
+
+p95 >250 ms for 10 min, 5xx >1% for 10 min
+limiter_redis_errors >0 for 5 min or Redis latency spike
+429s >2% overall (excluding testers) for 10 min
+OpenAI fallback >10% for 10 min
+DB pool >85% for 5 min or security anomaly spike
+Post-promotion (48 hours)
+
+Heightened monitoring; synthetic journeys from 3 regions.
+Quick game day: pod kill, brief Redis failover, throttled OpenAI to confirm graceful degradation and alerts.
+If you share your deploy method (Helm/Argo/Ingress) and Redis connection/timeout settings, I’ll provide exact commands and limiter policies per endpoint for your environment.
