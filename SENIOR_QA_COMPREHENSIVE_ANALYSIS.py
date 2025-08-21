@@ -1,709 +1,683 @@
 #!/usr/bin/env python3
 """
-SENIOR QA ENGINEER COMPREHENSIVE ANALYSIS SUITE
-================================================================
-Systematic identification of bugs, errors, and vulnerabilities
-WITHOUT modifying existing code - analysis and reporting only.
+Senior QA Engineer - Comprehensive Analysis and Test Execution
+CRITICAL: This is READ-ONLY analysis. NO code modifications are performed.
+Objective: Identify and report all errors, bugs, unexpected behavior, and vulnerabilities.
 """
 
-import pytest
-import requests
+import asyncio
+import httpx
 import json
 import time
-import os
-import sys
-import traceback
-import tempfile
-import subprocess
+from datetime import datetime
 from typing import Dict, List, Any, Optional
-from unittest.mock import patch, MagicMock
-from fastapi.testclient import TestClient
-from datetime import datetime, timedelta
-from pathlib import Path
-
-# Add project root to path
-sys.path.insert(0, '.')
+import traceback
+import sys
+import os
 
 class QAIssue:
-    """Data class for tracking identified issues"""
+    """Structured representation of a QA issue"""
     def __init__(self, issue_id: str, location: str, description: str, 
-                 reproduce_steps: str, observed: str, expected: str, severity: str):
+                 steps_to_reproduce: str, observed_output: str, 
+                 expected_output: str, severity: str):
         self.issue_id = issue_id
         self.location = location
         self.description = description
-        self.reproduce_steps = reproduce_steps
-        self.observed = observed
-        self.expected = expected
+        self.steps_to_reproduce = steps_to_reproduce
+        self.observed_output = observed_output
+        self.expected_output = expected_output
         self.severity = severity
-        self.timestamp = datetime.utcnow().isoformat()
 
 class SeniorQAAnalyzer:
-    """Senior QA Engineer Analysis Suite"""
+    """Senior QA Engineer comprehensive analysis framework"""
     
     def __init__(self):
-        self.issues = []
+        self.base_url = "http://localhost:5000"
+        self.issues: List[QAIssue] = []
         self.test_results = {}
-        self.client = None
         
-    def log_issue(self, issue_id: str, location: str, description: str,
-                  reproduce_steps: str, observed: str, expected: str, severity: str):
-        """Log a new issue"""
-        issue = QAIssue(issue_id, location, description, reproduce_steps, 
-                       observed, expected, severity)
+    def add_issue(self, issue_id: str, location: str, description: str, 
+                  steps: str, observed: str, expected: str, severity: str):
+        """Add a new issue to the tracking list"""
+        issue = QAIssue(issue_id, location, description, steps, observed, expected, severity)
         self.issues.append(issue)
-        print(f"🐛 ISSUE {issue_id} [{severity}]: {description}")
+        print(f"🔍 [{severity}] {issue_id}: {description}")
         
-    def setup_test_client(self):
-        """Initialize test client with error handling"""
-        try:
-            from main import app
-            self.client = TestClient(app)
-            return True
-        except Exception as e:
-            self.log_issue(
-                "SETUP-001", "main.py", 
-                "Failed to initialize FastAPI test client",
-                "1. Import main.py\n2. Create TestClient(app)",
-                f"Exception: {str(e)}", 
-                "TestClient should initialize successfully",
-                "Critical"
-            )
-            return False
-    
-    def test_import_vulnerabilities(self):
-        """Test for import-related issues and missing dependencies"""
-        print("\n🔍 Testing Import Vulnerabilities...")
+    async def run_comprehensive_analysis(self):
+        """Execute comprehensive QA analysis across all components"""
+        print("🎯 SENIOR QA COMPREHENSIVE ANALYSIS STARTING")
+        print("=" * 60)
         
-        critical_modules = [
-            'main', 'config.settings', 'middleware.auth', 'services.scholarship_service',
-            'routers.scholarships', 'routers.search', 'routers.eligibility',
-            'models.scholarship', 'schemas.eligibility', 'utils.logger'
+        # Test categories
+        await self.test_api_endpoints()
+        await self.test_authentication_security()
+        await self.test_rate_limiting()
+        await self.test_cors_security()
+        await self.test_input_validation()
+        await self.test_error_handling()
+        await self.test_edge_cases()
+        await self.test_concurrent_requests()
+        await self.analyze_code_vulnerabilities()
+        await self.test_database_operations()
+        
+        # Generate final report
+        self.generate_comprehensive_report()
+        
+    async def test_api_endpoints(self):
+        """Test all API endpoints for basic functionality"""
+        print("\n📡 Testing API Endpoints...")
+        
+        endpoints = [
+            ("GET", "/", "Root endpoint"),
+            ("GET", "/healthz", "Health check"),
+            ("GET", "/api/v1/scholarships", "Scholarships listing"),
+            ("GET", "/api/v1/search", "Search functionality"),
+            ("GET", "/api/v1/eligibility/check?gpa=3.5&grade_level=undergraduate", "Eligibility check"),
+            ("GET", "/api/v1/recommendations", "Recommendations"),
+            ("GET", "/docs", "API documentation"),
+            ("GET", "/metrics", "Metrics endpoint"),
+            ("HEAD", "/", "HEAD method support"),
+            ("OPTIONS", "/api/v1/scholarships", "CORS preflight")
         ]
         
-        for module in critical_modules:
-            try:
-                __import__(module)
-            except ImportError as e:
-                self.log_issue(
-                    f"IMPORT-{module.replace('.', '_').upper()}", 
-                    f"{module.replace('.', '/')}.py",
-                    f"Critical module import failure: {module}",
-                    f"1. python -c 'import {module}'",
-                    f"ImportError: {str(e)}",
-                    "Module should import without errors",
-                    "Critical"
-                )
-            except Exception as e:
-                self.log_issue(
-                    f"IMPORT-{module.replace('.', '_').upper()}-RUNTIME", 
-                    f"{module.replace('.', '/')}.py",
-                    f"Runtime error during module import: {module}",
-                    f"1. python -c 'import {module}'",
-                    f"Exception: {str(e)}",
-                    "Module should import and initialize without runtime errors",
-                    "High"
-                )
-    
-    def test_configuration_edge_cases(self):
-        """Test configuration handling with extreme and invalid inputs"""
-        print("\n🔍 Testing Configuration Edge Cases...")
-        
-        from config.settings import Settings
-        
-        # Test cases with various invalid/extreme configurations
-        test_configs = [
-            {
-                'name': 'extremely_long_jwt_secret',
-                'env': {'JWT_SECRET_KEY': 'x' * 10000},
-                'severity': 'Medium'
-            },
-            {
-                'name': 'unicode_jwt_secret', 
-                'env': {'JWT_SECRET_KEY': '🔑密钥тест💾'},
-                'severity': 'Medium'
-            },
-            {
-                'name': 'empty_string_values',
-                'env': {'API_TITLE': '', 'API_VERSION': '', 'JWT_ALGORITHM': ''},
-                'severity': 'High'
-            },
-            {
-                'name': 'extreme_port_numbers',
-                'env': {'PORT': '99999'},
-                'severity': 'Medium'
-            },
-            {
-                'name': 'negative_timeouts',
-                'env': {'ACCESS_TOKEN_EXPIRE_MINUTES': '-1'},
-                'severity': 'High'
-            },
-            {
-                'name': 'malformed_lists',
-                'env': {'CORS_ALLOW_METHODS': '["GET",invalid,}'},
-                'severity': 'Medium'
-            }
-        ]
-        
-        for config in test_configs:
-            try:
-                old_env = dict(os.environ)
-                os.environ.update(config['env'])
-                
-                settings = Settings()
-                
-                # If this succeeds when it shouldn't, it's an issue
-                if config['name'] in ['empty_string_values', 'negative_timeouts']:
-                    self.log_issue(
-                        f"CONFIG-{config['name'].upper()}",
-                        "config/settings.py",
-                        f"Configuration accepts invalid values: {config['name']}",
-                        f"1. Set environment: {config['env']}\n2. Create Settings()",
-                        "Configuration loaded successfully",
-                        "Should reject invalid configuration values",
-                        config['severity']
-                    )
-                
-                os.environ.clear()
-                os.environ.update(old_env)
-                
-            except Exception as e:
-                # Expected for some invalid configs
-                os.environ.clear() 
-                os.environ.update(old_env)
-                pass
-    
-    def test_authentication_vulnerabilities(self):
-        """Test authentication system for security vulnerabilities"""
-        print("\n🔍 Testing Authentication Vulnerabilities...")
-        
-        if not self.client:
-            return
-            
-        # Test JWT handling edge cases
-        auth_tests = [
-            {
-                'name': 'empty_jwt_token',
-                'headers': {'Authorization': 'Bearer '},
-                'expected_status': 401
-            },
-            {
-                'name': 'malformed_jwt_token', 
-                'headers': {'Authorization': 'Bearer not.a.jwt'},
-                'expected_status': 401
-            },
-            {
-                'name': 'jwt_without_bearer',
-                'headers': {'Authorization': 'eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9'},
-                'expected_status': 401
-            },
-            {
-                'name': 'extremely_long_jwt',
-                'headers': {'Authorization': f'Bearer {"x" * 10000}'},
-                'expected_status': 401
-            },
-            {
-                'name': 'jwt_with_null_bytes',
-                'headers': {'Authorization': 'Bearer test\x00token'},
-                'expected_status': 401
-            }
-        ]
-        
-        for test in auth_tests:
-            try:
-                response = self.client.get("/api/v1/scholarships", headers=test['headers'])
-                
-                if response.status_code != test['expected_status']:
-                    self.log_issue(
-                        f"AUTH-{test['name'].upper()}",
-                        "middleware/auth.py",
-                        f"Unexpected authentication behavior: {test['name']}",
-                        f"1. Send GET /api/v1/scholarships\n2. Headers: {test['headers']}",
-                        f"Status code: {response.status_code}",
-                        f"Expected status code: {test['expected_status']}",
-                        "High"
-                    )
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            for method, endpoint, description in endpoints:
+                try:
+                    response = await client.request(method, f"{self.base_url}{endpoint}")
                     
-            except Exception as e:
-                self.log_issue(
-                    f"AUTH-{test['name'].upper()}-EXCEPTION",
-                    "middleware/auth.py",
-                    f"Authentication test caused unexpected exception: {test['name']}",
-                    f"1. Send GET /api/v1/scholarships\n2. Headers: {test['headers']}",
-                    f"Exception: {str(e)}",
-                    "Should handle gracefully with appropriate HTTP status",
-                    "High"
-                )
-    
-    def test_input_validation_edge_cases(self):
-        """Test input validation with extreme and malicious inputs"""
-        print("\n🔍 Testing Input Validation Edge Cases...")
-        
-        if not self.client:
-            return
-            
-        # Test search endpoint with various problematic inputs
-        search_payloads = [
-            {
-                'name': 'extremely_long_query',
-                'payload': {'query': 'x' * 100000},
-                'severity': 'High'
-            },
-            {
-                'name': 'sql_injection_attempt',
-                'payload': {'query': "'; DROP TABLE scholarships; --"},
-                'severity': 'Critical'
-            },
-            {
-                'name': 'script_injection',
-                'payload': {'query': '<script>alert("xss")</script>'},
-                'severity': 'High'
-            },
-            {
-                'name': 'unicode_overflow',
-                'payload': {'query': '🔥' * 1000},
-                'severity': 'Medium'
-            },
-            {
-                'name': 'null_bytes',
-                'payload': {'query': 'test\x00query'},
-                'severity': 'High'
-            },
-            {
-                'name': 'negative_limits',
-                'payload': {'limit': -1, 'offset': -100},
-                'severity': 'High'
-            },
-            {
-                'name': 'extreme_limits',
-                'payload': {'limit': 999999, 'offset': 999999},
-                'severity': 'Medium'
-            },
-            {
-                'name': 'invalid_gpa_range',
-                'payload': {'min_gpa': 5.0, 'max_amount': -1000},
-                'severity': 'Medium'
-            }
-        ]
-        
-        for test in search_payloads:
-            try:
-                response = self.client.post("/search", json=test['payload'])
-                
-                # Check for unexpected behavior
-                if response.status_code == 500:
-                    self.log_issue(
-                        f"INPUT-{test['name'].upper()}",
-                        "routers/search.py",
-                        f"Input validation causes server error: {test['name']}",
-                        f"1. POST /search\n2. Payload: {test['payload']}",
-                        f"500 Internal Server Error: {response.text}",
-                        "Should handle invalid input gracefully with 4xx status",
-                        test['severity']
-                    )
-                elif response.status_code == 200 and test['name'] in ['sql_injection_attempt', 'script_injection']:
-                    self.log_issue(
-                        f"INPUT-{test['name'].upper()}-ACCEPTED",
-                        "routers/search.py", 
-                        f"Potentially dangerous input accepted: {test['name']}",
-                        f"1. POST /search\n2. Payload: {test['payload']}",
-                        f"Request accepted with 200 OK",
-                        "Should reject or sanitize dangerous input",
+                    # Analyze response
+                    if response.status_code >= 500:
+                        self.add_issue(
+                            f"API-{len(self.issues)+1:03d}",
+                            f"Endpoint: {method} {endpoint}",
+                            f"Server error in {description}",
+                            f"Send {method} request to {endpoint}",
+                            f"HTTP {response.status_code}: {response.text[:200]}",
+                            f"HTTP 2xx response with valid JSON/HTML",
+                            "High"
+                        )
+                    elif response.status_code == 404 and endpoint not in ["/favicon.ico"]:
+                        self.add_issue(
+                            f"API-{len(self.issues)+1:03d}",
+                            f"Endpoint: {method} {endpoint}",
+                            f"Endpoint not found: {description}",
+                            f"Send {method} request to {endpoint}",
+                            f"HTTP 404: {response.text[:200]}",
+                            f"HTTP 2xx response or proper documentation",
+                            "Medium"
+                        )
+                    elif method == "OPTIONS" and response.status_code == 400:
+                        # Expected for CORS with malicious origins
+                        pass
+                    else:
+                        print(f"   ✅ {method} {endpoint}: {response.status_code}")
+                        
+                except Exception as e:
+                    self.add_issue(
+                        f"API-{len(self.issues)+1:03d}",
+                        f"Endpoint: {method} {endpoint}",
+                        f"Connection/timeout error in {description}",
+                        f"Send {method} request to {endpoint}",
+                        f"Exception: {str(e)}",
+                        f"Successful HTTP response",
                         "Critical"
                     )
                     
-            except Exception as e:
-                self.log_issue(
-                    f"INPUT-{test['name'].upper()}-EXCEPTION",
-                    "routers/search.py",
-                    f"Input validation test caused exception: {test['name']}",
-                    f"1. POST /search\n2. Payload: {test['payload']}",
-                    f"Exception: {str(e)}",
-                    "Should handle edge case inputs without exceptions",
-                    "High"
-                )
-    
-    def test_rate_limiting_bypass(self):
-        """Test rate limiting for potential bypass vulnerabilities"""
-        print("\n🔍 Testing Rate Limiting Bypass Attempts...")
+    async def test_authentication_security(self):
+        """Test authentication and authorization mechanisms"""
+        print("\n🔐 Testing Authentication Security...")
         
-        if not self.client:
-            return
-            
-        # Test various rate limit bypass techniques
-        bypass_tests = [
-            {
-                'name': 'header_spoofing',
-                'headers': {'X-Forwarded-For': '127.0.0.1', 'X-Real-IP': '1.2.3.4'},
-                'requests': 20
-            },
-            {
-                'name': 'user_agent_rotation',
-                'headers': {},  # Will be set dynamically in test
-                'requests': 15
-            },
-            {
-                'name': 'concurrent_requests',
-                'headers': {},
-                'requests': 50  # Rapid fire
-            }
+        protected_endpoints = [
+            "/api/v1/scholarships",
+            "/api/v1/search", 
+            "/api/v1/eligibility/check"
         ]
         
-        for test in bypass_tests:
-            try:
-                rate_limited = False
-                for i in range(test['requests']):
-                    if test['name'] == 'user_agent_rotation':
-                        headers = {'User-Agent': f'TestBot-{i}'}
-                    else:
-                        headers = test['headers']
-                        
-                    response = self.client.get("/api/v1/scholarships", headers=headers)
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            for endpoint in protected_endpoints:
+                # Test without authentication
+                try:
+                    response = await client.get(f"{self.base_url}{endpoint}")
                     
-                    if response.status_code == 429:
-                        rate_limited = True
+                    # Check if authentication is properly enforced
+                    if response.status_code == 200:
+                        # This might be expected if PUBLIC_READ_ENDPOINTS is enabled
+                        print(f"   ℹ️  {endpoint}: Public access enabled (check if intentional)")
+                    elif response.status_code != 401:
+                        self.add_issue(
+                            f"AUTH-{len(self.issues)+1:03d}",
+                            f"Endpoint: {endpoint}",
+                            "Authentication bypass vulnerability",
+                            f"Access {endpoint} without Bearer token",
+                            f"HTTP {response.status_code}: {response.text[:200]}",
+                            "HTTP 401 Unauthorized",
+                            "High"
+                        )
+                    
+                    # Test with malformed token
+                    malformed_response = await client.get(
+                        f"{self.base_url}{endpoint}",
+                        headers={"Authorization": "Bearer invalid.token.here"}
+                    )
+                    
+                    if malformed_response.status_code == 200:
+                        self.add_issue(
+                            f"AUTH-{len(self.issues)+1:03d}",
+                            f"Endpoint: {endpoint}",
+                            "Invalid JWT token accepted",
+                            f"Access {endpoint} with malformed Bearer token",
+                            f"HTTP {malformed_response.status_code}",
+                            "HTTP 401 Unauthorized",
+                            "High"
+                        )
+                        
+                except Exception as e:
+                    self.add_issue(
+                        f"AUTH-{len(self.issues)+1:03d}",
+                        f"Endpoint: {endpoint}",
+                        "Authentication test failure",
+                        f"Test authentication on {endpoint}",
+                        f"Exception: {str(e)}",
+                        "Proper authentication response",
+                        "Medium"
+                    )
+                    
+    async def test_rate_limiting(self):
+        """Test rate limiting functionality and bypass attempts"""
+        print("\n🚦 Testing Rate Limiting...")
+        
+        test_endpoint = "/api/v1/search"
+        
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            # Rapid fire requests to trigger rate limiting
+            responses = []
+            for i in range(25):  # Should exceed most rate limits
+                try:
+                    response = await client.get(f"{self.base_url}{test_endpoint}")
+                    responses.append(response.status_code)
+                    
+                    if i > 10 and response.status_code == 429:
+                        # Check if rate limiting headers are present
+                        if "retry-after" not in response.headers and "ratelimit" not in str(response.headers).lower():
+                            self.add_issue(
+                                f"RATE-{len(self.issues)+1:03d}",
+                                "Rate limiting headers",
+                                "Missing rate limiting headers on 429 response",
+                                "Trigger rate limiting and check response headers",
+                                f"Headers: {dict(response.headers)}",
+                                "Retry-After or RateLimit-* headers present",
+                                "Medium"
+                            )
                         break
                         
-                if not rate_limited and test['requests'] > 10:
-                    self.log_issue(
-                        f"RATE-{test['name'].upper()}",
-                        "middleware/rate_limiting.py",
-                        f"Rate limiting potentially bypassed: {test['name']}",
-                        f"1. Send {test['requests']} requests rapidly\n2. Headers: {test['headers']}",
-                        "All requests succeeded without rate limiting",
-                        "Should enforce rate limits and return 429 status",
+                except Exception as e:
+                    self.add_issue(
+                        f"RATE-{len(self.issues)+1:03d}",
+                        "Rate limiting test",
+                        "Rate limiting test failed with exception",
+                        "Send rapid requests to trigger rate limiting",
+                        f"Exception: {str(e)}",
+                        "429 responses with proper headers",
                         "Medium"
+                    )
+                    break
+            
+            # Check if rate limiting was triggered
+            rate_limit_triggered = any(code == 429 for code in responses)
+            if not rate_limit_triggered and len(responses) > 15:
+                self.add_issue(
+                    f"RATE-{len(self.issues)+1:03d}",
+                    "Rate limiting enforcement",
+                    "Rate limiting not triggered after excessive requests",
+                    "Send 25+ rapid requests to search endpoint",
+                    f"All responses: {responses}",
+                    "429 Too Many Requests after threshold exceeded",
+                    "High"
+                )
+                
+    async def test_cors_security(self):
+        """Test CORS configuration for security vulnerabilities"""
+        print("\n🌐 Testing CORS Security...")
+        
+        malicious_origins = [
+            "https://malicious-attacker.com",
+            "https://evil.com", 
+            "https://phishing-site.net",
+            "http://localhost:3000",  # Common dev port
+            "https://random-domain.xyz"
+        ]
+        
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            for origin in malicious_origins:
+                try:
+                    response = await client.options(
+                        f"{self.base_url}/api/v1/scholarships",
+                        headers={
+                            "Origin": origin,
+                            "Access-Control-Request-Method": "GET",
+                            "Access-Control-Request-Headers": "authorization"
+                        }
+                    )
+                    
+                    # Check if malicious origin is allowed
+                    if response.status_code == 200 and "access-control-allow-origin" in response.headers:
+                        allowed_origin = response.headers.get("access-control-allow-origin")
+                        if allowed_origin == origin or allowed_origin == "*":
+                            self.add_issue(
+                                f"CORS-{len(self.issues)+1:03d}",
+                                "CORS configuration",
+                                f"Malicious origin allowed: {origin}",
+                                f"Send OPTIONS request with Origin: {origin}",
+                                f"Access-Control-Allow-Origin: {allowed_origin}",
+                                "400 Bad Request or origin rejection",
+                                "High"
+                            )
+                    
+                except Exception as e:
+                    print(f"   ℹ️  CORS test for {origin} failed: {e}")
+                    
+            # Test for wildcard CORS
+            try:
+                response = await client.get(
+                    f"{self.base_url}/",
+                    headers={"Origin": "https://unknown-domain.com"}
+                )
+                
+                if response.headers.get("access-control-allow-origin") == "*":
+                    self.add_issue(
+                        f"CORS-{len(self.issues)+1:03d}",
+                        "CORS wildcard configuration",
+                        "Wildcard CORS detected in production",
+                        "Send GET request with random Origin header",
+                        "Access-Control-Allow-Origin: *",
+                        "Specific origin whitelist or no CORS header",
+                        "High"
                     )
                     
             except Exception as e:
-                self.log_issue(
-                    f"RATE-{test['name'].upper()}-EXCEPTION",
-                    "middleware/rate_limiting.py",
-                    f"Rate limiting test caused exception: {test['name']}",
-                    f"1. Send {test['requests']} requests\n2. Headers: {test['headers']}",
-                    f"Exception: {str(e)}",
-                    "Rate limiting should handle stress testing gracefully",
-                    "High"
-                )
-    
-    def test_data_consistency_issues(self):
-        """Test for data consistency and integrity issues"""
-        print("\n🔍 Testing Data Consistency Issues...")
-        
-        try:
-            from services.scholarship_service import ScholarshipService
-            from services.eligibility_service import EligibilityService
-            
-            service = ScholarshipService()
-            eligibility_service = EligibilityService()
-            
-            # Test data consistency
-            scholarships = service.get_all_scholarships()
-            
-            if not scholarships:
-                self.log_issue(
-                    "DATA-EMPTY-SET",
-                    "services/scholarship_service.py",
-                    "No scholarships found in dataset",
-                    "1. Create ScholarshipService\n2. Call get_all_scholarships()",
-                    "Empty list returned",
-                    "Should return scholarship data",
-                    "High"
-                )
-                return
-            
-            # Check for data integrity issues
-            for i, scholarship in enumerate(scholarships):
-                if not hasattr(scholarship, 'id') or not scholarship.id:
-                    self.log_issue(
-                        f"DATA-MISSING-ID-{i}",
-                        "data/scholarships.py",
-                        f"Scholarship missing required ID field at index {i}",
-                        f"1. Get scholarship at index {i}",
-                        "Scholarship object without valid ID",
-                        "All scholarships should have unique IDs",
-                        "High"
-                    )
+                print(f"   ℹ️  Wildcard CORS test failed: {e}")
                 
-                if hasattr(scholarship, 'amount') and scholarship.amount and scholarship.amount < 0:
-                    self.log_issue(
-                        f"DATA-NEGATIVE-AMOUNT-{scholarship.id}",
-                        "data/scholarships.py",
-                        f"Scholarship {scholarship.id} has negative amount",
-                        f"1. Check scholarship {scholarship.id} amount field",
-                        f"Amount: {scholarship.amount}",
-                        "Scholarship amounts should be positive",
-                        "Medium"
-                    )
-                        
-        except Exception as e:
-            self.log_issue(
-                "DATA-SERVICE-EXCEPTION",
-                "services/scholarship_service.py",
-                "Exception accessing scholarship data",
-                "1. Import ScholarshipService\n2. Call get_all_scholarships()",
-                f"Exception: {str(e)}",
-                "Should access scholarship data without exceptions",
-                "Critical"
-            )
-    
-    def test_error_handling_consistency(self):
-        """Test error handling consistency across endpoints"""
-        print("\n🔍 Testing Error Handling Consistency...")
+    async def test_input_validation(self):
+        """Test input validation and sanitization"""
+        print("\n🔍 Testing Input Validation...")
         
-        if not self.client:
-            return
-            
-        endpoints_to_test = [
-            "/api/v1/scholarships",
-            "/search", 
-            "/eligibility/check",
-            "/api/v1/analytics/summary",
-            "/nonexistent/endpoint"
+        # SQL injection attempts
+        sql_payloads = [
+            "'; DROP TABLE scholarships; --",
+            "1' OR '1'='1",
+            "admin'--",
+            "'; SELECT * FROM users; --"
         ]
         
-        for endpoint in endpoints_to_test:
-            try:
-                response = self.client.get(endpoint)
-                
-                if response.status_code >= 400:
-                    try:
-                        error_data = response.json()
+        # XSS attempts
+        xss_payloads = [
+            "<script>alert('xss')</script>",
+            "javascript:alert('xss')",
+            "<img src=x onerror=alert('xss')>",
+            "';alert(String.fromCharCode(88,83,83))//';alert(String.fromCharCode(88,83,83))//",
+        ]
+        
+        # Path traversal attempts
+        path_payloads = [
+            "../../etc/passwd",
+            "..\\..\\windows\\system32\\drivers\\etc\\hosts",
+            "%2e%2e%2f%2e%2e%2f%2e%2e%2f%65%74%63%2f%70%61%73%73%77%64"
+        ]
+        
+        all_payloads = sql_payloads + xss_payloads + path_payloads
+        
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            for payload in all_payloads:
+                try:
+                    # Test in query parameter
+                    response = await client.get(
+                        f"{self.base_url}/api/v1/search",
+                        params={"keyword": payload}
+                    )
+                    
+                    # Check if payload is reflected or causes errors
+                    response_text = response.text.lower()
+                    if payload.lower() in response_text and response.status_code == 200:
+                        self.add_issue(
+                            f"INPUT-{len(self.issues)+1:03d}",
+                            "Query parameter validation",
+                            f"Potential XSS/injection vulnerability with payload: {payload[:50]}...",
+                            f"Send GET /api/v1/search?keyword={payload}",
+                            f"Payload reflected in response: {response.text[:200]}",
+                            "Payload sanitized or rejected",
+                            "High"
+                        )
+                    
+                    if response.status_code >= 500:
+                        self.add_issue(
+                            f"INPUT-{len(self.issues)+1:03d}",
+                            "Error handling",
+                            f"Server error on malicious input: {payload[:50]}...",
+                            f"Send GET /api/v1/search?keyword={payload}",
+                            f"HTTP {response.status_code}: {response.text[:200]}",
+                            "HTTP 400 Bad Request with sanitized error",
+                            "Medium"
+                        )
                         
-                        # Check for consistent error format
-                        required_fields = ['trace_id', 'code', 'message', 'status', 'timestamp']
-                        missing_fields = [field for field in required_fields if field not in error_data]
-                        
-                        if missing_fields:
-                            self.log_issue(
-                                f"ERROR-FORMAT-{endpoint.replace('/', '_').upper()}",
-                                "middleware/error_handlers.py",
-                                f"Inconsistent error format for {endpoint}",
-                                f"1. GET {endpoint}\n2. Check error response format",
-                                f"Missing fields: {missing_fields}",
-                                f"Error response should include: {required_fields}",
+                except Exception as e:
+                    print(f"   ℹ️  Input validation test failed for {payload[:20]}: {e}")
+                    
+    async def test_error_handling(self):
+        """Test error handling and information disclosure"""
+        print("\n⚠️  Testing Error Handling...")
+        
+        error_test_cases = [
+            ("GET", "/nonexistent-endpoint", 404),
+            ("POST", "/api/v1/scholarships", 405),  # Method not allowed
+            ("GET", "/api/v1/scholarships/nonexistent-id", 404),
+            ("GET", "/api/v1/eligibility/check", 400),  # Missing required params
+        ]
+        
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            for method, endpoint, expected_status in error_test_cases:
+                try:
+                    response = await client.request(method, f"{self.base_url}{endpoint}")
+                    
+                    if response.status_code != expected_status:
+                        self.add_issue(
+                            f"ERR-{len(self.issues)+1:03d}",
+                            f"Error handling: {method} {endpoint}",
+                            f"Unexpected error status code",
+                            f"Send {method} request to {endpoint}",
+                            f"HTTP {response.status_code}: {response.text[:200]}",
+                            f"HTTP {expected_status}",
+                            "Medium"
+                        )
+                    
+                    # Check for information disclosure
+                    response_text = response.text.lower()
+                    sensitive_info = ["traceback", "stack trace", "exception", "internal error", "debug"]
+                    
+                    for info in sensitive_info:
+                        if info in response_text:
+                            self.add_issue(
+                                f"ERR-{len(self.issues)+1:03d}",
+                                f"Information disclosure: {method} {endpoint}",
+                                f"Sensitive information leaked in error response",
+                                f"Send {method} request to {endpoint}",
+                                f"Response contains: {info}",
+                                "Generic error message without sensitive details",
                                 "Medium"
                             )
                             
-                    except json.JSONDecodeError:
-                        self.log_issue(
-                            f"ERROR-JSON-{endpoint.replace('/', '_').upper()}",
-                            "middleware/error_handlers.py", 
-                            f"Non-JSON error response for {endpoint}",
-                            f"1. GET {endpoint}\n2. Parse response as JSON",
-                            f"Response: {response.text}",
-                            "Error responses should be valid JSON",
+                except Exception as e:
+                    print(f"   ℹ️  Error handling test failed for {method} {endpoint}: {e}")
+                    
+    async def test_edge_cases(self):
+        """Test edge cases and boundary conditions"""
+        print("\n🔬 Testing Edge Cases...")
+        
+        edge_cases = [
+            # Large parameter values
+            ("GET", "/api/v1/search", {"keyword": "a" * 10000}),
+            ("GET", "/api/v1/eligibility/check", {"gpa": "999999"}),
+            ("GET", "/api/v1/scholarships", {"limit": "999999"}),
+            
+            # Invalid data types
+            ("GET", "/api/v1/eligibility/check", {"gpa": "not-a-number"}),
+            ("GET", "/api/v1/scholarships", {"min_amount": "invalid"}),
+            
+            # Boundary values
+            ("GET", "/api/v1/eligibility/check", {"gpa": "5.0"}),  # Above max GPA
+            ("GET", "/api/v1/eligibility/check", {"gpa": "-1.0"}),  # Below min GPA
+            ("GET", "/api/v1/scholarships", {"limit": "0"}),  # Zero limit
+            ("GET", "/api/v1/scholarships", {"offset": "-1"}),  # Negative offset
+        ]
+        
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            for method, endpoint, params in edge_cases:
+                try:
+                    response = await client.request(
+                        method, 
+                        f"{self.base_url}{endpoint}",
+                        params=params
+                    )
+                    
+                    if response.status_code >= 500:
+                        self.add_issue(
+                            f"EDGE-{len(self.issues)+1:03d}",
+                            f"Edge case handling: {endpoint}",
+                            f"Server error on edge case input: {params}",
+                            f"Send {method} to {endpoint} with params: {params}",
+                            f"HTTP {response.status_code}: {response.text[:200]}",
+                            "HTTP 400 Bad Request with validation error",
                             "Medium"
                         )
-                        
+                    elif response.status_code == 200:
+                        # Check if invalid inputs are accepted
+                        param_str = str(params)
+                        if "not-a-number" in param_str or "999999" in param_str:
+                            self.add_issue(
+                                f"EDGE-{len(self.issues)+1:03d}",
+                                f"Input validation: {endpoint}",
+                                f"Invalid input accepted: {params}",
+                                f"Send {method} to {endpoint} with params: {params}",
+                                f"HTTP 200: Request processed successfully",
+                                "HTTP 400 Bad Request with validation error",
+                                "Medium"
+                            )
+                            
+                except Exception as e:
+                    print(f"   ℹ️  Edge case test failed for {endpoint}: {e}")
+                    
+    async def test_concurrent_requests(self):
+        """Test system behavior under concurrent load"""
+        print("\n🔄 Testing Concurrent Requests...")
+        
+        async def single_request(client, endpoint):
+            try:
+                response = await client.get(f"{self.base_url}{endpoint}")
+                return response.status_code
             except Exception as e:
-                self.log_issue(
-                    f"ERROR-TEST-{endpoint.replace('/', '_').upper()}",
-                    "middleware/error_handlers.py",
-                    f"Exception testing error handling for {endpoint}",
-                    f"1. GET {endpoint}",
-                    f"Exception: {str(e)}",
-                    "Should handle endpoint testing without exceptions",
+                return f"Error: {str(e)}"
+        
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            # Test concurrent requests to same endpoint
+            tasks = [single_request(client, "/api/v1/scholarships") for _ in range(20)]
+            results = await asyncio.gather(*tasks, return_exceptions=True)
+            
+            error_count = sum(1 for r in results if isinstance(r, Exception) or str(r).startswith("Error"))
+            server_errors = sum(1 for r in results if isinstance(r, int) and r >= 500)
+            
+            if error_count > 5:
+                self.add_issue(
+                    f"CONC-{len(self.issues)+1:03d}",
+                    "Concurrent request handling",
+                    f"High failure rate under concurrent load: {error_count}/20 failures",
+                    "Send 20 concurrent requests to /api/v1/scholarships",
+                    f"Failed requests: {error_count}, Results: {results[:5]}...",
+                    "Majority of requests should succeed",
                     "High"
                 )
-    
-    def test_performance_degradation(self):
-        """Test for performance issues and potential DoS vectors"""
-        print("\n🔍 Testing Performance Degradation...")
-        
-        if not self.client:
-            return
             
-        # Test response times for potential performance issues
-        performance_tests = [
+            if server_errors > 2:
+                self.add_issue(
+                    f"CONC-{len(self.issues)+1:03d}",
+                    "Server stability under load",
+                    f"Server errors under concurrent load: {server_errors}/20",
+                    "Send 20 concurrent requests to /api/v1/scholarships",
+                    f"Server errors: {server_errors}",
+                    "No server errors under normal concurrent load",
+                    "High"
+                )
+                
+    async def analyze_code_vulnerabilities(self):
+        """Static analysis of code for common vulnerabilities"""
+        print("\n🔍 Analyzing Code Vulnerabilities...")
+        
+        # LSP diagnostic issues already identified
+        lsp_issues = [
             {
-                'name': 'large_search_query',
-                'endpoint': '/search',
-                'method': 'POST',
-                'payload': {'query': 'scholarship ' * 1000},
-                'max_time': 5.0
+                "file": "routers/scholarships.py",
+                "lines": "312-320",
+                "issue": "Argument missing for parameter 'eligibility_criteria'",
+                "severity": "High"
             },
             {
-                'name': 'complex_filters',
-                'endpoint': '/search', 
-                'method': 'POST',
-                'payload': {
-                    'fields_of_study': ['Engineering'] * 50,
-                    'states': ['CA'] * 50,
-                    'scholarship_types': ['Merit'] * 50
-                },
-                'max_time': 5.0
-            },
-            {
-                'name': 'health_check_performance',
-                'endpoint': '/health',
-                'method': 'GET',
-                'payload': None,
-                'max_time': 1.0
+                "file": "middleware/rate_limiting.py", 
+                "lines": "219, 223, 227",
+                "issue": "'limit' is not a known member of 'None'",
+                "severity": "High"
             }
         ]
         
-        for test in performance_tests:
-            try:
-                start_time = time.time()
-                
-                if test['method'] == 'GET':
-                    response = self.client.get(test['endpoint'])
-                else:
-                    response = self.client.post(test['endpoint'], json=test['payload'])
-                    
-                end_time = time.time()
-                response_time = end_time - start_time
-                
-                if response_time > test['max_time']:
-                    self.log_issue(
-                        f"PERF-{test['name'].upper()}",
-                        f"routers/{test['endpoint'].split('/')[1] if len(test['endpoint'].split('/')) > 1 else 'health'}.py",
-                        f"Slow response time for {test['name']}: {response_time:.2f}s",
-                        f"1. {test['method']} {test['endpoint']}\n2. Payload: {test['payload']}",
-                        f"Response time: {response_time:.2f} seconds",
-                        f"Should respond within {test['max_time']} seconds",
-                        "Medium"
-                    )
-                    
-            except Exception as e:
-                self.log_issue(
-                    f"PERF-{test['name'].upper()}-EXCEPTION",
-                    "Performance testing",
-                    f"Performance test caused exception: {test['name']}",
-                    f"1. {test['method']} {test['endpoint']}\n2. Payload: {test['payload']}",
-                    f"Exception: {str(e)}",
-                    "Performance tests should complete without exceptions",
-                    "High"
-                )
-    
-    def test_security_headers(self):
-        """Test for missing or misconfigured security headers"""
-        print("\n🔍 Testing Security Headers...")
-        
-        if not self.client:
-            return
-            
-        try:
-            response = self.client.get("/health")
-            headers = response.headers
-            
-            # Check for critical security headers
-            security_headers = {
-                'X-Content-Type-Options': 'nosniff',
-                'X-Frame-Options': ['DENY', 'SAMEORIGIN'],
-                'X-XSS-Protection': '1; mode=block',
-                'Strict-Transport-Security': None  # Should be present in production
-            }
-            
-            for header, expected in security_headers.items():
-                if header not in headers:
-                    self.log_issue(
-                        f"SEC-HEADER-{header.replace('-', '_').upper()}",
-                        "middleware/security_headers.py",
-                        f"Missing security header: {header}",
-                        f"1. GET /health\n2. Check response headers",
-                        f"Header not present in response",
-                        f"Should include {header} header",
-                        "Medium"
-                    )
-                elif expected and isinstance(expected, list):
-                    if headers[header] not in expected:
-                        self.log_issue(
-                            f"SEC-HEADER-{header.replace('-', '_').upper()}-VALUE",
-                            "middleware/security_headers.py",
-                            f"Invalid security header value: {header}",
-                            f"1. GET /health\n2. Check {header} header value",
-                            f"Value: {headers[header]}",
-                            f"Should be one of: {expected}",
-                            "Medium"
-                        )
-                elif expected and headers[header] != expected:
-                    self.log_issue(
-                        f"SEC-HEADER-{header.replace('-', '_').upper()}-VALUE",
-                        "middleware/security_headers.py", 
-                        f"Invalid security header value: {header}",
-                        f"1. GET /health\n2. Check {header} header value",
-                        f"Value: {headers[header]}",
-                        f"Expected: {expected}",
-                        "Medium"
-                    )
-                    
-        except Exception as e:
-            self.log_issue(
-                "SEC-HEADER-TEST-EXCEPTION",
-                "middleware/security_headers.py",
-                "Exception testing security headers",
-                "1. GET /health\n2. Check response headers",
-                f"Exception: {str(e)}",
-                "Should test security headers without exceptions",
-                "High"
+        for issue in lsp_issues:
+            self.add_issue(
+                f"CODE-{len(self.issues)+1:03d}",
+                f"{issue['file']}:{issue['lines']}",
+                f"Static analysis error: {issue['issue']}",
+                f"Analyze {issue['file']} with Python LSP",
+                f"LSP diagnostic: {issue['issue']}",
+                "Clean code without static analysis errors",
+                issue['severity']
             )
-    
-    def run_comprehensive_analysis(self):
-        """Run all QA tests and generate comprehensive report"""
-        print("🚀 STARTING SENIOR QA COMPREHENSIVE ANALYSIS")
-        print("=" * 60)
-        
-        # Initialize test client
-        if not self.setup_test_client():
-            print("❌ Failed to setup test client - some tests will be skipped")
-        
-        # Run all test suites
-        self.test_import_vulnerabilities()
-        self.test_configuration_edge_cases()
-        self.test_authentication_vulnerabilities()
-        self.test_input_validation_edge_cases()
-        self.test_rate_limiting_bypass()
-        self.test_data_consistency_issues()
-        self.test_error_handling_consistency()
-        self.test_performance_degradation()
-        self.test_security_headers()
-        
-        # Generate comprehensive report
-        self.generate_report()
-    
-    def generate_report(self):
-        """Generate detailed QA analysis report"""
-        print("\n" + "=" * 60)
-        print("📊 SENIOR QA ANALYSIS REPORT")
-        print("=" * 60)
-        
-        if not self.issues:
-            print("✅ No issues identified in comprehensive analysis")
-            return
             
-        # Group issues by severity
-        severity_groups = {}
+        # Additional code smell analysis
+        potential_issues = [
+            {
+                "location": "main.py:136",
+                "description": "Rate limiter fallback warning printed to stdout",
+                "severity": "Low"
+            },
+            {
+                "location": "config/settings.py:33-36", 
+                "description": "Hardcoded banned secrets list may need updates",
+                "severity": "Low"
+            }
+        ]
+        
+        for issue in potential_issues:
+            self.add_issue(
+                f"CODE-{len(self.issues)+1:03d}",
+                issue['location'],
+                issue['description'],
+                f"Review code at {issue['location']}",
+                "Code pattern that may need improvement",
+                "Best practice implementation",
+                issue['severity']
+            )
+            
+    async def test_database_operations(self):
+        """Test database-related operations for vulnerabilities"""
+        print("\n🗄️  Testing Database Operations...")
+        
+        # Test endpoints that likely interact with database
+        db_endpoints = [
+            "/api/v1/scholarships",
+            "/api/v1/search",
+            "/api/v1/eligibility/check?gpa=3.5&grade_level=undergraduate"
+        ]
+        
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            for endpoint in db_endpoints:
+                try:
+                    response = await client.get(f"{self.base_url}{endpoint}")
+                    
+                    if response.status_code == 200:
+                        # Check response time for potential performance issues
+                        if hasattr(response, 'elapsed') and response.elapsed.total_seconds() > 5:
+                            self.add_issue(
+                                f"DB-{len(self.issues)+1:03d}",
+                                f"Database performance: {endpoint}",
+                                f"Slow database query detected",
+                                f"Send GET request to {endpoint}",
+                                f"Response time: {response.elapsed.total_seconds()}s",
+                                "Response time under 1 second for simple queries",
+                                "Medium"
+                            )
+                        
+                        # Check for potential data leakage
+                        response_text = response.text.lower()
+                        sensitive_patterns = ["password", "secret", "token", "key", "hash"]
+                        
+                        for pattern in sensitive_patterns:
+                            if pattern in response_text:
+                                self.add_issue(
+                                    f"DB-{len(self.issues)+1:03d}",
+                                    f"Data exposure: {endpoint}",
+                                    f"Potential sensitive data exposure: {pattern}",
+                                    f"Send GET request to {endpoint}",
+                                    f"Response contains: {pattern}",
+                                    "No sensitive data in API responses",
+                                    "High"
+                                )
+                                
+                except Exception as e:
+                    print(f"   ℹ️  Database test failed for {endpoint}: {e}")
+                    
+    def generate_comprehensive_report(self):
+        """Generate the final comprehensive QA report"""
+        print("\n" + "="*80)
+        print("📋 SENIOR QA COMPREHENSIVE ANALYSIS REPORT")
+        print("="*80)
+        
+        # Summary statistics
+        total_issues = len(self.issues)
+        severity_counts = {"Critical": 0, "High": 0, "Medium": 0, "Low": 0}
+        
         for issue in self.issues:
-            if issue.severity not in severity_groups:
-                severity_groups[issue.severity] = []
-            severity_groups[issue.severity].append(issue)
+            severity_counts[issue.severity] += 1
+            
+        print(f"\n📊 EXECUTIVE SUMMARY:")
+        print(f"   Total Issues Found: {total_issues}")
+        print(f"   Critical: {severity_counts['Critical']}")
+        print(f"   High: {severity_counts['High']}")
+        print(f"   Medium: {severity_counts['Medium']}")
+        print(f"   Low: {severity_counts['Low']}")
         
-        # Report summary
-        print(f"\n📈 SUMMARY: {len(self.issues)} total issues identified")
-        for severity in ['Critical', 'High', 'Medium', 'Low']:
-            if severity in severity_groups:
-                print(f"  {severity}: {len(severity_groups[severity])} issues")
+        print(f"\n🔍 DETAILED FINDINGS:")
+        print("-" * 80)
         
-        # Detailed issue reports
-        for severity in ['Critical', 'High', 'Medium', 'Low']:
-            if severity in severity_groups:
-                print(f"\n🔥 {severity.upper()} SEVERITY ISSUES:")
-                print("-" * 40)
-                
-                for issue in severity_groups[severity]:
-                    print(f"\nIssue ID: {issue.issue_id}")
-                    print(f"Location: {issue.location}")
-                    print(f"Description: {issue.description}")
-                    print(f"Steps to Reproduce:")
-                    for step in issue.reproduce_steps.split('\n'):
-                        print(f"  {step}")
-                    print(f"Observed Output: {issue.observed}")
-                    print(f"Expected Output: {issue.expected}")
-                    print(f"Severity: {issue.severity}")
-                    print(f"Timestamp: {issue.timestamp}")
-                    print("-" * 40)
+        # Sort issues by severity
+        severity_order = {"Critical": 0, "High": 1, "Medium": 2, "Low": 3}
+        sorted_issues = sorted(self.issues, key=lambda x: severity_order[x.severity])
+        
+        for issue in sorted_issues:
+            print(f"\nIssue ID: {issue.issue_id}")
+            print(f"Location: {issue.location}")
+            print(f"Description: {issue.description}")
+            print(f"Severity: {issue.severity}")
+            print(f"Steps to Reproduce: {issue.steps_to_reproduce}")
+            print(f"Observed Output: {issue.observed_output}")
+            print(f"Expected Output: {issue.expected_output}")
+            print("-" * 40)
+            
+        # Save to JSON file
+        report_data = {
+            "timestamp": datetime.now().isoformat(),
+            "summary": {
+                "total_issues": total_issues,
+                "severity_breakdown": severity_counts
+            },
+            "issues": [
+                {
+                    "issue_id": issue.issue_id,
+                    "location": issue.location,
+                    "description": issue.description,
+                    "steps_to_reproduce": issue.steps_to_reproduce,
+                    "observed_output": issue.observed_output,
+                    "expected_output": issue.expected_output,
+                    "severity": issue.severity
+                }
+                for issue in sorted_issues
+            ]
+        }
+        
+        with open("SENIOR_QA_COMPREHENSIVE_ANALYSIS_REPORT.json", "w") as f:
+            json.dump(report_data, f, indent=2)
+            
+        print(f"\n💾 Report saved to: SENIOR_QA_COMPREHENSIVE_ANALYSIS_REPORT.json")
+        print(f"🎯 QA Analysis Complete - {total_issues} issues identified")
+
+async def main():
+    """Main execution function"""
+    analyzer = SeniorQAAnalyzer()
+    await analyzer.run_comprehensive_analysis()
 
 if __name__ == "__main__":
-    analyzer = SeniorQAAnalyzer()
-    analyzer.run_comprehensive_analysis()
+    asyncio.run(main())
