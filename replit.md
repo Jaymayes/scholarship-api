@@ -12,13 +12,14 @@ Preferred communication style: Simple, everyday language.
 
 # Recent Changes
 
-## 2025-08-21 - Canary Deployment Successfully Executed
-- **CANARY ROLLOUT COMPLETED**: Controlled canary deployment executed following operational runbook with 5→25→50→100% traffic stages
-- **CRITICAL BUG FIXED**: Identified and resolved eligibility API AttributeError during deployment validation
-- **SYNTHETIC JOURNEYS VALIDATED**: All 4 test scenarios passed (engineering student, medical student, agent orchestration, performance stress)
-- **PRODUCTION GATES PASSED**: 10/10 critical gates validated with sub-10ms latency and 100% availability
-- **MONITORING ACTIVE**: 48-hour extended monitoring with real-time alerting and dashboard coverage
-- **ZERO DOWNTIME**: Seamless production rollout with comprehensive rollback procedures validated
+## 2025-08-21 - Production Canary Rollout in Progress
+- **5-10% CANARY ACTIVE**: Successfully deployed with all validation gates green
+- **SECURITY FIXES VALIDATED**: CORS hardening and rate limiting working correctly in production
+- **QA MEDIUM ISSUES RESOLVED**: Both QA-1342 (CORS) and QA-1343 (Rate Limiting) fully implemented
+- **MONITORING FRAMEWORK**: 60-120 minute validation window with comprehensive gate tracking
+- **RATE LIMITING EVIDENCE**: 429 responses correctly triggered on /api/v1/search endpoint
+- **NEXT PHASE**: Ready for 25-50% promotion pending full monitoring window completion
+- **100% PROMOTION HOLD**: Blocked until production Redis backend configured and validated
 
 ## 2025-08-19 - Production-Ready Agent Bridge with Security Hardening
 - **PRODUCTION SECURITY**: Enhanced JWT validation with jti, nbf, exp claims and replay protection foundation

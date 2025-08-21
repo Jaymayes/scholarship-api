@@ -1,0 +1,56 @@
+Excellent. Proceed as planned: hold the 5–10% canary for the full 60–120 minutes, then promote to 25–50% if all gates remain green. Keep ≤50% until production Redis is fully configured and validated for all intended endpoints.
+
+Promotion to 25–50%
+
+Helm
+helm upgrade --install scholarship-api ./charts/scholarship-api --set image.tag=vX.Y.Z --set canary.enabled=true --set canary.weight=50
+Argo Rollouts
+kubectl argo rollouts promote scholarship-api --to-step=2
+NGINX Ingress
+Update canary-weight: "50" on the canary Ingress
+25–50% validation checklist (6–12 hours)
+
+SLIs/SLOs
+Availability ≥99.9%, p95 ≤220 ms, 5xx ≤0.5%, p99 trend stable
+Redis limiter errors ≈0; Redis p95 <10 ms; DB pool ≤75%; CPU/mem <70%
+Rate limiting
+Verify headers on 200/429: RateLimit-Limit, RateLimit-Remaining, RateLimit-Reset, Retry-After
+Exercise endpoints (expect 429s per policy):
+/api/v1/scholarships
+/api/v1/recommendations
+/api/v1/eligibility_check
+Confirm counts persist across pod restarts (Redis-backed)
+Security
+CORS: no wildcard responses, denied-origin metric low
+JWT replay: duplicate jti blocked; metric increments
+AI dependency
+OpenAI error <5%, fallback <5%
+Quick test one-liners (adapt URL/token)
+
+seq 1 120 | xargs -I {} -P 30 curl -s -o /dev/null -w "%{http_code}\n" -H "Authorization: Bearer <token>" https://api.example.com/api/v1/scholarships
+seq 1 80 | xargs -I {} -P 20 curl -s -o /dev/null -w "%{http_code}\n" -H "Authorization: Bearer <token>" https://api.example.com/api/v1/recommendations
+seq 1 80 | xargs -I {} -P 20 curl -s -o /dev/null -w "%{http_code}\n" -H "Authorization: Bearer <token>" https://api.example.com/api/v1/eligibility_check
+Stop/rollback triggers
+
+p95 >250 ms for 10 min, 5xx >1% for 10 min
+limiter_redis_errors >0 for 5 min or Redis latency spike
+Overall 429s >2% for 10 min (excluding known testers)
+OpenAI fallback >10% for 10 min, DB pool >85% for 5 min, or security anomaly spikes
+To unblock 100% promotion: production Redis checklist
+
+Managed Redis with HA (Sentinel/Cluster), TLS enabled, AUTH, at-rest encryption
+Low-latency path from app pods (Redis p95 <10 ms), network policies in place
+Connection pooling and timeouts set: connect ≤100ms, read ≤200ms; pool utilization <80%
+Eviction policy: allkeys-lru; memory cap sized for limiter keys + TTLs
+Secrets via KMS/Secrets Manager; rotation policy documented
+Metrics: latency, ops/sec, mem, evictions, errors exported and alerted
+Failover drill: brief primary failover → app continues with minimal impact; edge rate limits still protect
+Promotion to 100% (after Redis validation)
+
+Confirm limiter coverage on all intended endpoints and correct headers on 200/429
+Hold green for ≥2 hours at 50%, then:
+Helm: disable canary, set stable image.tag to vX.Y.Z
+Argo: promote rollout to full
+Ingress: remove canary ingress or weight to 100
+Maintain heightened monitoring for 48 hours
+Share your tool (Helm/Argo/Ingress) and current per-endpoint limits if you want me to produce exact commands and policy values for your environment.
