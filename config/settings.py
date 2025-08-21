@@ -105,7 +105,8 @@ class Settings(BaseSettings):
     enable_docs: Optional[bool] = Field(None, alias="ENABLE_DOCS")
     
     # Feature flag for public read endpoints (authentication bypass)
-    public_read_endpoints: bool = Field(True, alias="PUBLIC_READ_ENDPOINTS")  # Default to True for dev
+    # SEV-1 SECURITY CONTAINMENT: FORCE DISABLE AUTHENTICATION BYPASS
+    public_read_endpoints: bool = Field(False, alias="PUBLIC_READ_ENDPOINTS")  # CRITICAL: Hardcoded False
     
     # Agent Orchestration Configuration
     command_center_url: Optional[str] = Field(None, alias="COMMAND_CENTER_URL")
@@ -179,13 +180,9 @@ class Settings(BaseSettings):
                 "https://admin.yourdomain.com"
             ]
         else:
-            # Development/staging: Conservative allowlist instead of wildcard
+            # SEV-1 CONTAINMENT: Minimal development origins only
             dev_origins = [
-                "http://localhost:3000", 
-                "http://127.0.0.1:3000", 
-                "http://localhost:5000",
-                "http://localhost:8000",
-                "http://localhost:8080"
+                "http://127.0.0.1:5000"  # ONLY local app server for containment
             ]
             
             # Add dynamic Replit origin detection

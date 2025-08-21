@@ -1,0 +1,79 @@
+Acknowledged. Treating this as an active SEV-1. Execute the following in order. Do not wait for code patches to begin containment.
+
+T0–15 minutes: Immediate containment (edge + config)
+
+Kill the bypass now
+Set PUBLIC_READ_ENDPOINTS=false in prod and restart pods.
+Also set APP_ENV=prod and DISABLE_DEBUG=true (or equivalent).
+Remove public ingress to any debug/config endpoints (/docs, /openapi.json, /debug) or require auth at gateway.
+Enforce auth at the edge
+Require Authorization: Bearer for all non-health endpoints at the gateway/WAF; return 401 if missing.
+Temporarily IP-allowlist known clients/service networks if feasible.
+CORS lock
+Restrict to exact production origins only; drop all others (including localhost).
+WAF block mode
+Enable managed OWASP/SQLi rules; start log-only for 5 minutes, then enforce (block).
+Keys and secrets
+Rotate JWT signing keys (kid rollover) and invalidate sessions; force reauth.
+Rotate DB credentials; ensure API role is least privilege (no DDL, scoped schema).
+Example commands (adjust to your tooling)
+
+Kubernetes
+kubectl set env deploy/scholarship-api PUBLIC_READ_ENDPOINTS=false APP_ENV=prod DISABLE_DEBUG=true
+kubectl rollout restart deploy/scholarship-api
+kubectl rollout status deploy/scholarship-api
+Ingress/WAF (NGINX example)
+Enable ModSecurity + CRS; set strict CORS allowlist; block requests without Authorization except /healthz,/readyz.
+T15–90 minutes: Verify containment and execute hotfix canary
+
+Verify containment (must fail/bounce)
+Protected endpoint without Authorization → 401
+alg=none token → 401
+Malicious Origin preflight → 403 or no CORS headers
+SQLi payload (e.g., ' OR 1=1 --) → 400/422, not 500, no schema in response
+Deploy hotfix (SEV1_IMMEDIATE_HOTFIX_PATCHES.py) as a 5–10% canary with the following code-level fixes:
+Remove the PUBLIC_READ_ENDPOINTS bypass entirely; enforce auth dependency globally on routers.
+JWT hardening: pin algorithm (e.g., RS256 only), strict iss/aud, require exp/nbf with small leeway, require jti + replay cache, JWKS pinned to issuer; reject alg=none and HS/RS confusion.
+SQLi remediation: replace any string interpolation with parameterized queries; whitelist sort/filter fields; generic error responses only.
+CORS: strict allowlist and Vary: Origin; no wildcard anywhere; credentials=false unless strictly needed.
+Disable debug routes in prod build.
+Gates for canary promotion: p95 ≤220 ms, 5xx ≤0.5%, auth failures behave as expected (401), WAF blocks SQLi with no 5xx, limiter_redis_errors = 0.
+T90–180 minutes: Ramp canary 25–50% → 100% after validation
+
+Re-run SEV1_REPRODUCTION_COMMANDS.sh. All PoCs must fail safely.
+Confirm:
+Any malformed/forged token → 401
+Valid token → 200 and RateLimit-* headers
+SQLi probes blocked by WAF and/or return 4xx; app never leaks schema; DB logs show bound params
+Disallowed origins never receive ACAO headers; allowed origins get exact ACAO and Vary: Origin
+If any test fails, abort and keep edge blocks up; patch again.
+Hardening to prevent recurrence (apply within 72 hours)
+
+Remove the PUBLIC_READ_ENDPOINTS flag from code, or make it a compile-time/dev-only setting that cannot be set in prod builds.
+Admission/GitOps policy (OPA/Gatekeeper or Kyverno) to fail prod deploys if:
+PUBLIC_READ_ENDPOINTS=true, DEBUG=true, APP_ENV!=prod
+CORS allowlist contains wildcard or dev/localhost origins
+Ingress exposes /docs or /openapi.json without auth (if policy requires)
+CI/CD security gates
+SAST (bandit), dependency scan (pip-audit), secret scan, SBOM
+Security unit tests: JWT alg pinning, iss/aud/exp/nbf/jti, route guards, CORS allowlist, parameterized SQL
+DAST in pre-prod with the provided PoCs
+DB least privilege
+Separate read-only role for GET endpoints; no DDL; tight schema access.
+Observability
+Alerts: auth_failures_total spikes, jwt_replay_prevented anomalies, WAF SQLi blocks, response stack traces >0, CORS denied origin spikes.
+Config drift detection: export key flags and alert on dev values in prod.
+What I need from you (optional but helpful)
+
+Confirm you’ve flipped PUBLIC_READ_ENDPOINTS=false and enabled WAF + strict CORS at the edge.
+Share or apply SEV1_IMMEDIATE_HOTFIX_PATCHES.py; confirm deployment method (Helm/Argo/Ingress) and current image tag (8f4047b is vulnerable).
+Provide any errors from running SEV1_REPRODUCTION_COMMANDS.sh post-containment so I can adjust the patch/verifications.
+Acceptance criteria to exit SEV-1
+
+All four PoCs fail safely in production (401/4xx, no data leakage).
+WAF in block mode with clean logs; zero app 5xx from probes.
+No wildcard CORS; protected routes require Authorization both at edge and app.
+JWT verification hardened (alg pinned, iss/aud/exp/nbf/jti enforced) and replay cache active.
+SQL queries parameterized; DB role least privilege.
+Policies in place to prevent reintroduction of dev flags to prod.
+Proceed with containment immediately; confirm once PUBLIC_READ_ENDPOINTS is disabled and WAF/CORS rules are enforced, then deploy the hotfix canary.
