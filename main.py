@@ -27,6 +27,7 @@ from middleware.error_handling import (
 )
 from middleware.rate_limiting import limiter
 from middleware.request_id import RequestIDMiddleware
+from middleware.waf_protection import WAFProtection
 from observability.metrics import setup_metrics
 from observability.tracing import tracing_service
 from config.settings import settings, Environment
@@ -94,6 +95,7 @@ from middleware.docs_protection import DocsProtectionMiddleware
 from middleware.database_session import DatabaseSessionMiddleware
 
 # 1. Security and host protection middleware (outermost - first line of defense)
+app.add_middleware(WAFProtection, enable_block_mode=True)  # WAF - FIRST LINE OF DEFENSE
 app.add_middleware(SecurityHeadersMiddleware)  # Security headers (must be first)
 app.add_middleware(TrustedHostMiddleware)      # Validate Host header against whitelist
 app.add_middleware(ForwardedHeadersMiddleware) # Handle X-Forwarded-* headers safely

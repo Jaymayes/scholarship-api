@@ -1,0 +1,98 @@
+Acknowledged. Correct decision to block 100% promotion. Here is a tight 4–6 hour remediation plan with concrete steps, commands, and acceptance criteria to clear the remaining gaps, plus the final Go/No-Go checklist for resuming the rollout at 23:00Z.
+
+Plan of record (execute in order, parallelize where noted)
+
+Phase 1: WAF enablement (30–45 minutes)
+
+Goal: Edge-layer blocking for SQLi/OWASP attacks and missing Authorization header.
+Actions
+Enable WAF in block mode with OWASP Core Rule Set and SQLi rules.
+Require Authorization: Bearer on all non-health endpoints at the gateway.
+Lock CORS to production origins at the edge (mirror app config).
+NGINX Ingress example
+Enable ModSecurity + CRS and block missing Authorization:
+nginx.ingress.kubernetes.io/enable-modsecurity: "true"
+nginx.ingress.kubernetes.io/enable-owasp-core-rules: "true"
+nginx.ingress.kubernetes.io/modsecurity-snippet: | SecRuleEngine On SecRule REQUEST_HEADERS:Authorization "@streq " "id:10001,phase:1,deny,status:401,msg:'Missing Authorization header',t:none,chain" SecRule REQUEST_URI "@beginsWith /healthz" "t:none,skipAfter:END_AUTH_HEADER_CHECK" SecRule REQUEST_URI "@beginsWith /readyz" "t:none,skipAfter:END_AUTH_HEADER_CHECK" SecMarker END_AUTH_HEADER_CHECK
+If using AWS/GCP/Kong, enable managed OWASP/SQLi rule sets and header enforcement equivalently.
+Acceptance
+SQLi probes receive 403 at edge; no app 5xx.
+Requests without Authorization to protected paths → 401 at edge.
+Disallowed origins receive 403 or no CORS headers.
+Phase 2: Code-level SQL injection remediation (60–120 minutes)
+
+Goal: Eliminate latent SQLi regardless of auth/WAF; ensure parameterized queries everywhere.
+Actions
+Replace any string interpolation or f-strings with bound parameters (SQLAlchemy Core/ORM or text() + params()).
+Whitelist user-controlled sort/filter to known columns; map inputs to constants; reject unknowns.
+Validate numeric inputs and bounds (limit, offset) via Pydantic.
+Normalize LIKE inputs; escape % and _; prefer FTS/tsvector where available.
+Generic error responses only; no DB error text. Include correlation ID in errors; no stack traces.
+DB role least privilege: read-only for GET; no DDL permissions.
+Quick checks to run with a valid token (confirm app-level fix)
+Payloads: ' OR 1=1 --, '); DROP TABLE t; --, OR TRUE, UNION SELECT tests in query params.
+Expect 400/422 (validation) or safe 200 with empty result; never 500; no schema in responses.
+Enable DB statement logging temporarily; verify bound parameters (placeholders) rather than interpolated strings.
+Phase 3: Credential rotations (60–90 minutes)
+
+JWT signing keys
+Add new key (new kid) in IdP; deploy app to trust both old and new.
+Flip IdP default to new key; monitor auth rates.
+After grace (e.g., 30 minutes), remove old key from IdP and app trust set.
+Acceptance: tokens with old kid are rejected; clients re-auth seamlessly.
+Database credentials (PostgreSQL example)
+CREATE ROLE api_user_new WITH LOGIN PASSWORD '…' NOINHERIT;
+GRANT USAGE ON SCHEMA public TO api_user_new;
+GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO api_user_new;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO api_user_new;
+Update Kubernetes secret and rollout pods; then REVOKE ALL and DROP ROLE old user after verification.
+Acceptance: app uses new user; permissions scoped; no errors.
+Phase 4: Monitoring and alerting (parallel; 30–60 minutes)
+
+Metrics/alerts to enable
+waf_sqli_block_count > 0 (informational), and page if app 5xx correlates with WAF blocks.
+auth_failures_total spike (rate over 5 min) → investigate; jwt_replay_prevented_total anomalies.
+response_stack_traces_count > 0 → page.
+cors_denied_origin_count spikes → investigate.
+Redis limiter: limiter_redis_errors > 0 for 5 min → page.
+SLO burn alerts: fast (≥2%/hour for 30–60 min) and slow (≥1%/6h).
+Synthetic checks from at least two regions:
+Authenticated GET /api/v1/search (expect 200 + RateLimit-*).
+Unauthenticated same path (expect 401).
+Disallowed Origin preflight (expect 403/no CORS).
+SQLi payload with valid token (expect 4xx/safe 200).
+Promotion flow after remediation
+
+Keep current 25–50% canary during fixes; once all four phases pass:
+Maintain 25–50% for ≥60 minutes post-changes with gates green:
+Availability ≥99.9%; p95 ≤220 ms; 5xx ≤0.5%; p99 stable.
+WAF in block mode verified; waf_sqli_block_count present; no app 5xx from probes.
+App-level SQLi tests with valid token return safe responses; DB logs show bound params.
+JWT key rotation complete (old kid disabled); DB creds rotated; auth success stable.
+Then promote to 100% with the same rollback guards you used previously.
+Rollback triggers (unchanged)
+
+p95 >250 ms for 10 min, 5xx >1% for 10 min.
+Any unexpected 200 on malformed/alg=none tokens.
+Any schema/stack trace in responses.
+limiter_redis_errors >0 for 5 min; DB pool >85%.
+WAF block spikes correlated with app errors.
+Guardrails to prevent recurrence (implement within 72 hours)
+
+Remove PUBLIC_READ_ENDPOINTS from prod builds, or make it compile-time dev-only.
+Admission policies (OPA/Kyverno) to block prod deploys if:
+PUBLIC_READ_ENDPOINTS=true or DEBUG=true
+CORS allowlist contains wildcard/dev origins
+Ingress exposes /docs or /openapi.json without auth (if policy requires)
+CI/CD security gates:
+SAST (bandit), deps (pip-audit), secret scan, SBOM; pre-prod DAST using your PoCs.
+Security unit tests: JWT alg pinning, iss/aud/exp/nbf/jti, route-guard tests, parameterized SQL, strict CORS.
+Final Go/No-Go checklist for 100% at 23:00Z
+
+WAF: OWASP/SQLi block mode ON; missing Authorization blocked; verified with probes.
+SQLi: All dynamic queries parameterized; valid-token SQLi PoCs return safe responses; DB logs show bound params; no schema leakage.
+Credentials: new JWT kid active and old removed; DB creds rotated and least-privileged.
+Monitoring: alerts configured and firing in tests; synthetic journeys pass from multiple regions.
+SLIs steady at 25–50% for ≥60 minutes after changes: availability ≥99.9%, p95 ≤220 ms, 5xx ≤0.5%.
+Security: malformed/alg=none/expired/wrong iss/aud → 401; CORS strict; debug endpoints absent.
+If you confirm your WAF platform (NGINX/Kong/AWS/GCP) and the hotfix image tag, I can give you exact commands/snippets for your stack and a one-page verification sheet to attach to the change record.

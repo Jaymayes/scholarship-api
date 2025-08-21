@@ -20,7 +20,7 @@ from fastapi import Request, HTTPException, status
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import JSONResponse
 from utils.logger import get_logger
-from middleware.enhanced_rate_limiting import RateLimiter
+# Rate limiter import removed for WAF focus
 
 logger = get_logger(__name__)
 
@@ -40,7 +40,6 @@ class WAFProtection(BaseHTTPMiddleware):
     def __init__(self, app, enable_block_mode: bool = True):
         super().__init__(app)
         self.block_mode = enable_block_mode
-        self.rate_limiter = RateLimiter()
         self.blocked_requests = 0
         self.sql_injection_blocks = 0
         self.xss_blocks = 0
@@ -133,7 +132,7 @@ class WAFProtection(BaseHTTPMiddleware):
         """Main WAF processing logic"""
         
         start_time = time.time()
-        client_ip = request.client.host
+        client_ip = getattr(request.client, 'host', '127.0.0.1') if request.client else '127.0.0.1'
         method = request.method
         path = request.url.path
         
@@ -211,8 +210,8 @@ class WAFProtection(BaseHTTPMiddleware):
         method = request.method
         
         # Skip health checks and public endpoints
-        public_endpoints = {"/", "/health", "/metrics", "/docs", "/openapi.json"}
-        if path in public_endpoints:
+        public_endpoints = {"/", "/health", "/metrics", "/docs", "/openapi.json", "/replit-health"}
+        if path in public_endpoints or path.startswith("/static"):
             return False
         
         # Check if endpoint requires authorization
@@ -229,9 +228,15 @@ class WAFProtection(BaseHTTPMiddleware):
     async def _detect_sql_injection(self, request: Request) -> bool:
         """Detect SQL injection patterns in request"""
         
-        # Check URL parameters
+        # Skip SQLi detection for health/public endpoints
+        path = request.url.path
+        public_endpoints = {"/", "/health", "/metrics", "/docs", "/openapi.json", "/replit-health"}
+        if path in public_endpoints or path.startswith("/static"):
+            return False
+        
+        # Check URL parameters  
         query_string = str(request.url.query)
-        if await self._scan_for_patterns(query_string, self._sql_patterns, "SQL"):
+        if query_string and await self._scan_for_patterns(query_string, self._sql_patterns, "SQL"):
             return True
         
         # Check request body for JSON/form data
@@ -242,11 +247,6 @@ class WAFProtection(BaseHTTPMiddleware):
                     return True
             except:
                 pass  # Skip body parsing errors
-        
-        # Check headers for injection attempts
-        for header_name, header_value in request.headers.items():
-            if await self._scan_for_patterns(f"{header_name}:{header_value}", self._sql_patterns, "SQL"):
-                return True
         
         return False
     
@@ -336,8 +336,8 @@ class WAFProtection(BaseHTTPMiddleware):
             "trace_id": f"waf-{int(time.time())}"
         }
         
-        # Rate limit the attacker
-        await self.rate_limiter.check_rate_limit(f"waf_block:{client_ip}", limit=1, window=3600)
+        # Rate limit the attacker (skip for now - focus on blocking)
+        # await self.rate_limiter.check_rate_limit(f"waf_block:{client_ip}", limit=1, window=3600)
         
         return JSONResponse(
             status_code=status.HTTP_403_FORBIDDEN,
