@@ -1,0 +1,54 @@
+Strong pushback: Do not promote to 100% yet.
+
+Rationale
+
+SQL injection is only blocked “by authentication layer.” If config ever drifts again (as it did with PUBLIC_READ_ENDPOINTS), the latent SQLi becomes immediately exploitable. This is an unacceptable single point of failure at 100% traffic.
+You also listed WAF rules, JWT key rotation, DB credential rotation, and full production monitoring as still pending. Those are table stakes for closing a SEV‑1.
+Safe path to 100% (execute in this order)
+
+WAF to block mode (30–45 min)
+Enable managed OWASP/SQLi rules at the edge/gateway in block mode.
+Add a rule to require Authorization: Bearer on all non-health endpoints.
+Validation: SQLi probes get 403 at edge; no app 5xx; waf_sqli_block_count > 0.
+2. Code-level SQLi fix (targeted hotfix, 60–120 min)
+
+Replace any dynamic SQL or string interpolation with parameterized queries.
+Whitelist sort/filter fields; validate via schema; no user input in ORDER BY/LIMIT/OFFSET without mapping.
+Generic error handling (no schema details); DB role least-privilege (no DDL).
+Validation:
+With a valid token, SQLi payloads return safe 4xx/200 and no stack traces or schema.
+DB logs show bound parameters, not interpolated SQL.
+3. JWT signing key rotation (30–60 min)
+
+Add new key (kid) in IdP → roll app to trust both → flip IdP default to new key → remove old key after grace period.
+Validation: Tokens with old kid rejected after removal; clients re-auth seamlessly.
+4. DB credential rotation (30–60 min)
+
+Create new least-priv user → update secret → roll pods → revoke old user.
+Validation: No errors; app uses new user; permissions scoped.
+5. Monitoring and guardrails (parallel)
+
+Alerts: waf_sqli_block_count, auth_failures_total spikes, jwt_replay_prevented_total anomalies, response_stack_traces_count > 0, CORS denied_origin_count.
+Synthetic checks from multiple regions for protected endpoints.
+Policy controls (OPA/Kyverno): block prod deploys if PUBLIC_READ_ENDPOINTS=true, DEBUG=true, or CORS contains dev/wildcard origins; guard /docs exposure if required.
+Go/No-Go for 100% (all must be green)
+
+WAF in block mode verified; SQLi PoCs blocked at edge and return safe 4xx in app with a valid token.
+Code-level SQL parameterization verified (DB logs show bound params; no schema leakage).
+JWT key rotation complete (old kid disabled) and DB creds rotated.
+SLIs steady at 25–50% for ≥60 minutes: availability ≥99.9%, p95 ≤220 ms, 5xx ≤0.5%.
+Security: malformed/alg=none/expired/wrong iss/aud → 401; CORS allowlist strict; debug endpoints absent.
+If you still choose to proceed now (risk-accepted)
+
+Minimum extra safeguards before promotion:
+Put WAF in block mode immediately and enforce Authorization at the edge.
+Add admission policy to prevent PUBLIC_READ_ENDPOINTS or wildcard CORS in prod.
+Confirm monitoring/alerts above are live.
+Then promote to 100% with tight rollback criteria.
+Promotion and rollback
+
+Promote (Helm/Argo/Ingress) once the above are complete.
+Rollback triggers: p95 >250 ms 10m, 5xx >1% 10m, any unexpected 200 on malformed tokens, any schema/stacktrace in responses, waf_sqli_block_count spike with correlated 5xx, limiter_redis_errors >0 5m, DB pool >85%.
+Next step
+
+Confirm when WAF is in block mode and the targeted SQL parameterization hotfix is merged. I’ll give you a final, one-page 100% promotion checklist with exact pass/fail checks and post-promotion monitors.
