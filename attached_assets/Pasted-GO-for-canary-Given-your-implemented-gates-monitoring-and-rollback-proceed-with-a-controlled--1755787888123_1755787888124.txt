@@ -1,0 +1,66 @@
+GO for canary.
+
+Given your implemented gates, monitoring, and rollback, proceed with a controlled canary and tight observability. Below is a concise, operator-focused runbook you can use today.
+
+Pre-canary checklist (15 minutes)
+
+Freeze: lock main branch and pause unrelated deploys.
+On-call: confirm primary + backup on-call, paging tested.
+Baseline: snapshot key SLIs from prod (p50/p95 latency, 5xx, DB pool, Redis hit rate, OpenAI error/fallback).
+Migrations: pre-apply/verify DB migrations in staging; confirm migration job ready, idempotent, and reversible.
+Feature flags: AI/Agent Bridge features set to conservative defaults; kill switch verified.
+Traffic controls: rate limits, WAF, CORS allowlist rechecked in prod values.
+Canary rollout plan
+
+Step 1 (5–10% for 60–120 min)
+Gates must stay green: p95 ≤220 ms, 5xx ≤0.5%, search/reco tool errors ≤2%, OpenAI fallback ≤5%, DB pool ≤75%, Redis hit ≥90%, JWT auth errors not elevated, 429s ≤1% of requests.
+Validate automated gates script + synthetic journeys (search → eligibility_check → recommendations → analytics).
+Step 2 (25–50% for 6–12 hours)
+Same gates; add sustained cost and external dependency checks; ensure autoscaling stabilizes; no thundering herd on cache expiry.
+Step 3 (100%)
+Remove canary, scale to steady-state replicas, keep heightened monitoring for 48 hours.
+Promotion and rollback criteria
+
+Promote if all gates are green for the full window and no anomalous security or business-metric deviations (>3σ from baseline).
+Immediate rollback if any of:
+p95 >250 ms for 10 min
+5xx >1% for 10 min
+Search/reco tool errors >2% or OpenAI fallback >10% for 10 min
+DB pool >85% for 5 min, Redis hit <85% for 10 min
+SLO burn >2%/hour
+After rollback, switch traffic to last-good, page on-call, auto-open incident, attach dashboards and logs, and run the validation script against the restored version.
+What to watch during canary
+
+SLIs/SLOs: availability, p50/p95/p99 latency, 5xx/4xx by endpoint, saturation (CPU/mem), queue backlogs.
+Dependencies: Postgres connections and slow queries, PgBouncer pool, Redis hit rate/evictions, OpenAI latency/error/fallback rate.
+Security: JWT validation failures, WAF blocks, authz denials, CORS violations.
+Business: search-success rate, eligibility pass rate, recommendation CTR, conversions to application starts.
+Operator commands (adapt to your tooling)
+
+Helm canary pattern
+helm upgrade --install scholarship-api ./charts/scholarship-api --set image.tag=vX.Y.Z --set canary.enabled=true --set canary.weight=5
+Observe; then bump weight to 25/50 via helm upgrade … --set canary.weight=50
+Promote: disable canary and set stable image.tag to vX.Y.Z
+Argo Rollouts (if used)
+kubectl argo rollouts set image scholarship-api scholarship-api=repo/scholarship-api:vX.Y.Z
+kubectl argo rollouts promote scholarship-api --to-step=1 (5–10%)
+kubectl argo rollouts pause/resume scholarship-api; promote to next steps; abort to rollback
+NGINX/Ingress canary (if used)
+Apply canary ingress with canary: "true" and canary-weight: "5"; increment weights as gates pass.
+Post-deploy verification (Day 0–2)
+
+End-to-end probes from 3 regions: health, search, eligibility_check, recommendations, analytics write path.
+Validate logs/traces: correlation IDs, no PII in logs, error taxonomy as expected.
+Check autoscaling events, eviction rates, and grace termination behavior.
+Cost and token usage alarms for AI; confirm within budget.
+Chaos-lite game day: kill a pod, Redis restart/failover, throttle OpenAI; verify graceful degradation and alerting.
+Communication and documentation
+
+Announce canary start to stakeholders with expected windows and rollback plan.
+Maintain a live decision log: timestamps, metrics snapshots, gate outcomes, decisions.
+After promotion: publish release notes, any config changes, and updated runbooks.
+Nice-to-have quick wins during ramp
+
+Enable idempotency keys for write endpoints.
+Pre-warm caches on deploy; schedule staggered TTLs to avoid herd effects.
+Tighten request/response size caps and per-endpoint rate limits based on observed traffic.
