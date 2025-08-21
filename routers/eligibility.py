@@ -6,7 +6,7 @@ from models.user import UserProfile, EligibilityCheck, EligibilityResult
 from schemas.eligibility import EligibilityCheckRequest, GradeLevelEnum, CitizenshipEnum, FieldOfStudyEnum, StateEnum
 from services.eligibility_service import eligibility_service
 from services.scholarship_service import scholarship_service
-from middleware.auth import get_current_user
+from middleware.auth import get_current_user, require_auth, User
 from middleware.rate_limiting import eligibility_rate_limit
 from config.settings import settings
 # from routers.interaction_wrapper import log_interaction  # Will implement if needed
@@ -90,7 +90,7 @@ async def execute_eligibility_check(
 async def check_eligibility_post(
     request: Request,
     request_data: EligibilityCheckRequest,
-    current_user: dict = Depends(get_current_user)  # QA-005 fix: Require authentication
+    current_user: User = Depends(require_auth())  # HOTFIX: Always require authentication
 ):
     """
     Check scholarship eligibility using POST with request body.
@@ -98,12 +98,7 @@ async def check_eligibility_post(
     Enhanced validation with strict input constraints.
     Requires authentication in production unless PUBLIC_READ_ENDPOINTS is enabled.
     """
-    # QA-005 fix: Enforce authentication in production
-    if not settings.public_read_endpoints and not current_user:
-        raise HTTPException(
-            status_code=401,
-            detail="Authentication required for eligibility endpoints"
-        )
+    # Authentication enforced by dependency injection - no additional check needed
     return await execute_eligibility_check(
         gpa=request_data.gpa,
         grade_level=request_data.grade_level if request_data.grade_level else None,
@@ -121,7 +116,7 @@ async def check_eligibility_post(
 @eligibility_rate_limit()
 async def check_eligibility_get(
     request: Request,
-    current_user: dict = Depends(get_current_user),  # QA-005 fix: Require authentication
+    current_user: User = Depends(require_auth()),  # HOTFIX: Always require authentication
     gpa: Optional[float] = Query(None, ge=0.0, le=4.0, description="GPA on 4.0 scale"),
     grade_level: Optional[GradeLevelEnum] = Query(None, description="Grade level"),
     field_of_study: Optional[FieldOfStudyEnum] = Query(None, description="Field of study"),

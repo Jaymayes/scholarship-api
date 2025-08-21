@@ -127,36 +127,73 @@ def create_access_token(data: Dict[str, Any], expires_delta: Optional[timedelta]
     return encoded_jwt
 
 def decode_token(token: str) -> Optional[TokenData]:
-    """Decode and validate a JWT token with rotation support"""
-    if not token or not isinstance(token, str):
+    """Decode and validate JWT with hardened security"""
+    if not token or not isinstance(token, str) or len(token.strip()) == 0:
         return None
         
-    # Try current key first
+    # Security: Reject tokens with 'none' algorithm
+    try:
+        header = jwt.get_unverified_header(token)
+        if header.get('alg', '').lower() in ['none', 'null', '']:
+            return None
+    except Exception:
+        return None
+        
+    # Security: Ensure proper token structure  
+    token_parts = token.split('.')
+    if len(token_parts) != 3 or not all(part.strip() for part in token_parts):
+        return None
+        
+    # Try current key first with strict validation
     keys_to_try = [get_jwt_secret_key()] + get_jwt_previous_keys()
     
     for secret_key in keys_to_try:
-        if not secret_key:  # Skip empty keys
+        if not secret_key or len(secret_key.strip()) < 32:
             continue
             
         try:
-            payload = jwt.decode(token, secret_key, algorithms=[get_jwt_algorithm()])
+            # SECURITY: Pin algorithm, require all time claims
+            payload = jwt.decode(
+                token, 
+                secret_key, 
+                algorithms=[get_jwt_algorithm()],
+                options={
+                    "require_exp": True,
+                    "require_iat": True,
+                    "verify_exp": True,
+                    "verify_iat": True,
+                    "verify_signature": True
+                },
+                leeway=10  # Max 10 seconds clock skew
+            )
             
             # Extract and validate required fields
             user_id = payload.get("sub")
-            if not user_id or not isinstance(user_id, str):
+            if not user_id or not isinstance(user_id, str) or len(user_id.strip()) == 0:
                 continue
+                
+            # Security: Validate issuer and audience
+            if hasattr(settings, 'jwt_issuer') and settings.jwt_issuer:
+                if payload.get("iss") != settings.jwt_issuer:
+                    continue
+            if hasattr(settings, 'jwt_audience') and settings.jwt_audience:
+                if payload.get("aud") != settings.jwt_audience:
+                    continue
                 
             roles = payload.get("roles", [])
             scopes = payload.get("scopes", [])
             
-            # Ensure roles and scopes are lists
-            if not isinstance(roles, list):
+            # Ensure roles and scopes are valid lists
+            if not isinstance(roles, list) or not all(isinstance(r, str) for r in roles):
                 roles = []
-            if not isinstance(scopes, list):
+            if not isinstance(scopes, list) or not all(isinstance(s, str) for s in scopes):
                 scopes = []
                 
             return TokenData(user_id=user_id, roles=roles, scopes=scopes)
-        except (JWTError, ValueError, KeyError):
+        except (JWTError, ValueError, KeyError, TypeError) as e:
+            # Log security events
+            import logging
+            logging.warning(f"JWT validation failed: {type(e).__name__}")
             continue
     
     return None

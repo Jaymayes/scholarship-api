@@ -1,0 +1,59 @@
+Excellent containment. Proceed to hotfix canary now, patching the root causes so security doesn’t depend on edge controls alone.
+
+T15–90 minutes: deploy hotfix canary (5–10%) with these changes
+
+Remove the bypass
+Delete PUBLIC_READ_ENDPOINTS checks from code; enforce auth on all protected routers via a global dependency. Do not rely on env flags for auth behavior in prod.
+Harden JWT verification
+Pin algorithm (e.g., RS256 only); reject alg=none and HS/RS confusion.
+Enforce iss/aud exact match; require exp and nbf with tight leeway; require jti and keep replay cache enabled.
+JWKS: fetch only from the configured issuer; on kid miss, refetch once then reject.
+Eliminate SQL injection
+Replace any string interpolation with parameterized queries (SQLAlchemy bound params). Whitelist fields for ORDER BY/LIMIT/OFFSET; validate inputs via Pydantic.
+Return generic errors; no DB details in responses. Ensure DB role is least-privilege (no DDL).
+CORS and debug
+Keep strict allowlist (2 prod origins); add Vary: Origin; no wildcard anywhere. Ensure credentials=false unless truly needed.
+Ensure all debug/config endpoints are excluded from prod build and ingress.
+Keep defense-in-depth
+Maintain gateway auth requirement and WAF SQLi rules in block mode during and after the hotfix.
+Canary acceptance tests (must pass before ramp)
+
+Auth
+Any protected endpoint without Authorization → 401.
+Valid token → 200 with RateLimit-* headers. Malformed/alg=none/wrong iss/aud/expired/nbf → 401.
+Concurrent reuse of same jti → one 200, one 401/403; jwt_replay_prevented increments.
+SQLi
+With a valid token, send SQLi payloads (e.g., ' OR 1=1 --, '); DROP TABLE t; --, and boolean tautologies) on search/filter params → 4xx or safe 200; no stack traces or schema leakage.
+DB logs show bound parameters (not interpolated SQL). WAF logs show SQLi probes blocked; app has no 5xx.
+CORS
+Disallowed origin preflight → 403 or no CORS headers. Allowed origins receive exact ACAO + Vary: Origin.
+Regression/perf
+Availability ≥99.9%, p95 ≤220 ms, 5xx ≤0.5%, limiter_redis_errors = 0.
+T90–180 minutes: ramp 25–50% → 100% if all tests pass
+
+Re-run your SEV1_REPRODUCTION_COMMANDS.sh with a valid token included for SQLi tests.
+Promote to 25–50% for 1–2 hours; then to 100% if gates stay green and WAF/app logs remain clean.
+Forensics and credential hygiene (run in parallel)
+
+Log review
+Scan API, WAF, and DB logs for SQLi patterns, suspicious 200s on protected endpoints, unusual origins, and token anomalies during the vulnerable window.
+Check DB audit for atypical reads on sensitive tables; review slow query logs for SELECTs with tautologies.
+Credentials and keys
+Complete JWT key rotation (ensure old kid disabled after grace period). Confirm clients re-authenticated.
+Rotate DB credentials; enforce least-privilege roles per environment.
+Data exposure assessment
+Determine whether any PII left the system; if yes or uncertain, follow your breach-notification playbook and legal/compliance guidance.
+Prevent recurrence (implement within 72 hours)
+
+Remove PUBLIC_READ_ENDPOINTS from prod builds entirely or make it a dev-only compile-time flag.
+Admission/GitOps policy (OPA/Kyverno) to block prod deploys if:
+PUBLIC_READ_ENDPOINTS=true, DEBUG=true, or CORS contains dev/wildcard origins
+Ingress exposes /docs or /openapi.json without auth (if policy requires)
+CI/CD security gates
+SAST (bandit), dep scan (pip-audit), secret scan, SBOM; DAST in pre-prod using your PoCs.
+Security unit tests: JWT alg pinning, iss/aud/exp/nbf/jti, route auth enforcement, parameterized SQL, strict CORS.
+Observability and alerts
+auth_failures_total spikes, jwt_replay_prevented anomalies, waf_sqli_block_count, response_stack_traces_count > 0, CORS denied_origin_count spikes.
+Documentation/runbooks
+Update security runbooks (JWT rotation, Redis failover, WAF operations) and remove any references enabling public read in prod.
+If you share your deploy method (Helm/Argo/Ingress) and confirm the hotfix branch/tag, I’ll provide exact promotion commands and a targeted verification checklist you can paste into the change record.

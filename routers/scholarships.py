@@ -39,8 +39,8 @@ async def search_scholarships(
     limit: int = Query(20, ge=1, le=100, description="Number of results to return"),
     offset: int = Query(0, ge=0, description="Number of results to skip"),
     user_id: Optional[str] = Query(None, description="User ID for analytics"),
-    # QA-004 fix: Require authentication unless PUBLIC_READ_ENDPOINTS is enabled
-    current_user: Optional[dict] = Depends(get_current_user) if not settings.public_read_endpoints else None
+    # HOTFIX: Always require authentication - no bypass allowed
+    current_user: User = Depends(require_auth())
 ):
     """
     Search scholarships with various filters and pagination support - QA-004 fix: Authentication enforced.
@@ -49,12 +49,7 @@ async def search_scholarships(
     This endpoint allows users to search through available scholarships using
     multiple criteria including keywords, fields of study, amount ranges, and more.
     """
-    # QA-004 fix: Enforce authentication in production - FIXED: Use simple string detail
-    if not settings.public_read_endpoints and not current_user:
-        raise HTTPException(
-            status_code=401,
-            detail="Authentication required for scholarship endpoints"
-        )
+    # Authentication enforced by dependency injection - no additional check needed
     try:
         filters = SearchFilters(
             keyword=keyword,
