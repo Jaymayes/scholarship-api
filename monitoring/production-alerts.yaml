@@ -1,0 +1,145 @@
+# Production Alerting Rules for Scholarship Discovery API
+# Prometheus AlertManager Configuration
+
+groups:
+- name: scholarship-api-critical
+  rules:
+  - alert: HighLatencyP95
+    expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{job="scholarship-api"}[5m])) > 0.25
+    for: 10m
+    labels:
+      severity: critical
+      service: scholarship-api
+    annotations:
+      summary: "High P95 latency detected"
+      description: "P95 latency is {{ $value }}s, above 250ms threshold for 10 minutes"
+      runbook_url: "https://docs.company.com/runbooks/high-latency"
+
+  - alert: HighErrorRate
+    expr: rate(http_requests_total{job="scholarship-api",status=~"5.."}[5m]) / rate(http_requests_total{job="scholarship-api"}[5m]) > 0.01
+    for: 5m
+    labels:
+      severity: critical
+      service: scholarship-api
+    annotations:
+      summary: "High 5xx error rate detected"
+      description: "5xx error rate is {{ $value | humanizePercentage }}, above 1% threshold"
+      runbook_url: "https://docs.company.com/runbooks/high-error-rate"
+
+  - alert: DatabaseConnectionPoolHigh
+    expr: postgres_connections_active{job="scholarship-api"} / postgres_connections_max{job="scholarship-api"} > 0.8
+    for: 5m
+    labels:
+      severity: warning
+      service: scholarship-api
+    annotations:
+      summary: "Database connection pool utilization high"
+      description: "Connection pool is {{ $value | humanizePercentage }} utilized"
+      runbook_url: "https://docs.company.com/runbooks/db-connections"
+
+  - alert: AgentTaskFailureRate
+    expr: rate(agent_tasks_failed_total{job="scholarship-api"}[5m]) / rate(agent_tasks_total{job="scholarship-api"}[5m]) > 0.02
+    for: 10m
+    labels:
+      severity: warning
+      service: scholarship-api
+    annotations:
+      summary: "Agent task failure rate high"
+      description: "Agent task failure rate is {{ $value | humanizePercentage }}, above 2% threshold"
+
+  - alert: OpenAIServiceDegraded
+    expr: rate(openai_requests_failed_total{job="scholarship-api"}[5m]) / rate(openai_requests_total{job="scholarship-api"}[5m]) > 0.05
+    for: 5m
+    labels:
+      severity: warning
+      service: scholarship-api
+    annotations:
+      summary: "OpenAI service failure rate high"
+      description: "OpenAI failure rate is {{ $value | humanizePercentage }}, above 5% threshold"
+
+  - alert: ServiceDown
+    expr: up{job="scholarship-api"} == 0
+    for: 1m
+    labels:
+      severity: critical
+      service: scholarship-api
+    annotations:
+      summary: "Scholarship API service is down"
+      description: "Service has been down for more than 1 minute"
+      runbook_url: "https://docs.company.com/runbooks/service-down"
+
+- name: scholarship-api-performance
+  rules:
+  - alert: HighMemoryUsage
+    expr: container_memory_usage_bytes{pod=~"scholarship-api-.*"} / container_spec_memory_limit_bytes{pod=~"scholarship-api-.*"} > 0.85
+    for: 10m
+    labels:
+      severity: warning
+      service: scholarship-api
+    annotations:
+      summary: "High memory usage detected"
+      description: "Memory usage is {{ $value | humanizePercentage }} of limit"
+
+  - alert: HighCPUUsage
+    expr: rate(container_cpu_usage_seconds_total{pod=~"scholarship-api-.*"}[5m]) > 0.8
+    for: 10m
+    labels:
+      severity: warning
+      service: scholarship-api
+    annotations:
+      summary: "High CPU usage detected"
+      description: "CPU usage is {{ $value | humanizePercentage }}"
+
+  - alert: RedisHitRateLow
+    expr: redis_keyspace_hits_total{job="scholarship-api"} / (redis_keyspace_hits_total{job="scholarship-api"} + redis_keyspace_misses_total{job="scholarship-api"}) < 0.85
+    for: 10m
+    labels:
+      severity: warning
+      service: scholarship-api
+    annotations:
+      summary: "Redis cache hit rate low"
+      description: "Cache hit rate is {{ $value | humanizePercentage }}, below 85% threshold"
+
+- name: scholarship-api-security
+  rules:
+  - alert: HighAuthFailureRate
+    expr: rate(http_requests_total{job="scholarship-api",status="401"}[5m]) > 0.08
+    for: 5m
+    labels:
+      severity: warning
+      service: scholarship-api
+    annotations:
+      summary: "High authentication failure rate"
+      description: "Authentication failures: {{ $value }} per second"
+
+  - alert: RateLimitingTriggered
+    expr: rate(http_requests_total{job="scholarship-api",status="429"}[5m]) > 0.1
+    for: 5m
+    labels:
+      severity: info
+      service: scholarship-api
+    annotations:
+      summary: "Rate limiting frequently triggered"
+      description: "Rate limit triggers: {{ $value }} per second"
+
+- name: scholarship-api-business
+  rules:
+  - alert: SearchRequestsDropped
+    expr: rate(search_requests_total{job="scholarship-api"}[1h]) < rate(search_requests_total{job="scholarship-api"}[1h] offset 1h) * 0.5
+    for: 30m
+    labels:
+      severity: warning
+      service: scholarship-api
+    annotations:
+      summary: "Search request volume dropped significantly"
+      description: "Search requests down {{ $value | humanizePercentage }} from previous hour"
+
+  - alert: EligibilityCheckErrors
+    expr: rate(eligibility_check_errors_total{job="scholarship-api"}[5m]) > 0.02
+    for: 10m
+    labels:
+      severity: warning
+      service: scholarship-api
+    annotations:
+      summary: "Eligibility check error rate high"
+      description: "Eligibility check errors: {{ $value }} per second"

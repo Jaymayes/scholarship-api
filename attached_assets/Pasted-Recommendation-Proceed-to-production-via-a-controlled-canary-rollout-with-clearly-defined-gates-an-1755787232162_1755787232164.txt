@@ -1,0 +1,62 @@
+Recommendation: Proceed to production via a controlled, canary rollout with clearly defined gates and rollback criteria. Your artifacts indicate solid readiness; the plan below focuses on safe activation, observability, and operational resilience.
+
+Top-line rollout plan
+
+Stage → Canary → Gradual ramp → Full rollout with 48 hours heightened monitoring.
+Traffic: 5–10% for 2 hours → 50% for 6–12 hours → 100% if all gates are green.
+Rollback triggers: p95 latency >250 ms for 10 min, 5xx >1% for 10 min, search/recommendation error >2%, OpenAI fallback rate >10% sustained, or SLO burn >2%/hour.
+Pre-production gates (complete/verify)
+
+Security
+Enforce JWT iss/aud/exp/nbf validations, short-lived tokens, JWKS rotation; rate-limit per token and per IP.
+Secrets in KMS/Secrets Manager; key rotation policy; TLS 1.2+; mTLS in-cluster if service mesh exists.
+WAF + basic bot rules; strict CORS allowlist; security headers (HSTS, CSP, X-Content-Type-Options, Referrer-Policy).
+SAST/DAST, dependency scan, SBOM; pen test sign-off; infra policy checks (OPA/PSA).
+Data and compliance
+PII inventory and minimization; logging with PII redaction; data retention policy; DPA review (GDPR/CCPA).
+Postgres at-rest encryption, PITR enabled; Redis AOF or snapshot + encryption.
+Observability
+Dashboards for SLIs: availability, p50/p95/p99 latency, error rate, saturation (CPU/mem), DB pool, Redis hit rate, external AI dependency health.
+Alerts (example): p95 >250 ms 5m; 5xx >1% 5m; DB pool >80% 5m; Redis hit rate <85% 10m; OpenAI error rate >5% 5m; queue backlog >5m; saturation >80% 10m.
+Synthetic checks from at least 3 regions for health and key user journeys.
+Performance
+Load test to 2x expected peak; verify sub-200 ms p95 at steady-state with cache warm.
+Validate autoscaling behavior at step loads; confirm no DB/Redis saturation or thundering herd.
+DR and change management
+Backup/restore tested; RTO/RPO documented; runbooks and on-call rota confirmed; change/advisory notice shared.
+Deployment specifics (Kubernetes)
+
+Versioning and rollout
+Tag release v1.0.0 with matching OpenAPI spec; Helm/Kustomize manifests committed; release notes + migration plan.
+Blue/green or canary via mesh/gateway; maxSurge 25%, maxUnavailable 0; graceful termination >=30s with connection draining.
+Resources and resilience
+Requests/limits sized from load tests; HPA targeting ~60% CPU or RPS-based autoscaling; min 3 replicas; max 10+.
+PodDisruptionBudget minAvailable=2; topology spread across AZs; NetworkPolicies; Pod Security: restricted.
+Readiness/liveness probes tuned to real startup and dependency readiness.
+Data layers
+Postgres via PgBouncer (transaction pooling); cap app max connections; enforce timeouts/retries with jitter; idempotency on write endpoints.
+Alembic migrations with zero-downtime patterns; preflight apply in staging.
+Redis: select eviction policy (allkeys-lru), TTLs for cache keys, connection limits; monitor memory fragmentation and hit rate.
+API Gateway and limits
+Global and per-token rate limits (e.g., 100 rpm sustained, burst 200); 429 with Retry-After; circuit breaker for upstream dependencies.
+Error taxonomy standardized; correlation IDs propagated; request/response size caps.
+Agent Bridge and AI safeguards
+Tool timeouts and budgets; retries with backoff; circuit breaker for OpenAI with graceful degradation to local heuristics.
+Output validation and safety filters; prompt/response redaction of PII; audit logs; feature flags to disable AI paths quickly.
+Token/cost monitoring with caps and alerts; model selection fallback logic verified.
+Go/No-Go criteria for canary promotion
+
+Availability ≥99.9%, error rate ≤0.5%, p95 latency ≤220 ms (steady) during canary.
+DB pool <75% utilization; Redis hit rate ≥90%; OpenAI dependency: error <3%, latency within budget, fallback <5%.
+No security policy violations or anomalous spikes in blocked requests.
+Post-rollout
+
+48-hour heightened monitoring with on-call; weekly error budget review; first-week game day: kill a pod, Redis failover, throttled OpenAI to validate resilience.
+Capture learnings in runbooks; finalize SLAs and external status page monitors.
+Near-term enhancements (optional but high ROI)
+
+Add idempotency keys for POST/PUT; request dedup on retries.
+Precompute or cache heavy recommendation paths; warm caches on deploy.
+Contract tests against OpenAPI; consumer-driven tests with downstreams.
+Multi-region active-active or read-replica offloading for search.
+Quarterly key rotation and pen-test cadence.

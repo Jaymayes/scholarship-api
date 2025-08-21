@@ -35,6 +35,30 @@ from utils.logger import setup_logger
 # Initialize logger
 logger = setup_logger()
 
+# Lifespan event handler (FastAPI modern approach)
+from contextlib import asynccontextmanager
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Application lifespan handler for startup and shutdown events"""
+    # Startup
+    from services.orchestrator_service import orchestrator_service
+    
+    logger.info("🔗 Initializing Agent Bridge for Command Center integration")
+    
+    # Register with Command Center on startup
+    try:
+        await orchestrator_service.register_with_command_center()
+        logger.info("✅ Agent Bridge startup completed")
+    except Exception as e:
+        logger.warning(f"⚠️ Command Center registration failed (will retry): {e}")
+    
+    yield
+    
+    # Shutdown
+    logger.info("🔌 Shutting down Agent Bridge")
+    await orchestrator_service.close()
+
 # Create FastAPI app with production-aware docs configuration
 app = FastAPI(
     title=settings.api_title,
@@ -43,6 +67,7 @@ app = FastAPI(
     docs_url="/docs" if settings.should_enable_docs else None,
     redoc_url="/redoc" if settings.should_enable_docs else None,
     debug=settings.debug,
+    lifespan=lifespan,
     responses={
         status: {"model": resp["model"], "description": resp["description"]}
         for status, resp in ERROR_RESPONSES.items()
@@ -163,29 +188,6 @@ app.include_router(replit_health_router, tags=["health"])
 app.include_router(ai_router, tags=["ai"])
 app.include_router(db_status_router)
 app.include_router(agent_router, tags=["agent"])  # Agent Bridge for Command Center integration
-
-# Agent Bridge startup event
-@app.on_event("startup")
-async def startup_event():
-    """Initialize agent bridge and register with Command Center"""
-    from services.orchestrator_service import orchestrator_service
-    
-    logger.info("🔗 Initializing Agent Bridge for Command Center integration")
-    
-    # Register with Command Center on startup
-    try:
-        await orchestrator_service.register_with_command_center()
-        logger.info("✅ Agent Bridge startup completed")
-    except Exception as e:
-        logger.warning(f"⚠️ Command Center registration failed (will retry): {e}")
-
-@app.on_event("shutdown") 
-async def shutdown_event():
-    """Clean up agent bridge resources"""
-    from services.orchestrator_service import orchestrator_service
-    
-    logger.info("🔌 Shutting down Agent Bridge")
-    await orchestrator_service.close()
 
 # QA-003 fix: Include interaction wrapper endpoints  
 from routers.interaction_wrapper import router as interaction_wrapper_router
