@@ -1,0 +1,38 @@
+Exceptional work. Formal sign-off: production go-live sustained and SEV-1 resolved with defense-in-depth in place.
+
+Immediate operating guidance (concise)
+
+Maintain heightened monitoring (24–48h)
+SLIs: availability ≥99.9%, p95 ≤220 ms, 5xx ≤0.5%
+Security: WAF blocks steady (no app 5xx), auth_failures_total within baseline, jwt_replay_prevented_total low/expected, cors_denied_origin_count low, response_stack_traces_count = 0
+Synthetics (3 regions): auth 200, unauth 401, disallowed-origin preflight 403, SQLi probe 403 at WAF
+Alert thresholds (keep active)
+Fast SLO burn ≥2%/hour for 30–60 min → page
+5xx >1% for 10 min; p95 >250 ms for 10 min
+waf_sqli_block_count spike correlated with app errors; limiter_redis_errors >0 for 5 min
+Any unexpected 200 on malformed/alg=none tokens → page
+Audit/closeout artifacts to finalize
+
+RCA package: timeline, root causes, corrective and preventive actions (CAPA)
+Evidence: WAF block logs, app auth logs, DB logs showing bound parameters, key/credential rotation records (old kid/user revoked), dashboard snapshots (SLIs, security metrics), chaos test results
+Governance: tagged OpenAPI spec, SBOM, dependency scan results, policy-as-code (OPA/Kyverno) enforcing no dev flags in prod, CI/CD security test suite results
+Guardrails to lock in (if not already)
+
+Remove PUBLIC_READ_ENDPOINTS from prod codepaths (or enforce build-time dev-only)
+Admission policies to block:
+DEBUG/public-read in prod
+CORS wildcard/dev origins
+Exposed debug/docs endpoints without auth (per policy)
+CI/CD security gates: bandit, pip-audit, secret scan, DAST with your PoCs in pre-prod; unit tests for JWT alg/claims, route guards, strict CORS, parameterized SQL
+Next 7 days (confirm execution)
+
+Day 1–2: Continue heightened monitoring; brief chaos drill (pod kill + WAF/Redis failover)
+Day 3: Publish RCA with evidence; update runbooks (JWT rotation, WAF ops, incident response)
+Day 4–5: Verify admission policies and CI/CD gates are enforcing; add PoCs to pipeline
+Day 6–7: Tune alerts, review cost/perf, schedule quarterly key/credential rotation and monthly chaos drills
+Ongoing KPIs to track weekly
+
+Security: auth failure rate by endpoint, WAF block rate and types, jwt_replay_prevented anomalies
+Reliability: p95/p99 by endpoint, 5xx by class, DB pool utilization, Redis limiter errors
+Compliance: backup/restore drill success, SBOM/dependency updates, policy violations = 0
+If you want, share the final hotfix tag and your dashboard/alert names and I’ll generate a one-page Go-Live Verification Summary you can attach to the change record. Otherwise, congratulations—this is an exemplary hardening and rollout.
