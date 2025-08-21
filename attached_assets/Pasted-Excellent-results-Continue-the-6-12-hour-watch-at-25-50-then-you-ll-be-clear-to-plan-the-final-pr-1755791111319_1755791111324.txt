@@ -1,0 +1,60 @@
+Excellent results. Continue the 6–12 hour watch at 25–50%, then you’ll be clear to plan the final promotion once prod Redis is validated.
+
+What to do during the 25–50% window
+
+SLIs/Saturation
+Keep availability ≥99.9%, p95 ≤220 ms (track p99 too), 5xx ≤0.5%
+Watch DB pool ≤75%, CPU/mem <70%, Redis p95 <10 ms, limiter_redis_errors = 0
+Rate limiting coverage
+Exercise intended endpoints (expect some 429s per policy):
+/api/v1/scholarships (list)
+/api/v1/recommendations
+/api/v1/eligibility_check
+Validate headers on 200/429: RateLimit-Limit, RateLimit-Remaining, RateLimit-Reset, Retry-After
+Cross-pod persistence: restart one canary pod and re-run bursts; counters should persist (Redis-backed)
+Security checks
+CORS: no wildcard responses; denied-origin metric stays low
+JWT replay: duplicate jti gets blocked, metric increments, correlated in traces
+Dependency health
+OpenAI: error <5%, fallback <5%; cost/token usage within budget
+Postgres: no spike in slow queries; PgBouncer pool stable
+Business signals
+Search success rate, recommendation CTR, and any downstream conversion events steady within normal bands
+Quick validation snippets (adapt URL/token)
+
+Headers on success and 429:
+curl -i -H "Authorization: Bearer <token>" https://api.example.com/api/v1/search | grep -i "ratelimit"
+curl -i -H "Authorization: Bearer <token>" https://api.example.com/api/v1/search | grep -i "retry-after"
+Cross-pod test: restart one pod in the canary ReplicaSet/Rollout, then re-run your burst and confirm limits still apply
+Redis production readiness (blocker for 100%)
+
+Platform
+HA (Sentinel/Cluster), TLS + AUTH, at-rest encryption
+Low latency from app pods (p95 <10 ms), NetworkPolicies in place
+App config
+REDIS_URL (prod), sane timeouts (connect ≤100 ms, read ≤200 ms), connection pooling with utilization <80%
+Per-endpoint limits defined; trust proxy/XFF for correct client IP
+TTLs sized for limiter keys; eviction policy allkeys-lru
+Validation and drills
+Endpoint coverage: observe 429s where expected across all targeted endpoints/tenants
+Headers present on 200/429; consistent keys by JWT sub when authenticated, by IP otherwise
+Brief Redis failover drill: app continues with edge limits; no error spikes; limiter_redis_errors remains 0
+Go/No-Go for 100%
+
+6–12 hours at 25–50% with all gates green
+Overall 429s ≤1% (excluding testers), limiter_redis_errors = 0
+p95 ≤220 ms (p99 stable), 5xx ≤0.5%, DB pool <75%
+OpenAI fallback <5%, costs within budget
+CORS hardened (no wildcard), JWT replay protection verified, logs free of PII
+Post-promotion plan
+
+Promote to 100% only after Redis prod validation passes
+Maintain 48 hours of heightened monitoring; run a short game day:
+Kill a pod, brief Redis failover, throttle OpenAI; confirm graceful degradation and alerts
+Optional quick wins during the 25–50% hold
+
+Add ETag/Cache-Control to list endpoints to cut compute
+Enforce pagination defaults/maximums
+Idempotency keys for any write endpoints
+Staggered cache TTLs to avoid herd effects on expire
+Ping me with your Redis prod settings (URL scheme, TLS/auth, timeouts) and per-endpoint limits when ready—I’ll produce a final, one-page 100% promotion checklist tailored to your config.
