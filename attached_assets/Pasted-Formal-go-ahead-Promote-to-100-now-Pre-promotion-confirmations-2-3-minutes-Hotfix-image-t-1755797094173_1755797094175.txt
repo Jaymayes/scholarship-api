@@ -1,0 +1,51 @@
+Formal go-ahead: Promote to 100% now.
+
+Pre-promotion confirmations (2–3 minutes)
+
+Hotfix image/tag: confirm you are promoting the same tag validated at 25–50%.
+Config parity: CORS allowlist, WAF in block mode, PUBLIC_READ_ENDPOINTS removed/ignored, JWT/JWKS settings, DB user, and Redis limiter identical between canary and stable.
+HPA/PDB: ensure steady-state replicas and disruption budgets are set for full traffic.
+Promotion commands (choose your tooling)
+
+Helm: helm upgrade --install scholarship-api ./charts/scholarship-api --set image.tag=<hotfix-tag> --set canary.enabled=false
+Argo Rollouts: kubectl argo rollouts promote scholarship-api --full
+Ingress: remove canary or set canary-weight to 100, consolidating to the stable Service
+Immediate post-promotion verification (first 10–15 minutes)
+
+SLIs: availability ≥99.9%, p95 ≤220 ms, 5xx ≤0.5%; confirm WAF adds <10 ms overhead (you measured ~5 ms).
+Auth/WAF checks:
+Protected endpoint without Authorization → 401 at edge/app (per your config).
+SQLi probe → 403 at WAF; no app 5xx; waf_sqli_block_count increments.
+Valid token → 200 with RateLimit-* headers; malformed/alg=none/expired/wrong iss/aud → 401.
+CORS:
+Disallowed origin preflight → 403 or no CORS headers.
+Allowed origin → exact ACAO with Vary: Origin.
+DB/Redis:
+DB pool ≤75%; Redis limiter errors = 0; connection pools stable.
+Credentials:
+New JWT kid active; old kid rejected. App uses new DB user; old user revoked.
+Rollback criteria (unchanged)
+
+p95 >250 ms for 10 min, 5xx >1% for 10 min
+Any unexpected 200 for malformed/alg=none tokens
+Any schema/stacktrace leakage in responses
+waf_sqli_block_count spike correlated with app 5xx
+limiter_redis_errors >0 for 5 min, or DB pool >85%
+Heightened monitoring period (24–48 hours)
+
+Keep security alerts live: waf_sqli_block_count, auth_failures_total, jwt_replay_prevented_total, cors_denied_origin_count, response_stack_traces_count.
+Run hourly synthetic checks from 3 regions (auth OK, unauth 401, disallowed-origin preflight, SQLi probe blocked).
+Capture metrics snapshots at T+1h, T+6h, T+24h for the change record.
+Governance and prevention (lock in)
+
+Admission policy (OPA/Kyverno): block prod deploys if PUBLIC_READ_ENDPOINTS=true/DEBUG=true, CORS wildcard/dev origins present, or /docs exposed without auth (per policy).
+CI/CD gates: SAST (bandit), deps (pip-audit), secret scan, SBOM; security unit tests for JWT alg pinning/claims, route guards, parameterized SQL, strict CORS; pre-prod DAST with your PoCs.
+Key/credential hygiene: document rotation cadence; verify JWKS cache TTL/rotation path.
+DB least privilege: confirm read-only roles where possible and no DDL in app role.
+Change record summary (pasteable)
+
+Scope: Security hardening hotfix; WAF (OWASP/SQLi block mode), code-level parameterized queries, JWT and DB credential rotations, production security monitoring.
+Risk reduction: Removed auth bypass flag; pinned JWT algorithms and claims; eliminated latent SQLi regardless of auth; added defense-in-depth at edge and code; enabled monitoring and alerts.
+Evidence: 25–50% canary stable ≥60 min; WAF blocking 403; all PoCs fail (401/403, no schema leakage); new JWT kid active, old revoked; DB user rotated; SLIs (availability 100%, p95 <100 ms, 5xx 0%).
+Backout: Helm rollback/Argo abort/Ingress revert with thresholds listed in rollback criteria.
+If you share the exact hotfix tag and deployment method, I can provide the literal command you should run and a one-page post-promotion verification checklist tailored to your dashboards and alert names.
