@@ -1,0 +1,58 @@
+Go for 5–10% canary now. Hold promotion to 100% until the production Redis backend is live and validated for all endpoints.
+
+Immediate next steps (operator runbook)
+
+Guardrails during canary
+Keep edge/gateway rate limiting enabled (per-IP) as a safety net until app-level Redis limiting is fully productionized.
+Ensure trusted proxy settings so real client IP/JWT subject are used for keys (X-Forwarded-For respected).
+Canary steps and checks
+Step 1: 5–10% for 60–120 minutes. Run your validation script plus the checks below. Gates: p95 ≤220 ms, 5xx ≤0.5%, 429 rate ≤1% overall, DB pool ≤75%, Redis errors ≈0, OpenAI fallback ≤5%.
+Step 2: 25–50% for 6–12 hours if Step 1 is green. Same gates; confirm autoscaling and no cache herd effects.
+Do not exceed 50% until Redis prod config and limiter coverage across endpoints is validated.
+Rate limiting coverage checklist (must pass before 100%)
+
+Identity and headers
+Authenticated: key by JWT sub/tenant; include RateLimit-* headers and Retry-After on 429.
+Unauthenticated: key by client IP (correctly derived via proxy headers).
+Endpoints (example target policies; tune to your traffic)
+/api/v1/search → 60 rpm per token/IP (already working)
+/api/v1/scholarships (list) → 60 rpm per token/IP
+/api/v1/recommendations → 30 rpm per token/IP
+/api/v1/eligibility_check → 30 rpm per token/IP
+Writes (if any) → 30 rpm per token/IP
+Exempt: /healthz, /readyz, /docs, /openapi.json
+Persistence and consistency
+Limits persist across pod restarts (Redis-backed).
+Same principal hitting different pods still counts toward the same bucket.
+Middleware order: limiter runs before routers and after auth context is established (so it can key by subject).
+Validation commands (adapt URLs/tokens)
+Bad-origin CORS preflight (should fail): curl -i -X OPTIONS https://api.example.com/api/v1/scholarships -H "Origin: https://evil.test" -H "Access-Control-Request-Method: GET"
+Allowed-origin preflight (should pass): curl -i -X OPTIONS https://api.example.com/api/v1/search -H "Origin: https://app.example.com" -H "Access-Control-Request-Method: GET"
+Rate limit burst (expect some 429s):
+seq 1 120 | xargs -I {} -P 30 curl -s -o /dev/null -w "%{http_code}\n" -H "Authorization: Bearer <token>" https://api.example.com/api/v1/scholarships
+Cross-pod persistence: repeat the burst after restarting one canary pod; expect 429s without reset.
+Observability
+Dashboards/alerts for: rate_limit_rejected_total by endpoint and principal; limiter_redis_errors; jwt_replay_prevented_total; cors_denied_total.
+Alert if 429s >2% for 10 min (exclude known testers) or if limiter_redis_errors >0 for 5 min.
+Production Redis readiness (blocker to 100%)
+
+Provision managed Redis (HA/Sentinel/cluster) with TLS, auth, at-rest encryption; set connection pool, timeouts, and sane key TTLs.
+App config: REDIS_URL (prod), RATE_LIMIT_DEFAULT, per-endpoint overrides, TRUSTED_PROXIES/HOPS.
+Failover test: brief primary failover during canary; app should degrade to edge limits without error spikes.
+Verify latency: Redis p95 <5–10 ms from app pods; no connection churn; pool utilization <80%.
+JWT replay protection quick test
+
+Reuse the same JWT on two concurrent requests where jti is checked:
+First request succeeds; second should be rejected (401/403) or flagged as replay-prevented.
+Confirm jwt_replay_prevented_total increments and is traced with correlation IDs.
+Promotion criteria
+
+Promote to 50% after Step 1 gates hold for full window and rate limiting behaves as expected on all tested endpoints.
+Promote to 100% only after:
+Prod Redis configured and healthy
+Endpoint coverage checklist passes (429s observed where expected)
+429 rate ≤1% overall (excluding testers), limiter errors ≈0, correct headers present.
+Rollback triggers (unchanged)
+
+p95 >250 ms for 10 min, 5xx >1% for 10 min, limiter_redis_errors >0 for 5 min, OpenAI fallback >10% for 10 min, DB pool >85% for 5 min, or security anomalies.
+If you share your ingress/gateway (NGINX, Kong, ALB/WAF) and current limiter config, I can provide exact annotations/policies and a short script to exercise each endpoint with expected 429 distributions.
