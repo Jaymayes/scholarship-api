@@ -203,6 +203,10 @@ app.include_router(interaction_wrapper_router, tags=["interactions"])
 from routers.onboarding import router as onboarding_router
 app.include_router(onboarding_router, tags=["Magic Onboarding"])
 
+# AI Scholarship Playbook: Monetization endpoints (Credit System)
+from routers.monetization import router as monetization_router
+app.include_router(monetization_router, tags=["Monetization"])
+
 @app.get("/")
 async def root():
     """Root endpoint with helpful API information"""

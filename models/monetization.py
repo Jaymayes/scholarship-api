@@ -1,279 +1,151 @@
 # AI Scholarship Playbook - Monetization Models
-# Credit system and B2B marketplace implementation
+# Credit system with transparent pricing and B2C revenue generation
 
-from pydantic import BaseModel, Field, validator
-from typing import Optional, List, Dict, Any, Union
+from pydantic import BaseModel, Field
 from datetime import datetime
+from typing import Optional, List, Dict, Any
 from enum import Enum
-from decimal import Decimal
+import uuid
 
 class CreditTransactionType(str, Enum):
-    """Types of credit transactions"""
     PURCHASE = "purchase"
-    USAGE = "usage"
-    REFUND = "refund"
+    CONSUMPTION = "consumption"
     BONUS = "bonus"
-    EXPIRY = "expiry"  # Won't be used since credits never expire
-    ADMIN_ADJUSTMENT = "admin_adjustment"
-
-class AIOperationType(str, Enum):
-    """Types of AI operations that consume credits"""
-    SEARCH_ENHANCEMENT = "search_enhancement"
-    SCHOLARSHIP_SUMMARY = "scholarship_summary"
-    ESSAY_BRAINSTORM = "essay_brainstorm"
-    ESSAY_REVIEW = "essay_review"
-    ESSAY_IMPROVE = "essay_improve"
-    DOCUMENT_OCR = "document_ocr"
-    DOCUMENT_ANALYSIS = "document_analysis"
-    PREDICTIVE_MATCHING = "predictive_matching"
-    PROFILE_ANALYSIS = "profile_analysis"
-    APPLICATION_ASSISTANCE = "application_assistance"
+    REFUND = "refund"
+    STARTER_GRANT = "starter_grant"
 
 class CreditPackage(BaseModel):
-    """Credit purchase packages"""
+    """Credit package options for purchase"""
     package_id: str
     name: str
-    credit_amount: int
-    price_usd: Decimal
-    price_per_credit: Decimal
+    credits: int
+    price_usd: float
+    per_credit_cost: float
     bonus_credits: int = 0
-    
-    # Package details
-    recommended_for: str  # "light users", "heavy users", etc.
-    estimated_operations: int  # How many AI operations this covers
-    savings_percentage: Optional[float] = None  # vs smallest package
-    
-    # Promotional
-    is_promotional: bool = False
-    promotion_expires: Optional[datetime] = None
+    popular: bool = False
+    description: str
 
-class TokenUsageEstimate(BaseModel):
-    """Estimate of token usage for AI operations"""
-    operation_type: AIOperationType
-    estimated_input_tokens: int
-    estimated_output_tokens: int
-    total_estimated_tokens: int
-    
-    # Cost calculation (4x markup)
-    openai_cost_usd: Decimal
-    our_price_usd: Decimal
-    markup_percentage: float = 400.0  # 4x markup
-    
-    # User-friendly pricing
-    credits_required: int
-    operation_description: str
-
-class CreditUsageRecord(BaseModel):
-    """Record of credit usage"""
-    transaction_id: str
+class CreditBalance(BaseModel):
+    """User's current credit balance"""
     user_id: str
-    operation_type: AIOperationType
-    credits_used: int
+    total_credits: float
+    available_credits: float
+    reserved_credits: float = 0  # For pending operations
+    last_updated: datetime
+
+class CreditTransaction(BaseModel):
+    """Individual credit transaction record"""
+    transaction_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    user_id: str
+    transaction_type: CreditTransactionType
+    amount: float
+    description: str
+    feature_used: Optional[str] = None
+    token_count: Optional[int] = None
+    cost_basis: Optional[float] = None  # Actual OpenAI cost
     timestamp: datetime = Field(default_factory=datetime.utcnow)
-    
-    # Operation details
-    operation_description: str
-    operation_metadata: Dict[str, Any] = {}
-    
-    # Token tracking
-    actual_input_tokens: Optional[int] = None
-    actual_output_tokens: Optional[int] = None
-    actual_total_tokens: Optional[int] = None
-    
-    # Cost tracking
-    actual_openai_cost: Optional[Decimal] = None
-    charged_amount: Decimal
+    metadata: Dict[str, Any] = Field(default_factory=dict)
 
-class UserCreditAccount(BaseModel):
-    """User's credit account status"""
+class CreditUsageEvent(BaseModel):
+    """Event tracking for credit consumption"""
     user_id: str
-    current_balance: int
-    total_purchased: int = 0
-    total_used: int = 0
-    total_bonus_received: int = 0
-    
-    # Account history
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    last_purchase: Optional[datetime] = None
-    last_usage: Optional[datetime] = None
-    
-    # Usage patterns
-    favorite_operations: List[AIOperationType] = []
-    monthly_usage_trend: Dict[str, int] = {}  # month -> credits used
-    
-class CreditPurchaseRequest(BaseModel):
-    """Request to purchase credits"""
-    package_id: str
-    payment_method_id: str
-    promotional_code: Optional[str] = None
-    
-class CreditPurchaseResponse(BaseModel):
-    """Response after credit purchase"""
-    transaction_id: str
-    credits_added: int
-    bonus_credits: int = 0
-    new_balance: int
-    amount_charged_usd: Decimal
-    payment_status: str  # succeeded, failed, pending
-    
-class OperationCostEstimateRequest(BaseModel):
-    """Request to estimate cost of an AI operation"""
-    operation_type: AIOperationType
-    operation_parameters: Dict[str, Any] = {}
-    
-class OperationCostEstimateResponse(BaseModel):
-    """Response with operation cost estimate"""
-    operation_type: AIOperationType
-    estimated_credits: int
-    estimated_cost_usd: Decimal
-    confidence_level: str  # high, medium, low
-    
-    # User guidance
-    operation_description: str
-    typical_range_credits: tuple  # (min, max) credits
-    factors_affecting_cost: List[str] = []
+    feature: str
+    credits_consumed: float
+    token_count: int
+    operation_id: str
+    success: bool
+    timestamp: datetime = Field(default_factory=datetime.utcnow)
 
-# B2B Marketplace Models
+class SpendGuardrail(BaseModel):
+    """User spending limits and controls"""
+    user_id: str
+    daily_limit: Optional[float] = 50.0  # Credits per day
+    monthly_limit: Optional[float] = 500.0  # Credits per month
+    per_session_limit: Optional[float] = 25.0  # Credits per session
+    auto_purchase_enabled: bool = False
+    low_balance_threshold: float = 10.0
+    notifications_enabled: bool = True
 
-class PartnerTier(str, Enum):
-    """Partner tier levels"""
-    BRONZE = "bronze"
-    SILVER = "silver" 
-    GOLD = "gold"
-    PLATINUM = "platinum"
-    ENTERPRISE = "enterprise"
+class CreditPricing(BaseModel):
+    """Transparent credit pricing model"""
+    base_cost_per_1k_tokens: float = 0.002  # OpenAI GPT-4 pricing
+    markup_multiplier: float = 4.0  # 4x markup
+    credit_per_1k_tokens: float = 0.008  # Will be computed
+    
+    def model_post_init(self, __context):
+        self.credit_per_1k_tokens = self.base_cost_per_1k_tokens * self.markup_multiplier
 
-class ScholarshipListingType(str, Enum):
-    """Types of scholarship listings"""
-    BASIC = "basic"              # Standard listing
-    FEATURED = "featured"        # Featured placement
-    SPONSORED = "sponsored"      # Promoted in search results
-    EXCLUSIVE = "exclusive"      # Only on our platform
+class UserCreditSummary(BaseModel):
+    """Comprehensive user credit overview"""
+    user_id: str
+    current_balance: CreditBalance
+    recent_transactions: List[CreditTransaction]
+    monthly_usage: float
+    daily_usage: float
+    guardrails: SpendGuardrail
+    estimated_monthly_spend: float
+    savings_vs_pay_per_use: float
 
-class PartnerAccount(BaseModel):
-    """B2B partner account"""
-    partner_id: str
-    organization_name: str
-    contact_email: str
-    contact_name: str
-    website_url: Optional[str] = None
-    
-    # Account details
-    tier: PartnerTier = PartnerTier.BRONZE
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    is_verified: bool = False
-    is_active: bool = True
-    
-    # Billing information
-    billing_contact: Optional[str] = None
-    billing_address: Optional[Dict[str, str]] = None
-    tax_id: Optional[str] = None
-    
-    # Platform usage
-    total_scholarships_posted: int = 0
-    total_applications_received: int = 0
-    total_amount_awarded: Decimal = Decimal('0.00')
+class CreditAttachmentMetrics(BaseModel):
+    """B2C monetization KPIs"""
+    credit_attach_rate: float  # % users who purchase credits
+    pay_conversion_rate: float  # % users who convert to paid
+    arppu: float  # Average Revenue Per Paying User
+    unit_cost_to_serve: float  # Cost per active user
+    ltv_cac_ratio: Optional[float] = None
 
-class ScholarshipListing(BaseModel):
-    """B2B scholarship listing"""
-    listing_id: str
-    partner_id: str
-    scholarship_id: str  # Links to main scholarship record
-    
-    # Listing details
-    listing_type: ScholarshipListingType
-    featured_until: Optional[datetime] = None
-    listing_fee_paid: Decimal
-    
-    # Performance tracking
-    views: int = 0
-    applications_started: int = 0
-    applications_completed: int = 0
-    conversion_rate: float = 0.0
-    
-    # Dates
-    listed_at: datetime = Field(default_factory=datetime.utcnow)
-    expires_at: Optional[datetime] = None
+# Standard credit packages
+STARTER_CREDIT_GRANT = 50.0  # Free credits on onboarding
+CREDIT_PACKAGES = [
+    CreditPackage(
+        package_id="starter",
+        name="Starter Pack",
+        credits=100,
+        price_usd=9.99,
+        per_credit_cost=0.0999,
+        description="Perfect for exploring scholarships and trying AI features"
+    ),
+    CreditPackage(
+        package_id="student",
+        name="Student Pack",
+        credits=300,
+        price_usd=24.99,
+        per_credit_cost=0.0833,
+        bonus_credits=25,
+        popular=True,
+        description="Most popular - covers full scholarship search and applications"
+    ),
+    CreditPackage(
+        package_id="power",
+        name="Power User",
+        credits=750,
+        price_usd=54.99,
+        per_credit_cost=0.0733,
+        bonus_credits=100,
+        description="For intensive users - document processing and essay assistance"
+    ),
+    CreditPackage(
+        package_id="unlimited",
+        name="Unlimited Monthly",
+        credits=2000,
+        price_usd=99.99,
+        per_credit_cost=0.0500,
+        bonus_credits=500,
+        description="Monthly unlimited for power users and counselors"
+    )
+]
 
-class PartnerAnalytics(BaseModel):
-    """Analytics for B2B partners"""
-    partner_id: str
-    period_start: datetime
-    period_end: datetime
-    
-    # Application metrics
-    total_applications: int
-    qualified_applications: int
-    application_quality_score: float = Field(ge=0.0, le=1.0)
-    
-    # Engagement metrics
-    total_views: int
-    click_through_rate: float = Field(ge=0.0, le=1.0)
-    application_conversion_rate: float = Field(ge=0.0, le=1.0)
-    
-    # Candidate quality
-    avg_applicant_gpa: Optional[float] = None
-    top_applicant_majors: List[str] = []
-    geographic_distribution: Dict[str, int] = {}
-    
-    # ROI metrics
-    cost_per_application: Decimal
-    cost_per_qualified_application: Decimal
-    estimated_award_efficiency: Optional[float] = None
-
-class RecruitmentRequest(BaseModel):
-    """Recruitment-as-a-service request"""
-    partner_id: str
-    target_criteria: Dict[str, Any]
-    budget_range: tuple  # (min, max) budget
-    timeline: int  # days
-    preferred_candidate_count: int
-    
-    # Recruitment specifics
-    recruitment_type: str  # active_sourcing, targeted_promotion, etc.
-    message_template: Optional[str] = None
-    additional_requirements: List[str] = []
-
-class RecruitmentCampaign(BaseModel):
-    """Active recruitment campaign"""
-    campaign_id: str
-    partner_id: str
-    scholarship_id: str
-    
-    # Campaign details
-    campaign_name: str
-    target_criteria: Dict[str, Any]
-    budget_allocated: Decimal
-    budget_spent: Decimal = Decimal('0.00')
-    
-    # Performance
-    candidates_identified: int = 0
-    candidates_contacted: int = 0
-    candidates_applied: int = 0
-    
-    # Timeline
-    started_at: datetime = Field(default_factory=datetime.utcnow)
-    ends_at: datetime
-    is_active: bool = True
-
-class PartnerDashboardData(BaseModel):
-    """Data for partner dashboard"""
-    partner_id: str
-    current_month_metrics: PartnerAnalytics
-    
-    # Active listings
-    active_listings: List[ScholarshipListing] = []
-    pending_approvals: int = 0
-    
-    # Recent activity
-    recent_applications: List[Dict[str, Any]] = []
-    upcoming_deadlines: List[Dict[str, Any]] = []
-    
-    # Financial summary
-    current_month_spending: Decimal
-    remaining_budget: Optional[Decimal] = None
-    next_invoice_amount: Decimal
-    
-    # Recommendations
-    performance_insights: List[str] = []
-    optimization_suggestions: List[str] = []
+# Feature credit costs (based on token usage)
+FEATURE_CREDIT_COSTS = {
+    "magic_onboarding_conversation": 2.5,  # Per conversation turn
+    "document_ocr_processing": 5.0,  # Per document
+    "predictive_matching": 3.0,  # Per matching request
+    "essay_coach_brainstorm": 4.0,  # Per brainstorming session
+    "essay_coach_structure": 3.5,  # Per structure suggestion
+    "essay_coach_refine": 4.5,  # Per refinement pass
+    "scholarship_search_ai": 1.5,  # Per AI-enhanced search
+    "application_prefill": 2.0,  # Per application pre-fill
+    "recommendation_explanation": 1.0,  # Per "why matched" explanation
+    "trend_analysis": 6.0,  # Per trend report
+    "custom_insights": 8.0,  # Per custom analysis
+}
