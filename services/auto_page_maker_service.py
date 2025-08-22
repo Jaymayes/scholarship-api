@@ -119,7 +119,7 @@ class ScholarshipPageGenerator:
             
             return {
                 "scholarship_id": scholarship.id,
-                "slug": self._generate_slug(scholarship.title),
+                "slug": self._generate_slug(scholarship.name),
                 "title": seo_metadata["title"],
                 "meta_description": seo_metadata["meta_description"],
                 "content": {
@@ -142,12 +142,12 @@ class ScholarshipPageGenerator:
     async def _generate_overview_section(self, scholarship: Scholarship) -> str:
         """Generate scholarship overview section"""
         prompt = f"""
-        Write a comprehensive overview section for the {scholarship.title} scholarship page.
+        Write a comprehensive overview section for the {scholarship.name} scholarship page.
         
         Scholarship Details:
-        - Title: {scholarship.title}
+        - Title: {scholarship.name}
         - Award Amount: ${scholarship.amount:,}
-        - Deadline: {scholarship.deadline.strftime('%B %d, %Y')}
+        - Deadline: {scholarship.application_deadline.strftime('%B %d, %Y')}
         - Organization: {scholarship.organization}
         - Description: {scholarship.description}
         
@@ -160,13 +160,26 @@ class ScholarshipPageGenerator:
         Write in a helpful, informative tone. Use specific details. Keep it 300-400 words.
         """
         
-        response = await self.openai_service.generate_completion(prompt)
-        return response.strip()
+        # Use the OpenAI service to generate content
+        try:
+            response = await self.openai_service.client.chat.completions.create(
+                model="gpt-4o",
+                messages=[
+                    {"role": "system", "content": "You are a scholarship content writer creating helpful, informative content for students."},
+                    {"role": "user", "content": prompt}
+                ],
+                temperature=0.7,
+                max_tokens=500
+            )
+            return response.choices[0].message.content.strip()
+        except Exception as e:
+            logger.error(f"Error generating content: {e}")
+            return f"Overview for {scholarship.name} scholarship. Award: ${scholarship.amount:,}. Deadline: {scholarship.application_deadline.strftime('%B %d, %Y')}."
     
     async def _generate_eligibility_section(self, scholarship: Scholarship) -> str:
         """Generate detailed eligibility section"""
         prompt = f"""
-        Create a detailed eligibility requirements section for {scholarship.title}.
+        Create a detailed eligibility requirements section for {scholarship.name}.
         
         Scholarship Context:
         - Award: ${scholarship.amount:,}
@@ -184,16 +197,29 @@ class ScholarshipPageGenerator:
         Target 250-300 words.
         """
         
-        response = await self.openai_service.generate_completion(prompt)
-        return response.strip()
+        # Use the OpenAI service to generate content
+        try:
+            response = await self.openai_service.client.chat.completions.create(
+                model="gpt-4o",
+                messages=[
+                    {"role": "system", "content": "You are a scholarship content writer creating helpful, informative content for students."},
+                    {"role": "user", "content": prompt}
+                ],
+                temperature=0.7,
+                max_tokens=400
+            )
+            return response.choices[0].message.content.strip()
+        except Exception as e:
+            logger.error(f"Error generating content: {e}")
+            return f"Eligibility requirements for {scholarship.name} scholarship."
     
     async def _generate_application_section(self, scholarship: Scholarship) -> str:
         """Generate application process section"""
         prompt = f"""
-        Write a comprehensive application guide for {scholarship.title}.
+        Write a comprehensive application guide for {scholarship.name}.
         
         Details:
-        - Deadline: {scholarship.deadline.strftime('%B %d, %Y')}
+        - Deadline: {scholarship.application_deadline.strftime('%B %d, %Y')}
         - Award: ${scholarship.amount:,}
         - Organization: {scholarship.organization}
         
@@ -208,13 +234,26 @@ class ScholarshipPageGenerator:
         Target 350-400 words.
         """
         
-        response = await self.openai_service.generate_completion(prompt)
-        return response.strip()
+        # Use the OpenAI service to generate content
+        try:
+            response = await self.openai_service.client.chat.completions.create(
+                model="gpt-4o",
+                messages=[
+                    {"role": "system", "content": "You are a scholarship content writer creating helpful, informative content for students."},
+                    {"role": "user", "content": prompt}
+                ],
+                temperature=0.7,
+                max_tokens=500
+            )
+            return response.choices[0].message.content.strip()
+        except Exception as e:
+            logger.error(f"Error generating content: {e}")
+            return f"Application guide for {scholarship.name} scholarship. Deadline: {scholarship.application_deadline.strftime('%B %d, %Y')}."
     
     async def _generate_strategy_section(self, scholarship: Scholarship) -> str:
         """Generate application strategy section"""
         prompt = f"""
-        Create a strategic application advice section for {scholarship.title}.
+        Create a strategic application advice section for {scholarship.name}.
         
         Scholarship Profile:
         - Amount: ${scholarship.amount:,}
@@ -232,26 +271,39 @@ class ScholarshipPageGenerator:
         Target 250-300 words.
         """
         
-        response = await self.openai_service.generate_completion(prompt)
-        return response.strip()
+        # Use the OpenAI service to generate content
+        try:
+            response = await self.openai_service.client.chat.completions.create(
+                model="gpt-4o",
+                messages=[
+                    {"role": "system", "content": "You are a scholarship content writer creating helpful, informative content for students."},
+                    {"role": "user", "content": prompt}
+                ],
+                temperature=0.7,
+                max_tokens=400
+            )
+            return response.choices[0].message.content.strip()
+        except Exception as e:
+            logger.error(f"Error generating content: {e}")
+            return f"Strategic advice for {scholarship.name} scholarship application."
     
     async def _generate_seo_metadata(self, scholarship: Scholarship, content: str) -> Dict[str, Any]:
         """Generate SEO-optimized metadata"""
         
         # Generate SEO title
-        title = f"{scholarship.title} - ${scholarship.amount:,} Scholarship Application Guide"
+        title = f"{scholarship.name} - ${scholarship.amount:,} Scholarship Application Guide"
         if len(title) > 60:
-            title = f"{scholarship.title} - Application Guide"
+            title = f"{scholarship.name} - Application Guide"
         
         # Generate meta description
-        description = f"Apply for the ${scholarship.amount:,} {scholarship.title}. Complete eligibility requirements, application process, and winning strategies. Deadline: {scholarship.deadline.strftime('%B %d, %Y')}."
+        description = f"Apply for the ${scholarship.amount:,} {scholarship.name}. Complete eligibility requirements, application process, and winning strategies. Deadline: {scholarship.application_deadline.strftime('%B %d, %Y')}."
         if len(description) > 160:
-            description = f"${scholarship.amount:,} {scholarship.title} application guide. Requirements, process, and strategies to win."
+            description = f"${scholarship.amount:,} {scholarship.name} application guide. Requirements, process, and strategies to win."
         
         # Extract keywords
         keywords = [
-            scholarship.title.lower(),
-            f"{scholarship.title.lower()} scholarship",
+            scholarship.name.lower(),
+            f"{scholarship.name.lower()} scholarship",
             f"${scholarship.amount} scholarship",
             scholarship.organization.lower(),
             "scholarship application",
@@ -262,7 +314,7 @@ class ScholarshipPageGenerator:
         structured_data = {
             "@context": "https://schema.org/",
             "@type": "FinancialProduct",
-            "name": scholarship.title,
+            "name": scholarship.name,
             "description": scholarship.description,
             "provider": {
                 "@type": "Organization",
@@ -273,7 +325,7 @@ class ScholarshipPageGenerator:
                 "currency": "USD",
                 "value": scholarship.amount
             },
-            "applicationDeadline": scholarship.deadline.isoformat()
+            "applicationDeadline": scholarship.application_deadline.isoformat()
         }
         
         return {
@@ -281,7 +333,7 @@ class ScholarshipPageGenerator:
             "meta_description": description,
             "keywords": keywords,
             "structured_data": structured_data,
-            "canonical_url": f"/scholarships/{self._generate_slug(scholarship.title)}",
+            "canonical_url": f"/scholarships/{self._generate_slug(scholarship.name)}",
             "og_title": title,
             "og_description": description,
             "og_type": "article"
@@ -315,7 +367,7 @@ class CategoryLandingPageGenerator:
         # Calculate category stats
         total_amount = sum(s.amount for s in scholarships)
         avg_amount = total_amount / len(scholarships) if scholarships else 0
-        upcoming_deadlines = [s for s in scholarships if s.deadline > datetime.now()]
+        upcoming_deadlines = [s for s in scholarships if s.application_deadline > datetime.now()]
         
         prompt = f"""
         Create a comprehensive landing page for "{category}" scholarships.
@@ -338,7 +390,21 @@ class CategoryLandingPageGenerator:
         Focus on actionable insights specific to {category} students.
         """
         
-        content = await self.openai_service.generate_completion(prompt)
+        # Use the OpenAI service to generate content
+        try:
+            response = await self.openai_service.client.chat.completions.create(
+                model="gpt-4o",
+                messages=[
+                    {"role": "system", "content": "You are a scholarship content writer creating helpful, informative content for students."},
+                    {"role": "user", "content": prompt}
+                ],
+                temperature=0.7,
+                max_tokens=800
+            )
+            content = response.choices[0].message.content.strip()
+        except Exception as e:
+            logger.error(f"Error generating content: {e}")
+            content = f"Comprehensive guide to {category} scholarships with {len(scholarships)} opportunities available."
         
         # Generate scholarship highlights
         top_scholarships = sorted(scholarships, key=lambda s: s.amount, reverse=True)[:5]
@@ -346,11 +412,11 @@ class CategoryLandingPageGenerator:
         
         for scholarship in top_scholarships:
             highlights.append({
-                "title": scholarship.title,
+                "title": scholarship.name,
                 "amount": scholarship.amount,
-                "deadline": scholarship.deadline.isoformat(),
+                "deadline": scholarship.application_deadline.isoformat(),
                 "organization": scholarship.organization,
-                "slug": self._generate_slug(scholarship.title)
+                "slug": self._generate_slug(scholarship.name)
             })
         
         return {

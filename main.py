@@ -20,6 +20,7 @@ from routers.ai import router as ai_router
 from routers.db_status import router as db_status_router
 from routers.replit_health import router as replit_health_router
 from routers.agent import router as agent_router
+from routers.week2_acceleration import router as week2_router
 from middleware.error_handling import (
     api_error_handler, http_exception_handler, validation_exception_handler,
     rate_limit_exception_handler, general_exception_handler, trace_id_middleware,
@@ -193,6 +194,7 @@ app.include_router(health_router)
 app.include_router(replit_health_router, tags=["health"])
 app.include_router(ai_router, tags=["ai"])
 app.include_router(db_status_router)
+app.include_router(week2_router, tags=["Week 2 Acceleration"])
 app.include_router(agent_router, tags=["agent"])  # Agent Bridge for Command Center integration
 
 # QA-003 fix: Include interaction wrapper endpoints  
