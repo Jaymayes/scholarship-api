@@ -199,6 +199,10 @@ app.include_router(agent_router, tags=["agent"])  # Agent Bridge for Command Cen
 from routers.interaction_wrapper import router as interaction_wrapper_router
 app.include_router(interaction_wrapper_router, tags=["interactions"])
 
+# AI Scholarship Playbook: Magic Onboarding endpoints
+from routers.onboarding import router as onboarding_router
+app.include_router(onboarding_router, tags=["Magic Onboarding"])
+
 @app.get("/")
 async def root():
     """Root endpoint with helpful API information"""

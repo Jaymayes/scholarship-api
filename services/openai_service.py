@@ -247,6 +247,35 @@ class OpenAIService:
         except Exception as e:
             logger.error(f"Error analyzing scholarship trends: {e}")
             return {"insights": "Analysis failed"}
+    
+    async def generate_chat_response(self, prompt: str, system_message: Optional[str] = None) -> str:
+        """
+        Generate a conversational AI response for Magic Onboarding
+        """
+        if not self.is_available():
+            return "AI service is currently unavailable. Please try again later."
+        
+        try:
+            messages = []
+            if system_message:
+                messages.append({"role": "system", "content": system_message})
+            else:
+                messages.append({"role": "system", "content": "You are a helpful, friendly AI assistant specializing in scholarship applications and student guidance."})
+            
+            messages.append({"role": "user", "content": prompt})
+            
+            response = self.client.chat.completions.create(
+                model="gpt-4o",
+                messages=messages,
+                temperature=0.7,
+                max_tokens=500
+            )
+            
+            return response.choices[0].message.content
+            
+        except Exception as e:
+            logger.error(f"Error generating chat response: {e}")
+            return "I apologize, but I'm having trouble responding right now. Please try again."
 
 # Global service instance
 openai_service = OpenAIService()
