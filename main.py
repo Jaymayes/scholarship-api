@@ -207,6 +207,10 @@ app.include_router(onboarding_router, tags=["Magic Onboarding"])
 from routers.monetization import router as monetization_router
 app.include_router(monetization_router, tags=["Monetization"])
 
+# AI Scholarship Playbook: B2B Partner Portal endpoints
+from routers.b2b_partner import router as b2b_partner_router
+app.include_router(b2b_partner_router, tags=["B2B Partners"])
+
 @app.get("/")
 async def root():
     """Root endpoint with helpful API information"""
