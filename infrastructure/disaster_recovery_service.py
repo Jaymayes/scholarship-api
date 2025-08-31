@@ -465,6 +465,21 @@ class DisasterRecoveryService:
         
         return dashboard_data
     
+    async def list_backups(self, app_name: Optional[str] = None, limit: int = 10) -> List[BackupRecord]:
+        """List recent backups for application"""
+        if app_name:
+            backups = [b for b in self.backup_records if b.app_name == app_name]
+        else:
+            backups = self.backup_records
+        
+        # Sort by creation time, most recent first
+        sorted_backups = sorted(backups, key=lambda b: b.created_at, reverse=True)
+        return sorted_backups[:limit]
+    
+    async def get_backup_by_id(self, backup_id: str) -> Optional[BackupRecord]:
+        """Get specific backup by ID"""
+        return next((b for b in self.backup_records if b.backup_id == backup_id), None)
+    
     async def run_scheduled_backups(self):
         """Run scheduled backups for all applications"""
         for app_name, config in self.dr_config.items():
