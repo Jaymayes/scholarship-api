@@ -11,6 +11,8 @@ class ScholarshipService:
     def __init__(self):
         self.scholarships = {sch.id: sch for sch in MOCK_SCHOLARSHIPS}
         logger.info(f"Initialized ScholarshipService with {len(self.scholarships)} scholarships")
+        
+        # Note: Metrics update moved to FastAPI startup hook to ensure each worker sets the gauge
     
     def get_scholarship_by_id(self, scholarship_id: str) -> Optional[Scholarship]:
         """Get a specific scholarship by ID"""

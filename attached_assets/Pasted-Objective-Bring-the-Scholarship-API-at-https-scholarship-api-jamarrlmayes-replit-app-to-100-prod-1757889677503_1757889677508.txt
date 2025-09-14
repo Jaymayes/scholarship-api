@@ -1,0 +1,77 @@
+Objective
+Bring the Scholarship API at https://scholarship-api-jamarrlmayes.replit.app to 100% production readiness by closing remaining gaps, fixing the metrics discrepancy, and hardening operations, security, and reliability. Execute in small, verifiable steps with evidence and clear acceptance criteria. Use disciplined task decomposition and pause on blockers for review . Align with system/UAT best practices, CI/CD readiness, and security/privacy standards    .
+
+Guardrails
+
+Operate in staging or a safe test environment. If only production is available, use TEST_ prefixed data and reversible changes. Respect rate limits; avoid disruptive load without explicit instruction.
+Log timestamps, requests/responses (no secrets), console/server logs, and attach HARs for key calls.
+A) Fix the metrics discrepancy (Blocker)
+Goal: active_scholarships_total currently reports 0 while logs show 15 loaded. Diagnose and remediate.
+
+Discovery
+Locate metrics source (code, middleware, exporter). Identify metric type (counter/gauge), labels, and update sites.
+Cross-check the database query/ORM for “active” definition and where increment/decrement occurs.
+Confirm Prometheus scrape targets, ServiceMonitor config, and label relabeling.
+Remediation
+If metric is a counter but reflects a current total, convert to a gauge updated after data load and on changes, or create both: active_scholarships_total (gauge) and scholarships_ingested_total (counter).
+Ensure metric updates run after successful transaction commit. Add bootstrap reconciliation that sets the gauge to DB count at startup and after bulk loads.
+Prevent high-cardinality labels; limit to env, service, version.
+Validate with unit tests and an integration test that seeds 15 active rows and expects active_scholarships_total=15 within 60s scrape window.
+Acceptance criteria
+In staging, after seeding N active scholarships, Prometheus shows active_scholarships_total=N within 1 scrape; survives process restarts; no duplicate or missing updates.
+Dashboards display correct totals; Alert rules can threshold on zero when DB count > 0.
+Provide code diff, test evidence, screenshot of PromQL query, and HAR/logs.
+B) Contract and coverage hardening
+
+OpenAPI conformance
+Verify OpenAPI 3.1.0 spec covers all running endpoints; run linter and generate contract tests. Close any mismatch (types, enums, required fields).
+Acceptance: 100% endpoint coverage by contract tests; zero schema mismatches across a 50-call sample per key route; nightly contract tests wired in CI/CD .
+Data quality rules
+Enforce/validate domain rules: deadlines valid ISO dates; amount non-negative; eligibility fields normalized.
+Acceptance: automated validation suite passes; no PII beyond documented fields.
+C) Non-functional readiness (performance, reliability)
+
+Performance
+Baseline 3 key endpoints (list, detail, search) with 30 samples each; report p50/p95/p99. Target: p95 ≤ 120ms, p99 ≤ 300ms under expected RPS; zero 5xx. Attach metrics snapshots.
+Reliability
+Repeatability check: identical requests return consistent status, schema, and ordering (when sort specified). Include ETag/Last-Modified revalidation for 304 where applicable.
+Acceptance: performance targets met; reliability checks pass in two separate sessions.
+D) Security and privacy hygiene
+
+Validate existing headers (HSTS, CSP, CORS) remain correct; confirm TLS only.
+Add/verify SBOM, SCA scan, container image scan; set CI gate: no Critical and no High CVEs older than 14 days, with documented exceptions.
+Secrets and PII
+Ensure secrets management (no secrets in code/logs), and redact PII in logs.
+Confirm privacy policy and data-use transparency align with platform standards for FERPA/CCPA posture and encryption-in-transit/at-rest commitments .
+Acceptance: security scans clean per policy; redaction verified; privacy disclosures present and accurate.
+E) Observability, SLOs, and alerts
+
+Define API SLOs aligned with our platform: availability 99.9%, latency SLO p95 ≤ 120ms. Create error budget and alert policies for SLO burn rates and 5xx spikes. Publish dashboards and runbooks .
+Correlation/trace IDs: verify propagation and add to error responses/headers for support.
+Acceptance: live dashboards, alert rules firing on test conditions, runbooks with clear steps.
+F) Resilience, deploy safety, and rollback
+
+Health probes: ensure readiness/liveness endpoints cover dependencies; test rolling restart without user-visible errors.
+Canary/blue-green: document or implement canary at 10% → 50% → 100% with auto-rollback on SLO breach.
+Graceful shutdown: terminate pod/process during traffic and confirm zero request loss via retries/backoff.
+Acceptance: zero 5xx during rolling updates; successful canary demo; rollback validated.
+G) Compliance and risk checks
+
+Audit logging for admin/privileged actions; data retention policy documented; backup/restore drill with RPO/RTO notes. Provide short ethical/responsible AI checklist for data handling and transparency relevant to scholarships data .
+Acceptance: backup restore tested; audit trail visible for key actions; compliance notes published.
+Deliverables
+
+100% Readiness Package:
+Executive summary: Go decision with evidence
+Metrics fix PR(s) and test results (before/after screenshots, PromQL outputs)
+Contract test report and coverage summary
+Performance/reliability report with p50/p95/p99 and zero-error assertion
+Security scan reports and SBOM link; secrets/PII verification notes
+SLO dashboards, alert rules, and runbooks
+Resilience test evidence (rolling restart, canary, rollback)
+Compliance artifacts (privacy, backup/restore proof, audit logging)
+Provide links to repos, CI runs, dashboards, and a change log.
+Execution notes
+
+Work in short, verifiable increments. After each section (A–G), pause and summarize findings and diffs before continuing. If a critical blocker appears (e.g., persistent metric mismatch or SLO failure), stop and ship an interim report for review. This mirrors best practices for UAT/system readiness and continuous delivery in mature pipelines .
+If you need environment variables, credentials, or staging endpoints, request them explicitly and proceed only with approval.

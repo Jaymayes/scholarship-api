@@ -62,6 +62,16 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.warning(f"⚠️ Command Center registration failed (will retry): {e}")
     
+    # Startup reconciliation: Set active scholarships metric in each worker
+    try:
+        from services.scholarship_service import scholarship_service
+        from observability.metrics import metrics_service
+        scholarship_count = len(scholarship_service.scholarships)
+        metrics_service.update_scholarship_count(scholarship_count)
+        logger.info(f"🎯 Startup reconciliation: active_scholarships_total set to {scholarship_count}")
+    except Exception as e:
+        logger.warning(f"Failed startup metrics reconciliation: {e}")
+    
     yield
     
     # Shutdown

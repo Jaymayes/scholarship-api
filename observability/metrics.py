@@ -2,12 +2,30 @@
 Prometheus Metrics for Observability
 """
 
-from prometheus_client import Counter, Histogram, Gauge, generate_latest, CONTENT_TYPE_LATEST
+import os
+import shutil
+from prometheus_client import (
+    Counter, Histogram, Gauge, generate_latest, CONTENT_TYPE_LATEST, 
+    CollectorRegistry, multiprocess
+)
 from fastapi import FastAPI, Response
 from typing import Optional
 from utils.logger import get_logger
 
 logger = get_logger("metrics")
+
+# Configure multiprocess support for production
+PROMETHEUS_MULTIPROC_DIR = os.environ.get('PROMETHEUS_MULTIPROC_DIR', '/tmp/prometheus_multiproc')
+
+# Ensure multiprocess directory exists (but don't delete existing files!)
+if PROMETHEUS_MULTIPROC_DIR:
+    try:
+        os.makedirs(PROMETHEUS_MULTIPROC_DIR, exist_ok=True)
+        logger.info(f"Prometheus multiprocess directory configured: {PROMETHEUS_MULTIPROC_DIR}")
+    except Exception as e:
+        logger.warning(f"Failed to setup multiprocess directory: {e}")
+
+# Note: Registry setup moved to metrics endpoint to ensure fresh reads
 
 # Metrics definitions
 http_requests_total = Counter(
@@ -40,9 +58,12 @@ interactions_logged_total = Counter(
     ['event_type', 'status']
 )
 
+# Configure active scholarships as multiprocess gauge with "max" mode
+# This ensures correct aggregation across processes (max of all workers)
 active_scholarships = Gauge(
     'active_scholarships_total',
-    'Total number of active scholarships'
+    'Total number of active scholarships',
+    multiprocess_mode='max'
 )
 
 class MetricsService:
@@ -133,10 +154,20 @@ def setup_metrics(app: FastAPI):
     
     @app.get("/metrics")
     async def get_metrics():
-        """Prometheus metrics endpoint"""
+        """Prometheus metrics endpoint with multiprocess support"""
         try:
+            # Always build fresh registry when multiprocess directory exists
+            if os.path.isdir(PROMETHEUS_MULTIPROC_DIR):
+                registry = CollectorRegistry()
+                multiprocess.MultiProcessCollector(registry)
+                content = generate_latest(registry)
+                logger.debug("Generated metrics using fresh multiprocess registry")
+            else:
+                content = generate_latest()
+                logger.debug("Generated metrics using default registry (no multiprocess dir)")
+                
             return Response(
-                content=generate_latest(),
+                content=content,
                 media_type=CONTENT_TYPE_LATEST
             )
         except Exception as e:
