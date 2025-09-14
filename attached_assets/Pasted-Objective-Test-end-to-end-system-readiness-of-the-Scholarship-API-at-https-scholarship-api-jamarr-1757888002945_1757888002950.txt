@@ -1,0 +1,84 @@
+Objective
+Test end-to-end system readiness of the Scholarship API at https://scholarship-api-jamarrlmayes.replit.app and produce a concise Go/No-Go Readiness Report with evidence.
+
+Constraints and Safety
+
+Read-first strategy. Do not create, update, or delete real data unless a documented sandbox/test endpoint exists. If any write operations are tested, use clearly tagged test data (prefix: TEST_) and clean up after.
+Respect rate limits and avoid denial-of-service patterns. Max 5 RPS, bursts of 10, total < 200 calls unless explicitly required and safe.
+Log timestamps, request/response pairs (excluding secrets), and capture HAR where possible.
+Discovery
+
+Check for health and metadata:
+GET /health or /status
+GET /docs, /redoc, /openapi.json, /swagger.json
+GET /version
+Record:
+API base URL, supported schemes, documented endpoints, auth requirements, rate limits, and error model.
+Functional Tests (Black-box)
+For each discovered public endpoint (e.g., /scholarships, /scholarships/{id}, /search):
+
+Happy-path calls
+Verify HTTP 200/2xx, Content-Type application/json, valid JSON, and expected fields.
+If pagination exists (e.g., ?page, ?limit, cursor), retrieve 2–3 pages and confirm:
+Non-overlapping items across pages
+Stable ordering when sort params are applied
+next/prev tokens behave consistently
+Filtering/sorting
+Apply 2–3 realistic filters (e.g., state=CA, major=engineering, min_gpa=3.5, deadline_before=YYYY-MM-DD) and a sort param; confirm result set changes as expected and sort is respected.
+Object detail retrieval
+Fetch a valid scholarship by id from the list; confirm fields are complete and consistent with list view (no mismatched IDs, titles, deadlines).
+Error handling
+Invalid ID (e.g., 000000 or non-UUID) returns 404 with consistent error schema {code, message, details}.
+Invalid query param type (e.g., min_gpa=abc) returns 400 with helpful message.
+Unknown route returns 404 baseline.
+Idempotency and safe-method semantics
+GET endpoints are side-effect free (no state mutations, no counters that alter responses).
+Non-Functional Checks (Lightweight)
+
+Performance sampling
+For 3 key endpoints (list, detail, search), run 10 sequential calls each; capture latency samples and report p50/p95. Flag p95 > 1200ms or high variance.
+Reliability
+Repeat the same requests after a full refresh/new session; confirm consistent status codes, schemas, and item ordering (when sort specified).
+Caching and CDN behavior
+Inspect Cache-Control/ETag/Last-Modified on GET. If present, revalidate (If-None-Match / If-Modified-Since) and confirm 304 behavior.
+CORS and client compatibility
+From a browser context, verify Access-Control-Allow-Origin and preflight (OPTIONS) success on key routes.
+Security and Hygiene (Non-invasive)
+
+TLS and headers
+Confirm HTTPS only, no mixed content, HSTS if applicable. Check Content-Type, X-Content-Type-Options, and absence of sensitive server/version leakage.
+Input sanitization (read endpoints)
+Use harmless special characters in filters (e.g., "';()<>") and confirm no server errors or reflected unsanitized content.
+Rate-limit behavior
+If documented, approach the limit with controlled bursts. Confirm 429 with Retry-After and graceful recovery afterwards.
+PII hygiene (sample data)
+Ensure responses do not expose unnecessary PII beyond documented fields.
+Contract and Schema Validation
+
+If OpenAPI is available:
+Validate responses against schemas and report mismatches (missing/extra fields, type errors, format errors).
+Confirm required fields and enum constraints where defined.
+If no spec is available:
+Infer a provisional schema from sample responses. Validate subsequent calls against this inferred contract to detect drift.
+Data Quality and Domain Rules
+
+For scholarship objects, verify reasonable field integrity:
+deadline is a valid future/near-future date or clearly labeled if past (for archive endpoints).
+amount is numeric and non-negative; currency/units clear.
+eligibility fields (GPA/state/major) appear in a consistent format.
+description length and encoding are sane (no binary blobs or obvious HTML injection).
+Observability Signals
+
+Note any /metrics, /health, or status pages.
+Confirm errors surface consistent correlation/request IDs in responses or headers to aid support.
+Deliverables (produce at the end)
+
+Executive summary: Go or No-Go with 3–5 bullet reasons.
+Endpoint matrix: For each tested route, list method, sample request, status code, schema validation result, p50/p95 latency, and notable headers.
+Issues log: Title, severity (Blocker/Major/Minor), endpoint, repro steps, expected vs actual, evidence (screenshots/HAR/snippets).
+Recommendations: Quick wins for readiness (e.g., add OpenAPI, fix error schema consistency, enable ETag).
+Appendix: HAR files, cURL reproductions, and raw timings.
+Execution Notes for the Agent
+
+Work in small, verifiable steps. After each section (Discovery, Functional, Non-Functional, Security), pause and summarize findings before proceeding.
+If a critical blocker appears (e.g., persistent 5xx on core endpoints), stop and produce an interim report with evidence.
