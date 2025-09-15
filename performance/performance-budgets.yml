@@ -1,0 +1,96 @@
+# Priority 2 Day 2: Performance Budgets Configuration
+# CI Performance Gates and Thresholds
+
+name: "Performance Budgets & Quality Gates"
+
+# Performance targets and acceptance criteria
+targets:
+  latency:
+    p50_max: 50ms    # Median response time
+    p95_max: 120ms   # 95th percentile ≤ 120ms
+    p99_max: 300ms   # 99th percentile ≤ 300ms
+    
+  reliability:
+    error_rate_max: 0.1%     # < 0.1% error rate
+    success_rate_min: 99.9%  # > 99.9% success rate
+    zero_5xx: true           # Zero 5xx errors
+    
+  resources:
+    db_pool_max: 80%         # DB connection pool < 80%
+    cpu_max: 70%             # CPU usage < 70%
+    memory_max: 80%          # Memory usage < 80%
+
+# Traffic profiles for different test scenarios
+traffic_profiles:
+  baseline:
+    description: "Sustained baseline load"
+    rps: 2                   # 1-2 RPS baseline
+    duration: "5m"
+    endpoints:
+      - /health
+      - /api/v1/scholarships
+      - /api/v1/search
+      
+  burst:
+    description: "Short burst to catch tail latencies"  
+    rps_start: 2
+    rps_peak: 10             # 5-10 RPS burst
+    ramp_duration: "30s"
+    sustain_duration: "1m"
+    endpoints:
+      - /api/v1/search
+      - /api/v1/scholarships
+      - /api/v1/eligibility/check
+
+# CI integration settings
+ci_integration:
+  fail_on_budget_breach: true
+  trend_tracking:
+    runs_to_keep: 10         # Track last 10 runs
+    comparison_threshold: 20% # Fail if >20% regression
+    
+  artifacts:
+    performance_report: "performance-report.html"
+    metrics_json: "performance-metrics.json" 
+    trend_data: "performance-trend.csv"
+    
+  notifications:
+    on_failure: true
+    include_comparison: true
+    attach_report: true
+
+# Monitoring and alerting  
+monitoring:
+  custom_metrics:
+    - name: "api_latency_p95"
+      threshold: 120
+      unit: "ms"
+      
+    - name: "error_rate"  
+      threshold: 0.1
+      unit: "%"
+      
+    - name: "db_connections_active"
+      threshold: 80
+      unit: "%"
+      
+  alerts:
+    flatline_detection: true
+    abrupt_change_detection: true
+    regression_alerts: true
+
+# Resource monitoring configuration
+resources:
+  database:
+    monitor_pool: true
+    monitor_queries: true
+    slow_query_threshold: "100ms"
+    
+  application:
+    monitor_cpu: true
+    monitor_memory: true  
+    monitor_gc: true
+    
+  network:
+    monitor_connections: true
+    monitor_bandwidth: true

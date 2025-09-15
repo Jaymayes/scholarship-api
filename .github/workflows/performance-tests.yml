@@ -1,0 +1,195 @@
+name: "Priority 2 Day 2: Performance Budgets & Gates"
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+  schedule:
+    # Run performance tests daily at 2 AM UTC
+    - cron: '0 2 * * *'
+
+jobs:
+  performance-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    
+    services:
+      postgres:
+        image: postgres:13
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: scholarship_api_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 10  # Fetch history for trend analysis
+    
+    - name: Set up Python 3.11
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install psutil  # For resource monitoring
+    
+    - name: Set up test environment
+      env:
+        DATABASE_URL: postgresql://postgres:postgres@localhost:5432/scholarship_api_test
+        PGUSER: postgres
+        PGPASSWORD: postgres
+        PGHOST: localhost
+        PGPORT: 5432
+        PGDATABASE: scholarship_api_test
+      run: |
+        # Initialize test database
+        python -c "
+        from sqlalchemy import create_engine
+        from models import Base
+        engine = create_engine('postgresql://postgres:postgres@localhost:5432/scholarship_api_test')
+        Base.metadata.create_all(engine)
+        print('Database initialized for performance testing')
+        "
+    
+    - name: Start API server with monitoring
+      env:
+        DATABASE_URL: postgresql://postgres:postgres@localhost:5432/scholarship_api_test
+        ENVIRONMENT: testing
+        PORT: 5000
+      run: |
+        # Start server in background with resource monitoring
+        python performance/start-monitored-server.py &
+        echo $! > server.pid
+        
+        # Wait for server to be ready
+        timeout 30 bash -c 'until curl -f http://localhost:5000/health; do sleep 1; done'
+        echo "API server started and ready"
+    
+    - name: Install k6
+      run: |
+        sudo apt-key adv --keyserver hkp://keyserver.ubuntu.com:80 --recv-keys C5AD17C747E3415A3642D57D77C6C491D6AC1D69
+        echo "deb https://dl.k6.io/deb stable main" | sudo tee /etc/apt/sources.list.d/k6.list
+        sudo apt-get update
+        sudo apt-get install k6
+    
+    - name: Run performance tests
+      env:
+        API_BASE_URL: http://localhost:5000
+      run: |
+        # Create results directory
+        mkdir -p performance/results
+        
+        # Run k6 load tests with JSON output
+        k6 run --out json=performance/results/k6-results.json \
+               --summary-trend-stats="min,med,avg,p(95),p(99),max" \
+               performance/k6-load-test.js
+        
+        # Capture final resource metrics
+        python performance/capture-resource-metrics.py > performance/results/resource-metrics.json
+    
+    - name: Stop API server
+      run: |
+        if [ -f server.pid ]; then
+          kill $(cat server.pid) || true
+          rm server.pid
+        fi
+    
+    - name: Generate performance report
+      run: |
+        # Generate comprehensive performance report
+        python performance/generate-performance-report.py \
+          --k6-results performance/results/k6-results.json \
+          --resource-metrics performance/results/resource-metrics.json \
+          --output performance/results/performance-report.html \
+          --output-json performance/results/performance-metrics.json
+    
+    - name: Check performance budgets
+      run: |
+        # Validate performance against budgets
+        python performance/validate-performance-budgets.py \
+          --metrics performance/results/performance-metrics.json \
+          --budgets performance/performance-budgets.yml \
+          --fail-on-breach
+    
+    - name: Update performance trend
+      run: |
+        # Update 10-run performance trend
+        python performance/update-performance-trend.py \
+          --metrics performance/results/performance-metrics.json \
+          --trend-file performance/results/performance-trend.csv \
+          --max-runs 10
+    
+    - name: Upload performance artifacts
+      uses: actions/upload-artifact@v3
+      if: always()  # Upload even if tests failed
+      with:
+        name: performance-test-results
+        path: |
+          performance/results/
+          performance/performance-budgets.yml
+        retention-days: 30
+    
+    - name: Generate PR performance comment
+      if: github.event_name == 'pull_request'
+      uses: actions/github-script@v6
+      with:
+        script: |
+          const fs = require('fs');
+          
+          // Read performance metrics
+          const metricsFile = 'performance/results/performance-metrics.json';
+          if (fs.existsSync(metricsFile)) {
+            const metrics = JSON.parse(fs.readFileSync(metricsFile, 'utf8'));
+            
+            // Generate performance summary comment
+            const comment = `## 🚀 Performance Test Results
+          
+          ### Latency Metrics
+          - **p50**: ${metrics.latency.p50}ms ${metrics.latency.p50 <= 50 ? '✅' : '❌'}
+          - **p95**: ${metrics.latency.p95}ms ${metrics.latency.p95 <= 120 ? '✅' : '❌'}  
+          - **p99**: ${metrics.latency.p99}ms ${metrics.latency.p99 <= 300 ? '✅' : '❌'}
+          
+          ### Reliability
+          - **Success Rate**: ${metrics.reliability.success_rate}% ${metrics.reliability.success_rate >= 99.9 ? '✅' : '❌'}
+          - **Error Rate**: ${metrics.reliability.error_rate}% ${metrics.reliability.error_rate <= 0.1 ? '✅' : '❌'}
+          - **5xx Errors**: ${metrics.reliability.server_errors} ${metrics.reliability.server_errors === 0 ? '✅' : '❌'}
+          
+          ### Resource Usage
+          - **DB Pool**: ${metrics.resources.db_pool_usage}% ${metrics.resources.db_pool_usage <= 80 ? '✅' : '❌'}
+          - **CPU**: ${metrics.resources.cpu_usage}% ${metrics.resources.cpu_usage <= 70 ? '✅' : '❌'}
+          - **Memory**: ${metrics.resources.memory_usage}% ${metrics.resources.memory_usage <= 80 ? '✅' : '❌'}
+          
+          📊 [Full Performance Report](../actions/runs/${context.runId})
+          `;
+          
+            // Post comment on PR
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: comment
+            });
+          }
+    
+    - name: Fail on budget breach
+      run: |
+        # Check if performance budgets were breached
+        if [ -f performance/results/budget-breach.flag ]; then
+          echo "❌ Performance budget breach detected!"
+          cat performance/results/budget-breach.log
+          exit 1
+        else
+          echo "✅ All performance budgets met"
+        fi

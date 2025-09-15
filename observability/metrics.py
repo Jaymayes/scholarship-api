@@ -8,6 +8,8 @@ import prometheus_client
 from fastapi import FastAPI, Response
 from typing import Optional
 from utils.logger import get_logger
+from observability.domain_metrics import domain_metrics_service, setup_domain_metrics
+from observability.alerts import setup_alerting, get_alert_manager
 
 logger = get_logger("metrics")
 
@@ -215,12 +217,25 @@ async def debug_routes(app):
 def setup_metrics(app: FastAPI):
     """Setup metrics using unified registry approach - work with auto-instrumentation"""
     
+    # Priority 2 Day 2: Initialize domain metrics with strict governance  
+    try:
+        setup_domain_metrics(env='development', service='scholarship_api', version='1.0.0')
+        setup_alerting()
+        logger.info("🎯 Priority 2 Day 2: Domain metrics and alerting configured")
+    except Exception as e:
+        logger.error(f"Failed to setup domain metrics: {e}")
+    
     # LIFECYCLE RECONCILIATION: Ensure scholarship count is correct on startup
     def reconcile_metrics_on_startup():
-        """Reconcile metrics with actual data on startup"""
+        """Reconcile metrics with actual data on startup - Enhanced with domain metrics"""
         try:
             count = metrics_service.reconcile_scholarship_count_from_service()
             logger.info(f"🚀 STARTUP RECONCILIATION: active_scholarships_total = {count}")
+            
+            # Priority 2 Day 2: Record initial scholarship indexing with reconciliation
+            domain_metrics_service.record_scholarship_indexed(count, current_active=count)
+            logger.info(f"🎯 Domain metrics: Recorded {count} scholarships as indexed, reconciliation gauge set")
+            
         except Exception as e:
             logger.error(f"Failed startup metrics reconciliation: {str(e)}")
     

@@ -1,0 +1,52 @@
+Outstanding progress. Approved to proceed with Priority 2 Day 2 as outlined. Execute in this order with clear acceptance criteria and a 48-hour timebox.
+
+CI performance budgets and gates
+Actions
+Define traffic profiles for CI: baseline 1–2 RPS per key GET (list, detail, search), short burst 5–10 RPS to catch tail latencies without stressing infra. Calibrate so it’s safe for your env.
+Capture latency percentiles (p50/p95/p99), error rate, and non-200s. Export artifacts to the CI summary and store JSON/CSV for 10-run trend.
+Track server resource signals during the test if available: CPU, memory, DB query p95, connection pool saturation, timeouts.
+Targets
+p95 ≤ 120 ms; p99 ≤ 300 ms on read endpoints.
+Error rate < 0.1%; zero 5xx.
+DB connection pool saturation < 80%; no timeouts.
+Acceptance
+CI job fails on budget breach; trend visible for last 10 runs.
+A short performance report attached to each PR (auto-generated summary).
+2. Error schema standardization (extend beyond 404/405)
+
+Actions
+Enforce a single JSON error envelope across all failures: {code, message, correlation_id, details?}.
+Clarify semantics and mapping:
+400 vs 422: 400 for syntactic issues; 422 for valid JSON with semantic/validation errors.
+401 vs 403: 401 when no/invalid auth; 403 when authenticated but forbidden.
+404 unknown route/object; 405 method not allowed; 409 conflict; 429 include Retry-After.
+5xx never leaks internals; always includes correlation_id.
+Expand negative-path contract tests: invalid IDs, invalid types, missing/invalid auth (if applicable), rate-limit breach, unknown route.
+Update docs with examples per status.
+Acceptance
+Contract tests pass for all negative cases; CI fails on schema drift.
+Docs show copy-paste examples for each error type.
+3. Custom metrics optimization for observability
+
+Actions
+Confirm active_scholarships_total is emitted via the unified registry and reconciles on startup and data mutations (post-commit or periodic).
+Add domain metrics with strict label discipline:
+scholarships_indexed_total (counter)
+search_requests_total (counter, labels: result=ok|error)
+search_results_count (histogram, bucketed sizes)
+Guardrails: only env, service, version labels; no user-input labels. Add flatline and abrupt-change alerts.
+If tracing is enabled, attach exemplars to key histograms/counters for trace jump-to.
+Acceptance
+Metrics visible on /metrics; dashboards wired; no high-cardinality warnings.
+Alerts fire on flatline/zero and recover appropriately.
+Governance, timing, and outputs
+
+Timebox: 48 hours for Day 2.
+Deliverables:
+CI artifacts: performance report with budgets, last 10-run trend, and gate status.
+Error schema reference and negative-path contract test report.
+Metrics screenshots and PromQL queries demonstrating reconciliation and domain metrics.
+Risks and contingencies:
+If CI budgets are noisy, stabilize by fixing sample size, isolating env variability, or adding warm-up runs before measurements.
+If any target is missed, stop and submit a root-cause brief with mitigation options before proceeding.
+Confirm any staging constraints for the CI load step (allowed RPS and test window), then proceed.

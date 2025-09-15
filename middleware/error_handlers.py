@@ -26,9 +26,11 @@ def create_error_response(
     message: str,
     details: dict = None
 ) -> dict:
-    """Create standardized error response format - DEPRECATED: Use utils.error_utils.build_error instead"""
+    """Create standardized error response format - Priority 2 Day 2 Enhanced"""
     trace_id = get_trace_id(request)
-    return build_error(error_code, message, status_code, details, trace_id)
+    # Ensure correlation_id is included in unified schema
+    error_response = build_error(error_code, message, status_code, details, trace_id)
+    return error_response
 
 
 async def http_exception_handler(request: Request, exc: HTTPException) -> JSONResponse:

@@ -1,0 +1,97 @@
+groups:
+- name: scholarship_api_domain_metrics
+  rules:
+  - alert: SearchRequestsFlatline
+    expr: increase(search_requests_total[5m]) == 0
+    for: 10m
+    labels:
+      severity: warning
+      component: search_engine
+    annotations:
+      summary: Search requests have flatlined
+      description: No search requests received in the last 10 minutes on {{ $labels.instance
+        }}
+  - alert: ScholarshipIndexingFlatline
+    expr: increase(scholarships_indexed_total[30m]) == 0
+    for: 1h
+    labels:
+      severity: warning
+      component: data_ingestion
+    annotations:
+      summary: Scholarship indexing has stopped
+      description: No scholarships have been indexed in the last hour on {{ $labels.instance
+        }}
+  - alert: UserInteractionsFlatline
+    expr: increase(user_interactions_total[15m]) == 0
+    for: 30m
+    labels:
+      severity: info
+      component: user_engagement
+    annotations:
+      summary: User interactions have decreased significantly
+      description: No user interactions recorded in the last 30 minutes on {{ $labels.instance
+        }}
+  - alert: SearchErrorRateSpike
+    expr: rate(search_requests_error_total[5m]) / rate(search_requests_total[5m])
+      > 0.1
+    for: 2m
+    labels:
+      severity: critical
+      component: search_engine
+    annotations:
+      summary: Search error rate is abnormally high
+      description: Search error rate is {{ $value | humanizePercentage }} on {{ $labels.instance
+        }}, above 10% threshold
+  - alert: SearchResultCountAnomalous
+    expr: histogram_quantile(0.95, rate(search_results_count_bucket[5m])) > 1000 or
+      histogram_quantile(0.95, rate(search_results_count_bucket[5m])) < 1
+    for: 5m
+    labels:
+      severity: warning
+      component: search_engine
+    annotations:
+      summary: Search result counts are anomalous
+      description: 95th percentile search result count is {{ $value }} on {{ $labels.instance
+        }}, which is outside normal range
+  - alert: EligibilityCheckFailureSpike
+    expr: rate(eligibility_checks_error_total[5m]) / rate(eligibility_checks_total[5m])
+      > 0.05
+    for: 3m
+    labels:
+      severity: warning
+      component: eligibility_engine
+    annotations:
+      summary: Eligibility check failures are elevated
+      description: Eligibility check error rate is {{ $value | humanizePercentage
+        }} on {{ $labels.instance }}, above 5% threshold
+  - alert: SearchQueryLatencyHigh
+    expr: histogram_quantile(0.95, rate(search_query_duration_seconds_bucket[5m]))
+      > 2.0
+    for: 5m
+    labels:
+      severity: warning
+      component: search_engine
+    annotations:
+      summary: Search query latency is high
+      description: 95th percentile search query duration is {{ $value }}s on {{ $labels.instance
+        }}, above 2s threshold
+  - alert: ActiveScholarshipsCountInconsistent
+    expr: abs(active_scholarships_total - indexed_active_scholarships) > 5
+    for: 15m
+    labels:
+      severity: warning
+      component: data_consistency
+    annotations:
+      summary: Active scholarships count inconsistent between metrics
+      description: Active scholarships gauge ({{ $labels.active_scholarships_total
+        }}) differs from indexed count ({{ $labels.indexed_active_scholarships }})
+        by more than 5 on {{ $labels.instance }}
+  - alert: MetricsCollectionDown
+    expr: up{job="scholarship_api"} == 0
+    for: 1m
+    labels:
+      severity: critical
+      component: monitoring
+    annotations:
+      summary: Metrics collection is down
+      description: Prometheus cannot scrape metrics from {{ $labels.instance }}

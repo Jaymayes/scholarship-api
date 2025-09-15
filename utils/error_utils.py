@@ -28,19 +28,29 @@ def build_error(
     """
     Build standardized error response dict
     
+    Priority 2 Day 2: Enhanced unified error envelope
+    Schema: {code, message, correlation_id, details?, status, timestamp, trace_id}
+    
     Returns plain dict - never JSON string to prevent double encoding
     All error handlers must use this and pass result directly to JSONResponse
     """
+    correlation_id = trace_id or str(uuid.uuid4())
+    
+    # Primary error schema - Priority 2 Day 2 compliant
     error_dict = {
-        "trace_id": trace_id or str(uuid.uuid4()),
         "code": code,
         "message": message,
+        "correlation_id": correlation_id,  # Primary field for API consumers
         "status": status,
         "timestamp": int(time.time())
     }
     
+    # Include details if provided
     if details:
         error_dict["details"] = details
+    
+    # Keep trace_id for internal logging and backward compatibility
+    error_dict["trace_id"] = correlation_id
         
     return error_dict
 
