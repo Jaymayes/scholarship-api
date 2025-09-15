@@ -239,6 +239,9 @@ def setup_metrics(app: FastAPI):
         except Exception as e:
             logger.error(f"Failed startup metrics reconciliation: {str(e)}")
     
+    # CRITICAL FIX: Actually call the reconciliation function
+    reconcile_metrics_on_startup()
+    
     # Register CustomCollector AFTER instrumentation to ensure correct registry
     try:
         # METRICS DUPLICATION FIX: No gauge to unregister - using only CustomCollector
