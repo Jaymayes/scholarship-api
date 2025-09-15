@@ -32,7 +32,7 @@ ACCESS_TOKEN_EXPIRE_MINUTES = settings.access_token_expire_minutes
 
 # Password hashing
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-security = HTTPBearer(auto_error=False)
+security = HTTPBearer(auto_error=True)  # SECURITY FIX: Enforce authentication required
 
 class Token(BaseModel):
     access_token: str
