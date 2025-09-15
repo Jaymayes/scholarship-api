@@ -24,17 +24,25 @@ router = APIRouter(
 
 @router.post("/generate/bulk")
 async def generate_bulk_seo_pages(
-    target_count: int = Query(200, ge=100, le=500, description="Number of SEO pages to generate")
+    target_count: int = Query(500, ge=100, le=1000, description="Number of SEO pages to generate (optimized for 500+)")
 ) -> Dict[str, Any]:
     """
-    🚀 GENERATE BULK SEO PAGES
-    Executive directive: Create 100-500 unique scholarship pages for organic search
+    🚀 GENERATE BULK SEO PAGES - SCALED TO 500+
+    Executive directive: Create 500+ unique scholarship pages for massive organic traffic
+    
+    NEW SCALING FEATURES:
+    - 110+ scholarship database vs previous 5
+    - 9 page templates vs previous 5 
+    - Location-based pages (all 50 states + major cities)
+    - Eligibility-based pages (merit/need-based variations)
+    - Quality scoring system (90%+ target)
+    - Enhanced internal linking strategy
     
     Args:
-        target_count: Number of pages to generate (100-500)
+        target_count: Number of pages to generate (100-1000, optimized for 500+)
         
     Returns:
-        Generation summary with page counts and SEO metrics
+        Generation summary with scaling metrics and quality scores
     """
     try:
         pages = seo_service.generate_bulk_seo_pages(target_count)
@@ -154,7 +162,7 @@ async def get_sitemap() -> Response:
     """
     try:
         # Generate a sample set of pages for sitemap
-        pages = seo_service.generate_bulk_seo_pages(50)  # Smaller set for sitemap
+        pages = seo_service.generate_bulk_seo_pages(100)  # Larger set for comprehensive sitemap
         sitemap_xml = seo_service.generate_sitemap(pages)
         
         return Response(
