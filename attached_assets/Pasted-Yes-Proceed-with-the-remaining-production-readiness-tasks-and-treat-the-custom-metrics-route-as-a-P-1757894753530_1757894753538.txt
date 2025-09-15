@@ -1,0 +1,47 @@
+Yes. Proceed with the remaining production-readiness tasks and treat the custom metrics route as a P2 workstream with a targeted workaround. Here’s the decision and plan.
+
+Decision
+
+Go forward on production readiness using the working /metrics endpoint.
+Defer custom routes (/internal/metrics, /_debug/*) as a platform triage track without blocking launch.
+Immediate actions (workaround to hit 100% readiness)
+
+Unify metrics under the working /metrics exporter
+Publish active_scholarships_total via the same Prometheus registry the auto-instrumentation uses.
+Implementation note: ensure your custom Gauge/Counter is created on the same CollectorRegistry as the instrumentator (e.g., prometheus_client.REGISTRY or the registry object provided by your instrumentation library). Avoid creating a separate Registry or you won’t see the metric on /metrics.
+2. Reconcile the gauge value on lifecycle events
+
+On startup complete: set active_scholarships_total = SELECT COUNT(*) FROM scholarships WHERE status='active'.
+On create/update/delete (or bulk ingest): update the gauge post-commit.
+If you use reload or multiple workers, make updates in one process (or move to a scheduled reconciliation task every 60s) to prevent drift.
+3. Validate the fix end-to-end
+
+Seed 15 active records; within one scrape interval, confirm active_scholarships_total=15 on /metrics.
+Restart the process; confirm the value remains correct after bootstrap reconciliation.
+Add a small contract test that fails CI if active_scholarships_total < DB count.
+Continue the readiness hardening (parallel, non-blocking)
+
+Contract tests: Ensure OpenAPI coverage for all public endpoints; add CI gate for schema drift.
+Performance: 30-sample p50/p95/p99 on list/detail/search; assert p95 and variance targets.
+Security: Run SCA/image scans; verify headers (HSTS/CSP/CORS) and secret redaction; add CI gates for CVEs.
+Observability: Finalize SLO dashboards (availability 99.9%, latency p95 ≤ 120ms), burn-rate alerts, and runbooks.
+Resilience: Validate rolling restart/canary and rollback; ensure zero 5xx during deploys.
+Compliance: Backup/restore drill, audit logs for privileged actions, privacy notes finalized.
+Platform triage track (non-blocking, time-boxed)
+
+Hypothesis isolation via A/B hosting: Deploy the same build to an alternate host (Railway/Fly.io/Render) to confirm whether 404s are platform-specific.
+Root-path/proxy telemetry: On startup, log app.root_path, all route paths, and sample reverse-proxy headers. Expose route diagnostics through logs and as info metrics (since custom debug routes 404).
+If Replit-specific: open a support ticket with evidence (route table, proxy headers, failing curl traces) and keep the workaround in place.
+Timeline and ownership
+
+24 hours: Registry unification + gauge reconciliation + validation; close the metrics discrepancy.
+72 hours: CI gates, dashboards, alerts, resilience drills, and compliance artifacts complete.
+1 week (parallel): Platform escalation + alt-host A/B findings; decision on keeping or restoring custom routes.
+Risks and acceptance
+
+Risk of limited debug visibility without custom routes is acceptable short term given robust /metrics, health, and logs.
+Business impact minimal: core API functions are solid; monitoring remains effective through unified /metrics.
+Confirm and unblock
+
+Approve proceeding with the plan above.
+Optional: approve a small budget for the one-click alt-host deployment to complete the platform triage quickly.

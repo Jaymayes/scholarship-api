@@ -102,12 +102,12 @@ app = FastAPI(
 # Mount static files
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
-# Setup metrics endpoints FIRST to prevent wildcard route shadowing
-setup_metrics(app)
-
-# Setup observability  
+# Setup observability FIRST (creates proper registry for metrics to bind to)
 tracing_service.setup_tracing()
 tracing_service.instrument_app(app)
+
+# Setup metrics AFTER instrumentation (binds to correct registry)
+setup_metrics(app)
 
 # Agent Bridge initialization moved to lifespan for reliability
 

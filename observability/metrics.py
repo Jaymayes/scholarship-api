@@ -2,7 +2,9 @@
 Prometheus Metrics for Observability
 """
 
-from prometheus_client import Counter, Histogram, Gauge, generate_latest, CONTENT_TYPE_LATEST
+from prometheus_client import Counter, Histogram, Gauge, generate_latest, CONTENT_TYPE_LATEST, REGISTRY
+from prometheus_client.core import GaugeMetricFamily
+import prometheus_client
 from fastapi import FastAPI, Response
 from typing import Optional
 from utils.logger import get_logger
@@ -40,11 +42,30 @@ interactions_logged_total = Counter(
     ['event_type', 'status']
 )
 
-# Active scholarships gauge for single-process metrics
-active_scholarships = Gauge(
-    'active_scholarships_total',
-    'Total number of active scholarships'
-)
+# CUSTOM COLLECTOR: Computes value at scrape time to eliminate registry drift
+class ActiveScholarshipsCollector:
+    """Custom collector that computes active scholarships at scrape time"""
+    
+    def collect(self):
+        """Compute active scholarships count at Prometheus scrape time"""
+        try:
+            from services.scholarship_service import scholarship_service
+            count = len(scholarship_service.scholarships)
+            logger.info(f"🔄 SCRAPE-TIME COLLECTION: active_scholarships_total = {count}")
+            
+            yield GaugeMetricFamily(
+                'active_scholarships_total',
+                'Total number of active scholarships',
+                value=count
+            )
+        except Exception as e:
+            logger.error(f"❌ SCRAPE-TIME COLLECTION FAILED: {str(e)}")
+            # Return 0 if service unavailable
+            yield GaugeMetricFamily(
+                'active_scholarships_total', 
+                'Total number of active scholarships',
+                value=0
+            )
 
 # Note: active_scholarships value set directly in /metrics endpoint to avoid circular imports
 
@@ -119,14 +140,27 @@ class MetricsService:
             logger.warning(f"Failed to record interaction metrics: {str(e)}")
     
     def update_scholarship_count(self, count: int):
-        """Update active scholarship count"""
+        """Update active scholarship count on unified registry"""
         if not self.enabled:
             return
             
         try:
             active_scholarships.set(count)
+            logger.info(f"📊 UNIFIED METRICS: Updated active_scholarships_total to {count} on default registry")
         except Exception as e:
             logger.warning(f"Failed to update scholarship count: {str(e)}")
+    
+    def reconcile_scholarship_count_from_service(self):
+        """Reconcile scholarship count from service - startup/lifecycle hook"""
+        try:
+            from services.scholarship_service import scholarship_service
+            count = len(scholarship_service.scholarships)
+            self.update_scholarship_count(count)
+            logger.info(f"🔄 LIFECYCLE RECONCILIATION: Set active_scholarships_total to {count}")
+            return count
+        except Exception as e:
+            logger.error(f"Failed to reconcile scholarship count from service: {str(e)}")
+            return 0
 
 # Global metrics service instance
 metrics_service = MetricsService()
@@ -173,45 +207,44 @@ async def debug_routes(app):
     return {"routes": routes, "total": len(routes)}
 
 def setup_metrics(app: FastAPI):
-    """Setup metrics endpoint"""
-    # Real async handlers for proper FastAPI route registration
-    async def _metrics():
-        return await get_metrics()
+    """Setup metrics using unified registry approach - work with auto-instrumentation"""
     
-    async def _routes():
-        return await debug_routes(app)
+    # LIFECYCLE RECONCILIATION: Ensure scholarship count is correct on startup
+    def reconcile_metrics_on_startup():
+        """Reconcile metrics with actual data on startup"""
+        try:
+            count = metrics_service.reconcile_scholarship_count_from_service()
+            logger.info(f"🚀 STARTUP RECONCILIATION: active_scholarships_total = {count}")
+        except Exception as e:
+            logger.error(f"Failed startup metrics reconciliation: {str(e)}")
     
-    # TEMP DEBUG: Add scholarship count endpoint to verify service
-    async def _debug_scholarships():
-        """Debug endpoint to verify scholarship service status"""
-        from services.scholarship_service import scholarship_service
-        return {
-            "service_type": str(type(scholarship_service)),
-            "scholarship_count": len(scholarship_service.scholarships),
-            "scholarships_sample": scholarship_service.scholarships[:3] if scholarship_service.scholarships else []
-        }
+    # Register CustomCollector AFTER instrumentation to ensure correct registry
+    try:
+        # Unregister any existing gauge to prevent name collision
+        prometheus_client.REGISTRY.unregister(active_scholarships)
+        logger.info("🗑️ CLEANUP: Unregistered existing active_scholarships gauge")
+    except Exception as e:
+        logger.info(f"ℹ️ No existing gauge to unregister: {str(e)}")
     
-    # GUARANTEED ENDPOINT: /internal/metrics bypasses auto-instrumentation
-    app.add_api_route("/internal/metrics", _metrics, methods=["GET"], include_in_schema=False, name="internal_metrics_guaranteed")
+    # Register CustomCollector for scrape-time computation
+    collector = ActiveScholarshipsCollector()
+    prometheus_client.REGISTRY.register(collector)
+    logger.info("✅ CUSTOM COLLECTOR: Registered ActiveScholarshipsCollector for scrape-time computation")
     
-    # Original endpoint (may be intercepted by auto-instrumentation)
-    app.add_api_route("/metrics", _metrics, methods=["GET"], include_in_schema=False, name="metrics_primary")
+    # Create our own /metrics route using prometheus_client.REGISTRY
+    @app.get("/metrics", include_in_schema=False)
+    async def metrics_endpoint():
+        """Custom metrics endpoint using our registry with CustomCollector"""
+        logger.info("📊 CUSTOM METRICS ENDPOINT: Serving from prometheus_client.REGISTRY")
+        return Response(generate_latest(), media_type=CONTENT_TYPE_LATEST)
     
-    # Debug endpoints  
-    app.add_api_route("/_debug/routes", _routes, methods=["GET"], include_in_schema=False, name="debug_routes")
-    app.add_api_route("/_debug/scholarships", _debug_scholarships, methods=["GET"], include_in_schema=False, name="debug_scholarships")
+    # Test route to verify CustomCollector is working
+    @app.get("/metrics-test", include_in_schema=False)
+    async def metrics_test_endpoint():
+        """Test endpoint to verify CustomCollector"""
+        logger.info("🧪 TEST METRICS ENDPOINT: Verifying CustomCollector functionality")
+        return Response(generate_latest(), media_type=CONTENT_TYPE_LATEST)
     
-    # Add startup diagnostics - log route table
-    async def _debug_startup():
-        """Startup diagnostic to verify route registration"""
-        routes = []
-        for route in app.routes:
-            if hasattr(route, 'path'):
-                routes.append(route.path)
-        logger.info(f"🔍 Startup route table: {sorted(routes)}")
-        return {"registered_routes": sorted(routes)}
-    
-    app.add_api_route("/_debug/startup", _debug_startup, methods=["GET"], include_in_schema=False, name="debug_startup")
-    
-    logger.info("✅ Metrics endpoints registered - /internal/metrics (guaranteed), /metrics (may be intercepted)")
-    logger.info("🔍 Use /internal/metrics for guaranteed custom handler execution")
+    logger.info("✅ UNIFIED METRICS: Using default registry with auto-instrumentation")
+    logger.info("📊 Metrics available at /metrics endpoint (served by CUSTOM ROUTE)")
+    logger.info("🔄 Scholarship count will be reconciled on startup and service operations")
