@@ -29,6 +29,7 @@ from routers.ceo_marketing_dashboard import router as ceo_dashboard_router
 from routers.infrastructure_status import router as infrastructure_router
 from routers.priority_3_validation import router as priority3_router
 from routers.production_launch import router as launch_router
+from routers.commercialization import router as commercialization_router, public_router
 from middleware.error_handling import (
     api_error_handler, http_exception_handler, validation_exception_handler,
     rate_limit_exception_handler, general_exception_handler, trace_id_middleware,
@@ -37,6 +38,7 @@ from middleware.error_handling import (
 from middleware.rate_limiting import limiter
 from middleware.request_id import RequestIDMiddleware
 from middleware.waf_protection import WAFProtection
+from middleware.api_rate_limiting import APIRateLimitMiddleware
 from observability.metrics import setup_metrics
 from observability.tracing import tracing_service
 from config.settings import settings, Environment
@@ -174,6 +176,9 @@ app.add_middleware(HTTPMetricsMiddleware, enable_metrics=True)
 app.add_middleware(RequestIDMiddleware)
 app.middleware("http")(trace_id_middleware)
 
+# 4.5 CRITICAL SECURITY: API Rate Limiting Enforcement
+app.add_middleware(APIRateLimitMiddleware)  # Global API rate limiting enforcement
+
 # 5. Rate limiting handled by decorators (applied at route level)
 
 # Add rate limiter middleware for proper enforcement
@@ -265,6 +270,10 @@ app.include_router(monetization_router, tags=["Monetization"])
 # AI Scholarship Playbook: B2B Partner Portal endpoints
 from routers.b2b_partner import router as b2b_partner_router
 app.include_router(b2b_partner_router, tags=["B2B Partners"])
+
+# CRITICAL SECURITY: API Commercialization & Billing System
+app.include_router(commercialization_router, tags=["API Commercialization"])
+app.include_router(public_router, tags=["Public Status"])  # Status page and docs
 
 # Metrics already setup above - this was the wrong location causing route shadowing
 
