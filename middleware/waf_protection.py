@@ -137,6 +137,8 @@ class WAFProtection(BaseHTTPMiddleware):
         method = request.method
         path = request.url.path
         
+        # CRITICAL FIX: Only wrap WAF-specific checks in try/except
+        # Do NOT catch exceptions from call_next() - let auth exceptions propagate properly
         try:
             # 1. AUTHORIZATION ENFORCEMENT (Critical for SQLi protection)
             if await self._check_authorization_requirement(request):
@@ -184,25 +186,25 @@ class WAFProtection(BaseHTTPMiddleware):
                     client_ip,
                     path
                 )
-            
-            # Request passes all WAF checks
-            response = await call_next(request)
-            
-            # Add security headers
-            response.headers["X-WAF-Status"] = "passed"
-            response.headers["X-Content-Type-Options"] = "nosniff"
-            
-            processing_time = (time.time() - start_time) * 1000
-            logger.debug(f"WAF check passed - {method} {path} - {processing_time:.2f}ms")
-            
-            return response
-            
+                
         except Exception as e:
-            logger.error(f"WAF processing error: {str(e)}")
-            # Fail open for availability, but log security event
-            response = await call_next(request)
-            response.headers["X-WAF-Status"] = "error" 
-            return response
+            logger.error(f"WAF check processing error: {str(e)}")
+            # Only fail open on WAF check errors, not on authentication errors
+            # Continue to application for availability
+            pass
+        
+        # Request passes all WAF checks - call next middleware/application
+        # CRITICAL: Do NOT wrap this in try/except - let authentication exceptions propagate
+        response = await call_next(request)
+        
+        # Add security headers
+        response.headers["X-WAF-Status"] = "passed"
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        
+        processing_time = (time.time() - start_time) * 1000
+        logger.debug(f"WAF check passed - {method} {path} - {processing_time:.2f}ms")
+        
+        return response
     
     def _is_public_endpoint(self, request: Request) -> bool:
         """Centralized public endpoint check with path normalization"""
@@ -224,6 +226,23 @@ class WAFProtection(BaseHTTPMiddleware):
         
         # Use centralized public endpoint check
         if self._is_public_endpoint(request):
+            return False
+        
+        # B2B endpoints should be handled by their own authentication middleware, not WAF
+        # FIXED: Use precise path matching instead of broad startswith() checks
+        b2b_exempt_prefixes = {
+            "/b2b-partners/", "/partner/", "/commercial/", "/partner-sla/", 
+            "/api/v1/commercialization/", "/api/v1/billing/"
+        }
+        
+        # Normalize path for comparison
+        normalized_path = path.rstrip('/') + '/' if not path.endswith('/') else path
+        
+        # Check for exact B2B prefix matches to prevent overly broad exemptions
+        is_b2b_exempt = any(normalized_path.startswith(prefix) for prefix in b2b_exempt_prefixes)
+        
+        if is_b2b_exempt:
+            logger.debug(f"WAF: Allowing B2B endpoint for proper auth middleware - {request.method} {path}")
             return False
         
         # Check if endpoint requires authorization

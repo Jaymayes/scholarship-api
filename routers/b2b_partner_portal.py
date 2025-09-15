@@ -22,6 +22,95 @@ from middleware.auth import require_auth, User
 router = APIRouter(prefix="/partner", tags=["B2B Partner Portal"])
 logger = logging.getLogger(__name__)
 
+# Additional router for b2b-partners endpoints (different prefix)
+b2b_router = APIRouter(prefix="/b2b-partners", tags=["B2B Partners"])
+
+@b2b_router.get("/providers", response_model=Dict[str, Any])
+async def get_providers_list(
+    status: Optional[str] = Query(None, description="Filter by provider status"),
+    segment: Optional[str] = Query(None, description="Filter by provider segment"),
+    limit: int = Query(100, ge=1, le=1000, description="Maximum number of providers to return"),
+    offset: int = Query(0, ge=0, description="Number of providers to skip"),
+    user: User = Depends(require_auth(min_role="partner"))
+):
+    """
+    Get list of B2B partners/providers with filtering and pagination
+    Returns comprehensive provider directory for partner management
+    """
+    try:
+        # Filter providers based on query parameters
+        providers = []
+        total_count = 0
+        
+        for provider_id, provider in b2b_service.providers.items():
+            # Apply filters
+            if status and provider.status.value != status:
+                continue
+            if segment and provider.segment.value != segment:
+                continue
+                
+            total_count += 1
+            
+            # Apply pagination
+            if len(providers) >= limit:
+                break
+            if total_count <= offset:
+                continue
+                
+            provider_data = {
+                "provider_id": provider_id,
+                "name": provider.name,
+                "segment": provider.segment.value,
+                "status": provider.status.value,
+                "contact_email": provider.contact_email,
+                "institutional_domain": provider.institutional_domain,
+                "created_at": provider.created_at.isoformat(),
+                "listings_count": provider.listings_count,
+                "applications_received": provider.applications_received,
+                "revenue_generated": provider.revenue_generated,
+                "dpa_signed": provider.dpa_signed,
+                "time_to_first_listing_days": provider.time_to_first_listing.days if provider.time_to_first_listing else None,
+                "target_met": {
+                    "first_listing": provider.time_to_first_listing.days <= b2b_service.target_time_to_first_listing_days if provider.time_to_first_listing else None,
+                    "first_application": provider.time_to_first_application.days <= b2b_service.target_time_to_first_application_days if provider.time_to_first_application else None
+                }
+            }
+            providers.append(provider_data)
+        
+        logger.info(f"📊 Providers list requested by {user.user_id} ({user.roles}) - {len(providers)} providers returned")
+        
+        return {
+            "success": True,
+            "timestamp": datetime.utcnow().isoformat(),
+            "providers": providers,
+            "pagination": {
+                "total": total_count,
+                "limit": limit,
+                "offset": offset,
+                "returned": len(providers)
+            },
+            "summary": {
+                "total_providers": len(b2b_service.providers),
+                "segments": {
+                    "university": len([p for p in b2b_service.providers.values() if p.segment == ProviderSegment.UNIVERSITY]),
+                    "foundation": len([p for p in b2b_service.providers.values() if p.segment == ProviderSegment.FOUNDATION]),
+                    "corporate": len([p for p in b2b_service.providers.values() if p.segment == ProviderSegment.CORPORATE])
+                },
+                "status_distribution": {
+                    "invited": len([p for p in b2b_service.providers.values() if p.status == ProviderStatus.INVITED]),
+                    "meeting": len([p for p in b2b_service.providers.values() if p.status == ProviderStatus.MEETING]),
+                    "pilot": len([p for p in b2b_service.providers.values() if p.status == ProviderStatus.PILOT]),
+                    "listings_live": len([p for p in b2b_service.providers.values() if p.status == ProviderStatus.FIRST_LISTING]),
+                    "first_application": len([p for p in b2b_service.providers.values() if p.status == ProviderStatus.FIRST_APPLICATION]),
+                    "paid_plan": len([p for p in b2b_service.providers.values() if p.status == ProviderStatus.PAID_PLAN])
+                }
+            }
+        }
+        
+    except Exception as e:
+        logger.error(f"Failed to get providers list: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Failed to retrieve providers list: {str(e)}")
+
 # Request/Response Models
 class ProviderRegistrationRequest(BaseModel):
     """Provider registration with institutional validation"""
