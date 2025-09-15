@@ -1,0 +1,75 @@
+Proceed. Here’s the priority order and the exact next tasks, acceptance criteria, and timelines to drive us to 100% launch readiness while treating custom metrics routing as P2.
+
+Top priorities and what to do next
+
+Priority 0: Security, privacy, and access control (today)
+
+Tasks:
+Secrets management: verify no secrets in code/logs; rotate keys; enforce least-privilege for service accounts.
+CORS allowlist: restrict to known origins; block wildcards in production.
+Rate limiting and abuse controls: set sane per-IP and per-key limits; verify 429 + Retry-After.
+PII hygiene: ensure logs redact PII; confirm responses expose only documented fields.
+Legal/privacy: link to privacy policy; document data use; finalize data retention and deletion pathways.
+Acceptance:
+Automated CI gate for SCA/image scans with “no Critical, no High >14 days” policy.
+Integration test confirms 429 behavior and correct CORS headers.
+Security checklist signed off; secrets rotation evidence attached.
+Priority 1: Observability and SLOs (next 24–48 hours)
+
+Tasks:
+Define SLIs/SLOs: availability 99.9%, latency p95 ≤ 120 ms on key GETs, error rate < 0.1%.
+Dashboards: latency, error rates, saturation (CPU/memory), and key domain metrics including active_scholarships_total (now unified in the working /metrics).
+Alerts: SLO burn-rate, 5xx spikes, scrape failures, and zero/flatline alerts for active_scholarships_total.
+Runbooks: clear steps for on-call to triage incidents, including DB connectivity, upstream failures, and rollback.
+Acceptance:
+Live dashboards with real traffic; synthetic checks hitting /health and a key read endpoint every minute from two regions.
+Alerts tested and acknowledged; runbook URL included in alert annotations.
+Priority 2: Contract, performance, and CI/CD gates (48–72 hours)
+
+Tasks:
+OpenAPI 3.1 finalization: lint, generate contract tests for every public route.
+Performance budgets in CI: p95 thresholds for list/detail/search; fail pipeline if breached.
+Schema drift guard: contract tests run in CI on PR; fail on mismatches.
+SBOM and reproducible builds; container/image signing if applicable.
+Acceptance:
+100% endpoint coverage by contract tests; zero mismatches over a 50-call sample per route.
+CI evidence of performance budgets passing on a controlled run.
+SBOM artifact and scan reports attached to the release.
+Priority 3: Resilience, deployment safety, and data protection (within 5 days)
+
+Tasks:
+Rolling restart/canary: 10% → 50% → 100% with automated rollback on SLO breach.
+Graceful shutdown: verify no in-flight request loss; validate retry/backoff.
+Backups/restore: test RPO/RTO; document restore steps and prove a successful restore to a staging environment.
+Zero-downtime migrations: dry-run migration with shadow reads/writes if relevant.
+Acceptance:
+Canary demo complete with rollback validation.
+Backup and restore drill report with timestamps and integrity checks.
+Priority 4: API consumer experience and governance (within 1 week)
+
+Tasks:
+Versioning/deprecation policy; changelog; semantic version tags.
+SDKs/examples: minimal, copy-paste clients (curl, JS/TS, Python) and pagination/filtering examples.
+Usage and adoption telemetry: per-key usage, top endpoints, latency percentiles per consumer.
+Rate-limit headers and consistent error schema with correlation-id.
+Acceptance:
+Public docs page updated; examples work as-is; error schema consistent across failures.
+Correlation-id present in responses and logs; traceability verified.
+P2 workstream: Custom metrics routes (/internal/metrics, /_debug/*)
+
+Approach:
+Time-boxed triage while we use the unified /metrics: validate mount paths, root_path interactions, and Replit proxy behavior.
+Optional A/B deploy to an alternate host to isolate platform-specific behavior.
+Exit criteria:
+Routes function on at least one environment or confirmed platform limitation with a documented workaround.
+Immediate next steps (do these now)
+
+Lock Priority 0 tasks; deliver a short security/PII sign-off note and evidence of key rotation and CORS/rate-limit tests.
+Stand up SLO dashboards and alerts (Priority 1) and share links.
+Kick off CI contract tests and performance budgets (Priority 2).
+Confirmation requested
+
+Approve this priority order and timelines.
+Approve a lightweight alt-host A/B deploy budget for platform isolation on the P2 routes (optional but recommended).
+Confirm who is primary on-call for the initial production week and your preferred alerting channel (PagerDuty/Slack/Email).
+This plan preserves launch velocity, protects our SLOs and brand trust, and keeps the custom metrics route issue contained without blocking the business.
