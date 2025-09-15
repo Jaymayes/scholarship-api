@@ -31,6 +31,8 @@ from routers.priority_3_validation import router as priority3_router
 from routers.production_launch import router as launch_router
 from routers.commercialization import router as commercialization_router, public_router
 from routers.devrel import router as devrel_router
+from routers.auto_page_seo import router as auto_seo_router
+from routers.scholarship_pages import router as scholarship_pages_router
 from middleware.error_handling import (
     api_error_handler, http_exception_handler, validation_exception_handler,
     rate_limit_exception_handler, general_exception_handler, trace_id_middleware,
@@ -275,6 +277,8 @@ app.include_router(b2b_partner_router, tags=["B2B Partners"])
 # CRITICAL SECURITY: API Commercialization & Billing System
 app.include_router(commercialization_router, tags=["API Commercialization"])
 app.include_router(devrel_router, tags=["Developer Relations"])
+app.include_router(auto_seo_router, tags=["Auto SEO Pages"])
+app.include_router(scholarship_pages_router, tags=["Canonical Scholarship Pages"])
 app.include_router(public_router, tags=["Public Status"])  # Status page and docs
 
 # Metrics already setup above - this was the wrong location causing route shadowing
