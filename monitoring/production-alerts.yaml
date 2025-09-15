@@ -292,6 +292,122 @@ groups:
       description: "Downtime rate {{ $value | humanizePercentage }} exceeds slow burn threshold (0.6% for 6h, 0.3% for 24h). Consuming 30-day error budget in ~10 days."
       runbook_url: "https://docs.company.com/runbooks/slo-availability-burn"
 
+- name: scholarship-api-monitoring
+  rules:
+  # === SCRAPE FAILURES ALERTS ===
+  # Note: ServiceDown alert already covers up{job="scholarship-api"} == 0
+  # This alert focuses on scraping issues when target is up but scraping fails
+
+  - alert: PrometheusScrapeDurationHigh
+    expr: scrape_duration_seconds{job="scholarship-api"} > 10
+    for: 5m
+    labels:
+      severity: warning
+      service: scholarship-api
+      alert_type: scrape_failure
+    annotations:
+      summary: "Prometheus scrape duration too high"
+      description: "Scraping {{ $labels.instance }} is taking {{ $value }}s, above 10s threshold"
+      runbook_url: "https://docs.company.com/runbooks/prometheus-scrape-slow"
+
+  - alert: PrometheusScrapeFailures
+    expr: increase(scrape_samples_scraped{job="scholarship-api"}[5m]) == 0 and up{job="scholarship-api"} == 1
+    for: 2m
+    labels:
+      severity: warning
+      service: scholarship-api
+      alert_type: scrape_failure
+    annotations:
+      summary: "Prometheus scrape collecting no samples"
+      description: "Target {{ $labels.instance }} is up but no samples scraped for 5 minutes"
+
+  # === ZERO/FLATLINE DETECTION ALERTS ===
+  - alert: MetricsFlatlining
+    expr: |
+      (
+        increase(http_requests_total{job="scholarship-api",endpoint!~"/docs|/metrics"}[10m]) == 0
+        and
+        up{job="scholarship-api"} == 1
+      )
+    for: 10m
+    labels:
+      severity: warning
+      service: scholarship-api
+      alert_type: flatline
+    annotations:
+      summary: "HTTP request metrics flatlined"
+      description: "No new HTTP requests recorded for 10 minutes despite service being up"
+      runbook_url: "https://docs.company.com/runbooks/metrics-flatline"
+
+  - alert: ActiveScholarshipsZero
+    expr: active_scholarships_total{job="scholarship-api"} == 0
+    for: 5m
+    labels:
+      severity: critical
+      service: scholarship-api
+      alert_type: zero_metric
+    annotations:
+      summary: "Zero active scholarships detected"
+      description: "Active scholarships count is zero for more than 5 minutes - potential data loss"
+      runbook_url: "https://docs.company.com/runbooks/zero-scholarships"
+
+  - alert: MetricsStale
+    expr: |
+      (
+        time() - max by (job) (timestamp(http_requests_total{job="scholarship-api"})) > 300
+        and
+        up{job="scholarship-api"} == 1
+      )
+    for: 5m
+    labels:
+      severity: warning
+      service: scholarship-api
+      alert_type: stale_metrics
+    annotations:
+      summary: "Metrics appear stale"
+      description: "Last HTTP request metric timestamp was more than 5 minutes ago despite service being up"
+
+  # === 5XX SPIKES ALERTS (Enhanced) ===
+  - alert: ErrorRateSpike
+    expr: |
+      (
+        rate(http_requests_total{job="scholarship-api",status=~"5..",endpoint!~"/docs|/metrics"}[5m])
+        /
+        rate(http_requests_total{job="scholarship-api",endpoint!~"/docs|/metrics"}[5m])
+      ) > 0.05
+      and
+      (
+        rate(http_requests_total{job="scholarship-api",status=~"5..",endpoint!~"/docs|/metrics"}[5m])
+        >
+        4 * rate(http_requests_total{job="scholarship-api",status=~"5..",endpoint!~"/docs|/metrics"}[1h] offset 1h)
+      )
+    for: 2m
+    labels:
+      severity: critical
+      service: scholarship-api
+      alert_type: spike
+    annotations:
+      summary: "5xx error rate spike detected"
+      description: "5xx error rate {{ $value | humanizePercentage }} is 4x higher than historical baseline and above 5% threshold"
+      runbook_url: "https://docs.company.com/runbooks/error-spike"
+
+  - alert: LatencySpike
+    expr: |
+      histogram_quantile(0.95, sum by (le) (rate(http_request_duration_seconds_bucket{job="scholarship-api",endpoint!~"/docs|/metrics"}[5m])))
+      >
+      1.5 * histogram_quantile(0.95, sum by (le) (rate(http_request_duration_seconds_bucket{job="scholarship-api",endpoint!~"/docs|/metrics"}[1h] offset 1h)))
+      and
+      histogram_quantile(0.95, sum by (le) (rate(http_request_duration_seconds_bucket{job="scholarship-api",endpoint!~"/docs|/metrics"}[5m]))) > 0.08
+    for: 5m
+    labels:
+      severity: warning
+      service: scholarship-api
+      alert_type: spike
+    annotations:
+      summary: "Latency spike detected"
+      description: "P95 latency {{ $value }}s is 1.5x higher than historical baseline and above 80ms"
+      runbook_url: "https://docs.company.com/runbooks/latency-spike"
+
 - name: scholarship-api-business
   rules:
   - alert: SearchRequestsDropped
