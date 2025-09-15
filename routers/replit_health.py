@@ -148,8 +148,8 @@ async def services_health_check():
         environment=settings.environment.value
     )
 
-@router.get("/_debug/config", response_model=DebugConfigResponse)
-async def debug_config():
+@router.get("/_debug/repl", response_model=DebugConfigResponse)
+async def repl_debug_config():
     """
     Development-only configuration diagnostics
     Returns sanitized configuration info for Replit debugging

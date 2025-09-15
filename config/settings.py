@@ -75,12 +75,12 @@ class Settings(BaseSettings):
     @classmethod
     def parse_allowed_hosts(cls, v):
         """Parse allowed hosts from string or list"""
+        import json  # Move import to top of method
         if isinstance(v, str):
             if v.strip() == "":
                 return []
             # Try to parse as JSON first
             try:
-                import json
                 return json.loads(v)
             except (json.JSONDecodeError, ValueError):
                 # Fallback to comma-separated values
@@ -91,12 +91,12 @@ class Settings(BaseSettings):
     @classmethod
     def parse_trusted_proxy_ips(cls, v):
         """Parse trusted proxy IPs from string or list"""
+        import json  # Move import to top of method
         if isinstance(v, str):
             if v.strip() == "":
                 return []
             # Try to parse as JSON first
             try:
-                import json
                 return json.loads(v)
             except (json.JSONDecodeError, ValueError):
                 # Fallback to comma-separated values
@@ -517,7 +517,7 @@ class Settings(BaseSettings):
                     f"Set JWT_SECRET_KEY environment variable for production."
                 )
     
-    def validate(self) -> None:
+    def _validate_production_security(self) -> None:
         """Validate configuration with aggregated error reporting"""
         if not self.should_enforce_strict_validation:
             return
@@ -557,10 +557,6 @@ class Settings(BaseSettings):
         if errors:
             error_msg = "Invalid configuration:\n" + "\n".join(f"- {err}" for err in errors)
             raise RuntimeError(error_msg)
-    
-    def _validate_production_security(self):
-        """Legacy method - calls new validate method"""
-        self.validate()
     
     @property
     def get_jwt_secret_key(self) -> str:

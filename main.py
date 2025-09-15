@@ -207,10 +207,10 @@ async def handle_rate_limit_error(request: Request, exc: RateLimitExceeded):
 async def handle_general_error(request: Request, exc: Exception):
     return await general_exception_handler(request, exc)
 
-# Specific status code handlers - TEMPORARILY DISABLED FOR DEBUGGING
-# @app.exception_handler(404)
-# async def handle_not_found(request: Request, exc: HTTPException):
-#     return await not_found_handler(request, exc)
+# Specific status code handlers - ENABLED FOR UNIFIED ERROR SCHEMA
+@app.exception_handler(404)
+async def handle_not_found(request: Request, exc: HTTPException):
+    return await not_found_handler(request, exc)
 
 @app.exception_handler(405)
 async def handle_method_not_allowed(request: Request, exc: HTTPException):
@@ -347,7 +347,7 @@ async def readiness_check():
     }
 
 @app.get("/_debug/config")
-async def debug_config():
+async def main_debug_config():
     """Development-only debug endpoint showing sanitized runtime configuration"""
     if settings.environment == Environment.PRODUCTION:
         raise HTTPException(status_code=404, detail="Not found")

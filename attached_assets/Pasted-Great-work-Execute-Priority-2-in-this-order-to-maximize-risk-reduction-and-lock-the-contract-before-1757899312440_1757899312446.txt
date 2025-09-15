@@ -1,0 +1,65 @@
+Great work. Execute Priority 2 in this order to maximize risk reduction and lock the contract before performance gating:
+
+Decision
+
+Proceed with Priority 2, sequence: OpenAPI 3.1 lock + contract tests → CI performance budgets + gates → Error schema unification + drift guard → Custom metrics optimization.
+Priority 2 plan (actions, acceptance, timing)
+
+OpenAPI 3.1 finalization and contract test suite (Day 1)
+Actions:
+Freeze the spec for all public routes; lint and fix types/enums/required fields.
+Auto-generate contract tests from the spec; include success and failure cases (400, 404, 429).
+Add backward-compatibility check: compare current spec to last release; flag breaking changes.
+Acceptance:
+100% public endpoint coverage by contract tests.
+Zero schema mismatches across a 50-call sample per route.
+CI gate: fail on mismatch or unapproved breaking changes.
+2. Performance budgets in CI with automated quality gates (Day 2)
+
+Actions:
+Define budgets per key endpoints (list, detail, search): p50/p95/p99 and error rate.
+Add lightweight load step to CI (e.g., k6/autocannon/hey) with controlled RPS that is safe for env.
+Export artifacts (latency histograms, percentiles) and publish to CI summary.
+Targets:
+p95 ≤ 120 ms, p99 ≤ 300 ms on read endpoints; error rate < 0.1%.
+Acceptance:
+CI fails if budgets are exceeded.
+Historical trend visible for the last 10 runs.
+3. Error schema unification and drift guard (Day 2–3)
+
+Actions:
+Standardize error payload: {code, message, correlation_id, details?}.
+Ensure consistent 4xx/5xx mapping and messages for validation errors and unknown routes.
+Add negative-path contract tests (invalid params, invalid IDs, unknown route).
+Acceptance:
+All failures return the unified schema.
+Contract tests enforce schema on every PR.
+4. Custom metrics optimization for observability (Day 3)
+
+Actions:
+Confirm unified /metrics export includes active_scholarships_total and that the value matches DB after startup and mutations (post-commit updates or periodic reconciliation).
+Add domain metrics with strict label discipline:
+scholarships_indexed_total (counter)
+search_requests_total (counter, labels: result=ok|error)
+search_results_count (histogram of result set sizes)
+Attach trace/correlation exemplars to key counters/histograms if available.
+Cap labels to env, service, version; no high-cardinality user inputs.
+Acceptance:
+Metrics visible on /metrics; dashboards wired; zero high-cardinality alerts; alert on flatline or unexpected zero.
+Deliverables
+
+CI evidence: contract test report, performance report with budgets, and pass/fail gates.
+Error schema reference doc and examples.
+Metrics screenshots and PromQL queries; short runbook section for metric reconciliation.
+Ownership and handoffs
+
+Contract tests + error schema: QA/Platform eng
+CI performance setup: DevOps/Platform eng
+Metrics optimization: Backend eng with Observability support
+Optional parallel work (doesn’t block Priority 2)
+
+SDK/examples: minimal Python/JS clients with pagination and filtering examples.
+Consumer docs: versioning/deprecation policy, changelog, and error schema page.
+Confirm and proceed
+
+If you approve, start with OpenAPI lock + contract tests now and post the first CI report within 24 hours.
