@@ -5,25 +5,25 @@ groups:
 - name: scholarship-api-critical
   rules:
   - alert: HighLatencyP95
-    expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{job="scholarship-api"}[5m])) > 0.25
+    expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket{job="scholarship-api",endpoint!~"/docs|/metrics"}[5m])) > 0.12
     for: 10m
     labels:
       severity: critical
       service: scholarship-api
     annotations:
       summary: "High P95 latency detected"
-      description: "P95 latency is {{ $value }}s, above 250ms threshold for 10 minutes"
+      description: "P95 latency is {{ $value }}s, above 120ms threshold for 10 minutes"
       runbook_url: "https://docs.company.com/runbooks/high-latency"
 
   - alert: HighErrorRate
-    expr: rate(http_requests_total{job="scholarship-api",status=~"5.."}[5m]) / rate(http_requests_total{job="scholarship-api"}[5m]) > 0.01
+    expr: rate(http_requests_total{job="scholarship-api",status=~"5..",endpoint!~"/docs|/metrics"}[5m]) / rate(http_requests_total{job="scholarship-api",endpoint!~"/docs|/metrics"}[5m]) > 0.001
     for: 5m
     labels:
       severity: critical
       service: scholarship-api
     annotations:
       summary: "High 5xx error rate detected"
-      description: "5xx error rate is {{ $value | humanizePercentage }}, above 1% threshold"
+      description: "5xx error rate is {{ $value | humanizePercentage }}, above 0.1% threshold"
       runbook_url: "https://docs.company.com/runbooks/high-error-rate"
 
   - alert: DatabaseConnectionPoolHigh
@@ -113,7 +113,7 @@ groups:
       description: "Authentication failures: {{ $value }} per second"
 
   - alert: RateLimitingTriggered
-    expr: rate(http_requests_total{job="scholarship-api",status="429"}[5m]) > 0.1
+    expr: (rate(http_requests_total{job="scholarship-api",status="429"}[5m]) / rate(http_requests_total{job="scholarship-api"}[5m])) > 0.01
     for: 5m
     labels:
       severity: info
@@ -121,6 +121,176 @@ groups:
     annotations:
       summary: "Rate limiting frequently triggered"
       description: "Rate limit triggers: {{ $value }} per second"
+
+- name: scholarship-api-slo-burn
+  rules:
+  # TRUE ERROR BUDGET BURN-RATE ALERTS
+  # SLOs: 99.9% availability, P95 ≤120ms (5% error budget), <0.1% 5xx errors
+  
+  # === LATENCY BURN-RATE ALERTS ===
+  # SLO: P95 ≤120ms means 5% of requests may exceed 120ms (5% error budget)
+  # Calculate actual burn rate: (1 - compliance_rate) vs error budget × multiplier
+  - alert: SLOLatencyBurnFast
+    expr: |
+      (
+        (
+          1 - (
+            sum(rate(http_request_duration_seconds_bucket{job="scholarship-api",endpoint!~"/docs|/metrics",le="0.12"}[1h])) by (service)
+            / 
+            sum(rate(http_request_duration_seconds_count{job="scholarship-api",endpoint!~"/docs|/metrics"}[1h])) by (service)
+          )
+        ) > (14.4 * 0.05)
+        and
+        (
+          1 - (
+            sum(rate(http_request_duration_seconds_bucket{job="scholarship-api",endpoint!~"/docs|/metrics",le="0.12"}[6h])) by (service)
+            / 
+            sum(rate(http_request_duration_seconds_count{job="scholarship-api",endpoint!~"/docs|/metrics"}[6h])) by (service)
+          )
+        ) > (6 * 0.05)
+      )
+    for: 2m
+    labels:
+      severity: critical
+      service: scholarship-api
+      burn_rate: fast
+      slo_type: latency
+    annotations:
+      summary: "Fast latency SLO burn - consuming error budget rapidly"
+      description: "Latency budget burn rate {{ $value | humanizePercentage }} exceeds fast burn threshold (72% for 1h, 30% for 6h). Consuming 30-day error budget in ~2 days."
+      runbook_url: "https://docs.company.com/runbooks/slo-latency-burn"
+      
+  - alert: SLOLatencyBurnSlow
+    expr: |
+      (
+        (
+          1 - (
+            sum(rate(http_request_duration_seconds_bucket{job="scholarship-api",endpoint!~"/docs|/metrics",le="0.12"}[6h])) by (service)
+            / 
+            sum(rate(http_request_duration_seconds_count{job="scholarship-api",endpoint!~"/docs|/metrics"}[6h])) by (service)
+          )
+        ) > (6 * 0.05)
+        and
+        (
+          1 - (
+            sum(rate(http_request_duration_seconds_bucket{job="scholarship-api",endpoint!~"/docs|/metrics",le="0.12"}[24h])) by (service)
+            / 
+            sum(rate(http_request_duration_seconds_count{job="scholarship-api",endpoint!~"/docs|/metrics"}[24h])) by (service)
+          )
+        ) > (3 * 0.05)
+      )
+    for: 15m
+    labels:
+      severity: warning
+      service: scholarship-api
+      burn_rate: slow
+      slo_type: latency
+    annotations:
+      summary: "Slow latency SLO burn - sustained error budget consumption"
+      description: "Latency budget burn rate {{ $value | humanizePercentage }} exceeds slow burn threshold (30% for 6h, 15% for 24h). Consuming 30-day error budget in ~10 days."
+      runbook_url: "https://docs.company.com/runbooks/slo-latency-burn"
+
+  # === ERROR RATE BURN-RATE ALERTS ===
+  # SLO: <0.1% 5xx errors (0.001 as decimal)
+  # Calculate actual 5xx rate and burn rate relative to SLO
+  - alert: SLOErrorRateBurnFast
+    expr: |
+      (
+        (
+          sum(rate(http_requests_total{job="scholarship-api",status=~"5..",endpoint!~"/docs|/metrics"}[1h])) by (service)
+          / 
+          sum(rate(http_requests_total{job="scholarship-api",endpoint!~"/docs|/metrics"}[1h])) by (service)
+        ) > (14.4 * 0.001)
+        and
+        (
+          sum(rate(http_requests_total{job="scholarship-api",status=~"5..",endpoint!~"/docs|/metrics"}[6h])) by (service)
+          / 
+          sum(rate(http_requests_total{job="scholarship-api",endpoint!~"/docs|/metrics"}[6h])) by (service)
+        ) > (6 * 0.001)
+      )
+    for: 2m
+    labels:
+      severity: critical
+      service: scholarship-api
+      burn_rate: fast
+      slo_type: error_rate
+    annotations:
+      summary: "Fast error rate SLO burn - consuming error budget rapidly"
+      description: "5xx error rate {{ $value | humanizePercentage }} exceeds fast burn threshold (1.44% for 1h window). Consuming 30-day error budget in ~2 days."
+      runbook_url: "https://docs.company.com/runbooks/slo-error-burn"
+      
+  - alert: SLOErrorRateBurnSlow
+    expr: |
+      (
+        (
+          sum(rate(http_requests_total{job="scholarship-api",status=~"5..",endpoint!~"/docs|/metrics"}[6h])) by (service)
+          / 
+          sum(rate(http_requests_total{job="scholarship-api",endpoint!~"/docs|/metrics"}[6h])) by (service)
+        ) > (6 * 0.001)
+        and
+        (
+          sum(rate(http_requests_total{job="scholarship-api",status=~"5..",endpoint!~"/docs|/metrics"}[24h])) by (service)
+          / 
+          sum(rate(http_requests_total{job="scholarship-api",endpoint!~"/docs|/metrics"}[24h])) by (service)
+        ) > (3 * 0.001)
+      )
+    for: 15m
+    labels:
+      severity: warning
+      service: scholarship-api
+      burn_rate: slow
+      slo_type: error_rate
+    annotations:
+      summary: "Slow error rate SLO burn - sustained error budget consumption"
+      description: "5xx error rate {{ $value | humanizePercentage }} exceeds slow burn threshold (0.6% for 6h, 0.3% for 24h). Consuming 30-day error budget in ~10 days."
+      runbook_url: "https://docs.company.com/runbooks/slo-error-burn"
+
+  # === AVAILABILITY BURN-RATE ALERTS ===
+  # SLO: 99.9% availability (0.1% downtime allowed = 43.8 min/30 days)
+  # Calculate actual downtime burn rate against error budget
+  - alert: SLOAvailabilityBurnFast
+    expr: |
+      (
+        (
+          (1 - avg_over_time(up{job="scholarship-api"}[1h])) > (14.4 * 0.001)
+        )
+        and
+        (
+          (1 - avg_over_time(up{job="scholarship-api"}[6h])) > (6 * 0.001)
+        )
+      )
+    for: 2m
+    labels:
+      severity: critical
+      service: scholarship-api
+      burn_rate: fast
+      slo_type: availability
+    annotations:
+      summary: "Fast availability SLO burn - consuming error budget rapidly"
+      description: "Downtime rate {{ $value | humanizePercentage }} exceeds fast burn threshold (1.44% for 1h). Consuming 30-day error budget in ~2 days."
+      runbook_url: "https://docs.company.com/runbooks/slo-availability-burn"
+      
+  - alert: SLOAvailabilityBurnSlow
+    expr: |
+      (
+        (
+          (1 - avg_over_time(up{job="scholarship-api"}[6h])) > (6 * 0.001)
+        )
+        and
+        (
+          (1 - avg_over_time(up{job="scholarship-api"}[24h])) > (3 * 0.001)
+        )
+      )
+    for: 15m
+    labels:
+      severity: warning
+      service: scholarship-api
+      burn_rate: slow
+      slo_type: availability
+    annotations:
+      summary: "Slow availability SLO burn - sustained error budget consumption"
+      description: "Downtime rate {{ $value | humanizePercentage }} exceeds slow burn threshold (0.6% for 6h, 0.3% for 24h). Consuming 30-day error budget in ~10 days."
+      runbook_url: "https://docs.company.com/runbooks/slo-availability-burn"
 
 - name: scholarship-api-business
   rules:

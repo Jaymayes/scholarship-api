@@ -166,7 +166,9 @@ app.add_middleware(
 app.add_middleware(URLLengthMiddleware, max_length=settings.max_url_length)
 app.add_middleware(BodySizeLimitMiddleware, max_size=settings.max_request_size_bytes)
 
-# 4. Request identification (for tracing/logging)
+# 4. Request identification and metrics tracking
+from middleware.http_metrics import HTTPMetricsMiddleware
+app.add_middleware(HTTPMetricsMiddleware, enable_metrics=True)
 app.add_middleware(RequestIDMiddleware)
 app.middleware("http")(trace_id_middleware)
 

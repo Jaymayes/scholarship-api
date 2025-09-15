@@ -44,9 +44,9 @@ export let options = {
     'http_req_duration{endpoint:agent_health}': ['p(95)<200'],
     'http_req_duration{endpoint:agent_capabilities}': ['p(95)<300'],
     
-    // General API thresholds
-    'http_req_failed': ['rate<0.01'], // Less than 1% failures
-    'http_req_duration': ['p(95)<2000'], // 95% under 2s
+    // General API thresholds (aligned with SLOs)
+    'http_req_failed': ['rate<0.001'], // Less than 0.1% failures  
+    'http_req_duration': ['p(95)<120'], // 95% under 120ms
   },
 };
 

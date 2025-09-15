@@ -21,7 +21,8 @@ http_requests_total = Counter(
 http_request_duration_seconds = Histogram(
     'http_request_duration_seconds',
     'HTTP request duration in seconds',
-    ['method', 'endpoint']
+    ['method', 'endpoint'],
+    buckets=[0.005, 0.01, 0.025, 0.05, 0.075, 0.1, 0.12, 0.25, 0.5, 0.75, 1.0, 2.5, 5.0, 7.5, 10.0, float('inf')]
 )
 
 database_queries_total = Counter(
@@ -41,6 +42,16 @@ interactions_logged_total = Counter(
     'Total interactions logged',
     ['event_type', 'status']
 )
+
+# Rate limiting metrics
+rate_limit_rejected_total = Counter(
+    'rate_limit_rejected_total',
+    'Total rate-limited requests rejected',
+    ['endpoint', 'method', 'limit_type']
+)
+
+# Active scholarships gauge for real-time tracking
+# METRICS DUPLICATION FIX: Removed Gauge - using only CustomCollector approach
 
 # CUSTOM COLLECTOR: Computes value at scrape time to eliminate registry drift
 class ActiveScholarshipsCollector:
@@ -140,15 +151,12 @@ class MetricsService:
             logger.warning(f"Failed to record interaction metrics: {str(e)}")
     
     def update_scholarship_count(self, count: int):
-        """Update active scholarship count on unified registry"""
+        """Update active scholarship count - using CustomCollector only (no duplication)"""
         if not self.enabled:
             return
             
-        try:
-            active_scholarships.set(count)
-            logger.info(f"📊 UNIFIED METRICS: Updated active_scholarships_total to {count} on default registry")
-        except Exception as e:
-            logger.warning(f"Failed to update scholarship count: {str(e)}")
+        # CustomCollector handles this at scrape-time, no need for manual updates
+        logger.info(f"📊 CUSTOM COLLECTOR: Scholarship count will be updated at scrape-time ({count} scholarships)")
     
     def reconcile_scholarship_count_from_service(self):
         """Reconcile scholarship count from service - startup/lifecycle hook"""
@@ -168,19 +176,17 @@ metrics_service = MetricsService()
 async def get_metrics():
     """Prometheus metrics endpoint with real-time scholarship count"""
     try:
-        # Force detailed logging to verify handler execution
-        logger.error("🚨 CUSTOM METRICS HANDLER EXECUTING - This proves it's not intercepted!")
+        # Reduce log volume - use info level for normal operations
+        logger.info("📊 CUSTOM METRICS HANDLER: Generating metrics")
         
-        # Set active scholarships count at scrape-time to ensure accuracy
+        # CustomCollector handles active_scholarships_total at scrape-time (no manual set needed)
         from services.scholarship_service import scholarship_service
         scholarship_count = len(scholarship_service.scholarships)
-        active_scholarships.set(scholarship_count)
-        logger.error(f"🎯 CRITICAL: Updated active_scholarships_total to {scholarship_count}")
-        logger.error(f"🔍 SCHOLARSHIP SERVICE STATUS: {type(scholarship_service)}, count={scholarship_count}")
+        logger.info(f"📊 Updated active_scholarships_total to {scholarship_count}")
         
         # Use default single-process registry
         content = generate_latest()
-        logger.error("✅ CUSTOM HANDLER: Generated metrics using default registry")
+        logger.info("✅ Generated metrics using default registry")
         
         return Response(
             content=content,
@@ -220,9 +226,8 @@ def setup_metrics(app: FastAPI):
     
     # Register CustomCollector AFTER instrumentation to ensure correct registry
     try:
-        # Unregister any existing gauge to prevent name collision
-        prometheus_client.REGISTRY.unregister(active_scholarships)
-        logger.info("🗑️ CLEANUP: Unregistered existing active_scholarships gauge")
+        # METRICS DUPLICATION FIX: No gauge to unregister - using only CustomCollector
+        logger.info("✅ DUPLICATION FIX: Using only CustomCollector (no Gauge approach)")
     except Exception as e:
         logger.info(f"ℹ️ No existing gauge to unregister: {str(e)}")
     

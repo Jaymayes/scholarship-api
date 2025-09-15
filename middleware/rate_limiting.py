@@ -128,6 +128,19 @@ async def rate_limit_handler(request: Request, exc: RateLimitExceeded) -> Respon
     from middleware.error_handlers import create_error_response
     import time
     
+    # Record rate limiting metric
+    try:
+        from observability.metrics import rate_limit_rejected_total
+        endpoint = request.url.path
+        method = request.method
+        rate_limit_rejected_total.labels(
+            endpoint=endpoint,
+            method=method,
+            limit_type="api_rate_limit"
+        ).inc()
+    except Exception as e:
+        logger.warning(f"Failed to record rate limit metrics: {str(e)}")
+    
     # Extract rate limit details
     limit_info = str(exc).split() if exc else []
     
