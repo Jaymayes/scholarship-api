@@ -153,6 +153,81 @@ class SearchAnalyticsDB(Base):
     user_agent = Column(String(500))
     ip_address = Column(String(45))
 
+class ProviderDB(Base):
+    """Database model for B2B scholarship providers"""
+    __tablename__ = "providers"
+    
+    provider_id = Column(String, primary_key=True)
+    name = Column(String(200), nullable=False, index=True)
+    segment = Column(String(20), nullable=False, index=True)  # university, foundation, corporate
+    status = Column(String(20), nullable=False, index=True, default="invited")
+    contact_email = Column(String(255), nullable=False)
+    institutional_domain = Column(String(100), nullable=False)
+    
+    # API credentials - store hash for security
+    api_key_hash = Column(String(200), unique=True, index=True)
+    api_key_prefix = Column(String(20), index=True)  # For identification (pvd_xxxxx)
+    api_key_created_at = Column(DateTime)
+    api_key_last_used = Column(DateTime)
+    
+    # Onboarding metrics
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    first_listing_date = Column(DateTime)
+    first_application_date = Column(DateTime)
+    
+    # Account details
+    listings_count = Column(Integer, default=0)
+    applications_received = Column(Integer, default=0)
+    
+    # Contract/compliance
+    dpa_signed = Column(Boolean, default=False)
+    dpa_signed_date = Column(DateTime)
+    pilot_start_date = Column(DateTime)
+    pilot_end_date = Column(DateTime)
+    
+    # Business metrics
+    monthly_fee = Column(Float, default=0.0)
+    revenue_generated = Column(Float, default=0.0)
+    
+    # Metadata
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    is_active = Column(Boolean, default=True)
+    
+    # Relationships
+    listings = relationship("ScholarshipListingDB", back_populates="provider")
+
+class ScholarshipListingDB(Base):
+    """Database model for provider scholarship listings"""
+    __tablename__ = "scholarship_listings"
+    
+    listing_id = Column(String, primary_key=True)
+    provider_id = Column(String, ForeignKey("providers.provider_id"), nullable=False, index=True)
+    
+    # Basic listing information
+    title = Column(String(200), nullable=False)
+    amount = Column(Float, nullable=False)
+    deadline = Column(DateTime, nullable=False, index=True)
+    description = Column(Text, nullable=False)
+    requirements = Column(JSON, nullable=False)  # List of requirements
+    application_url = Column(String(500), nullable=False)
+    
+    # Metadata for matching
+    field_of_study = Column(JSON)  # List of fields
+    gpa_requirement = Column(Float)
+    citizenship_required = Column(String(50))
+    
+    # Performance tracking
+    views = Column(Integer, default=0)
+    applications = Column(Integer, default=0)
+    
+    # Metadata
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    is_active = Column(Boolean, default=True)
+    
+    # Relationships
+    provider = relationship("ProviderDB", back_populates="listings")
+
 def get_database_session():
     """Get database session"""
     db = SessionLocal()

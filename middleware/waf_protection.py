@@ -63,25 +63,26 @@ class WAFProtection(BaseHTTPMiddleware):
         logger.info(f"WAF Protection initialized - Block mode: {self.block_mode}")
     
     def _compile_sql_patterns(self) -> List[Pattern]:
-        """Compile SQL injection detection patterns"""
+        """Compile SQL injection detection patterns - tuned to avoid false positives"""
         sql_patterns = [
-            # Classic SQL injection patterns
-            r"(\b(union|select|insert|update|delete|drop|create|alter|exec|execute)\b)",
-            r"(\b(or|and)\s+['\"]?\w+['\"]?\s*=\s*['\"]?\w+['\"]?)",
-            r"(['\"];?\s*(drop|delete|update|insert)\s)",
-            r"(\b(concat|char|ascii|substring|length|mid|substr)\s*\()",
-            r"(\b(information_schema|sys\.|mysql\.|pg_)\w*)",
-            r"(--|\#|\/\*|\*\/)",
-            r"(\bor\b\s+['\"]?1['\"]?\s*=\s*['\"]?1['\"]?)",
-            r"(\bunion\b\s+(all\s+)?select)",
-            r"(\bselect\b.+\bfrom\b.+\bwhere\b)",
+            # More contextual SQL injection patterns to avoid false positives
+            r"(\bunion\b\s+(all\s+)?\bselect\b)",  # UNION SELECT specifically
+            r"(\bselect\b.+\bfrom\b.+(\bwhere\b|;))",  # SELECT...FROM...WHERE/; patterns
+            r"(['\"];?\s*(drop|delete|update|insert)\s+(table|from|into))",  # Commands with context
+            r"(\b(or|and)\s+['\"]?1['\"]?\s*=\s*['\"]?1['\"]?\s*(--|\#|;))",  # Classic injection patterns
+            r"(\b(information_schema|sys\.|mysql\.|pg_)\w*)",  # Database system objects
+            r"(--\s*|\#\s*|\s*/\*|\*/\s*)",  # SQL comments with context
+            r"(\bor\b\s+['\"]?1['\"]?\s*=\s*['\"]?1['\"]?)",  # OR 1=1 patterns
+            r"(\';?\s*(drop|delete|update|insert)\s)",  # Semicolon followed by dangerous commands
             
-            # Advanced SQL injection patterns  
+            # Advanced patterns  
             r"(\x27|\x22|\\x27|\\x22)",  # Encoded quotes
-            r"(\b(waitfor|delay|benchmark|sleep)\s*\()",
-            r"(\b(load_file|into\s+outfile|into\s+dumpfile)\b)",
-            r"(\b(grant|revoke|privilege)\b)",
+            r"(\b(waitfor|delay|benchmark|sleep)\s*\()",  # Time-based injection
+            r"(\b(load_file|into\s+outfile|into\s+dumpfile)\b)",  # File operations
             r"(\b(sp_|xp_)\w+)",  # Stored procedures
+            
+            # Dangerous function calls in suspicious contexts
+            r"(\b(concat|char|ascii|substring|length|mid|substr)\s*\(\s*['\"]?\w*['\"]?\s*,)",
         ]
         
         return [re.compile(pattern, re.IGNORECASE | re.MULTILINE) for pattern in sql_patterns]
@@ -241,6 +242,16 @@ class WAFProtection(BaseHTTPMiddleware):
         
         # Use centralized public endpoint check
         if self._is_public_endpoint(request):
+            return False
+        
+        # SQL injection exempt endpoints (legitimate content may contain SQL keywords)
+        sql_exempt_paths = {
+            "/partner/register",  # Partner registration may contain text like "select scholarships"
+            "/api/v1/launch/simulate/traffic"
+        }
+        
+        if request.url.path in sql_exempt_paths:
+            logger.debug(f"WAF: Allowing SQL-exempt endpoint - {request.method} {request.url.path}")
             return False
         
         # Check URL parameters  

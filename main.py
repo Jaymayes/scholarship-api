@@ -33,6 +33,7 @@ from routers.commercialization import router as commercialization_router, public
 from routers.devrel import router as devrel_router
 from routers.auto_page_seo import router as auto_seo_router
 from routers.scholarship_pages import router as scholarship_pages_router
+from routers.b2b_partner_portal import router as b2b_partner_router
 from middleware.error_handling import (
     api_error_handler, http_exception_handler, validation_exception_handler,
     rate_limit_exception_handler, general_exception_handler, trace_id_middleware,
@@ -271,7 +272,7 @@ from routers.monetization import router as monetization_router
 app.include_router(monetization_router, tags=["Monetization"])
 
 # AI Scholarship Playbook: B2B Partner Portal endpoints
-from routers.b2b_partner import router as b2b_partner_router
+from routers.b2b_partner_portal import router as b2b_partner_router
 app.include_router(b2b_partner_router, tags=["B2B Partners"])
 
 # CRITICAL SECURITY: API Commercialization & Billing System
