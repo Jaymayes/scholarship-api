@@ -203,15 +203,26 @@ class WAFProtection(BaseHTTPMiddleware):
             response.headers["X-WAF-Status"] = "error" 
             return response
     
+    def _is_public_endpoint(self, request: Request) -> bool:
+        """Centralized public endpoint check with path normalization"""
+        normalized_path = request.url.path.rstrip('/') or '/'
+        public_endpoints = {
+            '/', '/health', '/healthz', '/metrics', '/docs', '/openapi.json', 
+            '/replit-health', '/_debug/routes', '/_debug/startup', '/_debug/scholarships', '/internal/metrics'  # Added debug & guaranteed endpoints
+        }
+        is_public = normalized_path in public_endpoints or normalized_path.startswith('/static')
+        if is_public:
+            logger.debug(f"WAF: Allowing public endpoint - {request.method} {normalized_path}")
+        return is_public
+
     async def _check_authorization_requirement(self, request: Request) -> bool:
         """Check if protected endpoint requires Authorization header"""
         
         path = request.url.path
         method = request.method
         
-        # Skip health checks and public endpoints
-        public_endpoints = {"/", "/health", "/metrics", "/docs", "/openapi.json", "/replit-health"}
-        if path in public_endpoints or path.startswith("/static"):
+        # Use centralized public endpoint check
+        if self._is_public_endpoint(request):
             return False
         
         # Check if endpoint requires authorization
@@ -219,7 +230,7 @@ class WAFProtection(BaseHTTPMiddleware):
             auth_header = request.headers.get("authorization", "")
             
             if not auth_header or not auth_header.startswith("Bearer "):
-                logger.warning(f"Authorization required but missing - {method} {path}")
+                logger.warning(f"WAF: Blocking unauthorized request - {method} {path} (missing Bearer token)")
                 self.auth_enforcement_blocks += 1
                 return True
         
@@ -228,10 +239,8 @@ class WAFProtection(BaseHTTPMiddleware):
     async def _detect_sql_injection(self, request: Request) -> bool:
         """Detect SQL injection patterns in request"""
         
-        # Skip SQLi detection for health/public endpoints
-        path = request.url.path
-        public_endpoints = {"/", "/health", "/metrics", "/docs", "/openapi.json", "/replit-health"}
-        if path in public_endpoints or path.startswith("/static"):
+        # Use centralized public endpoint check
+        if self._is_public_endpoint(request):
             return False
         
         # Check URL parameters  

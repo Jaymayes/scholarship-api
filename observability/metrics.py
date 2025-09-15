@@ -2,30 +2,12 @@
 Prometheus Metrics for Observability
 """
 
-import os
-import shutil
-from prometheus_client import (
-    Counter, Histogram, Gauge, generate_latest, CONTENT_TYPE_LATEST, 
-    CollectorRegistry, multiprocess
-)
+from prometheus_client import Counter, Histogram, Gauge, generate_latest, CONTENT_TYPE_LATEST
 from fastapi import FastAPI, Response
 from typing import Optional
 from utils.logger import get_logger
 
 logger = get_logger("metrics")
-
-# Configure multiprocess support for production
-PROMETHEUS_MULTIPROC_DIR = os.environ.get('PROMETHEUS_MULTIPROC_DIR', '/tmp/prometheus_multiproc')
-
-# Ensure multiprocess directory exists (but don't delete existing files!)
-if PROMETHEUS_MULTIPROC_DIR:
-    try:
-        os.makedirs(PROMETHEUS_MULTIPROC_DIR, exist_ok=True)
-        logger.info(f"Prometheus multiprocess directory configured: {PROMETHEUS_MULTIPROC_DIR}")
-    except Exception as e:
-        logger.warning(f"Failed to setup multiprocess directory: {e}")
-
-# Note: Registry setup moved to metrics endpoint to ensure fresh reads
 
 # Metrics definitions
 http_requests_total = Counter(
@@ -58,13 +40,13 @@ interactions_logged_total = Counter(
     ['event_type', 'status']
 )
 
-# Configure active scholarships as multiprocess gauge with "max" mode
-# This ensures correct aggregation across processes (max of all workers)
+# Active scholarships gauge for single-process metrics
 active_scholarships = Gauge(
     'active_scholarships_total',
-    'Total number of active scholarships',
-    multiprocess_mode='max'
+    'Total number of active scholarships'
 )
+
+# Note: active_scholarships value set directly in /metrics endpoint to avoid circular imports
 
 class MetricsService:
     """Service for managing Prometheus metrics"""
@@ -149,33 +131,87 @@ class MetricsService:
 # Global metrics service instance
 metrics_service = MetricsService()
 
+async def get_metrics():
+    """Prometheus metrics endpoint with real-time scholarship count"""
+    try:
+        # Force detailed logging to verify handler execution
+        logger.error("🚨 CUSTOM METRICS HANDLER EXECUTING - This proves it's not intercepted!")
+        
+        # Set active scholarships count at scrape-time to ensure accuracy
+        from services.scholarship_service import scholarship_service
+        scholarship_count = len(scholarship_service.scholarships)
+        active_scholarships.set(scholarship_count)
+        logger.error(f"🎯 CRITICAL: Updated active_scholarships_total to {scholarship_count}")
+        logger.error(f"🔍 SCHOLARSHIP SERVICE STATUS: {type(scholarship_service)}, count={scholarship_count}")
+        
+        # Use default single-process registry
+        content = generate_latest()
+        logger.error("✅ CUSTOM HANDLER: Generated metrics using default registry")
+        
+        return Response(
+            content=content,
+            media_type=CONTENT_TYPE_LATEST
+        )
+    except Exception as e:
+        logger.error(f"❌ CUSTOM HANDLER FAILED: {str(e)}")
+        return Response(
+            content="# Failed to generate metrics\n",
+            status_code=500,
+            media_type=CONTENT_TYPE_LATEST
+        )
+
+async def debug_routes(app):
+    """Debug endpoint to show all registered routes"""
+    routes = []
+    for route in app.routes:
+        if hasattr(route, 'methods') and hasattr(route, 'path'):
+            routes.append({
+                "path": route.path,
+                "methods": list(route.methods) if route.methods else [],
+                "name": getattr(route, 'name', 'unnamed')
+            })
+    return {"routes": routes, "total": len(routes)}
+
 def setup_metrics(app: FastAPI):
     """Setup metrics endpoint"""
+    # Real async handlers for proper FastAPI route registration
+    async def _metrics():
+        return await get_metrics()
     
-    @app.get("/metrics")
-    async def get_metrics():
-        """Prometheus metrics endpoint with multiprocess support"""
-        try:
-            # Always build fresh registry when multiprocess directory exists
-            if os.path.isdir(PROMETHEUS_MULTIPROC_DIR):
-                registry = CollectorRegistry()
-                multiprocess.MultiProcessCollector(registry)
-                content = generate_latest(registry)
-                logger.debug("Generated metrics using fresh multiprocess registry")
-            else:
-                content = generate_latest()
-                logger.debug("Generated metrics using default registry (no multiprocess dir)")
-                
-            return Response(
-                content=content,
-                media_type=CONTENT_TYPE_LATEST
-            )
-        except Exception as e:
-            logger.error(f"Failed to generate metrics: {str(e)}")
-            return Response(
-                content="# Failed to generate metrics\n",
-                status_code=500,
-                media_type=CONTENT_TYPE_LATEST
-            )
+    async def _routes():
+        return await debug_routes(app)
     
-    logger.info("Metrics endpoint configured at /metrics")
+    # TEMP DEBUG: Add scholarship count endpoint to verify service
+    async def _debug_scholarships():
+        """Debug endpoint to verify scholarship service status"""
+        from services.scholarship_service import scholarship_service
+        return {
+            "service_type": str(type(scholarship_service)),
+            "scholarship_count": len(scholarship_service.scholarships),
+            "scholarships_sample": scholarship_service.scholarships[:3] if scholarship_service.scholarships else []
+        }
+    
+    # GUARANTEED ENDPOINT: /internal/metrics bypasses auto-instrumentation
+    app.add_api_route("/internal/metrics", _metrics, methods=["GET"], include_in_schema=False, name="internal_metrics_guaranteed")
+    
+    # Original endpoint (may be intercepted by auto-instrumentation)
+    app.add_api_route("/metrics", _metrics, methods=["GET"], include_in_schema=False, name="metrics_primary")
+    
+    # Debug endpoints  
+    app.add_api_route("/_debug/routes", _routes, methods=["GET"], include_in_schema=False, name="debug_routes")
+    app.add_api_route("/_debug/scholarships", _debug_scholarships, methods=["GET"], include_in_schema=False, name="debug_scholarships")
+    
+    # Add startup diagnostics - log route table
+    async def _debug_startup():
+        """Startup diagnostic to verify route registration"""
+        routes = []
+        for route in app.routes:
+            if hasattr(route, 'path'):
+                routes.append(route.path)
+        logger.info(f"🔍 Startup route table: {sorted(routes)}")
+        return {"registered_routes": sorted(routes)}
+    
+    app.add_api_route("/_debug/startup", _debug_startup, methods=["GET"], include_in_schema=False, name="debug_startup")
+    
+    logger.info("✅ Metrics endpoints registered - /internal/metrics (guaranteed), /metrics (may be intercepted)")
+    logger.info("🔍 Use /internal/metrics for guaranteed custom handler execution")

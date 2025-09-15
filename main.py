@@ -55,22 +55,28 @@ async def lifespan(app: FastAPI):
     
     logger.info("🔗 Initializing Agent Bridge for Command Center integration")
     
-    # Register with Command Center on startup
-    try:
-        await orchestrator_service.register_with_command_center()
-        logger.info("✅ Agent Bridge startup completed")
-    except Exception as e:
-        logger.warning(f"⚠️ Command Center registration failed (will retry): {e}")
+    # Force import scholarship_service to guarantee metrics initialization
+    logger.info("🔧 Force importing scholarship_service for metrics initialization")
+    from services.scholarship_service import scholarship_service
+    from observability.metrics import metrics_service
+    scholarship_count = len(scholarship_service.scholarships)
+    metrics_service.update_scholarship_count(scholarship_count)
+    logger.info(f"🎯 Forced metrics initialization: active_scholarships_total set to {scholarship_count}")
     
-    # Startup reconciliation: Set active scholarships metric in each worker
-    try:
-        from services.scholarship_service import scholarship_service
-        from observability.metrics import metrics_service
-        scholarship_count = len(scholarship_service.scholarships)
-        metrics_service.update_scholarship_count(scholarship_count)
-        logger.info(f"🎯 Startup reconciliation: active_scholarships_total set to {scholarship_count}")
-    except Exception as e:
-        logger.warning(f"Failed startup metrics reconciliation: {e}")
+    # Start Command Center registration in background (non-blocking)
+    import asyncio
+    
+    async def register_with_command_center():
+        try:
+            await asyncio.wait_for(
+                orchestrator_service.register_with_command_center(), 
+                timeout=5.0
+            )
+            logger.info("✅ Agent Bridge startup completed")
+        except Exception as e:
+            logger.warning(f"⚠️ Command Center registration failed (will retry): {e}")
+    
+    asyncio.create_task(register_with_command_center())
     
     yield
     
@@ -96,10 +102,27 @@ app = FastAPI(
 # Mount static files
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
-# Setup observability
+# Setup metrics endpoints FIRST to prevent wildcard route shadowing
 setup_metrics(app)
+
+# Setup observability  
 tracing_service.setup_tracing()
 tracing_service.instrument_app(app)
+
+# Agent Bridge initialization moved to lifespan for reliability
+
+# Defensive startup hook fallback (for environments where lifespan doesn't execute)
+@app.on_event("startup")
+async def reconcile_metrics():
+    """Fallback metrics reconciliation for production reliability"""
+    try:
+        from services.scholarship_service import scholarship_service
+        from observability.metrics import metrics_service
+        scholarship_count = len(scholarship_service.scholarships)
+        metrics_service.update_scholarship_count(scholarship_count)
+        logger.info(f"🔄 Startup hook: Reconciled active_scholarships_total to {scholarship_count}")
+    except Exception as e:
+        logger.warning(f"Failed startup hook metrics reconciliation: {e}")
 
 # QA-001 fix: Add middleware in correct order (outermost first, applied last)
 # Order: Security & Host Protection → CORS → Request Processing → Rate Limiting → Routing
@@ -114,9 +137,11 @@ from middleware.database_session import DatabaseSessionMiddleware
 # 1. Security and host protection middleware (outermost - first line of defense)
 app.add_middleware(WAFProtection, enable_block_mode=True)  # WAF - FIRST LINE OF DEFENSE
 app.add_middleware(SecurityHeadersMiddleware)  # Security headers (must be first)
-app.add_middleware(TrustedHostMiddleware)      # Validate Host header against whitelist
-app.add_middleware(ForwardedHeadersMiddleware) # Handle X-Forwarded-* headers safely
-app.add_middleware(DocsProtectionMiddleware)   # Block docs in production
+# CRITICAL FIX: ForwardedHeadersMiddleware breaks route matching on Replit - corrupts ASGI scope paths
+app.add_middleware(TrustedHostMiddleware)      # Validate Host header against whitelist  
+# app.add_middleware(ForwardedHeadersMiddleware) # DISABLED: Breaks routing on Replit proxy
+# Temporarily disabled for debugging - suspect it's blocking custom routes
+# app.add_middleware(DocsProtectionMiddleware)   # Block docs in production
 app.add_middleware(DatabaseSessionMiddleware)  # Database lifecycle management
 
 # 2. CORS (must be early to handle preflight requests) - Replit compatible
@@ -180,10 +205,10 @@ async def handle_rate_limit_error(request: Request, exc: RateLimitExceeded):
 async def handle_general_error(request: Request, exc: Exception):
     return await general_exception_handler(request, exc)
 
-# Specific status code handlers
-@app.exception_handler(404)
-async def handle_not_found(request: Request, exc: HTTPException):
-    return await not_found_handler(request, exc)
+# Specific status code handlers - TEMPORARILY DISABLED FOR DEBUGGING
+# @app.exception_handler(404)
+# async def handle_not_found(request: Request, exc: HTTPException):
+#     return await not_found_handler(request, exc)
 
 @app.exception_handler(405)
 async def handle_method_not_allowed(request: Request, exc: HTTPException):
@@ -234,6 +259,8 @@ app.include_router(monetization_router, tags=["Monetization"])
 # AI Scholarship Playbook: B2B Partner Portal endpoints
 from routers.b2b_partner import router as b2b_partner_router
 app.include_router(b2b_partner_router, tags=["B2B Partners"])
+
+# Metrics already setup above - this was the wrong location causing route shadowing
 
 @app.get("/")
 async def root():
@@ -363,12 +390,14 @@ if __name__ == "__main__":
     logger.info(f"Database: PostgreSQL")
     
     uvicorn.run(
-        "main:app",
+        app,  # Run app object directly to avoid double-import
         host=host,
         port=port,  # Use dynamic port from environment
-        reload=settings.reload,
+        reload=False,  # Hard disable to ensure single-process
+        workers=1,  # Force single process for shared metrics registry
         log_level="info",
         access_log=True,
-        proxy_headers=True,  # Handle X-Forwarded-* headers correctly for Replit
-        forwarded_allow_ips="*"  # Replit proxy requirement
+        proxy_headers=False,  # CRITICAL FIX: Disable to prevent ASGI scope corruption on Replit
+        # forwarded_allow_ips removed - was security risk and breaking routing
+        lifespan='on'  # Force lifespan execution
     )

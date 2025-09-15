@@ -12,7 +12,13 @@ class ScholarshipService:
         self.scholarships = {sch.id: sch for sch in MOCK_SCHOLARSHIPS}
         logger.info(f"Initialized ScholarshipService with {len(self.scholarships)} scholarships")
         
-        # Note: Metrics update moved to FastAPI startup hook to ensure each worker sets the gauge
+        # Update metrics during initialization (reliable execution point)
+        try:
+            from observability.metrics import metrics_service
+            metrics_service.update_scholarship_count(len(self.scholarships))
+            logger.info(f"✅ Updated active_scholarships_total metric to {len(self.scholarships)}")
+        except Exception as e:
+            logger.warning(f"Failed to update scholarship metrics: {str(e)}")
     
     def get_scholarship_by_id(self, scholarship_id: str) -> Optional[Scholarship]:
         """Get a specific scholarship by ID"""
