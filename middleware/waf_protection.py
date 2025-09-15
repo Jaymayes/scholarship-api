@@ -91,7 +91,7 @@ class WAFProtection(BaseHTTPMiddleware):
         xss_patterns = [
             r"(<\s*script\b[^<]*(?:(?!<\/\s*script\s*>)<[^<]*)*<\/\s*script\s*>)",
             r"(javascript\s*:)",
-            r"(on\w+\s*=)",
+            r"(?<!\w)(on(?:abort|blur|change|click|contextmenu|copy|cut|dblclick|drag|drop|error|focus|input|keydown|keypress|keyup|load|mousedown|mousemove|mouseout|mouseover|mouseup|paste|reset|resize|scroll|select|submit|touchstart|touchend|unload|wheel))\s*=",
             r"(<\s*(iframe|object|embed|form|img|svg)\b)",
             r"(document\.(cookie|write|domain))",
             r"(window\.(location|open))",
@@ -261,6 +261,18 @@ class WAFProtection(BaseHTTPMiddleware):
     
     async def _detect_xss(self, request: Request) -> bool:
         """Detect XSS patterns in request"""
+        
+        # Path-level exemptions for legitimate endpoints
+        xss_exempt_paths = {
+            "/api/v1/launch/simulate/traffic"
+        }
+        
+        if request.url.path in xss_exempt_paths:
+            return False
+        
+        # Use centralized public endpoint check (consistency with SQL detection)
+        if self._is_public_endpoint(request):
+            return False
         
         query_string = str(request.url.query)
         if await self._scan_for_patterns(query_string, self._xss_patterns, "XSS"):
