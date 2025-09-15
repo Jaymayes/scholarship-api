@@ -27,6 +27,7 @@ from routers.disaster_recovery import router as disaster_recovery_router
 from routers.compliance import router as compliance_router
 from routers.ceo_marketing_dashboard import router as ceo_dashboard_router
 from routers.infrastructure_status import router as infrastructure_router
+from routers.priority_3_validation import router as priority3_router
 from middleware.error_handling import (
     api_error_handler, http_exception_handler, validation_exception_handler,
     rate_limit_exception_handler, general_exception_handler, trace_id_middleware,
@@ -244,6 +245,7 @@ app.include_router(disaster_recovery_router, tags=["Disaster Recovery"])
 app.include_router(compliance_router, tags=["SOC2 Compliance"])
 app.include_router(ceo_dashboard_router, tags=["CEO/Marketing Dashboard"])
 app.include_router(infrastructure_router, tags=["Infrastructure Status"])
+app.include_router(priority3_router, tags=["Priority 3 Production Validation"])
 app.include_router(agent_router, tags=["agent"])  # Agent Bridge for Command Center integration
 
 # QA-003 fix: Include interaction wrapper endpoints  
