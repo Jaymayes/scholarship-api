@@ -1,55 +1,58 @@
-from fastapi import FastAPI, Request, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.exceptions import RequestValidationError
-from fastapi.staticfiles import StaticFiles
-from fastapi.responses import HTMLResponse
-from slowapi.errors import RateLimitExceeded
-from slowapi.middleware import SlowAPIMiddleware as RateLimitMiddleware
-import uvicorn
 import os
 
-from routers.scholarships import router as scholarships_router
-from routers.search import router as search_router
-from routers.eligibility import router as eligibility_router
-from routers.recommendations import router as recommendations_router
-from routers.analytics import router as analytics_router
-from routers.auth import router as auth_router
-from routers.database import router as database_router
-from routers.health import router as health_router
-from routers.ai import router as ai_router
-from routers.db_status import router as db_status_router
-from routers.replit_health import router as replit_health_router
-from routers.agent import router as agent_router
-from routers.week2_acceleration import router as week2_router
-from routers.week3_execution import router as week3_router
-from routers.week4_global_expansion import router as week4_router
-from routers.disaster_recovery import router as disaster_recovery_router
-from routers.compliance import router as compliance_router
-from routers.ceo_marketing_dashboard import router as ceo_dashboard_router
-from routers.infrastructure_status import router as infrastructure_router
-from routers.priority_3_validation import router as priority3_router
-from routers.production_launch import router as launch_router
-from routers.commercialization import router as commercialization_router, public_router
-from routers.devrel import router as devrel_router
-from routers.auto_page_seo import router as auto_seo_router
-from routers.scholarship_pages import router as scholarship_pages_router
-from routers.b2b_partner_portal import router as b2b_partner_router, b2b_router
-from routers.b2b_commercial import router as b2b_commercial_router
-from routers.partner_sla_trust_center import router as partner_sla_trust_center_router, partner_sla_router
-from routers.operations_framework import router as operations_framework_router
-from routers.commercialization import commercialization_router
+import uvicorn
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.exceptions import RequestValidationError
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from slowapi.errors import RateLimitExceeded
+from slowapi.middleware import SlowAPIMiddleware as RateLimitMiddleware
+
+from config.settings import Environment, settings
+from middleware.api_rate_limiting import APIRateLimitMiddleware
 from middleware.error_handling import (
-    api_error_handler, http_exception_handler, validation_exception_handler,
-    rate_limit_exception_handler, general_exception_handler, trace_id_middleware,
-    APIError
+    general_exception_handler,
+    http_exception_handler,
+    trace_id_middleware,
+    validation_exception_handler,
 )
 from middleware.rate_limiting import limiter
 from middleware.request_id import RequestIDMiddleware
 from middleware.waf_protection import WAFProtection
-from middleware.api_rate_limiting import APIRateLimitMiddleware
 from observability.metrics import setup_metrics
 from observability.tracing import tracing_service
-from config.settings import settings, Environment
+from routers.agent import router as agent_router
+from routers.ai import router as ai_router
+from routers.analytics import router as analytics_router
+from routers.auth import router as auth_router
+from routers.auto_page_seo import router as auto_seo_router
+from routers.b2b_commercial import router as b2b_commercial_router
+from routers.b2b_partner_portal import b2b_router
+from routers.b2b_partner_portal import router as b2b_partner_router
+from routers.ceo_marketing_dashboard import router as ceo_dashboard_router
+from routers.commercialization import commercialization_router, public_router
+from routers.commercialization import router as commercialization_router
+from routers.compliance import router as compliance_router
+from routers.database import router as database_router
+from routers.db_status import router as db_status_router
+from routers.devrel import router as devrel_router
+from routers.disaster_recovery import router as disaster_recovery_router
+from routers.eligibility import router as eligibility_router
+from routers.health import router as health_router
+from routers.infrastructure_status import router as infrastructure_router
+from routers.operations_framework import router as operations_framework_router
+from routers.partner_sla_trust_center import partner_sla_router
+from routers.partner_sla_trust_center import router as partner_sla_trust_center_router
+from routers.priority_3_validation import router as priority3_router
+from routers.production_launch import router as launch_router
+from routers.recommendations import router as recommendations_router
+from routers.replit_health import router as replit_health_router
+from routers.scholarship_pages import router as scholarship_pages_router
+from routers.scholarships import router as scholarships_router
+from routers.search import router as search_router
+from routers.week2_acceleration import router as week2_router
+from routers.week3_execution import router as week3_router
+from routers.week4_global_expansion import router as week4_router
 from schemas.error_responses import ERROR_RESPONSES
 from utils.logger import setup_logger
 
@@ -59,39 +62,40 @@ logger = setup_logger()
 # Lifespan event handler (FastAPI modern approach)
 from contextlib import asynccontextmanager
 
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifespan handler for startup and shutdown events"""
     # Startup
     from services.orchestrator_service import orchestrator_service
-    
+
     logger.info("🔗 Initializing Agent Bridge for Command Center integration")
-    
+
     # Force import scholarship_service to guarantee metrics initialization
     logger.info("🔧 Force importing scholarship_service for metrics initialization")
-    from services.scholarship_service import scholarship_service
     from observability.metrics import metrics_service
+    from services.scholarship_service import scholarship_service
     scholarship_count = len(scholarship_service.scholarships)
     metrics_service.update_scholarship_count(scholarship_count)
     logger.info(f"🎯 Forced metrics initialization: active_scholarships_total set to {scholarship_count}")
-    
+
     # Start Command Center registration in background (non-blocking)
     import asyncio
-    
+
     async def register_with_command_center():
         try:
             await asyncio.wait_for(
-                orchestrator_service.register_with_command_center(), 
+                orchestrator_service.register_with_command_center(),
                 timeout=5.0
             )
             logger.info("✅ Agent Bridge startup completed")
         except Exception as e:
             logger.warning(f"⚠️ Command Center registration failed (will retry): {e}")
-    
+
     asyncio.create_task(register_with_command_center())
-    
+
     yield
-    
+
     # Shutdown
     logger.info("🔌 Shutting down Agent Bridge")
     await orchestrator_service.close()
@@ -128,8 +132,8 @@ setup_metrics(app)
 async def reconcile_metrics():
     """Fallback metrics reconciliation for production reliability"""
     try:
-        from services.scholarship_service import scholarship_service
         from observability.metrics import metrics_service
+        from services.scholarship_service import scholarship_service
         scholarship_count = len(scholarship_service.scholarships)
         metrics_service.update_scholarship_count(scholarship_count)
         logger.info(f"🔄 Startup hook: Reconciled active_scholarships_total to {scholarship_count}")
@@ -138,19 +142,17 @@ async def reconcile_metrics():
 
 # QA-001 fix: Add middleware in correct order (outermost first, applied last)
 # Order: Security & Host Protection → CORS → Request Processing → Rate Limiting → Routing
-from middleware.security_headers import SecurityHeadersMiddleware
 from middleware.body_limit import BodySizeLimitMiddleware
-from middleware.url_length import URLLengthMiddleware
-from middleware.trusted_host import TrustedHostMiddleware
-from middleware.forwarded_headers import ForwardedHeadersMiddleware
-from middleware.docs_protection import DocsProtectionMiddleware
 from middleware.database_session import DatabaseSessionMiddleware
+from middleware.security_headers import SecurityHeadersMiddleware
+from middleware.trusted_host import TrustedHostMiddleware
+from middleware.url_length import URLLengthMiddleware
 
 # 1. Security and host protection middleware (outermost - first line of defense)
 app.add_middleware(WAFProtection, enable_block_mode=True)  # WAF - FIRST LINE OF DEFENSE
 app.add_middleware(SecurityHeadersMiddleware)  # Security headers (must be first)
 # CRITICAL FIX: ForwardedHeadersMiddleware breaks route matching on Replit - corrupts ASGI scope paths
-app.add_middleware(TrustedHostMiddleware)      # Validate Host header against whitelist  
+app.add_middleware(TrustedHostMiddleware)      # Validate Host header against whitelist
 # app.add_middleware(ForwardedHeadersMiddleware) # DISABLED: Breaks routing on Replit proxy
 # Temporarily disabled for debugging - suspect it's blocking custom routes
 # app.add_middleware(DocsProtectionMiddleware)   # Block docs in production
@@ -168,7 +170,7 @@ if settings.is_development and "*" in cors_origins:
 app.add_middleware(
     CORSMiddleware,
     allow_origins=cors_origins,
-    allow_credentials=cors_config["allow_credentials"], 
+    allow_credentials=cors_config["allow_credentials"],
     allow_methods=cors_config["allow_methods"],
     allow_headers=cors_config["allow_headers"],
     max_age=cors_config["max_age"]
@@ -180,6 +182,7 @@ app.add_middleware(BodySizeLimitMiddleware, max_size=settings.max_request_size_b
 
 # 4. Request identification and metrics tracking
 from middleware.http_metrics import HTTPMetricsMiddleware
+
 app.add_middleware(HTTPMetricsMiddleware, enable_metrics=True)
 app.add_middleware(RequestIDMiddleware)
 app.middleware("http")(trace_id_middleware)
@@ -198,10 +201,13 @@ else:
 
 # Global exception handlers with unified error format
 from middleware.error_handlers import (
-    http_exception_handler, validation_exception_handler,
-    rate_limit_exception_handler, general_exception_handler,
-    not_found_handler, method_not_allowed_handler
+    general_exception_handler,
+    http_exception_handler,
+    method_not_allowed_handler,
+    not_found_handler,
+    validation_exception_handler,
 )
+
 
 # Unified error handlers (all return standardized format)
 @app.exception_handler(HTTPException)
@@ -263,27 +269,29 @@ app.include_router(priority3_router, tags=["Priority 3 Production Validation"])
 app.include_router(launch_router, tags=["Production Launch"])
 app.include_router(agent_router, tags=["agent"])  # Agent Bridge for Command Center integration
 
-# QA-003 fix: Include interaction wrapper endpoints  
+# QA-003 fix: Include interaction wrapper endpoints
 from routers.interaction_wrapper import router as interaction_wrapper_router
+
 app.include_router(interaction_wrapper_router, tags=["interactions"])
 
 # AI Scholarship Playbook: Magic Onboarding endpoints
 from routers.onboarding import router as onboarding_router
+
 app.include_router(onboarding_router, tags=["Magic Onboarding"])
 
 # AI Scholarship Playbook: Monetization endpoints (Credit System)
 from routers.monetization import router as monetization_router
+
 app.include_router(monetization_router, tags=["Monetization"])
 
 # AI Scholarship Playbook: B2B Partner Portal endpoints
-from routers.b2b_partner_portal import router as b2b_partner_router
 app.include_router(b2b_partner_router, tags=["B2B Partners"])
 app.include_router(b2b_commercial_router, tags=["B2B Commercial"])
 app.include_router(partner_sla_trust_center_router, tags=["Partner SLA & Trust Center"])
 
 # CRITICAL: Missing B2B routes that were causing 404 errors
 app.include_router(b2b_router, tags=["B2B Partners - Providers"])
-app.include_router(commercialization_router, tags=["Commercialization Status"])  
+app.include_router(commercialization_router, tags=["Commercialization Status"])
 app.include_router(partner_sla_router, tags=["Partner SLA Status"])
 
 # B2B COMMERCIAL EXECUTION ENGINE: Operations Framework (Lead Routing, Pipeline, Sales Enablement)
@@ -307,7 +315,7 @@ async def root():
         "version": settings.api_version,
         "endpoints": {
             "health": "/healthz",
-            "api_info": "/api", 
+            "api_info": "/api",
             "search": "/api/v1/search?q=<query>",
             "documentation": "/docs",
             "debug": "/_debug/config"
@@ -339,7 +347,7 @@ async def api_status():
     }
 
 @app.get("/health")
-@app.head("/health") 
+@app.head("/health")
 async def health_check(request: Request):
     """Health check endpoint - fast response for deployment monitoring"""
     from utils.error_utils import get_trace_id
@@ -385,7 +393,7 @@ async def main_debug_config():
     """Development-only debug endpoint showing sanitized runtime configuration"""
     if settings.environment == Environment.PRODUCTION:
         raise HTTPException(status_code=404, detail="Not found")
-    
+
     return {
         "environment": settings.environment.value,
         "host": settings.host,
@@ -406,8 +414,8 @@ async def main_debug_config():
             "public_read_endpoints": settings.public_read_endpoints
         },
         "middleware_order": [
-            "SecurityHeaders", "TrustedHost", "ForwardedHeaders", 
-            "DocsProtection", "DatabaseSession", "RequestID", 
+            "SecurityHeaders", "TrustedHost", "ForwardedHeaders",
+            "DocsProtection", "DatabaseSession", "RequestID",
             "CORS", "URLLength", "BodySize", "RateLimit"
         ]
     }
@@ -416,15 +424,15 @@ if __name__ == "__main__":
     # Replit-specific port handling - must use PORT environment variable
     port = int(os.getenv("PORT", "5000"))  # Replit sets PORT=5000 in workflows
     host = "0.0.0.0"  # Required for Replit accessibility
-    
+
     # Startup logging for Replit diagnostics
     logger.info("🚀 Starting Scholarship Discovery API server")
     logger.info(f"Environment: {settings.environment.value}")
     logger.info(f"Host/Port: {host}:{port}")
     logger.info(f"CORS mode: {'dev (wildcard)' if settings.environment != Environment.PRODUCTION else 'prod (strict whitelist)'}")
     logger.info(f"Rate limiter: {'Redis' if limiter and hasattr(limiter, 'storage') and 'redis' in str(limiter.storage) else 'in-memory fallback (Redis unavailable)'}")
-    logger.info(f"Database: PostgreSQL")
-    
+    logger.info("Database: PostgreSQL")
+
     uvicorn.run(
         app,  # Run app object directly to avoid double-import
         host=host,

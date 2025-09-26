@@ -3,21 +3,20 @@ B2B Partner Portal Router
 Self-service partner onboarding with 7-day time-to-first-listing target
 Segments: Universities, Foundations, Corporates with differentiated value props
 """
-from fastapi import APIRouter, HTTPException, Depends, Body, Query
-from fastapi.responses import HTMLResponse, JSONResponse
-from typing import Dict, Any, List, Optional
-from datetime import datetime, timedelta
-from pydantic import BaseModel, EmailStr, Field
 import logging
+from datetime import datetime
+from typing import Any
 
+from fastapi import APIRouter, Body, Depends, HTTPException, Query
+from fastapi.responses import HTMLResponse
+from pydantic import BaseModel, EmailStr, Field
+
+from middleware.auth import User, require_auth
 from production.b2b_provider_acquisition import (
-    b2b_service, 
-    ProviderSegment, 
+    ProviderSegment,
     ProviderStatus,
-    ProviderProfile,
-    ScholarshipListing
+    b2b_service,
 )
-from middleware.auth import require_auth, User
 
 router = APIRouter(prefix="/partner", tags=["B2B Partner Portal"])
 logger = logging.getLogger(__name__)
@@ -25,10 +24,10 @@ logger = logging.getLogger(__name__)
 # Additional router for b2b-partners endpoints (different prefix)
 b2b_router = APIRouter(prefix="/b2b-partners", tags=["B2B Partners"])
 
-@b2b_router.get("/providers", response_model=Dict[str, Any])
+@b2b_router.get("/providers", response_model=dict[str, Any])
 async def get_providers_list(
-    status: Optional[str] = Query(None, description="Filter by provider status"),
-    segment: Optional[str] = Query(None, description="Filter by provider segment"),
+    status: str | None = Query(None, description="Filter by provider status"),
+    segment: str | None = Query(None, description="Filter by provider segment"),
     limit: int = Query(100, ge=1, le=1000, description="Maximum number of providers to return"),
     offset: int = Query(0, ge=0, description="Number of providers to skip"),
     user: User = Depends(require_auth(min_role="partner"))
@@ -41,22 +40,22 @@ async def get_providers_list(
         # Filter providers based on query parameters
         providers = []
         total_count = 0
-        
+
         for provider_id, provider in b2b_service.providers.items():
             # Apply filters
             if status and provider.status.value != status:
                 continue
             if segment and provider.segment.value != segment:
                 continue
-                
+
             total_count += 1
-            
+
             # Apply pagination
             if len(providers) >= limit:
                 break
             if total_count <= offset:
                 continue
-                
+
             provider_data = {
                 "provider_id": provider_id,
                 "name": provider.name,
@@ -76,9 +75,9 @@ async def get_providers_list(
                 }
             }
             providers.append(provider_data)
-        
+
         logger.info(f"📊 Providers list requested by {user.user_id} ({user.roles}) - {len(providers)} providers returned")
-        
+
         return {
             "success": True,
             "timestamp": datetime.utcnow().isoformat(),
@@ -106,7 +105,7 @@ async def get_providers_list(
                 }
             }
         }
-        
+
     except Exception as e:
         logger.error(f"Failed to get providers list: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to retrieve providers list: {str(e)}")
@@ -119,7 +118,7 @@ class ProviderRegistrationRequest(BaseModel):
     contact_email: EmailStr = Field(..., description="Primary contact email")
     institutional_domain: str = Field(..., description="Institution domain (e.g., harvard.edu)")
     contact_name: str = Field(..., description="Contact person name")
-    phone: Optional[str] = Field(None, description="Contact phone number")
+    phone: str | None = Field(None, description="Contact phone number")
     pilot_interest: bool = Field(True, description="Interest in 60-90 day pilot program")
 
 class ProviderRegistrationResponse(BaseModel):
@@ -130,9 +129,9 @@ class ProviderRegistrationResponse(BaseModel):
     status: str
     onboarding_url: str
     credentials_url: str
-    value_proposition: Dict[str, Any]
-    next_steps: List[str]
-    pilot_details: Dict[str, Any]
+    value_proposition: dict[str, Any]
+    next_steps: list[str]
+    pilot_details: dict[str, Any]
     security_note: str
 
 class ScholarshipListingRequest(BaseModel):
@@ -141,18 +140,18 @@ class ScholarshipListingRequest(BaseModel):
     amount: float = Field(..., gt=0, le=100000, description="Scholarship amount in USD")
     deadline: datetime = Field(..., description="Application deadline")
     description: str = Field(..., min_length=50, max_length=2000)
-    requirements: List[str] = Field(..., description="Eligibility requirements")
+    requirements: list[str] = Field(..., description="Eligibility requirements")
     application_url: str = Field(..., description="Direct application URL")
-    
+
     # Optional metadata for better matching
-    field_of_study: List[str] = Field(default=[], description="Relevant fields of study")
-    gpa_requirement: Optional[float] = Field(None, ge=0.0, le=4.0, description="Minimum GPA")
-    citizenship_required: Optional[str] = Field(None, description="Citizenship requirement")
+    field_of_study: list[str] = Field(default=[], description="Relevant fields of study")
+    gpa_requirement: float | None = Field(None, ge=0.0, le=4.0, description="Minimum GPA")
+    citizenship_required: str | None = Field(None, description="Citizenship requirement")
 
 class StatusUpdateRequest(BaseModel):
     """Provider status advancement request"""
     new_status: ProviderStatus
-    notes: Optional[str] = None
+    notes: str | None = None
 
 @router.post("/register", response_model=ProviderRegistrationResponse)
 async def register_provider(registration: ProviderRegistrationRequest):
@@ -168,10 +167,10 @@ async def register_provider(registration: ProviderRegistrationRequest):
             contact_email=registration.contact_email,
             institutional_domain=registration.institutional_domain
         )
-        
+
         # Get segment-specific value proposition
         value_prop = b2b_service.get_segment_value_proposition(registration.segment)
-        
+
         # Generate next steps based on segment
         next_steps = [
             "Complete your institutional profile",
@@ -181,13 +180,13 @@ async def register_provider(registration: ProviderRegistrationRequest):
             "Configure your provider dashboard",
             f"Target: First listing live within {b2b_service.target_time_to_first_listing_days} days"
         ]
-        
+
         # Pilot program details
         pilot_details = {
             "duration_days": 90,
             "benefits": [
                 "Free access to all premium features",
-                "Dedicated partner success manager", 
+                "Dedicated partner success manager",
                 "Priority customer support",
                 "Custom reporting and analytics",
                 "No listing fees during pilot"
@@ -199,9 +198,9 @@ async def register_provider(registration: ProviderRegistrationRequest):
                 "Minimum 80% provider satisfaction score"
             ]
         }
-        
+
         logger.info(f"✅ Provider registered: {registration.name} ({registration.segment}) - Starting pilot program")
-        
+
         return ProviderRegistrationResponse(
             provider_id=profile.provider_id,
             name=profile.name,
@@ -214,7 +213,7 @@ async def register_provider(registration: ProviderRegistrationRequest):
             pilot_details=pilot_details,
             security_note="API credentials are available through the secure credentials endpoint after authentication. This ensures your API keys remain protected."
         )
-        
+
     except Exception as e:
         logger.error(f"❌ Provider registration failed: {str(e)}")
         raise HTTPException(status_code=400, detail=f"Registration failed: {str(e)}")
@@ -227,14 +226,14 @@ async def provider_onboarding_portal(provider_id: str):
     """
     if provider_id not in b2b_service.providers:
         raise HTTPException(status_code=404, detail="Provider not found")
-    
+
     provider = b2b_service.providers[provider_id]
     value_prop = b2b_service.get_segment_value_proposition(provider.segment)
-    
+
     # Calculate onboarding progress
     days_since_registration = (datetime.utcnow() - provider.created_at).days
     target_days = b2b_service.target_time_to_first_listing_days
-    
+
     progress_items = [
         {
             "step": "Account Created",
@@ -243,7 +242,7 @@ async def provider_onboarding_portal(provider_id: str):
             "description": "Provider account successfully created"
         },
         {
-            "step": "Profile Setup", 
+            "step": "Profile Setup",
             "completed": provider.status != ProviderStatus.INVITED,
             "date": None,
             "description": "Complete institutional profile and contact details"
@@ -261,8 +260,8 @@ async def provider_onboarding_portal(provider_id: str):
             "description": f"Target: Within {target_days} days of registration"
         }
     ]
-    
-    html = f"""
+
+    return f"""
     <!DOCTYPE html>
     <html>
     <head>
@@ -301,7 +300,7 @@ async def provider_onboarding_portal(provider_id: str):
                 <p><strong>Status:</strong> {provider.status.value.replace('_', ' ').title()}</p>
                 <p><strong>API Keys:</strong> <a href="/partner/credentials/{provider.provider_id}" class="btn btn-secondary" style="display: inline; padding: 6px 12px; font-size: 0.9rem;">View API Credentials</a></p>
             </div>
-            
+
             <div class="value-prop">
                 <h2>{value_prop['headline']}</h2>
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; margin-top: 1rem;">
@@ -319,14 +318,14 @@ async def provider_onboarding_portal(provider_id: str):
                     </div>
                 </div>
             </div>
-            
+
             <div class="progress-section">
                 <h2>📊 Onboarding Progress</h2>
-                
+
                 {'<div class="urgency"><strong>⏰ Urgency:</strong> You have ' + str(target_days - days_since_registration) + ' days remaining to meet your first listing target.</div>' if days_since_registration < target_days and not provider.first_listing_date else ''}
-                
+
                 {'<div class="success"><strong>🎉 Congratulations!</strong> You met the time-to-first-listing target.</div>' if provider.first_listing_date and provider.time_to_first_listing and provider.time_to_first_listing.days <= target_days else ''}
-                
+
                 {''.join([f'''<div class="progress-item">
                     <div class="status-icon {'completed' if item['completed'] else 'pending'}">
                         {'✓' if item['completed'] else str(i+1)}
@@ -337,7 +336,7 @@ async def provider_onboarding_portal(provider_id: str):
                         {'<small style="color: #10b981;">Completed on ' + item['date'] + '</small>' if item['completed'] and item['date'] else ''}
                     </div>
                 </div>''' for i, item in enumerate(progress_items)])}
-                
+
                 <div class="metrics">
                     <div class="metric-card">
                         <div class="metric-value">{days_since_registration}</div>
@@ -356,7 +355,7 @@ async def provider_onboarding_portal(provider_id: str):
                         <div class="metric-label">Days to Target</div>
                     </div>
                 </div>
-                
+
                 <div class="action-buttons">
                     {'<a href="/partner/dpa/' + provider.provider_id + '" class="btn btn-primary">Sign Partnership Agreement</a>' if not provider.dpa_signed else ''}
                     <a href="/partner/listings/create?provider_id={provider.provider_id}" class="btn btn-primary">Create First Listing</a>
@@ -368,12 +367,11 @@ async def provider_onboarding_portal(provider_id: str):
     </body>
     </html>
     """
-    
-    return html
+
 
 @router.get("/credentials/{provider_id}")
 async def get_provider_credentials(
-    provider_id: str, 
+    provider_id: str,
     current_user: User = Depends(require_auth(min_role="partner"))
 ):
     """
@@ -385,17 +383,17 @@ async def get_provider_credentials(
         api_key_info = b2b_service.get_provider_api_key_for_display(provider_id)
         if not api_key_info:
             raise HTTPException(status_code=404, detail="Provider not found or has no API key")
-        
+
         # Get provider info directly from database
         providers = b2b_service.providers
         if provider_id not in providers:
             raise HTTPException(status_code=404, detail="Provider not found")
-        
+
         provider = providers[provider_id]
-        
+
         # Basic authorization check - more advanced would check if user owns this provider
         logger.info(f"🔐 Credentials accessed for provider {provider_id} by user {current_user.user_id}")
-        
+
         return {
             "provider_id": provider.provider_id,
             "name": provider.name,
@@ -406,7 +404,7 @@ async def get_provider_credentials(
             "security_note": "For security, API keys are hashed and cannot be displayed. Use the regenerate endpoint to get a new key.",
             "regenerate_url": f"/partner/credentials/{provider_id}/regenerate"
         }
-        
+
     except Exception as e:
         logger.error(f"❌ Error accessing credentials for provider {provider_id}: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Unable to retrieve credentials: {str(e)}")
@@ -418,7 +416,7 @@ async def regenerate_api_key(
 ):
     """
     Regenerate API key for provider
-    Requires authentication and partner role or higher  
+    Requires authentication and partner role or higher
     Returns new API key one time only for security
     """
     try:
@@ -426,9 +424,9 @@ async def regenerate_api_key(
         new_api_key = b2b_service.regenerate_provider_api_key(provider_id)
         if not new_api_key:
             raise HTTPException(status_code=404, detail="Provider not found")
-        
+
         logger.warning(f"🔄 API key regenerated for provider {provider_id} by user {current_user.user_id}")
-        
+
         return {
             "provider_id": provider_id,
             "new_api_key": new_api_key,
@@ -436,7 +434,7 @@ async def regenerate_api_key(
             "security_warning": "IMPORTANT: This key is shown once only for security. Save it now - the old API key is now invalid. Update all integrations immediately.",
             "show_once_notice": "This API key will not be displayed again. Store it securely."
         }
-        
+
     except Exception as e:
         logger.error(f"❌ Error regenerating API key for provider {provider_id}: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Unable to regenerate API key: {str(e)}")
@@ -446,10 +444,10 @@ async def digital_partnership_agreement(provider_id: str):
     """Digital Partnership Agreement with e-signature capability"""
     if provider_id not in b2b_service.providers:
         raise HTTPException(status_code=404, detail="Provider not found")
-    
+
     provider = b2b_service.providers[provider_id]
-    
-    html = f"""
+
+    return f"""
     <!DOCTYPE html>
     <html>
     <head>
@@ -474,15 +472,15 @@ async def digital_partnership_agreement(provider_id: str):
             <p>Provider: <strong>{provider.name}</strong></p>
             <p>Date: {datetime.utcnow().strftime("%B %d, %Y")}</p>
         </div>
-        
+
         {'<div class="already-signed"><h3>✅ Agreement Already Executed</h3><p>This DPA was signed on ' + (provider.dpa_signed_date.strftime("%B %d, %Y") if provider.dpa_signed_date else "Unknown") + '</p></div>' if provider.dpa_signed else ''}
-        
+
         <div class="agreement">
             <div class="section">
                 <h3>1. PARTNERSHIP SCOPE</h3>
                 <p>This Digital Partnership Agreement ("Agreement") establishes {provider.name} as an authorized scholarship provider on the Scholarship Discovery API platform, enabling direct access to qualified student applicants through our advanced matching technology.</p>
             </div>
-            
+
             <div class="section">
                 <h3>2. DATA PROTECTION & PRIVACY</h3>
                 <p><strong>Encryption:</strong> All data transmitted and stored uses AES-256 encryption with TLS 1.3 transport security.</p>
@@ -490,35 +488,35 @@ async def digital_partnership_agreement(provider_id: str):
                 <p><strong>PII Protection:</strong> Student personally identifiable information never exposed in analytics or reporting.</p>
                 <p><strong>Compliance:</strong> Full FERPA, CCPA, and GDPR compliance with automated audit logging.</p>
             </div>
-            
+
             <div class="section">
                 <h3>3. RESPONSIBLE AI COMMITMENTS</h3>
                 <p>Our predictive matching system operates with 100% transparency, providing clear explanations for all student-scholarship matches. No algorithmic bias or discriminatory practices are permitted.</p>
             </div>
-            
+
             <div class="section">
                 <h3>4. SERVICE LEVEL OBJECTIVES</h3>
                 <p><strong>Availability:</strong> 99.95% uptime guarantee with 24/7 monitoring</p>
                 <p><strong>Performance:</strong> API responses under 120ms P95 latency</p>
                 <p><strong>Support:</strong> Dedicated partner success manager and priority technical support</p>
             </div>
-            
+
             <div class="section">
                 <h3>5. PILOT PROGRAM TERMS</h3>
                 <p><strong>Duration:</strong> 60-90 day pilot with no platform fees</p>
                 <p><strong>Success Metrics:</strong> Time-to-first-listing ≤7 days, time-to-first-application ≤14 days</p>
                 <p><strong>Conversion:</strong> Option to convert to paid plan with grandfathered pilot benefits</p>
             </div>
-            
+
             <div class="section">
                 <h3>6. MUTUAL COMMITMENTS</h3>
                 <p><strong>Provider Commitments:</strong> Maintain accurate scholarship information, respond to qualified applications within 5 business days, provide feedback for platform improvement.</p>
                 <p><strong>Platform Commitments:</strong> Deliver qualified student matches, maintain security standards, provide comprehensive analytics and reporting.</p>
             </div>
         </div>
-        
+
         {'<div class="signature-section"><h3>Digital Signature Required</h3><p>By clicking "Execute Agreement", you acknowledge that you have read, understood, and agree to be bound by all terms of this Digital Partnership Agreement.</p><p><strong>Legal Name:</strong> ' + provider.name + '</p><p><strong>Contact Email:</strong> ' + provider.contact_email + '</p><button class="btn" onclick="signAgreement()">Execute Agreement</button></div>' if not provider.dpa_signed else ''}
-        
+
         <script>
             async function signAgreement() {{
                 try {{
@@ -527,7 +525,7 @@ async def digital_partnership_agreement(provider_id: str):
                         headers: {{ 'Content-Type': 'application/json' }},
                         body: JSON.stringify({{ agreed: true, timestamp: new Date().toISOString() }})
                     }});
-                    
+
                     if (response.ok) {{
                         alert('✅ Agreement successfully executed! Redirecting to onboarding portal...');
                         window.location.href = '/partner/onboarding/{provider.provider_id}';
@@ -542,30 +540,29 @@ async def digital_partnership_agreement(provider_id: str):
     </body>
     </html>
     """
-    
-    return html
+
 
 @router.post("/dpa/{provider_id}/sign")
-async def sign_partnership_agreement(provider_id: str, signature_data: Dict[str, Any] = Body(...)):
+async def sign_partnership_agreement(provider_id: str, signature_data: dict[str, Any] = Body(...)):
     """Execute digital partnership agreement with legal timestamp"""
     if provider_id not in b2b_service.providers:
         raise HTTPException(status_code=404, detail="Provider not found")
-    
+
     provider = b2b_service.providers[provider_id]
-    
+
     if provider.dpa_signed:
         raise HTTPException(status_code=400, detail="Agreement already executed")
-    
+
     # Execute DPA
     provider.dpa_signed = True
     provider.dpa_signed_date = datetime.utcnow()
-    
+
     # Advance provider status
     if provider.status == ProviderStatus.INVITED:
         b2b_service.advance_provider_status(provider_id, ProviderStatus.MEETING)
-    
+
     logger.info(f"📝 DPA executed: {provider.name} - {provider_id}")
-    
+
     return {
         "message": "Digital Partnership Agreement successfully executed",
         "provider_id": provider_id,
@@ -574,7 +571,7 @@ async def sign_partnership_agreement(provider_id: str, signature_data: Dict[str,
         "next_step": "Create your first scholarship listing"
     }
 
-@router.post("/listings/create", response_model=Dict[str, Any])
+@router.post("/listings/create", response_model=dict[str, Any])
 async def create_scholarship_listing(
     provider_id: str = Query(..., description="Provider ID"),
     listing: ScholarshipListingRequest = Body(...)
@@ -593,9 +590,9 @@ async def create_scholarship_listing(
             gpa_requirement=listing.gpa_requirement,
             citizenship_required=listing.citizenship_required
         )
-        
+
         provider = b2b_service.providers[provider_id]
-        
+
         return {
             "message": "Scholarship listing created successfully",
             "listing_id": scholarship.listing_id,
@@ -611,7 +608,7 @@ async def create_scholarship_listing(
                 "Review predictive matching performance"
             ]
         }
-        
+
     except Exception as e:
         logger.error(f"❌ Listing creation failed: {str(e)}")
         raise HTTPException(status_code=400, detail=f"Failed to create listing: {str(e)}")
@@ -621,16 +618,16 @@ async def provider_dashboard(provider_id: str):
     """Provider analytics dashboard with activation metrics"""
     if provider_id not in b2b_service.providers:
         raise HTTPException(status_code=404, detail="Provider not found")
-    
+
     provider = b2b_service.providers[provider_id]
     provider_listings = [l for l in b2b_service.listings.values() if l.provider_id == provider_id]
-    
+
     # Calculate performance metrics
     total_views = sum(listing.views for listing in provider_listings)
     total_applications = sum(listing.applications for listing in provider_listings)
     conversion_rate = (total_applications / total_views * 100) if total_views > 0 else 0
-    
-    html = f"""
+
+    return f"""
     <!DOCTYPE html>
     <html>
     <head>
@@ -659,12 +656,12 @@ async def provider_dashboard(provider_id: str):
                 <h1>📊 Provider Dashboard</h1>
                 <h2>{provider.name}</h2>
                 <p><strong>Status:</strong> {provider.status.value.replace('_', ' ').title()}</p>
-                
+
                 {'<div class="success-indicator">🎯 Target Met: Time-to-first-listing = ' + str(provider.time_to_first_listing.days) + ' days</div>' if provider.time_to_first_listing and provider.time_to_first_listing.days <= b2b_service.target_time_to_first_listing_days else ''}
-                
+
                 {'<div class="warning-indicator">⏰ Behind Target: ' + str((datetime.utcnow() - provider.created_at).days) + '/' + str(b2b_service.target_time_to_first_listing_days) + ' days elapsed</div>' if not provider.first_listing_date and (datetime.utcnow() - provider.created_at).days >= b2b_service.target_time_to_first_listing_days else ''}
             </div>
-            
+
             <div class="metrics-grid">
                 <div class="metric-card">
                     <div class="metric-value">{provider.listings_count}</div>
@@ -691,12 +688,12 @@ async def provider_dashboard(provider_id: str):
                     <div class="metric-label">Revenue Generated</div>
                 </div>
             </div>
-            
+
             <div class="listings-section">
                 <h2>📝 Your Scholarship Listings</h2>
-                
+
                 {('<p>No listings created yet. <a href="/partner/listings/create?provider_id=' + provider_id + '" class="btn">Create Your First Listing</a></p>') if len(provider_listings) == 0 else ''}
-                
+
                 {''.join([f'''<div class="listing-item">
                     <h3>{listing.title}</h3>
                     <p><strong>Amount:</strong> ${listing.amount:,.2f} | <strong>Deadline:</strong> {listing.deadline.strftime("%B %d, %Y")}</p>
@@ -704,7 +701,7 @@ async def provider_dashboard(provider_id: str):
                     <p><strong>Performance:</strong> {listing.views} views, {listing.applications} applications</p>
                     <p><strong>Requirements:</strong> {', '.join(listing.requirements[:3])}{'...' if len(listing.requirements) > 3 else ''}</p>
                 </div>''' for listing in provider_listings])}
-                
+
                 <div style="text-align: center; margin-top: 2rem;">
                     <a href="/partner/listings/create?provider_id={provider_id}" class="btn">+ Create New Listing</a>
                     <a href="/partner/onboarding/{provider_id}" class="btn" style="background: #6b7280;">Back to Onboarding</a>
@@ -714,17 +711,16 @@ async def provider_dashboard(provider_id: str):
     </body>
     </html>
     """
-    
-    return html
 
-@router.get("/status/{provider_id}", response_model=Dict[str, Any])
+
+@router.get("/status/{provider_id}", response_model=dict[str, Any])
 async def get_provider_status(provider_id: str):
     """Get provider status and activation metrics"""
     if provider_id not in b2b_service.providers:
         raise HTTPException(status_code=404, detail="Provider not found")
-    
+
     provider = b2b_service.providers[provider_id]
-    
+
     return {
         "provider_id": provider_id,
         "name": provider.name,
@@ -790,7 +786,7 @@ async def get_segment_value_propositions():
         },
         "targets": {
             "prospects": 30,
-            "meetings": 20, 
+            "meetings": 20,
             "pilots": 10,
             "conversion_rate": "33% prospect-to-meeting, 50% meeting-to-pilot"
         }

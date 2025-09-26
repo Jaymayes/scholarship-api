@@ -3,12 +3,10 @@ Week 4 Global Expansion Router
 International pilots, predictive insights, SEO scaling, marketplace monetization, and application automation
 """
 
-from fastapi import APIRouter, BackgroundTasks, HTTPException, Depends
-from typing import Dict, Any, List, Optional
-import asyncio
-import json
 from datetime import datetime
-import logging
+from typing import Any
+
+from fastapi import APIRouter, BackgroundTasks, HTTPException
 
 from services.openai_service import OpenAIService
 from utils.logger import get_logger
@@ -19,7 +17,7 @@ router = APIRouter(prefix="/api/v1/week4", tags=["Week 4 Global Expansion"])
 # Initialize services
 openai_service = OpenAIService()
 
-@router.get("/status", response_model=Dict[str, Any])
+@router.get("/status", response_model=dict[str, Any])
 async def get_week4_status(request_id: str = "week4-status"):
     """Get comprehensive Week 4 global expansion status across all 5 OKRs"""
     try:
@@ -104,25 +102,27 @@ async def get_week4_status(request_id: str = "week4-status"):
             "request_id": request_id,
             "timestamp": datetime.now().isoformat()
         }
-        
+
         logger.info(f"Week 4 status retrieved - Request ID: {request_id}")
         return status
-        
+
     except Exception as e:
         logger.error(f"Error getting Week 4 status: {str(e)} - Request ID: {request_id}")
         raise HTTPException(status_code=500, detail=f"Failed to get status: {str(e)}")
 
-@router.post("/okr1/international-pilot", response_model=Dict[str, Any])
+@router.post("/okr1/international-pilot", response_model=dict[str, Any])
 async def execute_international_pilot_okr1(
     background_tasks: BackgroundTasks,
-    target_regions: Optional[List[str]] = ["canada", "united_kingdom"],
-    target_scholarships: Optional[int] = 50,
+    target_regions: list[str] | None = None,
+    target_scholarships: int | None = 50,
     request_id: str = "week4-okr1-international"
 ):
     """Execute OKR 1: International Pilot (Canada + UK Discovery)"""
+    if target_regions is None:
+        target_regions = ["canada", "united_kingdom"]
     try:
         logger.info(f"🌍 OKR 1: International Pilot execution initiated - Request ID: {request_id}")
-        
+
         # Execute comprehensive international pilot (simulated)
         result = {
             "execution_status": "success",
@@ -157,7 +157,7 @@ async def execute_international_pilot_okr1(
             },
             "execution_time_seconds": 1756.8
         }
-        
+
         # Add OKR-specific metrics
         okr1_metrics = {
             "okr_number": 1,
@@ -193,24 +193,24 @@ async def execute_international_pilot_okr1(
             "request_id": request_id,
             "timestamp": datetime.now().isoformat()
         }
-        
+
         logger.info(f"✅ OKR 1 Complete: {result['regions_launched']} regions, {result['scholarships_ingested']} scholarships - Request ID: {request_id}")
         return okr1_metrics
-        
+
     except Exception as e:
         logger.error(f"Error in OKR 1 international pilot: {str(e)} - Request ID: {request_id}")
         raise HTTPException(status_code=500, detail=f"OKR 1 failed: {str(e)}")
 
-@router.post("/okr2/predictive-insights", response_model=Dict[str, Any])
+@router.post("/okr2/predictive-insights", response_model=dict[str, Any])
 async def execute_predictive_insights_okr2(
     background_tasks: BackgroundTasks,
-    target_ctr_improvement: Optional[float] = 0.10,
+    target_ctr_improvement: float | None = 0.10,
     request_id: str = "week4-okr2-insights"
 ):
     """Execute OKR 2: Predictive Insights Layer (Student & Partner Value)"""
     try:
         logger.info(f"🔮 OKR 2: Predictive Insights deployment initiated - Request ID: {request_id}")
-        
+
         # Execute comprehensive predictive insights (simulated)
         result = {
             "execution_status": "success",
@@ -251,7 +251,7 @@ async def execute_predictive_insights_okr2(
             },
             "execution_time_seconds": 1623.7
         }
-        
+
         # Add OKR-specific metrics
         okr2_metrics = {
             "okr_number": 2,
@@ -291,25 +291,25 @@ async def execute_predictive_insights_okr2(
             "request_id": request_id,
             "timestamp": datetime.now().isoformat()
         }
-        
+
         logger.info(f"✅ OKR 2 Complete: {result['student_insights_deployed']} insights, {result['ctr_improvement']['lift_percentage']:.1%} CTR improvement - Request ID: {request_id}")
         return okr2_metrics
-        
+
     except Exception as e:
         logger.error(f"Error in OKR 2 predictive insights: {str(e)} - Request ID: {request_id}")
         raise HTTPException(status_code=500, detail=f"OKR 2 failed: {str(e)}")
 
-@router.post("/okr3/seo-scale", response_model=Dict[str, Any])
+@router.post("/okr3/seo-scale", response_model=dict[str, Any])
 async def execute_seo_scale_okr3(
     background_tasks: BackgroundTasks,
-    target_pages: Optional[int] = 400,
-    target_index_coverage: Optional[float] = 0.75,
+    target_pages: int | None = 400,
+    target_index_coverage: float | None = 0.75,
     request_id: str = "week4-okr3-seo"
 ):
     """Execute OKR 3: SEO Scale & Authority (400+ pages, 75% index coverage)"""
     try:
         logger.info(f"📈 OKR 3: SEO Scale & Authority execution initiated - Request ID: {request_id}")
-        
+
         # Execute comprehensive SEO scaling (simulated)
         result = {
             "execution_status": "success",
@@ -335,7 +335,7 @@ async def execute_seo_scale_okr3(
             },
             "execution_time_seconds": 1389.4
         }
-        
+
         # Add OKR-specific metrics
         okr3_metrics = {
             "okr_number": 3,
@@ -379,25 +379,25 @@ async def execute_seo_scale_okr3(
             "request_id": request_id,
             "timestamp": datetime.now().isoformat()
         }
-        
+
         logger.info(f"✅ OKR 3 Complete: {result['pages_generated']} pages at {result['index_coverage_achieved']:.1%} index coverage - Request ID: {request_id}")
         return okr3_metrics
-        
+
     except Exception as e:
         logger.error(f"Error in OKR 3 SEO scale: {str(e)} - Request ID: {request_id}")
         raise HTTPException(status_code=500, detail=f"OKR 3 failed: {str(e)}")
 
-@router.post("/okr4/marketplace-monetization", response_model=Dict[str, Any])
+@router.post("/okr4/marketplace-monetization", response_model=dict[str, Any])
 async def execute_marketplace_monetization_okr4(
     background_tasks: BackgroundTasks,
-    target_partners: Optional[int] = 30,
-    target_listings: Optional[int] = 120,
+    target_partners: int | None = 30,
+    target_listings: int | None = 120,
     request_id: str = "week4-okr4-monetization"
 ):
     """Execute OKR 4: Marketplace Monetization (Tiered B2B Packages)"""
     try:
         logger.info(f"💼 OKR 4: Marketplace Monetization execution initiated - Request ID: {request_id}")
-        
+
         # Execute comprehensive marketplace monetization (simulated)
         result = {
             "execution_status": "success",
@@ -416,7 +416,7 @@ async def execute_marketplace_monetization_okr4(
             "monthly_b2b_revenue": 14959,  # $14.9K monthly from B2B
             "execution_time_seconds": 1205.3
         }
-        
+
         # Add OKR-specific metrics
         okr4_metrics = {
             "okr_number": 4,
@@ -477,25 +477,25 @@ async def execute_marketplace_monetization_okr4(
             "request_id": request_id,
             "timestamp": datetime.now().isoformat()
         }
-        
+
         logger.info(f"✅ OKR 4 Complete: {result['total_partners']} partners, {result['listings_generated']} listings, ${result['monthly_b2b_revenue']}/month B2B revenue - Request ID: {request_id}")
         return okr4_metrics
-        
+
     except Exception as e:
         logger.error(f"Error in OKR 4 marketplace monetization: {str(e)} - Request ID: {request_id}")
         raise HTTPException(status_code=500, detail=f"OKR 4 failed: {str(e)}")
 
-@router.post("/okr5/application-automation", response_model=Dict[str, Any])
+@router.post("/okr5/application-automation", response_model=dict[str, Any])
 async def execute_application_automation_okr5(
     background_tasks: BackgroundTasks,
-    target_coverage: Optional[float] = 0.98,
-    target_submit_ready: Optional[float] = 0.92,
+    target_coverage: float | None = 0.98,
+    target_submit_ready: float | None = 0.92,
     request_id: str = "week4-okr5-automation"
 ):
     """Execute OKR 5: Application Automation & Reliability Excellence"""
     try:
         logger.info(f"🔧 OKR 5: Application Automation & Reliability execution initiated - Request ID: {request_id}")
-        
+
         # Execute comprehensive automation and reliability (simulated)
         result = {
             "execution_status": "success",
@@ -519,7 +519,7 @@ async def execute_application_automation_okr5(
             },
             "execution_time_seconds": 956.2
         }
-        
+
         # Add OKR-specific metrics
         okr5_metrics = {
             "okr_number": 5,
@@ -567,15 +567,15 @@ async def execute_application_automation_okr5(
             "request_id": request_id,
             "timestamp": datetime.now().isoformat()
         }
-        
+
         logger.info(f"✅ OKR 5 Complete: {result['coverage_achieved']:.1%} coverage, {result['submit_ready_rate']:.1%} submit-ready, {result['global_infrastructure']['uptime_achieved']:.2%} uptime - Request ID: {request_id}")
         return okr5_metrics
-        
+
     except Exception as e:
         logger.error(f"Error in OKR 5 application automation: {str(e)} - Request ID: {request_id}")
         raise HTTPException(status_code=500, detail=f"OKR 5 failed: {str(e)}")
 
-@router.get("/ceo-dashboard", response_model=Dict[str, Any])
+@router.get("/ceo-dashboard", response_model=dict[str, Any])
 async def get_week4_ceo_dashboard(request_id: str = "week4-ceo-dashboard"):
     """Get comprehensive Week 4 CEO dashboard with global expansion metrics"""
     try:
@@ -734,15 +734,15 @@ async def get_week4_ceo_dashboard(request_id: str = "week4-ceo-dashboard"):
             "request_id": request_id,
             "last_updated": datetime.now().isoformat()
         }
-        
+
         logger.info(f"Week 4 CEO dashboard retrieved - Request ID: {request_id}")
         return ceo_dashboard
-        
+
     except Exception as e:
         logger.error(f"Error getting Week 4 CEO dashboard: {str(e)} - Request ID: {request_id}")
         raise HTTPException(status_code=500, detail=f"Failed to get CEO dashboard: {str(e)}")
 
-@router.post("/execute-all-okrs", response_model=Dict[str, Any])
+@router.post("/execute-all-okrs", response_model=dict[str, Any])
 async def execute_all_week4_okrs(
     background_tasks: BackgroundTasks,
     request_id: str = "week4-execute-all-okrs"
@@ -750,7 +750,7 @@ async def execute_all_week4_okrs(
     """Execute all 5 Week 4 OKRs in coordinated sequence"""
     try:
         logger.info(f"🚀 Week 4 All OKRs execution initiated - Request ID: {request_id}")
-        
+
         # Execute all OKRs in coordinated sequence (simulated)
         results = [
             {
@@ -804,9 +804,9 @@ async def execute_all_week4_okrs(
                 }
             }
         ]
-        
+
         successful_okrs = len([r for r in results if r["status"] == "success"])
-        
+
         all_okrs_result = {
             "execution_status": "success",
             "okrs_completed": successful_okrs,
@@ -850,10 +850,10 @@ async def execute_all_week4_okrs(
             "request_id": request_id,
             "timestamp": datetime.now().isoformat()
         }
-        
+
         logger.info(f"✅ Week 4 All OKRs Complete: {successful_okrs}/5 successful, international expansion achieved - Request ID: {request_id}")
         return all_okrs_result
-        
+
     except Exception as e:
         logger.error(f"Error in Week 4 all OKRs execution: {str(e)} - Request ID: {request_id}")
         raise HTTPException(status_code=500, detail=f"All OKRs execution failed: {str(e)}")
@@ -908,10 +908,10 @@ async def demonstrate_international_student_flow(request_id: str = "week4-demo-i
             "request_id": request_id,
             "timestamp": datetime.now().isoformat()
         }
-        
+
         logger.info(f"International student flow demo completed - Request ID: {request_id}")
         return demo_result
-        
+
     except Exception as e:
         logger.error(f"Error in international demo: {str(e)} - Request ID: {request_id}")
         raise HTTPException(status_code=500, detail=f"Demo failed: {str(e)}")
@@ -993,10 +993,10 @@ async def demonstrate_partner_analytics_beta(request_id: str = "week4-demo-partn
             "request_id": request_id,
             "timestamp": datetime.now().isoformat()
         }
-        
+
         logger.info(f"Partner analytics beta demo completed - Request ID: {request_id}")
         return demo_result
-        
+
     except Exception as e:
         logger.error(f"Error in partner analytics demo: {str(e)} - Request ID: {request_id}")
         raise HTTPException(status_code=500, detail=f"Demo failed: {str(e)}")

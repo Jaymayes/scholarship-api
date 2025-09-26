@@ -1,9 +1,10 @@
-from fastapi import FastAPI, HTTPException
-from fastapi.middleware.cors import CORSMiddleware
-from routers.scholarships import router as scholarships_router
-from routers.analytics import router as analytics_router
-from utils.logger import setup_logger
 import uvicorn
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+
+from routers.analytics import router as analytics_router
+from routers.scholarships import router as scholarships_router
+from utils.logger import setup_logger
 
 # Initialize logger
 logger = setup_logger()

@@ -5,18 +5,16 @@ OBJECTIVE: Identify and report all errors, bugs, unexpected behavior, and potent
 CONSTRAINT: NO MODIFICATIONS TO EXISTING CODE - ANALYSIS AND REPORTING ONLY
 """
 
-import os
-import sys
-import subprocess
+import ast
 import json
+import re
+import sys
+import time
 import traceback
 from pathlib import Path
-import importlib.util
-import ast
-import re
-from typing import List, Dict, Any
-import time
+
 import requests
+
 
 class QAAnalysisEngine:
     def __init__(self):
@@ -24,9 +22,9 @@ class QAAnalysisEngine:
         self.test_results = []
         self.current_issue_id = 1
         self.project_root = Path(".")
-        
-    def add_finding(self, location: str, description: str, severity: str, 
-                   steps_to_reproduce: str = "", observed_output: str = "", 
+
+    def add_finding(self, location: str, description: str, severity: str,
+                   steps_to_reproduce: str = "", observed_output: str = "",
                    expected_output: str = ""):
         """Add a finding to the report"""
         finding = {
@@ -40,11 +38,11 @@ class QAAnalysisEngine:
         }
         self.findings.append(finding)
         self.current_issue_id += 1
-        
+
     def analyze_file_structure(self):
         """Analyze project structure for potential issues"""
         print("🔍 Analyzing project structure...")
-        
+
         # Check for critical files
         critical_files = ["main.py", "requirements.txt", "pyproject.toml"]
         for file in critical_files:
@@ -58,20 +56,20 @@ class QAAnalysisEngine:
                         observed_output=f"{file} not found",
                         expected_output=f"{file} should exist for proper project setup"
                     )
-                    
+
     def analyze_python_syntax(self):
         """Analyze Python files for syntax errors"""
         print("🔍 Analyzing Python syntax...")
-        
+
         python_files = list(self.project_root.rglob("*.py"))
         for py_file in python_files:
             if ".pythonlibs" in str(py_file) or "__pycache__" in str(py_file):
                 continue
-                
+
             try:
-                with open(py_file, 'r', encoding='utf-8') as f:
+                with open(py_file, encoding='utf-8') as f:
                     content = f.read()
-                    
+
                 # Check for syntax errors
                 try:
                     ast.parse(content)
@@ -84,10 +82,10 @@ class QAAnalysisEngine:
                         observed_output=str(e),
                         expected_output="Valid Python syntax"
                     )
-                    
+
                 # Check for common issues
                 self._check_common_python_issues(py_file, content)
-                
+
             except Exception as e:
                 self.add_finding(
                     location=str(py_file),
@@ -97,11 +95,11 @@ class QAAnalysisEngine:
                     observed_output=str(e),
                     expected_output="File should be readable and parseable"
                 )
-                
+
     def _check_common_python_issues(self, file_path: Path, content: str):
         """Check for common Python coding issues"""
         lines = content.split('\n')
-        
+
         for i, line in enumerate(lines, 1):
             # Check for potential security issues
             if re.search(r'eval\(|exec\(', line):
@@ -113,7 +111,7 @@ class QAAnalysisEngine:
                     observed_output=line.strip(),
                     expected_output="Use safer alternatives to eval/exec"
                 )
-                
+
             # Check for hardcoded credentials
             if re.search(r'password\s*=\s*["\'][^"\']+["\']|api_key\s*=\s*["\'][^"\']+["\']', line, re.IGNORECASE):
                 self.add_finding(
@@ -124,7 +122,7 @@ class QAAnalysisEngine:
                     observed_output=line.strip(),
                     expected_output="Use environment variables for credentials"
                 )
-                
+
             # Check for deprecated imports
             if 'from fastapi import' in line and 'on_event' in content:
                 self.add_finding(
@@ -135,13 +133,13 @@ class QAAnalysisEngine:
                     observed_output="@app.on_event found in file",
                     expected_output="Use lifespan context manager instead"
                 )
-                
+
     def test_api_endpoints(self):
         """Test API endpoints for functionality and errors"""
         print("🔍 Testing API endpoints...")
-        
+
         base_url = "http://localhost:5000"
-        
+
         # Test basic endpoints
         endpoints_to_test = [
             {"path": "/", "method": "GET", "expected_status": 200},
@@ -155,17 +153,17 @@ class QAAnalysisEngine:
             {"path": "/agent/capabilities", "method": "GET", "expected_status": 200},
             {"path": "/ai/status", "method": "GET", "expected_status": 200},
         ]
-        
+
         for endpoint in endpoints_to_test:
             try:
                 response = requests.get(f"{base_url}{endpoint['path']}", timeout=10)
                 expected = endpoint["expected_status"]
-                
+
                 if isinstance(expected, list):
                     if response.status_code not in expected:
                         self.add_finding(
                             location=f"API endpoint {endpoint['path']}",
-                            description=f"Unexpected status code",
+                            description="Unexpected status code",
                             severity="Medium",
                             steps_to_reproduce=f"GET {base_url}{endpoint['path']}",
                             observed_output=f"Status: {response.status_code}, Response: {response.text[:200]}",
@@ -175,13 +173,13 @@ class QAAnalysisEngine:
                     if response.status_code != expected:
                         self.add_finding(
                             location=f"API endpoint {endpoint['path']}",
-                            description=f"Unexpected status code",
+                            description="Unexpected status code",
                             severity="Medium",
                             steps_to_reproduce=f"GET {base_url}{endpoint['path']}",
                             observed_output=f"Status: {response.status_code}, Response: {response.text[:200]}",
                             expected_output=f"Status code {expected}"
                         )
-                        
+
             except requests.exceptions.RequestException as e:
                 self.add_finding(
                     location=f"API endpoint {endpoint['path']}",
@@ -191,13 +189,13 @@ class QAAnalysisEngine:
                     observed_output=str(e),
                     expected_output="Successful HTTP response"
                 )
-                
+
     def test_eligibility_endpoint_edge_cases(self):
         """Test eligibility endpoint with edge cases"""
         print("🔍 Testing eligibility endpoint edge cases...")
-        
+
         base_url = "http://localhost:5000"
-        
+
         # Test cases with various invalid inputs
         test_cases = [
             {
@@ -236,7 +234,7 @@ class QAAnalysisEngine:
                 "expected_status": [200, 422]
             }
         ]
-        
+
         for test_case in test_cases:
             try:
                 response = requests.post(
@@ -245,7 +243,7 @@ class QAAnalysisEngine:
                     timeout=10,
                     headers={"Content-Type": "application/json"}
                 )
-                
+
                 expected = test_case["expected_status"]
                 if isinstance(expected, list):
                     if response.status_code not in expected:
@@ -267,7 +265,7 @@ class QAAnalysisEngine:
                             observed_output=f"Status: {response.status_code}, Response: {response.text[:200]}",
                             expected_output=f"Status code {expected}"
                         )
-                        
+
             except requests.exceptions.RequestException as e:
                 self.add_finding(
                     location="API endpoint /api/v1/eligibility/check",
@@ -277,13 +275,13 @@ class QAAnalysisEngine:
                     observed_output=str(e),
                     expected_output="Successful HTTP response"
                 )
-                
+
     def test_database_operations(self):
         """Test database-related functionality"""
         print("🔍 Testing database operations...")
-        
+
         base_url = "http://localhost:5000"
-        
+
         try:
             # Test database status
             response = requests.get(f"{base_url}/db/status", timeout=10)
@@ -298,7 +296,7 @@ class QAAnalysisEngine:
                         observed_output=str(data),
                         expected_output="Database should be connected: true"
                     )
-                    
+
                 # Check for reasonable scholarship count
                 scholarship_count = data.get("database", {}).get("scholarships", 0)
                 if scholarship_count == 0:
@@ -310,7 +308,7 @@ class QAAnalysisEngine:
                         observed_output=f"Scholarship count: {scholarship_count}",
                         expected_output="Should have scholarship data loaded"
                     )
-                    
+
         except Exception as e:
             self.add_finding(
                 location="Database status endpoint",
@@ -320,27 +318,27 @@ class QAAnalysisEngine:
                 observed_output=str(e),
                 expected_output="Successful database status response"
             )
-            
+
     def test_agent_bridge_functionality(self):
         """Test Agent Bridge orchestration functionality"""
         print("🔍 Testing Agent Bridge functionality...")
-        
+
         base_url = "http://localhost:5000"
-        
+
         try:
             # Test agent capabilities
             response = requests.get(f"{base_url}/agent/capabilities", timeout=10)
             if response.status_code == 200:
                 data = response.json()
                 capabilities = data.get("capabilities", [])
-                
+
                 expected_capabilities = [
                     "scholarship_api.search",
-                    "scholarship_api.eligibility_check", 
+                    "scholarship_api.eligibility_check",
                     "scholarship_api.recommendations",
                     "scholarship_api.analytics"
                 ]
-                
+
                 for expected_cap in expected_capabilities:
                     if expected_cap not in capabilities:
                         self.add_finding(
@@ -351,7 +349,7 @@ class QAAnalysisEngine:
                             observed_output=f"Capabilities: {capabilities}",
                             expected_output=f"Should include {expected_cap}"
                         )
-                        
+
             # Test agent task execution with invalid data
             invalid_task_data = {
                 "task_id": "test-invalid",
@@ -359,13 +357,13 @@ class QAAnalysisEngine:
                 "parameters": {},
                 "requester": "qa_test"
             }
-            
+
             response = requests.post(
                 f"{base_url}/agent/execute",
                 json=invalid_task_data,
                 timeout=10
             )
-            
+
             # Should handle invalid capability gracefully
             if response.status_code not in [400, 422, 404]:
                 self.add_finding(
@@ -376,7 +374,7 @@ class QAAnalysisEngine:
                     observed_output=f"Status: {response.status_code}, Response: {response.text[:200]}",
                     expected_output="Should return 400/422/404 for invalid capability"
                 )
-                
+
         except Exception as e:
             self.add_finding(
                 location="Agent Bridge endpoints",
@@ -386,13 +384,13 @@ class QAAnalysisEngine:
                 observed_output=str(e),
                 expected_output="Agent Bridge should be accessible and functional"
             )
-            
+
     def test_ai_service_integration(self):
         """Test AI service integration and error handling"""
         print("🔍 Testing AI service integration...")
-        
+
         base_url = "http://localhost:5000"
-        
+
         try:
             # Test AI status
             response = requests.get(f"{base_url}/ai/status", timeout=10)
@@ -407,11 +405,11 @@ class QAAnalysisEngine:
                         observed_output=str(data),
                         expected_output="AI service should be available or gracefully degrade"
                     )
-                    
+
             # Test AI endpoints with invalid data
             invalid_scholarship_id = "invalid_id_that_does_not_exist"
             response = requests.get(f"{base_url}/api/v1/ai/scholarship-summary/{invalid_scholarship_id}", timeout=10)
-            
+
             # Should handle invalid IDs gracefully
             if response.status_code not in [404, 422, 400]:
                 self.add_finding(
@@ -422,7 +420,7 @@ class QAAnalysisEngine:
                     observed_output=f"Status: {response.status_code}, Response: {response.text[:200]}",
                     expected_output="Should return 404/422/400 for invalid scholarship ID"
                 )
-                
+
         except Exception as e:
             self.add_finding(
                 location="AI service endpoints",
@@ -432,13 +430,13 @@ class QAAnalysisEngine:
                 observed_output=str(e),
                 expected_output="AI service should be accessible with graceful degradation"
             )
-            
+
     def test_security_vulnerabilities(self):
         """Test for common security vulnerabilities"""
         print("🔍 Testing security vulnerabilities...")
-        
+
         base_url = "http://localhost:5000"
-        
+
         # Test for information disclosure
         sensitive_paths = [
             "/.env",
@@ -449,7 +447,7 @@ class QAAnalysisEngine:
             "/debug",
             "/console"
         ]
-        
+
         for path in sensitive_paths:
             try:
                 response = requests.get(f"{base_url}{path}", timeout=5)
@@ -464,11 +462,11 @@ class QAAnalysisEngine:
                     )
             except:
                 pass  # Expected for most paths
-                
+
         # Test CORS configuration
         try:
-            response = requests.options(f"{base_url}/api/v1/scholarships", 
-                                      headers={"Origin": "http://malicious-site.com"}, 
+            response = requests.options(f"{base_url}/api/v1/scholarships",
+                                      headers={"Origin": "http://malicious-site.com"},
                                       timeout=5)
             cors_header = response.headers.get("Access-Control-Allow-Origin", "")
             if cors_header == "*":
@@ -482,22 +480,22 @@ class QAAnalysisEngine:
                 )
         except:
             pass
-            
+
     def test_rate_limiting(self):
         """Test rate limiting functionality"""
         print("🔍 Testing rate limiting...")
-        
+
         base_url = "http://localhost:5000"
-        
+
         # Test rapid requests to trigger rate limiting
         rapid_requests = []
-        for i in range(20):
+        for _i in range(20):
             try:
                 response = requests.get(f"{base_url}/api/v1/scholarships", timeout=2)
                 rapid_requests.append(response.status_code)
             except:
                 rapid_requests.append(0)
-                
+
         # Check if rate limiting was triggered
         rate_limited = any(status == 429 for status in rapid_requests)
         if not rate_limited:
@@ -509,25 +507,25 @@ class QAAnalysisEngine:
                 observed_output=f"Status codes: {rapid_requests}",
                 expected_output="Should receive 429 (Too Many Requests) for some requests"
             )
-            
+
     def analyze_configuration_files(self):
         """Analyze configuration files for issues"""
         print("🔍 Analyzing configuration files...")
-        
+
         config_files = [
             "pyproject.toml",
-            ".env.example", 
+            ".env.example",
             "docker-compose.yml",
             "Dockerfile"
         ]
-        
+
         for config_file in config_files:
             file_path = self.project_root / config_file
             if file_path.exists():
                 try:
-                    with open(file_path, 'r') as f:
+                    with open(file_path) as f:
                         content = f.read()
-                        
+
                     # Check for potential issues in config files
                     if config_file == "pyproject.toml":
                         # Check for dependency vulnerabilities (basic check)
@@ -542,7 +540,7 @@ class QAAnalysisEngine:
                                     observed_output="FastAPI dependency found without version constraint",
                                     expected_output="Dependencies should have version constraints"
                                 )
-                                
+
                 except Exception as e:
                     self.add_finding(
                         location=f"{config_file}",
@@ -552,21 +550,21 @@ class QAAnalysisEngine:
                         observed_output=str(e),
                         expected_output="Configuration file should be readable"
                     )
-                    
+
     def run_static_analysis(self):
         """Run additional static analysis checks"""
         print("🔍 Running static analysis...")
-        
+
         # Check for TODO/FIXME comments that might indicate incomplete code
         python_files = list(self.project_root.rglob("*.py"))
         for py_file in python_files:
             if ".pythonlibs" in str(py_file):
                 continue
-                
+
             try:
-                with open(py_file, 'r') as f:
+                with open(py_file) as f:
                     content = f.read()
-                    
+
                 lines = content.split('\n')
                 for i, line in enumerate(lines, 1):
                     if re.search(r'#\s*(TODO|FIXME|HACK|XXX)', line, re.IGNORECASE):
@@ -578,32 +576,32 @@ class QAAnalysisEngine:
                             observed_output=line.strip(),
                             expected_output="Production code should not contain TODO/FIXME markers"
                         )
-                        
-            except Exception as e:
+
+            except Exception:
                 continue
-                
+
     def generate_report(self):
         """Generate comprehensive QA report"""
         print("\n" + "="*80)
         print("📋 COMPREHENSIVE QA ANALYSIS REPORT")
         print("="*80)
-        
-        print(f"\n🎯 EXECUTIVE SUMMARY")
+
+        print("\n🎯 EXECUTIVE SUMMARY")
         print(f"Total Issues Found: {len(self.findings)}")
-        
+
         severity_counts = {}
         for finding in self.findings:
             severity = finding['severity']
             severity_counts[severity] = severity_counts.get(severity, 0) + 1
-            
+
         print(f"Critical: {severity_counts.get('Critical', 0)}")
         print(f"High: {severity_counts.get('High', 0)}")
         print(f"Medium: {severity_counts.get('Medium', 0)}")
         print(f"Low: {severity_counts.get('Low', 0)}")
-        
-        print(f"\n📊 DETAILED FINDINGS")
+
+        print("\n📊 DETAILED FINDINGS")
         print("-" * 80)
-        
+
         for finding in self.findings:
             print(f"\n🐛 {finding['issue_id']}: {finding['description']}")
             print(f"📍 Location: {finding['location']}")
@@ -612,7 +610,7 @@ class QAAnalysisEngine:
             print(f"📤 Observed Output: {finding['observed_output']}")
             print(f"✅ Expected Output: {finding['expected_output']}")
             print("-" * 40)
-            
+
         # Save detailed report to JSON
         report_data = {
             "summary": {
@@ -622,12 +620,12 @@ class QAAnalysisEngine:
             },
             "findings": self.findings
         }
-        
+
         with open("qa_comprehensive_analysis_report.json", "w") as f:
             json.dump(report_data, f, indent=2)
-            
-        print(f"\n📄 Detailed report saved to: qa_comprehensive_analysis_report.json")
-        
+
+        print("\n📄 Detailed report saved to: qa_comprehensive_analysis_report.json")
+
         return len(self.findings), severity_counts
 
 def main():
@@ -635,16 +633,16 @@ def main():
     print("🚀 Starting Comprehensive QA Analysis")
     print("⚠️  ANALYSIS ONLY - NO CODE MODIFICATIONS WILL BE MADE")
     print("="*80)
-    
+
     qa_engine = QAAnalysisEngine()
-    
+
     try:
         # Execute all analysis components
         qa_engine.analyze_file_structure()
         qa_engine.analyze_python_syntax()
         qa_engine.analyze_configuration_files()
         qa_engine.run_static_analysis()
-        
+
         # API testing (requires running server)
         qa_engine.test_api_endpoints()
         qa_engine.test_eligibility_endpoint_edge_cases()
@@ -653,16 +651,16 @@ def main():
         qa_engine.test_ai_service_integration()
         qa_engine.test_security_vulnerabilities()
         qa_engine.test_rate_limiting()
-        
+
         # Generate final report
         total_issues, severity_counts = qa_engine.generate_report()
-        
-        print(f"\n🎯 QA ANALYSIS COMPLETE")
+
+        print("\n🎯 QA ANALYSIS COMPLETE")
         print(f"Found {total_issues} total issues across {len(severity_counts)} severity levels")
         print("Review the detailed report above and in qa_comprehensive_analysis_report.json")
-        
+
         return total_issues
-        
+
     except Exception as e:
         print(f"❌ QA Analysis failed with error: {str(e)}")
         print(f"Traceback: {traceback.format_exc()}")

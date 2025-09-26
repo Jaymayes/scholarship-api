@@ -5,12 +5,15 @@ Optimized configuration for deployment environments
 """
 
 import os
+
 import uvicorn
-from config.settings import settings, Environment
+
+from config.settings import settings
+
 
 def main():
     """Run the application with production-optimized settings"""
-    
+
     # Override settings for deployment
     deployment_settings = {
         "host": "0.0.0.0",
@@ -20,10 +23,10 @@ def main():
         "access_log": True,
         "log_level": "info",
     }
-    
+
     print(f"🚀 Starting Scholarship Discovery API in {settings.environment.value} mode")
     print(f"📡 Server binding to {deployment_settings['host']}:{deployment_settings['port']}")
-    
+
     uvicorn.run(
         "main:app",
         **deployment_settings

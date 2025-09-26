@@ -9,18 +9,19 @@ Priority 2 Day 1: Contract Test Coverage
 - Zero schema mismatches across 50-call sample per route
 """
 
+import json
+import os
+import time
+
 import pytest
 import requests
-import json
-from typing import Dict, Any
-import time
-import os
+
 
 class TestOpenAPIContracts:
     """Comprehensive contract tests for all API endpoints"""
-    
+
     BASE_URL = os.getenv("API_BASE_URL", "http://localhost:5000")
-    
+
     @pytest.fixture(autouse=True)
     def setup(self):
         """Setup for each test"""
@@ -35,29 +36,29 @@ class TestOpenAPIContracts:
                 time.sleep(1)
         else:
             pytest.fail("API not available for testing")
-    
-    def _make_request(self, method: str, path: str, params: Dict = None, json_data: Dict = None, 
-                     form_data: Dict = None, headers: Dict = None) -> requests.Response:
+
+    def _make_request(self, method: str, path: str, params: dict = None, json_data: dict = None,
+                     form_data: dict = None, headers: dict = None) -> requests.Response:
         """Make HTTP request with proper error handling"""
         url = f"{self.BASE_URL}{path}"
-        
+
         default_headers = {"User-Agent": "Contract-Test/1.0"}
         if headers:
             default_headers.update(headers)
-        
+
         kwargs = {
             "timeout": 30,
             "headers": default_headers,
             "allow_redirects": False
         }
-        
+
         if params:
             kwargs["params"] = params
         if json_data:
             kwargs["json"] = json_data
         if form_data:
             kwargs["data"] = form_data
-        
+
         return requests.request(method.lower(), url, **kwargs)
 
 
@@ -68,9 +69,9 @@ class TestOpenAPIContracts:
         Tags: Authentication
         Auth Required: False
         """
-        
+
         # SUCCESS CASES
-        
+
         # Test successful request
         response = self._make_request(
             method="POST",
@@ -85,10 +86,10 @@ class TestOpenAPIContracts:
         "client_secret": "test_client_secret"
 }
         )
-        
+
         # Verify success response
         assert response.status_code in [200], f"Expected [200], got {response.status_code}: {response.text}"
-        
+
         # Verify response is valid JSON (for most endpoints)
         if response.headers.get('content-type', '').startswith('application/json'):
             try:
@@ -96,9 +97,9 @@ class TestOpenAPIContracts:
                 assert isinstance(json_response, (dict, list)), "Response should be valid JSON object or array"
             except json.JSONDecodeError as e:
                 pytest.fail(f"Response is not valid JSON: {e}")
-        
+
         # FAILURE CASES - Test error handling
-        
+
         # Test rate limiting (make multiple rapid requests)
         # Note: This test may be flaky depending on rate limit configuration
         rapid_responses = []
@@ -124,7 +125,7 @@ class TestOpenAPIContracts:
                     break
             except requests.RequestException:
                 continue
-        
+
     def test_login_simple_api_v1_auth_login_simple_post_1(self):
         """
         Contract test for POST /api/v1/auth/login-simple
@@ -132,9 +133,9 @@ class TestOpenAPIContracts:
         Tags: Authentication
         Auth Required: False
         """
-        
+
         # SUCCESS CASES
-        
+
         # Test successful request
         response = self._make_request(
             method="POST",
@@ -145,10 +146,10 @@ class TestOpenAPIContracts:
         "password": "testpass123"
 }
         )
-        
+
         # Verify success response
         assert response.status_code in [200], f"Expected [200], got {response.status_code}: {response.text}"
-        
+
         # Verify response is valid JSON (for most endpoints)
         if response.headers.get('content-type', '').startswith('application/json'):
             try:
@@ -156,9 +157,9 @@ class TestOpenAPIContracts:
                 assert isinstance(json_response, (dict, list)), "Response should be valid JSON object or array"
             except json.JSONDecodeError as e:
                 pytest.fail(f"Response is not valid JSON: {e}")
-        
+
         # FAILURE CASES - Test error handling
-        
+
         # Test rate limiting (make multiple rapid requests)
         # Note: This test may be flaky depending on rate limit configuration
         rapid_responses = []
@@ -180,7 +181,7 @@ class TestOpenAPIContracts:
                     break
             except requests.RequestException:
                 continue
-        
+
     def test_get_current_user_info_api_v1_auth_me_get_2(self):
         """
         Contract test for GET /api/v1/auth/me
@@ -188,9 +189,9 @@ class TestOpenAPIContracts:
         Tags: Authentication
         Auth Required: False
         """
-        
+
         # SUCCESS CASES
-        
+
         # Test successful request
         response = self._make_request(
             method="GET",
@@ -200,10 +201,10 @@ class TestOpenAPIContracts:
 },
             json_data=None
         )
-        
+
         # Verify success response
         assert response.status_code in [200], f"Expected [200], got {response.status_code}: {response.text}"
-        
+
         # Verify response is valid JSON (for most endpoints)
         if response.headers.get('content-type', '').startswith('application/json'):
             try:
@@ -211,9 +212,9 @@ class TestOpenAPIContracts:
                 assert isinstance(json_response, (dict, list)), "Response should be valid JSON object or array"
             except json.JSONDecodeError as e:
                 pytest.fail(f"Response is not valid JSON: {e}")
-        
+
         # FAILURE CASES - Test error handling
-        
+
         # Test rate limiting (make multiple rapid requests)
         # Note: This test may be flaky depending on rate limit configuration
         rapid_responses = []
@@ -234,7 +235,7 @@ class TestOpenAPIContracts:
                     break
             except requests.RequestException:
                 continue
-        
+
     def test_logout_api_v1_auth_logout_post_3(self):
         """
         Contract test for POST /api/v1/auth/logout
@@ -242,9 +243,9 @@ class TestOpenAPIContracts:
         Tags: Authentication
         Auth Required: False
         """
-        
+
         # SUCCESS CASES
-        
+
         # Test successful request
         response = self._make_request(
             method="POST",
@@ -254,10 +255,10 @@ class TestOpenAPIContracts:
 },
             json_data=None
         )
-        
+
         # Verify success response
         assert response.status_code in [200], f"Expected [200], got {response.status_code}: {response.text}"
-        
+
         # Verify response is valid JSON (for most endpoints)
         if response.headers.get('content-type', '').startswith('application/json'):
             try:
@@ -265,9 +266,9 @@ class TestOpenAPIContracts:
                 assert isinstance(json_response, (dict, list)), "Response should be valid JSON object or array"
             except json.JSONDecodeError as e:
                 pytest.fail(f"Response is not valid JSON: {e}")
-        
+
         # FAILURE CASES - Test error handling
-        
+
         # Test rate limiting (make multiple rapid requests)
         # Note: This test may be flaky depending on rate limit configuration
         rapid_responses = []
@@ -288,7 +289,7 @@ class TestOpenAPIContracts:
                     break
             except requests.RequestException:
                 continue
-        
+
     def test_check_auth_api_v1_auth_check_get_4(self):
         """
         Contract test for GET /api/v1/auth/check
@@ -296,9 +297,9 @@ class TestOpenAPIContracts:
         Tags: Authentication
         Auth Required: False
         """
-        
+
         # SUCCESS CASES
-        
+
         # Test successful request
         response = self._make_request(
             method="GET",
@@ -306,10 +307,10 @@ class TestOpenAPIContracts:
             params=None,
             json_data=None
         )
-        
+
         # Verify success response
         assert response.status_code in [200], f"Expected [200], got {response.status_code}: {response.text}"
-        
+
         # Verify response is valid JSON (for most endpoints)
         if response.headers.get('content-type', '').startswith('application/json'):
             try:
@@ -317,9 +318,9 @@ class TestOpenAPIContracts:
                 assert isinstance(json_response, (dict, list)), "Response should be valid JSON object or array"
             except json.JSONDecodeError as e:
                 pytest.fail(f"Response is not valid JSON: {e}")
-        
+
         # FAILURE CASES - Test error handling
-        
+
         # Test rate limiting (make multiple rapid requests)
         # Note: This test may be flaky depending on rate limit configuration
         rapid_responses = []
@@ -338,7 +339,7 @@ class TestOpenAPIContracts:
                     break
             except requests.RequestException:
                 continue
-        
+
     def test_search_scholarships_api_v1_scholarships_get_5(self):
         """
         Contract test for GET /api/v1/scholarships
@@ -346,9 +347,9 @@ class TestOpenAPIContracts:
         Tags: scholarships
         Auth Required: False
         """
-        
+
         # SUCCESS CASES
-        
+
         # Test successful request
         response = self._make_request(
             method="GET",
@@ -359,10 +360,10 @@ class TestOpenAPIContracts:
 },
             json_data=None
         )
-        
+
         # Verify success response
         assert response.status_code in [200], f"Expected [200], got {response.status_code}: {response.text}"
-        
+
         # Verify response is valid JSON (for most endpoints)
         if response.headers.get('content-type', '').startswith('application/json'):
             try:
@@ -370,9 +371,9 @@ class TestOpenAPIContracts:
                 assert isinstance(json_response, (dict, list)), "Response should be valid JSON object or array"
             except json.JSONDecodeError as e:
                 pytest.fail(f"Response is not valid JSON: {e}")
-        
+
         # FAILURE CASES - Test error handling
-        
+
         # Test rate limiting (make multiple rapid requests)
         # Note: This test may be flaky depending on rate limit configuration
         rapid_responses = []
@@ -394,7 +395,7 @@ class TestOpenAPIContracts:
                     break
             except requests.RequestException:
                 continue
-        
+
     def test_smart_search_scholarships_api_v1_scholarships_smart_search_get_6(self):
         """
         Contract test for GET /api/v1/scholarships/smart-search
@@ -402,9 +403,9 @@ class TestOpenAPIContracts:
         Tags: scholarships
         Auth Required: False
         """
-        
+
         # SUCCESS CASES
-        
+
         # Test successful request
         response = self._make_request(
             method="GET",
@@ -415,10 +416,10 @@ class TestOpenAPIContracts:
 },
             json_data=None
         )
-        
+
         # Verify success response
         assert response.status_code in [200], f"Expected [200], got {response.status_code}: {response.text}"
-        
+
         # Verify response is valid JSON (for most endpoints)
         if response.headers.get('content-type', '').startswith('application/json'):
             try:
@@ -426,9 +427,9 @@ class TestOpenAPIContracts:
                 assert isinstance(json_response, (dict, list)), "Response should be valid JSON object or array"
             except json.JSONDecodeError as e:
                 pytest.fail(f"Response is not valid JSON: {e}")
-        
+
         # FAILURE CASES - Test error handling
-        
+
         # Test rate limiting (make multiple rapid requests)
         # Note: This test may be flaky depending on rate limit configuration
         rapid_responses = []
@@ -450,7 +451,7 @@ class TestOpenAPIContracts:
                     break
             except requests.RequestException:
                 continue
-        
+
     def test_get_scholarship_api_v1_scholarships__scholarship_id__get_7(self):
         """
         Contract test for GET /api/v1/scholarships/{scholarship_id}
@@ -458,9 +459,9 @@ class TestOpenAPIContracts:
         Tags: scholarships
         Auth Required: False
         """
-        
+
         # SUCCESS CASES
-        
+
         # Test successful request
         response = self._make_request(
             method="GET",
@@ -468,10 +469,10 @@ class TestOpenAPIContracts:
             params=None,
             json_data=None
         )
-        
+
         # Verify success response
         assert response.status_code in [200], f"Expected [200], got {response.status_code}: {response.text}"
-        
+
         # Verify response is valid JSON (for most endpoints)
         if response.headers.get('content-type', '').startswith('application/json'):
             try:
@@ -479,9 +480,9 @@ class TestOpenAPIContracts:
                 assert isinstance(json_response, (dict, list)), "Response should be valid JSON object or array"
             except json.JSONDecodeError as e:
                 pytest.fail(f"Response is not valid JSON: {e}")
-        
+
         # FAILURE CASES - Test error handling
-        
+
         # Test 404 with invalid ID
         response_404 = self._make_request(
             method="GET",
@@ -492,7 +493,7 @@ class TestOpenAPIContracts:
         if response_404.status_code != 404:
             # Some endpoints may return different error codes
             assert response_404.status_code >= 400, f"Expected error code, got {response_404.status_code}"
-        
+
         # Test rate limiting (make multiple rapid requests)
         # Note: This test may be flaky depending on rate limit configuration
         rapid_responses = []
@@ -511,7 +512,7 @@ class TestOpenAPIContracts:
                     break
             except requests.RequestException:
                 continue
-        
+
     def test_check_eligibility_api_v1_scholarships_eligibility_check_post_8(self):
         """
         Contract test for POST /api/v1/scholarships/eligibility-check
@@ -519,9 +520,9 @@ class TestOpenAPIContracts:
         Tags: scholarships
         Auth Required: False
         """
-        
+
         # SUCCESS CASES
-        
+
         # Test successful request
         response = self._make_request(
             method="POST",
@@ -532,10 +533,10 @@ class TestOpenAPIContracts:
         "scholarship_id": "test_scholarship_id"
 }
         )
-        
+
         # Verify success response
         assert response.status_code in [200], f"Expected [200], got {response.status_code}: {response.text}"
-        
+
         # Verify response is valid JSON (for most endpoints)
         if response.headers.get('content-type', '').startswith('application/json'):
             try:
@@ -543,9 +544,9 @@ class TestOpenAPIContracts:
                 assert isinstance(json_response, (dict, list)), "Response should be valid JSON object or array"
             except json.JSONDecodeError as e:
                 pytest.fail(f"Response is not valid JSON: {e}")
-        
+
         # FAILURE CASES - Test error handling
-        
+
         # Test rate limiting (make multiple rapid requests)
         # Note: This test may be flaky depending on rate limit configuration
         rapid_responses = []
@@ -567,7 +568,7 @@ class TestOpenAPIContracts:
                     break
             except requests.RequestException:
                 continue
-        
+
     def test_bulk_eligibility_check_api_v1_scholarships_bulk_eligibility_check_post_9(self):
         """
         Contract test for POST /api/v1/scholarships/bulk-eligibility-check
@@ -575,9 +576,9 @@ class TestOpenAPIContracts:
         Tags: scholarships
         Auth Required: False
         """
-        
+
         # SUCCESS CASES
-        
+
         # Test successful request
         response = self._make_request(
             method="POST",
@@ -590,10 +591,10 @@ class TestOpenAPIContracts:
         ]
 }
         )
-        
+
         # Verify success response
         assert response.status_code in [200], f"Expected [200], got {response.status_code}: {response.text}"
-        
+
         # Verify response is valid JSON (for most endpoints)
         if response.headers.get('content-type', '').startswith('application/json'):
             try:
@@ -601,9 +602,9 @@ class TestOpenAPIContracts:
                 assert isinstance(json_response, (dict, list)), "Response should be valid JSON object or array"
             except json.JSONDecodeError as e:
                 pytest.fail(f"Response is not valid JSON: {e}")
-        
+
         # FAILURE CASES - Test error handling
-        
+
         # Test rate limiting (make multiple rapid requests)
         # Note: This test may be flaky depending on rate limit configuration
         rapid_responses = []
@@ -627,7 +628,7 @@ class TestOpenAPIContracts:
                     break
             except requests.RequestException:
                 continue
-        
+
     def test_get_recommendations_api_v1_scholarships_recommendations_post_10(self):
         """
         Contract test for POST /api/v1/scholarships/recommendations
@@ -635,9 +636,9 @@ class TestOpenAPIContracts:
         Tags: scholarships
         Auth Required: False
         """
-        
+
         # SUCCESS CASES
-        
+
         # Test successful request
         response = self._make_request(
             method="POST",
@@ -649,10 +650,10 @@ class TestOpenAPIContracts:
         "include_ineligible": true
 }
         )
-        
+
         # Verify success response
         assert response.status_code in [200], f"Expected [200], got {response.status_code}: {response.text}"
-        
+
         # Verify response is valid JSON (for most endpoints)
         if response.headers.get('content-type', '').startswith('application/json'):
             try:
@@ -660,9 +661,9 @@ class TestOpenAPIContracts:
                 assert isinstance(json_response, (dict, list)), "Response should be valid JSON object or array"
             except json.JSONDecodeError as e:
                 pytest.fail(f"Response is not valid JSON: {e}")
-        
+
         # FAILURE CASES - Test error handling
-        
+
         # Test rate limiting (make multiple rapid requests)
         # Note: This test may be flaky depending on rate limit configuration
         rapid_responses = []
@@ -685,7 +686,7 @@ class TestOpenAPIContracts:
                     break
             except requests.RequestException:
                 continue
-        
+
     def test_get_scholarships_by_organization_api_v1_scholarships_organization__organization__get_11(self):
         """
         Contract test for GET /api/v1/scholarships/organization/{organization}
@@ -693,9 +694,9 @@ class TestOpenAPIContracts:
         Tags: scholarships
         Auth Required: False
         """
-        
+
         # SUCCESS CASES
-        
+
         # Test successful request
         response = self._make_request(
             method="GET",
@@ -703,10 +704,10 @@ class TestOpenAPIContracts:
             params=None,
             json_data=None
         )
-        
+
         # Verify success response
         assert response.status_code in [200], f"Expected [200], got {response.status_code}: {response.text}"
-        
+
         # Verify response is valid JSON (for most endpoints)
         if response.headers.get('content-type', '').startswith('application/json'):
             try:
@@ -714,9 +715,9 @@ class TestOpenAPIContracts:
                 assert isinstance(json_response, (dict, list)), "Response should be valid JSON object or array"
             except json.JSONDecodeError as e:
                 pytest.fail(f"Response is not valid JSON: {e}")
-        
+
         # FAILURE CASES - Test error handling
-        
+
         # Test 404 with invalid ID
         response_404 = self._make_request(
             method="GET",
@@ -727,7 +728,7 @@ class TestOpenAPIContracts:
         if response_404.status_code != 404:
             # Some endpoints may return different error codes
             assert response_404.status_code >= 400, f"Expected error code, got {response_404.status_code}"
-        
+
         # Test rate limiting (make multiple rapid requests)
         # Note: This test may be flaky depending on rate limit configuration
         rapid_responses = []
@@ -746,7 +747,7 @@ class TestOpenAPIContracts:
                     break
             except requests.RequestException:
                 continue
-        
+
     def test_get_scholarships_by_field_api_v1_scholarships_fields__field_of_study__get_12(self):
         """
         Contract test for GET /api/v1/scholarships/fields/{field_of_study}
@@ -754,9 +755,9 @@ class TestOpenAPIContracts:
         Tags: scholarships
         Auth Required: False
         """
-        
+
         # SUCCESS CASES
-        
+
         # Test successful request
         response = self._make_request(
             method="GET",
@@ -766,10 +767,10 @@ class TestOpenAPIContracts:
 },
             json_data=None
         )
-        
+
         # Verify success response
         assert response.status_code in [200], f"Expected [200], got {response.status_code}: {response.text}"
-        
+
         # Verify response is valid JSON (for most endpoints)
         if response.headers.get('content-type', '').startswith('application/json'):
             try:
@@ -777,9 +778,9 @@ class TestOpenAPIContracts:
                 assert isinstance(json_response, (dict, list)), "Response should be valid JSON object or array"
             except json.JSONDecodeError as e:
                 pytest.fail(f"Response is not valid JSON: {e}")
-        
+
         # FAILURE CASES - Test error handling
-        
+
         # Test 404 with invalid ID
         response_404 = self._make_request(
             method="GET",
@@ -792,7 +793,7 @@ class TestOpenAPIContracts:
         if response_404.status_code != 404:
             # Some endpoints may return different error codes
             assert response_404.status_code >= 400, f"Expected error code, got {response_404.status_code}"
-        
+
         # Test rate limiting (make multiple rapid requests)
         # Note: This test may be flaky depending on rate limit configuration
         rapid_responses = []
@@ -813,7 +814,7 @@ class TestOpenAPIContracts:
                     break
             except requests.RequestException:
                 continue
-        
+
     def test_search_scholarships_post_search_post_13(self):
         """
         Contract test for POST /search
@@ -821,9 +822,9 @@ class TestOpenAPIContracts:
         Tags: search
         Auth Required: False
         """
-        
+
         # SUCCESS CASES
-        
+
         # Test successful request
         response = self._make_request(
             method="POST",
@@ -850,10 +851,10 @@ class TestOpenAPIContracts:
         "offset": 1
 }
         )
-        
+
         # Verify success response
         assert response.status_code in [200], f"Expected [200], got {response.status_code}: {response.text}"
-        
+
         # Verify response is valid JSON (for most endpoints)
         if response.headers.get('content-type', '').startswith('application/json'):
             try:
@@ -861,9 +862,9 @@ class TestOpenAPIContracts:
                 assert isinstance(json_response, (dict, list)), "Response should be valid JSON object or array"
             except json.JSONDecodeError as e:
                 pytest.fail(f"Response is not valid JSON: {e}")
-        
+
         # FAILURE CASES - Test error handling
-        
+
         # Test rate limiting (make multiple rapid requests)
         # Note: This test may be flaky depending on rate limit configuration
         rapid_responses = []
@@ -901,7 +902,7 @@ class TestOpenAPIContracts:
                     break
             except requests.RequestException:
                 continue
-        
+
     def test_search_scholarships_get_search_get_14(self):
         """
         Contract test for GET /search
@@ -909,9 +910,9 @@ class TestOpenAPIContracts:
         Tags: search
         Auth Required: False
         """
-        
+
         # SUCCESS CASES
-        
+
         # Test successful request
         response = self._make_request(
             method="GET",
@@ -922,10 +923,10 @@ class TestOpenAPIContracts:
 },
             json_data=None
         )
-        
+
         # Verify success response
         assert response.status_code in [200], f"Expected [200], got {response.status_code}: {response.text}"
-        
+
         # Verify response is valid JSON (for most endpoints)
         if response.headers.get('content-type', '').startswith('application/json'):
             try:
@@ -933,9 +934,9 @@ class TestOpenAPIContracts:
                 assert isinstance(json_response, (dict, list)), "Response should be valid JSON object or array"
             except json.JSONDecodeError as e:
                 pytest.fail(f"Response is not valid JSON: {e}")
-        
+
         # FAILURE CASES - Test error handling
-        
+
         # Test rate limiting (make multiple rapid requests)
         # Note: This test may be flaky depending on rate limit configuration
         rapid_responses = []
@@ -957,7 +958,7 @@ class TestOpenAPIContracts:
                     break
             except requests.RequestException:
                 continue
-        
+
     def test_search_scholarships_post_api_v1_search_post_15(self):
         """
         Contract test for POST /api/v1/search
@@ -965,9 +966,9 @@ class TestOpenAPIContracts:
         Tags: search
         Auth Required: False
         """
-        
+
         # SUCCESS CASES
-        
+
         # Test successful request
         response = self._make_request(
             method="POST",
@@ -994,10 +995,10 @@ class TestOpenAPIContracts:
         "offset": 1
 }
         )
-        
+
         # Verify success response
         assert response.status_code in [200], f"Expected [200], got {response.status_code}: {response.text}"
-        
+
         # Verify response is valid JSON (for most endpoints)
         if response.headers.get('content-type', '').startswith('application/json'):
             try:
@@ -1005,9 +1006,9 @@ class TestOpenAPIContracts:
                 assert isinstance(json_response, (dict, list)), "Response should be valid JSON object or array"
             except json.JSONDecodeError as e:
                 pytest.fail(f"Response is not valid JSON: {e}")
-        
+
         # FAILURE CASES - Test error handling
-        
+
         # Test rate limiting (make multiple rapid requests)
         # Note: This test may be flaky depending on rate limit configuration
         rapid_responses = []
@@ -1045,7 +1046,7 @@ class TestOpenAPIContracts:
                     break
             except requests.RequestException:
                 continue
-        
+
     def test_search_scholarships_get_api_v1_search_get_16(self):
         """
         Contract test for GET /api/v1/search
@@ -1053,9 +1054,9 @@ class TestOpenAPIContracts:
         Tags: search
         Auth Required: False
         """
-        
+
         # SUCCESS CASES
-        
+
         # Test successful request
         response = self._make_request(
             method="GET",
@@ -1066,10 +1067,10 @@ class TestOpenAPIContracts:
 },
             json_data=None
         )
-        
+
         # Verify success response
         assert response.status_code in [200], f"Expected [200], got {response.status_code}: {response.text}"
-        
+
         # Verify response is valid JSON (for most endpoints)
         if response.headers.get('content-type', '').startswith('application/json'):
             try:
@@ -1077,9 +1078,9 @@ class TestOpenAPIContracts:
                 assert isinstance(json_response, (dict, list)), "Response should be valid JSON object or array"
             except json.JSONDecodeError as e:
                 pytest.fail(f"Response is not valid JSON: {e}")
-        
+
         # FAILURE CASES - Test error handling
-        
+
         # Test rate limiting (make multiple rapid requests)
         # Note: This test may be flaky depending on rate limit configuration
         rapid_responses = []
@@ -1101,7 +1102,7 @@ class TestOpenAPIContracts:
                     break
             except requests.RequestException:
                 continue
-        
+
     def test_check_eligibility_post_eligibility_check_post_17(self):
         """
         Contract test for POST /eligibility/check
@@ -1109,9 +1110,9 @@ class TestOpenAPIContracts:
         Tags: eligibility
         Auth Required: False
         """
-        
+
         # SUCCESS CASES
-        
+
         # Test successful request
         response = self._make_request(
             method="POST",
@@ -1130,10 +1131,10 @@ class TestOpenAPIContracts:
         "scholarship_ids": "test_scholarship_ids"
 }
         )
-        
+
         # Verify success response
         assert response.status_code in [200], f"Expected [200], got {response.status_code}: {response.text}"
-        
+
         # Verify response is valid JSON (for most endpoints)
         if response.headers.get('content-type', '').startswith('application/json'):
             try:
@@ -1141,9 +1142,9 @@ class TestOpenAPIContracts:
                 assert isinstance(json_response, (dict, list)), "Response should be valid JSON object or array"
             except json.JSONDecodeError as e:
                 pytest.fail(f"Response is not valid JSON: {e}")
-        
+
         # FAILURE CASES - Test error handling
-        
+
         # Test rate limiting (make multiple rapid requests)
         # Note: This test may be flaky depending on rate limit configuration
         rapid_responses = []
@@ -1173,7 +1174,7 @@ class TestOpenAPIContracts:
                     break
             except requests.RequestException:
                 continue
-        
+
     def test_check_eligibility_get_eligibility_check_get_18(self):
         """
         Contract test for GET /eligibility/check
@@ -1181,9 +1182,9 @@ class TestOpenAPIContracts:
         Tags: eligibility
         Auth Required: False
         """
-        
+
         # SUCCESS CASES
-        
+
         # Test successful request
         response = self._make_request(
             method="GET",
@@ -1191,10 +1192,10 @@ class TestOpenAPIContracts:
             params=None,
             json_data=None
         )
-        
+
         # Verify success response
         assert response.status_code in [200], f"Expected [200], got {response.status_code}: {response.text}"
-        
+
         # Verify response is valid JSON (for most endpoints)
         if response.headers.get('content-type', '').startswith('application/json'):
             try:
@@ -1202,9 +1203,9 @@ class TestOpenAPIContracts:
                 assert isinstance(json_response, (dict, list)), "Response should be valid JSON object or array"
             except json.JSONDecodeError as e:
                 pytest.fail(f"Response is not valid JSON: {e}")
-        
+
         # FAILURE CASES - Test error handling
-        
+
         # Test rate limiting (make multiple rapid requests)
         # Note: This test may be flaky depending on rate limit configuration
         rapid_responses = []
@@ -1223,7 +1224,7 @@ class TestOpenAPIContracts:
                     break
             except requests.RequestException:
                 continue
-        
+
     def test_check_eligibility_post_api_v1_eligibility_check_post_19(self):
         """
         Contract test for POST /api/v1/eligibility/check
@@ -1231,9 +1232,9 @@ class TestOpenAPIContracts:
         Tags: eligibility
         Auth Required: False
         """
-        
+
         # SUCCESS CASES
-        
+
         # Test successful request
         response = self._make_request(
             method="POST",
@@ -1252,10 +1253,10 @@ class TestOpenAPIContracts:
         "scholarship_ids": "test_scholarship_ids"
 }
         )
-        
+
         # Verify success response
         assert response.status_code in [200], f"Expected [200], got {response.status_code}: {response.text}"
-        
+
         # Verify response is valid JSON (for most endpoints)
         if response.headers.get('content-type', '').startswith('application/json'):
             try:
@@ -1263,9 +1264,9 @@ class TestOpenAPIContracts:
                 assert isinstance(json_response, (dict, list)), "Response should be valid JSON object or array"
             except json.JSONDecodeError as e:
                 pytest.fail(f"Response is not valid JSON: {e}")
-        
+
         # FAILURE CASES - Test error handling
-        
+
         # Test rate limiting (make multiple rapid requests)
         # Note: This test may be flaky depending on rate limit configuration
         rapid_responses = []
@@ -1295,7 +1296,7 @@ class TestOpenAPIContracts:
                     break
             except requests.RequestException:
                 continue
-        
+
     def test_check_eligibility_get_api_v1_eligibility_check_get_20(self):
         """
         Contract test for GET /api/v1/eligibility/check
@@ -1303,9 +1304,9 @@ class TestOpenAPIContracts:
         Tags: eligibility
         Auth Required: False
         """
-        
+
         # SUCCESS CASES
-        
+
         # Test successful request
         response = self._make_request(
             method="GET",
@@ -1313,10 +1314,10 @@ class TestOpenAPIContracts:
             params=None,
             json_data=None
         )
-        
+
         # Verify success response
         assert response.status_code in [200], f"Expected [200], got {response.status_code}: {response.text}"
-        
+
         # Verify response is valid JSON (for most endpoints)
         if response.headers.get('content-type', '').startswith('application/json'):
             try:
@@ -1324,9 +1325,9 @@ class TestOpenAPIContracts:
                 assert isinstance(json_response, (dict, list)), "Response should be valid JSON object or array"
             except json.JSONDecodeError as e:
                 pytest.fail(f"Response is not valid JSON: {e}")
-        
+
         # FAILURE CASES - Test error handling
-        
+
         # Test rate limiting (make multiple rapid requests)
         # Note: This test may be flaky depending on rate limit configuration
         rapid_responses = []
@@ -1345,7 +1346,7 @@ class TestOpenAPIContracts:
                     break
             except requests.RequestException:
                 continue
-        
+
     def test_get_recommendations_api_v1_recommendations_get_21(self):
         """
         Contract test for GET /api/v1/recommendations
@@ -1353,9 +1354,9 @@ class TestOpenAPIContracts:
         Tags: recommendations, recommendations
         Auth Required: False
         """
-        
+
         # SUCCESS CASES
-        
+
         # Test successful request
         response = self._make_request(
             method="GET",
@@ -1363,10 +1364,10 @@ class TestOpenAPIContracts:
             params=None,
             json_data=None
         )
-        
+
         # Verify success response
         assert response.status_code in [200], f"Expected [200], got {response.status_code}: {response.text}"
-        
+
         # Verify response is valid JSON (for most endpoints)
         if response.headers.get('content-type', '').startswith('application/json'):
             try:
@@ -1374,9 +1375,9 @@ class TestOpenAPIContracts:
                 assert isinstance(json_response, (dict, list)), "Response should be valid JSON object or array"
             except json.JSONDecodeError as e:
                 pytest.fail(f"Response is not valid JSON: {e}")
-        
+
         # FAILURE CASES - Test error handling
-        
+
         # Test rate limiting (make multiple rapid requests)
         # Note: This test may be flaky depending on rate limit configuration
         rapid_responses = []
@@ -1395,7 +1396,7 @@ class TestOpenAPIContracts:
                     break
             except requests.RequestException:
                 continue
-        
+
     def test_get_analytics_summary_api_v1_analytics_summary_get_22(self):
         """
         Contract test for GET /api/v1/analytics/summary
@@ -1403,9 +1404,9 @@ class TestOpenAPIContracts:
         Tags: analytics
         Auth Required: False
         """
-        
+
         # SUCCESS CASES
-        
+
         # Test successful request
         response = self._make_request(
             method="GET",
@@ -1415,10 +1416,10 @@ class TestOpenAPIContracts:
 },
             json_data=None
         )
-        
+
         # Verify success response
         assert response.status_code in [200], f"Expected [200], got {response.status_code}: {response.text}"
-        
+
         # Verify response is valid JSON (for most endpoints)
         if response.headers.get('content-type', '').startswith('application/json'):
             try:
@@ -1426,9 +1427,9 @@ class TestOpenAPIContracts:
                 assert isinstance(json_response, (dict, list)), "Response should be valid JSON object or array"
             except json.JSONDecodeError as e:
                 pytest.fail(f"Response is not valid JSON: {e}")
-        
+
         # FAILURE CASES - Test error handling
-        
+
         # Test rate limiting (make multiple rapid requests)
         # Note: This test may be flaky depending on rate limit configuration
         rapid_responses = []
@@ -1449,7 +1450,7 @@ class TestOpenAPIContracts:
                     break
             except requests.RequestException:
                 continue
-        
+
     def test_get_user_analytics_api_v1_analytics_user__user_id__get_23(self):
         """
         Contract test for GET /api/v1/analytics/user/{user_id}
@@ -1457,9 +1458,9 @@ class TestOpenAPIContracts:
         Tags: analytics
         Auth Required: False
         """
-        
+
         # SUCCESS CASES
-        
+
         # Test successful request
         response = self._make_request(
             method="GET",
@@ -1469,10 +1470,10 @@ class TestOpenAPIContracts:
 },
             json_data=None
         )
-        
+
         # Verify success response
         assert response.status_code in [200], f"Expected [200], got {response.status_code}: {response.text}"
-        
+
         # Verify response is valid JSON (for most endpoints)
         if response.headers.get('content-type', '').startswith('application/json'):
             try:
@@ -1480,9 +1481,9 @@ class TestOpenAPIContracts:
                 assert isinstance(json_response, (dict, list)), "Response should be valid JSON object or array"
             except json.JSONDecodeError as e:
                 pytest.fail(f"Response is not valid JSON: {e}")
-        
+
         # FAILURE CASES - Test error handling
-        
+
         # Test 404 with invalid ID
         response_404 = self._make_request(
             method="GET",
@@ -1495,7 +1496,7 @@ class TestOpenAPIContracts:
         if response_404.status_code != 404:
             # Some endpoints may return different error codes
             assert response_404.status_code >= 400, f"Expected error code, got {response_404.status_code}"
-        
+
         # Test rate limiting (make multiple rapid requests)
         # Note: This test may be flaky depending on rate limit configuration
         rapid_responses = []
@@ -1516,7 +1517,7 @@ class TestOpenAPIContracts:
                     break
             except requests.RequestException:
                 continue
-        
+
     def test_get_recent_interactions_api_v1_analytics_interactions_get_24(self):
         """
         Contract test for GET /api/v1/analytics/interactions
@@ -1524,9 +1525,9 @@ class TestOpenAPIContracts:
         Tags: analytics
         Auth Required: False
         """
-        
+
         # SUCCESS CASES
-        
+
         # Test successful request
         response = self._make_request(
             method="GET",
@@ -1536,10 +1537,10 @@ class TestOpenAPIContracts:
 },
             json_data=None
         )
-        
+
         # Verify success response
         assert response.status_code in [200], f"Expected [200], got {response.status_code}: {response.text}"
-        
+
         # Verify response is valid JSON (for most endpoints)
         if response.headers.get('content-type', '').startswith('application/json'):
             try:
@@ -1547,9 +1548,9 @@ class TestOpenAPIContracts:
                 assert isinstance(json_response, (dict, list)), "Response should be valid JSON object or array"
             except json.JSONDecodeError as e:
                 pytest.fail(f"Response is not valid JSON: {e}")
-        
+
         # FAILURE CASES - Test error handling
-        
+
         # Test rate limiting (make multiple rapid requests)
         # Note: This test may be flaky depending on rate limit configuration
         rapid_responses = []
@@ -1570,7 +1571,7 @@ class TestOpenAPIContracts:
                     break
             except requests.RequestException:
                 continue
-        
+
     def test_get_popular_scholarships_api_v1_analytics_popular_scholarships_get_25(self):
         """
         Contract test for GET /api/v1/analytics/popular-scholarships
@@ -1578,9 +1579,9 @@ class TestOpenAPIContracts:
         Tags: analytics
         Auth Required: False
         """
-        
+
         # SUCCESS CASES
-        
+
         # Test successful request
         response = self._make_request(
             method="GET",
@@ -1591,10 +1592,10 @@ class TestOpenAPIContracts:
 },
             json_data=None
         )
-        
+
         # Verify success response
         assert response.status_code in [200], f"Expected [200], got {response.status_code}: {response.text}"
-        
+
         # Verify response is valid JSON (for most endpoints)
         if response.headers.get('content-type', '').startswith('application/json'):
             try:
@@ -1602,9 +1603,9 @@ class TestOpenAPIContracts:
                 assert isinstance(json_response, (dict, list)), "Response should be valid JSON object or array"
             except json.JSONDecodeError as e:
                 pytest.fail(f"Response is not valid JSON: {e}")
-        
+
         # FAILURE CASES - Test error handling
-        
+
         # Test rate limiting (make multiple rapid requests)
         # Note: This test may be flaky depending on rate limit configuration
         rapid_responses = []
@@ -1626,7 +1627,7 @@ class TestOpenAPIContracts:
                     break
             except requests.RequestException:
                 continue
-        
+
     def test_get_search_trends_api_v1_analytics_search_trends_get_26(self):
         """
         Contract test for GET /api/v1/analytics/search-trends
@@ -1634,9 +1635,9 @@ class TestOpenAPIContracts:
         Tags: analytics
         Auth Required: False
         """
-        
+
         # SUCCESS CASES
-        
+
         # Test successful request
         response = self._make_request(
             method="GET",
@@ -1646,10 +1647,10 @@ class TestOpenAPIContracts:
 },
             json_data=None
         )
-        
+
         # Verify success response
         assert response.status_code in [200], f"Expected [200], got {response.status_code}: {response.text}"
-        
+
         # Verify response is valid JSON (for most endpoints)
         if response.headers.get('content-type', '').startswith('application/json'):
             try:
@@ -1657,9 +1658,9 @@ class TestOpenAPIContracts:
                 assert isinstance(json_response, (dict, list)), "Response should be valid JSON object or array"
             except json.JSONDecodeError as e:
                 pytest.fail(f"Response is not valid JSON: {e}")
-        
+
         # FAILURE CASES - Test error handling
-        
+
         # Test rate limiting (make multiple rapid requests)
         # Note: This test may be flaky depending on rate limit configuration
         rapid_responses = []
@@ -1680,7 +1681,7 @@ class TestOpenAPIContracts:
                     break
             except requests.RequestException:
                 continue
-        
+
     def test_get_scholarships_from_db_api_v1_database_scholarships_get_27(self):
         """
         Contract test for GET /api/v1/database/scholarships
@@ -1688,9 +1689,9 @@ class TestOpenAPIContracts:
         Tags: database, Database Operations
         Auth Required: False
         """
-        
+
         # SUCCESS CASES
-        
+
         # Test successful request
         response = self._make_request(
             method="GET",
@@ -1702,10 +1703,10 @@ class TestOpenAPIContracts:
 },
             json_data=None
         )
-        
+
         # Verify success response
         assert response.status_code in [200], f"Expected [200], got {response.status_code}: {response.text}"
-        
+
         # Verify response is valid JSON (for most endpoints)
         if response.headers.get('content-type', '').startswith('application/json'):
             try:
@@ -1713,9 +1714,9 @@ class TestOpenAPIContracts:
                 assert isinstance(json_response, (dict, list)), "Response should be valid JSON object or array"
             except json.JSONDecodeError as e:
                 pytest.fail(f"Response is not valid JSON: {e}")
-        
+
         # FAILURE CASES - Test error handling
-        
+
         # Test rate limiting (make multiple rapid requests)
         # Note: This test may be flaky depending on rate limit configuration
         rapid_responses = []
@@ -1738,7 +1739,7 @@ class TestOpenAPIContracts:
                     break
             except requests.RequestException:
                 continue
-        
+
     def test_get_scholarship_from_db_api_v1_database_scholarships__scholarship_id__get_28(self):
         """
         Contract test for GET /api/v1/database/scholarships/{scholarship_id}
@@ -1746,9 +1747,9 @@ class TestOpenAPIContracts:
         Tags: database, Database Operations
         Auth Required: False
         """
-        
+
         # SUCCESS CASES
-        
+
         # Test successful request
         response = self._make_request(
             method="GET",
@@ -1758,10 +1759,10 @@ class TestOpenAPIContracts:
 },
             json_data=None
         )
-        
+
         # Verify success response
         assert response.status_code in [200], f"Expected [200], got {response.status_code}: {response.text}"
-        
+
         # Verify response is valid JSON (for most endpoints)
         if response.headers.get('content-type', '').startswith('application/json'):
             try:
@@ -1769,9 +1770,9 @@ class TestOpenAPIContracts:
                 assert isinstance(json_response, (dict, list)), "Response should be valid JSON object or array"
             except json.JSONDecodeError as e:
                 pytest.fail(f"Response is not valid JSON: {e}")
-        
+
         # FAILURE CASES - Test error handling
-        
+
         # Test 404 with invalid ID
         response_404 = self._make_request(
             method="GET",
@@ -1784,7 +1785,7 @@ class TestOpenAPIContracts:
         if response_404.status_code != 404:
             # Some endpoints may return different error codes
             assert response_404.status_code >= 400, f"Expected error code, got {response_404.status_code}"
-        
+
         # Test rate limiting (make multiple rapid requests)
         # Note: This test may be flaky depending on rate limit configuration
         rapid_responses = []
@@ -1805,7 +1806,7 @@ class TestOpenAPIContracts:
                     break
             except requests.RequestException:
                 continue
-        
+
     def test_log_interaction_to_db_api_v1_database_interactions_post_29(self):
         """
         Contract test for POST /api/v1/database/interactions
@@ -1813,9 +1814,9 @@ class TestOpenAPIContracts:
         Tags: database, Database Operations
         Auth Required: False
         """
-        
+
         # SUCCESS CASES
-        
+
         # Test successful request
         response = self._make_request(
             method="POST",
@@ -1827,10 +1828,10 @@ class TestOpenAPIContracts:
         "scopes": "test_scopes"
 }
         )
-        
+
         # Verify success response
         assert response.status_code in [200], f"Expected [200], got {response.status_code}: {response.text}"
-        
+
         # Verify response is valid JSON (for most endpoints)
         if response.headers.get('content-type', '').startswith('application/json'):
             try:
@@ -1838,9 +1839,9 @@ class TestOpenAPIContracts:
                 assert isinstance(json_response, (dict, list)), "Response should be valid JSON object or array"
             except json.JSONDecodeError as e:
                 pytest.fail(f"Response is not valid JSON: {e}")
-        
+
         # FAILURE CASES - Test error handling
-        
+
         # Test rate limiting (make multiple rapid requests)
         # Note: This test may be flaky depending on rate limit configuration
         rapid_responses = []
@@ -1863,7 +1864,7 @@ class TestOpenAPIContracts:
                     break
             except requests.RequestException:
                 continue
-        
+
     def test_get_analytics_from_db_api_v1_database_analytics_summary_get_30(self):
         """
         Contract test for GET /api/v1/database/analytics/summary
@@ -1871,9 +1872,9 @@ class TestOpenAPIContracts:
         Tags: database, Database Operations
         Auth Required: False
         """
-        
+
         # SUCCESS CASES
-        
+
         # Test successful request
         response = self._make_request(
             method="GET",
@@ -1883,10 +1884,10 @@ class TestOpenAPIContracts:
 },
             json_data=None
         )
-        
+
         # Verify success response
         assert response.status_code in [200], f"Expected [200], got {response.status_code}: {response.text}"
-        
+
         # Verify response is valid JSON (for most endpoints)
         if response.headers.get('content-type', '').startswith('application/json'):
             try:
@@ -1894,9 +1895,9 @@ class TestOpenAPIContracts:
                 assert isinstance(json_response, (dict, list)), "Response should be valid JSON object or array"
             except json.JSONDecodeError as e:
                 pytest.fail(f"Response is not valid JSON: {e}")
-        
+
         # FAILURE CASES - Test error handling
-        
+
         # Test rate limiting (make multiple rapid requests)
         # Note: This test may be flaky depending on rate limit configuration
         rapid_responses = []
@@ -1917,7 +1918,7 @@ class TestOpenAPIContracts:
                     break
             except requests.RequestException:
                 continue
-        
+
     def test_get_popular_scholarships_from_db_api_v1_database_analytics_popular_get_31(self):
         """
         Contract test for GET /api/v1/database/analytics/popular
@@ -1925,9 +1926,9 @@ class TestOpenAPIContracts:
         Tags: database, Database Operations
         Auth Required: False
         """
-        
+
         # SUCCESS CASES
-        
+
         # Test successful request
         response = self._make_request(
             method="GET",
@@ -1938,10 +1939,10 @@ class TestOpenAPIContracts:
 },
             json_data=None
         )
-        
+
         # Verify success response
         assert response.status_code in [200], f"Expected [200], got {response.status_code}: {response.text}"
-        
+
         # Verify response is valid JSON (for most endpoints)
         if response.headers.get('content-type', '').startswith('application/json'):
             try:
@@ -1949,9 +1950,9 @@ class TestOpenAPIContracts:
                 assert isinstance(json_response, (dict, list)), "Response should be valid JSON object or array"
             except json.JSONDecodeError as e:
                 pytest.fail(f"Response is not valid JSON: {e}")
-        
+
         # FAILURE CASES - Test error handling
-        
+
         # Test rate limiting (make multiple rapid requests)
         # Note: This test may be flaky depending on rate limit configuration
         rapid_responses = []
@@ -1973,7 +1974,7 @@ class TestOpenAPIContracts:
                     break
             except requests.RequestException:
                 continue
-        
+
     def test_database_status_api_v1_database_status_get_32(self):
         """
         Contract test for GET /api/v1/database/status
@@ -1981,9 +1982,9 @@ class TestOpenAPIContracts:
         Tags: database, Database Operations
         Auth Required: False
         """
-        
+
         # SUCCESS CASES
-        
+
         # Test successful request
         response = self._make_request(
             method="GET",
@@ -1991,10 +1992,10 @@ class TestOpenAPIContracts:
             params=None,
             json_data=None
         )
-        
+
         # Verify success response
         assert response.status_code in [200], f"Expected [200], got {response.status_code}: {response.text}"
-        
+
         # Verify response is valid JSON (for most endpoints)
         if response.headers.get('content-type', '').startswith('application/json'):
             try:
@@ -2002,9 +2003,9 @@ class TestOpenAPIContracts:
                 assert isinstance(json_response, (dict, list)), "Response should be valid JSON object or array"
             except json.JSONDecodeError as e:
                 pytest.fail(f"Response is not valid JSON: {e}")
-        
+
         # FAILURE CASES - Test error handling
-        
+
         # Test rate limiting (make multiple rapid requests)
         # Note: This test may be flaky depending on rate limit configuration
         rapid_responses = []
@@ -2023,7 +2024,7 @@ class TestOpenAPIContracts:
                     break
             except requests.RequestException:
                 continue
-        
+
     def test_kubernetes_health_check_healthz_get_33(self):
         """
         Contract test for GET /healthz
@@ -2031,9 +2032,9 @@ class TestOpenAPIContracts:
         Tags: default
         Auth Required: False
         """
-        
+
         # SUCCESS CASES
-        
+
         # Test successful request
         response = self._make_request(
             method="GET",
@@ -2041,10 +2042,10 @@ class TestOpenAPIContracts:
             params=None,
             json_data=None
         )
-        
+
         # Verify success response
         assert response.status_code in [200], f"Expected [200], got {response.status_code}: {response.text}"
-        
+
         # Verify response is valid JSON (for most endpoints)
         if response.headers.get('content-type', '').startswith('application/json'):
             try:
@@ -2052,9 +2053,9 @@ class TestOpenAPIContracts:
                 assert isinstance(json_response, (dict, list)), "Response should be valid JSON object or array"
             except json.JSONDecodeError as e:
                 pytest.fail(f"Response is not valid JSON: {e}")
-        
+
         # FAILURE CASES - Test error handling
-        
+
         # Test rate limiting (make multiple rapid requests)
         # Note: This test may be flaky depending on rate limit configuration
         rapid_responses = []
@@ -2073,7 +2074,7 @@ class TestOpenAPIContracts:
                     break
             except requests.RequestException:
                 continue
-        
+
     def test_readiness_probe_readyz_get_34(self):
         """
         Contract test for GET /readyz
@@ -2081,9 +2082,9 @@ class TestOpenAPIContracts:
         Tags: Health
         Auth Required: False
         """
-        
+
         # SUCCESS CASES
-        
+
         # Test successful request
         response = self._make_request(
             method="GET",
@@ -2091,10 +2092,10 @@ class TestOpenAPIContracts:
             params=None,
             json_data=None
         )
-        
+
         # Verify success response
         assert response.status_code in [200], f"Expected [200], got {response.status_code}: {response.text}"
-        
+
         # Verify response is valid JSON (for most endpoints)
         if response.headers.get('content-type', '').startswith('application/json'):
             try:
@@ -2102,9 +2103,9 @@ class TestOpenAPIContracts:
                 assert isinstance(json_response, (dict, list)), "Response should be valid JSON object or array"
             except json.JSONDecodeError as e:
                 pytest.fail(f"Response is not valid JSON: {e}")
-        
+
         # FAILURE CASES - Test error handling
-        
+
         # Test rate limiting (make multiple rapid requests)
         # Note: This test may be flaky depending on rate limit configuration
         rapid_responses = []
@@ -2123,7 +2124,7 @@ class TestOpenAPIContracts:
                     break
             except requests.RequestException:
                 continue
-        
+
     def test_database_health_check_health_database_get_35(self):
         """
         Contract test for GET /health/database
@@ -2131,9 +2132,9 @@ class TestOpenAPIContracts:
         Tags: health
         Auth Required: False
         """
-        
+
         # SUCCESS CASES
-        
+
         # Test successful request
         response = self._make_request(
             method="GET",
@@ -2141,10 +2142,10 @@ class TestOpenAPIContracts:
             params=None,
             json_data=None
         )
-        
+
         # Verify success response
         assert response.status_code in [200], f"Expected [200], got {response.status_code}: {response.text}"
-        
+
         # Verify response is valid JSON (for most endpoints)
         if response.headers.get('content-type', '').startswith('application/json'):
             try:
@@ -2152,9 +2153,9 @@ class TestOpenAPIContracts:
                 assert isinstance(json_response, (dict, list)), "Response should be valid JSON object or array"
             except json.JSONDecodeError as e:
                 pytest.fail(f"Response is not valid JSON: {e}")
-        
+
         # FAILURE CASES - Test error handling
-        
+
         # Test rate limiting (make multiple rapid requests)
         # Note: This test may be flaky depending on rate limit configuration
         rapid_responses = []
@@ -2173,7 +2174,7 @@ class TestOpenAPIContracts:
                     break
             except requests.RequestException:
                 continue
-        
+
     def test_services_health_check_health_services_get_36(self):
         """
         Contract test for GET /health/services
@@ -2181,9 +2182,9 @@ class TestOpenAPIContracts:
         Tags: health
         Auth Required: False
         """
-        
+
         # SUCCESS CASES
-        
+
         # Test successful request
         response = self._make_request(
             method="GET",
@@ -2191,10 +2192,10 @@ class TestOpenAPIContracts:
             params=None,
             json_data=None
         )
-        
+
         # Verify success response
         assert response.status_code in [200], f"Expected [200], got {response.status_code}: {response.text}"
-        
+
         # Verify response is valid JSON (for most endpoints)
         if response.headers.get('content-type', '').startswith('application/json'):
             try:
@@ -2202,9 +2203,9 @@ class TestOpenAPIContracts:
                 assert isinstance(json_response, (dict, list)), "Response should be valid JSON object or array"
             except json.JSONDecodeError as e:
                 pytest.fail(f"Response is not valid JSON: {e}")
-        
+
         # FAILURE CASES - Test error handling
-        
+
         # Test rate limiting (make multiple rapid requests)
         # Note: This test may be flaky depending on rate limit configuration
         rapid_responses = []
@@ -2223,7 +2224,7 @@ class TestOpenAPIContracts:
                     break
             except requests.RequestException:
                 continue
-        
+
     def test_repl_debug_config__debug_repl_get_37(self):
         """
         Contract test for GET /_debug/repl
@@ -2231,9 +2232,9 @@ class TestOpenAPIContracts:
         Tags: health
         Auth Required: False
         """
-        
+
         # SUCCESS CASES
-        
+
         # Test successful request
         response = self._make_request(
             method="GET",
@@ -2241,10 +2242,10 @@ class TestOpenAPIContracts:
             params=None,
             json_data=None
         )
-        
+
         # Verify success response
         assert response.status_code in [200], f"Expected [200], got {response.status_code}: {response.text}"
-        
+
         # Verify response is valid JSON (for most endpoints)
         if response.headers.get('content-type', '').startswith('application/json'):
             try:
@@ -2252,9 +2253,9 @@ class TestOpenAPIContracts:
                 assert isinstance(json_response, (dict, list)), "Response should be valid JSON object or array"
             except json.JSONDecodeError as e:
                 pytest.fail(f"Response is not valid JSON: {e}")
-        
+
         # FAILURE CASES - Test error handling
-        
+
         # Test rate limiting (make multiple rapid requests)
         # Note: This test may be flaky depending on rate limit configuration
         rapid_responses = []
@@ -2273,7 +2274,7 @@ class TestOpenAPIContracts:
                     break
             except requests.RequestException:
                 continue
-        
+
     def test_enhance_search_query_ai_enhance_search_post_38(self):
         """
         Contract test for POST /ai/enhance-search
@@ -2281,9 +2282,9 @@ class TestOpenAPIContracts:
         Tags: ai, AI-Powered Features
         Auth Required: False
         """
-        
+
         # SUCCESS CASES
-        
+
         # Test successful request
         response = self._make_request(
             method="POST",
@@ -2294,10 +2295,10 @@ class TestOpenAPIContracts:
         "user_context": "test_user_context"
 }
         )
-        
+
         # Verify success response
         assert response.status_code in [200], f"Expected [200], got {response.status_code}: {response.text}"
-        
+
         # Verify response is valid JSON (for most endpoints)
         if response.headers.get('content-type', '').startswith('application/json'):
             try:
@@ -2305,9 +2306,9 @@ class TestOpenAPIContracts:
                 assert isinstance(json_response, (dict, list)), "Response should be valid JSON object or array"
             except json.JSONDecodeError as e:
                 pytest.fail(f"Response is not valid JSON: {e}")
-        
+
         # FAILURE CASES - Test error handling
-        
+
         # Test rate limiting (make multiple rapid requests)
         # Note: This test may be flaky depending on rate limit configuration
         rapid_responses = []
@@ -2329,7 +2330,7 @@ class TestOpenAPIContracts:
                     break
             except requests.RequestException:
                 continue
-        
+
     def test_get_search_suggestions_ai_search_suggestions_get_39(self):
         """
         Contract test for GET /ai/search-suggestions
@@ -2337,9 +2338,9 @@ class TestOpenAPIContracts:
         Tags: ai, AI-Powered Features
         Auth Required: False
         """
-        
+
         # SUCCESS CASES
-        
+
         # Test successful request
         response = self._make_request(
             method="GET",
@@ -2350,10 +2351,10 @@ class TestOpenAPIContracts:
 },
             json_data=None
         )
-        
+
         # Verify success response
         assert response.status_code in [200], f"Expected [200], got {response.status_code}: {response.text}"
-        
+
         # Verify response is valid JSON (for most endpoints)
         if response.headers.get('content-type', '').startswith('application/json'):
             try:
@@ -2361,9 +2362,9 @@ class TestOpenAPIContracts:
                 assert isinstance(json_response, (dict, list)), "Response should be valid JSON object or array"
             except json.JSONDecodeError as e:
                 pytest.fail(f"Response is not valid JSON: {e}")
-        
+
         # FAILURE CASES - Test error handling
-        
+
         # Test rate limiting (make multiple rapid requests)
         # Note: This test may be flaky depending on rate limit configuration
         rapid_responses = []
@@ -2385,7 +2386,7 @@ class TestOpenAPIContracts:
                     break
             except requests.RequestException:
                 continue
-        
+
     def test_analyze_eligibility_match_ai_analyze_eligibility_post_40(self):
         """
         Contract test for POST /ai/analyze-eligibility
@@ -2393,9 +2394,9 @@ class TestOpenAPIContracts:
         Tags: ai, AI-Powered Features
         Auth Required: False
         """
-        
+
         # SUCCESS CASES
-        
+
         # Test successful request
         response = self._make_request(
             method="POST",
@@ -2405,10 +2406,10 @@ class TestOpenAPIContracts:
         "scholarship_id": "test_scholarship_id"
 }
         )
-        
+
         # Verify success response
         assert response.status_code in [200], f"Expected [200], got {response.status_code}: {response.text}"
-        
+
         # Verify response is valid JSON (for most endpoints)
         if response.headers.get('content-type', '').startswith('application/json'):
             try:
@@ -2416,9 +2417,9 @@ class TestOpenAPIContracts:
                 assert isinstance(json_response, (dict, list)), "Response should be valid JSON object or array"
             except json.JSONDecodeError as e:
                 pytest.fail(f"Response is not valid JSON: {e}")
-        
+
         # FAILURE CASES - Test error handling
-        
+
         # Test rate limiting (make multiple rapid requests)
         # Note: This test may be flaky depending on rate limit configuration
         rapid_responses = []
@@ -2439,7 +2440,7 @@ class TestOpenAPIContracts:
                     break
             except requests.RequestException:
                 continue
-        
+
     def test_get_ai_scholarship_summary_ai_scholarship_summary__scholarship_id__get_41(self):
         """
         Contract test for GET /ai/scholarship-summary/{scholarship_id}
@@ -2447,9 +2448,9 @@ class TestOpenAPIContracts:
         Tags: ai, AI-Powered Features
         Auth Required: False
         """
-        
+
         # SUCCESS CASES
-        
+
         # Test successful request
         response = self._make_request(
             method="GET",
@@ -2457,10 +2458,10 @@ class TestOpenAPIContracts:
             params=None,
             json_data=None
         )
-        
+
         # Verify success response
         assert response.status_code in [200], f"Expected [200], got {response.status_code}: {response.text}"
-        
+
         # Verify response is valid JSON (for most endpoints)
         if response.headers.get('content-type', '').startswith('application/json'):
             try:
@@ -2468,9 +2469,9 @@ class TestOpenAPIContracts:
                 assert isinstance(json_response, (dict, list)), "Response should be valid JSON object or array"
             except json.JSONDecodeError as e:
                 pytest.fail(f"Response is not valid JSON: {e}")
-        
+
         # FAILURE CASES - Test error handling
-        
+
         # Test 404 with invalid ID
         response_404 = self._make_request(
             method="GET",
@@ -2481,7 +2482,7 @@ class TestOpenAPIContracts:
         if response_404.status_code != 404:
             # Some endpoints may return different error codes
             assert response_404.status_code >= 400, f"Expected error code, got {response_404.status_code}"
-        
+
         # Test rate limiting (make multiple rapid requests)
         # Note: This test may be flaky depending on rate limit configuration
         rapid_responses = []
@@ -2500,7 +2501,7 @@ class TestOpenAPIContracts:
                     break
             except requests.RequestException:
                 continue
-        
+
     def test_get_scholarship_trends_ai_trends_analysis_get_42(self):
         """
         Contract test for GET /ai/trends-analysis
@@ -2508,9 +2509,9 @@ class TestOpenAPIContracts:
         Tags: ai, AI-Powered Features
         Auth Required: False
         """
-        
+
         # SUCCESS CASES
-        
+
         # Test successful request
         response = self._make_request(
             method="GET",
@@ -2518,10 +2519,10 @@ class TestOpenAPIContracts:
             params=None,
             json_data=None
         )
-        
+
         # Verify success response
         assert response.status_code in [200], f"Expected [200], got {response.status_code}: {response.text}"
-        
+
         # Verify response is valid JSON (for most endpoints)
         if response.headers.get('content-type', '').startswith('application/json'):
             try:
@@ -2529,9 +2530,9 @@ class TestOpenAPIContracts:
                 assert isinstance(json_response, (dict, list)), "Response should be valid JSON object or array"
             except json.JSONDecodeError as e:
                 pytest.fail(f"Response is not valid JSON: {e}")
-        
+
         # FAILURE CASES - Test error handling
-        
+
         # Test rate limiting (make multiple rapid requests)
         # Note: This test may be flaky depending on rate limit configuration
         rapid_responses = []
@@ -2550,7 +2551,7 @@ class TestOpenAPIContracts:
                     break
             except requests.RequestException:
                 continue
-        
+
     def test_get_ai_service_status_ai_status_get_43(self):
         """
         Contract test for GET /ai/status
@@ -2558,9 +2559,9 @@ class TestOpenAPIContracts:
         Tags: ai, AI-Powered Features
         Auth Required: False
         """
-        
+
         # SUCCESS CASES
-        
+
         # Test successful request
         response = self._make_request(
             method="GET",
@@ -2568,10 +2569,10 @@ class TestOpenAPIContracts:
             params=None,
             json_data=None
         )
-        
+
         # Verify success response
         assert response.status_code in [200], f"Expected [200], got {response.status_code}: {response.text}"
-        
+
         # Verify response is valid JSON (for most endpoints)
         if response.headers.get('content-type', '').startswith('application/json'):
             try:
@@ -2579,9 +2580,9 @@ class TestOpenAPIContracts:
                 assert isinstance(json_response, (dict, list)), "Response should be valid JSON object or array"
             except json.JSONDecodeError as e:
                 pytest.fail(f"Response is not valid JSON: {e}")
-        
+
         # FAILURE CASES - Test error handling
-        
+
         # Test rate limiting (make multiple rapid requests)
         # Note: This test may be flaky depending on rate limit configuration
         rapid_responses = []
@@ -2600,7 +2601,7 @@ class TestOpenAPIContracts:
                     break
             except requests.RequestException:
                 continue
-        
+
     def test_get_database_status_root_db_status_get_44(self):
         """
         Contract test for GET /db/status
@@ -2608,9 +2609,9 @@ class TestOpenAPIContracts:
         Tags: Database Status
         Auth Required: False
         """
-        
+
         # SUCCESS CASES
-        
+
         # Test successful request
         response = self._make_request(
             method="GET",
@@ -2618,10 +2619,10 @@ class TestOpenAPIContracts:
             params=None,
             json_data=None
         )
-        
+
         # Verify success response
         assert response.status_code in [200], f"Expected [200], got {response.status_code}: {response.text}"
-        
+
         # Verify response is valid JSON (for most endpoints)
         if response.headers.get('content-type', '').startswith('application/json'):
             try:
@@ -2629,9 +2630,9 @@ class TestOpenAPIContracts:
                 assert isinstance(json_response, (dict, list)), "Response should be valid JSON object or array"
             except json.JSONDecodeError as e:
                 pytest.fail(f"Response is not valid JSON: {e}")
-        
+
         # FAILURE CASES - Test error handling
-        
+
         # Test rate limiting (make multiple rapid requests)
         # Note: This test may be flaky depending on rate limit configuration
         rapid_responses = []
@@ -2650,7 +2651,7 @@ class TestOpenAPIContracts:
                     break
             except requests.RequestException:
                 continue
-        
+
     def test_get_database_status_api_api_v1_db_status_get_45(self):
         """
         Contract test for GET /api/v1/db/status
@@ -2658,9 +2659,9 @@ class TestOpenAPIContracts:
         Tags: Database Status
         Auth Required: False
         """
-        
+
         # SUCCESS CASES
-        
+
         # Test successful request
         response = self._make_request(
             method="GET",
@@ -2668,10 +2669,10 @@ class TestOpenAPIContracts:
             params=None,
             json_data=None
         )
-        
+
         # Verify success response
         assert response.status_code in [200], f"Expected [200], got {response.status_code}: {response.text}"
-        
+
         # Verify response is valid JSON (for most endpoints)
         if response.headers.get('content-type', '').startswith('application/json'):
             try:
@@ -2679,9 +2680,9 @@ class TestOpenAPIContracts:
                 assert isinstance(json_response, (dict, list)), "Response should be valid JSON object or array"
             except json.JSONDecodeError as e:
                 pytest.fail(f"Response is not valid JSON: {e}")
-        
+
         # FAILURE CASES - Test error handling
-        
+
         # Test rate limiting (make multiple rapid requests)
         # Note: This test may be flaky depending on rate limit configuration
         rapid_responses = []
@@ -2700,7 +2701,7 @@ class TestOpenAPIContracts:
                     break
             except requests.RequestException:
                 continue
-        
+
     def test_get_week2_status_api_v1_week2_status_get_46(self):
         """
         Contract test for GET /api/v1/week2/status
@@ -2708,9 +2709,9 @@ class TestOpenAPIContracts:
         Tags: Week 2 Acceleration, Week 2 Acceleration
         Auth Required: False
         """
-        
+
         # SUCCESS CASES
-        
+
         # Test successful request
         response = self._make_request(
             method="GET",
@@ -2720,10 +2721,10 @@ class TestOpenAPIContracts:
 },
             json_data=None
         )
-        
+
         # Verify success response
         assert response.status_code in [200], f"Expected [200], got {response.status_code}: {response.text}"
-        
+
         # Verify response is valid JSON (for most endpoints)
         if response.headers.get('content-type', '').startswith('application/json'):
             try:
@@ -2731,9 +2732,9 @@ class TestOpenAPIContracts:
                 assert isinstance(json_response, (dict, list)), "Response should be valid JSON object or array"
             except json.JSONDecodeError as e:
                 pytest.fail(f"Response is not valid JSON: {e}")
-        
+
         # FAILURE CASES - Test error handling
-        
+
         # Test rate limiting (make multiple rapid requests)
         # Note: This test may be flaky depending on rate limit configuration
         rapid_responses = []
@@ -2754,7 +2755,7 @@ class TestOpenAPIContracts:
                     break
             except requests.RequestException:
                 continue
-        
+
     def test_execute_seo_scale_sprint_api_v1_week2_sprint1_seo_scale_post_47(self):
         """
         Contract test for POST /api/v1/week2/sprint1/seo-scale
@@ -2762,9 +2763,9 @@ class TestOpenAPIContracts:
         Tags: Week 2 Acceleration, Week 2 Acceleration
         Auth Required: False
         """
-        
+
         # SUCCESS CASES
-        
+
         # Test successful request
         response = self._make_request(
             method="POST",
@@ -2774,10 +2775,10 @@ class TestOpenAPIContracts:
 },
             json_data=None
         )
-        
+
         # Verify success response
         assert response.status_code in [200], f"Expected [200], got {response.status_code}: {response.text}"
-        
+
         # Verify response is valid JSON (for most endpoints)
         if response.headers.get('content-type', '').startswith('application/json'):
             try:
@@ -2785,9 +2786,9 @@ class TestOpenAPIContracts:
                 assert isinstance(json_response, (dict, list)), "Response should be valid JSON object or array"
             except json.JSONDecodeError as e:
                 pytest.fail(f"Response is not valid JSON: {e}")
-        
+
         # FAILURE CASES - Test error handling
-        
+
         # Test rate limiting (make multiple rapid requests)
         # Note: This test may be flaky depending on rate limit configuration
         rapid_responses = []
@@ -2808,7 +2809,7 @@ class TestOpenAPIContracts:
                     break
             except requests.RequestException:
                 continue
-        
+
     def test_execute_partner_ttv_sprint_api_v1_week2_sprint2_partner_ttv_post_48(self):
         """
         Contract test for POST /api/v1/week2/sprint2/partner-ttv
@@ -2816,9 +2817,9 @@ class TestOpenAPIContracts:
         Tags: Week 2 Acceleration, Week 2 Acceleration
         Auth Required: False
         """
-        
+
         # SUCCESS CASES
-        
+
         # Test successful request
         response = self._make_request(
             method="POST",
@@ -2828,10 +2829,10 @@ class TestOpenAPIContracts:
 },
             json_data=None
         )
-        
+
         # Verify success response
         assert response.status_code in [200], f"Expected [200], got {response.status_code}: {response.text}"
-        
+
         # Verify response is valid JSON (for most endpoints)
         if response.headers.get('content-type', '').startswith('application/json'):
             try:
@@ -2839,9 +2840,9 @@ class TestOpenAPIContracts:
                 assert isinstance(json_response, (dict, list)), "Response should be valid JSON object or array"
             except json.JSONDecodeError as e:
                 pytest.fail(f"Response is not valid JSON: {e}")
-        
+
         # FAILURE CASES - Test error handling
-        
+
         # Test rate limiting (make multiple rapid requests)
         # Note: This test may be flaky depending on rate limit configuration
         rapid_responses = []
@@ -2862,7 +2863,7 @@ class TestOpenAPIContracts:
                     break
             except requests.RequestException:
                 continue
-        
+
     def test_execute_application_enhancement_sprint_api_v1_week2_sprint3_application_enhancement_post_49(self):
         """
         Contract test for POST /api/v1/week2/sprint3/application-enhancement
@@ -2870,9 +2871,9 @@ class TestOpenAPIContracts:
         Tags: Week 2 Acceleration, Week 2 Acceleration
         Auth Required: False
         """
-        
+
         # SUCCESS CASES
-        
+
         # Test successful request
         response = self._make_request(
             method="POST",
@@ -2886,10 +2887,10 @@ class TestOpenAPIContracts:
         ]
 }
         )
-        
+
         # Verify success response
         assert response.status_code in [200], f"Expected [200], got {response.status_code}: {response.text}"
-        
+
         # Verify response is valid JSON (for most endpoints)
         if response.headers.get('content-type', '').startswith('application/json'):
             try:
@@ -2897,9 +2898,9 @@ class TestOpenAPIContracts:
                 assert isinstance(json_response, (dict, list)), "Response should be valid JSON object or array"
             except json.JSONDecodeError as e:
                 pytest.fail(f"Response is not valid JSON: {e}")
-        
+
         # FAILURE CASES - Test error handling
-        
+
         # Test rate limiting (make multiple rapid requests)
         # Note: This test may be flaky depending on rate limit configuration
         rapid_responses = []
@@ -2924,7 +2925,7 @@ class TestOpenAPIContracts:
                     break
             except requests.RequestException:
                 continue
-        
+
     def test_demonstrate_seo_at_scale_api_v1_week2_demonstrations_seo_at_scale_get_50(self):
         """
         Contract test for GET /api/v1/week2/demonstrations/seo-at-scale
@@ -2932,9 +2933,9 @@ class TestOpenAPIContracts:
         Tags: Week 2 Acceleration, Week 2 Acceleration
         Auth Required: False
         """
-        
+
         # SUCCESS CASES
-        
+
         # Test successful request
         response = self._make_request(
             method="GET",
@@ -2944,10 +2945,10 @@ class TestOpenAPIContracts:
 },
             json_data=None
         )
-        
+
         # Verify success response
         assert response.status_code in [200], f"Expected [200], got {response.status_code}: {response.text}"
-        
+
         # Verify response is valid JSON (for most endpoints)
         if response.headers.get('content-type', '').startswith('application/json'):
             try:
@@ -2955,9 +2956,9 @@ class TestOpenAPIContracts:
                 assert isinstance(json_response, (dict, list)), "Response should be valid JSON object or array"
             except json.JSONDecodeError as e:
                 pytest.fail(f"Response is not valid JSON: {e}")
-        
+
         # FAILURE CASES - Test error handling
-        
+
         # Test rate limiting (make multiple rapid requests)
         # Note: This test may be flaky depending on rate limit configuration
         rapid_responses = []
@@ -2978,7 +2979,7 @@ class TestOpenAPIContracts:
                     break
             except requests.RequestException:
                 continue
-        
+
     def test_demonstrate_partner_ttv_api_v1_week2_demonstrations_partner_ttv_get_51(self):
         """
         Contract test for GET /api/v1/week2/demonstrations/partner-ttv
@@ -2986,9 +2987,9 @@ class TestOpenAPIContracts:
         Tags: Week 2 Acceleration, Week 2 Acceleration
         Auth Required: False
         """
-        
+
         # SUCCESS CASES
-        
+
         # Test successful request
         response = self._make_request(
             method="GET",
@@ -2998,10 +2999,10 @@ class TestOpenAPIContracts:
 },
             json_data=None
         )
-        
+
         # Verify success response
         assert response.status_code in [200], f"Expected [200], got {response.status_code}: {response.text}"
-        
+
         # Verify response is valid JSON (for most endpoints)
         if response.headers.get('content-type', '').startswith('application/json'):
             try:
@@ -3009,9 +3010,9 @@ class TestOpenAPIContracts:
                 assert isinstance(json_response, (dict, list)), "Response should be valid JSON object or array"
             except json.JSONDecodeError as e:
                 pytest.fail(f"Response is not valid JSON: {e}")
-        
+
         # FAILURE CASES - Test error handling
-        
+
         # Test rate limiting (make multiple rapid requests)
         # Note: This test may be flaky depending on rate limit configuration
         rapid_responses = []
@@ -3032,7 +3033,7 @@ class TestOpenAPIContracts:
                     break
             except requests.RequestException:
                 continue
-        
+
     def test_get_week2_kpi_dashboard_api_v1_week2_kpi_dashboard_get_52(self):
         """
         Contract test for GET /api/v1/week2/kpi-dashboard
@@ -3040,9 +3041,9 @@ class TestOpenAPIContracts:
         Tags: Week 2 Acceleration, Week 2 Acceleration
         Auth Required: False
         """
-        
+
         # SUCCESS CASES
-        
+
         # Test successful request
         response = self._make_request(
             method="GET",
@@ -3052,10 +3053,10 @@ class TestOpenAPIContracts:
 },
             json_data=None
         )
-        
+
         # Verify success response
         assert response.status_code in [200], f"Expected [200], got {response.status_code}: {response.text}"
-        
+
         # Verify response is valid JSON (for most endpoints)
         if response.headers.get('content-type', '').startswith('application/json'):
             try:
@@ -3063,9 +3064,9 @@ class TestOpenAPIContracts:
                 assert isinstance(json_response, (dict, list)), "Response should be valid JSON object or array"
             except json.JSONDecodeError as e:
                 pytest.fail(f"Response is not valid JSON: {e}")
-        
+
         # FAILURE CASES - Test error handling
-        
+
         # Test rate limiting (make multiple rapid requests)
         # Note: This test may be flaky depending on rate limit configuration
         rapid_responses = []
@@ -3086,7 +3087,7 @@ class TestOpenAPIContracts:
                     break
             except requests.RequestException:
                 continue
-        
+
     def test_execute_all_sprints_api_v1_week2_execute_all_sprints_post_53(self):
         """
         Contract test for POST /api/v1/week2/execute-all-sprints
@@ -3094,9 +3095,9 @@ class TestOpenAPIContracts:
         Tags: Week 2 Acceleration, Week 2 Acceleration
         Auth Required: False
         """
-        
+
         # SUCCESS CASES
-        
+
         # Test successful request
         response = self._make_request(
             method="POST",
@@ -3109,10 +3110,10 @@ class TestOpenAPIContracts:
         "partner_data": "test_partner_data"
 }
         )
-        
+
         # Verify success response
         assert response.status_code in [200], f"Expected [200], got {response.status_code}: {response.text}"
-        
+
         # Verify response is valid JSON (for most endpoints)
         if response.headers.get('content-type', '').startswith('application/json'):
             try:
@@ -3120,9 +3121,9 @@ class TestOpenAPIContracts:
                 assert isinstance(json_response, (dict, list)), "Response should be valid JSON object or array"
             except json.JSONDecodeError as e:
                 pytest.fail(f"Response is not valid JSON: {e}")
-        
+
         # FAILURE CASES - Test error handling
-        
+
         # Test rate limiting (make multiple rapid requests)
         # Note: This test may be flaky depending on rate limit configuration
         rapid_responses = []
@@ -3146,7 +3147,7 @@ class TestOpenAPIContracts:
                     break
             except requests.RequestException:
                 continue
-        
+
     def test_get_week3_status_api_v1_week3_status_get_54(self):
         """
         Contract test for GET /api/v1/week3/status
@@ -3154,9 +3155,9 @@ class TestOpenAPIContracts:
         Tags: Week 3 Execution, Week 3 Execution
         Auth Required: False
         """
-        
+
         # SUCCESS CASES
-        
+
         # Test successful request
         response = self._make_request(
             method="GET",
@@ -3166,10 +3167,10 @@ class TestOpenAPIContracts:
 },
             json_data=None
         )
-        
+
         # Verify success response
         assert response.status_code in [200], f"Expected [200], got {response.status_code}: {response.text}"
-        
+
         # Verify response is valid JSON (for most endpoints)
         if response.headers.get('content-type', '').startswith('application/json'):
             try:
@@ -3177,9 +3178,9 @@ class TestOpenAPIContracts:
                 assert isinstance(json_response, (dict, list)), "Response should be valid JSON object or array"
             except json.JSONDecodeError as e:
                 pytest.fail(f"Response is not valid JSON: {e}")
-        
+
         # FAILURE CASES - Test error handling
-        
+
         # Test rate limiting (make multiple rapid requests)
         # Note: This test may be flaky depending on rate limit configuration
         rapid_responses = []
@@ -3200,7 +3201,7 @@ class TestOpenAPIContracts:
                     break
             except requests.RequestException:
                 continue
-        
+
     def test_execute_seo_scale_okr1_api_v1_week3_okr1_seo_scale_post_55(self):
         """
         Contract test for POST /api/v1/week3/okr1/seo-scale
@@ -3208,9 +3209,9 @@ class TestOpenAPIContracts:
         Tags: Week 3 Execution, Week 3 Execution
         Auth Required: False
         """
-        
+
         # SUCCESS CASES
-        
+
         # Test successful request
         response = self._make_request(
             method="POST",
@@ -3220,10 +3221,10 @@ class TestOpenAPIContracts:
 },
             json_data=None
         )
-        
+
         # Verify success response
         assert response.status_code in [200], f"Expected [200], got {response.status_code}: {response.text}"
-        
+
         # Verify response is valid JSON (for most endpoints)
         if response.headers.get('content-type', '').startswith('application/json'):
             try:
@@ -3231,9 +3232,9 @@ class TestOpenAPIContracts:
                 assert isinstance(json_response, (dict, list)), "Response should be valid JSON object or array"
             except json.JSONDecodeError as e:
                 pytest.fail(f"Response is not valid JSON: {e}")
-        
+
         # FAILURE CASES - Test error handling
-        
+
         # Test rate limiting (make multiple rapid requests)
         # Note: This test may be flaky depending on rate limit configuration
         rapid_responses = []
@@ -3254,7 +3255,7 @@ class TestOpenAPIContracts:
                     break
             except requests.RequestException:
                 continue
-        
+
     def test_execute_b2b_marketplace_okr2_api_v1_week3_okr2_b2b_marketplace_post_56(self):
         """
         Contract test for POST /api/v1/week3/okr2/b2b-marketplace
@@ -3262,9 +3263,9 @@ class TestOpenAPIContracts:
         Tags: Week 3 Execution, Week 3 Execution
         Auth Required: False
         """
-        
+
         # SUCCESS CASES
-        
+
         # Test successful request
         response = self._make_request(
             method="POST",
@@ -3274,10 +3275,10 @@ class TestOpenAPIContracts:
 },
             json_data=None
         )
-        
+
         # Verify success response
         assert response.status_code in [200], f"Expected [200], got {response.status_code}: {response.text}"
-        
+
         # Verify response is valid JSON (for most endpoints)
         if response.headers.get('content-type', '').startswith('application/json'):
             try:
@@ -3285,9 +3286,9 @@ class TestOpenAPIContracts:
                 assert isinstance(json_response, (dict, list)), "Response should be valid JSON object or array"
             except json.JSONDecodeError as e:
                 pytest.fail(f"Response is not valid JSON: {e}")
-        
+
         # FAILURE CASES - Test error handling
-        
+
         # Test rate limiting (make multiple rapid requests)
         # Note: This test may be flaky depending on rate limit configuration
         rapid_responses = []
@@ -3308,7 +3309,7 @@ class TestOpenAPIContracts:
                     break
             except requests.RequestException:
                 continue
-        
+
     def test_execute_application_automation_okr3_api_v1_week3_okr3_application_automation_post_57(self):
         """
         Contract test for POST /api/v1/week3/okr3/application-automation
@@ -3316,9 +3317,9 @@ class TestOpenAPIContracts:
         Tags: Week 3 Execution, Week 3 Execution
         Auth Required: False
         """
-        
+
         # SUCCESS CASES
-        
+
         # Test successful request
         response = self._make_request(
             method="POST",
@@ -3328,10 +3329,10 @@ class TestOpenAPIContracts:
 },
             json_data=None
         )
-        
+
         # Verify success response
         assert response.status_code in [200], f"Expected [200], got {response.status_code}: {response.text}"
-        
+
         # Verify response is valid JSON (for most endpoints)
         if response.headers.get('content-type', '').startswith('application/json'):
             try:
@@ -3339,9 +3340,9 @@ class TestOpenAPIContracts:
                 assert isinstance(json_response, (dict, list)), "Response should be valid JSON object or array"
             except json.JSONDecodeError as e:
                 pytest.fail(f"Response is not valid JSON: {e}")
-        
+
         # FAILURE CASES - Test error handling
-        
+
         # Test rate limiting (make multiple rapid requests)
         # Note: This test may be flaky depending on rate limit configuration
         rapid_responses = []
@@ -3362,7 +3363,7 @@ class TestOpenAPIContracts:
                     break
             except requests.RequestException:
                 continue
-        
+
     def test_execute_data_ingestion_okr4_api_v1_week3_okr4_data_ingestion_post_58(self):
         """
         Contract test for POST /api/v1/week3/okr4/data-ingestion
@@ -3370,9 +3371,9 @@ class TestOpenAPIContracts:
         Tags: Week 3 Execution, Week 3 Execution
         Auth Required: False
         """
-        
+
         # SUCCESS CASES
-        
+
         # Test successful request
         response = self._make_request(
             method="POST",
@@ -3382,10 +3383,10 @@ class TestOpenAPIContracts:
 },
             json_data=None
         )
-        
+
         # Verify success response
         assert response.status_code in [200], f"Expected [200], got {response.status_code}: {response.text}"
-        
+
         # Verify response is valid JSON (for most endpoints)
         if response.headers.get('content-type', '').startswith('application/json'):
             try:
@@ -3393,9 +3394,9 @@ class TestOpenAPIContracts:
                 assert isinstance(json_response, (dict, list)), "Response should be valid JSON object or array"
             except json.JSONDecodeError as e:
                 pytest.fail(f"Response is not valid JSON: {e}")
-        
+
         # FAILURE CASES - Test error handling
-        
+
         # Test rate limiting (make multiple rapid requests)
         # Note: This test may be flaky depending on rate limit configuration
         rapid_responses = []
@@ -3416,7 +3417,7 @@ class TestOpenAPIContracts:
                     break
             except requests.RequestException:
                 continue
-        
+
     def test_execute_monetization_okr5_api_v1_week3_okr5_monetization_post_59(self):
         """
         Contract test for POST /api/v1/week3/okr5/monetization
@@ -3424,9 +3425,9 @@ class TestOpenAPIContracts:
         Tags: Week 3 Execution, Week 3 Execution
         Auth Required: False
         """
-        
+
         # SUCCESS CASES
-        
+
         # Test successful request
         response = self._make_request(
             method="POST",
@@ -3436,10 +3437,10 @@ class TestOpenAPIContracts:
 },
             json_data=None
         )
-        
+
         # Verify success response
         assert response.status_code in [200], f"Expected [200], got {response.status_code}: {response.text}"
-        
+
         # Verify response is valid JSON (for most endpoints)
         if response.headers.get('content-type', '').startswith('application/json'):
             try:
@@ -3447,9 +3448,9 @@ class TestOpenAPIContracts:
                 assert isinstance(json_response, (dict, list)), "Response should be valid JSON object or array"
             except json.JSONDecodeError as e:
                 pytest.fail(f"Response is not valid JSON: {e}")
-        
+
         # FAILURE CASES - Test error handling
-        
+
         # Test rate limiting (make multiple rapid requests)
         # Note: This test may be flaky depending on rate limit configuration
         rapid_responses = []
@@ -3470,7 +3471,7 @@ class TestOpenAPIContracts:
                     break
             except requests.RequestException:
                 continue
-        
+
     def test_execute_reliability_okr6_api_v1_week3_okr6_reliability_post_60(self):
         """
         Contract test for POST /api/v1/week3/okr6/reliability
@@ -3478,9 +3479,9 @@ class TestOpenAPIContracts:
         Tags: Week 3 Execution, Week 3 Execution
         Auth Required: False
         """
-        
+
         # SUCCESS CASES
-        
+
         # Test successful request
         response = self._make_request(
             method="POST",
@@ -3490,10 +3491,10 @@ class TestOpenAPIContracts:
 },
             json_data=None
         )
-        
+
         # Verify success response
         assert response.status_code in [200], f"Expected [200], got {response.status_code}: {response.text}"
-        
+
         # Verify response is valid JSON (for most endpoints)
         if response.headers.get('content-type', '').startswith('application/json'):
             try:
@@ -3501,9 +3502,9 @@ class TestOpenAPIContracts:
                 assert isinstance(json_response, (dict, list)), "Response should be valid JSON object or array"
             except json.JSONDecodeError as e:
                 pytest.fail(f"Response is not valid JSON: {e}")
-        
+
         # FAILURE CASES - Test error handling
-        
+
         # Test rate limiting (make multiple rapid requests)
         # Note: This test may be flaky depending on rate limit configuration
         rapid_responses = []
@@ -3524,7 +3525,7 @@ class TestOpenAPIContracts:
                     break
             except requests.RequestException:
                 continue
-        
+
     def test_execute_responsible_ai_okr7_api_v1_week3_okr7_responsible_ai_post_61(self):
         """
         Contract test for POST /api/v1/week3/okr7/responsible-ai
@@ -3532,9 +3533,9 @@ class TestOpenAPIContracts:
         Tags: Week 3 Execution, Week 3 Execution
         Auth Required: False
         """
-        
+
         # SUCCESS CASES
-        
+
         # Test successful request
         response = self._make_request(
             method="POST",
@@ -3544,10 +3545,10 @@ class TestOpenAPIContracts:
 },
             json_data=None
         )
-        
+
         # Verify success response
         assert response.status_code in [200], f"Expected [200], got {response.status_code}: {response.text}"
-        
+
         # Verify response is valid JSON (for most endpoints)
         if response.headers.get('content-type', '').startswith('application/json'):
             try:
@@ -3555,9 +3556,9 @@ class TestOpenAPIContracts:
                 assert isinstance(json_response, (dict, list)), "Response should be valid JSON object or array"
             except json.JSONDecodeError as e:
                 pytest.fail(f"Response is not valid JSON: {e}")
-        
+
         # FAILURE CASES - Test error handling
-        
+
         # Test rate limiting (make multiple rapid requests)
         # Note: This test may be flaky depending on rate limit configuration
         rapid_responses = []
@@ -3578,7 +3579,7 @@ class TestOpenAPIContracts:
                     break
             except requests.RequestException:
                 continue
-        
+
     def test_get_week3_ceo_dashboard_api_v1_week3_ceo_dashboard_get_62(self):
         """
         Contract test for GET /api/v1/week3/ceo-dashboard
@@ -3586,9 +3587,9 @@ class TestOpenAPIContracts:
         Tags: Week 3 Execution, Week 3 Execution
         Auth Required: False
         """
-        
+
         # SUCCESS CASES
-        
+
         # Test successful request
         response = self._make_request(
             method="GET",
@@ -3598,10 +3599,10 @@ class TestOpenAPIContracts:
 },
             json_data=None
         )
-        
+
         # Verify success response
         assert response.status_code in [200], f"Expected [200], got {response.status_code}: {response.text}"
-        
+
         # Verify response is valid JSON (for most endpoints)
         if response.headers.get('content-type', '').startswith('application/json'):
             try:
@@ -3609,9 +3610,9 @@ class TestOpenAPIContracts:
                 assert isinstance(json_response, (dict, list)), "Response should be valid JSON object or array"
             except json.JSONDecodeError as e:
                 pytest.fail(f"Response is not valid JSON: {e}")
-        
+
         # FAILURE CASES - Test error handling
-        
+
         # Test rate limiting (make multiple rapid requests)
         # Note: This test may be flaky depending on rate limit configuration
         rapid_responses = []
@@ -3632,7 +3633,7 @@ class TestOpenAPIContracts:
                     break
             except requests.RequestException:
                 continue
-        
+
     def test_execute_all_week3_okrs_api_v1_week3_execute_all_okrs_post_63(self):
         """
         Contract test for POST /api/v1/week3/execute-all-okrs
@@ -3640,9 +3641,9 @@ class TestOpenAPIContracts:
         Tags: Week 3 Execution, Week 3 Execution
         Auth Required: False
         """
-        
+
         # SUCCESS CASES
-        
+
         # Test successful request
         response = self._make_request(
             method="POST",
@@ -3652,10 +3653,10 @@ class TestOpenAPIContracts:
 },
             json_data=None
         )
-        
+
         # Verify success response
         assert response.status_code in [200], f"Expected [200], got {response.status_code}: {response.text}"
-        
+
         # Verify response is valid JSON (for most endpoints)
         if response.headers.get('content-type', '').startswith('application/json'):
             try:
@@ -3663,9 +3664,9 @@ class TestOpenAPIContracts:
                 assert isinstance(json_response, (dict, list)), "Response should be valid JSON object or array"
             except json.JSONDecodeError as e:
                 pytest.fail(f"Response is not valid JSON: {e}")
-        
+
         # FAILURE CASES - Test error handling
-        
+
         # Test rate limiting (make multiple rapid requests)
         # Note: This test may be flaky depending on rate limit configuration
         rapid_responses = []
@@ -3686,7 +3687,7 @@ class TestOpenAPIContracts:
                     break
             except requests.RequestException:
                 continue
-        
+
     def test_get_week4_status_api_v1_week4_status_get_64(self):
         """
         Contract test for GET /api/v1/week4/status
@@ -3694,9 +3695,9 @@ class TestOpenAPIContracts:
         Tags: Week 4 Global Expansion, Week 4 Global Expansion
         Auth Required: False
         """
-        
+
         # SUCCESS CASES
-        
+
         # Test successful request
         response = self._make_request(
             method="GET",
@@ -3706,10 +3707,10 @@ class TestOpenAPIContracts:
 },
             json_data=None
         )
-        
+
         # Verify success response
         assert response.status_code in [200], f"Expected [200], got {response.status_code}: {response.text}"
-        
+
         # Verify response is valid JSON (for most endpoints)
         if response.headers.get('content-type', '').startswith('application/json'):
             try:
@@ -3717,9 +3718,9 @@ class TestOpenAPIContracts:
                 assert isinstance(json_response, (dict, list)), "Response should be valid JSON object or array"
             except json.JSONDecodeError as e:
                 pytest.fail(f"Response is not valid JSON: {e}")
-        
+
         # FAILURE CASES - Test error handling
-        
+
         # Test rate limiting (make multiple rapid requests)
         # Note: This test may be flaky depending on rate limit configuration
         rapid_responses = []
@@ -3740,7 +3741,7 @@ class TestOpenAPIContracts:
                     break
             except requests.RequestException:
                 continue
-        
+
     def test_execute_international_pilot_okr1_api_v1_week4_okr1_international_pilot_post_65(self):
         """
         Contract test for POST /api/v1/week4/okr1/international-pilot
@@ -3748,9 +3749,9 @@ class TestOpenAPIContracts:
         Tags: Week 4 Global Expansion, Week 4 Global Expansion
         Auth Required: False
         """
-        
+
         # SUCCESS CASES
-        
+
         # Test successful request
         response = self._make_request(
             method="POST",
@@ -3760,10 +3761,10 @@ class TestOpenAPIContracts:
 },
             json_data=None
         )
-        
+
         # Verify success response
         assert response.status_code in [200], f"Expected [200], got {response.status_code}: {response.text}"
-        
+
         # Verify response is valid JSON (for most endpoints)
         if response.headers.get('content-type', '').startswith('application/json'):
             try:
@@ -3771,9 +3772,9 @@ class TestOpenAPIContracts:
                 assert isinstance(json_response, (dict, list)), "Response should be valid JSON object or array"
             except json.JSONDecodeError as e:
                 pytest.fail(f"Response is not valid JSON: {e}")
-        
+
         # FAILURE CASES - Test error handling
-        
+
         # Test rate limiting (make multiple rapid requests)
         # Note: This test may be flaky depending on rate limit configuration
         rapid_responses = []
@@ -3794,7 +3795,7 @@ class TestOpenAPIContracts:
                     break
             except requests.RequestException:
                 continue
-        
+
     def test_execute_predictive_insights_okr2_api_v1_week4_okr2_predictive_insights_post_66(self):
         """
         Contract test for POST /api/v1/week4/okr2/predictive-insights
@@ -3802,9 +3803,9 @@ class TestOpenAPIContracts:
         Tags: Week 4 Global Expansion, Week 4 Global Expansion
         Auth Required: False
         """
-        
+
         # SUCCESS CASES
-        
+
         # Test successful request
         response = self._make_request(
             method="POST",
@@ -3814,10 +3815,10 @@ class TestOpenAPIContracts:
 },
             json_data=None
         )
-        
+
         # Verify success response
         assert response.status_code in [200], f"Expected [200], got {response.status_code}: {response.text}"
-        
+
         # Verify response is valid JSON (for most endpoints)
         if response.headers.get('content-type', '').startswith('application/json'):
             try:
@@ -3825,9 +3826,9 @@ class TestOpenAPIContracts:
                 assert isinstance(json_response, (dict, list)), "Response should be valid JSON object or array"
             except json.JSONDecodeError as e:
                 pytest.fail(f"Response is not valid JSON: {e}")
-        
+
         # FAILURE CASES - Test error handling
-        
+
         # Test rate limiting (make multiple rapid requests)
         # Note: This test may be flaky depending on rate limit configuration
         rapid_responses = []
@@ -3848,7 +3849,7 @@ class TestOpenAPIContracts:
                     break
             except requests.RequestException:
                 continue
-        
+
     def test_execute_seo_scale_okr3_api_v1_week4_okr3_seo_scale_post_67(self):
         """
         Contract test for POST /api/v1/week4/okr3/seo-scale
@@ -3856,9 +3857,9 @@ class TestOpenAPIContracts:
         Tags: Week 4 Global Expansion, Week 4 Global Expansion
         Auth Required: False
         """
-        
+
         # SUCCESS CASES
-        
+
         # Test successful request
         response = self._make_request(
             method="POST",
@@ -3868,10 +3869,10 @@ class TestOpenAPIContracts:
 },
             json_data=None
         )
-        
+
         # Verify success response
         assert response.status_code in [200], f"Expected [200], got {response.status_code}: {response.text}"
-        
+
         # Verify response is valid JSON (for most endpoints)
         if response.headers.get('content-type', '').startswith('application/json'):
             try:
@@ -3879,9 +3880,9 @@ class TestOpenAPIContracts:
                 assert isinstance(json_response, (dict, list)), "Response should be valid JSON object or array"
             except json.JSONDecodeError as e:
                 pytest.fail(f"Response is not valid JSON: {e}")
-        
+
         # FAILURE CASES - Test error handling
-        
+
         # Test rate limiting (make multiple rapid requests)
         # Note: This test may be flaky depending on rate limit configuration
         rapid_responses = []
@@ -3902,7 +3903,7 @@ class TestOpenAPIContracts:
                     break
             except requests.RequestException:
                 continue
-        
+
     def test_execute_marketplace_monetization_okr4_api_v1_week4_okr4_marketplace_monetization_post_68(self):
         """
         Contract test for POST /api/v1/week4/okr4/marketplace-monetization
@@ -3910,9 +3911,9 @@ class TestOpenAPIContracts:
         Tags: Week 4 Global Expansion, Week 4 Global Expansion
         Auth Required: False
         """
-        
+
         # SUCCESS CASES
-        
+
         # Test successful request
         response = self._make_request(
             method="POST",
@@ -3922,10 +3923,10 @@ class TestOpenAPIContracts:
 },
             json_data=None
         )
-        
+
         # Verify success response
         assert response.status_code in [200], f"Expected [200], got {response.status_code}: {response.text}"
-        
+
         # Verify response is valid JSON (for most endpoints)
         if response.headers.get('content-type', '').startswith('application/json'):
             try:
@@ -3933,9 +3934,9 @@ class TestOpenAPIContracts:
                 assert isinstance(json_response, (dict, list)), "Response should be valid JSON object or array"
             except json.JSONDecodeError as e:
                 pytest.fail(f"Response is not valid JSON: {e}")
-        
+
         # FAILURE CASES - Test error handling
-        
+
         # Test rate limiting (make multiple rapid requests)
         # Note: This test may be flaky depending on rate limit configuration
         rapid_responses = []
@@ -3956,7 +3957,7 @@ class TestOpenAPIContracts:
                     break
             except requests.RequestException:
                 continue
-        
+
     def test_execute_application_automation_okr5_api_v1_week4_okr5_application_automation_post_69(self):
         """
         Contract test for POST /api/v1/week4/okr5/application-automation
@@ -3964,9 +3965,9 @@ class TestOpenAPIContracts:
         Tags: Week 4 Global Expansion, Week 4 Global Expansion
         Auth Required: False
         """
-        
+
         # SUCCESS CASES
-        
+
         # Test successful request
         response = self._make_request(
             method="POST",
@@ -3976,10 +3977,10 @@ class TestOpenAPIContracts:
 },
             json_data=None
         )
-        
+
         # Verify success response
         assert response.status_code in [200], f"Expected [200], got {response.status_code}: {response.text}"
-        
+
         # Verify response is valid JSON (for most endpoints)
         if response.headers.get('content-type', '').startswith('application/json'):
             try:
@@ -3987,9 +3988,9 @@ class TestOpenAPIContracts:
                 assert isinstance(json_response, (dict, list)), "Response should be valid JSON object or array"
             except json.JSONDecodeError as e:
                 pytest.fail(f"Response is not valid JSON: {e}")
-        
+
         # FAILURE CASES - Test error handling
-        
+
         # Test rate limiting (make multiple rapid requests)
         # Note: This test may be flaky depending on rate limit configuration
         rapid_responses = []
@@ -4010,7 +4011,7 @@ class TestOpenAPIContracts:
                     break
             except requests.RequestException:
                 continue
-        
+
     def test_get_week4_ceo_dashboard_api_v1_week4_ceo_dashboard_get_70(self):
         """
         Contract test for GET /api/v1/week4/ceo-dashboard
@@ -4018,9 +4019,9 @@ class TestOpenAPIContracts:
         Tags: Week 4 Global Expansion, Week 4 Global Expansion
         Auth Required: False
         """
-        
+
         # SUCCESS CASES
-        
+
         # Test successful request
         response = self._make_request(
             method="GET",
@@ -4030,10 +4031,10 @@ class TestOpenAPIContracts:
 },
             json_data=None
         )
-        
+
         # Verify success response
         assert response.status_code in [200], f"Expected [200], got {response.status_code}: {response.text}"
-        
+
         # Verify response is valid JSON (for most endpoints)
         if response.headers.get('content-type', '').startswith('application/json'):
             try:
@@ -4041,9 +4042,9 @@ class TestOpenAPIContracts:
                 assert isinstance(json_response, (dict, list)), "Response should be valid JSON object or array"
             except json.JSONDecodeError as e:
                 pytest.fail(f"Response is not valid JSON: {e}")
-        
+
         # FAILURE CASES - Test error handling
-        
+
         # Test rate limiting (make multiple rapid requests)
         # Note: This test may be flaky depending on rate limit configuration
         rapid_responses = []
@@ -4064,7 +4065,7 @@ class TestOpenAPIContracts:
                     break
             except requests.RequestException:
                 continue
-        
+
     def test_execute_all_week4_okrs_api_v1_week4_execute_all_okrs_post_71(self):
         """
         Contract test for POST /api/v1/week4/execute-all-okrs
@@ -4072,9 +4073,9 @@ class TestOpenAPIContracts:
         Tags: Week 4 Global Expansion, Week 4 Global Expansion
         Auth Required: False
         """
-        
+
         # SUCCESS CASES
-        
+
         # Test successful request
         response = self._make_request(
             method="POST",
@@ -4084,10 +4085,10 @@ class TestOpenAPIContracts:
 },
             json_data=None
         )
-        
+
         # Verify success response
         assert response.status_code in [200], f"Expected [200], got {response.status_code}: {response.text}"
-        
+
         # Verify response is valid JSON (for most endpoints)
         if response.headers.get('content-type', '').startswith('application/json'):
             try:
@@ -4095,9 +4096,9 @@ class TestOpenAPIContracts:
                 assert isinstance(json_response, (dict, list)), "Response should be valid JSON object or array"
             except json.JSONDecodeError as e:
                 pytest.fail(f"Response is not valid JSON: {e}")
-        
+
         # FAILURE CASES - Test error handling
-        
+
         # Test rate limiting (make multiple rapid requests)
         # Note: This test may be flaky depending on rate limit configuration
         rapid_responses = []
@@ -4118,7 +4119,7 @@ class TestOpenAPIContracts:
                     break
             except requests.RequestException:
                 continue
-        
+
     def test_demonstrate_international_student_flow_api_v1_week4_demos_international_student_flow_get_72(self):
         """
         Contract test for GET /api/v1/week4/demos/international-student-flow
@@ -4126,9 +4127,9 @@ class TestOpenAPIContracts:
         Tags: Week 4 Global Expansion, Week 4 Global Expansion
         Auth Required: False
         """
-        
+
         # SUCCESS CASES
-        
+
         # Test successful request
         response = self._make_request(
             method="GET",
@@ -4138,10 +4139,10 @@ class TestOpenAPIContracts:
 },
             json_data=None
         )
-        
+
         # Verify success response
         assert response.status_code in [200], f"Expected [200], got {response.status_code}: {response.text}"
-        
+
         # Verify response is valid JSON (for most endpoints)
         if response.headers.get('content-type', '').startswith('application/json'):
             try:
@@ -4149,9 +4150,9 @@ class TestOpenAPIContracts:
                 assert isinstance(json_response, (dict, list)), "Response should be valid JSON object or array"
             except json.JSONDecodeError as e:
                 pytest.fail(f"Response is not valid JSON: {e}")
-        
+
         # FAILURE CASES - Test error handling
-        
+
         # Test rate limiting (make multiple rapid requests)
         # Note: This test may be flaky depending on rate limit configuration
         rapid_responses = []
@@ -4172,7 +4173,7 @@ class TestOpenAPIContracts:
                     break
             except requests.RequestException:
                 continue
-        
+
     def test_demonstrate_partner_analytics_beta_api_v1_week4_demos_partner_analytics_beta_get_73(self):
         """
         Contract test for GET /api/v1/week4/demos/partner-analytics-beta
@@ -4180,9 +4181,9 @@ class TestOpenAPIContracts:
         Tags: Week 4 Global Expansion, Week 4 Global Expansion
         Auth Required: False
         """
-        
+
         # SUCCESS CASES
-        
+
         # Test successful request
         response = self._make_request(
             method="GET",
@@ -4192,10 +4193,10 @@ class TestOpenAPIContracts:
 },
             json_data=None
         )
-        
+
         # Verify success response
         assert response.status_code in [200], f"Expected [200], got {response.status_code}: {response.text}"
-        
+
         # Verify response is valid JSON (for most endpoints)
         if response.headers.get('content-type', '').startswith('application/json'):
             try:
@@ -4203,9 +4204,9 @@ class TestOpenAPIContracts:
                 assert isinstance(json_response, (dict, list)), "Response should be valid JSON object or array"
             except json.JSONDecodeError as e:
                 pytest.fail(f"Response is not valid JSON: {e}")
-        
+
         # FAILURE CASES - Test error handling
-        
+
         # Test rate limiting (make multiple rapid requests)
         # Note: This test may be flaky depending on rate limit configuration
         rapid_responses = []
@@ -4226,7 +4227,7 @@ class TestOpenAPIContracts:
                     break
             except requests.RequestException:
                 continue
-        
+
     def test_get_global_dr_status_api_v1_disaster_recovery_status_global_get_74(self):
         """
         Contract test for GET /api/v1/disaster-recovery/status/global
@@ -4234,9 +4235,9 @@ class TestOpenAPIContracts:
         Tags: Disaster Recovery, Disaster Recovery
         Auth Required: False
         """
-        
+
         # SUCCESS CASES
-        
+
         # Test successful request
         response = self._make_request(
             method="GET",
@@ -4244,10 +4245,10 @@ class TestOpenAPIContracts:
             params=None,
             json_data=None
         )
-        
+
         # Verify success response
         assert response.status_code in [200], f"Expected [200], got {response.status_code}: {response.text}"
-        
+
         # Verify response is valid JSON (for most endpoints)
         if response.headers.get('content-type', '').startswith('application/json'):
             try:
@@ -4255,9 +4256,9 @@ class TestOpenAPIContracts:
                 assert isinstance(json_response, (dict, list)), "Response should be valid JSON object or array"
             except json.JSONDecodeError as e:
                 pytest.fail(f"Response is not valid JSON: {e}")
-        
+
         # FAILURE CASES - Test error handling
-        
+
         # Test rate limiting (make multiple rapid requests)
         # Note: This test may be flaky depending on rate limit configuration
         rapid_responses = []
@@ -4276,7 +4277,7 @@ class TestOpenAPIContracts:
                     break
             except requests.RequestException:
                 continue
-        
+
     def test_get_app_dr_status_api_v1_disaster_recovery_status__app_name__get_75(self):
         """
         Contract test for GET /api/v1/disaster-recovery/status/{app_name}
@@ -4284,9 +4285,9 @@ class TestOpenAPIContracts:
         Tags: Disaster Recovery, Disaster Recovery
         Auth Required: False
         """
-        
+
         # SUCCESS CASES
-        
+
         # Test successful request
         response = self._make_request(
             method="GET",
@@ -4294,10 +4295,10 @@ class TestOpenAPIContracts:
             params=None,
             json_data=None
         )
-        
+
         # Verify success response
         assert response.status_code in [200], f"Expected [200], got {response.status_code}: {response.text}"
-        
+
         # Verify response is valid JSON (for most endpoints)
         if response.headers.get('content-type', '').startswith('application/json'):
             try:
@@ -4305,9 +4306,9 @@ class TestOpenAPIContracts:
                 assert isinstance(json_response, (dict, list)), "Response should be valid JSON object or array"
             except json.JSONDecodeError as e:
                 pytest.fail(f"Response is not valid JSON: {e}")
-        
+
         # FAILURE CASES - Test error handling
-        
+
         # Test 404 with invalid ID
         response_404 = self._make_request(
             method="GET",
@@ -4318,7 +4319,7 @@ class TestOpenAPIContracts:
         if response_404.status_code != 404:
             # Some endpoints may return different error codes
             assert response_404.status_code >= 400, f"Expected error code, got {response_404.status_code}"
-        
+
         # Test rate limiting (make multiple rapid requests)
         # Note: This test may be flaky depending on rate limit configuration
         rapid_responses = []
@@ -4337,7 +4338,7 @@ class TestOpenAPIContracts:
                     break
             except requests.RequestException:
                 continue
-        
+
     def test_create_backup_api_v1_disaster_recovery_backup__app_name__post_76(self):
         """
         Contract test for POST /api/v1/disaster-recovery/backup/{app_name}
@@ -4345,9 +4346,9 @@ class TestOpenAPIContracts:
         Tags: Disaster Recovery, Disaster Recovery
         Auth Required: False
         """
-        
+
         # SUCCESS CASES
-        
+
         # Test successful request
         response = self._make_request(
             method="POST",
@@ -4355,10 +4356,10 @@ class TestOpenAPIContracts:
             params=None,
             json_data=None
         )
-        
+
         # Verify success response
         assert response.status_code in [200], f"Expected [200], got {response.status_code}: {response.text}"
-        
+
         # Verify response is valid JSON (for most endpoints)
         if response.headers.get('content-type', '').startswith('application/json'):
             try:
@@ -4366,9 +4367,9 @@ class TestOpenAPIContracts:
                 assert isinstance(json_response, (dict, list)), "Response should be valid JSON object or array"
             except json.JSONDecodeError as e:
                 pytest.fail(f"Response is not valid JSON: {e}")
-        
+
         # FAILURE CASES - Test error handling
-        
+
         # Test 404 with invalid ID
         response_404 = self._make_request(
             method="POST",
@@ -4379,7 +4380,7 @@ class TestOpenAPIContracts:
         if response_404.status_code != 404:
             # Some endpoints may return different error codes
             assert response_404.status_code >= 400, f"Expected error code, got {response_404.status_code}"
-        
+
         # Test rate limiting (make multiple rapid requests)
         # Note: This test may be flaky depending on rate limit configuration
         rapid_responses = []
@@ -4398,7 +4399,7 @@ class TestOpenAPIContracts:
                     break
             except requests.RequestException:
                 continue
-        
+
     def test_initiate_restore_api_v1_disaster_recovery_restore__backup_id__post_77(self):
         """
         Contract test for POST /api/v1/disaster-recovery/restore/{backup_id}
@@ -4406,9 +4407,9 @@ class TestOpenAPIContracts:
         Tags: Disaster Recovery, Disaster Recovery
         Auth Required: False
         """
-        
+
         # SUCCESS CASES
-        
+
         # Test successful request
         response = self._make_request(
             method="POST",
@@ -4418,10 +4419,10 @@ class TestOpenAPIContracts:
 },
             json_data=None
         )
-        
+
         # Verify success response
         assert response.status_code in [200], f"Expected [200], got {response.status_code}: {response.text}"
-        
+
         # Verify response is valid JSON (for most endpoints)
         if response.headers.get('content-type', '').startswith('application/json'):
             try:
@@ -4429,9 +4430,9 @@ class TestOpenAPIContracts:
                 assert isinstance(json_response, (dict, list)), "Response should be valid JSON object or array"
             except json.JSONDecodeError as e:
                 pytest.fail(f"Response is not valid JSON: {e}")
-        
+
         # FAILURE CASES - Test error handling
-        
+
         # Test 404 with invalid ID
         response_404 = self._make_request(
             method="POST",
@@ -4444,7 +4445,7 @@ class TestOpenAPIContracts:
         if response_404.status_code != 404:
             # Some endpoints may return different error codes
             assert response_404.status_code >= 400, f"Expected error code, got {response_404.status_code}"
-        
+
         # Test rate limiting (make multiple rapid requests)
         # Note: This test may be flaky depending on rate limit configuration
         rapid_responses = []
@@ -4465,7 +4466,7 @@ class TestOpenAPIContracts:
                     break
             except requests.RequestException:
                 continue
-        
+
     def test_list_backups_api_v1_disaster_recovery_backups_get_78(self):
         """
         Contract test for GET /api/v1/disaster-recovery/backups
@@ -4473,9 +4474,9 @@ class TestOpenAPIContracts:
         Tags: Disaster Recovery, Disaster Recovery
         Auth Required: False
         """
-        
+
         # SUCCESS CASES
-        
+
         # Test successful request
         response = self._make_request(
             method="GET",
@@ -4485,10 +4486,10 @@ class TestOpenAPIContracts:
 },
             json_data=None
         )
-        
+
         # Verify success response
         assert response.status_code in [200], f"Expected [200], got {response.status_code}: {response.text}"
-        
+
         # Verify response is valid JSON (for most endpoints)
         if response.headers.get('content-type', '').startswith('application/json'):
             try:
@@ -4496,9 +4497,9 @@ class TestOpenAPIContracts:
                 assert isinstance(json_response, (dict, list)), "Response should be valid JSON object or array"
             except json.JSONDecodeError as e:
                 pytest.fail(f"Response is not valid JSON: {e}")
-        
+
         # FAILURE CASES - Test error handling
-        
+
         # Test rate limiting (make multiple rapid requests)
         # Note: This test may be flaky depending on rate limit configuration
         rapid_responses = []
@@ -4519,7 +4520,7 @@ class TestOpenAPIContracts:
                     break
             except requests.RequestException:
                 continue
-        
+
     def test_list_restores_api_v1_disaster_recovery_restores_get_79(self):
         """
         Contract test for GET /api/v1/disaster-recovery/restores
@@ -4527,9 +4528,9 @@ class TestOpenAPIContracts:
         Tags: Disaster Recovery, Disaster Recovery
         Auth Required: False
         """
-        
+
         # SUCCESS CASES
-        
+
         # Test successful request
         response = self._make_request(
             method="GET",
@@ -4539,10 +4540,10 @@ class TestOpenAPIContracts:
 },
             json_data=None
         )
-        
+
         # Verify success response
         assert response.status_code in [200], f"Expected [200], got {response.status_code}: {response.text}"
-        
+
         # Verify response is valid JSON (for most endpoints)
         if response.headers.get('content-type', '').startswith('application/json'):
             try:
@@ -4550,9 +4551,9 @@ class TestOpenAPIContracts:
                 assert isinstance(json_response, (dict, list)), "Response should be valid JSON object or array"
             except json.JSONDecodeError as e:
                 pytest.fail(f"Response is not valid JSON: {e}")
-        
+
         # FAILURE CASES - Test error handling
-        
+
         # Test rate limiting (make multiple rapid requests)
         # Note: This test may be flaky depending on rate limit configuration
         rapid_responses = []
@@ -4573,7 +4574,7 @@ class TestOpenAPIContracts:
                     break
             except requests.RequestException:
                 continue
-        
+
     def test_dr_health_check_api_v1_disaster_recovery_health_check_get_80(self):
         """
         Contract test for GET /api/v1/disaster-recovery/health-check
@@ -4581,9 +4582,9 @@ class TestOpenAPIContracts:
         Tags: Disaster Recovery, Disaster Recovery
         Auth Required: False
         """
-        
+
         # SUCCESS CASES
-        
+
         # Test successful request
         response = self._make_request(
             method="GET",
@@ -4591,10 +4592,10 @@ class TestOpenAPIContracts:
             params=None,
             json_data=None
         )
-        
+
         # Verify success response
         assert response.status_code in [200], f"Expected [200], got {response.status_code}: {response.text}"
-        
+
         # Verify response is valid JSON (for most endpoints)
         if response.headers.get('content-type', '').startswith('application/json'):
             try:
@@ -4602,9 +4603,9 @@ class TestOpenAPIContracts:
                 assert isinstance(json_response, (dict, list)), "Response should be valid JSON object or array"
             except json.JSONDecodeError as e:
                 pytest.fail(f"Response is not valid JSON: {e}")
-        
+
         # FAILURE CASES - Test error handling
-        
+
         # Test rate limiting (make multiple rapid requests)
         # Note: This test may be flaky depending on rate limit configuration
         rapid_responses = []
@@ -4623,7 +4624,7 @@ class TestOpenAPIContracts:
                     break
             except requests.RequestException:
                 continue
-        
+
     def test_schedule_restore_test_api_v1_disaster_recovery_test_restore__app_name__post_81(self):
         """
         Contract test for POST /api/v1/disaster-recovery/test-restore/{app_name}
@@ -4631,9 +4632,9 @@ class TestOpenAPIContracts:
         Tags: Disaster Recovery, Disaster Recovery
         Auth Required: False
         """
-        
+
         # SUCCESS CASES
-        
+
         # Test successful request
         response = self._make_request(
             method="POST",
@@ -4641,10 +4642,10 @@ class TestOpenAPIContracts:
             params=None,
             json_data=None
         )
-        
+
         # Verify success response
         assert response.status_code in [200], f"Expected [200], got {response.status_code}: {response.text}"
-        
+
         # Verify response is valid JSON (for most endpoints)
         if response.headers.get('content-type', '').startswith('application/json'):
             try:
@@ -4652,9 +4653,9 @@ class TestOpenAPIContracts:
                 assert isinstance(json_response, (dict, list)), "Response should be valid JSON object or array"
             except json.JSONDecodeError as e:
                 pytest.fail(f"Response is not valid JSON: {e}")
-        
+
         # FAILURE CASES - Test error handling
-        
+
         # Test 404 with invalid ID
         response_404 = self._make_request(
             method="POST",
@@ -4665,7 +4666,7 @@ class TestOpenAPIContracts:
         if response_404.status_code != 404:
             # Some endpoints may return different error codes
             assert response_404.status_code >= 400, f"Expected error code, got {response_404.status_code}"
-        
+
         # Test rate limiting (make multiple rapid requests)
         # Note: This test may be flaky depending on rate limit configuration
         rapid_responses = []
@@ -4684,7 +4685,7 @@ class TestOpenAPIContracts:
                     break
             except requests.RequestException:
                 continue
-        
+
     def test_get_dr_metrics_for_dashboard_api_v1_disaster_recovery_metrics_dashboard_get_82(self):
         """
         Contract test for GET /api/v1/disaster-recovery/metrics/dashboard
@@ -4692,9 +4693,9 @@ class TestOpenAPIContracts:
         Tags: Disaster Recovery, Disaster Recovery
         Auth Required: False
         """
-        
+
         # SUCCESS CASES
-        
+
         # Test successful request
         response = self._make_request(
             method="GET",
@@ -4702,10 +4703,10 @@ class TestOpenAPIContracts:
             params=None,
             json_data=None
         )
-        
+
         # Verify success response
         assert response.status_code in [200], f"Expected [200], got {response.status_code}: {response.text}"
-        
+
         # Verify response is valid JSON (for most endpoints)
         if response.headers.get('content-type', '').startswith('application/json'):
             try:
@@ -4713,9 +4714,9 @@ class TestOpenAPIContracts:
                 assert isinstance(json_response, (dict, list)), "Response should be valid JSON object or array"
             except json.JSONDecodeError as e:
                 pytest.fail(f"Response is not valid JSON: {e}")
-        
+
         # FAILURE CASES - Test error handling
-        
+
         # Test rate limiting (make multiple rapid requests)
         # Note: This test may be flaky depending on rate limit configuration
         rapid_responses = []
@@ -4734,7 +4735,7 @@ class TestOpenAPIContracts:
                     break
             except requests.RequestException:
                 continue
-        
+
     def test_get_compliance_dashboard_api_v1_compliance_dashboard_get_83(self):
         """
         Contract test for GET /api/v1/compliance/dashboard
@@ -4742,9 +4743,9 @@ class TestOpenAPIContracts:
         Tags: SOC2 Compliance, SOC2 Compliance
         Auth Required: False
         """
-        
+
         # SUCCESS CASES
-        
+
         # Test successful request
         response = self._make_request(
             method="GET",
@@ -4752,10 +4753,10 @@ class TestOpenAPIContracts:
             params=None,
             json_data=None
         )
-        
+
         # Verify success response
         assert response.status_code in [200], f"Expected [200], got {response.status_code}: {response.text}"
-        
+
         # Verify response is valid JSON (for most endpoints)
         if response.headers.get('content-type', '').startswith('application/json'):
             try:
@@ -4763,9 +4764,9 @@ class TestOpenAPIContracts:
                 assert isinstance(json_response, (dict, list)), "Response should be valid JSON object or array"
             except json.JSONDecodeError as e:
                 pytest.fail(f"Response is not valid JSON: {e}")
-        
+
         # FAILURE CASES - Test error handling
-        
+
         # Test rate limiting (make multiple rapid requests)
         # Note: This test may be flaky depending on rate limit configuration
         rapid_responses = []
@@ -4784,7 +4785,7 @@ class TestOpenAPIContracts:
                     break
             except requests.RequestException:
                 continue
-        
+
     def test_get_soc2_status_api_v1_compliance_soc2_status_get_84(self):
         """
         Contract test for GET /api/v1/compliance/soc2/status
@@ -4792,9 +4793,9 @@ class TestOpenAPIContracts:
         Tags: SOC2 Compliance, SOC2 Compliance
         Auth Required: False
         """
-        
+
         # SUCCESS CASES
-        
+
         # Test successful request
         response = self._make_request(
             method="GET",
@@ -4802,10 +4803,10 @@ class TestOpenAPIContracts:
             params=None,
             json_data=None
         )
-        
+
         # Verify success response
         assert response.status_code in [200], f"Expected [200], got {response.status_code}: {response.text}"
-        
+
         # Verify response is valid JSON (for most endpoints)
         if response.headers.get('content-type', '').startswith('application/json'):
             try:
@@ -4813,9 +4814,9 @@ class TestOpenAPIContracts:
                 assert isinstance(json_response, (dict, list)), "Response should be valid JSON object or array"
             except json.JSONDecodeError as e:
                 pytest.fail(f"Response is not valid JSON: {e}")
-        
+
         # FAILURE CASES - Test error handling
-        
+
         # Test rate limiting (make multiple rapid requests)
         # Note: This test may be flaky depending on rate limit configuration
         rapid_responses = []
@@ -4834,7 +4835,7 @@ class TestOpenAPIContracts:
                     break
             except requests.RequestException:
                 continue
-        
+
     def test_get_pii_data_map_api_v1_compliance_pii_data_map_get_85(self):
         """
         Contract test for GET /api/v1/compliance/pii/data-map
@@ -4842,9 +4843,9 @@ class TestOpenAPIContracts:
         Tags: SOC2 Compliance, SOC2 Compliance
         Auth Required: False
         """
-        
+
         # SUCCESS CASES
-        
+
         # Test successful request
         response = self._make_request(
             method="GET",
@@ -4852,10 +4853,10 @@ class TestOpenAPIContracts:
             params=None,
             json_data=None
         )
-        
+
         # Verify success response
         assert response.status_code in [200], f"Expected [200], got {response.status_code}: {response.text}"
-        
+
         # Verify response is valid JSON (for most endpoints)
         if response.headers.get('content-type', '').startswith('application/json'):
             try:
@@ -4863,9 +4864,9 @@ class TestOpenAPIContracts:
                 assert isinstance(json_response, (dict, list)), "Response should be valid JSON object or array"
             except json.JSONDecodeError as e:
                 pytest.fail(f"Response is not valid JSON: {e}")
-        
+
         # FAILURE CASES - Test error handling
-        
+
         # Test rate limiting (make multiple rapid requests)
         # Note: This test may be flaky depending on rate limit configuration
         rapid_responses = []
@@ -4884,7 +4885,7 @@ class TestOpenAPIContracts:
                     break
             except requests.RequestException:
                 continue
-        
+
     def test_list_pii_elements_api_v1_compliance_pii_elements_get_86(self):
         """
         Contract test for GET /api/v1/compliance/pii/elements
@@ -4892,9 +4893,9 @@ class TestOpenAPIContracts:
         Tags: SOC2 Compliance, SOC2 Compliance
         Auth Required: False
         """
-        
+
         # SUCCESS CASES
-        
+
         # Test successful request
         response = self._make_request(
             method="GET",
@@ -4902,10 +4903,10 @@ class TestOpenAPIContracts:
             params=None,
             json_data=None
         )
-        
+
         # Verify success response
         assert response.status_code in [200], f"Expected [200], got {response.status_code}: {response.text}"
-        
+
         # Verify response is valid JSON (for most endpoints)
         if response.headers.get('content-type', '').startswith('application/json'):
             try:
@@ -4913,9 +4914,9 @@ class TestOpenAPIContracts:
                 assert isinstance(json_response, (dict, list)), "Response should be valid JSON object or array"
             except json.JSONDecodeError as e:
                 pytest.fail(f"Response is not valid JSON: {e}")
-        
+
         # FAILURE CASES - Test error handling
-        
+
         # Test rate limiting (make multiple rapid requests)
         # Note: This test may be flaky depending on rate limit configuration
         rapid_responses = []
@@ -4934,7 +4935,7 @@ class TestOpenAPIContracts:
                     break
             except requests.RequestException:
                 continue
-        
+
     def test_get_data_lineage_api_v1_compliance_data_lineage_get_87(self):
         """
         Contract test for GET /api/v1/compliance/data-lineage
@@ -4942,9 +4943,9 @@ class TestOpenAPIContracts:
         Tags: SOC2 Compliance, SOC2 Compliance
         Auth Required: False
         """
-        
+
         # SUCCESS CASES
-        
+
         # Test successful request
         response = self._make_request(
             method="GET",
@@ -4952,10 +4953,10 @@ class TestOpenAPIContracts:
             params=None,
             json_data=None
         )
-        
+
         # Verify success response
         assert response.status_code in [200], f"Expected [200], got {response.status_code}: {response.text}"
-        
+
         # Verify response is valid JSON (for most endpoints)
         if response.headers.get('content-type', '').startswith('application/json'):
             try:
@@ -4963,9 +4964,9 @@ class TestOpenAPIContracts:
                 assert isinstance(json_response, (dict, list)), "Response should be valid JSON object or array"
             except json.JSONDecodeError as e:
                 pytest.fail(f"Response is not valid JSON: {e}")
-        
+
         # FAILURE CASES - Test error handling
-        
+
         # Test rate limiting (make multiple rapid requests)
         # Note: This test may be flaky depending on rate limit configuration
         rapid_responses = []
@@ -4984,7 +4985,7 @@ class TestOpenAPIContracts:
                     break
             except requests.RequestException:
                 continue
-        
+
     def test_create_data_lineage_mapping_api_v1_compliance_data_lineage_map_post_88(self):
         """
         Contract test for POST /api/v1/compliance/data-lineage/map
@@ -4992,9 +4993,9 @@ class TestOpenAPIContracts:
         Tags: SOC2 Compliance, SOC2 Compliance
         Auth Required: False
         """
-        
+
         # SUCCESS CASES
-        
+
         # Test successful request
         response = self._make_request(
             method="POST",
@@ -5005,10 +5006,10 @@ class TestOpenAPIContracts:
 },
             json_data=None
         )
-        
+
         # Verify success response
         assert response.status_code in [200], f"Expected [200], got {response.status_code}: {response.text}"
-        
+
         # Verify response is valid JSON (for most endpoints)
         if response.headers.get('content-type', '').startswith('application/json'):
             try:
@@ -5016,9 +5017,9 @@ class TestOpenAPIContracts:
                 assert isinstance(json_response, (dict, list)), "Response should be valid JSON object or array"
             except json.JSONDecodeError as e:
                 pytest.fail(f"Response is not valid JSON: {e}")
-        
+
         # FAILURE CASES - Test error handling
-        
+
         # Test rate limiting (make multiple rapid requests)
         # Note: This test may be flaky depending on rate limit configuration
         rapid_responses = []
@@ -5040,7 +5041,7 @@ class TestOpenAPIContracts:
                     break
             except requests.RequestException:
                 continue
-        
+
     def test_list_soc2_evidence_api_v1_compliance_evidence_get_89(self):
         """
         Contract test for GET /api/v1/compliance/evidence
@@ -5048,9 +5049,9 @@ class TestOpenAPIContracts:
         Tags: SOC2 Compliance, SOC2 Compliance
         Auth Required: False
         """
-        
+
         # SUCCESS CASES
-        
+
         # Test successful request
         response = self._make_request(
             method="GET",
@@ -5058,10 +5059,10 @@ class TestOpenAPIContracts:
             params=None,
             json_data=None
         )
-        
+
         # Verify success response
         assert response.status_code in [200], f"Expected [200], got {response.status_code}: {response.text}"
-        
+
         # Verify response is valid JSON (for most endpoints)
         if response.headers.get('content-type', '').startswith('application/json'):
             try:
@@ -5069,9 +5070,9 @@ class TestOpenAPIContracts:
                 assert isinstance(json_response, (dict, list)), "Response should be valid JSON object or array"
             except json.JSONDecodeError as e:
                 pytest.fail(f"Response is not valid JSON: {e}")
-        
+
         # FAILURE CASES - Test error handling
-        
+
         # Test rate limiting (make multiple rapid requests)
         # Note: This test may be flaky depending on rate limit configuration
         rapid_responses = []
@@ -5090,7 +5091,7 @@ class TestOpenAPIContracts:
                     break
             except requests.RequestException:
                 continue
-        
+
     def test_collect_security_evidence_api_v1_compliance_evidence_collect_post_90(self):
         """
         Contract test for POST /api/v1/compliance/evidence/collect
@@ -5098,9 +5099,9 @@ class TestOpenAPIContracts:
         Tags: SOC2 Compliance, SOC2 Compliance
         Auth Required: False
         """
-        
+
         # SUCCESS CASES
-        
+
         # Test successful request
         response = self._make_request(
             method="POST",
@@ -5108,10 +5109,10 @@ class TestOpenAPIContracts:
             params=None,
             json_data=None
         )
-        
+
         # Verify success response
         assert response.status_code in [200], f"Expected [200], got {response.status_code}: {response.text}"
-        
+
         # Verify response is valid JSON (for most endpoints)
         if response.headers.get('content-type', '').startswith('application/json'):
             try:
@@ -5119,9 +5120,9 @@ class TestOpenAPIContracts:
                 assert isinstance(json_response, (dict, list)), "Response should be valid JSON object or array"
             except json.JSONDecodeError as e:
                 pytest.fail(f"Response is not valid JSON: {e}")
-        
+
         # FAILURE CASES - Test error handling
-        
+
         # Test rate limiting (make multiple rapid requests)
         # Note: This test may be flaky depending on rate limit configuration
         rapid_responses = []
@@ -5140,7 +5141,7 @@ class TestOpenAPIContracts:
                     break
             except requests.RequestException:
                 continue
-        
+
     def test_scan_pii_compliance_api_v1_compliance_scan_pii_compliance_get_91(self):
         """
         Contract test for GET /api/v1/compliance/scan/pii-compliance
@@ -5148,9 +5149,9 @@ class TestOpenAPIContracts:
         Tags: SOC2 Compliance, SOC2 Compliance
         Auth Required: False
         """
-        
+
         # SUCCESS CASES
-        
+
         # Test successful request
         response = self._make_request(
             method="GET",
@@ -5158,10 +5159,10 @@ class TestOpenAPIContracts:
             params=None,
             json_data=None
         )
-        
+
         # Verify success response
         assert response.status_code in [200], f"Expected [200], got {response.status_code}: {response.text}"
-        
+
         # Verify response is valid JSON (for most endpoints)
         if response.headers.get('content-type', '').startswith('application/json'):
             try:
@@ -5169,9 +5170,9 @@ class TestOpenAPIContracts:
                 assert isinstance(json_response, (dict, list)), "Response should be valid JSON object or array"
             except json.JSONDecodeError as e:
                 pytest.fail(f"Response is not valid JSON: {e}")
-        
+
         # FAILURE CASES - Test error handling
-        
+
         # Test rate limiting (make multiple rapid requests)
         # Note: This test may be flaky depending on rate limit configuration
         rapid_responses = []
@@ -5190,7 +5191,7 @@ class TestOpenAPIContracts:
                     break
             except requests.RequestException:
                 continue
-        
+
     def test_generate_compliance_report_api_v1_compliance_report_compliance_get_92(self):
         """
         Contract test for GET /api/v1/compliance/report/compliance
@@ -5198,9 +5199,9 @@ class TestOpenAPIContracts:
         Tags: SOC2 Compliance, SOC2 Compliance
         Auth Required: False
         """
-        
+
         # SUCCESS CASES
-        
+
         # Test successful request
         response = self._make_request(
             method="GET",
@@ -5208,10 +5209,10 @@ class TestOpenAPIContracts:
             params=None,
             json_data=None
         )
-        
+
         # Verify success response
         assert response.status_code in [200], f"Expected [200], got {response.status_code}: {response.text}"
-        
+
         # Verify response is valid JSON (for most endpoints)
         if response.headers.get('content-type', '').startswith('application/json'):
             try:
@@ -5219,9 +5220,9 @@ class TestOpenAPIContracts:
                 assert isinstance(json_response, (dict, list)), "Response should be valid JSON object or array"
             except json.JSONDecodeError as e:
                 pytest.fail(f"Response is not valid JSON: {e}")
-        
+
         # FAILURE CASES - Test error handling
-        
+
         # Test rate limiting (make multiple rapid requests)
         # Note: This test may be flaky depending on rate limit configuration
         rapid_responses = []
@@ -5240,7 +5241,7 @@ class TestOpenAPIContracts:
                     break
             except requests.RequestException:
                 continue
-        
+
     def test_compliance_health_check_api_v1_compliance_health_check_get_93(self):
         """
         Contract test for GET /api/v1/compliance/health-check
@@ -5248,9 +5249,9 @@ class TestOpenAPIContracts:
         Tags: SOC2 Compliance, SOC2 Compliance
         Auth Required: False
         """
-        
+
         # SUCCESS CASES
-        
+
         # Test successful request
         response = self._make_request(
             method="GET",
@@ -5258,10 +5259,10 @@ class TestOpenAPIContracts:
             params=None,
             json_data=None
         )
-        
+
         # Verify success response
         assert response.status_code in [200], f"Expected [200], got {response.status_code}: {response.text}"
-        
+
         # Verify response is valid JSON (for most endpoints)
         if response.headers.get('content-type', '').startswith('application/json'):
             try:
@@ -5269,9 +5270,9 @@ class TestOpenAPIContracts:
                 assert isinstance(json_response, (dict, list)), "Response should be valid JSON object or array"
             except json.JSONDecodeError as e:
                 pytest.fail(f"Response is not valid JSON: {e}")
-        
+
         # FAILURE CASES - Test error handling
-        
+
         # Test rate limiting (make multiple rapid requests)
         # Note: This test may be flaky depending on rate limit configuration
         rapid_responses = []
@@ -5290,7 +5291,7 @@ class TestOpenAPIContracts:
                     break
             except requests.RequestException:
                 continue
-        
+
     def test_get_compliance_metrics_for_dashboard_api_v1_compliance_metrics_dashboard_get_94(self):
         """
         Contract test for GET /api/v1/compliance/metrics/dashboard
@@ -5298,9 +5299,9 @@ class TestOpenAPIContracts:
         Tags: SOC2 Compliance, SOC2 Compliance
         Auth Required: False
         """
-        
+
         # SUCCESS CASES
-        
+
         # Test successful request
         response = self._make_request(
             method="GET",
@@ -5308,10 +5309,10 @@ class TestOpenAPIContracts:
             params=None,
             json_data=None
         )
-        
+
         # Verify success response
         assert response.status_code in [200], f"Expected [200], got {response.status_code}: {response.text}"
-        
+
         # Verify response is valid JSON (for most endpoints)
         if response.headers.get('content-type', '').startswith('application/json'):
             try:
@@ -5319,9 +5320,9 @@ class TestOpenAPIContracts:
                 assert isinstance(json_response, (dict, list)), "Response should be valid JSON object or array"
             except json.JSONDecodeError as e:
                 pytest.fail(f"Response is not valid JSON: {e}")
-        
+
         # FAILURE CASES - Test error handling
-        
+
         # Test rate limiting (make multiple rapid requests)
         # Note: This test may be flaky depending on rate limit configuration
         rapid_responses = []
@@ -5340,7 +5341,7 @@ class TestOpenAPIContracts:
                     break
             except requests.RequestException:
                 continue
-        
+
     def test_get_executive_summary_api_v1_dashboard_executive_summary_get_95(self):
         """
         Contract test for GET /api/v1/dashboard/executive-summary
@@ -5348,9 +5349,9 @@ class TestOpenAPIContracts:
         Tags: CEO/Marketing Dashboard, CEO/Marketing Dashboard
         Auth Required: False
         """
-        
+
         # SUCCESS CASES
-        
+
         # Test successful request
         response = self._make_request(
             method="GET",
@@ -5358,10 +5359,10 @@ class TestOpenAPIContracts:
             params=None,
             json_data=None
         )
-        
+
         # Verify success response
         assert response.status_code in [200], f"Expected [200], got {response.status_code}: {response.text}"
-        
+
         # Verify response is valid JSON (for most endpoints)
         if response.headers.get('content-type', '').startswith('application/json'):
             try:
@@ -5369,9 +5370,9 @@ class TestOpenAPIContracts:
                 assert isinstance(json_response, (dict, list)), "Response should be valid JSON object or array"
             except json.JSONDecodeError as e:
                 pytest.fail(f"Response is not valid JSON: {e}")
-        
+
         # FAILURE CASES - Test error handling
-        
+
         # Test rate limiting (make multiple rapid requests)
         # Note: This test may be flaky depending on rate limit configuration
         rapid_responses = []
@@ -5390,7 +5391,7 @@ class TestOpenAPIContracts:
                     break
             except requests.RequestException:
                 continue
-        
+
     def test_get_dr_status_tiles_api_v1_dashboard_disaster_recovery_status_get_96(self):
         """
         Contract test for GET /api/v1/dashboard/disaster-recovery/status
@@ -5398,9 +5399,9 @@ class TestOpenAPIContracts:
         Tags: CEO/Marketing Dashboard, CEO/Marketing Dashboard
         Auth Required: False
         """
-        
+
         # SUCCESS CASES
-        
+
         # Test successful request
         response = self._make_request(
             method="GET",
@@ -5408,10 +5409,10 @@ class TestOpenAPIContracts:
             params=None,
             json_data=None
         )
-        
+
         # Verify success response
         assert response.status_code in [200], f"Expected [200], got {response.status_code}: {response.text}"
-        
+
         # Verify response is valid JSON (for most endpoints)
         if response.headers.get('content-type', '').startswith('application/json'):
             try:
@@ -5419,9 +5420,9 @@ class TestOpenAPIContracts:
                 assert isinstance(json_response, (dict, list)), "Response should be valid JSON object or array"
             except json.JSONDecodeError as e:
                 pytest.fail(f"Response is not valid JSON: {e}")
-        
+
         # FAILURE CASES - Test error handling
-        
+
         # Test rate limiting (make multiple rapid requests)
         # Note: This test may be flaky depending on rate limit configuration
         rapid_responses = []
@@ -5440,7 +5441,7 @@ class TestOpenAPIContracts:
                     break
             except requests.RequestException:
                 continue
-        
+
     def test_get_compliance_status_tiles_api_v1_dashboard_compliance_status_get_97(self):
         """
         Contract test for GET /api/v1/dashboard/compliance/status
@@ -5448,9 +5449,9 @@ class TestOpenAPIContracts:
         Tags: CEO/Marketing Dashboard, CEO/Marketing Dashboard
         Auth Required: False
         """
-        
+
         # SUCCESS CASES
-        
+
         # Test successful request
         response = self._make_request(
             method="GET",
@@ -5458,10 +5459,10 @@ class TestOpenAPIContracts:
             params=None,
             json_data=None
         )
-        
+
         # Verify success response
         assert response.status_code in [200], f"Expected [200], got {response.status_code}: {response.text}"
-        
+
         # Verify response is valid JSON (for most endpoints)
         if response.headers.get('content-type', '').startswith('application/json'):
             try:
@@ -5469,9 +5470,9 @@ class TestOpenAPIContracts:
                 assert isinstance(json_response, (dict, list)), "Response should be valid JSON object or array"
             except json.JSONDecodeError as e:
                 pytest.fail(f"Response is not valid JSON: {e}")
-        
+
         # FAILURE CASES - Test error handling
-        
+
         # Test rate limiting (make multiple rapid requests)
         # Note: This test may be flaky depending on rate limit configuration
         rapid_responses = []
@@ -5490,7 +5491,7 @@ class TestOpenAPIContracts:
                     break
             except requests.RequestException:
                 continue
-        
+
     def test_get_system_health_overview_api_v1_dashboard_health_overview_get_98(self):
         """
         Contract test for GET /api/v1/dashboard/health-overview
@@ -5498,9 +5499,9 @@ class TestOpenAPIContracts:
         Tags: CEO/Marketing Dashboard, CEO/Marketing Dashboard
         Auth Required: False
         """
-        
+
         # SUCCESS CASES
-        
+
         # Test successful request
         response = self._make_request(
             method="GET",
@@ -5508,10 +5509,10 @@ class TestOpenAPIContracts:
             params=None,
             json_data=None
         )
-        
+
         # Verify success response
         assert response.status_code in [200], f"Expected [200], got {response.status_code}: {response.text}"
-        
+
         # Verify response is valid JSON (for most endpoints)
         if response.headers.get('content-type', '').startswith('application/json'):
             try:
@@ -5519,9 +5520,9 @@ class TestOpenAPIContracts:
                 assert isinstance(json_response, (dict, list)), "Response should be valid JSON object or array"
             except json.JSONDecodeError as e:
                 pytest.fail(f"Response is not valid JSON: {e}")
-        
+
         # FAILURE CASES - Test error handling
-        
+
         # Test rate limiting (make multiple rapid requests)
         # Note: This test may be flaky depending on rate limit configuration
         rapid_responses = []
@@ -5540,7 +5541,7 @@ class TestOpenAPIContracts:
                     break
             except requests.RequestException:
                 continue
-        
+
     def test_get_infrastructure_status_api_v1_infrastructure_status_get_99(self):
         """
         Contract test for GET /api/v1/infrastructure/status
@@ -5548,9 +5549,9 @@ class TestOpenAPIContracts:
         Tags: Infrastructure Status, Infrastructure
         Auth Required: False
         """
-        
+
         # SUCCESS CASES
-        
+
         # Test successful request
         response = self._make_request(
             method="GET",
@@ -5558,10 +5559,10 @@ class TestOpenAPIContracts:
             params=None,
             json_data=None
         )
-        
+
         # Verify success response
         assert response.status_code in [200], f"Expected [200], got {response.status_code}: {response.text}"
-        
+
         # Verify response is valid JSON (for most endpoints)
         if response.headers.get('content-type', '').startswith('application/json'):
             try:
@@ -5569,9 +5570,9 @@ class TestOpenAPIContracts:
                 assert isinstance(json_response, (dict, list)), "Response should be valid JSON object or array"
             except json.JSONDecodeError as e:
                 pytest.fail(f"Response is not valid JSON: {e}")
-        
+
         # FAILURE CASES - Test error handling
-        
+
         # Test rate limiting (make multiple rapid requests)
         # Note: This test may be flaky depending on rate limit configuration
         rapid_responses = []
@@ -5590,7 +5591,7 @@ class TestOpenAPIContracts:
                     break
             except requests.RequestException:
                 continue
-        
+
     def test_get_disaster_recovery_status_api_v1_infrastructure_disaster_recovery_status_get_100(self):
         """
         Contract test for GET /api/v1/infrastructure/disaster-recovery/status
@@ -5598,9 +5599,9 @@ class TestOpenAPIContracts:
         Tags: Infrastructure Status, Infrastructure
         Auth Required: False
         """
-        
+
         # SUCCESS CASES
-        
+
         # Test successful request
         response = self._make_request(
             method="GET",
@@ -5608,10 +5609,10 @@ class TestOpenAPIContracts:
             params=None,
             json_data=None
         )
-        
+
         # Verify success response
         assert response.status_code in [200], f"Expected [200], got {response.status_code}: {response.text}"
-        
+
         # Verify response is valid JSON (for most endpoints)
         if response.headers.get('content-type', '').startswith('application/json'):
             try:
@@ -5619,9 +5620,9 @@ class TestOpenAPIContracts:
                 assert isinstance(json_response, (dict, list)), "Response should be valid JSON object or array"
             except json.JSONDecodeError as e:
                 pytest.fail(f"Response is not valid JSON: {e}")
-        
+
         # FAILURE CASES - Test error handling
-        
+
         # Test rate limiting (make multiple rapid requests)
         # Note: This test may be flaky depending on rate limit configuration
         rapid_responses = []
@@ -5640,7 +5641,7 @@ class TestOpenAPIContracts:
                     break
             except requests.RequestException:
                 continue
-        
+
     def test_run_disaster_recovery_test_api_v1_infrastructure_disaster_recovery_test__app_name__post_101(self):
         """
         Contract test for POST /api/v1/infrastructure/disaster-recovery/test/{app_name}
@@ -5648,9 +5649,9 @@ class TestOpenAPIContracts:
         Tags: Infrastructure Status, Infrastructure
         Auth Required: False
         """
-        
+
         # SUCCESS CASES
-        
+
         # Test successful request
         response = self._make_request(
             method="POST",
@@ -5660,10 +5661,10 @@ class TestOpenAPIContracts:
 },
             json_data=None
         )
-        
+
         # Verify success response
         assert response.status_code in [200], f"Expected [200], got {response.status_code}: {response.text}"
-        
+
         # Verify response is valid JSON (for most endpoints)
         if response.headers.get('content-type', '').startswith('application/json'):
             try:
@@ -5671,9 +5672,9 @@ class TestOpenAPIContracts:
                 assert isinstance(json_response, (dict, list)), "Response should be valid JSON object or array"
             except json.JSONDecodeError as e:
                 pytest.fail(f"Response is not valid JSON: {e}")
-        
+
         # FAILURE CASES - Test error handling
-        
+
         # Test 404 with invalid ID
         response_404 = self._make_request(
             method="POST",
@@ -5686,7 +5687,7 @@ class TestOpenAPIContracts:
         if response_404.status_code != 404:
             # Some endpoints may return different error codes
             assert response_404.status_code >= 400, f"Expected error code, got {response_404.status_code}"
-        
+
         # Test rate limiting (make multiple rapid requests)
         # Note: This test may be flaky depending on rate limit configuration
         rapid_responses = []
@@ -5707,7 +5708,7 @@ class TestOpenAPIContracts:
                     break
             except requests.RequestException:
                 continue
-        
+
     def test_get_disaster_recovery_test_results_api_v1_infrastructure_disaster_recovery_tests_get_102(self):
         """
         Contract test for GET /api/v1/infrastructure/disaster-recovery/tests
@@ -5715,9 +5716,9 @@ class TestOpenAPIContracts:
         Tags: Infrastructure Status, Infrastructure
         Auth Required: False
         """
-        
+
         # SUCCESS CASES
-        
+
         # Test successful request
         response = self._make_request(
             method="GET",
@@ -5727,10 +5728,10 @@ class TestOpenAPIContracts:
 },
             json_data=None
         )
-        
+
         # Verify success response
         assert response.status_code in [200], f"Expected [200], got {response.status_code}: {response.text}"
-        
+
         # Verify response is valid JSON (for most endpoints)
         if response.headers.get('content-type', '').startswith('application/json'):
             try:
@@ -5738,9 +5739,9 @@ class TestOpenAPIContracts:
                 assert isinstance(json_response, (dict, list)), "Response should be valid JSON object or array"
             except json.JSONDecodeError as e:
                 pytest.fail(f"Response is not valid JSON: {e}")
-        
+
         # FAILURE CASES - Test error handling
-        
+
         # Test rate limiting (make multiple rapid requests)
         # Note: This test may be flaky depending on rate limit configuration
         rapid_responses = []
@@ -5761,7 +5762,7 @@ class TestOpenAPIContracts:
                     break
             except requests.RequestException:
                 continue
-        
+
     def test_get_soc2_compliance_status_api_v1_infrastructure_soc2_compliance_status_get_103(self):
         """
         Contract test for GET /api/v1/infrastructure/soc2/compliance-status
@@ -5769,9 +5770,9 @@ class TestOpenAPIContracts:
         Tags: Infrastructure Status, Infrastructure
         Auth Required: False
         """
-        
+
         # SUCCESS CASES
-        
+
         # Test successful request
         response = self._make_request(
             method="GET",
@@ -5779,10 +5780,10 @@ class TestOpenAPIContracts:
             params=None,
             json_data=None
         )
-        
+
         # Verify success response
         assert response.status_code in [200], f"Expected [200], got {response.status_code}: {response.text}"
-        
+
         # Verify response is valid JSON (for most endpoints)
         if response.headers.get('content-type', '').startswith('application/json'):
             try:
@@ -5790,9 +5791,9 @@ class TestOpenAPIContracts:
                 assert isinstance(json_response, (dict, list)), "Response should be valid JSON object or array"
             except json.JSONDecodeError as e:
                 pytest.fail(f"Response is not valid JSON: {e}")
-        
+
         # FAILURE CASES - Test error handling
-        
+
         # Test rate limiting (make multiple rapid requests)
         # Note: This test may be flaky depending on rate limit configuration
         rapid_responses = []
@@ -5811,7 +5812,7 @@ class TestOpenAPIContracts:
                     break
             except requests.RequestException:
                 continue
-        
+
     def test_collect_soc2_evidence_api_v1_infrastructure_soc2_collect_evidence_post_104(self):
         """
         Contract test for POST /api/v1/infrastructure/soc2/collect-evidence
@@ -5819,9 +5820,9 @@ class TestOpenAPIContracts:
         Tags: Infrastructure Status, Infrastructure
         Auth Required: False
         """
-        
+
         # SUCCESS CASES
-        
+
         # Test successful request
         response = self._make_request(
             method="POST",
@@ -5829,10 +5830,10 @@ class TestOpenAPIContracts:
             params=None,
             json_data=None
         )
-        
+
         # Verify success response
         assert response.status_code in [200], f"Expected [200], got {response.status_code}: {response.text}"
-        
+
         # Verify response is valid JSON (for most endpoints)
         if response.headers.get('content-type', '').startswith('application/json'):
             try:
@@ -5840,9 +5841,9 @@ class TestOpenAPIContracts:
                 assert isinstance(json_response, (dict, list)), "Response should be valid JSON object or array"
             except json.JSONDecodeError as e:
                 pytest.fail(f"Response is not valid JSON: {e}")
-        
+
         # FAILURE CASES - Test error handling
-        
+
         # Test rate limiting (make multiple rapid requests)
         # Note: This test may be flaky depending on rate limit configuration
         rapid_responses = []
@@ -5861,7 +5862,7 @@ class TestOpenAPIContracts:
                     break
             except requests.RequestException:
                 continue
-        
+
     def test_get_pii_compliance_status_api_v1_infrastructure_pii_compliance_status_get_105(self):
         """
         Contract test for GET /api/v1/infrastructure/pii/compliance-status
@@ -5869,9 +5870,9 @@ class TestOpenAPIContracts:
         Tags: Infrastructure Status, Infrastructure
         Auth Required: False
         """
-        
+
         # SUCCESS CASES
-        
+
         # Test successful request
         response = self._make_request(
             method="GET",
@@ -5879,10 +5880,10 @@ class TestOpenAPIContracts:
             params=None,
             json_data=None
         )
-        
+
         # Verify success response
         assert response.status_code in [200], f"Expected [200], got {response.status_code}: {response.text}"
-        
+
         # Verify response is valid JSON (for most endpoints)
         if response.headers.get('content-type', '').startswith('application/json'):
             try:
@@ -5890,9 +5891,9 @@ class TestOpenAPIContracts:
                 assert isinstance(json_response, (dict, list)), "Response should be valid JSON object or array"
             except json.JSONDecodeError as e:
                 pytest.fail(f"Response is not valid JSON: {e}")
-        
+
         # FAILURE CASES - Test error handling
-        
+
         # Test rate limiting (make multiple rapid requests)
         # Note: This test may be flaky depending on rate limit configuration
         rapid_responses = []
@@ -5911,7 +5912,7 @@ class TestOpenAPIContracts:
                     break
             except requests.RequestException:
                 continue
-        
+
     def test_run_pii_discovery_api_v1_infrastructure_pii_discovery_post_106(self):
         """
         Contract test for POST /api/v1/infrastructure/pii/discovery
@@ -5919,9 +5920,9 @@ class TestOpenAPIContracts:
         Tags: Infrastructure Status, Infrastructure
         Auth Required: False
         """
-        
+
         # SUCCESS CASES
-        
+
         # Test successful request
         response = self._make_request(
             method="POST",
@@ -5929,10 +5930,10 @@ class TestOpenAPIContracts:
             params=None,
             json_data=None
         )
-        
+
         # Verify success response
         assert response.status_code in [200], f"Expected [200], got {response.status_code}: {response.text}"
-        
+
         # Verify response is valid JSON (for most endpoints)
         if response.headers.get('content-type', '').startswith('application/json'):
             try:
@@ -5940,9 +5941,9 @@ class TestOpenAPIContracts:
                 assert isinstance(json_response, (dict, list)), "Response should be valid JSON object or array"
             except json.JSONDecodeError as e:
                 pytest.fail(f"Response is not valid JSON: {e}")
-        
+
         # FAILURE CASES - Test error handling
-        
+
         # Test rate limiting (make multiple rapid requests)
         # Note: This test may be flaky depending on rate limit configuration
         rapid_responses = []
@@ -5961,7 +5962,7 @@ class TestOpenAPIContracts:
                     break
             except requests.RequestException:
                 continue
-        
+
     def test_process_data_subject_request_api_v1_infrastructure_pii_data_subject_request_post_107(self):
         """
         Contract test for POST /api/v1/infrastructure/pii/data-subject-request
@@ -5969,9 +5970,9 @@ class TestOpenAPIContracts:
         Tags: Infrastructure Status, Infrastructure
         Auth Required: False
         """
-        
+
         # SUCCESS CASES
-        
+
         # Test successful request
         response = self._make_request(
             method="POST",
@@ -5983,10 +5984,10 @@ class TestOpenAPIContracts:
 },
             json_data=None
         )
-        
+
         # Verify success response
         assert response.status_code in [200], f"Expected [200], got {response.status_code}: {response.text}"
-        
+
         # Verify response is valid JSON (for most endpoints)
         if response.headers.get('content-type', '').startswith('application/json'):
             try:
@@ -5994,9 +5995,9 @@ class TestOpenAPIContracts:
                 assert isinstance(json_response, (dict, list)), "Response should be valid JSON object or array"
             except json.JSONDecodeError as e:
                 pytest.fail(f"Response is not valid JSON: {e}")
-        
+
         # FAILURE CASES - Test error handling
-        
+
         # Test rate limiting (make multiple rapid requests)
         # Note: This test may be flaky depending on rate limit configuration
         rapid_responses = []
@@ -6019,7 +6020,7 @@ class TestOpenAPIContracts:
                     break
             except requests.RequestException:
                 continue
-        
+
     def test_infrastructure_health_check_api_v1_infrastructure_health_get_108(self):
         """
         Contract test for GET /api/v1/infrastructure/health
@@ -6027,9 +6028,9 @@ class TestOpenAPIContracts:
         Tags: Infrastructure Status, Infrastructure
         Auth Required: False
         """
-        
+
         # SUCCESS CASES
-        
+
         # Test successful request
         response = self._make_request(
             method="GET",
@@ -6037,10 +6038,10 @@ class TestOpenAPIContracts:
             params=None,
             json_data=None
         )
-        
+
         # Verify success response
         assert response.status_code in [200], f"Expected [200], got {response.status_code}: {response.text}"
-        
+
         # Verify response is valid JSON (for most endpoints)
         if response.headers.get('content-type', '').startswith('application/json'):
             try:
@@ -6048,9 +6049,9 @@ class TestOpenAPIContracts:
                 assert isinstance(json_response, (dict, list)), "Response should be valid JSON object or array"
             except json.JSONDecodeError as e:
                 pytest.fail(f"Response is not valid JSON: {e}")
-        
+
         # FAILURE CASES - Test error handling
-        
+
         # Test rate limiting (make multiple rapid requests)
         # Note: This test may be flaky depending on rate limit configuration
         rapid_responses = []
@@ -6069,7 +6070,7 @@ class TestOpenAPIContracts:
                     break
             except requests.RequestException:
                 continue
-        
+
     def test_get_compliance_dashboard_api_v1_infrastructure_compliance_dashboard_get_109(self):
         """
         Contract test for GET /api/v1/infrastructure/compliance/dashboard
@@ -6077,9 +6078,9 @@ class TestOpenAPIContracts:
         Tags: Infrastructure Status, Infrastructure
         Auth Required: False
         """
-        
+
         # SUCCESS CASES
-        
+
         # Test successful request
         response = self._make_request(
             method="GET",
@@ -6087,10 +6088,10 @@ class TestOpenAPIContracts:
             params=None,
             json_data=None
         )
-        
+
         # Verify success response
         assert response.status_code in [200], f"Expected [200], got {response.status_code}: {response.text}"
-        
+
         # Verify response is valid JSON (for most endpoints)
         if response.headers.get('content-type', '').startswith('application/json'):
             try:
@@ -6098,9 +6099,9 @@ class TestOpenAPIContracts:
                 assert isinstance(json_response, (dict, list)), "Response should be valid JSON object or array"
             except json.JSONDecodeError as e:
                 pytest.fail(f"Response is not valid JSON: {e}")
-        
+
         # FAILURE CASES - Test error handling
-        
+
         # Test rate limiting (make multiple rapid requests)
         # Note: This test may be flaky depending on rate limit configuration
         rapid_responses = []
@@ -6119,7 +6120,7 @@ class TestOpenAPIContracts:
                     break
             except requests.RequestException:
                 continue
-        
+
     def test_receive_task_agent_task_post_110(self):
         """
         Contract test for POST /agent/task
@@ -6127,9 +6128,9 @@ class TestOpenAPIContracts:
         Tags: agent, Agent Bridge
         Auth Required: False
         """
-        
+
         # SUCCESS CASES
-        
+
         # Test successful request
         response = self._make_request(
             method="POST",
@@ -6144,10 +6145,10 @@ class TestOpenAPIContracts:
         "resources": "test_resources"
 }
         )
-        
+
         # Verify success response
         assert response.status_code in [202], f"Expected [202], got {response.status_code}: {response.text}"
-        
+
         # Verify response is valid JSON (for most endpoints)
         if response.headers.get('content-type', '').startswith('application/json'):
             try:
@@ -6155,9 +6156,9 @@ class TestOpenAPIContracts:
                 assert isinstance(json_response, (dict, list)), "Response should be valid JSON object or array"
             except json.JSONDecodeError as e:
                 pytest.fail(f"Response is not valid JSON: {e}")
-        
+
         # FAILURE CASES - Test error handling
-        
+
         # Test rate limiting (make multiple rapid requests)
         # Note: This test may be flaky depending on rate limit configuration
         rapid_responses = []
@@ -6183,7 +6184,7 @@ class TestOpenAPIContracts:
                     break
             except requests.RequestException:
                 continue
-        
+
     def test_register_agent_agent_register_post_111(self):
         """
         Contract test for POST /agent/register
@@ -6191,9 +6192,9 @@ class TestOpenAPIContracts:
         Tags: agent, Agent Bridge
         Auth Required: False
         """
-        
+
         # SUCCESS CASES
-        
+
         # Test successful request
         response = self._make_request(
             method="POST",
@@ -6201,10 +6202,10 @@ class TestOpenAPIContracts:
             params=None,
             json_data=None
         )
-        
+
         # Verify success response
         assert response.status_code in [200], f"Expected [200], got {response.status_code}: {response.text}"
-        
+
         # Verify response is valid JSON (for most endpoints)
         if response.headers.get('content-type', '').startswith('application/json'):
             try:
@@ -6212,9 +6213,9 @@ class TestOpenAPIContracts:
                 assert isinstance(json_response, (dict, list)), "Response should be valid JSON object or array"
             except json.JSONDecodeError as e:
                 pytest.fail(f"Response is not valid JSON: {e}")
-        
+
         # FAILURE CASES - Test error handling
-        
+
         # Test rate limiting (make multiple rapid requests)
         # Note: This test may be flaky depending on rate limit configuration
         rapid_responses = []
@@ -6233,7 +6234,7 @@ class TestOpenAPIContracts:
                     break
             except requests.RequestException:
                 continue
-        
+
     def test_get_capabilities_agent_capabilities_get_112(self):
         """
         Contract test for GET /agent/capabilities
@@ -6241,9 +6242,9 @@ class TestOpenAPIContracts:
         Tags: agent, Agent Bridge
         Auth Required: False
         """
-        
+
         # SUCCESS CASES
-        
+
         # Test successful request
         response = self._make_request(
             method="GET",
@@ -6251,10 +6252,10 @@ class TestOpenAPIContracts:
             params=None,
             json_data=None
         )
-        
+
         # Verify success response
         assert response.status_code in [200], f"Expected [200], got {response.status_code}: {response.text}"
-        
+
         # Verify response is valid JSON (for most endpoints)
         if response.headers.get('content-type', '').startswith('application/json'):
             try:
@@ -6262,9 +6263,9 @@ class TestOpenAPIContracts:
                 assert isinstance(json_response, (dict, list)), "Response should be valid JSON object or array"
             except json.JSONDecodeError as e:
                 pytest.fail(f"Response is not valid JSON: {e}")
-        
+
         # FAILURE CASES - Test error handling
-        
+
         # Test rate limiting (make multiple rapid requests)
         # Note: This test may be flaky depending on rate limit configuration
         rapid_responses = []
@@ -6283,7 +6284,7 @@ class TestOpenAPIContracts:
                     break
             except requests.RequestException:
                 continue
-        
+
     def test_agent_health_agent_health_get_113(self):
         """
         Contract test for GET /agent/health
@@ -6291,9 +6292,9 @@ class TestOpenAPIContracts:
         Tags: agent, Agent Bridge
         Auth Required: False
         """
-        
+
         # SUCCESS CASES
-        
+
         # Test successful request
         response = self._make_request(
             method="GET",
@@ -6301,10 +6302,10 @@ class TestOpenAPIContracts:
             params=None,
             json_data=None
         )
-        
+
         # Verify success response
         assert response.status_code in [200], f"Expected [200], got {response.status_code}: {response.text}"
-        
+
         # Verify response is valid JSON (for most endpoints)
         if response.headers.get('content-type', '').startswith('application/json'):
             try:
@@ -6312,9 +6313,9 @@ class TestOpenAPIContracts:
                 assert isinstance(json_response, (dict, list)), "Response should be valid JSON object or array"
             except json.JSONDecodeError as e:
                 pytest.fail(f"Response is not valid JSON: {e}")
-        
+
         # FAILURE CASES - Test error handling
-        
+
         # Test rate limiting (make multiple rapid requests)
         # Note: This test may be flaky depending on rate limit configuration
         rapid_responses = []
@@ -6333,7 +6334,7 @@ class TestOpenAPIContracts:
                     break
             except requests.RequestException:
                 continue
-        
+
     def test_receive_event_agent_events_post_114(self):
         """
         Contract test for POST /agent/events
@@ -6341,9 +6342,9 @@ class TestOpenAPIContracts:
         Tags: agent, Agent Bridge
         Auth Required: False
         """
-        
+
         # SUCCESS CASES
-        
+
         # Test successful request
         response = self._make_request(
             method="POST",
@@ -6351,10 +6352,10 @@ class TestOpenAPIContracts:
             params=None,
             json_data=None
         )
-        
+
         # Verify success response
         assert response.status_code in [200], f"Expected [200], got {response.status_code}: {response.text}"
-        
+
         # Verify response is valid JSON (for most endpoints)
         if response.headers.get('content-type', '').startswith('application/json'):
             try:
@@ -6362,9 +6363,9 @@ class TestOpenAPIContracts:
                 assert isinstance(json_response, (dict, list)), "Response should be valid JSON object or array"
             except json.JSONDecodeError as e:
                 pytest.fail(f"Response is not valid JSON: {e}")
-        
+
         # FAILURE CASES - Test error handling
-        
+
         # Test rate limiting (make multiple rapid requests)
         # Note: This test may be flaky depending on rate limit configuration
         rapid_responses = []
@@ -6383,7 +6384,7 @@ class TestOpenAPIContracts:
                     break
             except requests.RequestException:
                 continue
-        
+
     def test_log_interaction_endpoint_interactions_log_post_115(self):
         """
         Contract test for POST /interactions/log
@@ -6391,9 +6392,9 @@ class TestOpenAPIContracts:
         Tags: interactions, interactions
         Auth Required: False
         """
-        
+
         # SUCCESS CASES
-        
+
         # Test successful request
         response = self._make_request(
             method="POST",
@@ -6408,10 +6409,10 @@ class TestOpenAPIContracts:
         "filters": "test_filters"
 }
         )
-        
+
         # Verify success response
         assert response.status_code in [200], f"Expected [200], got {response.status_code}: {response.text}"
-        
+
         # Verify response is valid JSON (for most endpoints)
         if response.headers.get('content-type', '').startswith('application/json'):
             try:
@@ -6419,9 +6420,9 @@ class TestOpenAPIContracts:
                 assert isinstance(json_response, (dict, list)), "Response should be valid JSON object or array"
             except json.JSONDecodeError as e:
                 pytest.fail(f"Response is not valid JSON: {e}")
-        
+
         # FAILURE CASES - Test error handling
-        
+
         # Test rate limiting (make multiple rapid requests)
         # Note: This test may be flaky depending on rate limit configuration
         rapid_responses = []
@@ -6447,7 +6448,7 @@ class TestOpenAPIContracts:
                     break
             except requests.RequestException:
                 continue
-        
+
     def test_bulk_log_interactions_endpoint_interactions_bulk_log_post_116(self):
         """
         Contract test for POST /interactions/bulk-log
@@ -6455,9 +6456,9 @@ class TestOpenAPIContracts:
         Tags: interactions, interactions
         Auth Required: False
         """
-        
+
         # SUCCESS CASES
-        
+
         # Test successful request
         response = self._make_request(
             method="POST",
@@ -6469,10 +6470,10 @@ class TestOpenAPIContracts:
         ]
 }
         )
-        
+
         # Verify success response
         assert response.status_code in [200], f"Expected [200], got {response.status_code}: {response.text}"
-        
+
         # Verify response is valid JSON (for most endpoints)
         if response.headers.get('content-type', '').startswith('application/json'):
             try:
@@ -6480,9 +6481,9 @@ class TestOpenAPIContracts:
                 assert isinstance(json_response, (dict, list)), "Response should be valid JSON object or array"
             except json.JSONDecodeError as e:
                 pytest.fail(f"Response is not valid JSON: {e}")
-        
+
         # FAILURE CASES - Test error handling
-        
+
         # Test rate limiting (make multiple rapid requests)
         # Note: This test may be flaky depending on rate limit configuration
         rapid_responses = []
@@ -6505,7 +6506,7 @@ class TestOpenAPIContracts:
                     break
             except requests.RequestException:
                 continue
-        
+
     def test_start_magic_onboarding_api_v1_onboarding_start_post_117(self):
         """
         Contract test for POST /api/v1/onboarding/start
@@ -6513,9 +6514,9 @@ class TestOpenAPIContracts:
         Tags: Magic Onboarding, Magic Onboarding
         Auth Required: False
         """
-        
+
         # SUCCESS CASES
-        
+
         # Test successful request
         response = self._make_request(
             method="POST",
@@ -6528,10 +6529,10 @@ class TestOpenAPIContracts:
         "priority_areas": "test_priority_areas"
 }
         )
-        
+
         # Verify success response
         assert response.status_code in [200], f"Expected [200], got {response.status_code}: {response.text}"
-        
+
         # Verify response is valid JSON (for most endpoints)
         if response.headers.get('content-type', '').startswith('application/json'):
             try:
@@ -6539,9 +6540,9 @@ class TestOpenAPIContracts:
                 assert isinstance(json_response, (dict, list)), "Response should be valid JSON object or array"
             except json.JSONDecodeError as e:
                 pytest.fail(f"Response is not valid JSON: {e}")
-        
+
         # FAILURE CASES - Test error handling
-        
+
         # Test rate limiting (make multiple rapid requests)
         # Note: This test may be flaky depending on rate limit configuration
         rapid_responses = []
@@ -6565,7 +6566,7 @@ class TestOpenAPIContracts:
                     break
             except requests.RequestException:
                 continue
-        
+
     def test_continue_magic_onboarding_api_v1_onboarding_continue_post_118(self):
         """
         Contract test for POST /api/v1/onboarding/continue
@@ -6573,9 +6574,9 @@ class TestOpenAPIContracts:
         Tags: Magic Onboarding, Magic Onboarding
         Auth Required: False
         """
-        
+
         # SUCCESS CASES
-        
+
         # Test successful request
         response = self._make_request(
             method="POST",
@@ -6588,10 +6589,10 @@ class TestOpenAPIContracts:
         "skip_current_question": "test_skip_current_question"
 }
         )
-        
+
         # Verify success response
         assert response.status_code in [200], f"Expected [200], got {response.status_code}: {response.text}"
-        
+
         # Verify response is valid JSON (for most endpoints)
         if response.headers.get('content-type', '').startswith('application/json'):
             try:
@@ -6599,9 +6600,9 @@ class TestOpenAPIContracts:
                 assert isinstance(json_response, (dict, list)), "Response should be valid JSON object or array"
             except json.JSONDecodeError as e:
                 pytest.fail(f"Response is not valid JSON: {e}")
-        
+
         # FAILURE CASES - Test error handling
-        
+
         # Test rate limiting (make multiple rapid requests)
         # Note: This test may be flaky depending on rate limit configuration
         rapid_responses = []
@@ -6625,7 +6626,7 @@ class TestOpenAPIContracts:
                     break
             except requests.RequestException:
                 continue
-        
+
     def test_get_profile_completion_api_v1_onboarding_profile_completion_get_119(self):
         """
         Contract test for GET /api/v1/onboarding/profile/completion
@@ -6633,9 +6634,9 @@ class TestOpenAPIContracts:
         Tags: Magic Onboarding, Magic Onboarding
         Auth Required: False
         """
-        
+
         # SUCCESS CASES
-        
+
         # Test successful request
         response = self._make_request(
             method="GET",
@@ -6643,10 +6644,10 @@ class TestOpenAPIContracts:
             params=None,
             json_data=None
         )
-        
+
         # Verify success response
         assert response.status_code in [200], f"Expected [200], got {response.status_code}: {response.text}"
-        
+
         # Verify response is valid JSON (for most endpoints)
         if response.headers.get('content-type', '').startswith('application/json'):
             try:
@@ -6654,9 +6655,9 @@ class TestOpenAPIContracts:
                 assert isinstance(json_response, (dict, list)), "Response should be valid JSON object or array"
             except json.JSONDecodeError as e:
                 pytest.fail(f"Response is not valid JSON: {e}")
-        
+
         # FAILURE CASES - Test error handling
-        
+
         # Test rate limiting (make multiple rapid requests)
         # Note: This test may be flaky depending on rate limit configuration
         rapid_responses = []
@@ -6675,7 +6676,7 @@ class TestOpenAPIContracts:
                     break
             except requests.RequestException:
                 continue
-        
+
     def test_update_profile_from_onboarding_api_v1_onboarding_profile_update_put_120(self):
         """
         Contract test for PUT /api/v1/onboarding/profile/update
@@ -6683,9 +6684,9 @@ class TestOpenAPIContracts:
         Tags: Magic Onboarding, Magic Onboarding
         Auth Required: False
         """
-        
+
         # SUCCESS CASES
-        
+
         # Test successful request
         response = self._make_request(
             method="PUT",
@@ -6697,10 +6698,10 @@ class TestOpenAPIContracts:
         "source": "test_source"
 }
         )
-        
+
         # Verify success response
         assert response.status_code in [200], f"Expected [200], got {response.status_code}: {response.text}"
-        
+
         # Verify response is valid JSON (for most endpoints)
         if response.headers.get('content-type', '').startswith('application/json'):
             try:
@@ -6708,9 +6709,9 @@ class TestOpenAPIContracts:
                 assert isinstance(json_response, (dict, list)), "Response should be valid JSON object or array"
             except json.JSONDecodeError as e:
                 pytest.fail(f"Response is not valid JSON: {e}")
-        
+
         # FAILURE CASES - Test error handling
-        
+
         # Test rate limiting (make multiple rapid requests)
         # Note: This test may be flaky depending on rate limit configuration
         rapid_responses = []
@@ -6733,7 +6734,7 @@ class TestOpenAPIContracts:
                     break
             except requests.RequestException:
                 continue
-        
+
     def test_get_onboarding_session_api_v1_onboarding_session__session_id__get_121(self):
         """
         Contract test for GET /api/v1/onboarding/session/{session_id}
@@ -6741,9 +6742,9 @@ class TestOpenAPIContracts:
         Tags: Magic Onboarding, Magic Onboarding
         Auth Required: False
         """
-        
+
         # SUCCESS CASES
-        
+
         # Test successful request
         response = self._make_request(
             method="GET",
@@ -6751,10 +6752,10 @@ class TestOpenAPIContracts:
             params=None,
             json_data=None
         )
-        
+
         # Verify success response
         assert response.status_code in [200], f"Expected [200], got {response.status_code}: {response.text}"
-        
+
         # Verify response is valid JSON (for most endpoints)
         if response.headers.get('content-type', '').startswith('application/json'):
             try:
@@ -6762,9 +6763,9 @@ class TestOpenAPIContracts:
                 assert isinstance(json_response, (dict, list)), "Response should be valid JSON object or array"
             except json.JSONDecodeError as e:
                 pytest.fail(f"Response is not valid JSON: {e}")
-        
+
         # FAILURE CASES - Test error handling
-        
+
         # Test 404 with invalid ID
         response_404 = self._make_request(
             method="GET",
@@ -6775,7 +6776,7 @@ class TestOpenAPIContracts:
         if response_404.status_code != 404:
             # Some endpoints may return different error codes
             assert response_404.status_code >= 400, f"Expected error code, got {response_404.status_code}"
-        
+
         # Test rate limiting (make multiple rapid requests)
         # Note: This test may be flaky depending on rate limit configuration
         rapid_responses = []
@@ -6794,7 +6795,7 @@ class TestOpenAPIContracts:
                     break
             except requests.RequestException:
                 continue
-        
+
     def test_get_credit_packages_api_v1_credits_packages_get_122(self):
         """
         Contract test for GET /api/v1/credits/packages
@@ -6802,9 +6803,9 @@ class TestOpenAPIContracts:
         Tags: Monetization, Monetization
         Auth Required: False
         """
-        
+
         # SUCCESS CASES
-        
+
         # Test successful request
         response = self._make_request(
             method="GET",
@@ -6812,10 +6813,10 @@ class TestOpenAPIContracts:
             params=None,
             json_data=None
         )
-        
+
         # Verify success response
         assert response.status_code in [200], f"Expected [200], got {response.status_code}: {response.text}"
-        
+
         # Verify response is valid JSON (for most endpoints)
         if response.headers.get('content-type', '').startswith('application/json'):
             try:
@@ -6823,9 +6824,9 @@ class TestOpenAPIContracts:
                 assert isinstance(json_response, (dict, list)), "Response should be valid JSON object or array"
             except json.JSONDecodeError as e:
                 pytest.fail(f"Response is not valid JSON: {e}")
-        
+
         # FAILURE CASES - Test error handling
-        
+
         # Test rate limiting (make multiple rapid requests)
         # Note: This test may be flaky depending on rate limit configuration
         rapid_responses = []
@@ -6844,7 +6845,7 @@ class TestOpenAPIContracts:
                     break
             except requests.RequestException:
                 continue
-        
+
     def test_get_credit_balance_api_v1_credits_balance_get_123(self):
         """
         Contract test for GET /api/v1/credits/balance
@@ -6852,9 +6853,9 @@ class TestOpenAPIContracts:
         Tags: Monetization, Monetization
         Auth Required: False
         """
-        
+
         # SUCCESS CASES
-        
+
         # Test successful request
         response = self._make_request(
             method="GET",
@@ -6862,10 +6863,10 @@ class TestOpenAPIContracts:
             params=None,
             json_data=None
         )
-        
+
         # Verify success response
         assert response.status_code in [200], f"Expected [200], got {response.status_code}: {response.text}"
-        
+
         # Verify response is valid JSON (for most endpoints)
         if response.headers.get('content-type', '').startswith('application/json'):
             try:
@@ -6873,9 +6874,9 @@ class TestOpenAPIContracts:
                 assert isinstance(json_response, (dict, list)), "Response should be valid JSON object or array"
             except json.JSONDecodeError as e:
                 pytest.fail(f"Response is not valid JSON: {e}")
-        
+
         # FAILURE CASES - Test error handling
-        
+
         # Test rate limiting (make multiple rapid requests)
         # Note: This test may be flaky depending on rate limit configuration
         rapid_responses = []
@@ -6894,7 +6895,7 @@ class TestOpenAPIContracts:
                     break
             except requests.RequestException:
                 continue
-        
+
     def test_get_credit_summary_api_v1_credits_summary_get_124(self):
         """
         Contract test for GET /api/v1/credits/summary
@@ -6902,9 +6903,9 @@ class TestOpenAPIContracts:
         Tags: Monetization, Monetization
         Auth Required: False
         """
-        
+
         # SUCCESS CASES
-        
+
         # Test successful request
         response = self._make_request(
             method="GET",
@@ -6912,10 +6913,10 @@ class TestOpenAPIContracts:
             params=None,
             json_data=None
         )
-        
+
         # Verify success response
         assert response.status_code in [200], f"Expected [200], got {response.status_code}: {response.text}"
-        
+
         # Verify response is valid JSON (for most endpoints)
         if response.headers.get('content-type', '').startswith('application/json'):
             try:
@@ -6923,9 +6924,9 @@ class TestOpenAPIContracts:
                 assert isinstance(json_response, (dict, list)), "Response should be valid JSON object or array"
             except json.JSONDecodeError as e:
                 pytest.fail(f"Response is not valid JSON: {e}")
-        
+
         # FAILURE CASES - Test error handling
-        
+
         # Test rate limiting (make multiple rapid requests)
         # Note: This test may be flaky depending on rate limit configuration
         rapid_responses = []
@@ -6944,7 +6945,7 @@ class TestOpenAPIContracts:
                     break
             except requests.RequestException:
                 continue
-        
+
     def test_purchase_credits_api_v1_credits_purchase_post_125(self):
         """
         Contract test for POST /api/v1/credits/purchase
@@ -6952,9 +6953,9 @@ class TestOpenAPIContracts:
         Tags: Monetization, Monetization
         Auth Required: False
         """
-        
+
         # SUCCESS CASES
-        
+
         # Test successful request
         response = self._make_request(
             method="POST",
@@ -6965,10 +6966,10 @@ class TestOpenAPIContracts:
         "payment_method_id": "test_payment_method_id"
 }
         )
-        
+
         # Verify success response
         assert response.status_code in [200], f"Expected [200], got {response.status_code}: {response.text}"
-        
+
         # Verify response is valid JSON (for most endpoints)
         if response.headers.get('content-type', '').startswith('application/json'):
             try:
@@ -6976,9 +6977,9 @@ class TestOpenAPIContracts:
                 assert isinstance(json_response, (dict, list)), "Response should be valid JSON object or array"
             except json.JSONDecodeError as e:
                 pytest.fail(f"Response is not valid JSON: {e}")
-        
+
         # FAILURE CASES - Test error handling
-        
+
         # Test rate limiting (make multiple rapid requests)
         # Note: This test may be flaky depending on rate limit configuration
         rapid_responses = []
@@ -7000,7 +7001,7 @@ class TestOpenAPIContracts:
                     break
             except requests.RequestException:
                 continue
-        
+
     def test_consume_credits_api_v1_credits_consume_post_126(self):
         """
         Contract test for POST /api/v1/credits/consume
@@ -7008,9 +7009,9 @@ class TestOpenAPIContracts:
         Tags: Monetization, Monetization
         Auth Required: False
         """
-        
+
         # SUCCESS CASES
-        
+
         # Test successful request
         response = self._make_request(
             method="POST",
@@ -7022,10 +7023,10 @@ class TestOpenAPIContracts:
         "estimated_tokens": 1
 }
         )
-        
+
         # Verify success response
         assert response.status_code in [200], f"Expected [200], got {response.status_code}: {response.text}"
-        
+
         # Verify response is valid JSON (for most endpoints)
         if response.headers.get('content-type', '').startswith('application/json'):
             try:
@@ -7033,9 +7034,9 @@ class TestOpenAPIContracts:
                 assert isinstance(json_response, (dict, list)), "Response should be valid JSON object or array"
             except json.JSONDecodeError as e:
                 pytest.fail(f"Response is not valid JSON: {e}")
-        
+
         # FAILURE CASES - Test error handling
-        
+
         # Test rate limiting (make multiple rapid requests)
         # Note: This test may be flaky depending on rate limit configuration
         rapid_responses = []
@@ -7058,7 +7059,7 @@ class TestOpenAPIContracts:
                     break
             except requests.RequestException:
                 continue
-        
+
     def test_confirm_credit_consumption_api_v1_credits_confirm__operation_id__post_127(self):
         """
         Contract test for POST /api/v1/credits/confirm/{operation_id}
@@ -7066,9 +7067,9 @@ class TestOpenAPIContracts:
         Tags: Monetization, Monetization
         Auth Required: False
         """
-        
+
         # SUCCESS CASES
-        
+
         # Test successful request
         response = self._make_request(
             method="POST",
@@ -7078,10 +7079,10 @@ class TestOpenAPIContracts:
 },
             json_data=None
         )
-        
+
         # Verify success response
         assert response.status_code in [200], f"Expected [200], got {response.status_code}: {response.text}"
-        
+
         # Verify response is valid JSON (for most endpoints)
         if response.headers.get('content-type', '').startswith('application/json'):
             try:
@@ -7089,9 +7090,9 @@ class TestOpenAPIContracts:
                 assert isinstance(json_response, (dict, list)), "Response should be valid JSON object or array"
             except json.JSONDecodeError as e:
                 pytest.fail(f"Response is not valid JSON: {e}")
-        
+
         # FAILURE CASES - Test error handling
-        
+
         # Test 404 with invalid ID
         response_404 = self._make_request(
             method="POST",
@@ -7104,7 +7105,7 @@ class TestOpenAPIContracts:
         if response_404.status_code != 404:
             # Some endpoints may return different error codes
             assert response_404.status_code >= 400, f"Expected error code, got {response_404.status_code}"
-        
+
         # Test rate limiting (make multiple rapid requests)
         # Note: This test may be flaky depending on rate limit configuration
         rapid_responses = []
@@ -7125,7 +7126,7 @@ class TestOpenAPIContracts:
                     break
             except requests.RequestException:
                 continue
-        
+
     def test_get_transparent_pricing_api_v1_credits_pricing_get_128(self):
         """
         Contract test for GET /api/v1/credits/pricing
@@ -7133,9 +7134,9 @@ class TestOpenAPIContracts:
         Tags: Monetization, Monetization
         Auth Required: False
         """
-        
+
         # SUCCESS CASES
-        
+
         # Test successful request
         response = self._make_request(
             method="GET",
@@ -7143,10 +7144,10 @@ class TestOpenAPIContracts:
             params=None,
             json_data=None
         )
-        
+
         # Verify success response
         assert response.status_code in [200], f"Expected [200], got {response.status_code}: {response.text}"
-        
+
         # Verify response is valid JSON (for most endpoints)
         if response.headers.get('content-type', '').startswith('application/json'):
             try:
@@ -7154,9 +7155,9 @@ class TestOpenAPIContracts:
                 assert isinstance(json_response, (dict, list)), "Response should be valid JSON object or array"
             except json.JSONDecodeError as e:
                 pytest.fail(f"Response is not valid JSON: {e}")
-        
+
         # FAILURE CASES - Test error handling
-        
+
         # Test rate limiting (make multiple rapid requests)
         # Note: This test may be flaky depending on rate limit configuration
         rapid_responses = []
@@ -7175,7 +7176,7 @@ class TestOpenAPIContracts:
                     break
             except requests.RequestException:
                 continue
-        
+
     def test_register_partner_api_v1_partners_register_post_129(self):
         """
         Contract test for POST /api/v1/partners/register
@@ -7183,9 +7184,9 @@ class TestOpenAPIContracts:
         Tags: B2B Partners, B2B Partners
         Auth Required: False
         """
-        
+
         # SUCCESS CASES
-        
+
         # Test successful request
         response = self._make_request(
             method="POST",
@@ -7207,10 +7208,10 @@ class TestOpenAPIContracts:
         "country": "test_country"
 }
         )
-        
+
         # Verify success response
         assert response.status_code in [200], f"Expected [200], got {response.status_code}: {response.text}"
-        
+
         # Verify response is valid JSON (for most endpoints)
         if response.headers.get('content-type', '').startswith('application/json'):
             try:
@@ -7218,9 +7219,9 @@ class TestOpenAPIContracts:
                 assert isinstance(json_response, (dict, list)), "Response should be valid JSON object or array"
             except json.JSONDecodeError as e:
                 pytest.fail(f"Response is not valid JSON: {e}")
-        
+
         # FAILURE CASES - Test error handling
-        
+
         # Test rate limiting (make multiple rapid requests)
         # Note: This test may be flaky depending on rate limit configuration
         rapid_responses = []
@@ -7253,7 +7254,7 @@ class TestOpenAPIContracts:
                     break
             except requests.RequestException:
                 continue
-        
+
     def test_get_onboarding_steps_api_v1_partners__partner_id__onboarding_get_130(self):
         """
         Contract test for GET /api/v1/partners/{partner_id}/onboarding
@@ -7261,9 +7262,9 @@ class TestOpenAPIContracts:
         Tags: B2B Partners, B2B Partners
         Auth Required: False
         """
-        
+
         # SUCCESS CASES
-        
+
         # Test successful request
         response = self._make_request(
             method="GET",
@@ -7271,10 +7272,10 @@ class TestOpenAPIContracts:
             params=None,
             json_data=None
         )
-        
+
         # Verify success response
         assert response.status_code in [200], f"Expected [200], got {response.status_code}: {response.text}"
-        
+
         # Verify response is valid JSON (for most endpoints)
         if response.headers.get('content-type', '').startswith('application/json'):
             try:
@@ -7282,9 +7283,9 @@ class TestOpenAPIContracts:
                 assert isinstance(json_response, (dict, list)), "Response should be valid JSON object or array"
             except json.JSONDecodeError as e:
                 pytest.fail(f"Response is not valid JSON: {e}")
-        
+
         # FAILURE CASES - Test error handling
-        
+
         # Test 404 with invalid ID
         response_404 = self._make_request(
             method="GET",
@@ -7295,7 +7296,7 @@ class TestOpenAPIContracts:
         if response_404.status_code != 404:
             # Some endpoints may return different error codes
             assert response_404.status_code >= 400, f"Expected error code, got {response_404.status_code}"
-        
+
         # Test rate limiting (make multiple rapid requests)
         # Note: This test may be flaky depending on rate limit configuration
         rapid_responses = []
@@ -7314,7 +7315,7 @@ class TestOpenAPIContracts:
                     break
             except requests.RequestException:
                 continue
-        
+
     def test_complete_onboarding_step_api_v1_partners__partner_id__onboarding__step_id__complete_post_131(self):
         """
         Contract test for POST /api/v1/partners/{partner_id}/onboarding/{step_id}/complete
@@ -7322,9 +7323,9 @@ class TestOpenAPIContracts:
         Tags: B2B Partners, B2B Partners
         Auth Required: False
         """
-        
+
         # SUCCESS CASES
-        
+
         # Test successful request
         response = self._make_request(
             method="POST",
@@ -7332,10 +7333,10 @@ class TestOpenAPIContracts:
             params=None,
             json_data=None
         )
-        
+
         # Verify success response
         assert response.status_code in [200], f"Expected [200], got {response.status_code}: {response.text}"
-        
+
         # Verify response is valid JSON (for most endpoints)
         if response.headers.get('content-type', '').startswith('application/json'):
             try:
@@ -7343,9 +7344,9 @@ class TestOpenAPIContracts:
                 assert isinstance(json_response, (dict, list)), "Response should be valid JSON object or array"
             except json.JSONDecodeError as e:
                 pytest.fail(f"Response is not valid JSON: {e}")
-        
+
         # FAILURE CASES - Test error handling
-        
+
         # Test 404 with invalid ID
         response_404 = self._make_request(
             method="POST",
@@ -7356,7 +7357,7 @@ class TestOpenAPIContracts:
         if response_404.status_code != 404:
             # Some endpoints may return different error codes
             assert response_404.status_code >= 400, f"Expected error code, got {response_404.status_code}"
-        
+
         # Test rate limiting (make multiple rapid requests)
         # Note: This test may be flaky depending on rate limit configuration
         rapid_responses = []
@@ -7375,7 +7376,7 @@ class TestOpenAPIContracts:
                     break
             except requests.RequestException:
                 continue
-        
+
     def test_get_partner_details_api_v1_partners__partner_id__get_132(self):
         """
         Contract test for GET /api/v1/partners/{partner_id}
@@ -7383,9 +7384,9 @@ class TestOpenAPIContracts:
         Tags: B2B Partners, B2B Partners
         Auth Required: False
         """
-        
+
         # SUCCESS CASES
-        
+
         # Test successful request
         response = self._make_request(
             method="GET",
@@ -7393,10 +7394,10 @@ class TestOpenAPIContracts:
             params=None,
             json_data=None
         )
-        
+
         # Verify success response
         assert response.status_code in [200], f"Expected [200], got {response.status_code}: {response.text}"
-        
+
         # Verify response is valid JSON (for most endpoints)
         if response.headers.get('content-type', '').startswith('application/json'):
             try:
@@ -7404,9 +7405,9 @@ class TestOpenAPIContracts:
                 assert isinstance(json_response, (dict, list)), "Response should be valid JSON object or array"
             except json.JSONDecodeError as e:
                 pytest.fail(f"Response is not valid JSON: {e}")
-        
+
         # FAILURE CASES - Test error handling
-        
+
         # Test 404 with invalid ID
         response_404 = self._make_request(
             method="GET",
@@ -7417,7 +7418,7 @@ class TestOpenAPIContracts:
         if response_404.status_code != 404:
             # Some endpoints may return different error codes
             assert response_404.status_code >= 400, f"Expected error code, got {response_404.status_code}"
-        
+
         # Test rate limiting (make multiple rapid requests)
         # Note: This test may be flaky depending on rate limit configuration
         rapid_responses = []
@@ -7436,7 +7437,7 @@ class TestOpenAPIContracts:
                     break
             except requests.RequestException:
                 continue
-        
+
     def test_get_partner_analytics_api_v1_partners__partner_id__analytics_get_133(self):
         """
         Contract test for GET /api/v1/partners/{partner_id}/analytics
@@ -7444,9 +7445,9 @@ class TestOpenAPIContracts:
         Tags: B2B Partners, B2B Partners
         Auth Required: False
         """
-        
+
         # SUCCESS CASES
-        
+
         # Test successful request
         response = self._make_request(
             method="GET",
@@ -7456,10 +7457,10 @@ class TestOpenAPIContracts:
 },
             json_data=None
         )
-        
+
         # Verify success response
         assert response.status_code in [200], f"Expected [200], got {response.status_code}: {response.text}"
-        
+
         # Verify response is valid JSON (for most endpoints)
         if response.headers.get('content-type', '').startswith('application/json'):
             try:
@@ -7467,9 +7468,9 @@ class TestOpenAPIContracts:
                 assert isinstance(json_response, (dict, list)), "Response should be valid JSON object or array"
             except json.JSONDecodeError as e:
                 pytest.fail(f"Response is not valid JSON: {e}")
-        
+
         # FAILURE CASES - Test error handling
-        
+
         # Test 404 with invalid ID
         response_404 = self._make_request(
             method="GET",
@@ -7482,7 +7483,7 @@ class TestOpenAPIContracts:
         if response_404.status_code != 404:
             # Some endpoints may return different error codes
             assert response_404.status_code >= 400, f"Expected error code, got {response_404.status_code}"
-        
+
         # Test rate limiting (make multiple rapid requests)
         # Note: This test may be flaky depending on rate limit configuration
         rapid_responses = []
@@ -7503,7 +7504,7 @@ class TestOpenAPIContracts:
                     break
             except requests.RequestException:
                 continue
-        
+
     def test_create_scholarship_listing_api_v1_partners__partner_id__scholarships_post_134(self):
         """
         Contract test for POST /api/v1/partners/{partner_id}/scholarships
@@ -7511,9 +7512,9 @@ class TestOpenAPIContracts:
         Tags: B2B Partners, B2B Partners
         Auth Required: False
         """
-        
+
         # SUCCESS CASES
-        
+
         # Test successful request
         response = self._make_request(
             method="POST",
@@ -7542,10 +7543,10 @@ class TestOpenAPIContracts:
         "contact_email": "test_contact_email"
 }
         )
-        
+
         # Verify success response
         assert response.status_code in [200], f"Expected [200], got {response.status_code}: {response.text}"
-        
+
         # Verify response is valid JSON (for most endpoints)
         if response.headers.get('content-type', '').startswith('application/json'):
             try:
@@ -7553,9 +7554,9 @@ class TestOpenAPIContracts:
                 assert isinstance(json_response, (dict, list)), "Response should be valid JSON object or array"
             except json.JSONDecodeError as e:
                 pytest.fail(f"Response is not valid JSON: {e}")
-        
+
         # FAILURE CASES - Test error handling
-        
+
         # Test 404 with invalid ID
         response_404 = self._make_request(
             method="POST",
@@ -7587,7 +7588,7 @@ class TestOpenAPIContracts:
         if response_404.status_code != 404:
             # Some endpoints may return different error codes
             assert response_404.status_code >= 400, f"Expected error code, got {response_404.status_code}"
-        
+
         # Test rate limiting (make multiple rapid requests)
         # Note: This test may be flaky depending on rate limit configuration
         rapid_responses = []
@@ -7627,7 +7628,7 @@ class TestOpenAPIContracts:
                     break
             except requests.RequestException:
                 continue
-        
+
     def test_get_partner_scholarships_api_v1_partners__partner_id__scholarships_get_135(self):
         """
         Contract test for GET /api/v1/partners/{partner_id}/scholarships
@@ -7635,9 +7636,9 @@ class TestOpenAPIContracts:
         Tags: B2B Partners, B2B Partners
         Auth Required: False
         """
-        
+
         # SUCCESS CASES
-        
+
         # Test successful request
         response = self._make_request(
             method="GET",
@@ -7645,10 +7646,10 @@ class TestOpenAPIContracts:
             params=None,
             json_data=None
         )
-        
+
         # Verify success response
         assert response.status_code in [200], f"Expected [200], got {response.status_code}: {response.text}"
-        
+
         # Verify response is valid JSON (for most endpoints)
         if response.headers.get('content-type', '').startswith('application/json'):
             try:
@@ -7656,9 +7657,9 @@ class TestOpenAPIContracts:
                 assert isinstance(json_response, (dict, list)), "Response should be valid JSON object or array"
             except json.JSONDecodeError as e:
                 pytest.fail(f"Response is not valid JSON: {e}")
-        
+
         # FAILURE CASES - Test error handling
-        
+
         # Test 404 with invalid ID
         response_404 = self._make_request(
             method="GET",
@@ -7669,7 +7670,7 @@ class TestOpenAPIContracts:
         if response_404.status_code != 404:
             # Some endpoints may return different error codes
             assert response_404.status_code >= 400, f"Expected error code, got {response_404.status_code}"
-        
+
         # Test rate limiting (make multiple rapid requests)
         # Note: This test may be flaky depending on rate limit configuration
         rapid_responses = []
@@ -7688,7 +7689,7 @@ class TestOpenAPIContracts:
                     break
             except requests.RequestException:
                 continue
-        
+
     def test_publish_scholarship_listing_api_v1_partners__partner_id__scholarships__listing_id__publish_put_136(self):
         """
         Contract test for PUT /api/v1/partners/{partner_id}/scholarships/{listing_id}/publish
@@ -7696,9 +7697,9 @@ class TestOpenAPIContracts:
         Tags: B2B Partners, B2B Partners
         Auth Required: False
         """
-        
+
         # SUCCESS CASES
-        
+
         # Test successful request
         response = self._make_request(
             method="PUT",
@@ -7706,10 +7707,10 @@ class TestOpenAPIContracts:
             params=None,
             json_data=None
         )
-        
+
         # Verify success response
         assert response.status_code in [200], f"Expected [200], got {response.status_code}: {response.text}"
-        
+
         # Verify response is valid JSON (for most endpoints)
         if response.headers.get('content-type', '').startswith('application/json'):
             try:
@@ -7717,9 +7718,9 @@ class TestOpenAPIContracts:
                 assert isinstance(json_response, (dict, list)), "Response should be valid JSON object or array"
             except json.JSONDecodeError as e:
                 pytest.fail(f"Response is not valid JSON: {e}")
-        
+
         # FAILURE CASES - Test error handling
-        
+
         # Test 404 with invalid ID
         response_404 = self._make_request(
             method="PUT",
@@ -7730,7 +7731,7 @@ class TestOpenAPIContracts:
         if response_404.status_code != 404:
             # Some endpoints may return different error codes
             assert response_404.status_code >= 400, f"Expected error code, got {response_404.status_code}"
-        
+
         # Test rate limiting (make multiple rapid requests)
         # Note: This test may be flaky depending on rate limit configuration
         rapid_responses = []
@@ -7749,7 +7750,7 @@ class TestOpenAPIContracts:
                     break
             except requests.RequestException:
                 continue
-        
+
     def test_create_support_ticket_api_v1_partners__partner_id__support_tickets_post_137(self):
         """
         Contract test for POST /api/v1/partners/{partner_id}/support/tickets
@@ -7757,9 +7758,9 @@ class TestOpenAPIContracts:
         Tags: B2B Partners, B2B Partners
         Auth Required: False
         """
-        
+
         # SUCCESS CASES
-        
+
         # Test successful request
         response = self._make_request(
             method="POST",
@@ -7772,10 +7773,10 @@ class TestOpenAPIContracts:
         "category": "test_category"
 }
         )
-        
+
         # Verify success response
         assert response.status_code in [200], f"Expected [200], got {response.status_code}: {response.text}"
-        
+
         # Verify response is valid JSON (for most endpoints)
         if response.headers.get('content-type', '').startswith('application/json'):
             try:
@@ -7783,9 +7784,9 @@ class TestOpenAPIContracts:
                 assert isinstance(json_response, (dict, list)), "Response should be valid JSON object or array"
             except json.JSONDecodeError as e:
                 pytest.fail(f"Response is not valid JSON: {e}")
-        
+
         # FAILURE CASES - Test error handling
-        
+
         # Test 404 with invalid ID
         response_404 = self._make_request(
             method="POST",
@@ -7801,7 +7802,7 @@ class TestOpenAPIContracts:
         if response_404.status_code != 404:
             # Some endpoints may return different error codes
             assert response_404.status_code >= 400, f"Expected error code, got {response_404.status_code}"
-        
+
         # Test rate limiting (make multiple rapid requests)
         # Note: This test may be flaky depending on rate limit configuration
         rapid_responses = []
@@ -7825,7 +7826,7 @@ class TestOpenAPIContracts:
                     break
             except requests.RequestException:
                 continue
-        
+
     def test_get_support_resources_api_v1_partners__partner_id__support_resources_get_138(self):
         """
         Contract test for GET /api/v1/partners/{partner_id}/support/resources
@@ -7833,9 +7834,9 @@ class TestOpenAPIContracts:
         Tags: B2B Partners, B2B Partners
         Auth Required: False
         """
-        
+
         # SUCCESS CASES
-        
+
         # Test successful request
         response = self._make_request(
             method="GET",
@@ -7843,10 +7844,10 @@ class TestOpenAPIContracts:
             params=None,
             json_data=None
         )
-        
+
         # Verify success response
         assert response.status_code in [200], f"Expected [200], got {response.status_code}: {response.text}"
-        
+
         # Verify response is valid JSON (for most endpoints)
         if response.headers.get('content-type', '').startswith('application/json'):
             try:
@@ -7854,9 +7855,9 @@ class TestOpenAPIContracts:
                 assert isinstance(json_response, (dict, list)), "Response should be valid JSON object or array"
             except json.JSONDecodeError as e:
                 pytest.fail(f"Response is not valid JSON: {e}")
-        
+
         # FAILURE CASES - Test error handling
-        
+
         # Test 404 with invalid ID
         response_404 = self._make_request(
             method="GET",
@@ -7867,7 +7868,7 @@ class TestOpenAPIContracts:
         if response_404.status_code != 404:
             # Some endpoints may return different error codes
             assert response_404.status_code >= 400, f"Expected error code, got {response_404.status_code}"
-        
+
         # Test rate limiting (make multiple rapid requests)
         # Note: This test may be flaky depending on rate limit configuration
         rapid_responses = []
@@ -7886,7 +7887,7 @@ class TestOpenAPIContracts:
                     break
             except requests.RequestException:
                 continue
-        
+
     def test_root__get_139(self):
         """
         Contract test for GET /
@@ -7894,9 +7895,9 @@ class TestOpenAPIContracts:
         Tags: default
         Auth Required: False
         """
-        
+
         # SUCCESS CASES
-        
+
         # Test successful request
         response = self._make_request(
             method="GET",
@@ -7904,10 +7905,10 @@ class TestOpenAPIContracts:
             params=None,
             json_data=None
         )
-        
+
         # Verify success response
         assert response.status_code in [200], f"Expected [200], got {response.status_code}: {response.text}"
-        
+
         # Verify response is valid JSON (for most endpoints)
         if response.headers.get('content-type', '').startswith('application/json'):
             try:
@@ -7915,9 +7916,9 @@ class TestOpenAPIContracts:
                 assert isinstance(json_response, (dict, list)), "Response should be valid JSON object or array"
             except json.JSONDecodeError as e:
                 pytest.fail(f"Response is not valid JSON: {e}")
-        
+
         # FAILURE CASES - Test error handling
-        
+
         # Test rate limiting (make multiple rapid requests)
         # Note: This test may be flaky depending on rate limit configuration
         rapid_responses = []
@@ -7936,7 +7937,7 @@ class TestOpenAPIContracts:
                     break
             except requests.RequestException:
                 continue
-        
+
     def test_api_status_api_get_140(self):
         """
         Contract test for GET /api
@@ -7944,9 +7945,9 @@ class TestOpenAPIContracts:
         Tags: default
         Auth Required: False
         """
-        
+
         # SUCCESS CASES
-        
+
         # Test successful request
         response = self._make_request(
             method="GET",
@@ -7954,10 +7955,10 @@ class TestOpenAPIContracts:
             params=None,
             json_data=None
         )
-        
+
         # Verify success response
         assert response.status_code in [200], f"Expected [200], got {response.status_code}: {response.text}"
-        
+
         # Verify response is valid JSON (for most endpoints)
         if response.headers.get('content-type', '').startswith('application/json'):
             try:
@@ -7965,9 +7966,9 @@ class TestOpenAPIContracts:
                 assert isinstance(json_response, (dict, list)), "Response should be valid JSON object or array"
             except json.JSONDecodeError as e:
                 pytest.fail(f"Response is not valid JSON: {e}")
-        
+
         # FAILURE CASES - Test error handling
-        
+
         # Test rate limiting (make multiple rapid requests)
         # Note: This test may be flaky depending on rate limit configuration
         rapid_responses = []
@@ -7986,7 +7987,7 @@ class TestOpenAPIContracts:
                     break
             except requests.RequestException:
                 continue
-        
+
     def test_health_check_health_get_141(self):
         """
         Contract test for GET /health
@@ -7994,9 +7995,9 @@ class TestOpenAPIContracts:
         Tags: default
         Auth Required: False
         """
-        
+
         # SUCCESS CASES
-        
+
         # Test successful request
         response = self._make_request(
             method="GET",
@@ -8004,10 +8005,10 @@ class TestOpenAPIContracts:
             params=None,
             json_data=None
         )
-        
+
         # Verify success response
         assert response.status_code in [200], f"Expected [200], got {response.status_code}: {response.text}"
-        
+
         # Verify response is valid JSON (for most endpoints)
         if response.headers.get('content-type', '').startswith('application/json'):
             try:
@@ -8015,9 +8016,9 @@ class TestOpenAPIContracts:
                 assert isinstance(json_response, (dict, list)), "Response should be valid JSON object or array"
             except json.JSONDecodeError as e:
                 pytest.fail(f"Response is not valid JSON: {e}")
-        
+
         # FAILURE CASES - Test error handling
-        
+
         # Test rate limiting (make multiple rapid requests)
         # Note: This test may be flaky depending on rate limit configuration
         rapid_responses = []
@@ -8036,7 +8037,7 @@ class TestOpenAPIContracts:
                     break
             except requests.RequestException:
                 continue
-        
+
     def test_favicon_favicon_ico_get_142(self):
         """
         Contract test for GET /favicon.ico
@@ -8044,9 +8045,9 @@ class TestOpenAPIContracts:
         Tags: default
         Auth Required: False
         """
-        
+
         # SUCCESS CASES
-        
+
         # Test successful request
         response = self._make_request(
             method="GET",
@@ -8054,10 +8055,10 @@ class TestOpenAPIContracts:
             params=None,
             json_data=None
         )
-        
+
         # Verify success response
         assert response.status_code in [200], f"Expected [200], got {response.status_code}: {response.text}"
-        
+
         # Verify response is valid JSON (for most endpoints)
         if response.headers.get('content-type', '').startswith('application/json'):
             try:
@@ -8065,9 +8066,9 @@ class TestOpenAPIContracts:
                 assert isinstance(json_response, (dict, list)), "Response should be valid JSON object or array"
             except json.JSONDecodeError as e:
                 pytest.fail(f"Response is not valid JSON: {e}")
-        
+
         # FAILURE CASES - Test error handling
-        
+
         # Test rate limiting (make multiple rapid requests)
         # Note: This test may be flaky depending on rate limit configuration
         rapid_responses = []
@@ -8086,7 +8087,7 @@ class TestOpenAPIContracts:
                     break
             except requests.RequestException:
                 continue
-        
+
     def test_json_status_status_get_143(self):
         """
         Contract test for GET /status
@@ -8094,9 +8095,9 @@ class TestOpenAPIContracts:
         Tags: default
         Auth Required: False
         """
-        
+
         # SUCCESS CASES
-        
+
         # Test successful request
         response = self._make_request(
             method="GET",
@@ -8104,10 +8105,10 @@ class TestOpenAPIContracts:
             params=None,
             json_data=None
         )
-        
+
         # Verify success response
         assert response.status_code in [200], f"Expected [200], got {response.status_code}: {response.text}"
-        
+
         # Verify response is valid JSON (for most endpoints)
         if response.headers.get('content-type', '').startswith('application/json'):
             try:
@@ -8115,9 +8116,9 @@ class TestOpenAPIContracts:
                 assert isinstance(json_response, (dict, list)), "Response should be valid JSON object or array"
             except json.JSONDecodeError as e:
                 pytest.fail(f"Response is not valid JSON: {e}")
-        
+
         # FAILURE CASES - Test error handling
-        
+
         # Test rate limiting (make multiple rapid requests)
         # Note: This test may be flaky depending on rate limit configuration
         rapid_responses = []
@@ -8136,7 +8137,7 @@ class TestOpenAPIContracts:
                     break
             except requests.RequestException:
                 continue
-        
+
     def test_readiness_check_readiness_get_144(self):
         """
         Contract test for GET /readiness
@@ -8144,9 +8145,9 @@ class TestOpenAPIContracts:
         Tags: default
         Auth Required: False
         """
-        
+
         # SUCCESS CASES
-        
+
         # Test successful request
         response = self._make_request(
             method="GET",
@@ -8154,10 +8155,10 @@ class TestOpenAPIContracts:
             params=None,
             json_data=None
         )
-        
+
         # Verify success response
         assert response.status_code in [200], f"Expected [200], got {response.status_code}: {response.text}"
-        
+
         # Verify response is valid JSON (for most endpoints)
         if response.headers.get('content-type', '').startswith('application/json'):
             try:
@@ -8165,9 +8166,9 @@ class TestOpenAPIContracts:
                 assert isinstance(json_response, (dict, list)), "Response should be valid JSON object or array"
             except json.JSONDecodeError as e:
                 pytest.fail(f"Response is not valid JSON: {e}")
-        
+
         # FAILURE CASES - Test error handling
-        
+
         # Test rate limiting (make multiple rapid requests)
         # Note: This test may be flaky depending on rate limit configuration
         rapid_responses = []
@@ -8186,7 +8187,7 @@ class TestOpenAPIContracts:
                     break
             except requests.RequestException:
                 continue
-        
+
     def test_main_debug_config__debug_config_get_145(self):
         """
         Contract test for GET /_debug/config
@@ -8194,9 +8195,9 @@ class TestOpenAPIContracts:
         Tags: default
         Auth Required: False
         """
-        
+
         # SUCCESS CASES
-        
+
         # Test successful request
         response = self._make_request(
             method="GET",
@@ -8204,10 +8205,10 @@ class TestOpenAPIContracts:
             params=None,
             json_data=None
         )
-        
+
         # Verify success response
         assert response.status_code in [200], f"Expected [200], got {response.status_code}: {response.text}"
-        
+
         # Verify response is valid JSON (for most endpoints)
         if response.headers.get('content-type', '').startswith('application/json'):
             try:
@@ -8215,9 +8216,9 @@ class TestOpenAPIContracts:
                 assert isinstance(json_response, (dict, list)), "Response should be valid JSON object or array"
             except json.JSONDecodeError as e:
                 pytest.fail(f"Response is not valid JSON: {e}")
-        
+
         # FAILURE CASES - Test error handling
-        
+
         # Test rate limiting (make multiple rapid requests)
         # Note: This test may be flaky depending on rate limit configuration
         rapid_responses = []
@@ -8236,35 +8237,35 @@ class TestOpenAPIContracts:
                     break
             except requests.RequestException:
                 continue
-        
+
 
 # Additional schema validation tests
 class TestSchemaCompliance:
     """Test OpenAPI schema compliance"""
-    
+
     BASE_URL = os.getenv("API_BASE_URL", "http://localhost:5000")
-    
+
     def test_openapi_spec_available(self):
         """Test that OpenAPI spec is accessible"""
         response = requests.get(f"{self.BASE_URL}/docs", timeout=10)
         assert response.status_code in [200, 403], f"OpenAPI docs should be available or forbidden in production, got {response.status_code}"
-    
+
     def test_health_endpoints_schema(self):
         """Test health endpoint response schemas"""
         # Test basic health check
         response = requests.get(f"{self.BASE_URL}/health", timeout=5)
         assert response.status_code == 200
-        
+
         health_data = response.json()
         assert "status" in health_data
         assert health_data["status"] in ["healthy", "degraded", "unhealthy"]
-    
+
     def test_error_response_schema(self):
         """Test error response follows standard schema"""
         # Request non-existent endpoint
         response = requests.get(f"{self.BASE_URL}/nonexistent-endpoint-test", timeout=5)
         assert response.status_code == 404
-        
+
         # Verify error response has expected fields (current FastAPI format)
         if response.headers.get('content-type', '').startswith('application/json'):
             error_data = response.json()

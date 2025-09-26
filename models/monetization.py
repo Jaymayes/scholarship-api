@@ -1,11 +1,13 @@
 # AI Scholarship Playbook - Monetization Models
 # Credit system with transparent pricing and B2C revenue generation
 
-from pydantic import BaseModel, Field
-from datetime import datetime
-from typing import Optional, List, Dict, Any
-from enum import Enum
 import uuid
+from datetime import datetime
+from enum import Enum
+from typing import Any
+
+from pydantic import BaseModel, Field
+
 
 class CreditTransactionType(str, Enum):
     PURCHASE = "purchase"
@@ -40,11 +42,11 @@ class CreditTransaction(BaseModel):
     transaction_type: CreditTransactionType
     amount: float
     description: str
-    feature_used: Optional[str] = None
-    token_count: Optional[int] = None
-    cost_basis: Optional[float] = None  # Actual OpenAI cost
+    feature_used: str | None = None
+    token_count: int | None = None
+    cost_basis: float | None = None  # Actual OpenAI cost
     timestamp: datetime = Field(default_factory=datetime.utcnow)
-    metadata: Dict[str, Any] = Field(default_factory=dict)
+    metadata: dict[str, Any] = Field(default_factory=dict)
 
 class CreditUsageEvent(BaseModel):
     """Event tracking for credit consumption"""
@@ -59,9 +61,9 @@ class CreditUsageEvent(BaseModel):
 class SpendGuardrail(BaseModel):
     """User spending limits and controls"""
     user_id: str
-    daily_limit: Optional[float] = 50.0  # Credits per day
-    monthly_limit: Optional[float] = 500.0  # Credits per month
-    per_session_limit: Optional[float] = 25.0  # Credits per session
+    daily_limit: float | None = 50.0  # Credits per day
+    monthly_limit: float | None = 500.0  # Credits per month
+    per_session_limit: float | None = 25.0  # Credits per session
     auto_purchase_enabled: bool = False
     low_balance_threshold: float = 10.0
     notifications_enabled: bool = True
@@ -71,7 +73,7 @@ class CreditPricing(BaseModel):
     base_cost_per_1k_tokens: float = 0.002  # OpenAI GPT-4 pricing
     markup_multiplier: float = 4.0  # 4x markup
     credit_per_1k_tokens: float = 0.008  # Will be computed
-    
+
     def model_post_init(self, __context):
         self.credit_per_1k_tokens = self.base_cost_per_1k_tokens * self.markup_multiplier
 
@@ -79,7 +81,7 @@ class UserCreditSummary(BaseModel):
     """Comprehensive user credit overview"""
     user_id: str
     current_balance: CreditBalance
-    recent_transactions: List[CreditTransaction]
+    recent_transactions: list[CreditTransaction]
     monthly_usage: float
     daily_usage: float
     guardrails: SpendGuardrail
@@ -92,7 +94,7 @@ class CreditAttachmentMetrics(BaseModel):
     pay_conversion_rate: float  # % users who convert to paid
     arppu: float  # Average Revenue Per Paying User
     unit_cost_to_serve: float  # Cost per active user
-    ltv_cac_ratio: Optional[float] = None
+    ltv_cac_ratio: float | None = None
 
 # Standard credit packages
 STARTER_CREDIT_GRANT = 50.0  # Free credits on onboarding

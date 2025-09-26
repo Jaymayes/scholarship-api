@@ -2,14 +2,13 @@
 Production Canary Deployment System
 Implements traffic splitting with SLO monitoring gates for production ramp
 """
-import time
-import logging
-from datetime import datetime, timedelta
-from typing import Dict, Any, List, Optional
-from dataclasses import dataclass
-import asyncio
 import json
+import logging
+import time
+from dataclasses import dataclass
+from datetime import datetime, timedelta
 from pathlib import Path
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -28,21 +27,21 @@ class CanaryStage:
     name: str
     traffic_percentage: int
     duration_hours: int
-    slo_gates: List[SLOGate]
+    slo_gates: list[SLOGate]
 
 class CanaryDeploymentManager:
     """
     Manages production canary deployment with traffic ramp and SLO gates
     Executive directive: 10% (6h) → 25% (6h) → 50% (12h) → 100% GA
     """
-    
+
     def __init__(self):
         self.current_stage = None
         self.deployment_start_time = None
         self.stage_start_time = None
         self.evidence_path = Path("production/canary_evidence")
         self.evidence_path.mkdir(exist_ok=True)
-        
+
         # Executive directive ramp plan
         self.ramp_plan = [
             CanaryStage(
@@ -86,11 +85,11 @@ class CanaryDeploymentManager:
                 ]
             )
         ]
-        
+
         logger.info("🚀 Canary deployment manager initialized")
         logger.info(f"📋 Ramp plan: {len(self.ramp_plan)} stages configured")
-    
-    def initiate_canary(self) -> Dict[str, Any]:
+
+    def initiate_canary(self) -> dict[str, Any]:
         """
         Initiate canary deployment at 10% traffic
         Executive directive: Start production ramp with SLO gates
@@ -99,7 +98,7 @@ class CanaryDeploymentManager:
             self.deployment_start_time = datetime.now()
             self.current_stage = self.ramp_plan[0]  # Start with 10%
             self.stage_start_time = self.deployment_start_time
-            
+
             result = {
                 "status": "canary_initiated",
                 "stage": self.current_stage.name,
@@ -107,46 +106,46 @@ class CanaryDeploymentManager:
                 "duration_hours": self.current_stage.duration_hours,
                 "deployment_start": self.deployment_start_time.isoformat(),
                 "slo_gates_active": len(self.current_stage.slo_gates),
-                "next_promotion_time": (self.deployment_start_time + 
+                "next_promotion_time": (self.deployment_start_time +
                                      timedelta(hours=self.current_stage.duration_hours)).isoformat(),
                 "war_room_schedule": "twice_daily_checkins",
                 "escalation_policy": "halt_on_any_gate_miss"
             }
-            
+
             # Save evidence
             evidence_file = self.evidence_path / f"canary_initiation_{int(time.time())}.json"
             with open(evidence_file, 'w') as f:
                 json.dump(result, f, indent=2)
-            
+
             logger.info("🎯 CANARY INITIATED: 10% traffic with SLO gates active")
             logger.info(f"🕒 Next promotion: {result['next_promotion_time']}")
             logger.info(f"📊 SLO gates: {len(self.current_stage.slo_gates)} active")
-            
+
             return result
-            
+
         except Exception as e:
             logger.error(f"❌ Canary initiation failed: {e}")
             return {"status": "failed", "error": str(e)}
-    
-    def check_slo_gates(self) -> Dict[str, Any]:
+
+    def check_slo_gates(self) -> dict[str, Any]:
         """
         Check all SLO gates for current stage
         Executive directive: Halt or rollback on any gate miss
         """
         if not self.current_stage:
             return {"status": "no_active_deployment"}
-        
+
         gate_results = []
         all_gates_pass = True
-        
+
         for gate in self.current_stage.slo_gates:
             # Simulate SLO checking (in production, query Prometheus)
             gate_result = self._evaluate_slo_gate(gate)
             gate_results.append(gate_result)
-            
+
             if not gate_result["passed"]:
                 all_gates_pass = False
-        
+
         result = {
             "stage": self.current_stage.name,
             "traffic_percentage": self.current_stage.traffic_percentage,
@@ -155,20 +154,20 @@ class CanaryDeploymentManager:
             "check_time": datetime.now().isoformat(),
             "action_required": "continue" if all_gates_pass else "halt_or_rollback"
         }
-        
+
         # Save evidence
         evidence_file = self.evidence_path / f"slo_check_{self.current_stage.name}_{int(time.time())}.json"
         with open(evidence_file, 'w') as f:
             json.dump(result, f, indent=2)
-        
+
         if all_gates_pass:
             logger.info(f"✅ All SLO gates PASS for {self.current_stage.name}")
         else:
             logger.warning(f"⚠️ SLO gates BREACH detected in {self.current_stage.name}")
-            
+
         return result
-    
-    def _evaluate_slo_gate(self, gate: SLOGate) -> Dict[str, Any]:
+
+    def _evaluate_slo_gate(self, gate: SLOGate) -> dict[str, Any]:
         """
         Evaluate individual SLO gate
         In production: query Prometheus metrics endpoint
@@ -177,12 +176,12 @@ class CanaryDeploymentManager:
         # In production: implement actual Prometheus queries
         simulated_values = {
             "p95_latency": 95.0,  # ms - under 120ms threshold
-            "error_rate": 0.05,   # % - under 0.1% threshold  
+            "error_rate": 0.05,   # % - under 0.1% threshold
             "burn_rate": 0.3      # rate - under 1.0 threshold
         }
-        
+
         current_value = simulated_values.get(gate.name, 0)
-        
+
         # Evaluate gate condition
         if gate.operator == "<=":
             passed = current_value <= gate.threshold
@@ -194,7 +193,7 @@ class CanaryDeploymentManager:
             passed = current_value > gate.threshold
         else:
             passed = False
-        
+
         return {
             "gate_name": gate.name,
             "threshold": gate.threshold,
@@ -203,15 +202,15 @@ class CanaryDeploymentManager:
             "passed": passed,
             "breach_action": gate.breach_action if not passed else "none"
         }
-    
-    def promote_stage(self) -> Dict[str, Any]:
+
+    def promote_stage(self) -> dict[str, Any]:
         """
         Promote to next stage if SLO gates pass
         Executive directive: Progressive ramp with gate validation
         """
         if not self.current_stage:
             return {"status": "no_active_deployment"}
-        
+
         # Check SLO gates before promotion
         gate_check = self.check_slo_gates()
         if not gate_check["all_gates_pass"]:
@@ -221,23 +220,23 @@ class CanaryDeploymentManager:
                 "current_stage": self.current_stage.name,
                 "action": "halt_or_rollback"
             }
-        
+
         # Find next stage
-        current_index = next(i for i, stage in enumerate(self.ramp_plan) 
+        current_index = next(i for i, stage in enumerate(self.ramp_plan)
                            if stage.name == self.current_stage.name)
-        
+
         if current_index >= len(self.ramp_plan) - 1:
             return {
                 "status": "production_ga_complete",
                 "current_stage": "production_100",
                 "traffic_percentage": 100
             }
-        
+
         # Promote to next stage
         next_stage = self.ramp_plan[current_index + 1]
         self.current_stage = next_stage
         self.stage_start_time = datetime.now()
-        
+
         result = {
             "status": "promoted",
             "new_stage": self.current_stage.name,
@@ -246,25 +245,25 @@ class CanaryDeploymentManager:
             "duration_hours": self.current_stage.duration_hours,
             "slo_gates_active": len(self.current_stage.slo_gates)
         }
-        
+
         # Save evidence
         evidence_file = self.evidence_path / f"promotion_{self.current_stage.name}_{int(time.time())}.json"
         with open(evidence_file, 'w') as f:
             json.dump(result, f, indent=2)
-        
+
         logger.info(f"📈 PROMOTED to {self.current_stage.name} ({self.current_stage.traffic_percentage}%)")
-        
+
         return result
-    
-    def get_deployment_status(self) -> Dict[str, Any]:
+
+    def get_deployment_status(self) -> dict[str, Any]:
         """Get current deployment status with business metrics"""
         if not self.current_stage or not self.stage_start_time or not self.deployment_start_time:
             return {"status": "no_active_deployment"}
-        
+
         now = datetime.now()
         stage_elapsed = (now - self.stage_start_time).total_seconds() / 3600  # hours
         total_elapsed = (now - self.deployment_start_time).total_seconds() / 3600  # hours
-        
+
         return {
             "deployment_status": "active",
             "current_stage": self.current_stage.name,

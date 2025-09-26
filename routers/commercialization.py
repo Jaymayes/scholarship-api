@@ -2,15 +2,16 @@
 API Commercialization Router
 Executive directive: API plans, billing, key management endpoints
 """
-from fastapi import APIRouter, HTTPException, Header, Depends
-from fastapi.responses import HTMLResponse
-from typing import Dict, Any, Optional
 import logging
 from datetime import datetime
+from typing import Any
 
-from production.api_commercialization import commercialization_service, TierType
-from production.status_page import status_service 
+from fastapi import APIRouter, Header, HTTPException
+from fastapi.responses import HTMLResponse
+
+from production.api_commercialization import TierType, commercialization_service
 from production.release_notes import release_service
+from production.status_page import status_service
 
 logger = logging.getLogger(__name__)
 
@@ -30,11 +31,11 @@ router = APIRouter(
 commercialization_router = APIRouter(prefix="/api/v1/commercialization", tags=["Commercialization Status"])
 
 @commercialization_router.get("/status")
-async def get_commercialization_status() -> Dict[str, Any]:
+async def get_commercialization_status() -> dict[str, Any]:
     """
     🎯 COMMERCIALIZATION SERVICE STATUS
     Executive directive: Real-time service health and billing system status
-    
+
     Returns:
         Comprehensive commercialization service status and health metrics
     """
@@ -43,9 +44,9 @@ async def get_commercialization_status() -> Dict[str, Any]:
         # Use fallback values for robust operation
         active_tiers = 4
         tier_names = ["Free", "Starter", "Professional", "Enterprise"]
-        
+
         total_api_keys = len(getattr(commercialization_service, 'api_keys', {}))
-        
+
         # Service health indicators
         service_status = {
             "service": "API Commercialization",
@@ -54,7 +55,7 @@ async def get_commercialization_status() -> Dict[str, Any]:
             "timestamp": datetime.utcnow().isoformat(),
             "health": {
                 "billing_system": "operational",
-                "rate_limiting": "operational", 
+                "rate_limiting": "operational",
                 "api_key_management": "operational",
                 "tier_management": "operational"
             },
@@ -86,11 +87,11 @@ async def get_commercialization_status() -> Dict[str, Any]:
                 "audit_logging": "Enabled"
             }
         }
-        
+
         logger.info(f"💰 Commercialization status requested - {total_api_keys} API keys, {active_tiers} tiers active")
-        
+
         return service_status
-        
+
     except Exception as e:
         logger.error(f"❌ Failed to get commercialization status: {e}")
         # Return degraded status instead of failing completely
@@ -121,17 +122,17 @@ async def create_api_key(
     email: str,
     company_name: str,
     tier: str = "free"
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     🔑 CREATE API KEY WITH BILLING SETUP
     Executive directive: Key issuance with contact email/company tracking
-    
+
     Args:
         user_id: Unique user identifier
         email: Contact email for billing and support
         company_name: Company name for B2B tracking
         tier: API tier (free, starter, professional, enterprise)
-    
+
     Returns:
         API key details with billing information
     """
@@ -144,16 +145,16 @@ async def create_api_key(
                 status_code=400,
                 detail=f"Invalid tier '{tier}'. Valid options: free, starter, professional, enterprise"
             )
-        
+
         result = commercialization_service.create_api_key(
             user_id=user_id,
             email=email,
             company_name=company_name,
             tier=tier_type
         )
-        
+
         logger.info(f"🔑 API key created: {result['api_key'][:16]}... for {company_name}")
-        
+
         return {
             "message": "API key created successfully",
             "api_key_details": result,
@@ -164,23 +165,23 @@ async def create_api_key(
                 "Monitor usage at /api/v1/billing/usage"
             ]
         }
-        
+
     except Exception as e:
         logger.error(f"❌ API key creation error: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to create API key: {str(e)}")
 
 @router.get("/tiers")
-async def get_tier_comparison() -> Dict[str, Any]:
+async def get_tier_comparison() -> dict[str, Any]:
     """
     💰 GET API TIER COMPARISON
     Executive directive: Clear pricing and feature differentiation
-    
+
     Returns:
         Complete tier comparison with pricing and features
     """
     try:
         comparison = commercialization_service.get_tier_comparison()
-        
+
         return {
             "message": "API tier comparison retrieved successfully",
             "pricing_tiers": comparison,
@@ -192,22 +193,22 @@ async def get_tier_comparison() -> Dict[str, Any]:
                 "b2b_commission": "3% provider fee for marketplace transactions"
             }
         }
-        
+
     except Exception as e:
         logger.error(f"❌ Tier comparison error: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to get tier comparison: {str(e)}")
 
 @router.get("/usage")
 async def get_usage_details(
-    x_api_key: Optional[str] = Header(None, alias="X-API-Key")
-) -> Dict[str, Any]:
+    x_api_key: str | None = Header(None, alias="X-API-Key")
+) -> dict[str, Any]:
     """
     📊 GET API USAGE AND BILLING DETAILS
     Executive directive: Per-key usage tracking and overage transparency
-    
+
     Headers:
         X-API-Key: Your API key for usage lookup
-    
+
     Returns:
         Usage statistics, billing information, and limits
     """
@@ -217,19 +218,19 @@ async def get_usage_details(
                 status_code=401,
                 detail="X-API-Key header required for usage lookup"
             )
-        
+
         # Check rate limits to get current usage
         usage_info = commercialization_service.check_rate_limits(x_api_key, "usage_check")
-        
+
         if not usage_info["allowed"] and usage_info.get("reason") == "invalid_api_key":
             raise HTTPException(
                 status_code=401,
                 detail="Invalid API key"
             )
-        
+
         # Generate invoice preview
         invoice = commercialization_service.generate_invoice_preview(x_api_key)
-        
+
         return {
             "message": "Usage details retrieved successfully",
             "current_usage": {
@@ -244,7 +245,7 @@ async def get_usage_details(
                 "monthly_quota": usage_info["headers"]["X-RateLimit-Monthly-Limit"]
             }
         }
-        
+
     except Exception as e:
         logger.error(f"❌ Usage details error: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to get usage details: {str(e)}")
@@ -252,18 +253,18 @@ async def get_usage_details(
 @router.post("/ai-credits/consume")
 async def consume_ai_credits(
     credits_needed: int,
-    x_api_key: Optional[str] = Header(None, alias="X-API-Key")
-) -> Dict[str, Any]:
+    x_api_key: str | None = Header(None, alias="X-API-Key")
+) -> dict[str, Any]:
     """
     🤖 CONSUME AI CREDITS WITH BILLING
     Executive directive: 4x AI service markup for B2C credits
-    
+
     Headers:
         X-API-Key: Your API key
-    
+
     Args:
         credits_needed: Number of AI credits to consume
-    
+
     Returns:
         Credit consumption result with billing details
     """
@@ -273,19 +274,19 @@ async def consume_ai_credits(
                 status_code=401,
                 detail="X-API-Key header required"
             )
-        
+
         result = commercialization_service.consume_ai_credits(x_api_key, credits_needed)
-        
+
         if not result["success"]:
             status_code = result.get("status_code", 400)
             raise HTTPException(status_code=status_code, detail=result["reason"])
-        
+
         return {
             "message": "AI credits consumed successfully",
             "credit_details": result,
             "billing_impact": result.get("overage_cost", 0.0) > 0
         }
-        
+
     except HTTPException:
         raise
     except Exception as e:
@@ -296,15 +297,15 @@ async def consume_ai_credits(
 async def track_b2b_revenue(
     provider_id: str,
     transaction_amount: float
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     🏢 TRACK B2B PROVIDER REVENUE
     Executive directive: 3% provider fee pipeline for B2B marketplace
-    
+
     Args:
         provider_id: Provider identifier
         transaction_amount: Transaction amount for commission calculation
-    
+
     Returns:
         Revenue tracking confirmation with commission details
     """
@@ -313,28 +314,28 @@ async def track_b2b_revenue(
             provider_id=provider_id,
             transaction_amount=transaction_amount
         )
-        
+
         return {
             "message": "B2B revenue tracked successfully",
             "commission_details": result,
             "marketplace_fee": "3% of transaction amount"
         }
-        
+
     except Exception as e:
         logger.error(f"❌ B2B revenue tracking error: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to track B2B revenue: {str(e)}")
 
 @router.get("/invoice/preview")
 async def get_invoice_preview(
-    x_api_key: Optional[str] = Header(None, alias="X-API-Key")
-) -> Dict[str, Any]:
+    x_api_key: str | None = Header(None, alias="X-API-Key")
+) -> dict[str, Any]:
     """
     🧾 GET BILLING INVOICE PREVIEW
     Executive directive: Dry-run invoicing for paid tiers
-    
+
     Headers:
         X-API-Key: Your API key
-    
+
     Returns:
         Invoice preview with line items and total
     """
@@ -344,19 +345,19 @@ async def get_invoice_preview(
                 status_code=401,
                 detail="X-API-Key header required"
             )
-        
+
         invoice = commercialization_service.generate_invoice_preview(x_api_key)
-        
+
         if "error" in invoice:
             raise HTTPException(status_code=401, detail=invoice["error"])
-        
+
         return {
             "message": "Invoice preview generated successfully",
             "invoice_preview": invoice,
             "billing_cycle": "Monthly",
             "payment_due": "Due on next billing cycle"
         }
-        
+
     except HTTPException:
         raise
     except Exception as e:
@@ -373,11 +374,11 @@ async def get_status_page():
     try:
         html_content = status_service.generate_status_page_html()
         return HTMLResponse(content=html_content, status_code=200)
-        
+
     except Exception as e:
         logger.error(f"❌ Status page error: {e}")
         return HTMLResponse(
-            content="<h1>Status page temporarily unavailable</h1>", 
+            content="<h1>Status page temporarily unavailable</h1>",
             status_code=500
         )
 
@@ -391,14 +392,14 @@ async def get_status_json():
         overall_status = status_service.get_overall_status()
         components = status_service.get_component_details()
         security = status_service.get_security_posture()
-        
+
         return {
             "status_page": overall_status,
             "components": components,
             "security_posture": security,
             "last_updated": datetime.now().isoformat()
         }
-        
+
     except Exception as e:
         logger.error(f"❌ Status JSON error: {e}")
         raise HTTPException(status_code=500, detail="Failed to get status information")
@@ -411,13 +412,13 @@ async def get_release_notes():
     """
     try:
         release_notes = release_service.generate_v100_release_notes()
-        
+
         return {
             "message": "Release notes retrieved successfully",
             "release_notes": release_notes,
             "contract_lock": "24+ month backward compatibility guarantee"
         }
-        
+
     except Exception as e:
         logger.error(f"❌ Release notes error: {e}")
         raise HTTPException(status_code=500, detail="Failed to get release notes")
@@ -430,7 +431,7 @@ async def get_changelog_html():
     """
     try:
         changelog_md = release_service.generate_changelog()
-        
+
         # Convert markdown to simple HTML
         html_content = f"""
 <!DOCTYPE html>
@@ -438,7 +439,7 @@ async def get_changelog_html():
 <head>
     <title>Scholarship Discovery API - Changelog</title>
     <style>
-        body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; 
+        body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
                max-width: 800px; margin: 0 auto; padding: 20px; line-height: 1.6; }}
         h1, h2, h3 {{ color: #333; }}
         code {{ background: #f4f4f4; padding: 2px 4px; border-radius: 3px; }}
@@ -449,9 +450,9 @@ async def get_changelog_html():
     <pre>{changelog_md}</pre>
 </body>
 </html>"""
-        
+
         return HTMLResponse(content=html_content, status_code=200)
-        
+
     except Exception as e:
         logger.error(f"❌ Changelog error: {e}")
         return HTMLResponse(

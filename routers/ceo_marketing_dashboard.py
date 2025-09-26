@@ -3,26 +3,27 @@ CEO/Marketing Dashboard Integration Router
 Central dashboard for executive visibility into DR and compliance status
 """
 
-from fastapi import APIRouter, HTTPException
-from fastapi.responses import JSONResponse
-from typing import Dict, List, Optional, Any
-from datetime import datetime
 import asyncio
+from datetime import datetime
+from typing import Any
+
+from fastapi import APIRouter, HTTPException
+
+from compliance.soc2_evidence_service import compliance_service
 
 # Import our DR and compliance services
 from infrastructure.disaster_recovery_service import dr_service
-from compliance.soc2_evidence_service import compliance_service
 from utils.logger import get_logger
 
 logger = get_logger(__name__)
 
 router = APIRouter(prefix="/api/v1/dashboard", tags=["CEO/Marketing Dashboard"])
 
-@router.get("/executive-summary", response_model=Dict[str, Any])
+@router.get("/executive-summary", response_model=dict[str, Any])
 async def get_executive_summary():
     """
     Get executive summary dashboard with key metrics for CEO/Marketing
-    
+
     Combines disaster recovery, compliance, and operational metrics
     into a high-level executive view
     """
@@ -33,16 +34,16 @@ async def get_executive_summary():
             compliance_service.get_compliance_dashboard(),
             return_exceptions=True
         )
-        
+
         # Handle any exceptions in data fetching
         if isinstance(dr_data, Exception):
             logger.error(f"Failed to fetch DR data: {dr_data}")
             dr_data = {"error": "DR data unavailable"}
-        
+
         if isinstance(compliance_data, Exception):
             logger.error(f"Failed to fetch compliance data: {compliance_data}")
             compliance_data = {"error": "Compliance data unavailable"}
-        
+
         # Build executive summary
         executive_summary = {
             "dashboard_title": "Executive Operations Dashboard",
@@ -67,22 +68,22 @@ async def get_executive_summary():
             },
             "alerts_and_actions": _get_critical_alerts(dr_data, compliance_data)
         }
-        
+
         logger.info("Executive summary dashboard generated")
         return executive_summary
-        
+
     except Exception as e:
         logger.error(f"Failed to generate executive summary: {e}")
         raise HTTPException(status_code=500, detail="Failed to generate executive summary")
 
-@router.get("/disaster-recovery/status", response_model=Dict[str, Any])
+@router.get("/disaster-recovery/status", response_model=dict[str, Any])
 async def get_dr_status_tiles():
     """
     Get disaster recovery status tiles for dashboard display
     """
     try:
         dr_dashboard = await dr_service.get_global_dr_dashboard()
-        
+
         status_tiles = {
             "backup_health": {
                 "title": "Backup Health",
@@ -117,7 +118,7 @@ async def get_dr_status_tiles():
                 "last_updated": dr_dashboard.get("last_updated")
             }
         }
-        
+
         return {
             "disaster_recovery_tiles": status_tiles,
             "critical_applications": _format_critical_apps(dr_dashboard),
@@ -128,19 +129,19 @@ async def get_dr_status_tiles():
                 "Check storage quotas"
             ]
         }
-        
+
     except Exception as e:
         logger.error(f"Failed to get DR status tiles: {e}")
         raise HTTPException(status_code=500, detail="Failed to get DR status tiles")
 
-@router.get("/compliance/status", response_model=Dict[str, Any])
+@router.get("/compliance/status", response_model=dict[str, Any])
 async def get_compliance_status_tiles():
     """
     Get SOC2 compliance and PII lineage status tiles for dashboard display
     """
     try:
         compliance_dashboard = await compliance_service.get_compliance_dashboard()
-        
+
         status_tiles = {
             "soc2_readiness": {
                 "title": "SOC2 Readiness",
@@ -175,7 +176,7 @@ async def get_compliance_status_tiles():
                 "last_updated": compliance_dashboard.get("last_updated")
             }
         }
-        
+
         return {
             "compliance_tiles": status_tiles,
             "evidence_links": compliance_dashboard.get("evidence_links", {}),
@@ -188,7 +189,7 @@ async def get_compliance_status_tiles():
                 "Schedule audit prep"
             ]
         }
-        
+
     except Exception as e:
         logger.error(f"Failed to get compliance status tiles: {e}")
         raise HTTPException(status_code=500, detail="Failed to get compliance status tiles")
@@ -206,13 +207,13 @@ async def get_system_health_overview():
             _check_application_health(),
             return_exceptions=True
         )
-        
+
         dr_health, compliance_health, app_health = health_checks
-        
+
         overall_status = "healthy"
         if any(isinstance(h, Exception) or (isinstance(h, dict) and h.get("status") != "healthy") for h in health_checks):
             overall_status = "degraded"
-        
+
         return {
             "overall_status": overall_status,
             "system_components": {
@@ -222,45 +223,43 @@ async def get_system_health_overview():
             },
             "last_check": datetime.utcnow().isoformat()
         }
-        
+
     except Exception as e:
         logger.error(f"Failed to get system health overview: {e}")
         raise HTTPException(status_code=500, detail="Failed to get system health overview")
 
 # Helper functions for data processing
 
-def _assess_dr_health(dr_data: Dict) -> str:
+def _assess_dr_health(dr_data: dict) -> str:
     """Assess disaster recovery health status"""
     if isinstance(dr_data, dict) and "global_metrics" in dr_data:
         compliance_score = dr_data["global_metrics"].get("compliance_score", 0)
         if compliance_score >= 90:
             return "excellent"
-        elif compliance_score >= 80:
+        if compliance_score >= 80:
             return "healthy"
-        elif compliance_score >= 60:
+        if compliance_score >= 60:
             return "at_risk"
-        else:
-            return "critical"
+        return "critical"
     return "unknown"
 
-def _assess_compliance_health(compliance_data: Dict) -> str:
+def _assess_compliance_health(compliance_data: dict) -> str:
     """Assess compliance health status"""
     if isinstance(compliance_data, dict) and "compliance_overview" in compliance_data:
         soc2_score = compliance_data["compliance_overview"].get("soc2_readiness_score", 0)
         pii_score = compliance_data["compliance_overview"].get("pii_compliance_score", 0)
         avg_score = (soc2_score + pii_score) / 2
-        
+
         if avg_score >= 90:
             return "excellent"
-        elif avg_score >= 80:
+        if avg_score >= 80:
             return "compliant"
-        elif avg_score >= 60:
+        if avg_score >= 60:
             return "improving"
-        else:
-            return "needs_attention"
+        return "needs_attention"
     return "unknown"
 
-def _get_protected_apps_count(dr_data: Dict) -> str:
+def _get_protected_apps_count(dr_data: dict) -> str:
     """Get count of protected applications"""
     if isinstance(dr_data, dict) and "global_metrics" in dr_data:
         compliant = dr_data["global_metrics"].get("apps_compliant", 0)
@@ -268,7 +267,7 @@ def _get_protected_apps_count(dr_data: Dict) -> str:
         return f"{compliant}/{total}"
     return "0/0"
 
-def _get_backup_success_rate(dr_data: Dict) -> str:
+def _get_backup_success_rate(dr_data: dict) -> str:
     """Get backup success rate"""
     if isinstance(dr_data, dict) and "global_metrics" in dr_data:
         successful = dr_data["global_metrics"].get("successful_backups_24h", 0)
@@ -277,42 +276,42 @@ def _get_backup_success_rate(dr_data: Dict) -> str:
         return f"{rate:.1f}%"
     return "0%"
 
-def _get_soc2_readiness(compliance_data: Dict) -> str:
+def _get_soc2_readiness(compliance_data: dict) -> str:
     """Get SOC2 readiness percentage"""
     if isinstance(compliance_data, dict) and "compliance_overview" in compliance_data:
         score = compliance_data["compliance_overview"].get("soc2_readiness_score", 0)
         return f"{score:.1f}%"
     return "0%"
 
-def _get_pii_compliance(compliance_data: Dict) -> str:
+def _get_pii_compliance(compliance_data: dict) -> str:
     """Get PII compliance percentage"""
     if isinstance(compliance_data, dict) and "compliance_overview" in compliance_data:
         score = compliance_data["compliance_overview"].get("pii_compliance_score", 0)
         return f"{score:.1f}%"
     return "0%"
 
-def _get_storage_usage(dr_data: Dict) -> float:
+def _get_storage_usage(dr_data: dict) -> float:
     """Get backup storage usage in GB"""
     if isinstance(dr_data, dict) and "global_metrics" in dr_data:
         return dr_data["global_metrics"].get("total_storage_gb", 0)
     return 0.0
 
-def _get_evidence_count(compliance_data: Dict) -> int:
+def _get_evidence_count(compliance_data: dict) -> int:
     """Get evidence items count"""
     if isinstance(compliance_data, dict) and "compliance_overview" in compliance_data:
         return compliance_data["compliance_overview"].get("total_evidence_items", 0)
     return 0
 
-def _get_lineage_count(compliance_data: Dict) -> int:
+def _get_lineage_count(compliance_data: dict) -> int:
     """Get data lineage count"""
     if isinstance(compliance_data, dict) and "compliance_overview" in compliance_data:
         return compliance_data["compliance_overview"].get("data_lineage_mapped", 0)
     return 0
 
-def _get_critical_alerts(dr_data: Dict, compliance_data: Dict) -> List[Dict[str, Any]]:
+def _get_critical_alerts(dr_data: dict, compliance_data: dict) -> list[dict[str, Any]]:
     """Get critical alerts and recommended actions"""
     alerts = []
-    
+
     # DR alerts
     if isinstance(dr_data, dict) and "global_metrics" in dr_data:
         if dr_data["global_metrics"].get("failed_backups_24h", 0) > 0:
@@ -322,7 +321,7 @@ def _get_critical_alerts(dr_data: Dict, compliance_data: Dict) -> List[Dict[str,
                 "message": f"{dr_data['global_metrics']['failed_backups_24h']} backup failures in last 24h",
                 "action": "Review backup logs and retry failed backups"
             })
-    
+
     # Compliance alerts
     if isinstance(compliance_data, dict) and "compliance_overview" in compliance_data:
         critical_findings = compliance_data["compliance_overview"].get("critical_findings", 0)
@@ -333,10 +332,10 @@ def _get_critical_alerts(dr_data: Dict, compliance_data: Dict) -> List[Dict[str,
                 "message": f"{critical_findings} critical compliance findings",
                 "action": "Review and address compliance violations"
             })
-    
+
     return alerts
 
-def _format_critical_apps(dr_data: Dict) -> Dict[str, Any]:
+def _format_critical_apps(dr_data: dict) -> dict[str, Any]:
     """Format critical applications status for display"""
     if isinstance(dr_data, dict) and "apps" in dr_data:
         critical_apps = {}
@@ -348,16 +347,16 @@ def _format_critical_apps(dr_data: Dict) -> Dict[str, Any]:
                     "last_backup": app_data.get("last_backup"),
                     "issues": []
                 }
-                
+
                 if app_data.get("status") != "compliant":
                     critical_apps[app_name]["issues"].append("Backup compliance issue")
                 if app_data.get("health_score", 0) < 50:
                     critical_apps[app_name]["issues"].append("Low backup health score")
-        
+
         return critical_apps
     return {}
 
-async def _check_dr_service_health() -> Dict[str, Any]:
+async def _check_dr_service_health() -> dict[str, Any]:
     """Check disaster recovery service health"""
     try:
         # Check if DR service is responsive
@@ -373,7 +372,7 @@ async def _check_dr_service_health() -> Dict[str, Any]:
             "error": str(e)
         }
 
-async def _check_compliance_service_health() -> Dict[str, Any]:
+async def _check_compliance_service_health() -> dict[str, Any]:
     """Check compliance service health"""
     try:
         # Check if compliance service is responsive
@@ -389,7 +388,7 @@ async def _check_compliance_service_health() -> Dict[str, Any]:
             "error": str(e)
         }
 
-async def _check_application_health() -> Dict[str, Any]:
+async def _check_application_health() -> dict[str, Any]:
     """Check main application health"""
     try:
         return {

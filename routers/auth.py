@@ -4,14 +4,19 @@ Handles user authentication and token management
 """
 
 from datetime import timedelta
-from typing import Optional
-from fastapi import APIRouter, HTTPException, Depends, status
+
+from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
 from pydantic import BaseModel
 
 from middleware.auth import (
-    authenticate_user, create_access_token, Token, User,
-    ACCESS_TOKEN_EXPIRE_MINUTES, require_auth, optional_auth
+    ACCESS_TOKEN_EXPIRE_MINUTES,
+    Token,
+    User,
+    authenticate_user,
+    create_access_token,
+    optional_auth,
+    require_auth,
 )
 from utils.logger import get_logger
 
@@ -40,7 +45,7 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends()):
             detail="Incorrect username or password",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    
+
     access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(
         data={
@@ -50,9 +55,9 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends()):
         },
         expires_delta=access_token_expires
     )
-    
+
     logger.info(f"Successful login for user: {user.user_id}")
-    
+
     return {
         "access_token": access_token,
         "token_type": "bearer"
@@ -68,7 +73,7 @@ async def login_simple(login_data: LoginRequest):
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect username or password"
         )
-    
+
     access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(
         data={
@@ -78,9 +83,9 @@ async def login_simple(login_data: LoginRequest):
         },
         expires_delta=access_token_expires
     )
-    
+
     logger.info(f"Successful login for user: {user.user_id}")
-    
+
     return {
         "access_token": access_token,
         "token_type": "bearer"
@@ -104,7 +109,7 @@ async def logout(current_user: User = Depends(require_auth)):
     return {"message": "Successfully logged out"}
 
 @router.get("/check")
-async def check_auth(current_user: Optional[User] = Depends(optional_auth)):
+async def check_auth(current_user: User | None = Depends(optional_auth)):
     """Check authentication status"""
     if current_user:
         return {
@@ -112,5 +117,4 @@ async def check_auth(current_user: Optional[User] = Depends(optional_auth)):
             "user_id": current_user.user_id,
             "roles": current_user.roles
         }
-    else:
-        return {"authenticated": False}
+    return {"authenticated": False}

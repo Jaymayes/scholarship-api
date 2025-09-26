@@ -1,20 +1,22 @@
 # AI Scholarship Playbook - Magic Onboarding Router
 # Conversational AI-powered profile intake endpoints
 
-from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks, Request
-from fastapi.security import HTTPBearer
-from typing import Optional, Dict, Any
 import logging
 
+from fastapi import APIRouter, Depends, HTTPException, Request
+
+from middleware.auth import User, require_auth
+from middleware.rate_limiting import search_rate_limit as general_rate_limit
 from models.onboarding import (
-    OnboardingStartRequest, OnboardingContinueRequest,
-    OnboardingResponse, ProfileUpdateRequest, ProfileUpdateResponse,
-    ProfileCompletionStatus
+    OnboardingContinueRequest,
+    OnboardingResponse,
+    OnboardingStartRequest,
+    ProfileCompletionStatus,
+    ProfileUpdateRequest,
+    ProfileUpdateResponse,
 )
 from services.magic_onboarding_service import MagicOnboardingService
 from services.openai_service import OpenAIService
-from middleware.auth import require_auth, User
-from middleware.rate_limiting import search_rate_limit as general_rate_limit
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/v1/onboarding", tags=["Magic Onboarding"])
@@ -31,7 +33,7 @@ async def start_magic_onboarding(
 ):
     """
     Start Magic Onboarding - AI-powered conversational profile intake.
-    
+
     This endpoint initiates a personalized conversation to help students
     build their scholarship profile through natural conversation rather
     than traditional forms.
@@ -42,15 +44,15 @@ async def start_magic_onboarding(
                 status_code=503,
                 detail="AI service unavailable. Please try again later."
             )
-        
+
         response = await onboarding_service.start_onboarding(
             user_id=current_user.user_id,
             request=request
         )
-        
+
         logger.info(f"Started magic onboarding for user {current_user.user_id}")
         return response
-        
+
     except Exception as e:
         logger.error(f"Failed to start magic onboarding: {str(e)}")
         raise HTTPException(
@@ -66,7 +68,7 @@ async def continue_magic_onboarding(
 ):
     """
     Continue Magic Onboarding conversation.
-    
+
     Processes user responses and continues the AI-guided conversation
     to build a comprehensive scholarship profile.
     """
@@ -76,12 +78,12 @@ async def continue_magic_onboarding(
                 status_code=503,
                 detail="AI service unavailable. Please try again later."
             )
-        
+
         response = await onboarding_service.continue_onboarding(request)
-        
+
         logger.info(f"Continued onboarding session {request.session_id}")
         return response
-        
+
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e))
     except Exception as e:
@@ -99,7 +101,7 @@ async def get_profile_completion(
 ):
     """
     Get current profile completion status.
-    
+
     Returns detailed completion percentages across different profile
     categories and suggestions for improvement.
     """
@@ -118,7 +120,7 @@ async def get_profile_completion(
             suggested_improvements=["Start Magic Onboarding to build your profile"],
             estimated_time_to_complete=15
         )
-        
+
     except Exception as e:
         logger.error(f"Failed to get profile completion: {str(e)}")
         raise HTTPException(
@@ -135,7 +137,7 @@ async def update_profile_from_onboarding(
 ):
     """
     Update user profile with data from Magic Onboarding.
-    
+
     Applies extracted profile data from the onboarding conversation
     to the user's main profile for scholarship matching.
     """
@@ -153,7 +155,7 @@ async def update_profile_from_onboarding(
             ],
             next_suggested_action="Upload your transcript for better matching"
         )
-        
+
     except Exception as e:
         logger.error(f"Failed to update profile: {str(e)}")
         raise HTTPException(
@@ -170,7 +172,7 @@ async def get_onboarding_session(
 ):
     """
     Retrieve details of a specific onboarding session.
-    
+
     Allows users to review their onboarding conversation history
     and extracted profile data.
     """
@@ -181,14 +183,14 @@ async def get_onboarding_session(
                 status_code=404,
                 detail="Onboarding session not found"
             )
-        
+
         # Verify session belongs to current user
         if session.user_id != current_user.user_id:
             raise HTTPException(
                 status_code=403,
                 detail="Access denied to this onboarding session"
             )
-        
+
         return {
             "session_id": session.session_id,
             "current_stage": session.current_stage,
@@ -199,7 +201,7 @@ async def get_onboarding_session(
             "profile_completion_status": session.profile_completion_status,
             "conversation_length": len(session.conversation_context.conversation_history)
         }
-        
+
     except HTTPException:
         raise
     except Exception as e:

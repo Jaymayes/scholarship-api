@@ -10,14 +10,12 @@ Features:
 - Sales collateral and presentation tools
 """
 
-import logging
-from datetime import datetime, timedelta
-from typing import Dict, List, Optional, Any, Tuple
+import uuid
+from dataclasses import dataclass, field
+from datetime import datetime
 from decimal import Decimal
 from enum import Enum
-from dataclasses import dataclass, field
-import json
-import uuid
+from typing import Any
 
 from utils.logger import get_logger
 
@@ -52,36 +50,36 @@ class ROICalculation:
     calculation_id: str
     prospect_name: str
     segment: str  # university, foundation, corporate
-    
+
     # Current state inputs
     annual_scholarship_budget: Decimal
     scholarships_managed: int
     staff_hours_per_month: int
     hourly_rate: Decimal
     application_volume: int
-    
+
     # Solution impact
     time_savings_percentage: float  # 0-100%
     efficiency_gain_percentage: float  # 0-100%
     application_increase_percentage: float  # 0-100%
     cost_reduction_percentage: float  # 0-100%
-    
+
     # ROI calculations
     annual_time_savings_hours: float = 0
     annual_cost_savings: Decimal = field(default_factory=lambda: Decimal('0'))
     annual_efficiency_value: Decimal = field(default_factory=lambda: Decimal('0'))
     total_annual_value: Decimal = field(default_factory=lambda: Decimal('0'))
-    
+
     # Investment
     annual_platform_cost: Decimal = field(default_factory=lambda: Decimal('0'))
     implementation_cost: Decimal = field(default_factory=lambda: Decimal('0'))
     total_investment: Decimal = field(default_factory=lambda: Decimal('0'))
-    
+
     # ROI metrics
     net_annual_benefit: Decimal = field(default_factory=lambda: Decimal('0'))
     roi_percentage: float = 0
     payback_months: float = 0
-    
+
     # Presentation data
     created_by: str = ""
     created_at: datetime = field(default_factory=datetime.utcnow)
@@ -93,30 +91,30 @@ class BattleCard:
     card_id: str
     competitor_name: str
     competitor_type: CompetitorType
-    
+
     # Competitor overview
     market_position: str
-    target_segments: List[str]
+    target_segments: list[str]
     pricing_model: str
-    key_strengths: List[str]
-    key_weaknesses: List[str]
-    
+    key_strengths: list[str]
+    key_weaknesses: list[str]
+
     # Competitive positioning
-    our_advantages: List[str]
-    differentiation_points: List[str]
-    win_strategies: List[str]
-    
+    our_advantages: list[str]
+    differentiation_points: list[str]
+    win_strategies: list[str]
+
     # Common objections and responses
-    objections_responses: Dict[str, str] = field(default_factory=dict)
-    
+    objections_responses: dict[str, str] = field(default_factory=dict)
+
     # Proof points and references
-    competitive_wins: List[str] = field(default_factory=list)
-    case_studies: List[str] = field(default_factory=list)
-    
+    competitive_wins: list[str] = field(default_factory=list)
+    case_studies: list[str] = field(default_factory=list)
+
     # Pricing and negotiation
-    pricing_comparison: Dict[str, Any] = field(default_factory=dict)
-    negotiation_tactics: List[str] = field(default_factory=list)
-    
+    pricing_comparison: dict[str, Any] = field(default_factory=dict)
+    negotiation_tactics: list[str] = field(default_factory=list)
+
     # Metadata
     last_updated: datetime = field(default_factory=datetime.utcnow)
     updated_by: str = ""
@@ -128,33 +126,33 @@ class PricingGuideline:
     guideline_id: str
     segment: str  # university, foundation, corporate
     tier: str     # listings_promotion, recruitment_dashboard, analytics
-    
+
     # Pricing structure
     list_price: Decimal
-    standard_discount_range: Tuple[float, float]  # (min%, max%)
-    volume_discount_tiers: Dict[int, float] = field(default_factory=dict)
-    
+    standard_discount_range: tuple[float, float]  # (min%, max%)
+    volume_discount_tiers: dict[int, float] = field(default_factory=dict)
+
     # Negotiation parameters
     minimum_acceptable_price: Decimal = field(default_factory=lambda: Decimal('0'))
     approval_required_below: Decimal = field(default_factory=lambda: Decimal('0'))
-    
+
     # Value-based pricing factors
-    value_multipliers: Dict[str, float] = field(default_factory=dict)
-    competitive_positioning: Dict[str, Decimal] = field(default_factory=dict)
-    
+    value_multipliers: dict[str, float] = field(default_factory=dict)
+    competitive_positioning: dict[str, Decimal] = field(default_factory=dict)
+
     # Contract terms
-    payment_terms: List[str] = field(default_factory=list)
-    contract_length_options: List[int] = field(default_factory=list)  # months
+    payment_terms: list[str] = field(default_factory=list)
+    contract_length_options: list[int] = field(default_factory=list)  # months
     renewal_terms: str = ""
-    
+
     # Special considerations
-    pilot_pricing: Optional[Decimal] = None
-    nonprofit_discount: Optional[float] = None
-    multi_year_discount: Optional[float] = None
-    
+    pilot_pricing: Decimal | None = None
+    nonprofit_discount: float | None = None
+    multi_year_discount: float | None = None
+
     # Metadata
     effective_date: datetime = field(default_factory=datetime.utcnow)
-    expiry_date: Optional[datetime] = None
+    expiry_date: datetime | None = None
     approval_level: str = "standard"  # standard, manager, director
 
 @dataclass
@@ -164,61 +162,61 @@ class ContractTemplate:
     template_name: str
     contract_type: ContractType
     target_segment: str
-    
+
     # Template content
     template_text: str
-    required_fields: List[str] = field(default_factory=list)
-    optional_fields: List[str] = field(default_factory=list)
-    
+    required_fields: list[str] = field(default_factory=list)
+    optional_fields: list[str] = field(default_factory=list)
+
     # Legal terms
-    standard_terms: Dict[str, str] = field(default_factory=dict)
-    negotiable_terms: List[str] = field(default_factory=list)
-    non_negotiable_terms: List[str] = field(default_factory=list)
-    
+    standard_terms: dict[str, str] = field(default_factory=dict)
+    negotiable_terms: list[str] = field(default_factory=list)
+    non_negotiable_terms: list[str] = field(default_factory=list)
+
     # Pricing integration
-    pricing_sections: List[str] = field(default_factory=list)
-    discount_clauses: List[str] = field(default_factory=list)
-    
+    pricing_sections: list[str] = field(default_factory=list)
+    discount_clauses: list[str] = field(default_factory=list)
+
     # Approval workflow
     approval_required: bool = True
-    approver_roles: List[str] = field(default_factory=list)
-    
+    approver_roles: list[str] = field(default_factory=list)
+
     # Version control
     version: str = "1.0"
     last_updated: datetime = field(default_factory=datetime.utcnow)
-    legal_review_date: Optional[datetime] = None
+    legal_review_date: datetime | None = None
 
 class SalesEnablementToolkit:
     """
     Comprehensive Sales Enablement Toolkit
-    
+
     Provides sales teams with:
     - Dynamic ROI calculators for value demonstration
     - Competitive battle cards and positioning
     - Pricing guidelines and negotiation strategies
     - Contract templates and legal frameworks
     """
-    
+
     def __init__(self):
         # In-memory storage for MVP (would be database in production)
-        self.roi_calculations: Dict[str, ROICalculation] = {}
-        self.battle_cards: Dict[str, BattleCard] = {}
-        self.pricing_guidelines: Dict[str, PricingGuideline] = {}
-        self.contract_templates: Dict[str, ContractTemplate] = {}
-        
+        self.roi_calculations: dict[str, ROICalculation] = {}
+        self.battle_cards: dict[str, BattleCard] = {}
+        self.pricing_guidelines: dict[str, PricingGuideline] = {}
+        self.contract_templates: dict[str, ContractTemplate] = {}
+
         # Initialize default content
         self._initialize_battle_cards()
         self._initialize_pricing_guidelines()
         self._initialize_contract_templates()
-        
+
         logger.info("🛠️ Sales Enablement Toolkit initialized")
         logger.info(f"⚔️ Battle cards: {len(self.battle_cards)}")
         logger.info(f"💰 Pricing guidelines: {len(self.pricing_guidelines)}")
         logger.info(f"📄 Contract templates: {len(self.contract_templates)}")
-    
+
     def _initialize_battle_cards(self):
         """Initialize competitive battle cards"""
-        
+
         # Competitor 1: Generic Scholarship Platform
         generic_platform = BattleCard(
             card_id="comp_generic_platform",
@@ -280,9 +278,9 @@ class SalesEnablementToolkit:
                 "Bundle analytics package for comprehensive solution"
             ]
         )
-        
+
         self.battle_cards[generic_platform.card_id] = generic_platform
-        
+
         # Competitor 2: Legacy CRM/Manual Process
         legacy_crm = BattleCard(
             card_id="comp_legacy_manual",
@@ -328,12 +326,12 @@ class SalesEnablementToolkit:
                 "Budget constraints": "The efficiency gains typically pay for the platform within 3 months. We can also start with a pilot to demonstrate value."
             }
         )
-        
+
         self.battle_cards[legacy_crm.card_id] = legacy_crm
-    
+
     def _initialize_pricing_guidelines(self):
         """Initialize pricing guidelines for different segments and tiers"""
-        
+
         # University segment - Listings + Promotion tier
         univ_listings = PricingGuideline(
             guideline_id="univ_listings_pricing",
@@ -359,9 +357,9 @@ class SalesEnablementToolkit:
             nonprofit_discount=15.0,       # 15% for verified nonprofits
             multi_year_discount=10.0       # 10% for 2+ year agreements
         )
-        
+
         self.pricing_guidelines[univ_listings.guideline_id] = univ_listings
-        
+
         # Foundation segment - Recruitment Dashboard tier
         found_dashboard = PricingGuideline(
             guideline_id="found_dashboard_pricing",
@@ -384,9 +382,9 @@ class SalesEnablementToolkit:
             nonprofit_discount=10.0,
             multi_year_discount=15.0
         )
-        
+
         self.pricing_guidelines[found_dashboard.guideline_id] = found_dashboard
-        
+
         # Corporate segment - Enterprise Analytics tier
         corp_analytics = PricingGuideline(
             guideline_id="corp_analytics_pricing",
@@ -412,12 +410,12 @@ class SalesEnablementToolkit:
             multi_year_discount=20.0,  # Higher discount for enterprise multi-year
             approval_level="director"
         )
-        
+
         self.pricing_guidelines[corp_analytics.guideline_id] = corp_analytics
-    
+
     def _initialize_contract_templates(self):
         """Initialize contract templates for different deal types"""
-        
+
         # Pilot Agreement Template
         pilot_template = ContractTemplate(
             template_id="pilot_agreement_v1",
@@ -453,7 +451,7 @@ Either party may terminate with [TERMINATION_NOTICE] days notice.
 [STANDARD_LEGAL_TERMS]
             """,
             required_fields=[
-                "CUSTOMER_NAME", "DATE", "PILOT_DURATION", "START_DATE", 
+                "CUSTOMER_NAME", "DATE", "PILOT_DURATION", "START_DATE",
                 "END_DATE", "PILOT_SCOPE", "SUCCESS_CRITERIA", "PILOT_PRICE"
             ],
             optional_fields=[
@@ -472,9 +470,9 @@ Either party may terminate with [TERMINATION_NOTICE] days notice.
             ],
             approver_roles=["sales_manager"]
         )
-        
+
         self.contract_templates[pilot_template.template_id] = pilot_template
-        
+
         # Annual Service Agreement Template
         annual_template = ContractTemplate(
             template_id="annual_service_agreement_v1",
@@ -522,9 +520,9 @@ RENEWAL TERMS:
             ],
             approver_roles=["sales_manager", "legal"]
         )
-        
+
         self.contract_templates[annual_template.template_id] = annual_template
-        
+
         # Enterprise Agreement Template
         enterprise_template = ContractTemplate(
             template_id="enterprise_agreement_v1",
@@ -572,10 +570,10 @@ TERMINATION:
             ],
             approver_roles=["sales_director", "legal", "security"]
         )
-        
+
         self.contract_templates[enterprise_template.template_id] = enterprise_template
-    
-    def calculate_roi(self, prospect_data: Dict[str, Any]) -> ROICalculation:
+
+    def calculate_roi(self, prospect_data: dict[str, Any]) -> ROICalculation:
         """Calculate ROI for prospect value demonstration"""
         try:
             calculation = ROICalculation(
@@ -595,54 +593,54 @@ TERMINATION:
                 implementation_cost=Decimal(str(prospect_data.get('implementation_cost', 5000))),
                 created_by=prospect_data.get('created_by', 'sales_rep')
             )
-            
+
             # Calculate time savings
-            monthly_hours_saved = (calculation.staff_hours_per_month * 
+            monthly_hours_saved = (calculation.staff_hours_per_month *
                                  calculation.time_savings_percentage / 100)
             calculation.annual_time_savings_hours = monthly_hours_saved * 12
-            
+
             # Calculate cost savings
             annual_labor_cost = calculation.staff_hours_per_month * 12 * calculation.hourly_rate
-            calculation.annual_cost_savings = (annual_labor_cost * 
+            calculation.annual_cost_savings = (annual_labor_cost *
                                             calculation.cost_reduction_percentage / 100)
-            
+
             # Calculate efficiency value (improved outcomes)
             current_efficiency_value = calculation.annual_scholarship_budget * Decimal('0.1')  # 10% efficiency baseline
-            calculation.annual_efficiency_value = (current_efficiency_value * 
+            calculation.annual_efficiency_value = (current_efficiency_value *
                                                  Decimal(str(calculation.efficiency_gain_percentage / 100)))
-            
+
             # Total annual value
             time_savings_value = Decimal(str(calculation.annual_time_savings_hours)) * calculation.hourly_rate
-            calculation.total_annual_value = (calculation.annual_cost_savings + 
-                                           calculation.annual_efficiency_value + 
+            calculation.total_annual_value = (calculation.annual_cost_savings +
+                                           calculation.annual_efficiency_value +
                                            time_savings_value)
-            
+
             # Total investment
-            calculation.total_investment = (calculation.annual_platform_cost + 
+            calculation.total_investment = (calculation.annual_platform_cost +
                                          calculation.implementation_cost)
-            
+
             # ROI calculations
             calculation.net_annual_benefit = calculation.total_annual_value - calculation.annual_platform_cost
-            
+
             if calculation.total_investment > 0:
                 calculation.roi_percentage = float(
                     (calculation.net_annual_benefit / calculation.total_investment) * 100
                 )
                 calculation.payback_months = float(
-                    (calculation.total_investment / (calculation.net_annual_benefit / 12))
+                    calculation.total_investment / (calculation.net_annual_benefit / 12)
                 )
-            
+
             # Store calculation
             self.roi_calculations[calculation.calculation_id] = calculation
-            
+
             logger.info(f"💰 ROI calculated: {calculation.prospect_name} | ROI: {calculation.roi_percentage:.1f}% | Payback: {calculation.payback_months:.1f} months")
             return calculation
-            
+
         except Exception as e:
             logger.error(f"Failed to calculate ROI: {str(e)}")
             raise
-    
-    def get_battle_card(self, competitor_name: str) -> Optional[BattleCard]:
+
+    def get_battle_card(self, competitor_name: str) -> BattleCard | None:
         """Get battle card for specific competitor"""
         for card in self.battle_cards.values():
             if competitor_name.lower() in card.competitor_name.lower():
@@ -650,57 +648,57 @@ TERMINATION:
                 logger.info(f"⚔️ Battle card accessed: {card.competitor_name}")
                 return card
         return None
-    
-    def get_pricing_guidance(self, segment: str, tier: str, deal_size: Optional[Decimal] = None) -> Optional[PricingGuideline]:
+
+    def get_pricing_guidance(self, segment: str, tier: str, deal_size: Decimal | None = None) -> PricingGuideline | None:
         """Get pricing guidance for specific segment and tier"""
         guideline_key = f"{segment}_{tier}_pricing"
         guideline = self.pricing_guidelines.get(guideline_key)
-        
+
         if guideline and deal_size:
             # Apply volume discounts if applicable
             additional_discount = 0.0
             for volume_threshold, discount in sorted(guideline.volume_discount_tiers.items()):
                 if deal_size >= volume_threshold:
                     additional_discount = discount
-            
+
             logger.info(f"💰 Pricing guidance: {segment} {tier} | Additional discount: {additional_discount}%")
-        
+
         return guideline
-    
-    def generate_contract(self, template_id: str, contract_data: Dict[str, Any]) -> str:
+
+    def generate_contract(self, template_id: str, contract_data: dict[str, Any]) -> str:
         """Generate contract from template with filled data"""
         try:
             template = self.contract_templates.get(template_id)
             if not template:
                 raise ValueError(f"Contract template {template_id} not found")
-            
+
             # Start with template text
             contract_text = template.template_text
-            
+
             # Replace required fields
             for field in template.required_fields:
                 value = contract_data.get(field, f"[{field}]")
                 contract_text = contract_text.replace(f"[{field}]", str(value))
-            
+
             # Replace optional fields if provided
             for field in template.optional_fields:
                 if field in contract_data:
                     contract_text = contract_text.replace(f"[{field}]", str(contract_data[field]))
-            
+
             # Apply standard terms for any remaining placeholders
             for term, default_value in template.standard_terms.items():
                 placeholder = f"[{term.upper()}]"
                 if placeholder in contract_text:
                     contract_text = contract_text.replace(placeholder, default_value)
-            
+
             logger.info(f"📄 Contract generated: {template.template_name}")
             return contract_text
-            
+
         except Exception as e:
             logger.error(f"Failed to generate contract: {str(e)}")
             raise
-    
-    def get_negotiation_strategy(self, competitor: str, segment: str, deal_value: Decimal) -> Dict[str, Any]:
+
+    def get_negotiation_strategy(self, competitor: str, segment: str, deal_value: Decimal) -> dict[str, Any]:
         """Get comprehensive negotiation strategy"""
         try:
             strategy = {
@@ -710,7 +708,7 @@ TERMINATION:
                 "negotiation_tactics": [],
                 "risk_mitigation": []
             }
-            
+
             # Get battle card for competitive positioning
             battle_card = self.get_battle_card(competitor)
             if battle_card:
@@ -721,11 +719,11 @@ TERMINATION:
                     "objection_responses": battle_card.objections_responses
                 }
                 strategy["negotiation_tactics"].extend(battle_card.negotiation_tactics)
-            
+
             # Get pricing guidance
             pricing_guidelines = list(self.pricing_guidelines.values())
             relevant_pricing = [p for p in pricing_guidelines if p.segment == segment]
-            
+
             if relevant_pricing:
                 pricing = relevant_pricing[0]
                 strategy["pricing_strategy"] = {
@@ -739,7 +737,7 @@ TERMINATION:
                         "multi_year_discount": pricing.multi_year_discount
                     }
                 }
-            
+
             # Standard value propositions by segment
             value_props = {
                 "university": [
@@ -761,9 +759,9 @@ TERMINATION:
                     "Dedicated customer success management"
                 ]
             }
-            
+
             strategy["value_propositions"] = value_props.get(segment, value_props["university"])
-            
+
             # Risk mitigation strategies
             strategy["risk_mitigation"] = [
                 "Offer pilot program to demonstrate value",
@@ -772,19 +770,19 @@ TERMINATION:
                 "Flexible contract terms and renewal options",
                 "Reference customers in similar segment"
             ]
-            
+
             return strategy
-            
+
         except Exception as e:
             logger.error(f"Failed to generate negotiation strategy: {str(e)}")
             raise
-    
-    def get_enablement_analytics(self) -> Dict[str, Any]:
+
+    def get_enablement_analytics(self) -> dict[str, Any]:
         """Get sales enablement usage and effectiveness analytics"""
         try:
             total_roi_calculations = len(self.roi_calculations)
             total_battle_card_usage = sum(card.usage_count for card in self.battle_cards.values())
-            
+
             # ROI calculation statistics
             if self.roi_calculations:
                 roi_values = [calc.roi_percentage for calc in self.roi_calculations.values()]
@@ -794,24 +792,24 @@ TERMINATION:
             else:
                 avg_roi = 0
                 avg_payback = 0
-            
+
             # Battle card usage by competitor
             competitor_usage = {}
             for card in self.battle_cards.values():
                 competitor_usage[card.competitor_name] = card.usage_count
-            
+
             # Segment analysis
             segment_roi = {}
             for calc in self.roi_calculations.values():
                 if calc.segment not in segment_roi:
                     segment_roi[calc.segment] = []
                 segment_roi[calc.segment].append(calc.roi_percentage)
-            
+
             # Calculate segment averages
             segment_averages = {}
             for segment, rois in segment_roi.items():
                 segment_averages[segment] = sum(rois) / len(rois) if rois else 0
-            
+
             return {
                 "usage_summary": {
                     "total_roi_calculations": total_roi_calculations,
@@ -830,7 +828,7 @@ TERMINATION:
                 },
                 "generated_at": datetime.utcnow().isoformat()
             }
-            
+
         except Exception as e:
             logger.error(f"Failed to generate enablement analytics: {str(e)}")
             raise

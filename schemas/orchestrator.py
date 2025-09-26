@@ -3,16 +3,17 @@ Orchestrator schemas for Agent Bridge integration
 Defines Task, Result, and Event models for Command Center communication
 """
 
-from pydantic import BaseModel, Field
-from typing import Optional, Dict, Any, List
-from enum import Enum
 from datetime import datetime
+from enum import Enum
+from typing import Any
+
+from pydantic import BaseModel, Field
 
 
 class TaskStatus(str, Enum):
     """Task execution status"""
     ACCEPTED = "accepted"
-    IN_PROGRESS = "in_progress" 
+    IN_PROGRESS = "in_progress"
     SUCCEEDED = "succeeded"
     FAILED = "failed"
 
@@ -38,11 +39,11 @@ class Task(BaseModel):
     """Incoming task from Command Center"""
     task_id: str = Field(..., description="Unique task identifier")
     action: str = Field(..., description="Action to execute (e.g., scholarship_api.search)")
-    payload: Dict[str, Any] = Field(..., description="Task payload with action-specific data")
+    payload: dict[str, Any] = Field(..., description="Task payload with action-specific data")
     reply_to: str = Field(..., description="Command Center callback URL")
     trace_id: str = Field(..., description="Request tracing identifier")
     requested_by: str = Field(..., description="Identity of request originator")
-    resources: Optional[TaskResources] = Field(default_factory=TaskResources, description="Task execution resources")
+    resources: TaskResources | None = Field(default_factory=TaskResources, description="Task execution resources")
 
     model_config = {
         "json_schema_extra": {
@@ -74,17 +75,17 @@ class TaskError(BaseModel):
     """Task execution error details"""
     code: str = Field(..., description="Error code")
     message: str = Field(..., description="Human-readable error message")
-    details: Optional[Dict[str, Any]] = Field(None, description="Additional error context")
+    details: dict[str, Any] | None = Field(None, description="Additional error context")
 
 
 class TaskResult(BaseModel):
     """Task execution result sent back to Command Center"""
     task_id: str = Field(..., description="Task identifier")
     status: TaskStatus = Field(..., description="Task execution status")
-    result: Optional[Dict[str, Any]] = Field(None, description="Task result data")
-    error: Optional[TaskError] = Field(None, description="Error details if failed")
+    result: dict[str, Any] | None = Field(None, description="Task result data")
+    error: TaskError | None = Field(None, description="Error details if failed")
     trace_id: str = Field(..., description="Request tracing identifier")
-    execution_time_ms: Optional[int] = Field(None, description="Task execution duration")
+    execution_time_ms: int | None = Field(None, description="Task execution duration")
 
     model_config = {
         "json_schema_extra": {
@@ -109,9 +110,9 @@ class Event(BaseModel):
     event_id: str = Field(..., description="Unique event identifier")
     type: EventType = Field(..., description="Event type")
     source: str = Field(..., description="Event source (agent name)")
-    data: Dict[str, Any] = Field(..., description="Event data")
+    data: dict[str, Any] = Field(..., description="Event data")
     time: datetime = Field(default_factory=datetime.utcnow, description="Event timestamp")
-    trace_id: Optional[str] = Field(None, description="Associated trace ID")
+    trace_id: str | None = Field(None, description="Associated trace ID")
 
     model_config = {
         "json_schema_extra": {
@@ -135,10 +136,10 @@ class AgentCapabilities(BaseModel):
     """Agent capabilities and status"""
     agent_id: str = Field(..., description="Agent identifier")
     name: str = Field(..., description="Human-readable agent name")
-    capabilities: List[str] = Field(..., description="List of supported actions")
+    capabilities: list[str] = Field(..., description="List of supported actions")
     version: str = Field(..., description="Agent version")
     health: str = Field(default="healthy", description="Agent health status")
-    last_seen: Optional[datetime] = Field(default_factory=datetime.utcnow, description="Last activity timestamp")
+    last_seen: datetime | None = Field(default_factory=datetime.utcnow, description="Last activity timestamp")
 
     model_config = {
         "json_schema_extra": {
@@ -163,15 +164,15 @@ class HeartbeatRequest(BaseModel):
     agent_id: str = Field(..., description="Agent identifier")
     name: str = Field(..., description="Agent name")
     base_url: str = Field(..., description="Agent base URL")
-    capabilities: List[str] = Field(..., description="Supported actions")
+    capabilities: list[str] = Field(..., description="Supported actions")
     timestamp: datetime = Field(default_factory=datetime.utcnow, description="Heartbeat timestamp")
 
 
 class SearchTaskPayload(BaseModel):
     """Payload schema for scholarship_api.search action"""
     query: str = Field(..., description="Search query")
-    filters: Optional[Dict[str, Any]] = Field(default_factory=dict, description="Search filters")
-    pagination: Optional[Dict[str, Any]] = Field(default_factory=lambda: {"page": 1, "size": 10}, description="Pagination parameters")
+    filters: dict[str, Any] | None = Field(default_factory=dict, description="Search filters")
+    pagination: dict[str, Any] | None = Field(default_factory=lambda: {"page": 1, "size": 10}, description="Pagination parameters")
 
     model_config = {
         "json_schema_extra": {

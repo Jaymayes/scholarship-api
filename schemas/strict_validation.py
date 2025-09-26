@@ -3,9 +3,9 @@ Strict input validation schemas to prevent gaps and ensure robustness
 Addresses QA findings about input validation vulnerabilities
 """
 
-from typing import List, Optional, Dict, Any
-from pydantic import BaseModel, Field, field_validator, ConfigDict
-from enum import Enum
+from typing import Any
+
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class StrictBaseModel(BaseModel):
@@ -18,8 +18,8 @@ class StrictInteractionRequest(StrictBaseModel):
     type: str = Field(..., min_length=1, max_length=50, pattern="^[a-z_]+$")
     scholarship_id: str = Field(..., min_length=1, max_length=100)
     user_id: str = Field(..., min_length=1, max_length=100)
-    metadata: Optional[Dict[str, Any]] = Field(default=None)
-    
+    metadata: dict[str, Any] | None = Field(default=None)
+
     @field_validator('type')
     @classmethod
     def validate_interaction_type(cls, v: str) -> str:
@@ -32,72 +32,72 @@ class StrictInteractionRequest(StrictBaseModel):
 
 class StrictSearchRequest(StrictBaseModel):
     """Strict validation for search requests with size limits"""
-    query: Optional[str] = Field(None, max_length=1000)
-    fields_of_study: List[str] = Field(default_factory=list, max_items=20)
-    min_amount: Optional[float] = Field(None, ge=0, le=1000000)
-    max_amount: Optional[float] = Field(None, ge=0, le=1000000)
-    scholarship_types: List[str] = Field(default_factory=list, max_items=10)
-    states: List[str] = Field(default_factory=list, max_items=60)  # All US states + territories
-    min_gpa: Optional[float] = Field(None, ge=0.0, le=4.0)
-    citizenship: Optional[str] = Field(None, max_length=100)
-    deadline_after: Optional[str] = Field(None)
-    deadline_before: Optional[str] = Field(None)
+    query: str | None = Field(None, max_length=1000)
+    fields_of_study: list[str] = Field(default_factory=list, max_items=20)
+    min_amount: float | None = Field(None, ge=0, le=1000000)
+    max_amount: float | None = Field(None, ge=0, le=1000000)
+    scholarship_types: list[str] = Field(default_factory=list, max_items=10)
+    states: list[str] = Field(default_factory=list, max_items=60)  # All US states + territories
+    min_gpa: float | None = Field(None, ge=0.0, le=4.0)
+    citizenship: str | None = Field(None, max_length=100)
+    deadline_after: str | None = Field(None)
+    deadline_before: str | None = Field(None)
     limit: int = Field(20, ge=1, le=100)
     offset: int = Field(0, ge=0, le=10000)
-    
+
     @field_validator('query')
     @classmethod
-    def validate_query(cls, v: Optional[str]) -> Optional[str]:
+    def validate_query(cls, v: str | None) -> str | None:
         """Validate search query for dangerous content"""
         if v is None:
             return v
-        
+
         # Check for SQL injection patterns
         dangerous_patterns = [
             'drop table', 'delete from', 'update set', 'insert into',
             'alter table', 'truncate', 'create table', '--', ';'
         ]
-        
+
         v_lower = v.lower()
         for pattern in dangerous_patterns:
             if pattern in v_lower:
                 raise ValueError(f"Query contains potentially dangerous content: {pattern}")
-        
+
         return v
 
 
 class StrictEligibilityRequest(StrictBaseModel):
     """Strict validation for eligibility check requests"""
-    gpa: Optional[float] = Field(None, ge=0.0, le=4.0)
-    grade_level: Optional[str] = Field(None, max_length=50)
-    field_of_study: Optional[str] = Field(None, max_length=100)
-    citizenship: Optional[str] = Field(None, max_length=100)
-    state: Optional[str] = Field(None, max_length=50)
-    financial_need: Optional[bool] = Field(None)
-    
+    gpa: float | None = Field(None, ge=0.0, le=4.0)
+    grade_level: str | None = Field(None, max_length=50)
+    field_of_study: str | None = Field(None, max_length=100)
+    citizenship: str | None = Field(None, max_length=100)
+    state: str | None = Field(None, max_length=50)
+    financial_need: bool | None = Field(None)
+
     @field_validator('grade_level')
     @classmethod
-    def validate_grade_level(cls, v: Optional[str]) -> Optional[str]:
+    def validate_grade_level(cls, v: str | None) -> str | None:
         """Validate grade level against allowed values"""
         if v is None:
             return v
-        
+
         allowed_levels = {
-            'freshman', 'sophomore', 'junior', 'senior', 
+            'freshman', 'sophomore', 'junior', 'senior',
             'graduate', 'postgraduate', 'high_school'
         }
-        
+
         if v.lower() not in allowed_levels:
             raise ValueError(f"Invalid grade level: {v}. Must be one of: {allowed_levels}")
-        
+
         return v
 
 
 class StrictHealthRequest(StrictBaseModel):
     """Strict validation for health check requests"""
-    check_type: Optional[str] = Field("basic", max_length=50)
+    check_type: str | None = Field("basic", max_length=50)
     include_details: bool = Field(False)
-    
+
     @field_validator('check_type')
     @classmethod
     def validate_check_type(cls, v: str) -> str:

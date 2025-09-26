@@ -3,16 +3,15 @@ Partner SLA (Service Level Agreement) Management Service
 Comprehensive SLA definitions, monitoring, and reporting for institutional B2B partners
 """
 
-import asyncio
+import hashlib
 import json
+import statistics
 import time
+from dataclasses import asdict, dataclass
 from datetime import datetime, timedelta
-from typing import Dict, Any, List, Optional, Tuple
-from dataclasses import dataclass, asdict
 from enum import Enum
 from pathlib import Path
-import statistics
-import hashlib
+from typing import Any
 
 from utils.logger import get_logger
 
@@ -21,7 +20,7 @@ logger = get_logger(__name__)
 class SLATier(Enum):
     """SLA tier levels for different partner types"""
     ENTERPRISE = "enterprise"
-    PROFESSIONAL = "professional" 
+    PROFESSIONAL = "professional"
     STANDARD = "standard"
 
 class SLAMetricType(Enum):
@@ -61,11 +60,11 @@ class SLABreach:
     target_value: float
     actual_value: float
     breach_start: datetime
-    breach_end: Optional[datetime]
+    breach_end: datetime | None
     duration_minutes: int
     severity: IncidentSeverity
-    root_cause: Optional[str]
-    remediation_actions: List[str]
+    root_cause: str | None
+    remediation_actions: list[str]
     credit_percentage: float
     customer_impact: str
     status: str  # active, resolved, investigating
@@ -78,7 +77,7 @@ class MaintenanceWindow:
     description: str
     start_time: datetime
     end_time: datetime
-    services_affected: List[str]
+    services_affected: list[str]
     impact_level: str  # none, low, medium, high
     notification_sent: bool
     advance_notice_hours: int
@@ -91,16 +90,16 @@ class SLAReport:
     reporting_period_end: datetime
     tier: SLATier
     overall_compliance_percentage: float
-    metric_compliance: Dict[SLAMetricType, Dict[str, Any]]
-    breaches: List[SLABreach]
-    maintenance_windows: List[MaintenanceWindow]
+    metric_compliance: dict[SLAMetricType, dict[str, Any]]
+    breaches: list[SLABreach]
+    maintenance_windows: list[MaintenanceWindow]
     credits_earned: float
     next_review_date: datetime
 
 class PartnerSLAService:
     """
     Comprehensive Partner SLA Management Service
-    
+
     Features:
     - Enterprise-grade SLA definitions (99.9%+ availability, P95≤120ms)
     - Real-time SLA monitoring and breach detection
@@ -109,28 +108,28 @@ class PartnerSLAService:
     - Maintenance window management
     - Support response time tracking
     """
-    
+
     def __init__(self):
         self.evidence_path = Path("production/sla_evidence")
         self.evidence_path.mkdir(exist_ok=True)
-        
+
         # Initialize SLA targets by tier
         self.sla_targets = self._initialize_sla_targets()
-        
+
         # Active SLA tracking
-        self.active_breaches: Dict[str, List[SLABreach]] = {}
-        self.maintenance_windows: List[MaintenanceWindow] = []
-        self.partner_sla_history: Dict[str, List[SLAReport]] = {}
-        
+        self.active_breaches: dict[str, list[SLABreach]] = {}
+        self.maintenance_windows: list[MaintenanceWindow] = []
+        self.partner_sla_history: dict[str, list[SLAReport]] = {}
+
         logger.info("🎯 Partner SLA Service initialized")
         logger.info(f"📊 SLA Targets: {len(self.sla_targets)} metrics across {len(SLATier)} tiers")
-        logger.info(f"🏢 Enterprise SLA: 99.95% availability, P95≤100ms, 2hr support response")
-        logger.info(f"💼 Professional SLA: 99.9% availability, P95≤120ms, 4hr support response")
-        logger.info(f"📋 Standard SLA: 99.5% availability, P95≤150ms, 8hr support response")
-    
-    def _initialize_sla_targets(self) -> Dict[SLATier, List[SLATarget]]:
+        logger.info("🏢 Enterprise SLA: 99.95% availability, P95≤100ms, 2hr support response")
+        logger.info("💼 Professional SLA: 99.9% availability, P95≤120ms, 4hr support response")
+        logger.info("📋 Standard SLA: 99.5% availability, P95≤150ms, 8hr support response")
+
+    def _initialize_sla_targets(self) -> dict[SLATier, list[SLATarget]]:
         """Initialize comprehensive SLA targets for all tiers"""
-        targets = {
+        return {
             SLATier.ENTERPRISE: [
                 SLATarget(
                     metric_type=SLAMetricType.AVAILABILITY,
@@ -327,13 +326,12 @@ class PartnerSLAService:
                 )
             ]
         }
-        
-        return targets
-    
-    async def get_sla_targets(self, tier: SLATier) -> List[SLATarget]:
+
+
+    async def get_sla_targets(self, tier: SLATier) -> list[SLATarget]:
         """Get SLA targets for a specific tier"""
         return self.sla_targets.get(tier, [])
-    
+
     async def record_sla_breach(
         self,
         partner_id: str,
@@ -344,16 +342,16 @@ class PartnerSLAService:
         tier: SLATier
     ) -> SLABreach:
         """Record an SLA breach incident"""
-        
+
         breach_id = f"sla_breach_{int(time.time())}_{hash(partner_id) % 10000}"
-        
+
         # Find the relevant SLA target
         targets = await self.get_sla_targets(tier)
         target = next((t for t in targets if t.metric_type == metric_type), None)
-        
+
         if not target:
             raise ValueError(f"No SLA target found for {metric_type} in {tier} tier")
-        
+
         breach = SLABreach(
             breach_id=breach_id,
             partner_id=partner_id,
@@ -370,30 +368,30 @@ class PartnerSLAService:
             customer_impact="Under investigation",
             status="active"
         )
-        
+
         # Track active breach
         if partner_id not in self.active_breaches:
             self.active_breaches[partner_id] = []
         self.active_breaches[partner_id].append(breach)
-        
+
         # Save evidence
         evidence_file = self.evidence_path / f"sla_breach_{breach_id}.json"
         with open(evidence_file, 'w') as f:
             json.dump(asdict(breach), f, indent=2, default=str)
-        
+
         logger.warning(f"🚨 SLA BREACH: {partner_id} - {metric_type.value} - Target: {target_value}, Actual: {actual_value}")
-        
+
         return breach
-    
+
     async def resolve_sla_breach(
         self,
         breach_id: str,
         root_cause: str,
-        remediation_actions: List[str]
-    ) -> Optional[SLABreach]:
+        remediation_actions: list[str]
+    ) -> SLABreach | None:
         """Resolve an active SLA breach"""
-        
-        for partner_id, breaches in self.active_breaches.items():
+
+        for _partner_id, breaches in self.active_breaches.items():
             for breach in breaches:
                 if breach.breach_id == breach_id:
                     breach.breach_end = datetime.utcnow()
@@ -401,31 +399,31 @@ class PartnerSLAService:
                     breach.root_cause = root_cause
                     breach.remediation_actions = remediation_actions
                     breach.status = "resolved"
-                    
+
                     # Update evidence
                     evidence_file = self.evidence_path / f"sla_breach_{breach_id}.json"
                     with open(evidence_file, 'w') as f:
                         json.dump(asdict(breach), f, indent=2, default=str)
-                    
+
                     logger.info(f"✅ SLA BREACH RESOLVED: {breach_id} - Duration: {breach.duration_minutes}min")
                     return breach
-        
+
         return None
-    
+
     async def schedule_maintenance_window(
         self,
         title: str,
         description: str,
         start_time: datetime,
         end_time: datetime,
-        services_affected: List[str],
+        services_affected: list[str],
         impact_level: str = "low",
         advance_notice_hours: int = 72
     ) -> MaintenanceWindow:
         """Schedule a planned maintenance window"""
-        
+
         window_id = f"maint_{int(time.time())}_{hashlib.md5(title.encode()).hexdigest()[:8]}"
-        
+
         maintenance = MaintenanceWindow(
             window_id=window_id,
             title=title,
@@ -437,18 +435,18 @@ class PartnerSLAService:
             notification_sent=False,
             advance_notice_hours=advance_notice_hours
         )
-        
+
         self.maintenance_windows.append(maintenance)
-        
+
         # Save evidence
         evidence_file = self.evidence_path / f"maintenance_{window_id}.json"
         with open(evidence_file, 'w') as f:
             json.dump(asdict(maintenance), f, indent=2, default=str)
-        
+
         logger.info(f"📅 MAINTENANCE SCHEDULED: {title} - {start_time} to {end_time}")
-        
+
         return maintenance
-    
+
     async def generate_sla_report(
         self,
         partner_id: str,
@@ -457,7 +455,7 @@ class PartnerSLAService:
         end_date: datetime
     ) -> SLAReport:
         """Generate comprehensive SLA compliance report for a partner"""
-        
+
         # Get partner's breaches during period
         partner_breaches = []
         if partner_id in self.active_breaches:
@@ -465,21 +463,21 @@ class PartnerSLAService:
                 b for b in self.active_breaches[partner_id]
                 if b.breach_start >= start_date and b.breach_start <= end_date
             ]
-        
+
         # Get maintenance windows during period
         period_maintenance = [
             m for m in self.maintenance_windows
             if m.start_time >= start_date and m.start_time <= end_date
         ]
-        
+
         # Calculate compliance metrics (simulated for demo)
         targets = await self.get_sla_targets(tier)
         metric_compliance = {}
-        
+
         for target in targets:
             # Simulate compliance calculation
             compliance_percentage = 99.9 if not partner_breaches else 99.2
-            
+
             metric_compliance[target.metric_type] = {
                 "target_value": target.target_value,
                 "actual_value": target.target_value + 0.1 if partner_breaches else target.target_value - 0.05,
@@ -488,14 +486,14 @@ class PartnerSLAService:
                 "breaches_count": len([b for b in partner_breaches if b.metric_type == target.metric_type]),
                 "status": "compliant" if compliance_percentage >= 99.0 else "breach"
             }
-        
+
         # Calculate overall compliance
         compliance_values = [m["compliance_percentage"] for m in metric_compliance.values()]
         overall_compliance = statistics.mean(compliance_values) if compliance_values else 100.0
-        
+
         # Calculate total credits earned
         total_credits = sum(b.credit_percentage for b in partner_breaches)
-        
+
         report = SLAReport(
             partner_id=partner_id,
             reporting_period_start=start_date,
@@ -508,41 +506,41 @@ class PartnerSLAService:
             credits_earned=total_credits,
             next_review_date=end_date + timedelta(days=30)
         )
-        
+
         # Save report
         report_file = self.evidence_path / f"sla_report_{partner_id}_{int(start_date.timestamp())}.json"
         with open(report_file, 'w') as f:
             json.dump(asdict(report), f, indent=2, default=str)
-        
+
         # Track in history
         if partner_id not in self.partner_sla_history:
             self.partner_sla_history[partner_id] = []
         self.partner_sla_history[partner_id].append(report)
-        
+
         logger.info(f"📊 SLA REPORT GENERATED: {partner_id} - {overall_compliance:.2f}% compliance")
-        
+
         return report
-    
-    async def get_real_time_sla_status(self, partner_id: str, tier: SLATier) -> Dict[str, Any]:
+
+    async def get_real_time_sla_status(self, partner_id: str, tier: SLATier) -> dict[str, Any]:
         """Get real-time SLA status for partner dashboard"""
-        
+
         current_time = datetime.utcnow()
-        
+
         # Get active breaches
         active_breaches = self.active_breaches.get(partner_id, [])
         active_count = len([b for b in active_breaches if b.status == "active"])
-        
+
         # Get upcoming maintenance
         upcoming_maintenance = [
             m for m in self.maintenance_windows
             if m.start_time > current_time and m.start_time <= current_time + timedelta(days=7)
         ]
-        
+
         # Calculate current month compliance (simplified)
         month_start = current_time.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
         targets = await self.get_sla_targets(tier)
-        
-        status = {
+
+        return {
             "partner_id": partner_id,
             "tier": tier.value,
             "timestamp": current_time.isoformat(),
@@ -560,22 +558,21 @@ class PartnerSLAService:
             "credits_this_month": sum(b.credit_percentage for b in active_breaches),
             "next_report_date": (month_start + timedelta(days=32)).replace(day=1).isoformat()
         }
-        
-        return status
-    
-    async def get_sla_dashboard_summary(self) -> Dict[str, Any]:
+
+
+    async def get_sla_dashboard_summary(self) -> dict[str, Any]:
         """Get system-wide SLA dashboard summary"""
-        
+
         total_partners = len(self.active_breaches) + 50  # Include partners with no breaches
         total_active_breaches = sum(
             len([b for b in breaches if b.status == "active"])
             for breaches in self.active_breaches.values()
         )
-        
+
         # Calculate system-wide metrics
         system_availability = 99.9 if total_active_breaches == 0 else 99.5
         avg_response_time = 105.5
-        
+
         return {
             "timestamp": datetime.utcnow().isoformat(),
             "system_metrics": {

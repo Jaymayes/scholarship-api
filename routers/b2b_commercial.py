@@ -3,19 +3,19 @@ B2B Commercial Execution API
 Aggressive ARR targets with real-time tracking and partner management
 """
 
+import logging
+from datetime import datetime
+
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
-from typing import Dict, List, Any, Optional
-from datetime import datetime
-import logging
 
+from middleware.auth import User, require_admin, require_auth
 from models.database import get_db
-from middleware.auth import require_auth, require_admin, User
 from production.b2b_commercial_execution import (
-    b2b_commercial_service, 
     PricingTier,
-    FunnelMetrics
+    b2b_commercial_service,
 )
+
 logger = logging.getLogger(__name__)
 
 # Initialize router
@@ -27,7 +27,7 @@ router = APIRouter(
     }
 )
 
-@router.get("/arr-targets", 
+@router.get("/arr-targets",
     summary="Get 30/60/90 day ARR targets and current progress",
     description="Track progress against aggressive B2B ARR targets: $150k → $250k → $500k run-rates")
 async def get_arr_targets_progress(
@@ -38,12 +38,12 @@ async def get_arr_targets_progress(
     """Get current progress against 30/60/90 day ARR targets"""
     try:
         progress = b2b_commercial_service.get_arr_progress(db)
-        
+
         # Add real-time metrics
         current_metrics = b2b_commercial_service.get_current_funnel_metrics(db)
-        
+
         logger.info(f"📊 ARR progress requested by {user.user_id} ({user.roles}) - Current: {current_metrics.paid_count} paid providers")
-        
+
         return {
             "success": True,
             "request_id": request_id,
@@ -60,29 +60,29 @@ async def get_arr_targets_progress(
                 "pipeline_health": "strong" if current_metrics.pipeline_coverage and current_metrics.pipeline_coverage >= 3 else "needs attention"
             }
         }
-        
+
     except Exception as e:
         logger.error(f"Failed to get ARR progress: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to retrieve ARR progress: {str(e)}")
 
 @router.get("/pricing-packages",
-    summary="Get commercial pricing packages",  
+    summary="Get commercial pricing packages",
     description="B2B pricing tiers: Listings+Promotion, Recruitment Dashboard, Analytics")
 async def get_pricing_packages(
     request_id: str = Depends(lambda: f"req_{datetime.utcnow().strftime('%Y%m%d_%H%M%S_%f')[:-3]}"),
-    segment: Optional[str] = Query(None, description="Filter by target segment: university, foundation, corporate"),
+    segment: str | None = Query(None, description="Filter by target segment: university, foundation, corporate"),
     user: User = Depends(require_auth(min_role="partner"))
 ):
     """Get all commercial pricing packages with segment filtering"""
     try:
         packages = b2b_commercial_service.get_pricing_packages()
-        
+
         # Filter by segment if requested
         if segment:
             packages = [pkg for pkg in packages if pkg["target_segment"] == segment or pkg["target_segment"] == "all"]
-            
+
         logger.info(f"💰 Pricing packages requested by {user.user_id} ({user.roles}) - {len(packages)} packages returned")
-        
+
         return {
             "success": True,
             "request_id": request_id,
@@ -96,7 +96,7 @@ async def get_pricing_packages(
                 }
             }
         }
-        
+
     except Exception as e:
         logger.error(f"Failed to get pricing packages: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to retrieve pricing packages: {str(e)}")
@@ -115,14 +115,14 @@ async def upgrade_provider_tier(
     try:
         # SECURITY AUDIT: Provider tier upgrade
         logger.warning(f"🔐 AUDIT: Provider upgrade initiated - Provider: {provider_id}, Tier: {tier.value}, Admin: {user.user_id} ({user.email})")
-        
+
         upgrade_result = b2b_commercial_service.upgrade_provider_tier(provider_id, tier, db)
-        
+
         # SECURITY AUDIT: Log successful upgrade
         logger.warning(f"🔐 AUDIT: Provider upgrade completed - Provider: {provider_id}, Tier: {tier.value}, Admin: {user.user_id}, Revenue: ${upgrade_result['annual_revenue']:,.0f} ARR")
         logger.info(f"💰 Provider {provider_id} upgraded to {tier.value} by admin {user.user_id}")
         logger.info(f"📈 Revenue impact: ${upgrade_result['annual_revenue']:,.0f} ARR")
-        
+
         return {
             "success": True,
             "request_id": request_id,
@@ -130,7 +130,7 @@ async def upgrade_provider_tier(
             "upgrade_details": upgrade_result,
             "message": f"Provider successfully upgraded to {upgrade_result['package_name']}"
         }
-        
+
     except ValueError as e:
         logger.warning(f"Provider upgrade failed - {str(e)}")
         raise HTTPException(status_code=404, detail=str(e))
@@ -149,13 +149,13 @@ async def get_weekly_provider_engine_report(
     """Generate weekly Provider Engine report for executive tracking"""
     try:
         report = b2b_commercial_service.generate_weekly_provider_engine_report(db)
-        
+
         # Log key metrics for monitoring
         exec_summary = report["executive_summary"]
         logger.info(f"📊 Weekly report generated by {user.user_id} ({user.roles}) - {exec_summary['total_providers_live']} providers live")
         logger.info(f"💰 ARR run-rate: ${exec_summary['arr_runrate_k']}k")
         logger.info(f"🎯 Pipeline coverage: {exec_summary['pipeline_coverage']}x")
-        
+
         return {
             "success": True,
             "request_id": request_id,
@@ -169,12 +169,12 @@ async def get_weekly_provider_engine_report(
                 "ltv_cac_health": "strong" if exec_summary.get("ltv_cac_ratio", 0) >= 3 else "needs attention"
             }
         }
-        
+
     except Exception as e:
         logger.error(f"Failed to generate weekly report: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to generate weekly report: {str(e)}")
 
-@router.get("/funnel-metrics", 
+@router.get("/funnel-metrics",
     summary="Get real-time B2B funnel conversion metrics",
     description="Track invited → meeting → pilot → listings → application → paid conversion rates")
 async def get_funnel_metrics(
@@ -185,13 +185,13 @@ async def get_funnel_metrics(
     """Get real-time B2B funnel conversion metrics"""
     try:
         metrics = b2b_commercial_service.get_current_funnel_metrics(db)
-        
+
         # Calculate conversion rates for quick analysis
         total_in_funnel = sum([
             metrics.invited_count, metrics.meeting_count, metrics.pilot_count,
             metrics.listings_live_count, metrics.first_application_count, metrics.paid_count
         ])
-        
+
         conversion_analysis = {
             "funnel_efficiency": (metrics.paid_count / total_in_funnel * 100) if total_in_funnel > 0 else 0,
             "time_to_value_health": {
@@ -200,9 +200,9 @@ async def get_funnel_metrics(
             },
             "pipeline_strength": "strong" if metrics.pipeline_coverage and metrics.pipeline_coverage >= 3 else "weak"
         }
-        
+
         logger.info(f"📊 Funnel metrics requested by {user.user_id} ({user.roles}) - {total_in_funnel} total in funnel, {metrics.paid_count} paid")
-        
+
         return {
             "success": True,
             "request_id": request_id,
@@ -211,12 +211,12 @@ async def get_funnel_metrics(
             "conversion_analysis": conversion_analysis,
             "targets": {
                 "time_to_first_listing_days": 7,
-                "time_to_first_application_days": 14, 
+                "time_to_first_application_days": 14,
                 "pipeline_coverage_minimum": 3.0,
                 "ltv_cac_minimum": 3.0
             }
         }
-        
+
     except Exception as e:
         logger.error(f"Failed to get funnel metrics: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to retrieve funnel metrics: {str(e)}")
@@ -235,16 +235,16 @@ async def get_commercial_dashboard(
         arr_progress = b2b_commercial_service.get_arr_progress(db)
         funnel_metrics = b2b_commercial_service.get_current_funnel_metrics(db)
         pricing_packages = b2b_commercial_service.get_pricing_packages()
-        
+
         # Calculate executive summary
         total_providers = sum([
             funnel_metrics.invited_count, funnel_metrics.meeting_count,
             funnel_metrics.pilot_count, funnel_metrics.listings_live_count,
             funnel_metrics.first_application_count, funnel_metrics.paid_count
         ])
-        
+
         current_arr_k = arr_progress.get("day_30", {}).get("current", {}).get("arr_runrate_k", 0)
-        
+
         executive_summary = {
             "total_providers_in_pipeline": total_providers,
             "paid_providers": funnel_metrics.paid_count,
@@ -256,9 +256,9 @@ async def get_commercial_dashboard(
                 "time_to_value": "good" if (funnel_metrics.avg_time_to_first_listing or 0) <= 7 and (funnel_metrics.avg_time_to_first_application or 0) <= 14 else "needs attention"
             }
         }
-        
+
         logger.info(f"📊 Commercial dashboard accessed by {user.user_id} ({user.roles}) - {total_providers} providers, ${current_arr_k}k ARR")
-        
+
         return {
             "success": True,
             "request_id": request_id,
@@ -276,7 +276,7 @@ async def get_commercial_dashboard(
                 "Increase pipeline coverage" if funnel_metrics.pipeline_coverage and funnel_metrics.pipeline_coverage < 3 else None
             ]
         }
-        
+
     except Exception as e:
         logger.error(f"Failed to get commercial dashboard: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to retrieve commercial dashboard: {str(e)}")
@@ -293,7 +293,7 @@ async def health_check(
     return {
         "success": True,
         "service": "B2B Commercial Execution",
-        "status": "operational", 
+        "status": "operational",
         "request_id": request_id,
         "timestamp": datetime.utcnow().isoformat(),
         "targets": {

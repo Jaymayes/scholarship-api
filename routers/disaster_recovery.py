@@ -3,25 +3,27 @@ Disaster Recovery Dashboard Router
 Provides backup/restore status endpoints for CEO/Marketing dashboards
 """
 
-from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks
-from fastapi.responses import JSONResponse
-from typing import Dict, List, Optional, Any
 from datetime import datetime
-import asyncio
+from typing import Any
 
-from infrastructure.disaster_recovery_service import dr_service, DRStatus, BackupRecord, RestoreRecord
-from middleware.auth import get_current_user, User
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
+from fastapi.responses import JSONResponse
+
+from infrastructure.disaster_recovery_service import (
+    dr_service,
+)
+from middleware.auth import User, get_current_user
 from utils.logger import get_logger
 
 logger = get_logger(__name__)
 
 router = APIRouter(prefix="/api/v1/disaster-recovery", tags=["Disaster Recovery"])
 
-@router.get("/status/global", response_model=Dict[str, Any])
+@router.get("/status/global", response_model=dict[str, Any])
 async def get_global_dr_status():
     """
     Get global disaster recovery status for CEO/Marketing dashboards
-    
+
     Returns comprehensive DR status across all applications including:
     - Backup health scores
     - Compliance status
@@ -30,25 +32,25 @@ async def get_global_dr_status():
     """
     try:
         dashboard_data = await dr_service.get_global_dr_dashboard()
-        
+
         logger.info("Global DR status retrieved for dashboard")
         return dashboard_data
-        
+
     except Exception as e:
         logger.error(f"Failed to retrieve global DR status: {e}")
         raise HTTPException(status_code=500, detail="Failed to retrieve DR status")
 
-@router.get("/status/{app_name}", response_model=Dict[str, Any])
+@router.get("/status/{app_name}", response_model=dict[str, Any])
 async def get_app_dr_status(app_name: str):
     """
     Get disaster recovery status for specific application
-    
+
     Args:
         app_name: Application name (scholarship_api, auto_command_center, etc.)
     """
     try:
         dr_status = await dr_service.get_dr_status(app_name)
-        
+
         return {
             "app_name": dr_status.app_name,
             "last_backup_time": dr_status.last_backup_time.isoformat() if dr_status.last_backup_time != datetime.min else None,
@@ -62,7 +64,7 @@ async def get_app_dr_status(app_name: str):
             "backup_health_score": round(dr_status.backup_health_score, 1),
             "compliance_status": dr_status.compliance_status
         }
-        
+
     except Exception as e:
         logger.error(f"Failed to retrieve DR status for {app_name}: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to retrieve DR status for {app_name}")
@@ -71,7 +73,7 @@ async def get_app_dr_status(app_name: str):
 async def create_backup(app_name: str, background_tasks: BackgroundTasks, current_user: User = Depends(get_current_user)):
     """
     Create backup for specified application
-    
+
     Args:
         app_name: Application to backup
         background_tasks: FastAPI background tasks
@@ -81,12 +83,12 @@ async def create_backup(app_name: str, background_tasks: BackgroundTasks, curren
         # Validate app name
         if app_name not in dr_service.dr_config:
             raise HTTPException(status_code=404, detail=f"Application {app_name} not found in DR configuration")
-        
+
         # Start backup in background
         backup_record = await dr_service.create_database_backup(app_name)
-        
+
         logger.info(f"Backup initiated for {app_name} by {current_user.user_id}")
-        
+
         return {
             "backup_id": backup_record.backup_id,
             "app_name": backup_record.app_name,
@@ -94,7 +96,7 @@ async def create_backup(app_name: str, background_tasks: BackgroundTasks, curren
             "created_at": backup_record.created_at.isoformat(),
             "message": "Backup initiated successfully"
         }
-        
+
     except Exception as e:
         logger.error(f"Failed to create backup for {app_name}: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to create backup: {str(e)}")
@@ -103,7 +105,7 @@ async def create_backup(app_name: str, background_tasks: BackgroundTasks, curren
 async def initiate_restore(backup_id: str, target_app: str, current_user: User = Depends(get_current_user)):
     """
     Initiate restore operation from backup
-    
+
     Args:
         backup_id: ID of backup to restore
         target_app: Target application for restore
@@ -111,9 +113,9 @@ async def initiate_restore(backup_id: str, target_app: str, current_user: User =
     """
     try:
         restore_record = await dr_service.initiate_restore(backup_id, target_app, current_user.user_id)
-        
+
         logger.info(f"Restore initiated: {restore_record.restore_id} by {current_user.user_id}")
-        
+
         return {
             "restore_id": restore_record.restore_id,
             "backup_id": restore_record.backup_id,
@@ -122,29 +124,29 @@ async def initiate_restore(backup_id: str, target_app: str, current_user: User =
             "initiated_by": restore_record.initiated_by,
             "created_at": restore_record.created_at.isoformat()
         }
-        
+
     except Exception as e:
         logger.error(f"Failed to initiate restore: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to initiate restore: {str(e)}")
 
-@router.get("/backups", response_model=List[Dict[str, Any]])
-async def list_backups(app_name: Optional[str] = None, limit: int = 50):
+@router.get("/backups", response_model=list[dict[str, Any]])
+async def list_backups(app_name: str | None = None, limit: int = 50):
     """
     List recent backups with optional filtering
-    
+
     Args:
         app_name: Optional app filter
         limit: Maximum number of records to return
     """
     try:
         backups = dr_service.backup_records
-        
+
         if app_name:
             backups = [b for b in backups if b.app_name == app_name]
-        
+
         # Sort by creation time (newest first) and limit
         backups = sorted(backups, key=lambda b: b.created_at, reverse=True)[:limit]
-        
+
         return [
             {
                 "backup_id": backup.backup_id,
@@ -160,29 +162,29 @@ async def list_backups(app_name: Optional[str] = None, limit: int = 50):
             }
             for backup in backups
         ]
-        
+
     except Exception as e:
         logger.error(f"Failed to list backups: {e}")
         raise HTTPException(status_code=500, detail="Failed to list backups")
 
-@router.get("/restores", response_model=List[Dict[str, Any]])
-async def list_restores(app_name: Optional[str] = None, limit: int = 20):
+@router.get("/restores", response_model=list[dict[str, Any]])
+async def list_restores(app_name: str | None = None, limit: int = 20):
     """
     List recent restore operations
-    
+
     Args:
         app_name: Optional app filter
         limit: Maximum number of records to return
     """
     try:
         restores = dr_service.restore_records
-        
+
         if app_name:
             restores = [r for r in restores if r.app_name == app_name]
-        
+
         # Sort by creation time (newest first) and limit
         restores = sorted(restores, key=lambda r: r.created_at, reverse=True)[:limit]
-        
+
         return [
             {
                 "restore_id": restore.restore_id,
@@ -198,7 +200,7 @@ async def list_restores(app_name: Optional[str] = None, limit: int = 20):
             }
             for restore in restores
         ]
-        
+
     except Exception as e:
         logger.error(f"Failed to list restores: {e}")
         raise HTTPException(status_code=500, detail="Failed to list restores")
@@ -212,22 +214,22 @@ async def dr_health_check():
         # Perform basic service checks
         total_apps = len(dr_service.dr_config)
         total_backups = len(dr_service.backup_records)
-        
+
         # Check if all critical apps have recent backups
         critical_apps = [app for app, config in dr_service.dr_config.items() if config.get('critical_priority', False)]
         critical_status = {}
-        
+
         for app in critical_apps:
             dr_status = await dr_service.get_dr_status(app)
             critical_status[app] = {
                 "health_score": dr_status.backup_health_score,
                 "compliance": dr_status.compliance_status
             }
-        
+
         overall_health = "healthy"
         if any(status["compliance"] == "non_compliant" for status in critical_status.values()):
             overall_health = "degraded"
-        
+
         return {
             "status": overall_health,
             "total_applications": total_apps,
@@ -236,7 +238,7 @@ async def dr_health_check():
             "service_version": "1.0.0",
             "last_check": datetime.utcnow().isoformat()
         }
-        
+
     except Exception as e:
         logger.error(f"DR health check failed: {e}")
         return JSONResponse(
@@ -252,26 +254,26 @@ async def dr_health_check():
 async def schedule_restore_test(app_name: str, current_user: User = Depends(get_current_user)):
     """
     Schedule disaster recovery test for application
-    
+
     Args:
         app_name: Application to test DR for
         current_user: Authenticated user
     """
     try:
         # Get latest successful backup
-        app_backups = [b for b in dr_service.backup_records 
+        app_backups = [b for b in dr_service.backup_records
                       if b.app_name == app_name and b.status.value == "success"]
-        
+
         if not app_backups:
             raise HTTPException(status_code=404, detail=f"No successful backups found for {app_name}")
-        
+
         latest_backup = max(app_backups, key=lambda b: b.created_at)
-        
+
         # Create test restore in a separate environment (simulated)
         test_restore_id = f"test-restore-{app_name}-{datetime.utcnow().strftime('%Y%m%d-%H%M%S')}"
-        
+
         logger.info(f"DR test scheduled for {app_name} using backup {latest_backup.backup_id}")
-        
+
         return {
             "test_restore_id": test_restore_id,
             "app_name": app_name,
@@ -281,7 +283,7 @@ async def schedule_restore_test(app_name: str, current_user: User = Depends(get_
             "estimated_duration_minutes": 30,
             "message": "DR test scheduled successfully"
         }
-        
+
     except Exception as e:
         logger.error(f"Failed to schedule DR test for {app_name}: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to schedule DR test: {str(e)}")
@@ -293,7 +295,7 @@ async def get_dr_metrics_for_dashboard():
     """
     try:
         dashboard_data = await dr_service.get_global_dr_dashboard()
-        
+
         # Format for executive consumption
         executive_metrics = {
             "disaster_recovery_status": {
@@ -311,7 +313,7 @@ async def get_dr_metrics_for_dashboard():
                 "retention_period": "90 days"
             }
         }
-        
+
         # Add critical app details
         for app_name, app_data in dashboard_data["apps"].items():
             if dr_service.dr_config.get(app_name, {}).get('critical_priority', False):
@@ -321,9 +323,9 @@ async def get_dr_metrics_for_dashboard():
                     "last_backup": app_data["last_backup"],
                     "next_backup": app_data["next_backup"]
                 }
-        
+
         return executive_metrics
-        
+
     except Exception as e:
         logger.error(f"Failed to get DR metrics for dashboard: {e}")
         raise HTTPException(status_code=500, detail="Failed to get DR metrics")

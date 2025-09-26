@@ -1,7 +1,8 @@
-from fastapi import APIRouter, HTTPException, Query, Depends
-from typing import Optional
+
+from fastapi import APIRouter, Depends, HTTPException, Query
+
+from middleware.auth import User, require_admin
 from services.analytics_service import analytics_service
-from middleware.auth import require_admin, User
 from utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -14,14 +15,13 @@ async def get_analytics_summary(
 ):
     """
     Get analytics summary for the specified time period.
-    
+
     Provides insights into user interactions, search patterns, and
     scholarship engagement metrics.
     """
     try:
-        summary = analytics_service.get_analytics_summary(days)
-        return summary
-        
+        return analytics_service.get_analytics_summary(days)
+
     except Exception as e:
         logger.error(f"Error generating analytics summary: {str(e)}")
         raise HTTPException(status_code=500, detail="Error generating analytics summary")
@@ -34,14 +34,13 @@ async def get_user_analytics(
 ):
     """
     Get analytics for a specific user.
-    
+
     Returns detailed activity history and engagement patterns
     for the specified user.
     """
     try:
-        user_analytics = analytics_service.get_user_analytics(user_id, days)
-        return user_analytics
-        
+        return analytics_service.get_user_analytics(user_id, days)
+
     except Exception as e:
         logger.error(f"Error generating user analytics for {user_id}: {str(e)}")
         raise HTTPException(status_code=500, detail="Error generating user analytics")
@@ -49,28 +48,28 @@ async def get_user_analytics(
 @router.get("/analytics/interactions")
 async def get_recent_interactions(
     limit: int = Query(50, ge=1, le=200, description="Number of interactions to return"),
-    action: Optional[str] = Query(None, description="Filter by interaction type"),
+    action: str | None = Query(None, description="Filter by interaction type"),
     current_user: User = Depends(require_admin())
 ):
     """
     Get recent user interactions with optional filtering.
-    
+
     Returns a list of recent user interactions, optionally filtered
     by interaction type (search, view_scholarship, etc.).
     """
     try:
         interactions = analytics_service.interactions
-        
+
         # Filter by action if specified
         if action:
             interactions = [i for i in interactions if i.action == action]
-        
+
         # Sort by timestamp (most recent first)
         interactions.sort(key=lambda x: x.timestamp, reverse=True)
-        
+
         # Apply limit
         interactions = interactions[:limit]
-        
+
         # Convert to dict format for JSON response
         interaction_dicts = []
         for interaction in interactions:
@@ -82,13 +81,13 @@ async def get_recent_interactions(
                 "metadata": interaction.metadata
             }
             interaction_dicts.append(interaction_dict)
-        
+
         return {
             "interactions": interaction_dicts,
             "total_returned": len(interaction_dicts),
             "filtered_by_action": action
         }
-        
+
     except Exception as e:
         logger.error(f"Error retrieving interactions: {str(e)}")
         raise HTTPException(status_code=500, detail="Error retrieving interactions")
@@ -100,28 +99,29 @@ async def get_popular_scholarships(
 ):
     """
     Get most popular scholarships based on view count.
-    
+
     Returns scholarships ordered by popularity (view count) within
     the specified time period.
     """
     try:
-        from datetime import datetime, timedelta
         from collections import Counter
+        from datetime import datetime, timedelta
+
         from services.scholarship_service import scholarship_service
-        
+
         cutoff_date = datetime.utcnow() - timedelta(days=days)
-        
+
         # Get scholarship views within time period
         scholarship_views = [
             i for i in analytics_service.interactions
-            if (i.action == "view_scholarship" and 
-                i.scholarship_id and 
+            if (i.action == "view_scholarship" and
+                i.scholarship_id and
                 i.timestamp >= cutoff_date)
         ]
-        
+
         # Count views per scholarship
         view_counts = Counter(i.scholarship_id for i in scholarship_views)
-        
+
         # Get top scholarships with details
         popular_scholarships = []
         for scholarship_id, view_count in view_counts.most_common(limit):
@@ -140,14 +140,14 @@ async def get_popular_scholarships(
                         "view_count": view_count,
                         "popularity_rank": len(popular_scholarships) + 1
                     })
-        
+
         return {
             "period_days": days,
             "popular_scholarships": popular_scholarships,
             "total_scholarship_views": len(scholarship_views),
             "unique_scholarships_viewed": len(view_counts)
         }
-        
+
     except Exception as e:
         logger.error(f"Error retrieving popular scholarships: {str(e)}")
         raise HTTPException(status_code=500, detail="Error retrieving popular scholarships")
@@ -158,45 +158,45 @@ async def get_search_trends(
 ):
     """
     Get search trends and patterns.
-    
+
     Analyzes search queries, filters used, and search success rates
     to identify trends in user behavior.
     """
     try:
-        from datetime import datetime, timedelta
         from collections import Counter
-        
+        from datetime import datetime, timedelta
+
         cutoff_date = datetime.utcnow() - timedelta(days=days)
-        
+
         # Get search interactions within time period
         search_interactions = [
             i for i in analytics_service.interactions
             if (i.action == "search" and i.timestamp >= cutoff_date)
         ]
-        
+
         # Analyze search queries
         search_queries = []
         zero_result_searches = 0
         total_results = 0
-        
+
         for interaction in search_interactions:
             if interaction.metadata:
                 query = interaction.metadata.get("query", "").strip()
                 result_count = interaction.metadata.get("result_count", 0)
-                
+
                 if query:  # Non-empty query
                     search_queries.append(query.lower())
-                
+
                 if result_count == 0:
                     zero_result_searches += 1
-                
+
                 total_results += result_count
-        
+
         # Calculate metrics
         popular_queries = dict(Counter(search_queries).most_common(15))
         avg_results_per_search = total_results / len(search_interactions) if search_interactions else 0
         zero_result_rate = zero_result_searches / len(search_interactions) if search_interactions else 0
-        
+
         # Analyze search filters usage (simplified)
         filter_usage = Counter()
         for interaction in search_interactions:
@@ -204,11 +204,9 @@ async def get_search_trends(
                 filters = interaction.metadata["filters"]
                 for key, value in filters.items():
                     if value and key != "limit" and key != "offset":  # Skip pagination params
-                        if isinstance(value, list) and value:
+                        if isinstance(value, list) and value or not isinstance(value, list) and value is not None:
                             filter_usage[key] += 1
-                        elif not isinstance(value, list) and value is not None:
-                            filter_usage[key] += 1
-        
+
         return {
             "period_days": days,
             "search_statistics": {
@@ -226,7 +224,7 @@ async def get_search_trends(
                 f"Top query: '{list(popular_queries.keys())[0]}'" if popular_queries else "No queries with keywords"
             ]
         }
-        
+
     except Exception as e:
         logger.error(f"Error analyzing search trends: {str(e)}")
         raise HTTPException(status_code=500, detail="Error analyzing search trends")

@@ -4,43 +4,43 @@ All errors return unified schema: { trace_id, code, message, status, timestamp }
 CRITICAL FIX: Eliminates double-encoding by using central error builder
 """
 
-from fastapi import Request, HTTPException
-from fastapi.responses import JSONResponse
-from fastapi.exceptions import RequestValidationError
-from starlette.exceptions import HTTPException as StarletteHTTPException
-from slowapi.errors import RateLimitExceeded
-from datetime import datetime
-from typing import Union, Dict, Any
 import traceback
-import time
+
+from fastapi import HTTPException, Request
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
+from slowapi.errors import RateLimitExceeded
+
+from utils.error_utils import (
+    build_error,
+    get_trace_id,
+)
 from utils.logger import get_logger
-from utils.error_utils import build_error, build_rate_limit_error, build_auth_error, build_validation_error, get_trace_id
 
 logger = get_logger(__name__)
 
 
 def create_error_response(
-    request: Request, 
-    status_code: int, 
-    error_code: str, 
+    request: Request,
+    status_code: int,
+    error_code: str,
     message: str,
     details: dict = None
 ) -> dict:
     """Create standardized error response format - Priority 2 Day 2 Enhanced"""
     trace_id = get_trace_id(request)
     # Ensure correlation_id is included in unified schema
-    error_response = build_error(error_code, message, status_code, details, trace_id)
-    return error_response
+    return build_error(error_code, message, status_code, details, trace_id)
 
 
 async def http_exception_handler(request: Request, exc: HTTPException) -> JSONResponse:
     """Handle HTTP exceptions with standardized error format"""
     trace_id = getattr(request.state, "trace_id", "unknown")
-    
+
     # Map status codes to error codes
     error_code_map = {
         400: "BAD_REQUEST",
-        401: "UNAUTHORIZED", 
+        401: "UNAUTHORIZED",
         403: "FORBIDDEN",
         404: "NOT_FOUND",
         405: "METHOD_NOT_ALLOWED",
@@ -50,13 +50,13 @@ async def http_exception_handler(request: Request, exc: HTTPException) -> JSONRe
         502: "BAD_GATEWAY",
         503: "SERVICE_UNAVAILABLE"
     }
-    
+
     error_code = error_code_map.get(exc.status_code, f"HTTP_{exc.status_code}")
-    
+
     error_response = create_error_response(
         request, exc.status_code, error_code, str(exc.detail)
     )
-    
+
     # Log appropriate level based on status code
     if exc.status_code >= 500:
         logger.error(
@@ -73,7 +73,7 @@ async def http_exception_handler(request: Request, exc: HTTPException) -> JSONRe
             f"Client error {exc.status_code} on {request.method} {request.url.path}",
             extra={"trace_id": trace_id, "status_code": exc.status_code}
         )
-    
+
     return JSONResponse(
         status_code=exc.status_code,
         content=error_response,
@@ -91,44 +91,44 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
             "message": error["msg"],
             "value": error.get("input", None)
         })
-    
+
     error_response = create_error_response(
-        request, 422, "VALIDATION_ERROR", "Request validation failed", 
+        request, 422, "VALIDATION_ERROR", "Request validation failed",
         {"fields": validation_details}
     )
-    
+
     logger.warning(
         f"Validation error on {request.method} {request.url.path}",
         extra={
-            "trace_id": error_response["trace_id"], 
+            "trace_id": error_response["trace_id"],
             "validation_errors": validation_details
         }
     )
-    
+
     return JSONResponse(status_code=422, content=error_response)
 
 
 async def rate_limit_exception_handler(request: Request, exc: RateLimitExceeded) -> JSONResponse:
     """Handle rate limit exceeded with standard headers"""
     error_response = create_error_response(
-        request, 429, "RATE_LIMITED", 
+        request, 429, "RATE_LIMITED",
         f"Rate limit exceeded: {exc.detail}"
     )
-    
+
     # Extract rate limit info from exception
     headers = {
         "Retry-After": "60",  # Retry after 1 minute
         "X-RateLimit-Limit": str(getattr(exc, 'limit', 'unknown')),
         "X-RateLimit-Remaining": "0"
     }
-    
+
     logger.warning(
         f"Rate limit exceeded for {request.method} {request.url.path}",
         extra={"trace_id": error_response["trace_id"]}
     )
-    
+
     return JSONResponse(
-        status_code=429, 
+        status_code=429,
         content=error_response,
         headers=headers
     )
@@ -137,7 +137,7 @@ async def rate_limit_exception_handler(request: Request, exc: RateLimitExceeded)
 async def general_exception_handler(request: Request, exc: Exception) -> JSONResponse:
     """Handle unexpected server errors"""
     trace_id = getattr(request.state, "trace_id", "unknown")
-    
+
     # Log full traceback for debugging
     logger.error(
         f"Unhandled exception on {request.method} {request.url.path}",
@@ -148,12 +148,12 @@ async def general_exception_handler(request: Request, exc: Exception) -> JSONRes
             "traceback": traceback.format_exc()
         }
     )
-    
+
     error_response = create_error_response(
-        request, 500, "INTERNAL_ERROR", 
+        request, 500, "INTERNAL_ERROR",
         "An internal server error occurred"
     )
-    
+
     return JSONResponse(status_code=500, content=error_response)
 
 
@@ -164,12 +164,12 @@ async def not_found_handler(request: Request, exc: HTTPException) -> JSONRespons
         request, 404, "NOT_FOUND",
         f"The requested resource '{request.url.path}' was not found"
     )
-    
+
     logger.info(
         f"Resource not found: {request.method} {request.url.path}",
         extra={"trace_id": error_response["trace_id"]}
     )
-    
+
     return JSONResponse(status_code=404, content=error_response)
 
 
@@ -187,17 +187,17 @@ async def method_not_allowed_handler(request: Request, exc: HTTPException) -> JS
                 "Access-Control-Allow-Headers": "Content-Type, Authorization"
             }
         )
-    
+
     error_response = create_error_response(
         request, 405, "METHOD_NOT_ALLOWED",
         f"Method {request.method} not allowed for '{request.url.path}'"
     )
-    
+
     logger.warning(
         f"Method not allowed: {request.method} {request.url.path}",
         extra={"trace_id": error_response["trace_id"]}
     )
-    
+
     return JSONResponse(status_code=405, content=error_response)
 
 

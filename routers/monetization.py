@@ -1,18 +1,26 @@
 # AI Scholarship Playbook - Monetization API Endpoints
 # Credit system with transparent pricing and B2C revenue
 
-from fastapi import APIRouter, HTTPException, Depends, Request
-from pydantic import BaseModel
-from typing import List, Optional
 import logging
 
-from models.monetization import (
-    CreditBalance, CreditTransaction, UserCreditSummary,
-    CreditPackage, CREDIT_PACKAGES, STARTER_CREDIT_GRANT
-)
-from services.monetization_service import MonetizationService, CreditInsufficientError, SpendLimitExceededError
-from middleware.auth import require_auth, User
+from fastapi import APIRouter, Depends, HTTPException, Request
+from pydantic import BaseModel
+
+from middleware.auth import User, require_auth
 from middleware.rate_limiting import search_rate_limit as rate_limit
+from models.monetization import (
+    CREDIT_PACKAGES,
+    STARTER_CREDIT_GRANT,
+    CreditBalance,
+    CreditPackage,
+    CreditTransaction,
+    UserCreditSummary,
+)
+from services.monetization_service import (
+    CreditInsufficientError,
+    MonetizationService,
+    SpendLimitExceededError,
+)
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/v1/credits", tags=["Monetization"])
@@ -45,7 +53,7 @@ class CreditUsageResponse(BaseModel):
 
 @router.get("/packages")
 @rate_limit()
-async def get_credit_packages(request: Request) -> List[CreditPackage]:
+async def get_credit_packages(request: Request) -> list[CreditPackage]:
     """Get available credit packages for purchase"""
     return CREDIT_PACKAGES
 
@@ -57,8 +65,7 @@ async def get_credit_balance(
 ) -> CreditBalance:
     """Get user's current credit balance"""
     try:
-        balance = await monetization_service.initialize_user_credits(current_user.user_id)
-        return balance
+        return await monetization_service.initialize_user_credits(current_user.user_id)
     except Exception as e:
         logger.error(f"Failed to get credit balance: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to retrieve credit balance")
@@ -71,8 +78,7 @@ async def get_credit_summary(
 ) -> UserCreditSummary:
     """Get comprehensive credit overview and usage history"""
     try:
-        summary = await monetization_service.get_user_credit_summary(current_user.user_id)
-        return summary
+        return await monetization_service.get_user_credit_summary(current_user.user_id)
     except Exception as e:
         logger.error(f"Failed to get credit summary: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to retrieve credit summary")
@@ -90,14 +96,14 @@ async def purchase_credits(
         package = next((p for p in CREDIT_PACKAGES if p.package_id == request_data.package_id), None)
         if not package:
             raise HTTPException(status_code=400, detail="Invalid credit package")
-        
+
         # Process purchase
         transaction, balance = await monetization_service.purchase_credits(
             user_id=current_user.user_id,
             package_id=request_data.package_id,
             payment_method_id=request_data.payment_method_id
         )
-        
+
         return PurchaseCreditsResponse(
             success=True,
             transaction_id=transaction.transaction_id,
@@ -106,7 +112,7 @@ async def purchase_credits(
             bonus_credits=package.bonus_credits,
             total_cost_usd=package.price_usd
         )
-        
+
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
@@ -129,17 +135,17 @@ async def consume_credits(
             token_count=request_data.estimated_tokens,
             operation_id=request_data.operation_id
         )
-        
+
         # Get updated balance
         balance = await monetization_service.initialize_user_credits(current_user.user_id)
-        
+
         return CreditUsageResponse(
             success=usage_event.success,
             credits_consumed=usage_event.credits_consumed,
             remaining_balance=balance.available_credits,
             operation_id=usage_event.operation_id
         )
-        
+
     except CreditInsufficientError as e:
         raise HTTPException(
             status_code=402,  # Payment Required
@@ -173,13 +179,12 @@ async def confirm_credit_consumption(
 ) -> CreditTransaction:
     """Confirm credit consumption after successful AI operation"""
     try:
-        transaction = await monetization_service.confirm_credit_consumption(
+        return await monetization_service.confirm_credit_consumption(
             user_id=current_user.user_id,
             operation_id=operation_id,
             actual_token_count=actual_tokens
         )
-        return transaction
-        
+
     except Exception as e:
         logger.error(f"Failed to confirm credit consumption: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to confirm credit usage")
@@ -211,8 +216,7 @@ async def get_monetization_metrics(
     """Get B2C monetization KPIs (admin only)"""
     try:
         # In production, would check for admin role
-        metrics = await monetization_service.get_monetization_metrics()
-        return metrics
+        return await monetization_service.get_monetization_metrics()
     except Exception as e:
         logger.error(f"Failed to get monetization metrics: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to retrieve metrics")

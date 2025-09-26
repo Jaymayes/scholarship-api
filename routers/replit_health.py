@@ -3,17 +3,29 @@ Replit-specific health check endpoints with Input Validation - QA-006 fix
 Robust health checks designed for Replit deployment environment
 """
 
-from fastapi import APIRouter, Request, HTTPException
+import os
+import time
+
+from fastapi import APIRouter, HTTPException
 from sqlalchemy import text
-from utils.logger import get_logger
+
 from config.settings import settings
 from schemas.health import (
-    BasicHealthResponse, DatabaseHealthResponse, ServicesHealthResponse, 
-    DebugConfigResponse, ServiceInfo, HealthStatus, ServiceStatus,
-    CorsConfig, RateLimitConfig, DatabaseConfig, JwtConfig, FeatureConfig, ReplitEnvConfig
+    BasicHealthResponse,
+    CorsConfig,
+    DatabaseConfig,
+    DatabaseHealthResponse,
+    DebugConfigResponse,
+    FeatureConfig,
+    HealthStatus,
+    JwtConfig,
+    RateLimitConfig,
+    ReplitEnvConfig,
+    ServiceInfo,
+    ServicesHealthResponse,
+    ServiceStatus,
 )
-import time
-import os
+from utils.logger import get_logger
 
 logger = get_logger(__name__)
 router = APIRouter()
@@ -38,22 +50,21 @@ async def database_health_check():
     Uses short timeout and graceful fallback for SQLite in dev
     """
     try:
-        # For Replit, handle both PostgreSQL and SQLite fallback  
+        # For Replit, handle both PostgreSQL and SQLite fallback
         if settings.database_url:
             # Import here to avoid circular imports
             # Try to use existing database models for connectivity test
-            from models.scholarship import Scholarship
-            from sqlalchemy.orm import sessionmaker
             from sqlalchemy import create_engine
-            
+            from sqlalchemy.orm import sessionmaker
+
             # Create a temporary session for health check
             engine = create_engine(settings.database_url)
             SessionLocal = sessionmaker(bind=engine)
-            
+
             with SessionLocal() as session:
                 # Simple connectivity test with timeout
                 result = session.execute(text("SELECT 1")).scalar()
-                
+
                 if result == 1:
                     return DatabaseHealthResponse(
                         status="healthy",
@@ -61,30 +72,28 @@ async def database_health_check():
                         type=getattr(settings, 'get_database_info', 'PostgreSQL'),
                         timestamp=int(time.time())
                     )
-                else:
-                    raise Exception("Database connectivity test failed")
+                raise Exception("Database connectivity test failed")
         else:
             # Development fallback (Replit without DATABASE_URL)
             if settings.is_development:
                 return DatabaseHealthResponse(
-                    status="healthy", 
+                    status="healthy",
                     database="development_mode",
                     type="SQLite fallback",
                     note="Using in-memory database for development",
                     timestamp=int(time.time())
                 )
-            else:
-                raise Exception("No database configured")
-                
+            raise Exception("No database configured")
+
     except Exception as e:
         logger.error(f"Database health check failed: {str(e)}")
-        
+
         # Return 503 with unified error format
         raise HTTPException(
             status_code=503,
             detail={
                 "trace_id": "health_check",
-                "code": "DATABASE_UNAVAILABLE", 
+                "code": "DATABASE_UNAVAILABLE",
                 "message": f"Database health check failed: {str(e)}",
                 "status": 503,
                 "timestamp": int(time.time())
@@ -99,7 +108,7 @@ async def services_health_check():
     """
     services_status = {}
     overall_healthy = True
-    
+
     # Check rate limiter
     try:
         limiter_info = getattr(settings, 'get_rate_limiter_info', 'Redis')
@@ -107,13 +116,13 @@ async def services_health_check():
             status=ServiceStatus.HEALTHY,
             backend=limiter_info
         )
-    except Exception as e:
+    except Exception:
         services_status["rate_limiter"] = ServiceInfo(
             status=ServiceStatus.DEGRADED,
             backend="in-memory fallback",
             note="Redis unavailable, using memory backend"
         )
-    
+
     # Check database
     try:
         db_info = getattr(settings, 'get_database_info', 'PostgreSQL')
@@ -127,7 +136,7 @@ async def services_health_check():
             error=str(e)
         )
         overall_healthy = False
-    
+
     # Check OpenAI (if configured)
     openai_key = os.getenv("OPENAI_API_KEY")
     if openai_key:
@@ -140,7 +149,7 @@ async def services_health_check():
             status=ServiceStatus.NOT_CONFIGURED,
             note="API key not provided"
         )
-    
+
     return ServicesHealthResponse(
         status=HealthStatus.HEALTHY if overall_healthy else HealthStatus.DEGRADED,
         services=services_status,
@@ -160,10 +169,10 @@ async def repl_debug_config():
             status_code=404,
             detail="Debug endpoint not available in production"
         )
-    
+
     # Sanitized config info for debugging
     cors_origins = settings.get_cors_origins
-    
+
     return DebugConfigResponse(
         environment=settings.environment.value,
         debug_mode=settings.debug,

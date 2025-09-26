@@ -1,7 +1,8 @@
-from pydantic import BaseModel, Field, field_validator
-from typing import List, Optional, Dict, Any
 from datetime import datetime
 from enum import Enum
+
+from pydantic import BaseModel, Field, field_validator
+
 
 class FieldOfStudy(str, Enum):
     ENGINEERING = "engineering"
@@ -24,18 +25,18 @@ class ScholarshipType(str, Enum):
     COMMUNITY_SERVICE = "community_service"
 
 class EligibilityCriteria(BaseModel):
-    min_gpa: Optional[float] = Field(None, ge=0.0, le=4.0, description="Minimum GPA required")
-    max_gpa: Optional[float] = Field(None, ge=0.0, le=4.0, description="Maximum GPA allowed")
-    grade_levels: List[str] = Field(default=[], description="Eligible grade levels")
-    citizenship_required: Optional[str] = Field(None, description="Required citizenship")
-    residency_states: List[str] = Field(default=[], description="Eligible US states")
-    fields_of_study: List[FieldOfStudy] = Field(default=[], description="Eligible fields of study")
-    min_age: Optional[int] = Field(None, ge=0, description="Minimum age requirement")
-    max_age: Optional[int] = Field(None, ge=0, description="Maximum age requirement")
-    financial_need: Optional[bool] = Field(None, description="Financial need requirement")
+    min_gpa: float | None = Field(None, ge=0.0, le=4.0, description="Minimum GPA required")
+    max_gpa: float | None = Field(None, ge=0.0, le=4.0, description="Maximum GPA allowed")
+    grade_levels: list[str] = Field(default=[], description="Eligible grade levels")
+    citizenship_required: str | None = Field(None, description="Required citizenship")
+    residency_states: list[str] = Field(default=[], description="Eligible US states")
+    fields_of_study: list[FieldOfStudy] = Field(default=[], description="Eligible fields of study")
+    min_age: int | None = Field(None, ge=0, description="Minimum age requirement")
+    max_age: int | None = Field(None, ge=0, description="Maximum age requirement")
+    financial_need: bool | None = Field(None, description="Financial need requirement")
     essay_required: bool = Field(False, description="Whether essay is required")
     recommendation_letters: int = Field(0, description="Number of recommendation letters required")
-    
+
     @field_validator('max_gpa')
     @classmethod
     def validate_gpa_range(cls, v):
@@ -51,16 +52,16 @@ class Scholarship(BaseModel):
     amount: float = Field(..., ge=0, description="Scholarship amount in USD")
     max_awards: int = Field(..., ge=1, description="Maximum number of awards available")
     application_deadline: datetime = Field(..., description="Application deadline")
-    notification_date: Optional[datetime] = Field(None, description="Winners notification date")
+    notification_date: datetime | None = Field(None, description="Winners notification date")
     scholarship_type: ScholarshipType = Field(..., description="Type of scholarship")
     eligibility_criteria: EligibilityCriteria = Field(..., description="Eligibility requirements")
     application_url: str = Field(..., description="URL to apply for scholarship")
-    contact_email: Optional[str] = Field(None, description="Contact email for inquiries")
-    website_url: Optional[str] = Field(None, description="Organization website")
+    contact_email: str | None = Field(None, description="Contact email for inquiries")
+    website_url: str | None = Field(None, description="Organization website")
     renewable: bool = Field(False, description="Whether scholarship is renewable")
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
-    
+
 class ScholarshipSummary(BaseModel):
     """Simplified scholarship model for search results"""
     id: str
@@ -75,22 +76,22 @@ class ScholarshipSummary(BaseModel):
 
 class SearchFilters(BaseModel):
     """Search and filter criteria"""
-    keyword: Optional[str] = Field(None, description="Search keyword")
-    fields_of_study: List[FieldOfStudy] = Field(default=[], description="Filter by fields of study")
-    min_amount: Optional[float] = Field(None, ge=0, description="Minimum scholarship amount")
-    max_amount: Optional[float] = Field(None, ge=0, description="Maximum scholarship amount")
-    scholarship_types: List[ScholarshipType] = Field(default=[], description="Filter by scholarship types")
-    states: List[str] = Field(default=[], description="Filter by US states")
-    min_gpa: Optional[float] = Field(None, ge=0.0, le=4.0, description="Minimum GPA filter")
-    citizenship: Optional[str] = Field(None, description="Citizenship requirement")
-    deadline_after: Optional[datetime] = Field(None, description="Deadlines after this date")
-    deadline_before: Optional[datetime] = Field(None, description="Deadlines before this date")
+    keyword: str | None = Field(None, description="Search keyword")
+    fields_of_study: list[FieldOfStudy] = Field(default=[], description="Filter by fields of study")
+    min_amount: float | None = Field(None, ge=0, description="Minimum scholarship amount")
+    max_amount: float | None = Field(None, ge=0, description="Maximum scholarship amount")
+    scholarship_types: list[ScholarshipType] = Field(default=[], description="Filter by scholarship types")
+    states: list[str] = Field(default=[], description="Filter by US states")
+    min_gpa: float | None = Field(None, ge=0.0, le=4.0, description="Minimum GPA filter")
+    citizenship: str | None = Field(None, description="Citizenship requirement")
+    deadline_after: datetime | None = Field(None, description="Deadlines after this date")
+    deadline_before: datetime | None = Field(None, description="Deadlines before this date")
     limit: int = Field(20, ge=1, le=100, description="Number of results to return")
     offset: int = Field(0, ge=0, description="Number of results to skip")
 
 class SearchResponse(BaseModel):
     """Search results response"""
-    scholarships: List[ScholarshipSummary]
+    scholarships: list[ScholarshipSummary]
     total_count: int
     page: int
     page_size: int

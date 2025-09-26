@@ -4,15 +4,13 @@ Comprehensive QA Analysis Report Generator
 Senior QA Engineer Analysis - Bug Detection and Vulnerability Assessment
 """
 
-import requests
 import json
 import time
-import traceback
-from typing import Dict, List, Any, Optional
 from dataclasses import dataclass
 from datetime import datetime
-import sys
-import os
+
+import requests
+
 
 @dataclass
 class QAIssue:
@@ -28,14 +26,14 @@ class QAIssue:
 
 class ComprehensiveQAAnalyzer:
     """Senior QA Engineer - Comprehensive Bug Detection System"""
-    
+
     def __init__(self):
         self.base_url = "http://localhost:5000"
-        self.issues: List[QAIssue] = []
+        self.issues: list[QAIssue] = []
         self.test_results = {}
         self.start_time = datetime.now()
-        
-    def add_issue(self, issue_id: str, location: str, description: str, 
+
+    def add_issue(self, issue_id: str, location: str, description: str,
                   steps: str, observed: str, expected: str, severity: str, category: str = "Bug"):
         """Add a new issue to the report"""
         issue = QAIssue(
@@ -94,7 +92,7 @@ class ComprehensiveQAAnalyzer:
     def test_api_documentation(self):
         """Test OpenAPI documentation endpoints"""
         print("📚 Testing API documentation...")
-        
+
         # Test /docs endpoint
         try:
             response = requests.get(f"{self.base_url}/docs")
@@ -124,7 +122,7 @@ class ComprehensiveQAAnalyzer:
     def test_search_functionality(self):
         """Comprehensive search endpoint testing"""
         print("🔍 Testing search functionality...")
-        
+
         # Test basic search
         try:
             response = requests.get(f"{self.base_url}/search?q=engineering")
@@ -198,7 +196,7 @@ class ComprehensiveQAAnalyzer:
             "\\x00\\x01\\x02",
             "A" * 10000  # Very long input
         ]
-        
+
         for malicious_input in malicious_inputs:
             try:
                 response = requests.get(f"{self.base_url}/search", params={"q": malicious_input})
@@ -228,7 +226,7 @@ class ComprehensiveQAAnalyzer:
     def test_eligibility_functionality(self):
         """Test eligibility checking endpoints"""
         print("🎯 Testing eligibility functionality...")
-        
+
         # Test eligibility check without parameters
         try:
             response = requests.get(f"{self.base_url}/eligibility/check")
@@ -287,7 +285,7 @@ class ComprehensiveQAAnalyzer:
     def test_ai_functionality(self):
         """Test AI-powered endpoints"""
         print("🤖 Testing AI functionality...")
-        
+
         # Test AI status
         try:
             response = requests.get(f"{self.base_url}/ai/status")
@@ -352,7 +350,7 @@ class ComprehensiveQAAnalyzer:
                     "AI-005",
                     "services/openai_service.py",
                     "Very long AI query causes server error",
-                    f"1. Send POST /ai/enhance-search with 50k character query\n2. Check response",
+                    "1. Send POST /ai/enhance-search with 50k character query\n2. Check response",
                     f"Status: {response.status_code}",
                     "Status: 400 with length validation error or 200 with truncated processing",
                     "Medium",
@@ -373,7 +371,7 @@ class ComprehensiveQAAnalyzer:
     def test_database_endpoints(self):
         """Test database-related endpoints"""
         print("🗄️ Testing database functionality...")
-        
+
         # Test database status
         try:
             response = requests.get(f"{self.base_url}/db/status")
@@ -406,7 +404,7 @@ class ComprehensiveQAAnalyzer:
             "1' OR '1'='1",
             "'; UNION SELECT * FROM users; --"
         ]
-        
+
         for injection in sql_injections:
             try:
                 response = requests.get(f"{self.base_url}/scholarships/{injection}")
@@ -436,13 +434,13 @@ class ComprehensiveQAAnalyzer:
     def test_authentication_security(self):
         """Test authentication and security"""
         print("🔐 Testing authentication and security...")
-        
+
         # Test protected endpoints without authentication
         protected_endpoints = [
             "/api/v1/scholarships",
             "/api/v1/analytics/summary"
         ]
-        
+
         for endpoint in protected_endpoints:
             try:
                 response = requests.get(f"{self.base_url}{endpoint}")
@@ -499,7 +497,7 @@ class ComprehensiveQAAnalyzer:
     def test_rate_limiting(self):
         """Test rate limiting functionality"""
         print("⏱️ Testing rate limiting...")
-        
+
         # Test rate limiting by making rapid requests
         try:
             responses = []
@@ -508,7 +506,7 @@ class ComprehensiveQAAnalyzer:
                 responses.append(response.status_code)
                 if response.status_code == 429:
                     break
-            
+
             # Check if rate limiting kicked in
             if 429 not in responses:
                 self.add_issue(
@@ -536,7 +534,7 @@ class ComprehensiveQAAnalyzer:
     def test_error_handling(self):
         """Test error handling across endpoints"""
         print("⚠️ Testing error handling...")
-        
+
         # Test 404 handling
         try:
             response = requests.get(f"{self.base_url}/nonexistent-endpoint")
@@ -551,7 +549,7 @@ class ComprehensiveQAAnalyzer:
                     "Low",
                     "Error Handling"
                 )
-            
+
             # Check if error response has proper structure
             if response.status_code == 404:
                 try:
@@ -595,7 +593,7 @@ class ComprehensiveQAAnalyzer:
     def test_input_validation(self):
         """Test input validation across endpoints"""
         print("✅ Testing input validation...")
-        
+
         # Test various invalid inputs
         invalid_inputs = [
             {"endpoint": "/search", "params": {"limit": -1}, "expected_issue": "Negative limit accepted"},
@@ -603,7 +601,7 @@ class ComprehensiveQAAnalyzer:
             {"endpoint": "/search", "params": {"offset": -1}, "expected_issue": "Negative offset accepted"},
             {"endpoint": "/scholarships/", "params": {}, "expected_issue": "Empty scholarship ID accepted"}
         ]
-        
+
         for test_case in invalid_inputs:
             try:
                 response = requests.get(f"{self.base_url}{test_case['endpoint']}", params=test_case['params'])
@@ -618,13 +616,13 @@ class ComprehensiveQAAnalyzer:
                         "Medium",
                         "Input Validation"
                     )
-            except Exception as e:
+            except Exception:
                 pass  # Expected for some invalid inputs
 
     def test_performance_edge_cases(self):
         """Test performance and edge cases"""
         print("⚡ Testing performance edge cases...")
-        
+
         # Test very large response handling
         try:
             response = requests.get(f"{self.base_url}/search?limit=10000")
@@ -654,14 +652,14 @@ class ComprehensiveQAAnalyzer:
     def test_cors_security(self):
         """Test CORS configuration"""
         print("🌐 Testing CORS security...")
-        
+
         try:
             headers = {
                 "Origin": "https://malicious-site.com",
                 "Access-Control-Request-Method": "GET"
             }
             response = requests.options(f"{self.base_url}/search", headers=headers)
-            
+
             # Check CORS headers
             cors_headers = response.headers.get("Access-Control-Allow-Origin", "")
             if cors_headers == "*":
@@ -691,11 +689,11 @@ class ComprehensiveQAAnalyzer:
         """Run all QA tests and generate comprehensive report"""
         print("🚀 Starting Comprehensive QA Analysis")
         print("=" * 80)
-        
+
         if not self.test_server_availability():
             print("❌ Server not available - stopping analysis")
             return
-        
+
         # Run all test categories
         test_methods = [
             self.test_api_documentation,
@@ -710,7 +708,7 @@ class ComprehensiveQAAnalyzer:
             self.test_performance_edge_cases,
             self.test_cors_security
         ]
-        
+
         for test_method in test_methods:
             try:
                 test_method()
@@ -726,20 +724,20 @@ class ComprehensiveQAAnalyzer:
                     "High",
                     "Test Framework"
                 )
-        
+
         self.generate_report()
 
     def generate_report(self):
         """Generate comprehensive QA report"""
         end_time = datetime.now()
         duration = end_time - self.start_time
-        
+
         # Categorize issues by severity
         critical_issues = [i for i in self.issues if i.severity == "Critical"]
         high_issues = [i for i in self.issues if i.severity == "High"]
         medium_issues = [i for i in self.issues if i.severity == "Medium"]
         low_issues = [i for i in self.issues if i.severity == "Low"]
-        
+
         # Generate summary
         print("\n" + "=" * 80)
         print("📋 COMPREHENSIVE QA ANALYSIS REPORT")
@@ -748,7 +746,7 @@ class ComprehensiveQAAnalyzer:
         print(f"Total Issues Found: {len(self.issues)}")
         print(f"Critical: {len(critical_issues)} | High: {len(high_issues)} | Medium: {len(medium_issues)} | Low: {len(low_issues)}")
         print("\n" + "=" * 80)
-        
+
         # Generate detailed report
         report_data = {
             "analysis_metadata": {
@@ -764,14 +762,14 @@ class ComprehensiveQAAnalyzer:
             },
             "issues": []
         }
-        
+
         # Print and collect detailed issues
-        for severity, issues in [("Critical", critical_issues), ("High", high_issues), 
+        for severity, issues in [("Critical", critical_issues), ("High", high_issues),
                                ("Medium", medium_issues), ("Low", low_issues)]:
             if issues:
                 print(f"\n🚨 {severity.upper()} SEVERITY ISSUES:")
                 print("-" * 50)
-                
+
                 for issue in issues:
                     print(f"\nIssue ID: {issue.issue_id}")
                     print(f"Location: {issue.location}")
@@ -781,7 +779,7 @@ class ComprehensiveQAAnalyzer:
                     print(f"Observed Output: {issue.observed_output}")
                     print(f"Expected Output: {issue.expected_output}")
                     print("-" * 30)
-                    
+
                     # Add to JSON report
                     report_data["issues"].append({
                         "issue_id": issue.issue_id,
@@ -793,14 +791,14 @@ class ComprehensiveQAAnalyzer:
                         "severity": issue.severity,
                         "category": issue.category
                     })
-        
+
         # Save JSON report
         with open("comprehensive_qa_report.json", "w") as f:
             json.dump(report_data, f, indent=2)
-        
-        print(f"\n📄 Detailed report saved to: comprehensive_qa_report.json")
+
+        print("\n📄 Detailed report saved to: comprehensive_qa_report.json")
         print("=" * 80)
-        
+
         return report_data
 
 def main():

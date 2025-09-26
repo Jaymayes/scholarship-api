@@ -1,18 +1,24 @@
 # AI Scholarship Playbook - B2B Partner Portal API
 # Self-serve partner onboarding and marketplace management
 
-from fastapi import APIRouter, HTTPException, Depends, Request, status
-from pydantic import BaseModel, EmailStr
-from typing import List, Optional, Dict, Any
 import logging
+from typing import Any
 
+from fastapi import APIRouter, HTTPException, Request, status
+from pydantic import BaseModel, EmailStr
+
+from middleware.rate_limiting import search_rate_limit as rate_limit
 from models.b2b_partner import (
-    Partner, PartnerScholarship, PartnerAnalytics, PartnerOnboardingStep,
-    PartnerSupportTicket, PartnerType, PartnerStatus
+    Partner,
+    PartnerAnalytics,
+    PartnerOnboardingStep,
+    PartnerScholarship,
+    PartnerStatus,
+    PartnerSupportTicket,
+    PartnerType,
 )
 from services.b2b_partner_service import B2BPartnerService
 from services.openai_service import OpenAIService
-from middleware.rate_limiting import search_rate_limit as rate_limit
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/v1/partners", tags=["B2B Partners"])
@@ -27,11 +33,11 @@ class PartnerRegistrationRequest(BaseModel):
     partner_type: PartnerType
     primary_contact_name: str
     primary_contact_email: EmailStr
-    primary_contact_phone: Optional[str] = None
-    website_url: Optional[str] = None
-    tax_id: Optional[str] = None
+    primary_contact_phone: str | None = None
+    website_url: str | None = None
+    tax_id: str | None = None
     address_line1: str
-    address_line2: Optional[str] = None
+    address_line2: str | None = None
     city: str
     state: str
     zip_code: str
@@ -42,7 +48,7 @@ class PartnerRegistrationResponse(BaseModel):
     partner_id: str
     organization_name: str
     status: PartnerStatus
-    onboarding_steps: List[PartnerOnboardingStep]
+    onboarding_steps: list[PartnerOnboardingStep]
     next_step: str
     portal_url: str
 
@@ -52,14 +58,14 @@ class ScholarshipListingRequest(BaseModel):
     award_amount: float
     number_of_awards: int = 1
     application_deadline: str  # ISO format datetime
-    min_gpa: Optional[float] = None
-    citizenship_requirements: List[str] = []
-    field_of_study: List[str] = []
-    required_documents: List[str] = []
+    min_gpa: float | None = None
+    citizenship_requirements: list[str] = []
+    field_of_study: list[str] = []
+    required_documents: list[str] = []
     essay_required: bool = False
-    essay_prompts: List[str] = []
-    application_url: Optional[str] = None
-    contact_email: Optional[EmailStr] = None
+    essay_prompts: list[str] = []
+    application_url: str | None = None
+    contact_email: EmailStr | None = None
 
 class SupportTicketRequest(BaseModel):
     subject: str
@@ -68,7 +74,7 @@ class SupportTicketRequest(BaseModel):
     category: str = "general"
 
 class OnboardingStepRequest(BaseModel):
-    step_data: Dict[str, Any]
+    step_data: dict[str, Any]
 
 # Partner Registration and Onboarding Endpoints
 
@@ -83,15 +89,15 @@ async def register_partner(
         partner, onboarding_steps = await partner_service.register_partner(
             registration_data.model_dump()
         )
-        
+
         # Determine next step
         next_step = next(
             (step.step_name for step in onboarding_steps if not step.completed and step.required),
             "Complete"
         )
-        
+
         portal_url = f"/partners/portal/{partner.partner_id}"
-        
+
         return PartnerRegistrationResponse(
             success=True,
             partner_id=partner.partner_id,
@@ -101,7 +107,7 @@ async def register_partner(
             next_step=next_step,
             portal_url=portal_url
         )
-        
+
     except Exception as e:
         logger.error(f"Partner registration failed: {str(e)}")
         raise HTTPException(
@@ -114,7 +120,7 @@ async def register_partner(
 async def get_onboarding_steps(
     request: Request,
     partner_id: str
-) -> List[PartnerOnboardingStep]:
+) -> list[PartnerOnboardingStep]:
     """Get partner onboarding steps and progress"""
     try:
         steps = partner_service.get_partner_onboarding_steps(partner_id)
@@ -124,7 +130,7 @@ async def get_onboarding_steps(
                 detail="Partner not found"
             )
         return steps
-        
+
     except Exception as e:
         logger.error(f"Failed to get onboarding steps: {str(e)}")
         raise HTTPException(
@@ -142,11 +148,10 @@ async def complete_onboarding_step(
 ) -> PartnerOnboardingStep:
     """Complete specific onboarding step"""
     try:
-        completed_step = await partner_service.complete_onboarding_step(
+        return await partner_service.complete_onboarding_step(
             partner_id, step_id, step_request.step_data
         )
-        return completed_step
-        
+
     except ValueError as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -176,7 +181,7 @@ async def get_partner_details(
                 detail="Partner not found"
             )
         return partner
-        
+
     except Exception as e:
         logger.error(f"Failed to get partner details: {str(e)}")
         raise HTTPException(
@@ -193,9 +198,8 @@ async def get_partner_analytics(
 ) -> PartnerAnalytics:
     """Get partner analytics for dashboard"""
     try:
-        analytics = await partner_service.get_partner_analytics(partner_id, period_days)
-        return analytics
-        
+        return await partner_service.get_partner_analytics(partner_id, period_days)
+
     except Exception as e:
         logger.error(f"Failed to get partner analytics: {str(e)}")
         raise HTTPException(
@@ -215,18 +219,17 @@ async def create_scholarship_listing(
     """Create new scholarship listing"""
     try:
         from datetime import datetime
-        
+
         # Parse datetime string
         listing_dict = listing_data.model_dump()
         listing_dict["application_deadline"] = datetime.fromisoformat(
             listing_data.application_deadline.replace('Z', '+00:00')
         )
-        
-        scholarship = await partner_service.create_scholarship_listing(
+
+        return await partner_service.create_scholarship_listing(
             partner_id, listing_dict
         )
-        return scholarship
-        
+
     except ValueError as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -244,12 +247,11 @@ async def create_scholarship_listing(
 async def get_partner_scholarships(
     request: Request,
     partner_id: str
-) -> List[PartnerScholarship]:
+) -> list[PartnerScholarship]:
     """Get all scholarships for partner"""
     try:
-        scholarships = partner_service.get_partner_scholarships(partner_id)
-        return scholarships
-        
+        return partner_service.get_partner_scholarships(partner_id)
+
     except Exception as e:
         logger.error(f"Failed to get partner scholarships: {str(e)}")
         raise HTTPException(
@@ -273,7 +275,7 @@ async def publish_scholarship_listing(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Partner not active or not found"
             )
-        
+
         # Get and publish listing
         scholarship = partner_service.scholarships.get(listing_id)
         if not scholarship or scholarship.partner_id != partner_id:
@@ -281,17 +283,17 @@ async def publish_scholarship_listing(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Scholarship listing not found"
             )
-        
+
         scholarship.published = True
         scholarship.published_at = datetime.utcnow()
-        
+
         return {
             "success": True,
             "message": "Scholarship listing published successfully",
             "listing_id": listing_id,
             "published_at": scholarship.published_at.isoformat()
         }
-        
+
     except HTTPException:
         raise
     except Exception as e:
@@ -312,11 +314,10 @@ async def create_support_ticket(
 ) -> PartnerSupportTicket:
     """Create support ticket"""
     try:
-        ticket = await partner_service.create_support_ticket(
+        return await partner_service.create_support_ticket(
             partner_id, ticket_data.model_dump()
         )
-        return ticket
-        
+
     except Exception as e:
         logger.error(f"Failed to create support ticket: {str(e)}")
         raise HTTPException(
@@ -338,10 +339,10 @@ async def get_support_resources(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Partner not found"
             )
-        
+
         support_tier = "pilot" if partner.pilot_program else "standard"
-        
-        resources = {
+
+        return {
             "getting_started": {
                 "title": "Getting Started Guide",
                 "url": "/docs/partners/getting-started",
@@ -358,7 +359,7 @@ async def get_support_resources(
                 "description": "How to interpret your scholarship performance data"
             },
             "api_documentation": {
-                "title": "API Documentation", 
+                "title": "API Documentation",
                 "url": "/docs/partners/api",
                 "description": "Technical documentation for API integration"
             },
@@ -369,9 +370,8 @@ async def get_support_resources(
                 "response_time": "24 hours" if support_tier == "pilot" else "48 hours"
             }
         }
-        
-        return resources
-        
+
+
     except Exception as e:
         logger.error(f"Failed to get support resources: {str(e)}")
         raise HTTPException(
@@ -386,9 +386,8 @@ async def get_support_resources(
 async def get_marketplace_metrics(request: Request) -> dict:
     """Get overall marketplace metrics (admin only)"""
     try:
-        metrics = await partner_service.get_marketplace_metrics()
-        return metrics
-        
+        return await partner_service.get_marketplace_metrics()
+
     except Exception as e:
         logger.error(f"Failed to get marketplace metrics: {str(e)}")
         raise HTTPException(

@@ -3,13 +3,13 @@ Rate Limiting Middleware
 Implements rate limiting using slowapi with Redis backend
 """
 
-from typing import Optional
-from fastapi import Request, HTTPException, status
-from slowapi import Limiter, _rate_limit_exceeded_handler
-from slowapi.util import get_remote_address
-from slowapi.errors import RateLimitExceeded
-import redis
 import os
+
+import redis
+from fastapi import HTTPException, Request, status
+from slowapi import Limiter
+from slowapi.errors import RateLimitExceeded
+from slowapi.util import get_remote_address
 
 # Redis configuration
 REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379")
@@ -34,11 +34,11 @@ def get_limiter_key(request: Request) -> str:
     user_id = getattr(request.state, "user_id", None)
     if user_id:
         return f"user:{user_id}"
-    
+
     # Fall back to IP-based limiting for unauthenticated requests
     return f"ip:{get_remote_address(request)}"
 
-def get_user_from_request(request: Request) -> Optional[str]:
+def get_user_from_request(request: Request) -> str | None:
     """Extract user ID from request state (set by auth middleware)"""
     return getattr(request.state, "user_id", None)
 
@@ -82,14 +82,14 @@ def custom_rate_limit_exceeded_handler(request: Request, exc: RateLimitExceeded)
             "type": "rate_limit_error"
         }
     )
-    
+
     # Add headers for rate limiting info
     response.headers = {
         "Retry-After": str(exc.retry_after),
         "X-RateLimit-Limit": str(exc.detail.split("/")[0]),
         "X-RateLimit-Reset": str(exc.retry_after)
     }
-    
+
     return response
 
 # Middleware to set user context for rate limiting
@@ -97,17 +97,16 @@ async def set_rate_limit_context(request: Request, call_next):
     """Middleware to set user context for rate limiting"""
     # This would extract user info from JWT token if present
     # For now, we'll use a simple approach
-    
+
     authorization = request.headers.get("Authorization")
     if authorization and authorization.startswith("Bearer "):
         # In a real implementation, decode JWT here
         # For now, just extract a mock user ID for demonstration
-        token = authorization.split(" ")[1]
+        authorization.split(" ")[1]
         # This would be replaced with actual JWT decoding
         request.state.user_id = "mock_user_from_token"
-    
-    response = await call_next(request)
-    return response
+
+    return await call_next(request)
 
 # Rate limiting policies by endpoint type
 RATE_LIMIT_POLICIES = {
@@ -120,9 +119,9 @@ RATE_LIMIT_POLICIES = {
     "admin_operations": "1000/minute",      # Admin operations
 }
 
-def get_rate_limit_for_endpoint(endpoint_type: str, user_roles: Optional[list] = None) -> str:
+def get_rate_limit_for_endpoint(endpoint_type: str, user_roles: list | None = None) -> str:
     """Get rate limit policy for specific endpoint type and user role"""
     if user_roles and "admin" in user_roles:
         return RATE_LIMIT_POLICIES.get("admin_operations", "1000/minute")
-    
+
     return RATE_LIMIT_POLICIES.get(endpoint_type, "60/minute")

@@ -2,18 +2,22 @@
 Interaction Logging Wrapper Functions with Input Validation - QA-003 fix
 """
 
-from typing import Optional
-from fastapi import APIRouter, Request, Response, Depends, HTTPException, status
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from sqlalchemy.orm import Session
-from services.interaction_service import InteractionService
-from models.database import get_db
-from schemas.interaction import InteractionRequest, BulkInteractionRequest, InteractionResponse
-from schemas.strict_validation import StrictInteractionRequest
-from utils.logger import get_logger
-from middleware.auth import get_current_user
-from config.settings import settings
 import time
+
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
+from fastapi.security import HTTPBearer
+from sqlalchemy.orm import Session
+
+from config.settings import settings
+from middleware.auth import get_current_user
+from models.database import get_db
+from schemas.interaction import (
+    BulkInteractionRequest,
+    InteractionRequest,
+    InteractionResponse,
+)
+from services.interaction_service import InteractionService
+from utils.logger import get_logger
 
 logger = get_logger("interaction_wrapper")
 router = APIRouter(prefix="/interactions", tags=["interactions"])
@@ -21,24 +25,24 @@ security = HTTPBearer(auto_error=False)
 
 async def log_scholarship_interaction(
     request: Request,
-    response: Response, 
+    response: Response,
     event_type: str,
-    scholarship_id: Optional[str] = None,
-    user_id: Optional[str] = None
+    scholarship_id: str | None = None,
+    user_id: str | None = None
 ):
     """Wrapper to log interactions without breaking the main request flow"""
     try:
         # Get database session
         db = next(get_db())
-        
+
         try:
             # Create interaction service
             interaction_service = InteractionService(db)
-            
+
             # Extract user ID from request if not provided
             if not user_id and hasattr(request.state, 'user'):
                 user_id = getattr(request.state.user, 'user_id', None)
-            
+
             # Log the interaction
             await interaction_service.log_interaction(
                 event_type=event_type,
@@ -48,37 +52,37 @@ async def log_scholarship_interaction(
                 scholarship_id=scholarship_id,
                 trace_id=getattr(request.state, 'trace_id', None)
             )
-            
+
         finally:
             db.close()
-            
+
     except Exception as e:
         # Never let interaction logging break the main request
         logger.warning(f"Failed to log interaction {event_type}: {str(e)}")
 
-def with_interaction_logging(event_type: str, scholarship_id_param: Optional[str] = None):
+def with_interaction_logging(event_type: str, scholarship_id_param: str | None = None):
     """Decorator to add interaction logging to endpoint functions"""
     def decorator(func):
         async def wrapper(*args, **kwargs):
             # Execute the original function
             response = await func(*args, **kwargs)
-            
+
             # Extract request from args/kwargs
             request = None
             for arg in args:
                 if isinstance(arg, Request):
                     request = arg
                     break
-            
+
             if request:
                 # Extract scholarship_id if specified
                 scholarship_id = None
                 if scholarship_id_param and scholarship_id_param in kwargs:
                     scholarship_id = kwargs[scholarship_id_param]
-                
+
                 # Create mock response object for logging
                 mock_response = type('MockResponse', (), {'status_code': 200})()
-                
+
                 # Log the interaction
                 await log_scholarship_interaction(
                     request=request,
@@ -86,9 +90,9 @@ def with_interaction_logging(event_type: str, scholarship_id_param: Optional[str
                     event_type=event_type,
                     scholarship_id=scholarship_id
                 )
-            
+
             return response
-        
+
         return wrapper
     return decorator
 
@@ -106,10 +110,10 @@ async def log_interaction_endpoint(
     """
     try:
         interaction_service = InteractionService(db)
-        
+
         # Create mock response for logging
         mock_response = type('MockResponse', (), {'status_code': 200})()
-        
+
         # Log the interaction with validated data
         await interaction_service.log_interaction(
             event_type=interaction.event_type.value,
@@ -124,13 +128,13 @@ async def log_interaction_endpoint(
                 "custom_metadata": interaction.metadata
             }
         )
-        
+
         return InteractionResponse(
             success=True,
             interaction_id=getattr(request.state, 'trace_id', None),
             message="Interaction logged successfully"
         )
-        
+
     except Exception as e:
         logger.error(f"Failed to log interaction: {str(e)}")
         raise HTTPException(
@@ -153,12 +157,12 @@ async def bulk_log_interactions_endpoint(
         interaction_service = InteractionService(db)
         logged_count = 0
         errors = []
-        
+
         for interaction in bulk_request.interactions:
             try:
                 # Create mock response for logging
                 mock_response = type('MockResponse', (), {'status_code': 200})()
-                
+
                 # Log each interaction with validated data
                 await interaction_service.log_interaction(
                     event_type=interaction.event_type.value,
@@ -174,11 +178,11 @@ async def bulk_log_interactions_endpoint(
                     }
                 )
                 logged_count += 1
-                
+
             except Exception as e:
                 errors.append(f"Failed to log interaction {logged_count + 1}: {str(e)}")
                 logger.warning(f"Failed to log bulk interaction: {str(e)}")
-        
+
         return {
             "success": logged_count > 0,
             "logged_count": logged_count,
@@ -186,7 +190,7 @@ async def bulk_log_interactions_endpoint(
             "errors": errors[:10],  # Limit error reporting
             "message": f"Successfully logged {logged_count}/{len(bulk_request.interactions)} interactions"
         }
-        
+
     except Exception as e:
         logger.error(f"Failed to process bulk interaction logging: {str(e)}")
         raise HTTPException(

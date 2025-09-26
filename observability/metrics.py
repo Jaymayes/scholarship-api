@@ -2,14 +2,15 @@
 Prometheus Metrics for Observability
 """
 
-from prometheus_client import Counter, Histogram, Gauge, generate_latest, CONTENT_TYPE_LATEST, REGISTRY
-from prometheus_client.core import GaugeMetricFamily
+
 import prometheus_client
 from fastapi import FastAPI, Response
-from typing import Optional
-from utils.logger import get_logger
+from prometheus_client import CONTENT_TYPE_LATEST, Counter, Histogram, generate_latest
+from prometheus_client.core import GaugeMetricFamily
+
+from observability.alerts import setup_alerting
 from observability.domain_metrics import domain_metrics_service, setup_domain_metrics
-from observability.alerts import setup_alerting, get_alert_manager
+from utils.logger import get_logger
 
 logger = get_logger("metrics")
 
@@ -58,14 +59,14 @@ rate_limit_rejected_total = Counter(
 # CUSTOM COLLECTOR: Computes value at scrape time to eliminate registry drift
 class ActiveScholarshipsCollector:
     """Custom collector that computes active scholarships at scrape time"""
-    
+
     def collect(self):
         """Compute active scholarships count at Prometheus scrape time"""
         try:
             from services.scholarship_service import scholarship_service
             count = len(scholarship_service.scholarships)
             logger.info(f"🔄 SCRAPE-TIME COLLECTION: active_scholarships_total = {count}")
-            
+
             yield GaugeMetricFamily(
                 'active_scholarships_total',
                 'Total number of active scholarships',
@@ -75,7 +76,7 @@ class ActiveScholarshipsCollector:
             logger.error(f"❌ SCRAPE-TIME COLLECTION FAILED: {str(e)}")
             # Return 0 if service unavailable
             yield GaugeMetricFamily(
-                'active_scholarships_total', 
+                'active_scholarships_total',
                 'Total number of active scholarships',
                 value=0
             )
@@ -84,66 +85,66 @@ class ActiveScholarshipsCollector:
 
 class MetricsService:
     """Service for managing Prometheus metrics"""
-    
+
     def __init__(self):
         self.enabled = True
-    
+
     def record_http_request(
-        self, 
-        method: str, 
-        endpoint: str, 
-        status: int, 
-        duration: Optional[float] = None
+        self,
+        method: str,
+        endpoint: str,
+        status: int,
+        duration: float | None = None
     ):
         """Record HTTP request metrics"""
         if not self.enabled:
             return
-            
+
         try:
             http_requests_total.labels(
                 method=method,
                 endpoint=endpoint,
                 status=status
             ).inc()
-            
+
             if duration is not None:
                 http_request_duration_seconds.labels(
                     method=method,
                     endpoint=endpoint
                 ).observe(duration)
-                
+
         except Exception as e:
             logger.warning(f"Failed to record HTTP metrics: {str(e)}")
-    
+
     def record_database_query(
-        self, 
-        query_type: str, 
-        status: str, 
-        duration: Optional[float] = None
+        self,
+        query_type: str,
+        status: str,
+        duration: float | None = None
     ):
         """Record database query metrics"""
         if not self.enabled:
             return
-            
+
         try:
             database_queries_total.labels(
                 query_type=query_type,
                 status=status
             ).inc()
-            
+
             if duration is not None:
                 database_query_duration_seconds.labels(
                     query_type=query_type
                 ).observe(duration)
-                
+
         except Exception as e:
             logger.warning(f"Failed to record database metrics: {str(e)}")
-    
+
     def record_interaction(self, event_type: str, status: str):
         """Record interaction logging metrics"""
         if not self.enabled:
             return
-            
+
         try:
             interactions_logged_total.labels(
                 event_type=event_type,
@@ -151,15 +152,15 @@ class MetricsService:
             ).inc()
         except Exception as e:
             logger.warning(f"Failed to record interaction metrics: {str(e)}")
-    
+
     def update_scholarship_count(self, count: int):
         """Update active scholarship count - using CustomCollector only (no duplication)"""
         if not self.enabled:
             return
-            
+
         # CustomCollector handles this at scrape-time, no need for manual updates
         logger.info(f"📊 CUSTOM COLLECTOR: Scholarship count will be updated at scrape-time ({count} scholarships)")
-    
+
     def reconcile_scholarship_count_from_service(self):
         """Reconcile scholarship count from service - startup/lifecycle hook"""
         try:
@@ -180,16 +181,16 @@ async def get_metrics():
     try:
         # Reduce log volume - use info level for normal operations
         logger.info("📊 CUSTOM METRICS HANDLER: Generating metrics")
-        
+
         # CustomCollector handles active_scholarships_total at scrape-time (no manual set needed)
         from services.scholarship_service import scholarship_service
         scholarship_count = len(scholarship_service.scholarships)
         logger.info(f"📊 Updated active_scholarships_total to {scholarship_count}")
-        
+
         # Use default single-process registry
         content = generate_latest()
         logger.info("✅ Generated metrics using default registry")
-        
+
         return Response(
             content=content,
             media_type=CONTENT_TYPE_LATEST
@@ -216,58 +217,58 @@ async def debug_routes(app):
 
 def setup_metrics(app: FastAPI):
     """Setup metrics using unified registry approach - work with auto-instrumentation"""
-    
-    # Priority 2 Day 2: Initialize domain metrics with strict governance  
+
+    # Priority 2 Day 2: Initialize domain metrics with strict governance
     try:
         setup_domain_metrics(env='development', service='scholarship_api', version='1.0.0')
         setup_alerting()
         logger.info("🎯 Priority 2 Day 2: Domain metrics and alerting configured")
     except Exception as e:
         logger.error(f"Failed to setup domain metrics: {e}")
-    
+
     # LIFECYCLE RECONCILIATION: Ensure scholarship count is correct on startup
     def reconcile_metrics_on_startup():
         """Reconcile metrics with actual data on startup - Enhanced with domain metrics"""
         try:
             count = metrics_service.reconcile_scholarship_count_from_service()
             logger.info(f"🚀 STARTUP RECONCILIATION: active_scholarships_total = {count}")
-            
+
             # Priority 2 Day 2: Record initial scholarship indexing with reconciliation
             domain_metrics_service.record_scholarship_indexed(count, current_active=count)
             logger.info(f"🎯 Domain metrics: Recorded {count} scholarships as indexed, reconciliation gauge set")
-            
+
         except Exception as e:
             logger.error(f"Failed startup metrics reconciliation: {str(e)}")
-    
+
     # CRITICAL FIX: Actually call the reconciliation function
     reconcile_metrics_on_startup()
-    
+
     # Register CustomCollector AFTER instrumentation to ensure correct registry
     try:
         # METRICS DUPLICATION FIX: No gauge to unregister - using only CustomCollector
         logger.info("✅ DUPLICATION FIX: Using only CustomCollector (no Gauge approach)")
     except Exception as e:
         logger.info(f"ℹ️ No existing gauge to unregister: {str(e)}")
-    
+
     # Register CustomCollector for scrape-time computation
     collector = ActiveScholarshipsCollector()
     prometheus_client.REGISTRY.register(collector)
     logger.info("✅ CUSTOM COLLECTOR: Registered ActiveScholarshipsCollector for scrape-time computation")
-    
+
     # Create our own /metrics route using prometheus_client.REGISTRY
     @app.get("/metrics", include_in_schema=False)
     async def metrics_endpoint():
         """Custom metrics endpoint using our registry with CustomCollector"""
         logger.info("📊 CUSTOM METRICS ENDPOINT: Serving from prometheus_client.REGISTRY")
         return Response(generate_latest(), media_type=CONTENT_TYPE_LATEST)
-    
+
     # Test route to verify CustomCollector is working
     @app.get("/metrics-test", include_in_schema=False)
     async def metrics_test_endpoint():
         """Test endpoint to verify CustomCollector"""
         logger.info("🧪 TEST METRICS ENDPOINT: Verifying CustomCollector functionality")
         return Response(generate_latest(), media_type=CONTENT_TYPE_LATEST)
-    
+
     logger.info("✅ UNIFIED METRICS: Using default registry with auto-instrumentation")
     logger.info("📊 Metrics available at /metrics endpoint (served by CUSTOM ROUTE)")
     logger.info("🔄 Scholarship count will be reconciled on startup and service operations")

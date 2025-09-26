@@ -3,12 +3,13 @@ Production Deployment Tests
 Validates production-ready configuration and security requirements
 """
 
-import pytest
 import os
-import requests
-from fastapi.testclient import TestClient
 from unittest.mock import patch
-from config.settings import Settings, Environment
+
+import pytest
+from fastapi.testclient import TestClient
+
+from config.settings import Environment, Settings
 
 
 class TestProductionConfiguration:
@@ -22,9 +23,8 @@ class TestProductionConfiguration:
             "CORS_ALLOWED_ORIGINS": "https://example.com",
             "ALLOWED_HOSTS": "example.com",
             "RATE_LIMIT_BACKEND_URL": "redis://localhost:6379"
-        }):
-            with pytest.raises(ValueError, match="JWT_SECRET_KEY is required"):
-                Settings()
+        }), pytest.raises(ValueError, match="JWT_SECRET_KEY is required"):
+            Settings()
 
     def test_production_requires_strong_jwt_secret(self):
         """Production must have strong JWT secret (64+ chars)"""
@@ -35,9 +35,8 @@ class TestProductionConfiguration:
             "CORS_ALLOWED_ORIGINS": "https://example.com",
             "ALLOWED_HOSTS": "example.com",
             "RATE_LIMIT_BACKEND_URL": "redis://localhost:6379"
-        }):
-            with pytest.raises(ValueError, match="at least 64 characters"):
-                Settings()
+        }), pytest.raises(ValueError, match="at least 64 characters"):
+            Settings()
 
     def test_production_rejects_banned_secrets(self):
         """Production rejects common default/weak secrets"""
@@ -49,9 +48,8 @@ class TestProductionConfiguration:
             "CORS_ALLOWED_ORIGINS": "https://example.com",
             "ALLOWED_HOSTS": "example.com",
             "RATE_LIMIT_BACKEND_URL": "redis://localhost:6379"
-        }):
-            with pytest.raises(ValueError, match="banned default value"):
-                Settings()
+        }), pytest.raises(ValueError, match="banned default value"):
+            Settings()
 
     def test_production_requires_database_url(self):
         """Production must have database URL configured"""
@@ -62,9 +60,8 @@ class TestProductionConfiguration:
             "CORS_ALLOWED_ORIGINS": "https://example.com",
             "ALLOWED_HOSTS": "example.com",
             "RATE_LIMIT_BACKEND_URL": "redis://localhost:6379"
-        }):
-            with pytest.raises(ValueError, match="DATABASE_URL is required"):
-                Settings()
+        }), pytest.raises(ValueError, match="DATABASE_URL is required"):
+            Settings()
 
     def test_production_requires_cors_origins(self):
         """Production must have CORS origins configured"""
@@ -75,9 +72,8 @@ class TestProductionConfiguration:
             "DATABASE_URL": "postgresql://test:test@localhost/test",
             "ALLOWED_HOSTS": "example.com",
             "RATE_LIMIT_BACKEND_URL": "redis://localhost:6379"
-        }):
-            with pytest.raises(ValueError, match="CORS_ALLOWED_ORIGINS must be configured"):
-                Settings()
+        }), pytest.raises(ValueError, match="CORS_ALLOWED_ORIGINS must be configured"):
+            Settings()
 
     def test_production_requires_allowed_hosts(self):
         """Production must have allowed hosts configured"""
@@ -88,9 +84,8 @@ class TestProductionConfiguration:
             "DATABASE_URL": "postgresql://test:test@localhost/test",
             "CORS_ALLOWED_ORIGINS": "https://example.com",
             "RATE_LIMIT_BACKEND_URL": "redis://localhost:6379"
-        }):
-            with pytest.raises(ValueError, match="ALLOWED_HOSTS must be configured"):
-                Settings()
+        }), pytest.raises(ValueError, match="ALLOWED_HOSTS must be configured"):
+            Settings()
 
     def test_production_requires_rate_limit_backend(self):
         """Production must have rate limit backend or explicit disable"""
@@ -101,9 +96,8 @@ class TestProductionConfiguration:
             "DATABASE_URL": "postgresql://test:test@localhost/test",
             "CORS_ALLOWED_ORIGINS": "https://example.com",
             "ALLOWED_HOSTS": "example.com"
-        }):
-            with pytest.raises(ValueError, match="RATE_LIMIT_BACKEND_URL is required"):
-                Settings()
+        }), pytest.raises(ValueError, match="RATE_LIMIT_BACKEND_URL is required"):
+            Settings()
 
     def test_valid_production_config(self):
         """Valid production configuration should pass validation"""
@@ -188,7 +182,7 @@ class TestRateLimiting:
         for _ in range(5):
             response = client.get("/api/v1/scholarships")
             responses.append(response)
-        
+
         # Check if rate limiting is working and headers are present
         for response in responses:
             if response.status_code == 429:

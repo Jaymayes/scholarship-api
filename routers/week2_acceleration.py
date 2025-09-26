@@ -1,16 +1,18 @@
 # Week 2 Acceleration API Endpoints
 # Three high-leverage sprints for compound student value and organic growth
 
-from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks
-from typing import Dict, List, Any, Optional
-from datetime import datetime
 import asyncio
+from datetime import datetime
+from typing import Any
 
-from services.scholarship_service import ScholarshipService
-from services.openai_service import OpenAIService
-from SEO_ENHANCEMENT_ENGINE import SEOEnhancementEngine
-from PARTNER_PORTAL_ACCELERATOR import PartnerPortalAccelerator  
+from fastapi import APIRouter, BackgroundTasks, HTTPException
+
 from APPLICATION_AUTOMATION_ENHANCER import ApplicationAutomationEnhancer
+from PARTNER_PORTAL_ACCELERATOR import PartnerPortalAccelerator
+from SEO_ENHANCEMENT_ENGINE import SEOEnhancementEngine
+from services.openai_service import OpenAIService
+from services.scholarship_service import ScholarshipService
+
 # Remove request_id dependency for now - will use string default
 # from middleware.request_id import get_request_id
 from utils.logger import get_logger
@@ -26,7 +28,7 @@ seo_engine = SEOEnhancementEngine(openai_service)
 partner_accelerator = PartnerPortalAccelerator(openai_service)
 application_enhancer = ApplicationAutomationEnhancer(openai_service)
 
-@router.get("/status", response_model=Dict[str, Any])
+@router.get("/status", response_model=dict[str, Any])
 async def get_week2_status(request_id: str = "week2-status"):
     """Get comprehensive Week 2 acceleration status"""
     try:
@@ -45,7 +47,7 @@ async def get_week2_status(request_id: str = "week2-status"):
                     "target_maus": 12000
                 },
                 "partner_portal_ttv": {
-                    "status": "ready", 
+                    "status": "ready",
                     "current_partners": 4,
                     "target_partners": 15,
                     "current_onboarding_time": 8.5 * 60,  # seconds
@@ -77,38 +79,38 @@ async def get_week2_status(request_id: str = "week2-status"):
             "request_id": request_id,
             "timestamp": datetime.utcnow().isoformat()
         }
-        
+
         logger.info(f"Week 2 status retrieved - Request ID: {request_id}")
         return status
-        
+
     except Exception as e:
         logger.error(f"Error getting Week 2 status: {str(e)} - Request ID: {request_id}")
         raise HTTPException(status_code=500, detail=f"Failed to get status: {str(e)}")
 
-@router.post("/sprint1/seo-scale", response_model=Dict[str, Any])
+@router.post("/sprint1/seo-scale", response_model=dict[str, Any])
 async def execute_seo_scale_sprint(
     background_tasks: BackgroundTasks,
-    target_pages: Optional[int] = 120,
-    target_quality: Optional[float] = 0.90,
+    target_pages: int | None = 120,
+    target_quality: float | None = 0.90,
     request_id: str = "week2-seo-scale"
 ):
     """Execute Sprint 1: SEO Auto Page Maker Scale (Primary Low-CAC Engine)"""
     try:
         logger.info(f"🚀 Sprint 1 SEO Scale initiated - Target: {target_pages} pages at {target_quality*100}% quality - Request ID: {request_id}")
-        
+
         # Get all scholarships for page generation
         scholarships = await scholarship_service.get_all_scholarships()
-        
+
         if not scholarships:
             raise HTTPException(status_code=404, detail="No scholarships available for page generation")
-        
+
         # Update targets
         seo_engine.target_pages = target_pages
         seo_engine.target_quality = target_quality
-        
+
         # Execute SEO enhancement acceleration
         results = await seo_engine.accelerate_page_generation(scholarships)
-        
+
         # Add sprint tracking
         sprint_summary = {
             "sprint": "seo_auto_page_maker_scale",
@@ -126,12 +128,12 @@ async def execute_seo_scale_sprint(
                 "quality_over_target": results["sprint_metrics"]["quality_over_target"]
             },
             "success": (
-                results["sprint_metrics"]["total_pages_generated"] >= target_pages and 
+                results["sprint_metrics"]["total_pages_generated"] >= target_pages and
                 results["sprint_metrics"]["average_quality_score"] >= target_quality
             ),
             "seo_features_deployed": [
                 "Internal linking hubs",
-                "Schema.org structured data", 
+                "Schema.org structured data",
                 "XML sitemaps with priorities",
                 "Canonical tag management",
                 "Thin content prevention"
@@ -143,49 +145,49 @@ async def execute_seo_scale_sprint(
                 "cost_per_acquisition": "<$2"
             }
         }
-        
+
         # Background task for additional SEO optimizations
         background_tasks.add_task(
             _optimize_seo_performance,
             results["sitemap"],
             results["internal_linking_network"]
         )
-        
+
         combined_results = {**results, "sprint_summary": sprint_summary}
-        
+
         logger.info(f"✅ Sprint 1 SEO Scale completed - {results['sprint_metrics']['total_pages_generated']} pages generated - Request ID: {request_id}")
         return combined_results
-        
+
     except Exception as e:
         logger.error(f"Error in SEO scale sprint: {str(e)} - Request ID: {request_id}")
         raise HTTPException(status_code=500, detail=f"Sprint 1 failed: {str(e)}")
 
-@router.post("/sprint2/partner-ttv", response_model=Dict[str, Any])
+@router.post("/sprint2/partner-ttv", response_model=dict[str, Any])
 async def execute_partner_ttv_sprint(
-    partner_data: Dict[str, Any],
-    target_onboarding_seconds: Optional[int] = 300,  # 5 minutes
+    partner_data: dict[str, Any],
+    target_onboarding_seconds: int | None = 300,  # 5 minutes
     request_id: str = "week2-partner-ttv"
 ):
     """Execute Sprint 2: Partner Portal Time-to-Value Acceleration"""
     try:
         logger.info(f"🚀 Sprint 2 Partner TTV initiated - Target: ≤{target_onboarding_seconds}s onboarding - Request ID: {request_id}")
-        
+
         # Validate required partner data
         required_fields = ["organization_name", "primary_contact_email", "primary_contact_name"]
         missing_fields = [field for field in required_fields if not partner_data.get(field)]
-        
+
         if missing_fields:
             raise HTTPException(
-                status_code=400, 
+                status_code=400,
                 detail=f"Missing required fields: {', '.join(missing_fields)}"
             )
-        
+
         # Update target onboarding time
         partner_accelerator.target_onboarding_time = target_onboarding_seconds
-        
+
         # Execute partner onboarding acceleration
         results = await partner_accelerator.accelerate_partner_onboarding(partner_data)
-        
+
         # Add sprint tracking
         sprint_summary = {
             "sprint": "partner_portal_time_to_value",
@@ -218,40 +220,40 @@ async def execute_partner_ttv_sprint(
                 "support_tier_assigned": results["partner"].support_tier.value
             }
         }
-        
+
         combined_results = {**results, "sprint_summary": sprint_summary}
-        
+
         logger.info(f"✅ Sprint 2 Partner TTV completed - {results['onboarding_metrics']['onboarding_time_seconds']:.1f}s onboarding - Request ID: {request_id}")
         return combined_results
-        
+
     except Exception as e:
         logger.error(f"Error in partner TTV sprint: {str(e)} - Request ID: {request_id}")
         raise HTTPException(status_code=500, detail=f"Sprint 2 failed: {str(e)}")
 
-@router.post("/sprint3/application-enhancement", response_model=Dict[str, Any])
+@router.post("/sprint3/application-enhancement", response_model=dict[str, Any])
 async def execute_application_enhancement_sprint(
-    user_profile: Dict[str, Any],
-    application_forms: List[Dict[str, Any]],
-    target_coverage: Optional[float] = 0.95,
+    user_profile: dict[str, Any],
+    application_forms: list[dict[str, Any]],
+    target_coverage: float | None = 0.95,
     request_id: str = "week2-app-enhancement"
 ):
     """Execute Sprint 3: Application Automation & Responsible AI Enhancement"""
     try:
         logger.info(f"🚀 Sprint 3 Application Enhancement initiated - Target: {target_coverage*100}% coverage - Request ID: {request_id}")
-        
+
         # Validate inputs
         if not user_profile:
             raise HTTPException(status_code=400, detail="User profile is required")
-        
+
         if not application_forms or len(application_forms) == 0:
             raise HTTPException(status_code=400, detail="At least one application form is required")
-        
+
         # Update target coverage
         application_enhancer.target_prefill_coverage = target_coverage
-        
+
         # Execute application automation enhancement
         results = await application_enhancer.enhance_application_automation(user_profile, application_forms)
-        
+
         # Add sprint tracking
         sprint_summary = {
             "sprint": "application_automation_enhancement",
@@ -290,12 +292,12 @@ async def execute_application_enhancement_sprint(
                 "smart_fallbacks": True
             }
         }
-        
+
         combined_results = {**results, "sprint_summary": sprint_summary}
-        
+
         logger.info(f"✅ Sprint 3 Application Enhancement completed - {results['enhancement_metrics']['achieved_coverage']*100:.1f}% coverage - Request ID: {request_id}")
         return combined_results
-        
+
     except Exception as e:
         logger.error(f"Error in application enhancement sprint: {str(e)} - Request ID: {request_id}")
         raise HTTPException(status_code=500, detail=f"Sprint 3 failed: {str(e)}")
@@ -305,13 +307,13 @@ async def demonstrate_seo_at_scale(request_id: str = "week2-seo-demo"):
     """Demo 1: SEO at Scale - 120+ pages, index coverage, CTR performance"""
     try:
         logger.info(f"🎬 SEO at Scale demonstration starting - Request ID: {request_id}")
-        
+
         # Get current SEO metrics
         scholarships = await scholarship_service.get_all_scholarships()
-        
+
         # Generate demonstration data
         demo_results = await seo_engine.accelerate_page_generation(scholarships[:50])  # Demo subset
-        
+
         demonstration = {
             "demo_name": "SEO at Scale",
             "objective": "Show 120+ pages live, index coverage, impressions/CTR, internal linking map",
@@ -335,7 +337,7 @@ async def demonstrate_seo_at_scale(request_id: str = "week2-seo-demo"):
                 "cost_per_acquisition": "<$2"
             },
             "internal_linking_network": {
-                "hub_pages": len([p for p in demo_results["topic_hubs"]]),
+                "hub_pages": len(list(demo_results["topic_hubs"])),
                 "individual_pages": len(demo_results["individual_pages"]),
                 "cross_links": sum(len(links) for links in demo_results["internal_linking_network"].values()),
                 "link_authority_distribution": "hub-to-individual model implemented"
@@ -344,10 +346,10 @@ async def demonstrate_seo_at_scale(request_id: str = "week2-seo-demo"):
             "live_preview_url": "/api/v1/week2/preview/seo-pages",
             "timestamp": datetime.utcnow().isoformat()
         }
-        
+
         logger.info(f"✅ SEO at Scale demo prepared - {demo_results['sprint_metrics']['total_pages_generated']} pages - Request ID: {request_id}")
         return demonstration
-        
+
     except Exception as e:
         logger.error(f"Error in SEO demonstration: {str(e)} - Request ID: {request_id}")
         raise HTTPException(status_code=500, detail=f"SEO demo failed: {str(e)}")
@@ -357,10 +359,10 @@ async def demonstrate_partner_ttv(request_id: str = "week2-partner-demo"):
     """Demo 2: Partner Time-to-Value - Live 5-minute onboarding walkthrough"""
     try:
         logger.info(f"🎬 Partner TTV demonstration starting - Request ID: {request_id}")
-        
+
         # Execute demonstration
         demo_result = await partner_accelerator.demonstrate_time_to_value()
-        
+
         demonstration = {
             "demo_name": "Partner Time-to-Value",
             "objective": "Live walkthrough from signup to first listing ≤5 minutes",
@@ -389,7 +391,7 @@ async def demonstrate_partner_ttv(request_id: str = "week2-partner-demo"):
             ],
             "partner_portal_features": [
                 "Self-serve signup and verification",
-                "Scholarship listing creation and management", 
+                "Scholarship listing creation and management",
                 "Basic analytics dashboard",
                 "Automated support and training resources"
             ],
@@ -397,15 +399,15 @@ async def demonstrate_partner_ttv(request_id: str = "week2-partner-demo"):
             "live_demo_url": "/api/v1/week2/partner-portal/demo",
             "timestamp": datetime.utcnow().isoformat()
         }
-        
+
         logger.info(f"✅ Partner TTV demo prepared - {demo_result['onboarding_metrics']['onboarding_time_seconds']:.1f}s onboarding - Request ID: {request_id}")
         return demonstration
-        
+
     except Exception as e:
         logger.error(f"Error in partner TTV demonstration: {str(e)} - Request ID: {request_id}")
         raise HTTPException(status_code=500, detail=f"Partner TTV demo failed: {str(e)}")
 
-@router.get("/kpi-dashboard", response_model=Dict[str, Any])
+@router.get("/kpi-dashboard", response_model=dict[str, Any])
 async def get_week2_kpi_dashboard(request_id: str = "week2-kpi-dashboard"):
     """Get comprehensive Week 2 KPI tracking dashboard"""
     try:
@@ -465,7 +467,7 @@ async def get_week2_kpi_dashboard(request_id: str = "week2-kpi-dashboard"):
                     "on_track": True
                 },
                 "sprint_2_partner": {
-                    "status": "in_progress", 
+                    "status": "in_progress",
                     "completion": 0.27,  # 4/15 partners
                     "avg_onboarding_time": 8.5 * 60,
                     "needs_acceleration": True
@@ -485,16 +487,16 @@ async def get_week2_kpi_dashboard(request_id: str = "week2-kpi-dashboard"):
             },
             "risk_mitigation": {
                 "seo_indexation": "monitor_closely",
-                "partner_recruitment": "accelerate_outreach", 
+                "partner_recruitment": "accelerate_outreach",
                 "application_coverage": "minimal_risk"
             },
             "request_id": request_id,
             "last_updated": datetime.utcnow().isoformat()
         }
-        
+
         logger.info(f"Week 2 KPI dashboard retrieved - Request ID: {request_id}")
         return kpi_dashboard
-        
+
     except Exception as e:
         logger.error(f"Error getting KPI dashboard: {str(e)} - Request ID: {request_id}")
         raise HTTPException(status_code=500, detail=f"KPI dashboard failed: {str(e)}")
@@ -502,23 +504,23 @@ async def get_week2_kpi_dashboard(request_id: str = "week2-kpi-dashboard"):
 @router.post("/execute-all-sprints")
 async def execute_all_sprints(
     background_tasks: BackgroundTasks,
-    user_profile: Optional[Dict[str, Any]] = None,
-    partner_data: Optional[Dict[str, Any]] = None,
+    user_profile: dict[str, Any] | None = None,
+    partner_data: dict[str, Any] | None = None,
     request_id: str = "week2-execute-all"
 ):
     """Execute all three Week 2 sprints in coordinated sequence"""
     try:
         logger.info(f"🚀 Week 2 All Sprints execution initiated - Request ID: {request_id}")
-        
+
         execution_start = datetime.utcnow()
         results = {"sprints": {}, "overall": {}}
-        
+
         # Sprint 1: SEO Scale (can run independently)
         logger.info("Executing Sprint 1: SEO Auto Page Maker Scale")
         scholarships = await scholarship_service.get_all_scholarships()
         sprint1_result = await seo_engine.accelerate_page_generation(scholarships)
         results["sprints"]["seo_scale"] = sprint1_result
-        
+
         # Sprint 2: Partner TTV (if partner data provided)
         if partner_data:
             logger.info("Executing Sprint 2: Partner Portal Time-to-Value")
@@ -528,7 +530,7 @@ async def execute_all_sprints(
             logger.info("Sprint 2: Partner data not provided, using demonstration")
             sprint2_result = await partner_accelerator.demonstrate_time_to_value()
             results["sprints"]["partner_ttv_demo"] = sprint2_result
-        
+
         # Sprint 3: Application Enhancement (if user profile provided)
         if user_profile:
             logger.info("Executing Sprint 3: Application Automation Enhancement")
@@ -550,10 +552,10 @@ async def execute_all_sprints(
             logger.info("Sprint 3: User profile not provided, using demonstration")
             sprint3_result = await application_enhancer.demonstrate_application_enhancement()
             results["sprints"]["application_enhancement_demo"] = sprint3_result
-        
+
         execution_end = datetime.utcnow()
         total_time = (execution_end - execution_start).total_seconds()
-        
+
         # Overall execution summary
         results["overall"] = {
             "execution_time_seconds": total_time,
@@ -575,19 +577,19 @@ async def execute_all_sprints(
             "demo_deliverables_ready": True,
             "timestamp": execution_end.isoformat()
         }
-        
+
         # Schedule follow-up optimizations
         background_tasks.add_task(_schedule_week2_followups, results)
-        
+
         logger.info(f"✅ Week 2 All Sprints completed in {total_time:.1f}s - Request ID: {request_id}")
         return results
-        
+
     except Exception as e:
         logger.error(f"Error in all sprints execution: {str(e)} - Request ID: {request_id}")
         raise HTTPException(status_code=500, detail=f"All sprints execution failed: {str(e)}")
 
 # Background task helpers
-async def _optimize_seo_performance(sitemap: Dict[str, Any], internal_links: Dict[str, Any]):
+async def _optimize_seo_performance(sitemap: dict[str, Any], internal_links: dict[str, Any]):
     """Background optimization of SEO performance"""
     try:
         logger.info("🔧 Background SEO optimization started")
@@ -596,7 +598,7 @@ async def _optimize_seo_performance(sitemap: Dict[str, Any], internal_links: Dic
     except Exception as e:
         logger.error(f"Background SEO optimization failed: {e}")
 
-async def _schedule_week2_followups(execution_results: Dict[str, Any]):
+async def _schedule_week2_followups(execution_results: dict[str, Any]):
     """Schedule Week 2 follow-up tasks"""
     try:
         logger.info("📅 Scheduling Week 2 follow-up tasks")

@@ -3,16 +3,13 @@ Trust Center Service
 Comprehensive security, compliance, and transparency center for institutional partners
 """
 
-import asyncio
 import json
-import os
+from dataclasses import dataclass
 from datetime import datetime, timedelta
-from typing import Dict, Any, List, Optional
-from dataclasses import dataclass, asdict
 from enum import Enum
 from pathlib import Path
+from typing import Any
 
-from compliance.soc2_evidence_service import compliance_service
 from utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -40,13 +37,13 @@ class SecurityCertification:
     """Security certification details"""
     framework: ComplianceFramework
     status: CertificationStatus
-    certification_date: Optional[datetime]
-    expiry_date: Optional[datetime]
-    auditor: Optional[str]
-    certificate_url: Optional[str]
+    certification_date: datetime | None
+    expiry_date: datetime | None
+    auditor: str | None
+    certificate_url: str | None
     scope: str
     description: str
-    evidence_artifacts: List[str]
+    evidence_artifacts: list[str]
 
 @dataclass
 class DataProtectionPolicy:
@@ -58,8 +55,8 @@ class DataProtectionPolicy:
     last_updated: datetime
     description: str
     content_url: str
-    applicable_regions: List[str]
-    compliance_frameworks: List[ComplianceFramework]
+    applicable_regions: list[str]
+    compliance_frameworks: list[ComplianceFramework]
 
 @dataclass
 class IncidentResponseProcedure:
@@ -68,9 +65,9 @@ class IncidentResponseProcedure:
     title: str
     severity_level: str
     response_time_target: str
-    escalation_matrix: Dict[str, Any]
-    communication_plan: Dict[str, Any]
-    contact_information: Dict[str, str]
+    escalation_matrix: dict[str, Any]
+    communication_plan: dict[str, Any]
+    contact_information: dict[str, str]
     last_updated: datetime
 
 @dataclass
@@ -89,7 +86,7 @@ class SecurityControl:
 class TrustCenterService:
     """
     Comprehensive Trust Center Service for Institutional Partners
-    
+
     Provides:
     - Security certifications and compliance status
     - Data protection policies and procedures
@@ -98,26 +95,26 @@ class TrustCenterService:
     - Audit reports and evidence
     - Transparency reports and disclosures
     """
-    
+
     def __init__(self):
         self.trust_center_path = Path("production/trust_center")
         self.trust_center_path.mkdir(exist_ok=True)
-        
+
         # Initialize certifications, policies, and procedures
         self.certifications = self._initialize_certifications()
         self.policies = self._initialize_policies()
         self.incident_procedures = self._initialize_incident_procedures()
         self.security_controls = self._initialize_security_controls()
-        
+
         logger.info("🛡️ Trust Center Service initialized")
         logger.info(f"📜 Certifications: {len(self.certifications)} frameworks")
         logger.info(f"📋 Policies: {len(self.policies)} data protection policies")
         logger.info(f"🚨 Procedures: {len(self.incident_procedures)} incident response procedures")
         logger.info(f"🔒 Controls: {len(self.security_controls)} security controls")
-    
-    def _initialize_certifications(self) -> Dict[ComplianceFramework, SecurityCertification]:
+
+    def _initialize_certifications(self) -> dict[ComplianceFramework, SecurityCertification]:
         """Initialize security certifications and compliance status"""
-        
+
         return {
             ComplianceFramework.SOC2_TYPE2: SecurityCertification(
                 framework=ComplianceFramework.SOC2_TYPE2,
@@ -186,10 +183,10 @@ class TrustCenterService:
                 evidence_artifacts=[]
             )
         }
-    
-    def _initialize_policies(self) -> List[DataProtectionPolicy]:
+
+    def _initialize_policies(self) -> list[DataProtectionPolicy]:
         """Initialize data protection policies"""
-        
+
         return [
             DataProtectionPolicy(
                 policy_id="DPP-001",
@@ -258,10 +255,10 @@ class TrustCenterService:
                 compliance_frameworks=[ComplianceFramework.SOC2_TYPE2]
             )
         ]
-    
-    def _initialize_incident_procedures(self) -> List[IncidentResponseProcedure]:
+
+    def _initialize_incident_procedures(self) -> list[IncidentResponseProcedure]:
         """Initialize incident response procedures"""
-        
+
         return [
             IncidentResponseProcedure(
                 procedure_id="IRP-001",
@@ -336,10 +333,10 @@ class TrustCenterService:
                 last_updated=datetime(2024, 11, 1)
             )
         ]
-    
-    def _initialize_security_controls(self) -> List[SecurityControl]:
+
+    def _initialize_security_controls(self) -> list[SecurityControl]:
         """Initialize security controls documentation"""
-        
+
         return [
             SecurityControl(
                 control_id="AC-2",
@@ -408,13 +405,13 @@ class TrustCenterService:
                 responsible_team="Infrastructure Engineering"
             )
         ]
-    
-    async def get_compliance_overview(self) -> Dict[str, Any]:
+
+    async def get_compliance_overview(self) -> dict[str, Any]:
         """Get comprehensive compliance framework overview"""
-        
+
         certified_count = len([c for c in self.certifications.values() if c.status == CertificationStatus.CERTIFIED])
         in_progress_count = len([c for c in self.certifications.values() if c.status == CertificationStatus.IN_PROGRESS])
-        
+
         return {
             "overview": {
                 "total_frameworks": len(self.certifications),
@@ -454,12 +451,12 @@ class TrustCenterService:
                 }
             ]
         }
-    
-    async def get_security_controls_summary(self) -> Dict[str, Any]:
+
+    async def get_security_controls_summary(self) -> dict[str, Any]:
         """Get security controls implementation summary"""
-        
+
         implemented_count = len([c for c in self.security_controls if c.implementation_status == "Implemented"])
-        
+
         controls_by_family = {}
         for control in self.security_controls:
             family = control.control_family
@@ -468,7 +465,7 @@ class TrustCenterService:
             controls_by_family[family]["total"] += 1
             if control.implementation_status == "Implemented":
                 controls_by_family[family]["implemented"] += 1
-        
+
         return {
             "summary": {
                 "total_controls": len(self.security_controls),
@@ -487,10 +484,10 @@ class TrustCenterService:
                 for control in sorted(self.security_controls, key=lambda x: x.last_tested, reverse=True)[:5]
             ]
         }
-    
-    async def get_incident_response_contacts(self) -> Dict[str, Any]:
+
+    async def get_incident_response_contacts(self) -> dict[str, Any]:
         """Get incident response contact information"""
-        
+
         return {
             "emergency_contacts": {
                 "security_team": {
@@ -529,10 +526,10 @@ class TrustCenterService:
             "customer_portal": "https://partners.scholarship-api.com",
             "last_updated": datetime.utcnow().isoformat()
         }
-    
-    async def get_data_protection_policies(self) -> Dict[str, Any]:
+
+    async def get_data_protection_policies(self) -> dict[str, Any]:
         """Get data protection policies overview"""
-        
+
         return {
             "policies": [
                 {
@@ -552,9 +549,9 @@ class TrustCenterService:
                 "total_policies": len(self.policies),
                 "last_policy_update": max(p.last_updated for p in self.policies).isoformat(),
                 "global_coverage": True,
-                "framework_coverage": list(set(
+                "framework_coverage": list({
                     f.value for policy in self.policies for f in policy.compliance_frameworks
-                ))
+                })
             },
             "key_rights": {
                 "data_subject_rights": [
@@ -569,15 +566,15 @@ class TrustCenterService:
                 "how_to_exercise": "Contact privacy@company.com or use our privacy portal at https://privacy.scholarship-api.com"
             }
         }
-    
-    async def generate_trust_center_report(self) -> Dict[str, Any]:
+
+    async def generate_trust_center_report(self) -> dict[str, Any]:
         """Generate comprehensive trust center report"""
-        
+
         compliance_overview = await self.get_compliance_overview()
         security_controls = await self.get_security_controls_summary()
         incident_contacts = await self.get_incident_response_contacts()
         data_policies = await self.get_data_protection_policies()
-        
+
         report = {
             "generated_at": datetime.utcnow().isoformat(),
             "trust_center_version": "2.1",
@@ -598,14 +595,14 @@ class TrustCenterService:
                 "continuous_improvement": "Monthly security control reviews and annual third-party penetration testing"
             }
         }
-        
+
         # Save report
         report_file = self.trust_center_path / f"trust_center_report_{datetime.utcnow().strftime('%Y%m%d')}.json"
         with open(report_file, 'w') as f:
             json.dump(report, f, indent=2, default=str)
-        
+
         logger.info("📄 Trust Center report generated successfully")
-        
+
         return report
 
 # Global service instance

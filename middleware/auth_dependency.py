@@ -3,13 +3,14 @@ Unified authentication dependencies for consistent auth enforcement
 Fixes QA issues with authentication bypass vulnerabilities
 """
 
-from typing import Optional
+
 from fastapi import Depends, HTTPException
-from middleware.auth import get_current_user
+
 from config.settings import settings
+from middleware.auth import get_current_user
 
 
-async def require_auth_unless_public() -> Optional[dict]:
+async def require_auth_unless_public() -> dict | None:
     """
     Require authentication unless PUBLIC_READ_ENDPOINTS is enabled
     Used as router-level dependency for consistent auth enforcement
@@ -17,12 +18,11 @@ async def require_auth_unless_public() -> Optional[dict]:
     if settings.public_read_endpoints:
         # Public access allowed - return None for anonymous user
         return None
-    else:
-        # Authentication required - use standard auth dependency
-        return Depends(get_current_user)
+    # Authentication required - use standard auth dependency
+    return Depends(get_current_user)
 
 
-async def get_auth_user_optional() -> Optional[dict]:
+async def get_auth_user_optional() -> dict | None:
     """
     Get authenticated user if available, otherwise return None
     Used for endpoints that benefit from user context but don't require auth
@@ -40,5 +40,4 @@ def get_conditional_auth_dependency():
     """
     if settings.public_read_endpoints:
         return lambda: None
-    else:
-        return get_current_user
+    return get_current_user

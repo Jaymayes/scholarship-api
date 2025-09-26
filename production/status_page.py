@@ -2,14 +2,13 @@
 Production Status Page & Trust Center
 Executive directive: Real-time status, incident policy, security/privacy posture
 """
-import time
 import json
-from datetime import datetime, timedelta
-from typing import Dict, Any, List, Optional
+import time
 from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path
-from fastapi import APIRouter
-from fastapi.responses import HTMLResponse
+from typing import Any
+
 
 @dataclass
 class SystemStatus:
@@ -39,11 +38,11 @@ class StatusPageService:
     - Security/privacy posture transparency
     - Trust center information
     """
-    
+
     def __init__(self):
         self.evidence_path = Path("production/status_evidence")
         self.evidence_path.mkdir(exist_ok=True)
-        
+
         # System components for monitoring
         self.components = [
             SystemStatus("API Gateway", "operational", datetime.now(), 99.95, 45),
@@ -53,13 +52,13 @@ class StatusPageService:
             SystemStatus("AI Services", "operational", datetime.now(), 99.89, 120),
             SystemStatus("Business Telemetry", "operational", datetime.now(), 99.99, 8)
         ]
-        
-        self.incidents: List[Incident] = []
-        
+
+        self.incidents: list[Incident] = []
+
         print("📊 Status page service initialized")
         print("🔍 Monitoring 6 system components")
-    
-    def get_overall_status(self) -> Dict[str, Any]:
+
+    def get_overall_status(self) -> dict[str, Any]:
         """
         Get overall system status for status page
         Executive directive: Real-time status visibility
@@ -69,7 +68,7 @@ class StatusPageService:
         operational_components = sum(1 for c in self.components if c.status == "operational")
         degraded_components = sum(1 for c in self.components if c.status == "degraded")
         outage_components = sum(1 for c in self.components if c.status == "outage")
-        
+
         # Determine overall status
         if outage_components > 0:
             overall_status = "major_outage"
@@ -77,11 +76,11 @@ class StatusPageService:
             overall_status = "partial_outage"
         else:
             overall_status = "operational"
-        
+
         # Calculate average uptime and response time
         avg_uptime = sum(c.uptime_percent for c in self.components) / total_components
         avg_response_time = sum(c.response_time_ms for c in self.components) / total_components
-        
+
         return {
             "overall_status": overall_status,
             "last_updated": datetime.now().isoformat(),
@@ -99,8 +98,8 @@ class StatusPageService:
             "active_incidents": len([i for i in self.incidents if i.status != "resolved"]),
             "last_incident": self.incidents[-1].created_at.isoformat() if self.incidents else None
         }
-    
-    def get_component_details(self) -> List[Dict[str, Any]]:
+
+    def get_component_details(self) -> list[dict[str, Any]]:
         """Get detailed component status"""
         return [
             {
@@ -111,14 +110,14 @@ class StatusPageService:
                 "last_updated": component.last_updated.isoformat(),
                 "status_indicator": {
                     "operational": "🟢",
-                    "degraded": "🟡", 
+                    "degraded": "🟡",
                     "outage": "🔴"
                 }.get(component.status, "⚫")
             }
             for component in self.components
         ]
-    
-    def get_security_posture(self) -> Dict[str, Any]:
+
+    def get_security_posture(self) -> dict[str, Any]:
         """
         Get security and privacy posture for trust center
         Executive directive: Security/privacy transparency
@@ -151,15 +150,15 @@ class StatusPageService:
             "compliance_status": {
                 "soc2_type_ii": "In progress - 85% audit readiness",
                 "gdpr_compliance": "Fully compliant",
-                "ccpa_compliance": "Fully compliant", 
+                "ccpa_compliance": "Fully compliant",
                 "ferpa_compliance": "Educational data safeguards active"
             }
         }
-    
+
     def create_incident(self, title: str, severity: str, description: str) -> str:
         """Create new incident for tracking"""
         incident_id = f"INC-{int(time.time())}"
-        
+
         incident = Incident(
             id=incident_id,
             title=title,
@@ -169,9 +168,9 @@ class StatusPageService:
             updated_at=datetime.now(),
             description=description
         )
-        
+
         self.incidents.append(incident)
-        
+
         # Save evidence
         evidence_file = self.evidence_path / f"incident_{incident_id}.json"
         with open(evidence_file, 'w') as f:
@@ -185,10 +184,10 @@ class StatusPageService:
                     "description": incident.description
                 }
             }, f, indent=2)
-        
+
         print(f"📋 Incident created: {incident_id} - {title} ({severity})")
         return incident_id
-    
+
     def generate_status_page_html(self) -> str:
         """
         Generate HTML status page
@@ -197,13 +196,13 @@ class StatusPageService:
         status = self.get_overall_status()
         components = self.get_component_details()
         security = self.get_security_posture()
-        
+
         status_indicator = {
             "operational": "🟢 All Systems Operational",
-            "partial_outage": "🟡 Partial Service Disruption", 
+            "partial_outage": "🟡 Partial Service Disruption",
             "major_outage": "🔴 Major Service Disruption"
         }.get(status["overall_status"], "⚫ Unknown Status")
-        
+
         html = f"""
 <!DOCTYPE html>
 <html lang="en">
@@ -239,11 +238,11 @@ class StatusPageService:
             <h1>🎓 Scholarship Discovery API</h1>
             <h2>System Status & Trust Center</h2>
         </div>
-        
+
         <div class="status-banner status-{status["overall_status"].replace("_", "-")}">
             {status_indicator}
         </div>
-        
+
         <div class="metrics">
             <h3>📊 Overall System Metrics</h3>
             <div>
@@ -266,11 +265,11 @@ class StatusPageService:
             </div>
             <div class="timestamp">Last updated: {status["last_updated"]}</div>
         </div>
-        
+
         <h3>🔧 System Components</h3>
         <div class="components">
 """
-        
+
         for component in components:
             html += f"""
             <div class="component">
@@ -283,46 +282,46 @@ class StatusPageService:
                 <div class="timestamp">Updated: {component["last_updated"]}</div>
             </div>
 """
-        
+
         html += f"""
         </div>
-        
+
         <div class="security-section">
             <h3>🔒 Security & Privacy Posture</h3>
             <p>Executive commitment to data protection and privacy transparency</p>
-            
+
             <div class="security-grid">
                 <div class="security-item">
                     <h4>🛡️ Data Security</h4>
                     <p><strong>Encryption:</strong> {security["data_security"]["encryption_at_rest"]} at rest, {security["data_security"]["encryption_in_transit"]} in transit</p>
                     <p><strong>Key Management:</strong> {security["data_security"]["key_management"]}</p>
                 </div>
-                
+
                 <div class="security-item">
                     <h4>🔐 Privacy Protection</h4>
                     <p><strong>Data Minimization:</strong> {security["privacy_protection"]["data_minimization"]}</p>
                     <p><strong>Retention:</strong> {security["privacy_protection"]["retention_policy"]}</p>
                 </div>
-                
+
                 <div class="security-item">
                     <h4>👥 Access Controls</h4>
                     <p><strong>Authentication:</strong> {security["access_controls"]["authentication"]}</p>
                     <p><strong>Authorization:</strong> {security["access_controls"]["authorization"]}</p>
                 </div>
-                
+
                 <div class="security-item">
                     <h4>🏗️ Infrastructure Security</h4>
                     <p><strong>WAF Protection:</strong> {security["infrastructure_security"]["waf_protection"]}</p>
                     <p><strong>Monitoring:</strong> {security["infrastructure_security"]["incident_response"]}</p>
                 </div>
-                
+
                 <div class="security-item">
                     <h4>📋 Compliance Status</h4>
                     <p><strong>SOC2 Type II:</strong> {security["compliance_status"]["soc2_type_ii"]}</p>
                     <p><strong>GDPR:</strong> {security["compliance_status"]["gdpr_compliance"]}</p>
                     <p><strong>CCPA:</strong> {security["compliance_status"]["ccpa_compliance"]}</p>
                 </div>
-                
+
                 <div class="security-item">
                     <h4>📞 Contact & Policies</h4>
                     <p><strong>Security Issues:</strong> security@scholarshipapi.com</p>
@@ -330,7 +329,7 @@ class StatusPageService:
                     <p><strong>Incident Response:</strong> 24/7 monitoring active</p>
                 </div>
             </div>
-            
+
             <h4>🏛️ Trust Center</h4>
             <p>Our commitment to transparency includes:</p>
             <ul>
@@ -340,21 +339,21 @@ class StatusPageService:
                 <li>Privacy policy updates and data handling practices</li>
                 <li>Compliance framework adherence (FERPA, GDPR, CCPA)</li>
             </ul>
-            
+
             <div class="timestamp">Security posture last reviewed: {datetime.now().isoformat()}</div>
         </div>
     </div>
-    
+
     <script>
         // Auto-refresh page every 60 seconds
         setTimeout(function(){{ window.location.reload(); }}, 60000);
     </script>
 </body>
 </html>"""
-        
+
         return html
-    
-    def get_incident_policy(self) -> Dict[str, Any]:
+
+    def get_incident_policy(self) -> dict[str, Any]:
         """
         Get incident response policy
         Executive directive: Transparent incident communication

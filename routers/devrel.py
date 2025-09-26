@@ -2,10 +2,11 @@
 Developer Relations Router
 Executive directive: SDK endpoints, quickstart guide, developer onboarding
 """
+import logging
+from typing import Any
+
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import HTMLResponse, PlainTextResponse
-from typing import Dict, Any
-import logging
 
 from production.sdk_quickstart import sdk_service
 
@@ -21,17 +22,17 @@ router = APIRouter(
 )
 
 @router.get("/quickstart")
-async def get_quickstart_guide() -> Dict[str, Any]:
+async def get_quickstart_guide() -> dict[str, Any]:
     """
     📚 10-MINUTE QUICKSTART GUIDE
     Executive directive: Fast developer onboarding and adoption
-    
+
     Returns:
         Complete quickstart guide with time-to-value under 10 minutes
     """
     try:
         quickstart_content = sdk_service.generate_ten_minute_quickstart()
-        
+
         return {
             "message": "10-minute quickstart guide retrieved successfully",
             "quickstart_guide": {
@@ -46,7 +47,7 @@ async def get_quickstart_guide() -> Dict[str, Any]:
                 "Monitor usage and upgrade tier as needed"
             ]
         }
-        
+
     except Exception as e:
         logger.error(f"❌ Quickstart guide error: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to get quickstart guide: {str(e)}")
@@ -62,7 +63,7 @@ async def get_quickstart_markdown():
             content=sdk_service.generate_ten_minute_quickstart(),
             media_type="text/markdown"
         )
-        
+
     except Exception as e:
         logger.error(f"❌ Quickstart markdown error: {e}")
         raise HTTPException(status_code=500, detail="Failed to get quickstart markdown")
@@ -75,7 +76,7 @@ async def get_quickstart_html():
     """
     try:
         markdown_content = sdk_service.generate_ten_minute_quickstart()
-        
+
         # Convert to simple HTML with syntax highlighting
         html_content = f"""
 <!DOCTYPE html>
@@ -85,7 +86,7 @@ async def get_quickstart_html():
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Scholarship API - 10-Minute Quickstart</title>
     <style>
-        body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; 
+        body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
                max-width: 900px; margin: 0 auto; padding: 20px; line-height: 1.6; }}
         h1 {{ color: #2563eb; border-bottom: 3px solid #e5e7eb; padding-bottom: 10px; }}
         h2 {{ color: #1f2937; margin-top: 30px; }}
@@ -106,7 +107,7 @@ async def get_quickstart_html():
 </head>
 <body>
     <pre style="white-space: pre-wrap; background: none; color: inherit; padding: 0;">{markdown_content}</pre>
-    
+
     <script>
         // Copy code button functionality
         document.addEventListener('DOMContentLoaded', function() {{
@@ -117,7 +118,7 @@ async def get_quickstart_html():
                 button.style.cssText = 'position: absolute; top: 10px; right: 10px; padding: 5px 10px; background: #374151; color: white; border: none; border-radius: 4px; cursor: pointer;';
                 block.style.position = 'relative';
                 block.appendChild(button);
-                
+
                 button.onclick = () => {{
                     const code = block.textContent.replace('Copy', '').trim();
                     navigator.clipboard.writeText(code);
@@ -129,9 +130,9 @@ async def get_quickstart_html():
     </script>
 </body>
 </html>"""
-        
+
         return HTMLResponse(content=html_content, status_code=200)
-        
+
     except Exception as e:
         logger.error(f"❌ Quickstart HTML error: {e}")
         return HTMLResponse(
@@ -140,17 +141,17 @@ async def get_quickstart_html():
         )
 
 @router.get("/sdk/curl")
-async def get_curl_examples() -> Dict[str, Any]:
+async def get_curl_examples() -> dict[str, Any]:
     """
     🔧 CURL SDK EXAMPLES
     Executive directive: Minimal curl commands for immediate testing
-    
+
     Returns:
         Complete curl command examples for all API endpoints
     """
     try:
         examples = sdk_service.get_curl_examples()
-        
+
         return {
             "message": "cURL SDK examples retrieved successfully",
             "language": "curl",
@@ -165,23 +166,23 @@ async def get_curl_examples() -> Dict[str, Any]:
             ],
             "getting_started": "Copy and paste any example, replace the API key, and run in your terminal"
         }
-        
+
     except Exception as e:
         logger.error(f"❌ cURL examples error: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to get cURL examples: {str(e)}")
 
 @router.get("/sdk/javascript")
-async def get_javascript_sdk() -> Dict[str, Any]:
+async def get_javascript_sdk() -> dict[str, Any]:
     """
     🔧 JAVASCRIPT/TYPESCRIPT SDK
     Executive directive: Complete client library for web applications
-    
+
     Returns:
         JavaScript/TypeScript SDK with React integration examples
     """
     try:
         examples = sdk_service.get_javascript_sdk()
-        
+
         return {
             "message": "JavaScript/TypeScript SDK retrieved successfully",
             "language": "javascript",
@@ -203,23 +204,23 @@ async def get_javascript_sdk() -> Dict[str, Any]:
             ],
             "installation": "npm install @scholarshipapi/client (coming soon)"
         }
-        
+
     except Exception as e:
         logger.error(f"❌ JavaScript SDK error: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to get JavaScript SDK: {str(e)}")
 
 @router.get("/sdk/python")
-async def get_python_sdk() -> Dict[str, Any]:
+async def get_python_sdk() -> dict[str, Any]:
     """
     🔧 PYTHON SDK
     Executive directive: Full-featured client for backend integration
-    
+
     Returns:
         Python SDK with Django integration examples
     """
     try:
         examples = sdk_service.get_python_sdk()
-        
+
         return {
             "message": "Python SDK retrieved successfully",
             "language": "python",
@@ -241,23 +242,23 @@ async def get_python_sdk() -> Dict[str, Any]:
             ],
             "installation": "pip install scholarship-api-client (coming soon)"
         }
-        
+
     except Exception as e:
         logger.error(f"❌ Python SDK error: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to get Python SDK: {str(e)}")
 
 @router.get("/documentation")
-async def get_developer_documentation() -> Dict[str, Any]:
+async def get_developer_documentation() -> dict[str, Any]:
     """
     📚 COMPLETE DEVELOPER DOCUMENTATION
     Executive directive: Comprehensive developer onboarding experience
-    
+
     Returns:
         Full developer documentation with SDKs and integration guides
     """
     try:
         documentation = sdk_service.generate_developer_documentation()
-        
+
         return {
             "message": "Developer documentation retrieved successfully",
             "developer_documentation": documentation,
@@ -273,20 +274,20 @@ async def get_developer_documentation() -> Dict[str, Any]:
                 ]
             }
         }
-        
+
     except Exception as e:
         logger.error(f"❌ Developer documentation error: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to get developer documentation: {str(e)}")
 
 @router.get("/examples/{framework}")
-async def get_framework_examples(framework: str) -> Dict[str, Any]:
+async def get_framework_examples(framework: str) -> dict[str, Any]:
     """
     🔧 FRAMEWORK-SPECIFIC EXAMPLES
     Executive directive: Tailored integration guides for popular frameworks
-    
+
     Args:
         framework: Framework name (react, django, express, flask, vue, angular)
-    
+
     Returns:
         Framework-specific integration examples and best practices
     """
@@ -304,7 +305,7 @@ async def get_framework_examples(framework: str) -> Dict[str, Any]:
                 ]
             },
             "django": {
-                "title": "Django Integration", 
+                "title": "Django Integration",
                 "description": "Views, models, and middleware for Django applications",
                 "examples": [
                     {
@@ -341,7 +342,7 @@ app.use('/api/scholarships', scholarshipMiddleware, (req, res) => {
             },
             "flask": {
                 "title": "Flask Integration",
-                "description": "Flask routes and blueprints with error handling", 
+                "description": "Flask routes and blueprints with error handling",
                 "examples": [
                     {
                         "name": "Flask Blueprint",
@@ -365,14 +366,14 @@ def search():
                 ]
             }
         }
-        
+
         if framework not in framework_examples:
             available = list(framework_examples.keys())
             raise HTTPException(
                 status_code=404,
                 detail=f"Framework '{framework}' not found. Available: {', '.join(available)}"
             )
-        
+
         return {
             "message": f"{framework.title()} integration examples retrieved successfully",
             "framework": framework,
@@ -383,7 +384,7 @@ def search():
                 "support": "support@scholarshipapi.com"
             }
         }
-        
+
     except HTTPException:
         raise
     except Exception as e:

@@ -2,23 +2,20 @@
 # Advanced programmatic content generation with quality gates and SEO optimization
 
 import asyncio
-import json
-import logging
-from typing import Dict, List, Optional, Any, Tuple
-from datetime import datetime, timedelta
 import xml.etree.ElementTree as ET
-from pathlib import Path
+from datetime import datetime
+from typing import Any
 
+from models.scholarship import Scholarship
 from services.auto_page_maker_service import AutoPageMakerService
 from services.openai_service import OpenAIService
-from models.scholarship import Scholarship
 from utils.logger import get_logger
 
 logger = get_logger(__name__)
 
 class SEOEnhancementEngine:
     """Enhanced SEO engine for Week 2 acceleration objectives"""
-    
+
     def __init__(self, openai_service: OpenAIService):
         self.openai_service = openai_service
         self.auto_page_maker = AutoPageMakerService(openai_service)
@@ -27,31 +24,31 @@ class SEOEnhancementEngine:
         self.generated_pages = []
         self.internal_links = {}
         self.schema_data = []
-        
-    async def accelerate_page_generation(self, scholarships: List[Scholarship]) -> Dict[str, Any]:
+
+    async def accelerate_page_generation(self, scholarships: list[Scholarship]) -> dict[str, Any]:
         """Sprint 1: Scale from 55 to 120+ pages with 90%+ quality"""
         logger.info(f"🚀 SEO Enhancement: Scaling to {self.target_pages} pages with {self.target_quality*100}% quality target")
-        
+
         start_time = datetime.utcnow()
-        
+
         # Phase 1: Generate enhanced individual scholarship pages
         individual_pages = await self._generate_enhanced_individual_pages(scholarships)
-        
+
         # Phase 2: Create topic hub pages with internal linking
         topic_hubs = await self._create_internal_linking_hubs(scholarships)
-        
+
         # Phase 3: Generate schema.org structured data
         schema_data = await self._generate_enhanced_schema_data(individual_pages + topic_hubs)
-        
+
         # Phase 4: Build comprehensive XML sitemap
         sitemap = await self._generate_dynamic_sitemap(individual_pages + topic_hubs)
-        
+
         # Phase 5: Implement canonical tag management
         canonical_mapping = await self._create_canonical_tag_system(individual_pages)
-        
+
         end_time = datetime.utcnow()
         generation_time = (end_time - start_time).total_seconds()
-        
+
         results = {
             "sprint_metrics": {
                 "total_pages_generated": len(individual_pages) + len(topic_hubs),
@@ -79,41 +76,41 @@ class SEOEnhancementEngine:
             "generation_time_seconds": generation_time,
             "timestamp": datetime.utcnow().isoformat()
         }
-        
+
         logger.info(f"✅ SEO Enhancement Complete: {len(individual_pages + topic_hubs)} pages generated in {generation_time:.1f}s")
         return results
-    
-    async def _generate_enhanced_individual_pages(self, scholarships: List[Scholarship]) -> List[Dict[str, Any]]:
+
+    async def _generate_enhanced_individual_pages(self, scholarships: list[Scholarship]) -> list[dict[str, Any]]:
         """Generate individual scholarship pages with enhanced quality gates"""
         pages = []
-        
+
         # Process scholarships in batches for efficiency
         for i in range(0, min(len(scholarships), self.target_pages - 20), 10):  # Reserve 20 slots for topic hubs
             batch = scholarships[i:i+10]
             batch_tasks = []
-            
+
             for scholarship in batch:
                 task = self._generate_enhanced_scholarship_page(scholarship)
                 batch_tasks.append(task)
-            
+
             # Process batch concurrently
             batch_results = await asyncio.gather(*batch_tasks, return_exceptions=True)
-            
+
             for result in batch_results:
                 if isinstance(result, dict) and result.get("quality", {}).get("overall_score", 0) >= self.target_quality:
                     pages.append(result)
                 elif not isinstance(result, Exception):
                     logger.warning(f"Page quality below target: {result.get('quality', {}).get('overall_score', 0)}")
-        
+
         logger.info(f"Generated {len(pages)} individual pages meeting quality threshold")
         return pages
-    
-    async def _generate_enhanced_scholarship_page(self, scholarship: Scholarship) -> Dict[str, Any]:
+
+    async def _generate_enhanced_scholarship_page(self, scholarship: Scholarship) -> dict[str, Any]:
         """Generate individual page with enhanced SEO and quality features"""
         try:
             # Use the existing auto page maker with enhancements
             base_page = await self.auto_page_maker.scholarship_generator.generate_scholarship_page(scholarship)
-            
+
             # Add SEO enhancements
             enhanced_page = base_page.copy()
             enhanced_page.update({
@@ -134,14 +131,14 @@ class SEOEnhancementEngine:
                     "user_intent_aligned": True
                 }
             })
-            
+
             return enhanced_page
-            
+
         except Exception as e:
             logger.error(f"Failed to generate enhanced page for {scholarship.id}: {str(e)}")
             raise
-    
-    async def _create_internal_linking_hubs(self, scholarships: List[Scholarship]) -> List[Dict[str, Any]]:
+
+    async def _create_internal_linking_hubs(self, scholarships: list[Scholarship]) -> list[dict[str, Any]]:
         """Create topic-based hub pages for internal linking authority"""
         hub_topics = [
             {"category": "STEM Scholarships", "keywords": ["engineering", "science", "technology", "mathematics"], "target_scholarships": 15},
@@ -151,56 +148,56 @@ class SEOEnhancementEngine:
             {"category": "Academic Merit", "keywords": ["merit", "academic", "gpa", "achievement"], "target_scholarships": 20},
             {"category": "Need-Based Support", "keywords": ["financial need", "low income", "pell eligible"], "target_scholarships": 18}
         ]
-        
+
         hub_pages = []
-        
+
         for hub_topic in hub_topics:
             try:
                 # Filter scholarships for this hub
                 relevant_scholarships = self._filter_scholarships_for_hub(scholarships, hub_topic)
-                
+
                 if len(relevant_scholarships) >= 5:  # Minimum threshold for hub creation
                     hub_page = await self._generate_topic_hub_page(hub_topic, relevant_scholarships)
                     hub_pages.append(hub_page)
-                    
+
                     # Build internal linking network
                     self._build_internal_linking_network(hub_page, relevant_scholarships)
-                
+
             except Exception as e:
                 logger.warning(f"Failed to create hub for {hub_topic['category']}: {str(e)}")
                 continue
-        
+
         logger.info(f"Created {len(hub_pages)} topic hub pages")
         return hub_pages
-    
-    def _filter_scholarships_for_hub(self, scholarships: List[Scholarship], hub_topic: Dict[str, Any]) -> List[Scholarship]:
+
+    def _filter_scholarships_for_hub(self, scholarships: list[Scholarship], hub_topic: dict[str, Any]) -> list[Scholarship]:
         """Filter scholarships relevant to hub topic"""
         relevant = []
         keywords = [kw.lower() for kw in hub_topic["keywords"]]
-        
+
         for scholarship in scholarships:
             # Check if scholarship matches any hub keywords
             text_to_search = f"{scholarship.name} {scholarship.description} {scholarship.organization}".lower()
-            
+
             if any(keyword in text_to_search for keyword in keywords):
                 relevant.append(scholarship)
-        
+
         return relevant[:hub_topic["target_scholarships"]]
-    
-    async def _generate_topic_hub_page(self, hub_topic: Dict[str, Any], scholarships: List[Scholarship]) -> Dict[str, Any]:
+
+    async def _generate_topic_hub_page(self, hub_topic: dict[str, Any], scholarships: list[Scholarship]) -> dict[str, Any]:
         """Generate comprehensive topic hub page"""
         category = hub_topic["category"]
         total_amount = sum(s.amount for s in scholarships)
         avg_amount = total_amount / len(scholarships) if scholarships else 0
-        
+
         prompt = f"""
         Create a comprehensive hub page for "{category}" scholarships that serves as the definitive guide.
-        
+
         Hub Statistics:
         - Available scholarships: {len(scholarships)}
         - Total funding: ${total_amount:,}
         - Average award: ${avg_amount:,.0f}
-        
+
         Create content including:
         1. Complete category overview and importance
         2. Student success profiles and case studies
@@ -210,11 +207,11 @@ class SEOEnhancementEngine:
         6. Related scholarship opportunities
         7. Expert tips and insider insights
         8. Frequently asked questions
-        
+
         Write 1200-1500 words optimized for search intent.
         Include specific actionable advice and real value for {category.lower()} students.
         """
-        
+
         try:
             response = await self.openai_service.client.chat.completions.create(
                 model="gpt-4o",
@@ -229,7 +226,7 @@ class SEOEnhancementEngine:
         except Exception as e:
             logger.error(f"Error generating hub content: {e}")
             content = f"Comprehensive guide to {category} with {len(scholarships)} scholarship opportunities."
-        
+
         return {
             "type": "topic_hub",
             "category": category,
@@ -259,11 +256,11 @@ class SEOEnhancementEngine:
             "word_count": len(content.split()),
             "generated_at": datetime.utcnow().isoformat()
         }
-    
-    def _build_internal_linking_network(self, hub_page: Dict[str, Any], scholarships: List[Scholarship]):
+
+    def _build_internal_linking_network(self, hub_page: dict[str, Any], scholarships: list[Scholarship]):
         """Build strategic internal linking network"""
         hub_url = hub_page["seo_enhancements"]["canonical_url"]
-        
+
         # Hub links to individual scholarships
         self.internal_links[hub_url] = []
         for scholarship in scholarships:
@@ -274,24 +271,24 @@ class SEOEnhancementEngine:
                 "link_type": "hub_to_individual",
                 "relevance_score": 0.9
             })
-        
+
         # Individual scholarships link back to hub
         for scholarship in scholarships:
             scholarship_url = f"/scholarships/{self._generate_slug(scholarship.name)}"
             if scholarship_url not in self.internal_links:
                 self.internal_links[scholarship_url] = []
-            
+
             self.internal_links[scholarship_url].append({
                 "url": hub_url,
                 "anchor_text": f"More {hub_page['category']} Scholarships",
                 "link_type": "individual_to_hub",
                 "relevance_score": 0.8
             })
-    
-    async def _generate_enhanced_schema_data(self, all_pages: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+
+    async def _generate_enhanced_schema_data(self, all_pages: list[dict[str, Any]]) -> list[dict[str, Any]]:
         """Generate comprehensive Schema.org structured data"""
         schema_data = []
-        
+
         for page in all_pages:
             if page.get("type") == "topic_hub":
                 # FAQPage schema for hub pages
@@ -311,7 +308,7 @@ class SEOEnhancementEngine:
                         }
                     ]
                 })
-                
+
                 # Breadcrumb schema for hub pages
                 schema_data.append({
                     "@context": "https://schema.org",
@@ -324,7 +321,7 @@ class SEOEnhancementEngine:
                             "item": "/"
                         },
                         {
-                            "@type": "ListItem", 
+                            "@type": "ListItem",
                             "position": 2,
                             "name": "Scholarship Guides",
                             "item": "/guides"
@@ -337,18 +334,18 @@ class SEOEnhancementEngine:
                         }
                     ]
                 })
-            
+
             else:
                 # Individual scholarship page schema
                 if page.get("seo_enhancements", {}).get("schema_org"):
                     schema_data.append(page["seo_enhancements"]["schema_org"])
-        
+
         return schema_data
-    
-    async def _generate_dynamic_sitemap(self, all_pages: List[Dict[str, Any]]) -> Dict[str, Any]:
+
+    async def _generate_dynamic_sitemap(self, all_pages: list[dict[str, Any]]) -> dict[str, Any]:
         """Generate comprehensive XML sitemap with priority scoring"""
         sitemap_entries = []
-        
+
         for page in all_pages:
             if page.get("type") == "topic_hub":
                 priority = 0.9  # High priority for pillar content
@@ -356,9 +353,9 @@ class SEOEnhancementEngine:
             else:
                 priority = 0.8  # High priority for individual scholarships
                 changefreq = "weekly"
-            
+
             url = page.get("canonical_url") or page.get("seo_enhancements", {}).get("canonical_url", f"/{page['slug']}")
-            
+
             sitemap_entries.append({
                 "url": url,
                 "lastmod": datetime.utcnow().isoformat(),
@@ -366,51 +363,51 @@ class SEOEnhancementEngine:
                 "priority": priority,
                 "page_type": page.get("type", "individual")
             })
-        
+
         # Sort by priority for optimal crawling
         sitemap_entries.sort(key=lambda x: x["priority"], reverse=True)
-        
+
         return {
             "entries": sitemap_entries,
             "total_urls": len(sitemap_entries),
             "last_generated": datetime.utcnow().isoformat(),
             "xml_content": self._generate_xml_sitemap(sitemap_entries)
         }
-    
-    def _generate_xml_sitemap(self, entries: List[Dict[str, Any]]) -> str:
+
+    def _generate_xml_sitemap(self, entries: list[dict[str, Any]]) -> str:
         """Generate XML sitemap content"""
         root = ET.Element("urlset", xmlns="http://www.sitemaps.org/schemas/sitemap/0.9")
-        
+
         for entry in entries:
             url_elem = ET.SubElement(root, "url")
-            
+
             loc = ET.SubElement(url_elem, "loc")
             loc.text = f"https://scholarship-api.jamarrlmayes.replit.app{entry['url']}"
-            
+
             lastmod = ET.SubElement(url_elem, "lastmod")
             lastmod.text = entry["lastmod"]
-            
+
             changefreq = ET.SubElement(url_elem, "changefreq")
             changefreq.text = entry["changefreq"]
-            
+
             priority = ET.SubElement(url_elem, "priority")
             priority.text = str(entry["priority"])
-        
+
         return ET.tostring(root, encoding='unicode', method='xml')
-    
-    async def _create_canonical_tag_system(self, pages: List[Dict[str, Any]]) -> Dict[str, str]:
+
+    async def _create_canonical_tag_system(self, pages: list[dict[str, Any]]) -> dict[str, str]:
         """Create canonical tag mapping to prevent duplicate content"""
         canonical_mapping = {}
-        
+
         # Group similar pages by content similarity
         content_groups = self._group_similar_content(pages)
-        
+
         for group in content_groups:
             if len(group) > 1:
                 # Choose the highest quality page as canonical
                 canonical_page = max(group, key=lambda p: p.get("quality", {}).get("overall_score", 0))
                 canonical_url = canonical_page.get("canonical_url", f"/{canonical_page['slug']}")
-                
+
                 for page in group:
                     page_url = page.get("canonical_url", f"/{page['slug']}")
                     canonical_mapping[page_url] = canonical_url
@@ -419,34 +416,34 @@ class SEOEnhancementEngine:
                 page = group[0]
                 page_url = page.get("canonical_url", f"/{page['slug']}")
                 canonical_mapping[page_url] = page_url
-        
+
         return canonical_mapping
-    
-    def _group_similar_content(self, pages: List[Dict[str, Any]]) -> List[List[Dict[str, Any]]]:
+
+    def _group_similar_content(self, pages: list[dict[str, Any]]) -> list[list[dict[str, Any]]]:
         """Group pages with similar content to identify canonicalization opportunities"""
         # Simple grouping by organization for now
         # In production, would use more sophisticated content similarity analysis
         groups = {}
-        
+
         for page in pages:
             # Use organization as similarity key
             org_key = page.get("scholarship_id", "unknown")[:8]  # First 8 chars as group key
-            
+
             if org_key not in groups:
                 groups[org_key] = []
             groups[org_key].append(page)
-        
+
         return list(groups.values())
-    
-    def _calculate_average_quality(self, pages: List[Dict[str, Any]]) -> float:
+
+    def _calculate_average_quality(self, pages: list[dict[str, Any]]) -> float:
         """Calculate average quality score across all pages"""
         if not pages:
             return 0.0
-        
+
         total_score = sum(page.get("quality", {}).get("overall_score", 0) for page in pages)
         return total_score / len(pages)
-    
-    def _generate_scholarship_schema(self, scholarship: Scholarship) -> Dict[str, Any]:
+
+    def _generate_scholarship_schema(self, scholarship: Scholarship) -> dict[str, Any]:
         """Generate Schema.org structured data for scholarship"""
         return {
             "@context": "https://schema.org",
@@ -464,8 +461,8 @@ class SEOEnhancementEngine:
             },
             "applicationDeadline": scholarship.application_deadline.isoformat()
         }
-    
-    def _generate_breadcrumb_schema(self, scholarship: Scholarship) -> Dict[str, Any]:
+
+    def _generate_breadcrumb_schema(self, scholarship: Scholarship) -> dict[str, Any]:
         """Generate breadcrumb navigation schema"""
         return {
             "@context": "https://schema.org",
@@ -491,8 +488,8 @@ class SEOEnhancementEngine:
                 }
             ]
         }
-    
-    def _generate_faq_schema(self, scholarship: Scholarship) -> Dict[str, Any]:
+
+    def _generate_faq_schema(self, scholarship: Scholarship) -> dict[str, Any]:
         """Generate FAQ schema for scholarship page"""
         return {
             "@context": "https://schema.org",
@@ -516,8 +513,8 @@ class SEOEnhancementEngine:
                 }
             ]
         }
-    
-    def _generate_hub_schema(self, category: str, scholarships: List[Scholarship]) -> Dict[str, Any]:
+
+    def _generate_hub_schema(self, category: str, scholarships: list[Scholarship]) -> dict[str, Any]:
         """Generate schema for topic hub pages"""
         return {
             "@context": "https://schema.org",
@@ -537,21 +534,21 @@ class SEOEnhancementEngine:
                 } for s in scholarships[:5]  # Include top 5 for schema
             ]
         }
-    
-    def _identify_internal_link_opportunities(self, scholarship: Scholarship) -> List[Dict[str, str]]:
+
+    def _identify_internal_link_opportunities(self, scholarship: Scholarship) -> list[dict[str, str]]:
         """Identify strategic internal linking opportunities"""
         opportunities = []
-        
+
         # Link to related category hubs
         text_to_analyze = f"{scholarship.name} {scholarship.description}".lower()
-        
+
         category_links = [
             {"text": "stem", "url": "/guides/stem-scholarships-complete-guide", "anchor": "STEM Scholarships Guide"},
             {"text": "women", "url": "/guides/women-in-technology-complete-guide", "anchor": "Women in Technology Scholarships"},
             {"text": "community", "url": "/guides/community-service-complete-guide", "anchor": "Community Service Scholarships"},
             {"text": "merit", "url": "/guides/academic-merit-complete-guide", "anchor": "Merit-Based Scholarships"}
         ]
-        
+
         for link in category_links:
             if link["text"] in text_to_analyze:
                 opportunities.append({
@@ -559,9 +556,9 @@ class SEOEnhancementEngine:
                     "anchor_text": link["anchor"],
                     "context": "category_hub"
                 })
-        
+
         return opportunities
-    
+
     def _generate_slug(self, title: str) -> str:
         """Generate URL-friendly slug"""
         import re
@@ -574,19 +571,19 @@ async def demonstrate_seo_enhancement():
     """Demonstrate SEO enhancement capabilities"""
     print("🚀 SEO Enhancement Engine Demo")
     print("=" * 50)
-    
+
     # This would be called with real scholarship data
     print("Target: 120+ pages with 90%+ quality")
     print("Features: Internal linking, Schema.org, XML sitemaps, canonical tags")
     print("Expected impact: 12k MAUs, 50%+ organic traffic")
-    
+
     return {
         "demo_status": "ready",
         "target_pages": 120,
         "quality_target": 0.90,
         "seo_features": [
             "Schema.org structured data",
-            "XML sitemap with priorities", 
+            "XML sitemap with priorities",
             "Internal linking network",
             "Canonical tag management",
             "Thin content prevention"

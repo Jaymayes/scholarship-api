@@ -3,17 +3,16 @@ Week 3 Execution Router
 Seven OKRs for AI Scholarship Playbook Scale & Monetization
 """
 
-from fastapi import APIRouter, BackgroundTasks, HTTPException, Depends
-from typing import Dict, Any, List, Optional
-import asyncio
-import json
 from datetime import datetime
-import logging
+from typing import Any
+
+from fastapi import APIRouter, BackgroundTasks, HTTPException
 
 from services.openai_service import OpenAIService
+
 # Import Week 3 execution engines - will be available as modules
 # from WEEK_3_SEO_SCALER import Week3SEOScaler
-# from WEEK_3_B2B_MARKETPLACE import Week3B2BMarketplace  
+# from WEEK_3_B2B_MARKETPLACE import Week3B2BMarketplace
 # from WEEK_3_APPLICATION_ENHANCER import Week3ApplicationEnhancer
 from utils.logger import get_logger
 
@@ -26,7 +25,7 @@ openai_service = OpenAIService()
 # b2b_marketplace = Week3B2BMarketplace(openai_service)
 # app_enhancer = Week3ApplicationEnhancer(openai_service)
 
-@router.get("/status", response_model=Dict[str, Any])
+@router.get("/status", response_model=dict[str, Any])
 async def get_week3_status(request_id: str = "week3-status"):
     """Get comprehensive Week 3 execution status across all 7 OKRs"""
     try:
@@ -119,26 +118,26 @@ async def get_week3_status(request_id: str = "week3-status"):
             "request_id": request_id,
             "timestamp": datetime.now().isoformat()
         }
-        
+
         logger.info(f"Week 3 status retrieved - Request ID: {request_id}")
         return status
-        
+
     except Exception as e:
         logger.error(f"Error getting Week 3 status: {str(e)} - Request ID: {request_id}")
         raise HTTPException(status_code=500, detail=f"Failed to get status: {str(e)}")
 
-@router.post("/okr1/seo-scale", response_model=Dict[str, Any])
+@router.post("/okr1/seo-scale", response_model=dict[str, Any])
 async def execute_seo_scale_okr1(
     background_tasks: BackgroundTasks,
-    target_pages: Optional[int] = 300,
-    target_quality: Optional[float] = 0.92,
-    target_index_coverage: Optional[float] = 0.70,
+    target_pages: int | None = 300,
+    target_quality: float | None = 0.92,
+    target_index_coverage: float | None = 0.70,
     request_id: str = "week3-okr1-seo"
 ):
     """Execute OKR 1: SEO-Led Growth (300+ pages, 70% index coverage, 25K MAUs)"""
     try:
         logger.info(f"🎯 OKR 1: SEO Scale execution initiated - Request ID: {request_id}")
-        
+
         # Execute comprehensive SEO scaling (simulated for now)
         result = {
             "execution_status": "success",
@@ -153,7 +152,7 @@ async def execute_seo_scale_okr1(
             "pillar_authority": ["FAFSA", "essays", "deadlines", "financial_literacy", "scholarship_scams"],
             "execution_time_seconds": 1247.3
         }
-        
+
         # Add OKR-specific metrics
         okr1_metrics = {
             "okr_number": 1,
@@ -171,28 +170,28 @@ async def execute_seo_scale_okr1(
             "request_id": request_id,
             "timestamp": datetime.now().isoformat()
         }
-        
+
         logger.info(f"✅ OKR 1 Complete: {result['pages_generated']} pages at {result['quality_achieved']:.3f} quality - Request ID: {request_id}")
         return okr1_metrics
-        
+
     except Exception as e:
         logger.error(f"Error in OKR 1 SEO scale: {str(e)} - Request ID: {request_id}")
         raise HTTPException(status_code=500, detail=f"OKR 1 failed: {str(e)}")
 
-@router.post("/okr2/b2b-marketplace", response_model=Dict[str, Any])
+@router.post("/okr2/b2b-marketplace", response_model=dict[str, Any])
 async def execute_b2b_marketplace_okr2(
     background_tasks: BackgroundTasks,
-    target_partners: Optional[int] = 25,
-    target_listings: Optional[int] = 100,
+    target_partners: int | None = 25,
+    target_listings: int | None = 100,
     request_id: str = "week3-okr2-b2b"
 ):
     """Execute OKR 2: B2B Marketplace Pilots at Scale (25 partners, 100 listings, revenue primitives)"""
     try:
         logger.info(f"🤝 OKR 2: B2B Marketplace scaling initiated - Request ID: {request_id}")
-        
+
         # Execute comprehensive B2B marketplace expansion (simulated)
         result = {
-            "execution_status": "success", 
+            "execution_status": "success",
             "partners_onboarded": 19,
             "total_partners": 23,
             "listings_generated": 97,
@@ -206,7 +205,7 @@ async def execute_b2b_marketplace_okr2(
             "case_studies_collected": 3,
             "execution_time_seconds": 892.1
         }
-        
+
         # Add OKR-specific metrics
         okr2_metrics = {
             "okr_number": 2,
@@ -226,25 +225,25 @@ async def execute_b2b_marketplace_okr2(
             "request_id": request_id,
             "timestamp": datetime.now().isoformat()
         }
-        
+
         logger.info(f"✅ OKR 2 Complete: {result['total_partners']} partners, {result['listings_generated']} listings - Request ID: {request_id}")
         return okr2_metrics
-        
+
     except Exception as e:
         logger.error(f"Error in OKR 2 B2B marketplace: {str(e)} - Request ID: {request_id}")
         raise HTTPException(status_code=500, detail=f"OKR 2 failed: {str(e)}")
 
-@router.post("/okr3/application-automation", response_model=Dict[str, Any])
+@router.post("/okr3/application-automation", response_model=dict[str, Any])
 async def execute_application_automation_okr3(
     background_tasks: BackgroundTasks,
-    target_coverage: Optional[float] = 0.97,
-    target_submit_ready: Optional[float] = 0.90,
+    target_coverage: float | None = 0.97,
+    target_submit_ready: float | None = 0.90,
     request_id: str = "week3-okr3-automation"
 ):
     """Execute OKR 3: Application Automation & Student Value (97% coverage, 90% submit-ready)"""
     try:
         logger.info(f"📝 OKR 3: Application Automation enhancement initiated - Request ID: {request_id}")
-        
+
         # Execute comprehensive application automation enhancement (simulated)
         result = {
             "execution_status": "success",
@@ -253,7 +252,7 @@ async def execute_application_automation_okr3(
             "portals_deployed": 3,
             "enhancement_features": {
                 "enhanced_field_mapping": True,
-                "confidence_scoring_system": True, 
+                "confidence_scoring_system": True,
                 "read_only_preview": True,
                 "graceful_fallbacks": True,
                 "responsible_ai_compliant": True
@@ -262,7 +261,7 @@ async def execute_application_automation_okr3(
             "responsible_ai_status": {"compliant": True, "compliance_score": 1.0},
             "execution_time_seconds": 654.2
         }
-        
+
         # Add OKR-specific metrics
         okr3_metrics = {
             "okr_number": 3,
@@ -280,24 +279,24 @@ async def execute_application_automation_okr3(
             "request_id": request_id,
             "timestamp": datetime.now().isoformat()
         }
-        
+
         logger.info(f"✅ OKR 3 Complete: {result['coverage_achieved']:.3f} coverage, {result['submit_ready_rate']:.3f} submit-ready - Request ID: {request_id}")
         return okr3_metrics
-        
+
     except Exception as e:
         logger.error(f"Error in OKR 3 application automation: {str(e)} - Request ID: {request_id}")
         raise HTTPException(status_code=500, detail=f"OKR 3 failed: {str(e)}")
 
-@router.post("/okr4/data-ingestion", response_model=Dict[str, Any])
+@router.post("/okr4/data-ingestion", response_model=dict[str, Any])
 async def execute_data_ingestion_okr4(
     background_tasks: BackgroundTasks,
-    target_new_sources: Optional[int] = 15,
+    target_new_sources: int | None = 15,
     request_id: str = "week3-okr4-data"
 ):
     """Execute OKR 4: Data Ingestion & Normalization Scale (15 new sources, enhanced normalization)"""
     try:
         logger.info(f"🔄 OKR 4: Data Ingestion scaling initiated - Request ID: {request_id}")
-        
+
         # Simulate comprehensive data ingestion expansion
         okr4_result = {
             "okr_number": 4,
@@ -350,25 +349,25 @@ async def execute_data_ingestion_okr4(
             "request_id": request_id,
             "timestamp": datetime.now().isoformat()
         }
-        
+
         logger.info(f"✅ OKR 4 Complete: {target_new_sources} sources added, enhanced normalization - Request ID: {request_id}")
         return okr4_result
-        
+
     except Exception as e:
         logger.error(f"Error in OKR 4 data ingestion: {str(e)} - Request ID: {request_id}")
         raise HTTPException(status_code=500, detail=f"OKR 4 failed: {str(e)}")
 
-@router.post("/okr5/monetization", response_model=Dict[str, Any])
+@router.post("/okr5/monetization", response_model=dict[str, Any])
 async def execute_monetization_okr5(
     background_tasks: BackgroundTasks,
-    target_credit_attach: Optional[float] = 0.12,
-    target_arppu: Optional[float] = 35.00,
+    target_credit_attach: float | None = 0.12,
+    target_arppu: float | None = 35.00,
     request_id: str = "week3-okr5-monetization"
 ):
     """Execute OKR 5: Monetization & Unit Economics (12% attach rate, $35 ARPPU)"""
     try:
         logger.info(f"💰 OKR 5: Monetization optimization initiated - Request ID: {request_id}")
-        
+
         # Simulate monetization optimization
         okr5_result = {
             "okr_number": 5,
@@ -426,25 +425,25 @@ async def execute_monetization_okr5(
             "request_id": request_id,
             "timestamp": datetime.now().isoformat()
         }
-        
+
         logger.info(f"✅ OKR 5 Complete: {okr5_result['credit_attach_improvements']['achieved_rate']:.3f} attach rate, ${okr5_result['arppu_optimization']['achieved_arppu']:.2f} ARPPU - Request ID: {request_id}")
         return okr5_result
-        
+
     except Exception as e:
         logger.error(f"Error in OKR 5 monetization: {str(e)} - Request ID: {request_id}")
         raise HTTPException(status_code=500, detail=f"OKR 5 failed: {str(e)}")
 
-@router.post("/okr6/reliability", response_model=Dict[str, Any])
+@router.post("/okr6/reliability", response_model=dict[str, Any])
 async def execute_reliability_okr6(
     background_tasks: BackgroundTasks,
-    target_uptime: Optional[float] = 0.999,
-    target_p95_latency: Optional[int] = 120,
+    target_uptime: float | None = 0.999,
+    target_p95_latency: int | None = 120,
     request_id: str = "week3-okr6-reliability"
 ):
     """Execute OKR 6: Reliability, Security & Trust (99.9% uptime, ≤120ms P95, 0.1% error rate)"""
     try:
         logger.info(f"🛡️ OKR 6: Reliability & Security hardening initiated - Request ID: {request_id}")
-        
+
         # Simulate comprehensive reliability and security hardening
         okr6_result = {
             "okr_number": 6,
@@ -470,7 +469,7 @@ async def execute_reliability_okr6(
             },
             "multi_az_failover": {
                 "failover_time_seconds": 12.3,
-                "data_consistency": "PASS", 
+                "data_consistency": "PASS",
                 "zero_customer_impact": "PASS",
                 "automated_recovery": "PASS",
                 "monitoring_alerting": "PASS"
@@ -503,15 +502,15 @@ async def execute_reliability_okr6(
             "request_id": request_id,
             "timestamp": datetime.now().isoformat()
         }
-        
+
         logger.info(f"✅ OKR 6 Complete: {okr6_result['reliability_metrics']['achieved_uptime']:.4f} uptime, {okr6_result['reliability_metrics']['achieved_p95_latency']}ms P95 - Request ID: {request_id}")
         return okr6_result
-        
+
     except Exception as e:
         logger.error(f"Error in OKR 6 reliability: {str(e)} - Request ID: {request_id}")
         raise HTTPException(status_code=500, detail=f"OKR 6 failed: {str(e)}")
 
-@router.post("/okr7/responsible-ai", response_model=Dict[str, Any])
+@router.post("/okr7/responsible-ai", response_model=dict[str, Any])
 async def execute_responsible_ai_okr7(
     background_tasks: BackgroundTasks,
     request_id: str = "week3-okr7-ai-ethics"
@@ -519,7 +518,7 @@ async def execute_responsible_ai_okr7(
     """Execute OKR 7: Responsible AI & Transparency (maintain explainability, publish privacy explainer)"""
     try:
         logger.info(f"🤖 OKR 7: Responsible AI & Transparency validation initiated - Request ID: {request_id}")
-        
+
         # Execute responsible AI validation and documentation
         okr7_result = {
             "okr_number": 7,
@@ -546,7 +545,7 @@ async def execute_responsible_ai_okr7(
                 "plain_language": True,
                 "comprehensive_coverage": [
                     "Data collection practices",
-                    "AI model usage", 
+                    "AI model usage",
                     "Privacy protections",
                     "User rights",
                     "Data retention policies"
@@ -586,15 +585,15 @@ async def execute_responsible_ai_okr7(
             "request_id": request_id,
             "timestamp": datetime.now().isoformat()
         }
-        
+
         logger.info(f"✅ OKR 7 Complete: 100% ethics compliance, privacy explainer published - Request ID: {request_id}")
         return okr7_result
-        
+
     except Exception as e:
         logger.error(f"Error in OKR 7 responsible AI: {str(e)} - Request ID: {request_id}")
         raise HTTPException(status_code=500, detail=f"OKR 7 failed: {str(e)}")
 
-@router.get("/ceo-dashboard", response_model=Dict[str, Any])
+@router.get("/ceo-dashboard", response_model=dict[str, Any])
 async def get_week3_ceo_dashboard(request_id: str = "week3-ceo-dashboard"):
     """Get comprehensive Week 3 CEO dashboard with all OKR metrics"""
     try:
@@ -728,15 +727,15 @@ async def get_week3_ceo_dashboard(request_id: str = "week3-ceo-dashboard"):
             "request_id": request_id,
             "last_updated": datetime.now().isoformat()
         }
-        
+
         logger.info(f"Week 3 CEO dashboard retrieved - Request ID: {request_id}")
         return ceo_dashboard
-        
+
     except Exception as e:
         logger.error(f"Error getting Week 3 CEO dashboard: {str(e)} - Request ID: {request_id}")
         raise HTTPException(status_code=500, detail=f"Failed to get CEO dashboard: {str(e)}")
 
-@router.post("/execute-all-okrs", response_model=Dict[str, Any])
+@router.post("/execute-all-okrs", response_model=dict[str, Any])
 async def execute_all_week3_okrs(
     background_tasks: BackgroundTasks,
     request_id: str = "week3-execute-all-okrs"
@@ -744,14 +743,14 @@ async def execute_all_week3_okrs(
     """Execute all 7 Week 3 OKRs in coordinated sequence"""
     try:
         logger.info(f"🚀 Week 3 All OKRs execution initiated - Request ID: {request_id}")
-        
+
         # Execute all OKRs in parallel for efficiency (simulated)
         results = [
             {"execution_status": "success", "pages_generated": 287, "quality_achieved": 0.923},
             {"execution_status": "success", "partners_onboarded": 19, "total_partners": 23},
             {"execution_status": "success", "coverage_achieved": 0.971, "submit_ready_rate": 0.903}
         ]
-        
+
         # Process results and handle any exceptions
         okr_results = []
         for i, result in enumerate(results):
@@ -767,7 +766,7 @@ async def execute_all_week3_okrs(
                     "status": "success",
                     "result": result
                 })
-        
+
         # Add remaining OKRs (4-7) as successful simulations
         okr_results.extend([
             {"okr_number": 4, "status": "success", "result": {"data_sources_added": 15, "normalization_enhanced": True}},
@@ -775,9 +774,9 @@ async def execute_all_week3_okrs(
             {"okr_number": 6, "status": "success", "result": {"uptime": 0.9992, "p95_latency": 110}},
             {"okr_number": 7, "status": "success", "result": {"ethics_compliant": True, "transparency_published": True}}
         ])
-        
+
         successful_okrs = len([r for r in okr_results if r["status"] == "success"])
-        
+
         all_okrs_result = {
             "execution_status": "success" if successful_okrs == 7 else "partial_success",
             "okrs_completed": successful_okrs,
@@ -814,10 +813,10 @@ async def execute_all_week3_okrs(
             "request_id": request_id,
             "timestamp": datetime.now().isoformat()
         }
-        
+
         logger.info(f"✅ Week 3 All OKRs Complete: {successful_okrs}/7 successful - Request ID: {request_id}")
         return all_okrs_result
-        
+
     except Exception as e:
         logger.error(f"Error in Week 3 all OKRs execution: {str(e)} - Request ID: {request_id}")
         raise HTTPException(status_code=500, detail=f"All OKRs execution failed: {str(e)}")

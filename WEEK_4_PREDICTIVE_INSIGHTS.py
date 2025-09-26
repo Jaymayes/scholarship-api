@@ -6,13 +6,13 @@ Student-facing insights and partner analytics with ethical AI and transparency
 
 import asyncio
 import json
-import uuid
-from datetime import datetime, timedelta
-from typing import Dict, List, Any, Optional, Tuple
-from dataclasses import dataclass, asdict
-from enum import Enum
 import logging
 import random
+import uuid
+from dataclasses import dataclass
+from datetime import datetime, timedelta
+from enum import Enum
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -40,9 +40,9 @@ class StudentInsightChip:
     confidence_band: ConfidenceBand
     confidence_score: float
     rationale: str
-    improvement_tips: List[str]
+    improvement_tips: list[str]
     ethical_disclaimer: str
-    data_sources: List[str]
+    data_sources: list[str]
     expires_at: str
     actionable: bool
 
@@ -51,11 +51,11 @@ class PartnerAnalytics:
     """Schema for partner dashboard analytics with privacy preservation"""
     partner_id: str
     analytics_period: str
-    intent_signals: Dict[str, int]
-    demand_metrics: Dict[str, float]
-    geographic_distribution: Dict[str, int]
-    demographic_insights: Dict[str, Any]
-    conversion_funnel: Dict[str, float]
+    intent_signals: dict[str, int]
+    demand_metrics: dict[str, float]
+    geographic_distribution: dict[str, int]
+    demographic_insights: dict[str, Any]
+    conversion_funnel: dict[str, float]
     anonymization_level: str
     privacy_compliant: bool
     aggregation_threshold: int  # Minimum 10 data points for insights
@@ -66,60 +66,60 @@ class PredictiveModel:
     model_id: str
     model_type: str
     training_date: str
-    accuracy_metrics: Dict[str, float]
-    feature_importance: Dict[str, float]
-    bias_detection: Dict[str, Any]
-    fairness_metrics: Dict[str, float]
+    accuracy_metrics: dict[str, float]
+    feature_importance: dict[str, float]
+    bias_detection: dict[str, Any]
+    fairness_metrics: dict[str, float]
     explainability_score: float
     ethical_validation: bool
 
 class Week4PredictiveInsights:
     """
     Week 4 Predictive Insights Engine
-    
+
     Objectives:
     - Deploy student-facing insight chips with ethical framing
     - Launch partner analytics beta with privacy preservation
     - Achieve +10% match CTR improvement
     - Maintain transparency and ethical AI standards
     """
-    
+
     def __init__(self, openai_service=None):
         self.openai_service = openai_service
-        self.student_insights: List[StudentInsightChip] = []
-        self.partner_analytics: List[PartnerAnalytics] = []
-        self.predictive_models: List[PredictiveModel] = []
+        self.student_insights: list[StudentInsightChip] = []
+        self.partner_analytics: list[PartnerAnalytics] = []
+        self.predictive_models: list[PredictiveModel] = []
         self.baseline_ctr = 0.245  # Current Week 3 CTR
         self.target_ctr_improvement = 0.10  # +10% improvement
-        
-    async def deploy_predictive_insights(self) -> Dict[str, Any]:
+
+    async def deploy_predictive_insights(self) -> dict[str, Any]:
         """Deploy comprehensive predictive insights layer"""
         try:
             logger.info("🔮 Week 4 Predictive Insights: Student + Partner analytics deployment initiated")
-            
+
             # Phase 1: Deploy student-facing insight chips
-            student_insights = await self._deploy_student_insight_chips()
-            
+            await self._deploy_student_insight_chips()
+
             # Phase 2: Launch partner analytics beta
             partner_analytics = await self._launch_partner_analytics_beta()
-            
+
             # Phase 3: Implement predictive models with explainability
             predictive_models = await self._implement_predictive_models()
-            
+
             # Phase 4: Measure CTR improvement
             ctr_improvement = await self._measure_ctr_improvement()
-            
+
             # Phase 5: Validate ethical AI compliance
             ethics_validation = await self._validate_ethical_ai_compliance()
-            
+
             # Phase 6: Generate privacy-preserving insights
-            privacy_insights = await self._generate_privacy_preserving_insights()
-            
+            await self._generate_privacy_preserving_insights()
+
             # Calculate success metrics
             total_insights = len(self.student_insights)
             partner_beta_participants = len(self.partner_analytics)
             ctr_lift_achieved = ctr_improvement["lift_percentage"]
-            
+
             results = {
                 "execution_status": "success",
                 "student_insights_deployed": total_insights,
@@ -162,10 +162,10 @@ class Week4PredictiveInsights:
                 "execution_time_seconds": 1623.7,
                 "ready_for_production": True
             }
-            
+
             logger.info(f"✅ Predictive Insights Complete: {total_insights} insights, {ctr_lift_achieved:.1%} CTR improvement")
             return results
-            
+
         except Exception as e:
             logger.error(f"❌ Predictive insights deployment failed: {str(e)}")
             return {
@@ -174,10 +174,10 @@ class Week4PredictiveInsights:
                 "insights_deployed": 0,
                 "ctr_improvement": 0.0
             }
-    
-    async def _deploy_student_insight_chips(self) -> Dict[str, Any]:
+
+    async def _deploy_student_insight_chips(self) -> dict[str, Any]:
         """Deploy student-facing insight chips with ethical AI framing"""
-        
+
         # Generate various types of insights for students
         insight_templates = [
             {
@@ -216,12 +216,12 @@ class Week4PredictiveInsights:
                 "tips": ["Still submit a strong application", "Use this as a safety option", "Apply to mix of competitive and less competitive scholarships"]
             }
         ]
-        
+
         # Generate specific insights for different student profiles
         for i in range(50):  # Generate 50 unique insights
             template = insight_templates[i % len(insight_templates)]
             confidence_score = random.uniform(template["confidence_range"][0], template["confidence_range"][1])
-            
+
             # Determine confidence band
             if confidence_score >= 0.90:
                 confidence_band = ConfidenceBand.VERY_HIGH
@@ -233,13 +233,13 @@ class Week4PredictiveInsights:
                 confidence_band = ConfidenceBand.LOW
             else:
                 confidence_band = ConfidenceBand.VERY_LOW
-            
+
             # Generate contextual content
             if template["type"] == InsightType.MATCH_RANKING:
                 percentile = random.choice([5, 10, 15, 20, 25])
                 title = template["title_template"].format(percentile=percentile)
                 description = template["description_template"].format(percentile=percentile)
-                rationale = f"Based on GPA, extracurriculars, and demographic alignment with past recipients"
+                rationale = "Based on GPA, extracurriculars, and demographic alignment with past recipients"
             elif template["type"] == InsightType.PROFILE_STRENGTH:
                 category = random.choice(["academic", "leadership", "community service", "research"])
                 title = template["title_template"].format(category=category)
@@ -260,7 +260,7 @@ class Week4PredictiveInsights:
                 title = template["title_template"]
                 description = template["description_template"]
                 rationale = "Historical data shows 40% fewer applications compared to similar scholarship amounts"
-            
+
             insight = StudentInsightChip(
                 insight_id=str(uuid.uuid4()),
                 insight_type=template["type"],
@@ -276,8 +276,8 @@ class Week4PredictiveInsights:
                 actionable=True
             )
             self.student_insights.append(insight)
-        
-        deployment_summary = {
+
+        return {
             "total_insights_generated": len(self.student_insights),
             "insight_type_distribution": {
                 itype.value: len([i for i in self.student_insights if i.insight_type == itype])
@@ -295,12 +295,11 @@ class Week4PredictiveInsights:
             },
             "deployment_ready": True
         }
-        
-        return deployment_summary
-    
-    async def _launch_partner_analytics_beta(self) -> Dict[str, Any]:
+
+
+    async def _launch_partner_analytics_beta(self) -> dict[str, Any]:
         """Launch partner analytics beta with privacy-preserving insights"""
-        
+
         # Select 3 pilot partners for analytics beta
         beta_partners = [
             {
@@ -312,7 +311,7 @@ class Week4PredictiveInsights:
             {
                 "partner_id": "google-org",
                 "partner_name": "Google.org Education",
-                "tier": "enterprise", 
+                "tier": "enterprise",
                 "focus_areas": ["computer_science", "underrepresented_minorities", "innovation"]
             },
             {
@@ -322,7 +321,7 @@ class Week4PredictiveInsights:
                 "focus_areas": ["college_readiness", "equity", "leadership"]
             }
         ]
-        
+
         # Generate analytics for each beta partner
         for partner in beta_partners:
             # Simulate intent signals (aggregated, anonymized)
@@ -333,7 +332,7 @@ class Week4PredictiveInsights:
                 "engagement_time_minutes": random.randint(8, 15),
                 "return_visits": random.randint(200, 600)
             }
-            
+
             # Demand analytics with privacy preservation
             demand_metrics = {
                 "application_completion_rate": random.uniform(0.65, 0.85),
@@ -342,7 +341,7 @@ class Week4PredictiveInsights:
                 "demographic_alignment": random.uniform(0.6, 0.9),
                 "competitive_positioning": random.uniform(0.4, 0.8)
             }
-            
+
             # Geographic distribution (state-level aggregation for privacy)
             geographic_distribution = {
                 "california": random.randint(25, 45),
@@ -352,7 +351,7 @@ class Week4PredictiveInsights:
                 "illinois": random.randint(6, 15),
                 "other_states": random.randint(20, 35)
             }
-            
+
             # Demographic insights (aggregated groups only)
             demographic_insights = {
                 "academic_level": {
@@ -372,7 +371,7 @@ class Week4PredictiveInsights:
                     "emerging_potential": random.uniform(0.10, 0.25)
                 }
             }
-            
+
             # Conversion funnel with privacy-safe aggregation
             conversion_funnel = {
                 "awareness_to_interest": random.uniform(0.15, 0.35),
@@ -381,7 +380,7 @@ class Week4PredictiveInsights:
                 "completion_to_finalist": random.uniform(0.08, 0.15),
                 "finalist_to_award": random.uniform(0.35, 0.65)
             }
-            
+
             analytics = PartnerAnalytics(
                 partner_id=partner["partner_id"],
                 analytics_period="last_30_days",
@@ -395,8 +394,8 @@ class Week4PredictiveInsights:
                 aggregation_threshold=10  # Minimum 10 data points for any insight
             )
             self.partner_analytics.append(analytics)
-        
-        analytics_summary = {
+
+        return {
             "beta_partners_enrolled": len(self.partner_analytics),
             "intent_tracking": True,
             "demand_insights": True,
@@ -412,12 +411,11 @@ class Week4PredictiveInsights:
                 "privacy_confidence": 4.6
             }
         }
-        
-        return analytics_summary
-    
-    async def _implement_predictive_models(self) -> Dict[str, Any]:
+
+
+    async def _implement_predictive_models(self) -> dict[str, Any]:
         """Implement predictive models with explainability and bias detection"""
-        
+
         model_configs = [
             {
                 "model_type": "scholarship_match_predictor",
@@ -426,7 +424,7 @@ class Week4PredictiveInsights:
                 "explainability": 0.92
             },
             {
-                "model_type": "application_success_predictor", 
+                "model_type": "application_success_predictor",
                 "purpose": "Estimate likelihood of scholarship award",
                 "accuracy": 0.756,
                 "explainability": 0.88
@@ -438,7 +436,7 @@ class Week4PredictiveInsights:
                 "explainability": 0.85
             }
         ]
-        
+
         for config in model_configs:
             # Feature importance for explainability
             feature_importance = {
@@ -451,11 +449,11 @@ class Week4PredictiveInsights:
                 "field_of_study_alignment": random.uniform(0.08, 0.18),
                 "application_completeness": random.uniform(0.05, 0.12)
             }
-            
+
             # Normalize feature importance to sum to 1.0
             total_importance = sum(feature_importance.values())
             feature_importance = {k: v/total_importance for k, v in feature_importance.items()}
-            
+
             # Bias detection across protected characteristics
             bias_detection = {
                 "gender_bias": {"detected": False, "disparity_ratio": random.uniform(0.95, 1.05)},
@@ -464,7 +462,7 @@ class Week4PredictiveInsights:
                 "socioeconomic_bias": {"detected": False, "disparity_ratio": random.uniform(0.90, 1.10)},
                 "age_bias": {"detected": False, "disparity_ratio": random.uniform(0.96, 1.04)}
             }
-            
+
             # Fairness metrics
             fairness_metrics = {
                 "demographic_parity": random.uniform(0.85, 0.95),
@@ -472,7 +470,7 @@ class Week4PredictiveInsights:
                 "individual_fairness": random.uniform(0.90, 0.98),
                 "counterfactual_fairness": random.uniform(0.82, 0.92)
             }
-            
+
             model = PredictiveModel(
                 model_id=str(uuid.uuid4()),
                 model_type=config["model_type"],
@@ -490,8 +488,8 @@ class Week4PredictiveInsights:
                 ethical_validation=True
             )
             self.predictive_models.append(model)
-        
-        models_summary = {
+
+        return {
             "models_deployed": len(self.predictive_models),
             "accuracy_range": {
                 "min": min(m.accuracy_metrics["overall_accuracy"] for m in self.predictive_models),
@@ -504,29 +502,28 @@ class Week4PredictiveInsights:
             "feature_transparency": True,
             "model_validation": "cross_validated_with_holdout"
         }
-        
-        return models_summary
-    
-    async def _measure_ctr_improvement(self) -> Dict[str, Any]:
+
+
+    async def _measure_ctr_improvement(self) -> dict[str, Any]:
         """Measure CTR improvement from predictive insights"""
-        
+
         # Simulate CTR improvement from insights deployment
         baseline_ctr = self.baseline_ctr  # 0.245 (24.5%)
-        
+
         # Factors contributing to CTR improvement
         improvement_factors = {
             "insight_chips_engagement": 0.023,  # 2.3% point improvement
-            "better_match_ranking": 0.018,      # 1.8% point improvement  
+            "better_match_ranking": 0.018,      # 1.8% point improvement
             "improvement_tips_adoption": 0.015,  # 1.5% point improvement
             "confidence_band_clarity": 0.012,   # 1.2% point improvement
             "deadline_alerts": 0.008            # 0.8% point improvement
         }
-        
+
         total_improvement = sum(improvement_factors.values())
         new_ctr = baseline_ctr + total_improvement
         lift_percentage = total_improvement / baseline_ctr
-        
-        ctr_analysis = {
+
+        return {
             "baseline_ctr": baseline_ctr,
             "current_ctr": new_ctr,
             "absolute_improvement": total_improvement,
@@ -539,13 +536,12 @@ class Week4PredictiveInsights:
             "confidence_interval": "95%",
             "p_value": 0.003  # Statistically significant
         }
-        
-        return ctr_analysis
-    
-    async def _validate_ethical_ai_compliance(self) -> Dict[str, Any]:
+
+
+    async def _validate_ethical_ai_compliance(self) -> dict[str, Any]:
         """Validate comprehensive ethical AI compliance"""
-        
-        ethics_validation = {
+
+        return {
             "transparency_score": 0.94,  # 94% transparency in AI decisions
             "user_control": {
                 "insight_dismissal": True,       # Users can dismiss insights
@@ -579,13 +575,12 @@ class Week4PredictiveInsights:
                 "human_oversight": True        # Human review capability
             }
         }
-        
-        return ethics_validation
-    
-    async def _generate_privacy_preserving_insights(self) -> Dict[str, Any]:
+
+
+    async def _generate_privacy_preserving_insights(self) -> dict[str, Any]:
         """Generate insights while preserving student privacy"""
-        
-        privacy_techniques = {
+
+        return {
             "differential_privacy": {
                 "enabled": True,
                 "epsilon": 1.0,  # Privacy budget
@@ -616,8 +611,7 @@ class Week4PredictiveInsights:
                 "temporal_aggregation": "weekly_minimum"
             }
         }
-        
-        return privacy_techniques
+
 
 # Usage example for Week 4 execution
 if __name__ == "__main__":
@@ -625,5 +619,5 @@ if __name__ == "__main__":
         insights = Week4PredictiveInsights()
         result = await insights.deploy_predictive_insights()
         print(json.dumps(result, indent=2))
-    
+
     asyncio.run(main())

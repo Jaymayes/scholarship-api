@@ -2,22 +2,24 @@
 API Commercialization & Billing System
 Executive directive: API plans, rate limits, billing pipeline, revenue tracking
 """
-import time
-import json
-from datetime import datetime, timedelta
-from typing import Dict, Any, List, Optional
-from dataclasses import dataclass, asdict
-from pathlib import Path
-from enum import Enum
 import hashlib
-import secrets
 import hmac
-from prometheus_client import Counter, Gauge, Histogram
+import json
+import secrets
+import time
+from dataclasses import dataclass
+from datetime import datetime, timedelta
+from enum import Enum
+from pathlib import Path
+from typing import Any
+
+from prometheus_client import Counter, Gauge
+
 
 class TierType(Enum):
     """API tier types for commercialization"""
     FREE = "free"
-    STARTER = "starter" 
+    STARTER = "starter"
     PROFESSIONAL = "professional"
     ENTERPRISE = "enterprise"
 
@@ -30,7 +32,7 @@ class APITier:
     requests_per_month: int
     ai_credits_included: int
     ai_credit_cost: float  # Cost per additional credit
-    features: List[str]
+    features: list[str]
     support_level: str
     sla_commitment: str
 
@@ -61,11 +63,11 @@ class APICommercializationService:
     - 4x AI service markup for B2C credits
     - Billing readiness with invoicing
     """
-    
+
     def __init__(self):
         self.evidence_path = Path("production/commercialization_evidence")
         self.evidence_path.mkdir(exist_ok=True)
-        
+
         # Define API tier structure
         self.tiers = {
             TierType.FREE: APITier(
@@ -91,7 +93,7 @@ class APICommercializationService:
                 sla_commitment="99.9% Uptime"
             ),
             TierType.PROFESSIONAL: APITier(
-                name="Professional", 
+                name="Professional",
                 monthly_cost=99.0,
                 requests_per_minute=500,
                 requests_per_month=500000,
@@ -107,42 +109,42 @@ class APICommercializationService:
                 requests_per_minute=2000,
                 requests_per_month=5000000,
                 ai_credits_included=25000,
-                ai_credit_cost=0.06,  # Enterprise discount (2.4x markup) 
+                ai_credit_cost=0.06,  # Enterprise discount (2.4x markup)
                 features=["Full API Access", "Dedicated Support", "Custom SLA", "White-label Options", "B2B Provider Portal"],
                 support_level="Dedicated Account Manager",
                 sla_commitment="99.99% Uptime"
             )
         }
-        
+
         # Business metrics tracking
         self.revenue_metrics = Counter(
             'api_revenue_total',
             'Total API revenue by source and tier',
             ['source', 'tier', 'currency']
         )
-        
+
         self.usage_metrics = Counter(
-            'api_usage_total', 
+            'api_usage_total',
             'API usage by tier and endpoint',
             ['tier', 'endpoint', 'status']
         )
-        
+
         self.billing_metrics = Gauge(
             'api_active_subscriptions_total',
             'Number of active API subscriptions by tier',
             ['tier']
         )
-        
+
         # In-memory storage for demonstration (use database in production)
-        self.api_keys: Dict[str, APIKey] = {}
-        self.usage_tracking: Dict[str, Dict] = {}
-        self.billing_events: List[Dict] = []
-        
+        self.api_keys: dict[str, APIKey] = {}
+        self.usage_tracking: dict[str, dict] = {}
+        self.billing_events: list[dict] = []
+
         print("💰 API commercialization service initialized")
         print(f"🎯 Tiers configured: {len(self.tiers)} (Free → ${self.tiers[TierType.ENTERPRISE].monthly_cost}/mo)")
-    
-    def create_api_key(self, user_id: str, email: str, company_name: str, 
-                      tier: TierType = TierType.FREE) -> Dict[str, Any]:
+
+    def create_api_key(self, user_id: str, email: str, company_name: str,
+                      tier: TierType = TierType.FREE) -> dict[str, Any]:
         """
         Create new API key with billing setup
         Executive directive: Key issuance with telemetry tracking
@@ -152,15 +154,15 @@ class APICommercializationService:
         key_secret = secrets.token_urlsafe(30)  # 30 bytes = 40 chars base64url
         key_prefix = "sk_live_"
         key_id = f"{key_prefix}{key_secret}"
-        
+
         # Create salted hash for secure storage (never store the actual secret)
         salt = secrets.token_bytes(32)  # 32-byte random salt
         key_secret_hash = hashlib.pbkdf2_hmac('sha256', key_secret.encode(), salt, 100000).hex()
         stored_hash = f"{salt.hex()}${key_secret_hash}"  # Format: salt$hash
-        
+
         # Get tier configuration
         tier_config = self.tiers[tier]
-        
+
         # Create API key record
         api_key = APIKey(
             key_id=key_id,
@@ -178,9 +180,9 @@ class APICommercializationService:
             billing_enabled=tier != TierType.FREE,
             status="active"
         )
-        
+
         self.api_keys[key_id] = api_key
-        
+
         # Initialize usage tracking
         self.usage_tracking[key_id] = {
             "requests_today": 0,
@@ -189,10 +191,10 @@ class APICommercializationService:
             "last_reset_monthly": datetime.now().replace(day=1).date(),
             "overage_charges": 0.0
         }
-        
+
         # Track subscription
         self.billing_metrics.labels(tier=tier.value).inc()
-        
+
         result = {
             "api_key": key_id,
             "tier": tier.value,
@@ -213,57 +215,56 @@ class APICommercializationService:
             "billing_enabled": api_key.billing_enabled,
             "created_at": api_key.created_at.isoformat()
         }
-        
+
         # Save evidence
         evidence_file = self.evidence_path / f"api_key_created_{key_id}_{int(time.time())}.json"
         with open(evidence_file, 'w') as f:
             json.dump(result, f, indent=2)
-        
+
         print(f"🔑 API key created: {key_prefix}{'*' * 16}... ({tier.value} tier)")
         print(f"💳 Billing enabled: {api_key.billing_enabled}")
-        
+
         return result
-    
-    def verify_api_key(self, provided_key: str) -> Optional[APIKey]:
+
+    def verify_api_key(self, provided_key: str) -> APIKey | None:
         """
         Securely verify API key using constant-time comparison
         Returns APIKey object if valid, None if invalid
         """
         if not provided_key or not provided_key.startswith("sk_live_"):
             return None
-            
+
         # Extract the secret part (everything after sk_live_)
         try:
             key_secret = provided_key[8:]  # Remove "sk_live_" prefix
         except (IndexError, AttributeError):
             return None
-            
+
         # Check against all stored keys using constant-time comparison
         for stored_key_id, api_key_obj in self.api_keys.items():
             if stored_key_id != provided_key:
                 continue
-                
+
             # Parse stored hash (format: salt$hash)
             try:
                 salt_hex, stored_hash = api_key_obj.key_secret_hash.split('$', 1)
                 salt = bytes.fromhex(salt_hex)
-                
+
                 # Compute hash of provided secret with same salt
                 provided_hash = hashlib.pbkdf2_hmac('sha256', key_secret.encode(), salt, 100000).hex()
-                
+
                 # Constant-time comparison to prevent timing attacks
                 if hmac.compare_digest(provided_hash, stored_hash):
                     if api_key_obj.status == "active":
                         return api_key_obj
-                    else:
-                        return None  # Key exists but is suspended/cancelled
-                        
+                    return None  # Key exists but is suspended/cancelled
+
             except (ValueError, TypeError):
                 continue  # Malformed hash, skip this key
-                
+
         return None  # No matching key found
-    
-    def check_rate_limits(self, api_key: str, endpoint: str) -> Dict[str, Any]:
+
+    def check_rate_limits(self, api_key: str, endpoint: str) -> dict[str, Any]:
         """
         Check rate limits with overage handling using secure key verification
         Executive directive: Per-key rate-limit headers and overage handling
@@ -278,23 +279,23 @@ class APICommercializationService:
             }
         tier_config = self.tiers[key_info.tier]
         usage = self.usage_tracking[api_key]
-        
+
         # Reset counters if needed
         today = datetime.now().date()
         current_month = datetime.now().replace(day=1).date()
-        
+
         if usage["last_reset_daily"] < today:
             usage["requests_today"] = 0
             usage["last_reset_daily"] = today
-            
+
         if usage["last_reset_monthly"] < current_month:
             usage["requests_this_month"] = 0
             usage["last_reset_monthly"] = current_month
             usage["overage_charges"] = 0.0
-        
+
         # Check minute-level rate limit (simplified - use Redis in production)
         minute_requests = usage["requests_today"] // 1440  # Rough estimate
-        
+
         if minute_requests >= tier_config.requests_per_minute:
             return {
                 "allowed": False,
@@ -307,30 +308,30 @@ class APICommercializationService:
                     "Retry-After": "60"
                 }
             }
-        
+
         # Check monthly quota
         monthly_overage = max(0, usage["requests_this_month"] - tier_config.requests_per_month)
-        
+
         # Calculate overage cost (if billing enabled)
         overage_cost_per_request = 0.001  # $0.001 per overage request
         if monthly_overage > 0 and key_info.billing_enabled:
             additional_cost = monthly_overage * overage_cost_per_request
             usage["overage_charges"] += additional_cost
-        
+
         # Increment usage
         usage["requests_today"] += 1
         usage["requests_this_month"] += 1
         key_info.last_used = datetime.now()
-        
+
         # Track metrics
         self.usage_metrics.labels(
             tier=key_info.tier.value,
             endpoint=endpoint,
             status="allowed"
         ).inc()
-        
+
         remaining_monthly = max(0, tier_config.requests_per_month - usage["requests_this_month"])
-        
+
         return {
             "allowed": True,
             "tier": key_info.tier.value,
@@ -348,8 +349,8 @@ class APICommercializationService:
                 "next_billing_cycle": (current_month + timedelta(days=32)).replace(day=1).isoformat()
             }
         }
-    
-    def consume_ai_credits(self, api_key: str, credits_needed: int) -> Dict[str, Any]:
+
+    def consume_ai_credits(self, api_key: str, credits_needed: int) -> dict[str, Any]:
         """
         Consume AI credits with 4x markup billing
         Executive directive: 4x AI service markup for B2C credits
@@ -360,16 +361,16 @@ class APICommercializationService:
                 "reason": "invalid_api_key",
                 "status_code": 401
             }
-        
+
         key_info = self.api_keys[api_key]
         tier_config = self.tiers[key_info.tier]
-        
+
         # Check available credits
         if key_info.ai_credits_remaining >= credits_needed:
             # Use included credits
             key_info.ai_credits_remaining -= credits_needed
             key_info.ai_credits_used += credits_needed
-            
+
             return {
                 "success": True,
                 "credits_consumed": credits_needed,
@@ -377,8 +378,8 @@ class APICommercializationService:
                 "cost": 0.0,
                 "source": "included_credits"
             }
-        
-        elif key_info.tier == TierType.FREE:
+
+        if key_info.tier == TierType.FREE:
             # Free tier cannot purchase additional credits
             return {
                 "success": False,
@@ -389,62 +390,61 @@ class APICommercializationService:
                 "upgrade_required": True,
                 "suggested_tier": "starter"
             }
-        
-        else:
-            # Calculate overage cost with markup
-            overage_credits = credits_needed - key_info.ai_credits_remaining
-            overage_cost = overage_credits * tier_config.ai_credit_cost
-            
-            # Consume all remaining included credits
-            included_used = key_info.ai_credits_remaining
-            key_info.ai_credits_remaining = 0
-            key_info.ai_credits_used += included_used
-            
-            # Track overage billing
-            billing_event = {
-                "api_key": api_key,
-                "event_type": "ai_credits_overage",
-                "credits_consumed": overage_credits,
-                "cost": overage_cost,
-                "timestamp": datetime.now().isoformat(),
-                "tier": key_info.tier.value
-            }
-            self.billing_events.append(billing_event)
-            
-            # Track revenue
-            self.revenue_metrics.labels(
-                source="ai_credits_b2c",
-                tier=key_info.tier.value,
-                currency="usd"
-            ).inc(overage_cost)
-            
-            print(f"💳 AI credits overage: {overage_credits} credits, ${overage_cost:.2f}")
-            
-            return {
-                "success": True,
-                "credits_consumed": credits_needed,
-                "included_credits_used": included_used,
-                "overage_credits": overage_credits,
-                "overage_cost": overage_cost,
-                "credits_remaining": 0,
-                "source": "mixed_included_and_overage"
-            }
-    
-    def track_b2b_revenue(self, provider_id: str, transaction_amount: float) -> Dict[str, Any]:
+
+        # Calculate overage cost with markup
+        overage_credits = credits_needed - key_info.ai_credits_remaining
+        overage_cost = overage_credits * tier_config.ai_credit_cost
+
+        # Consume all remaining included credits
+        included_used = key_info.ai_credits_remaining
+        key_info.ai_credits_remaining = 0
+        key_info.ai_credits_used += included_used
+
+        # Track overage billing
+        billing_event = {
+            "api_key": api_key,
+            "event_type": "ai_credits_overage",
+            "credits_consumed": overage_credits,
+            "cost": overage_cost,
+            "timestamp": datetime.now().isoformat(),
+            "tier": key_info.tier.value
+        }
+        self.billing_events.append(billing_event)
+
+        # Track revenue
+        self.revenue_metrics.labels(
+            source="ai_credits_b2c",
+            tier=key_info.tier.value,
+            currency="usd"
+        ).inc(overage_cost)
+
+        print(f"💳 AI credits overage: {overage_credits} credits, ${overage_cost:.2f}")
+
+        return {
+            "success": True,
+            "credits_consumed": credits_needed,
+            "included_credits_used": included_used,
+            "overage_credits": overage_credits,
+            "overage_cost": overage_cost,
+            "credits_remaining": 0,
+            "source": "mixed_included_and_overage"
+        }
+
+    def track_b2b_revenue(self, provider_id: str, transaction_amount: float) -> dict[str, Any]:
         """
         Track B2B provider revenue with 3% fee
         Executive directive: 3% provider fee pipeline for B2B
         """
         commission_rate = 0.03  # 3% provider fee
         commission_amount = transaction_amount * commission_rate
-        
+
         # Track B2B revenue
         self.revenue_metrics.labels(
             source="b2b_provider_fee",
             tier="enterprise",
             currency="usd"
         ).inc(commission_amount)
-        
+
         billing_event = {
             "provider_id": provider_id,
             "event_type": "b2b_commission",
@@ -454,14 +454,14 @@ class APICommercializationService:
             "timestamp": datetime.now().isoformat()
         }
         self.billing_events.append(billing_event)
-        
+
         # Save evidence
         evidence_file = self.evidence_path / f"b2b_revenue_{provider_id}_{int(time.time())}.json"
         with open(evidence_file, 'w') as f:
             json.dump(billing_event, f, indent=2)
-        
+
         print(f"🏢 B2B revenue tracked: ${transaction_amount:.2f} → ${commission_amount:.2f} commission (3%)")
-        
+
         return {
             "provider_id": provider_id,
             "transaction_amount": transaction_amount,
@@ -469,43 +469,43 @@ class APICommercializationService:
             "commission_rate": "3%",
             "recorded_at": billing_event["timestamp"]
         }
-    
-    def generate_invoice_preview(self, api_key: str) -> Dict[str, Any]:
+
+    def generate_invoice_preview(self, api_key: str) -> dict[str, Any]:
         """
         Generate billing invoice preview
         Executive directive: Dry-run invoicing for paid tiers
         """
         if api_key not in self.api_keys:
             return {"error": "invalid_api_key"}
-        
+
         key_info = self.api_keys[api_key]
         tier_config = self.tiers[key_info.tier]
         usage = self.usage_tracking[api_key]
-        
+
         # Calculate billing period
         current_month = datetime.now().replace(day=1)
         next_month = (current_month + timedelta(days=32)).replace(day=1)
-        
+
         # Base subscription cost
         base_cost = tier_config.monthly_cost
-        
+
         # Usage overage costs
         overage_requests = max(0, usage["requests_this_month"] - tier_config.requests_per_month)
         overage_request_cost = overage_requests * 0.001  # $0.001 per overage request
-        
+
         # AI credits overage
         ai_overage_events = [
-            event for event in self.billing_events 
+            event for event in self.billing_events
             if event.get("api_key") == api_key and event.get("event_type") == "ai_credits_overage"
         ]
         ai_overage_cost = sum(event["cost"] for event in ai_overage_events)
-        
+
         # Total calculation
         subtotal = base_cost + overage_request_cost + ai_overage_cost
         tax_rate = 0.08  # 8% tax
         tax_amount = subtotal * tax_rate
         total = subtotal + tax_amount
-        
+
         invoice = {
             "invoice_preview": True,
             "api_key": api_key[:16] + "...",
@@ -534,7 +534,7 @@ class APICommercializationService:
             "currency": "USD",
             "status": "preview"
         }
-        
+
         # Add overage charges if any
         if overage_request_cost > 0:
             invoice["usage_charges"].append({
@@ -544,7 +544,7 @@ class APICommercializationService:
                 "amount": round(overage_request_cost, 2)
             })
             invoice["subtotal"] += overage_request_cost
-        
+
         if ai_overage_cost > 0:
             invoice["usage_charges"].append({
                 "description": "AI Credits Overage",
@@ -553,22 +553,22 @@ class APICommercializationService:
                 "amount": round(ai_overage_cost, 2)
             })
             invoice["subtotal"] += ai_overage_cost
-        
+
         # Recalculate with overages
         invoice["subtotal"] = round(invoice["subtotal"], 2)
         invoice["tax_amount"] = round(invoice["subtotal"] * tax_rate, 2)
         invoice["total"] = round(invoice["subtotal"] + invoice["tax_amount"], 2)
-        
+
         # Save evidence
         evidence_file = self.evidence_path / f"invoice_preview_{api_key}_{int(time.time())}.json"
         with open(evidence_file, 'w') as f:
             json.dump(invoice, f, indent=2)
-        
+
         print(f"🧾 Invoice preview: ${invoice['total']:.2f} for {key_info.company_name}")
-        
+
         return invoice
-    
-    def get_tier_comparison(self) -> Dict[str, Any]:
+
+    def get_tier_comparison(self) -> dict[str, Any]:
         """
         Get API tier comparison for marketing
         Executive directive: Clear tier differentiation for conversion

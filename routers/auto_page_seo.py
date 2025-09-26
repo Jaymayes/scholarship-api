@@ -1,12 +1,13 @@
 """
-Auto Page Maker SEO Router  
+Auto Page Maker SEO Router
 Executive directive: SEO page endpoints for 100-500 scholarship pages
 """
+import json
+import logging
+from typing import Any
+
 from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import HTMLResponse, Response
-from typing import Dict, Any, List, Optional
-import logging
-import json
 
 from production.auto_page_maker_seo import seo_service
 
@@ -25,47 +26,47 @@ router = APIRouter(
 @router.post("/generate/bulk")
 async def generate_bulk_seo_pages(
     target_count: int = Query(500, ge=100, le=1000, description="Number of SEO pages to generate (optimized for 500+)")
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """
     🚀 GENERATE BULK SEO PAGES - SCALED TO 500+
     Executive directive: Create 500+ unique scholarship pages for massive organic traffic
-    
+
     NEW SCALING FEATURES:
     - 110+ scholarship database vs previous 5
-    - 9 page templates vs previous 5 
+    - 9 page templates vs previous 5
     - Location-based pages (all 50 states + major cities)
     - Eligibility-based pages (merit/need-based variations)
     - Quality scoring system (90%+ target)
     - Enhanced internal linking strategy
-    
+
     Args:
         target_count: Number of pages to generate (100-1000, optimized for 500+)
-        
+
     Returns:
         Generation summary with scaling metrics and quality scores
     """
     try:
         pages = seo_service.generate_bulk_seo_pages(target_count)
-        
+
         # Calculate SEO metrics
         seo_metrics = {
             "total_pages": len(pages),
-            "unique_titles": len(set(p.title for p in pages)),
-            "unique_descriptions": len(set(p.meta_description for p in pages)),
+            "unique_titles": len({p.title for p in pages}),
+            "unique_descriptions": len({p.meta_description for p in pages}),
             "structured_data_coverage": "100%",
             "internal_links_per_page": sum(len(p.internal_links) for p in pages) / len(pages),
             "average_title_length": sum(len(p.title) for p in pages) / len(pages),
             "average_description_length": sum(len(p.meta_description) for p in pages) / len(pages),
             "keyword_coverage": sum(len(p.keywords) for p in pages) / len(pages)
         }
-        
+
         # Page type breakdown
         page_types = {
             "scholarship_details": len([p for p in pages if not p.scholarship_id.startswith(("category_", "amount_"))]),
             "category_listings": len([p for p in pages if p.scholarship_id.startswith("category_")]),
             "amount_ranges": len([p for p in pages if p.scholarship_id.startswith("amount_")])
         }
-        
+
         return {
             "message": f"Successfully generated {len(pages)} SEO-optimized pages",
             "executive_directive": "100-500 scholarship pages for massive organic growth",
@@ -83,25 +84,25 @@ async def generate_bulk_seo_pages(
             "sitemap_available": "/seo/sitemap.xml",
             "next_steps": [
                 "Submit sitemap to Google Search Console",
-                "Monitor page indexing and rankings", 
+                "Monitor page indexing and rankings",
                 "Optimize high-performing pages further",
                 "Generate additional pages based on performance"
             ]
         }
-        
+
     except Exception as e:
         logger.error(f"❌ Bulk SEO page generation error: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to generate SEO pages: {str(e)}")
 
 @router.get("/page/{page_id}")
-async def get_seo_page_details(page_id: str) -> Dict[str, Any]:
+async def get_seo_page_details(page_id: str) -> dict[str, Any]:
     """
     📄 GET SEO PAGE DETAILS
     Executive directive: Individual page content and metadata
-    
+
     Args:
         page_id: Unique page identifier
-        
+
     Returns:
         Complete page details with SEO metadata
     """
@@ -114,12 +115,12 @@ async def get_seo_page_details(page_id: str) -> Dict[str, Any]:
                 if s["id"] == page_id:
                     scholarship = s
                     break
-            
+
             if not scholarship:
                 raise HTTPException(status_code=404, detail="Scholarship page not found")
-                
+
             page = seo_service.generate_scholarship_detail_page(scholarship)
-            
+
             return {
                 "message": "SEO page details retrieved successfully",
                 "page_data": {
@@ -142,9 +143,9 @@ async def get_seo_page_details(page_id: str) -> Dict[str, Any]:
                     "structured_data_type": page.structured_data.get("@type", "Unknown")
                 }
             }
-        
+
         raise HTTPException(status_code=404, detail="Page not found")
-        
+
     except HTTPException:
         raise
     except Exception as e:
@@ -156,7 +157,7 @@ async def get_sitemap() -> Response:
     """
     🗺️ GENERATE XML SITEMAP
     Executive directive: Search engine discoverability for all SEO pages
-    
+
     Returns:
         XML sitemap with all generated pages
     """
@@ -164,29 +165,29 @@ async def get_sitemap() -> Response:
         # Generate a sample set of pages for sitemap
         pages = seo_service.generate_bulk_seo_pages(100)  # Larger set for comprehensive sitemap
         sitemap_xml = seo_service.generate_sitemap(pages)
-        
+
         return Response(
             content=sitemap_xml,
             media_type="application/xml",
             headers={"Content-Type": "application/xml"}
         )
-        
+
     except Exception as e:
         logger.error(f"❌ Sitemap generation error: {e}")
         raise HTTPException(status_code=500, detail="Failed to generate sitemap")
 
 @router.get("/templates")
-async def get_seo_templates() -> Dict[str, Any]:
+async def get_seo_templates() -> dict[str, Any]:
     """
     📝 GET SEO PAGE TEMPLATES
     Executive directive: Template structure for different page types
-    
+
     Returns:
         Available SEO templates and their configurations
     """
     try:
         templates_info = {}
-        
+
         for template_type, template in seo_service.seo_templates.items():
             templates_info[template_type] = {
                 "type": template.template_type,
@@ -202,28 +203,28 @@ async def get_seo_templates() -> Dict[str, Any]:
                     "field_of_study": "Major-specific scholarship collections"
                 }.get(template_type, "Template for SEO page generation")
             }
-        
+
         return {
             "message": "SEO templates retrieved successfully",
             "total_templates": len(templates_info),
             "templates": templates_info,
             "template_usage": {
                 "scholarship_detail": "40% of generated pages",
-                "category_listing": "25% of generated pages", 
+                "category_listing": "25% of generated pages",
                 "amount_range": "35% of generated pages"
             }
         }
-        
+
     except Exception as e:
         logger.error(f"❌ SEO templates error: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to get templates: {str(e)}")
 
 @router.get("/analytics")
-async def get_seo_analytics() -> Dict[str, Any]:
+async def get_seo_analytics() -> dict[str, Any]:
     """
     📊 GET SEO ANALYTICS
     Executive directive: Performance metrics for organic search optimization
-    
+
     Returns:
         SEO performance analytics and recommendations
     """
@@ -259,7 +260,7 @@ async def get_seo_analytics() -> Dict[str, Any]:
                 "structured_data_coverage": "100%"
             }
         }
-        
+
         recommendations = [
             "Focus on optimizing pages ranking 11-20 to break into top 10",
             "Increase internal linking between related scholarship categories",
@@ -267,7 +268,7 @@ async def get_seo_analytics() -> Dict[str, Any]:
             "Implement user-generated content (reviews/testimonials)",
             "Create seasonal content around application deadlines"
         ]
-        
+
         return {
             "message": "SEO analytics retrieved successfully",
             "analytics_data": analytics_data,
@@ -279,7 +280,7 @@ async def get_seo_analytics() -> Dict[str, Any]:
                 "expected_conversions": 850
             }
         }
-        
+
     except Exception as e:
         logger.error(f"❌ SEO analytics error: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to get SEO analytics: {str(e)}")
@@ -287,16 +288,16 @@ async def get_seo_analytics() -> Dict[str, Any]:
 @router.get("/preview/{page_type}", response_class=HTMLResponse)
 async def preview_seo_page(
     page_type: str,
-    scholarship_id: Optional[str] = Query(None, description="Scholarship ID for detail pages")
+    scholarship_id: str | None = Query(None, description="Scholarship ID for detail pages")
 ) -> HTMLResponse:
     """
     👀 PREVIEW SEO PAGE HTML
     Executive directive: Visual preview of generated SEO pages
-    
+
     Args:
         page_type: Type of page to preview (scholarship_detail, category_listing, amount_range)
         scholarship_id: Optional scholarship ID for detail pages
-        
+
     Returns:
         HTML preview of the SEO page
     """
@@ -308,15 +309,15 @@ async def preview_seo_page(
                 if s["id"] == scholarship_id:
                     scholarship = s
                     break
-                    
+
             if not scholarship:
                 return HTMLResponse(
                     content="<h1>Scholarship not found</h1>",
                     status_code=404
                 )
-            
+
             page = seo_service.generate_scholarship_detail_page(scholarship)
-            
+
             # Generate HTML preview
             html_content = f"""
 <!DOCTYPE html>
@@ -331,7 +332,7 @@ async def preview_seo_page(
     {json.dumps(page.structured_data, indent=2)}
     </script>
     <style>
-        body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; 
+        body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
                max-width: 800px; margin: 0 auto; padding: 20px; line-height: 1.6; }}
         h1 {{ color: #1f2937; border-bottom: 3px solid #3b82f6; padding-bottom: 10px; }}
         h2 {{ color: #374151; margin-top: 30px; }}
@@ -343,25 +344,25 @@ async def preview_seo_page(
 </head>
 <body>
     <h1>{page.h1_title}</h1>
-    
+
     <div class="meta-info">
         <strong>SEO Preview:</strong><br>
         <strong>Title:</strong> {page.title}<br>
         <strong>Description:</strong> {page.meta_description}<br>
         <strong>URL:</strong> {page.canonical_url}
     </div>
-    
+
     {"".join(f'<h2>{block["heading"]}</h2><p>{block["content"]}</p>' for block in page.content_blocks)}
-    
+
     <div class="internal-links">
         <h3>Related Links:</h3>
         {"".join(f'<a href="{link["url"]}">{link["text"]}</a>' for link in page.internal_links)}
     </div>
-    
+
     <div class="keywords">
         <strong>Keywords:</strong> {", ".join(page.keywords)}
     </div>
-    
+
     <div style="margin-top: 40px; padding: 20px; background: #f9fafb; border-radius: 8px;">
         <h3>SEO Analysis</h3>
         <ul>
@@ -374,14 +375,14 @@ async def preview_seo_page(
     </div>
 </body>
 </html>"""
-            
+
             return HTMLResponse(content=html_content, status_code=200)
-        
+
         return HTMLResponse(
             content=f"<h1>Preview for {page_type} not available</h1><p>Try: /seo/preview/scholarship_detail?scholarship_id=sch_eng_001</p>",
             status_code=400
         )
-        
+
     except Exception as e:
         logger.error(f"❌ SEO page preview error: {e}")
         return HTMLResponse(

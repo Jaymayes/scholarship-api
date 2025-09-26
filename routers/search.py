@@ -1,15 +1,14 @@
-from fastapi import APIRouter, Depends, Query, Request, HTTPException
-from typing import List, Optional
-from datetime import datetime
 import time
+from datetime import datetime
 
-from models.scholarship import SearchFilters, SearchResponse, FieldOfStudy, ScholarshipType
-from models.user import UserProfile
-from services.scholarship_service import scholarship_service
-from services.analytics_service import analytics_service
-from middleware.auth import get_current_user, require_auth, User
-from config.settings import settings
+from fastapi import APIRouter, Depends, Query, Request
+
+from middleware.auth import User, require_auth
 from middleware.simple_rate_limiter import search_rate_limit
+from models.scholarship import FieldOfStudy, ScholarshipType, SearchFilters
+from services.analytics_service import analytics_service
+from services.scholarship_service import scholarship_service
+
 # from routers.interaction_wrapper import log_interaction  # Will implement if needed
 from utils.logger import get_logger
 
@@ -19,39 +18,46 @@ router = APIRouter()
 # Pydantic models for search requests
 from pydantic import BaseModel
 
+
 class SearchRequest(BaseModel):
     """Search request payload for POST endpoint"""
-    query: Optional[str] = None
-    fields_of_study: List[FieldOfStudy] = []
-    min_amount: Optional[float] = None
-    max_amount: Optional[float] = None
-    scholarship_types: List[ScholarshipType] = []
-    states: List[str] = []
-    min_gpa: Optional[float] = None
-    citizenship: Optional[str] = None
-    deadline_after: Optional[datetime] = None
-    deadline_before: Optional[datetime] = None
+    query: str | None = None
+    fields_of_study: list[FieldOfStudy] = []
+    min_amount: float | None = None
+    max_amount: float | None = None
+    scholarship_types: list[ScholarshipType] = []
+    states: list[str] = []
+    min_gpa: float | None = None
+    citizenship: str | None = None
+    deadline_after: datetime | None = None
+    deadline_before: datetime | None = None
     limit: int = 20
     offset: int = 0
 
 async def execute_search(
-    keyword: Optional[str] = None,
-    fields_of_study: List[FieldOfStudy] = [],
-    min_amount: Optional[float] = None,
-    max_amount: Optional[float] = None,
-    scholarship_types: List[ScholarshipType] = [],
-    states: List[str] = [],
-    min_gpa: Optional[float] = None,
-    citizenship: Optional[str] = None,
-    deadline_after: Optional[datetime] = None,
-    deadline_before: Optional[datetime] = None,
+    keyword: str | None = None,
+    fields_of_study: list[FieldOfStudy] = None,
+    min_amount: float | None = None,
+    max_amount: float | None = None,
+    scholarship_types: list[ScholarshipType] = None,
+    states: list[str] = None,
+    min_gpa: float | None = None,
+    citizenship: str | None = None,
+    deadline_after: datetime | None = None,
+    deadline_before: datetime | None = None,
     limit: int = 20,
     offset: int = 0,
-    user_id: Optional[str] = None
+    user_id: str | None = None
 ) -> dict:
     """Execute search logic shared between GET and POST endpoints"""
+    if states is None:
+        states = []
+    if scholarship_types is None:
+        scholarship_types = []
+    if fields_of_study is None:
+        fields_of_study = []
     start_time = time.time()
-    
+
     try:
         filters = SearchFilters(
             keyword=keyword,
@@ -67,7 +73,7 @@ async def execute_search(
             limit=limit,
             offset=offset
         )
-        
+
         # Log search interaction
         analytics_service.log_search(
             user_id=user_id,
@@ -75,16 +81,16 @@ async def execute_search(
             result_count=0,  # Will be updated after search
             filters=filters.model_dump()
         )
-        
+
         result = scholarship_service.search_scholarships(filters)
-        
+
         # Update analytics with actual result count
         if analytics_service.interactions:
             analytics_service.interactions[-1].metadata["result_count"] = result.total_count
-        
+
         # Calculate processing time
         took_ms = int((time.time() - start_time) * 1000)
-        
+
         # Return metadata-rich response matching expected format
         return {
             "items": result.scholarships,
@@ -96,7 +102,7 @@ async def execute_search(
             "has_next": result.has_next,
             "has_previous": result.has_previous
         }
-        
+
     except Exception as e:
         logger.error(f"Search execution failed: {str(e)}")
         raise
@@ -113,12 +119,12 @@ async def search_scholarships_post(
     """
     Search scholarships using POST with request body - QA-005 fix: Authentication enforced
     Requires authentication unless PUBLIC_READ_ENDPOINTS feature flag is enabled.
-    
+
     Returns metadata-rich response with items, total, pagination info, and timing.
     """
     # Authentication enforced by dependency injection - no additional check needed
     user_id = current_user.user_id
-    
+
     return await execute_search(
         keyword=request_data.query,
         fields_of_study=request_data.fields_of_study,
@@ -138,17 +144,17 @@ async def search_scholarships_post(
 @router.get("/search")
 async def search_scholarships_get(
     request: Request,
-    q: Optional[str] = Query(None, description="Search query"),
+    q: str | None = Query(None, description="Search query"),
     _rate_limit: bool = Depends(search_rate_limit),
-    fields_of_study: List[FieldOfStudy] = Query(default=[], description="Filter by fields of study"),
-    min_amount: Optional[float] = Query(None, ge=0, description="Minimum scholarship amount"),
-    max_amount: Optional[float] = Query(None, ge=0, description="Maximum scholarship amount"),
-    scholarship_types: List[ScholarshipType] = Query(default=[], description="Filter by scholarship types"),
-    states: List[str] = Query(default=[], description="Filter by US states"),
-    min_gpa: Optional[float] = Query(None, ge=0.0, le=4.0, description="Minimum GPA filter"),
-    citizenship: Optional[str] = Query(None, description="Citizenship requirement"),
-    deadline_after: Optional[datetime] = Query(None, description="Deadlines after this date"),
-    deadline_before: Optional[datetime] = Query(None, description="Deadlines before this date"),
+    fields_of_study: list[FieldOfStudy] = Query(default=[], description="Filter by fields of study"),
+    min_amount: float | None = Query(None, ge=0, description="Minimum scholarship amount"),
+    max_amount: float | None = Query(None, ge=0, description="Maximum scholarship amount"),
+    scholarship_types: list[ScholarshipType] = Query(default=[], description="Filter by scholarship types"),
+    states: list[str] = Query(default=[], description="Filter by US states"),
+    min_gpa: float | None = Query(None, ge=0.0, le=4.0, description="Minimum GPA filter"),
+    citizenship: str | None = Query(None, description="Citizenship requirement"),
+    deadline_after: datetime | None = Query(None, description="Deadlines after this date"),
+    deadline_before: datetime | None = Query(None, description="Deadlines before this date"),
     limit: int = Query(20, ge=1, le=100, description="Number of results to return"),
     offset: int = Query(0, ge=0, description="Number of results to skip"),
     current_user: User = Depends(require_auth())  # HOTFIX: Always require authentication
@@ -156,12 +162,12 @@ async def search_scholarships_get(
     """
     Search scholarships using GET with query parameters - QA-005 fix: Authentication enforced
     Requires authentication unless PUBLIC_READ_ENDPOINTS feature flag is enabled.
-    
+
     Returns the same metadata-rich response format as POST endpoint.
     """
     # Authentication enforced by dependency injection - no additional check needed
     user_id = current_user.user_id
-    
+
     return await execute_search(
         keyword=q,
         fields_of_study=fields_of_study,

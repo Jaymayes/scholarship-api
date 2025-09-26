@@ -3,14 +3,16 @@ Strict eligibility validation schemas
 Enhanced input validation with proper constraints and enums
 """
 
-from pydantic import BaseModel, Field, field_validator, model_validator
-from typing import Optional, List, Literal, Annotated
 from enum import Enum
+from typing import Annotated
+
+from pydantic import BaseModel, Field, field_validator, model_validator
+
 
 class GradeLevelEnum(str, Enum):
     """Valid grade levels"""
     HIGH_SCHOOL = "high_school"
-    UNDERGRADUATE = "undergraduate" 
+    UNDERGRADUATE = "undergraduate"
     GRADUATE = "graduate"
     DOCTORAL = "doctoral"
     POST_DOCTORAL = "post_doctoral"
@@ -93,91 +95,90 @@ class StateEnum(str, Enum):
 
 class EligibilityCheckRequest(BaseModel):
     """Strict eligibility check request with proper validation"""
-    
-    gpa: Optional[Annotated[float, Field(ge=0.0, le=4.0)]] = Field(
-        None, 
+
+    gpa: Annotated[float, Field(ge=0.0, le=4.0)] | None = Field(
+        None,
         description="GPA on 4.0 scale (0.0-4.0), or null if not available"
     )
-    
-    grade_level: Optional[GradeLevelEnum] = Field(
+
+    grade_level: GradeLevelEnum | None = Field(
         None,
         description="Current education level"
     )
-    
-    field_of_study: Optional[FieldOfStudyEnum] = Field(
+
+    field_of_study: FieldOfStudyEnum | None = Field(
         None,
         description="Primary field of study or intended major"
     )
-    
-    citizenship: Optional[CitizenshipEnum] = Field(
+
+    citizenship: CitizenshipEnum | None = Field(
         None,
         description="Citizenship or residency status"
     )
-    
-    state_of_residence: Optional[StateEnum] = Field(
+
+    state_of_residence: StateEnum | None = Field(
         None,
         description="US state of legal residence"
     )
-    
-    age: Optional[int] = Field(
+
+    age: int | None = Field(
         None,
         ge=13,
         le=120,
         description="Age in years (13-120)"
     )
-    
-    annual_income: Optional[float] = Field(
+
+    annual_income: float | None = Field(
         None,
         ge=0,
         description="Annual household income in USD"
     )
-    
-    financial_need: Optional[bool] = Field(
+
+    financial_need: bool | None = Field(
         None,
         description="Whether applicant demonstrates financial need"
     )
-    
-    credits_completed: Optional[int] = Field(
+
+    credits_completed: int | None = Field(
         None,
         ge=0,
         le=300,
         description="Number of academic credits completed (0-300)"
     )
-    
-    scholarship_ids: Optional[List[str]] = Field(
+
+    scholarship_ids: list[str] | None = Field(
         None,
         description="Specific scholarship IDs to check (optional)"
     )
-    
+
     @model_validator(mode='after')
     def validate_gpa_constraints(self):
         """Ensure GPA constraints are met when provided"""
-        if self.gpa is not None:
-            if self.gpa < 0.0 or self.gpa > 4.0:
-                raise ValueError('GPA must be between 0.0 and 4.0 when provided')
+        if self.gpa is not None and (self.gpa < 0.0 or self.gpa > 4.0):
+            raise ValueError('GPA must be between 0.0 and 4.0 when provided')
         return self
-    
+
     @field_validator('age')
     @classmethod
     def validate_age(cls, v):
         if v is not None and (v < 13 or v > 120):
             raise ValueError('Age must be between 13 and 120')
         return v
-    
+
     @field_validator('annual_income')
     @classmethod
     def validate_income(cls, v):
         if v is not None and v < 0:
             raise ValueError('Annual income cannot be negative')
         return v
-    
+
     @field_validator('credits_completed')
     @classmethod
     def validate_credits(cls, v):
         if v is not None and (v < 0 or v > 300):
             raise ValueError('Credits completed must be between 0 and 300')
         return v
-    
+
     @field_validator('scholarship_ids')
     @classmethod
     def validate_scholarship_ids(cls, v):

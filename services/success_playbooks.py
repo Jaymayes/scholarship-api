@@ -10,14 +10,11 @@ Features:
 - Playbook automation and task orchestration
 """
 
-import logging
-from datetime import datetime, timedelta
-from typing import Dict, List, Optional, Any, Tuple
-from decimal import Decimal
-from enum import Enum
-from dataclasses import dataclass, field
-import json
 import uuid
+from dataclasses import dataclass, field
+from datetime import datetime, timedelta
+from enum import Enum
+from typing import Any
 
 from utils.logger import get_logger
 
@@ -77,26 +74,26 @@ class PlaybookStep:
     title: str
     description: str
     step_type: PlaybookStepType
-    
+
     # Execution details
     assigned_to: str  # Role or specific person
     estimated_duration: int  # minutes
     due_days_from_start: int  # Days from playbook start
-    
+
     # Content and templates
-    email_template: Optional[str] = None
-    call_script: Optional[str] = None
-    task_instructions: Optional[str] = None
-    success_criteria: List[str] = field(default_factory=list)
-    
+    email_template: str | None = None
+    call_script: str | None = None
+    task_instructions: str | None = None
+    success_criteria: list[str] = field(default_factory=list)
+
     # Automation
     auto_execute: bool = False
-    depends_on: List[str] = field(default_factory=list)  # Previous step IDs
-    
+    depends_on: list[str] = field(default_factory=list)  # Previous step IDs
+
     # Status tracking
     completed: bool = False
-    completed_at: Optional[datetime] = None
-    completion_notes: Optional[str] = None
+    completed_at: datetime | None = None
+    completion_notes: str | None = None
 
 @dataclass
 class PlaybookTemplate:
@@ -106,19 +103,19 @@ class PlaybookTemplate:
     description: str
     playbook_type: PlaybookType
     target_segment: str  # university, foundation, corporate, all
-    
+
     # Trigger configuration
-    triggers: List[PlaybookTrigger]
-    trigger_conditions: Dict[str, Any] = field(default_factory=dict)
-    
+    triggers: list[PlaybookTrigger]
+    trigger_conditions: dict[str, Any] = field(default_factory=dict)
+
     # Steps and flow
-    steps: List[PlaybookStep] = field(default_factory=list)
+    steps: list[PlaybookStep] = field(default_factory=list)
     estimated_duration_days: int = 30
-    
+
     # Success metrics
-    success_metrics: List[str] = field(default_factory=list)
-    kpis: Dict[str, str] = field(default_factory=dict)
-    
+    success_metrics: list[str] = field(default_factory=list)
+    kpis: dict[str, str] = field(default_factory=dict)
+
     # Metadata
     created_by: str = "system"
     created_at: datetime = field(default_factory=datetime.utcnow)
@@ -131,53 +128,53 @@ class PlaybookExecution:
     customer_id: str
     template_id: str
     playbook_name: str
-    
+
     # Execution details
     status: PlaybookStatus
     started_at: datetime
     assigned_to: str  # CSM or AE responsible
-    
+
     # Progress tracking
     current_step: int = 0
     completed_steps: int = 0
     total_steps: int = 0
     progress_percentage: float = 0.0
-    
+
     # Timeline
     expected_completion: datetime = field(default_factory=datetime.utcnow)
-    actual_completion: Optional[datetime] = None
-    
+    actual_completion: datetime | None = None
+
     # Step executions
-    step_executions: List[Dict[str, Any]] = field(default_factory=list)
-    
+    step_executions: list[dict[str, Any]] = field(default_factory=list)
+
     # Outcomes and notes
     success_achieved: bool = False
-    completion_notes: Optional[str] = None
-    next_playbook: Optional[str] = None
+    completion_notes: str | None = None
+    next_playbook: str | None = None
 
 @dataclass
 class CustomerHealthScore:
     """Customer health scoring and risk assessment"""
     customer_id: str
     organization_name: str
-    
+
     # Health components
     usage_score: int = 0          # 0-100 based on platform usage
     engagement_score: int = 0     # 0-100 based on interactions
     value_realization_score: int = 0  # 0-100 based on outcomes
     support_satisfaction: int = 0 # 0-100 based on support interactions
-    
+
     # Overall health
     overall_score: int = 0        # 0-100 weighted average
     health_status: CustomerHealthStatus = CustomerHealthStatus.HEALTHY
-    
+
     # Risk factors
-    risk_factors: List[str] = field(default_factory=list)
-    
+    risk_factors: list[str] = field(default_factory=list)
+
     # Recommendations
-    recommended_actions: List[str] = field(default_factory=list)
-    playbook_recommendations: List[str] = field(default_factory=list)
-    
+    recommended_actions: list[str] = field(default_factory=list)
+    playbook_recommendations: list[str] = field(default_factory=list)
+
     # Timeline
     last_calculated: datetime = field(default_factory=datetime.utcnow)
     next_check: datetime = field(default_factory=datetime.utcnow)
@@ -185,32 +182,32 @@ class CustomerHealthScore:
 class SuccessPlaybooksEngine:
     """
     Comprehensive Success Playbooks Engine
-    
+
     Manages automated and guided playbooks for:
     - Customer onboarding and activation
     - Expansion and upselling opportunities
     - Retention and health monitoring
     - Escalation and recovery procedures
     """
-    
+
     def __init__(self):
         # In-memory storage for MVP (would be database in production)
-        self.playbook_templates: Dict[str, PlaybookTemplate] = {}
-        self.active_executions: Dict[str, PlaybookExecution] = {}
-        self.customer_health: Dict[str, CustomerHealthScore] = {}
-        
+        self.playbook_templates: dict[str, PlaybookTemplate] = {}
+        self.active_executions: dict[str, PlaybookExecution] = {}
+        self.customer_health: dict[str, CustomerHealthScore] = {}
+
         # Initialize default playbook templates
         self._initialize_onboarding_playbooks()
         self._initialize_expansion_playbooks()
         self._initialize_retention_playbooks()
         self._initialize_escalation_playbooks()
-        
+
         logger.info("🎯 Success Playbooks Engine initialized")
         logger.info(f"📚 Playbook templates: {len(self.playbook_templates)}")
-    
+
     def _initialize_onboarding_playbooks(self):
         """Initialize onboarding playbook templates"""
-        
+
         # University Onboarding Playbook
         university_onboarding = PlaybookTemplate(
             template_id="univ_onboarding_v1",
@@ -227,7 +224,7 @@ class SuccessPlaybooksEngine:
                 "onboarding_completion": "≤ 30 days"
             }
         )
-        
+
         # Add onboarding steps
         university_onboarding.steps = [
             PlaybookStep(
@@ -301,9 +298,9 @@ class SuccessPlaybooksEngine:
                 success_criteria=["KPIs reviewed", "Success celebrated", "Future roadmap planned"]
             )
         ]
-        
+
         self.playbook_templates[university_onboarding.template_id] = university_onboarding
-        
+
         # Foundation Onboarding Playbook (similar structure, different focus)
         foundation_onboarding = PlaybookTemplate(
             template_id="found_onboarding_v1",
@@ -315,7 +312,7 @@ class SuccessPlaybooksEngine:
             estimated_duration_days=30,
             success_metrics=["impact_tracking_setup", "first_award_cycle", "reporting_configured"]
         )
-        
+
         # Simplified step creation for foundation
         foundation_onboarding.steps = [
             PlaybookStep("found_welcome", 1, "Foundation Welcome Call", "Specialized welcome for foundation partners", PlaybookStepType.CALL, "customer_success_manager", 60, 1),
@@ -323,12 +320,12 @@ class SuccessPlaybooksEngine:
             PlaybookStep("first_award", 3, "First Award Cycle", "Support through first award cycle", PlaybookStepType.TASK, "customer_success_manager", 60, 7),
             PlaybookStep("reporting_config", 4, "Reporting Configuration", "Set up custom reporting dashboards", PlaybookStepType.TRAINING, "customer_success_manager", 45, 14)
         ]
-        
+
         self.playbook_templates[foundation_onboarding.template_id] = foundation_onboarding
-    
+
     def _initialize_expansion_playbooks(self):
         """Initialize expansion and upselling playbook templates"""
-        
+
         # Upselling Playbook
         expansion_playbook = PlaybookTemplate(
             template_id="expansion_upsell_v1",
@@ -344,7 +341,7 @@ class SuccessPlaybooksEngine:
                 "expansion_opportunity": {"engagement_score": 80, "satisfaction_score": 85}
             }
         )
-        
+
         expansion_playbook.steps = [
             PlaybookStep(
                 step_id="expansion_analysis",
@@ -408,12 +405,12 @@ class SuccessPlaybooksEngine:
                 success_criteria=["Terms agreed", "Contract signed", "Implementation scheduled"]
             )
         ]
-        
+
         self.playbook_templates[expansion_playbook.template_id] = expansion_playbook
-    
+
     def _initialize_retention_playbooks(self):
         """Initialize retention and health monitoring playbooks"""
-        
+
         # Low Engagement Recovery
         low_engagement_playbook = PlaybookTemplate(
             template_id="low_engagement_recovery_v1",
@@ -428,7 +425,7 @@ class SuccessPlaybooksEngine:
                 "low_engagement": {"login_frequency": "<5/month", "support_tickets": ">3", "satisfaction": "<7"}
             }
         )
-        
+
         low_engagement_playbook.steps = [
             PlaybookStep(
                 step_id="engagement_assessment",
@@ -479,12 +476,12 @@ class SuccessPlaybooksEngine:
                 success_criteria=["Progress monitored", "Issues addressed", "Engagement restored"]
             )
         ]
-        
+
         self.playbook_templates[low_engagement_playbook.template_id] = low_engagement_playbook
-    
+
     def _initialize_escalation_playbooks(self):
         """Initialize escalation and recovery playbooks"""
-        
+
         # Churn Risk Escalation
         churn_risk_playbook = PlaybookTemplate(
             template_id="churn_risk_escalation_v1",
@@ -499,7 +496,7 @@ class SuccessPlaybooksEngine:
                 "churn_risk": {"health_score": "<30", "satisfaction": "<5", "usage_decline": ">50%"}
             }
         )
-        
+
         churn_risk_playbook.steps = [
             PlaybookStep(
                 step_id="immediate_escalation",
@@ -564,16 +561,16 @@ class SuccessPlaybooksEngine:
                 success_criteria=["Resolution confirmed", "Satisfaction restored", "Future partnership secured"]
             )
         ]
-        
+
         self.playbook_templates[churn_risk_playbook.template_id] = churn_risk_playbook
-    
+
     def trigger_playbook(self, customer_id: str, template_id: str, assigned_to: str, trigger_reason: str = "") -> PlaybookExecution:
         """Trigger playbook execution for a customer"""
         try:
             template = self.playbook_templates.get(template_id)
             if not template:
                 raise ValueError(f"Playbook template {template_id} not found")
-            
+
             # Create playbook execution
             execution = PlaybookExecution(
                 execution_id=str(uuid.uuid4()),
@@ -586,7 +583,7 @@ class SuccessPlaybooksEngine:
                 total_steps=len(template.steps),
                 expected_completion=datetime.utcnow() + timedelta(days=template.estimated_duration_days)
             )
-            
+
             # Initialize step executions
             for step in template.steps:
                 step_execution = {
@@ -600,68 +597,68 @@ class SuccessPlaybooksEngine:
                     "depends_on": step.depends_on
                 }
                 execution.step_executions.append(step_execution)
-            
+
             # Auto-execute immediate steps
             self._execute_auto_steps(execution, template)
-            
+
             # Store execution
             self.active_executions[execution.execution_id] = execution
-            
+
             logger.info(f"🎯 Playbook triggered: {template.name} for customer {customer_id}")
             logger.info(f"📋 {len(template.steps)} steps scheduled | Expected completion: {execution.expected_completion.strftime('%Y-%m-%d')}")
-            
+
             return execution
-            
+
         except Exception as e:
             logger.error(f"Failed to trigger playbook: {str(e)}")
             raise
-    
+
     def _execute_auto_steps(self, execution: PlaybookExecution, template: PlaybookTemplate):
         """Execute steps that are marked for auto-execution"""
         for i, step in enumerate(template.steps):
             if step.auto_execute and step.due_days_from_start == 0:
                 self._execute_step(execution, i, "Auto-executed")
-    
+
     def complete_step(self, execution_id: str, step_number: int, completion_notes: str = "") -> PlaybookExecution:
         """Mark a playbook step as completed"""
         try:
             execution = self.active_executions.get(execution_id)
             if not execution:
                 raise ValueError(f"Playbook execution {execution_id} not found")
-            
+
             if step_number < 1 or step_number > len(execution.step_executions):
                 raise ValueError(f"Invalid step number: {step_number}")
-            
+
             step_execution = execution.step_executions[step_number - 1]
-            
+
             # Mark step as completed
             step_execution["status"] = "completed"
             step_execution["completed_at"] = datetime.utcnow().isoformat()
             step_execution["completion_notes"] = completion_notes
-            
+
             # Update execution progress
             execution.completed_steps += 1
             execution.progress_percentage = (execution.completed_steps / execution.total_steps) * 100
-            
+
             # Update current step to next pending step
             execution.current_step = self._find_next_pending_step(execution)
-            
+
             # Check if playbook is completed
             if execution.completed_steps == execution.total_steps:
                 execution.status = PlaybookStatus.COMPLETED
                 execution.actual_completion = datetime.utcnow()
                 execution.success_achieved = True
-                
+
                 # Recommend next playbook
                 execution.next_playbook = self._recommend_next_playbook(execution)
-            
+
             logger.info(f"✅ Step completed: {step_execution['title']} | Progress: {execution.progress_percentage:.1f}%")
             return execution
-            
+
         except Exception as e:
             logger.error(f"Failed to complete playbook step: {str(e)}")
             raise
-    
+
     def _execute_step(self, execution: PlaybookExecution, step_index: int, notes: str):
         """Execute a playbook step"""
         step_execution = execution.step_executions[step_index]
@@ -669,34 +666,34 @@ class SuccessPlaybooksEngine:
         step_execution["completed_at"] = datetime.utcnow().isoformat()
         step_execution["completion_notes"] = notes
         execution.completed_steps += 1
-    
+
     def _find_next_pending_step(self, execution: PlaybookExecution) -> int:
         """Find the next pending step in the playbook"""
         for i, step in enumerate(execution.step_executions):
             if step["status"] == "pending":
                 return i + 1
         return execution.total_steps  # All steps completed
-    
-    def _recommend_next_playbook(self, execution: PlaybookExecution) -> Optional[str]:
+
+    def _recommend_next_playbook(self, execution: PlaybookExecution) -> str | None:
         """Recommend next playbook based on completed playbook"""
         template = self.playbook_templates.get(execution.template_id)
         if not template:
             return None
-        
+
         # Playbook progression logic
         if template.playbook_type == PlaybookType.ONBOARDING:
             # After onboarding, recommend expansion playbook
             return "expansion_upsell_v1"
-        elif template.playbook_type == PlaybookType.EXPANSION:
+        if template.playbook_type == PlaybookType.EXPANSION:
             # After expansion, no automatic next playbook
             return None
-        elif template.playbook_type == PlaybookType.RETENTION:
+        if template.playbook_type == PlaybookType.RETENTION:
             # After retention, monitor for expansion
             return "expansion_upsell_v1"
-        
+
         return None
-    
-    def calculate_customer_health(self, customer_id: str, usage_data: Dict[str, Any]) -> CustomerHealthScore:
+
+    def calculate_customer_health(self, customer_id: str, usage_data: dict[str, Any]) -> CustomerHealthScore:
         """Calculate comprehensive customer health score"""
         try:
             # Extract health indicators from usage data
@@ -706,13 +703,13 @@ class SuccessPlaybooksEngine:
             support_tickets = usage_data.get('support_tickets', 0)
             last_login_days = usage_data.get('last_login_days', 0)
             satisfaction_score = usage_data.get('satisfaction_score', 5)  # 1-10 scale
-            
+
             # Calculate component scores (0-100 scale)
             usage_score = min(100, (logins_last_month * 5) + (scholarships_published * 10))
             engagement_score = min(100, max(0, 100 - (last_login_days * 5)))
             value_realization_score = min(100, applications_received * 2)
             support_satisfaction = min(100, max(0, (satisfaction_score * 10) - (support_tickets * 10)))
-            
+
             # Calculate weighted overall score
             overall_score = int(
                 (usage_score * 0.3) +
@@ -720,7 +717,7 @@ class SuccessPlaybooksEngine:
                 (value_realization_score * 0.25) +
                 (support_satisfaction * 0.2)
             )
-            
+
             # Determine health status
             if overall_score >= 75:
                 health_status = CustomerHealthStatus.HEALTHY
@@ -730,7 +727,7 @@ class SuccessPlaybooksEngine:
                 health_status = CustomerHealthStatus.CRITICAL
             else:
                 health_status = CustomerHealthStatus.CHURNED
-            
+
             # Identify risk factors
             risk_factors = []
             if last_login_days > 14:
@@ -741,11 +738,11 @@ class SuccessPlaybooksEngine:
                 risk_factors.append("Low satisfaction score")
             if applications_received == 0:
                 risk_factors.append("No applications received")
-            
+
             # Generate recommendations
             recommended_actions = []
             playbook_recommendations = []
-            
+
             if health_status == CustomerHealthStatus.AT_RISK:
                 recommended_actions.append("Schedule check-in call")
                 recommended_actions.append("Review usage patterns")
@@ -757,7 +754,7 @@ class SuccessPlaybooksEngine:
             elif health_status == CustomerHealthStatus.HEALTHY and overall_score > 80:
                 recommended_actions.append("Explore expansion opportunities")
                 playbook_recommendations.append("expansion_upsell_v1")
-            
+
             health_score = CustomerHealthScore(
                 customer_id=customer_id,
                 organization_name=usage_data.get('organization_name', 'Unknown'),
@@ -772,57 +769,57 @@ class SuccessPlaybooksEngine:
                 playbook_recommendations=playbook_recommendations,
                 next_check=datetime.utcnow() + timedelta(days=7)
             )
-            
+
             # Store health score
             self.customer_health[customer_id] = health_score
-            
+
             logger.info(f"📊 Health calculated: {health_score.organization_name} | Score: {overall_score} | Status: {health_status.value}")
             return health_score
-            
+
         except Exception as e:
             logger.error(f"Failed to calculate customer health: {str(e)}")
             raise
-    
-    def get_playbook_analytics(self) -> Dict[str, Any]:
+
+    def get_playbook_analytics(self) -> dict[str, Any]:
         """Get comprehensive playbook performance analytics"""
         try:
             total_executions = len(self.active_executions)
-            completed_executions = len([e for e in self.active_executions.values() 
+            completed_executions = len([e for e in self.active_executions.values()
                                       if e.status == PlaybookStatus.COMPLETED])
-            
+
             # Playbook type distribution
             type_distribution = {}
             for template in self.playbook_templates.values():
                 type_name = template.playbook_type.value
                 type_distribution[type_name] = type_distribution.get(type_name, 0) + 1
-            
+
             # Success rates by playbook type
             success_rates = {}
             for pb_type in PlaybookType:
-                type_executions = [e for e in self.active_executions.values() 
+                type_executions = [e for e in self.active_executions.values()
                                  if self.playbook_templates.get(e.template_id, {}).playbook_type == pb_type]
                 successful = [e for e in type_executions if e.success_achieved]
-                
+
                 if type_executions:
                     success_rates[pb_type.value] = len(successful) / len(type_executions)
                 else:
                     success_rates[pb_type.value] = 0
-            
+
             # Average completion times
-            completed = [e for e in self.active_executions.values() 
+            completed = [e for e in self.active_executions.values()
                         if e.status == PlaybookStatus.COMPLETED and e.actual_completion]
             avg_completion_days = 0
             if completed:
                 total_days = sum((e.actual_completion - e.started_at).days for e in completed)
                 avg_completion_days = total_days / len(completed)
-            
+
             # Health distribution
             health_distribution = {}
             for health in CustomerHealthStatus:
-                count = len([h for h in self.customer_health.values() 
+                count = len([h for h in self.customer_health.values()
                            if h.health_status == health])
                 health_distribution[health.value] = count
-            
+
             return {
                 "summary": {
                     "total_executions": total_executions,
@@ -842,7 +839,7 @@ class SuccessPlaybooksEngine:
                 },
                 "generated_at": datetime.utcnow().isoformat()
             }
-            
+
         except Exception as e:
             logger.error(f"Failed to generate playbook analytics: {str(e)}")
             raise

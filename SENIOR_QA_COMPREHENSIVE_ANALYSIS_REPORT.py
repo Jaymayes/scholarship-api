@@ -4,17 +4,16 @@ SENIOR QA COMPREHENSIVE ANALYSIS - TEST EXECUTION AND BUG REPORTING
 Systematic analysis of the entire codebase to identify all errors, bugs, and vulnerabilities
 """
 
+import json
 import os
 import sys
-import pytest
-import json
-import subprocess
-import requests
 import time
-from typing import Dict, List, Any, Optional
+import traceback
 from datetime import datetime
 from pathlib import Path
-import traceback
+from typing import Any
+
+import requests
 
 # Test configuration - only identify issues, no fixes
 TEST_BASE_URL = "http://localhost:5000"
@@ -22,9 +21,9 @@ REPORT_FILE = "SENIOR_QA_FINDINGS_REPORT.json"
 
 class QATestFinding:
     """Structure for QA test findings"""
-    
-    def __init__(self, issue_id: str, location: str, description: str, 
-                 steps_to_reproduce: str, observed_output: str, 
+
+    def __init__(self, issue_id: str, location: str, description: str,
+                 steps_to_reproduce: str, observed_output: str,
                  expected_output: str, severity: str):
         self.issue_id = issue_id
         self.location = location
@@ -35,7 +34,7 @@ class QATestFinding:
         self.severity = severity
         self.timestamp = datetime.now().isoformat()
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "issue_id": self.issue_id,
             "location": self.location,
@@ -49,23 +48,23 @@ class QATestFinding:
 
 class SeniorQAAnalyzer:
     """Senior QA Engineer - Comprehensive codebase analysis"""
-    
+
     def __init__(self):
-        self.findings: List[QATestFinding] = []
+        self.findings: list[QATestFinding] = []
         self.test_results = {}
-        
+
     def report_finding(self, issue_id: str, location: str, description: str,
                       steps: str, observed: str, expected: str, severity: str):
         """Report a new finding"""
-        finding = QATestFinding(issue_id, location, description, steps, 
+        finding = QATestFinding(issue_id, location, description, steps,
                               observed, expected, severity)
         self.findings.append(finding)
         print(f"🐛 ISSUE FOUND: {issue_id} - {severity} - {description}")
-        
+
     def analyze_code_structure(self):
         """Analyze project structure and identify structural issues"""
         print("\n=== ANALYZING CODE STRUCTURE ===")
-        
+
         # Check for missing __init__.py files
         service_init = Path("services/__init__.py")
         if not service_init.exists():
@@ -78,15 +77,15 @@ class SeniorQAAnalyzer:
                 "services/__init__.py should exist for proper Python package structure",
                 "Medium"
             )
-            
-        models_init = Path("models/__init__.py") 
+
+        models_init = Path("models/__init__.py")
         if not models_init.exists():
             self.report_finding(
                 "STRUCT-002",
                 "models/",
                 "Missing __init__.py file in models package",
                 "1. Navigate to models directory\n2. Observe missing __init__.py",
-                "models/__init__.py does not exist", 
+                "models/__init__.py does not exist",
                 "models/__init__.py should exist for proper Python package structure",
                 "Medium"
             )
@@ -94,14 +93,14 @@ class SeniorQAAnalyzer:
     def test_configuration_loading(self):
         """Test configuration system for errors"""
         print("\n=== TESTING CONFIGURATION LOADING ===")
-        
+
         try:
             # Test with invalid environment variables
             os.environ['TEST_INVALID_CONFIG'] = 'true'
-            
+
             from config.settings import get_settings
             settings = get_settings()
-            
+
             # Test JWT secret key validation
             if hasattr(settings, 'jwt_secret_key'):
                 jwt_key = settings.jwt_secret_key
@@ -115,7 +114,7 @@ class SeniorQAAnalyzer:
                         "JWT key should be at least 32 characters for security",
                         "High"
                     )
-                    
+
         except Exception as e:
             self.report_finding(
                 "CONFIG-002",
@@ -130,10 +129,10 @@ class SeniorQAAnalyzer:
     def test_authentication_system(self):
         """Test authentication for vulnerabilities and bugs"""
         print("\n=== TESTING AUTHENTICATION SYSTEM ===")
-        
+
         try:
-            from middleware.auth import get_current_user, create_access_token
-            
+            from middleware.auth import create_access_token, get_current_user
+
             # Test with None/empty tokens
             test_cases = [
                 {"token": None, "description": "None token"},
@@ -141,7 +140,7 @@ class SeniorQAAnalyzer:
                 {"token": "invalid_jwt_token", "description": "Invalid JWT format"},
                 {"token": "bearer.invalid.token", "description": "Invalid JWT signature"}
             ]
-            
+
             for case in test_cases:
                 try:
                     # This should fail gracefully, not crash
@@ -159,10 +158,10 @@ class SeniorQAAnalyzer:
                             "Should return 401 Unauthorized gracefully",
                             "High"
                         )
-                        
+
         except ImportError as e:
             self.report_finding(
-                "AUTH-002", 
+                "AUTH-002",
                 "middleware/auth.py",
                 "Authentication module import error",
                 "1. Import middleware.auth module",
@@ -174,7 +173,7 @@ class SeniorQAAnalyzer:
     def test_api_endpoints_functionality(self):
         """Test API endpoints for errors and edge cases"""
         print("\n=== TESTING API ENDPOINTS ===")
-        
+
         try:
             # Test health endpoint
             response = requests.get(f"{TEST_BASE_URL}/health", timeout=5)
@@ -188,7 +187,7 @@ class SeniorQAAnalyzer:
                     "Status code should be 200",
                     "Medium"
                 )
-                
+
             # Test search endpoint with malformed input
             malformed_inputs = [
                 {"q": "' OR 1=1 --", "desc": "SQL injection pattern"},
@@ -196,7 +195,7 @@ class SeniorQAAnalyzer:
                 {"limit": 10000, "desc": "Extremely high limit"},
                 {"min_amount": "not_a_number", "desc": "Invalid amount type"}
             ]
-            
+
             for test_input in malformed_inputs:
                 try:
                     response = requests.get(f"{TEST_BASE_URL}/search", params=test_input, timeout=5)
@@ -213,19 +212,19 @@ class SeniorQAAnalyzer:
                 except requests.exceptions.RequestException as e:
                     self.report_finding(
                         "API-003",
-                        "routers/search.py", 
+                        "routers/search.py",
                         f"Search endpoint network error with {test_input['desc']}",
                         f"1. Send request to /search with {test_input}\n2. Connection fails",
                         f"Network error: {str(e)}",
                         "Should respond to HTTP requests",
                         "Critical"
                     )
-                    
+
         except Exception as e:
             self.report_finding(
                 "API-004",
                 "API Testing Framework",
-                "API testing framework error", 
+                "API testing framework error",
                 "1. Run API endpoint tests\n2. Framework crashes",
                 f"Testing error: {str(e)}",
                 "Tests should execute without crashing",
@@ -235,7 +234,7 @@ class SeniorQAAnalyzer:
     def test_data_validation_edge_cases(self):
         """Test input validation with edge cases"""
         print("\n=== TESTING DATA VALIDATION ===")
-        
+
         # Test eligibility endpoint validation
         edge_cases = [
             {"gpa": 5.0, "desc": "GPA above maximum (4.0)"},
@@ -245,7 +244,7 @@ class SeniorQAAnalyzer:
             {"grade_level": "invalid_grade", "desc": "Invalid grade level"},
             {"field_of_study": "", "desc": "Empty field of study"}
         ]
-        
+
         for case in edge_cases:
             try:
                 response = requests.get(f"{TEST_BASE_URL}/eligibility/check", params=case, timeout=5)
@@ -274,14 +273,13 @@ class SeniorQAAnalyzer:
     def test_database_error_handling(self):
         """Test database connection and error handling"""
         print("\n=== TESTING DATABASE ERROR HANDLING ===")
-        
+
         try:
-            from models.database import get_db
             from services.scholarship_service import scholarship_service
-            
+
             # Test service initialization
             service = scholarship_service
-            
+
             # Test data retrieval
             scholarships = service.get_all_scholarships()
             if not scholarships:
@@ -294,7 +292,7 @@ class SeniorQAAnalyzer:
                     "Should return list of mock scholarships",
                     "Medium"
                 )
-                
+
         except Exception as e:
             self.report_finding(
                 "DB-002",
@@ -307,15 +305,14 @@ class SeniorQAAnalyzer:
             )
 
     def test_middleware_functionality(self):
-        """Test middleware for errors and security issues"""  
+        """Test middleware for errors and security issues"""
         print("\n=== TESTING MIDDLEWARE ===")
-        
+
         # Test rate limiting middleware
         try:
-            from middleware.rate_limiting import limiter
-            
+
             # Test multiple rapid requests
-            for i in range(10):
+            for _i in range(10):
                 try:
                     response = requests.get(f"{TEST_BASE_URL}/health", timeout=1)
                     if response.status_code == 429:
@@ -326,10 +323,10 @@ class SeniorQAAnalyzer:
             else:
                 # No rate limiting detected - could be intentionally disabled
                 pass
-                
+
         except Exception as e:
             self.report_finding(
-                "MIDDLEWARE-001", 
+                "MIDDLEWARE-001",
                 "middleware/rate_limiting.py",
                 "Rate limiting middleware initialization error",
                 "1. Import rate limiting middleware\n2. Initialize limiter",
@@ -341,16 +338,16 @@ class SeniorQAAnalyzer:
     def test_security_vulnerabilities(self):
         """Test for common security vulnerabilities"""
         print("\n=== TESTING SECURITY VULNERABILITIES ===")
-        
+
         # Test CORS configuration
         try:
-            response = requests.options(f"{TEST_BASE_URL}/search", 
+            response = requests.options(f"{TEST_BASE_URL}/search",
                                       headers={"Origin": "http://malicious-site.com"}, timeout=5)
             cors_header = response.headers.get("Access-Control-Allow-Origin")
             if cors_header == "*":
                 self.report_finding(
                     "SEC-001",
-                    "main.py:CORS configuration", 
+                    "main.py:CORS configuration",
                     "CORS allows all origins with wildcard",
                     "1. Send OPTIONS request with malicious origin\n2. Check CORS headers",
                     f"Access-Control-Allow-Origin: {cors_header}",
@@ -359,7 +356,7 @@ class SeniorQAAnalyzer:
                 )
         except Exception:
             pass  # Server may not be running
-            
+
         # Test for information disclosure in error messages
         try:
             response = requests.get(f"{TEST_BASE_URL}/scholarships/nonexistent_id", timeout=5)
@@ -379,13 +376,13 @@ class SeniorQAAnalyzer:
     def test_performance_issues(self):
         """Test for potential performance bottlenecks"""
         print("\n=== TESTING PERFORMANCE ISSUES ===")
-        
+
         try:
             # Test search endpoint performance
             start_time = time.time()
-            response = requests.get(f"{TEST_BASE_URL}/search?limit=100", timeout=10)
+            requests.get(f"{TEST_BASE_URL}/search?limit=100", timeout=10)
             end_time = time.time()
-            
+
             response_time = end_time - start_time
             if response_time > 5.0:  # 5 second threshold
                 self.report_finding(
@@ -403,19 +400,19 @@ class SeniorQAAnalyzer:
     def run_static_code_analysis(self):
         """Run static analysis to find code quality issues"""
         print("\n=== RUNNING STATIC CODE ANALYSIS ===")
-        
+
         try:
             # Check for potential import issues
             python_files = list(Path(".").rglob("*.py"))
-            
+
             for py_file in python_files:
                 if py_file.name.startswith("test_") or "test" in str(py_file.parent):
                     continue
-                    
+
                 try:
-                    with open(py_file, 'r', encoding='utf-8') as f:
+                    with open(py_file, encoding='utf-8') as f:
                         content = f.read()
-                        
+
                     # Check for hardcoded secrets (basic check)
                     if "password" in content.lower() and "=" in content:
                         lines = content.split('\n')
@@ -431,7 +428,7 @@ class SeniorQAAnalyzer:
                                         "Passwords should be loaded from environment variables",
                                         "High"
                                     )
-                                    
+
                     # Check for unused imports (basic check)
                     if content.startswith("from") or content.startswith("import"):
                         lines = content.split('\n')
@@ -441,9 +438,9 @@ class SeniorQAAnalyzer:
                                 imports.append(line)
                             elif line.strip() and not line.startswith("#"):
                                 break  # Stop at first non-import code
-                        
+
                         # This is a simplified check - would need AST for accuracy
-                        
+
                 except Exception as e:
                     self.report_finding(
                         "STATIC-002",
@@ -454,7 +451,7 @@ class SeniorQAAnalyzer:
                         "Python files should be readable",
                         "Low"
                     )
-                    
+
         except Exception as e:
             self.report_finding(
                 "STATIC-003",
@@ -470,7 +467,7 @@ class SeniorQAAnalyzer:
         """Run all QA tests and analysis"""
         print("🔍 SENIOR QA COMPREHENSIVE ANALYSIS STARTING")
         print("=" * 60)
-        
+
         # Run all analysis modules
         self.analyze_code_structure()
         self.test_configuration_loading()
@@ -482,21 +479,21 @@ class SeniorQAAnalyzer:
         self.test_security_vulnerabilities()
         self.test_performance_issues()
         self.run_static_code_analysis()
-        
+
         print("\n" + "=" * 60)
         print("🔍 ANALYSIS COMPLETE")
         print(f"📋 TOTAL ISSUES FOUND: {len(self.findings)}")
-        
+
         # Count by severity
         severity_counts = {}
         for finding in self.findings:
             severity = finding.severity
             severity_counts[severity] = severity_counts.get(severity, 0) + 1
-            
-        print(f"📊 SEVERITY BREAKDOWN:")
+
+        print("📊 SEVERITY BREAKDOWN:")
         for severity, count in sorted(severity_counts.items()):
             print(f"   {severity}: {count}")
-            
+
         return self.findings
 
     def generate_report(self, output_file: str = REPORT_FILE):
@@ -510,73 +507,73 @@ class SeniorQAAnalyzer:
             },
             "findings": [finding.to_dict() for finding in self.findings]
         }
-        
+
         # Calculate severity distribution
         for finding in self.findings:
             severity = finding.severity
             if severity not in report_data["analysis_metadata"]["severity_distribution"]:
                 report_data["analysis_metadata"]["severity_distribution"][severity] = 0
             report_data["analysis_metadata"]["severity_distribution"][severity] += 1
-        
+
         with open(output_file, 'w', encoding='utf-8') as f:
             json.dump(report_data, f, indent=2, ensure_ascii=False)
-            
+
         print(f"\n📋 DETAILED REPORT SAVED TO: {output_file}")
         return report_data
 
 if __name__ == "__main__":
     analyzer = SeniorQAAnalyzer()
-    
+
     try:
         findings = analyzer.run_comprehensive_analysis()
         report = analyzer.generate_report()
-        
+
         print("\n" + "="*60)
         print("📋 EXECUTIVE SUMMARY")
         print("="*60)
-        
+
         if not findings:
             print("✅ NO CRITICAL ISSUES FOUND")
             print("   The codebase appears to be in good condition.")
         else:
             print(f"❌ {len(findings)} ISSUES IDENTIFIED")
-            
+
             # Group and display findings by severity
             critical = [f for f in findings if f.severity == "Critical"]
-            high = [f for f in findings if f.severity == "High"] 
+            high = [f for f in findings if f.severity == "High"]
             medium = [f for f in findings if f.severity == "Medium"]
             low = [f for f in findings if f.severity == "Low"]
-            
+
             if critical:
                 print(f"\n🚨 CRITICAL ISSUES ({len(critical)}):")
                 for finding in critical[:3]:  # Show first 3
                     print(f"   {finding.issue_id}: {finding.description}")
                 if len(critical) > 3:
                     print(f"   ... and {len(critical) - 3} more")
-                    
+
             if high:
                 print(f"\n⚠️  HIGH PRIORITY ({len(high)}):")
                 for finding in high[:3]:
                     print(f"   {finding.issue_id}: {finding.description}")
                 if len(high) > 3:
                     print(f"   ... and {len(high) - 3} more")
-                    
+
             if medium:
                 print(f"\n⚡ MEDIUM PRIORITY ({len(medium)}):")
                 for finding in medium[:3]:
                     print(f"   {finding.issue_id}: {finding.description}")
                 if len(medium) > 3:
                     print(f"   ... and {len(medium) - 3} more")
-                    
+
             if low:
                 print(f"\n💡 LOW PRIORITY ({len(low)}):")
                 for finding in low[:3]:
-                    print(f"   {finding.issue_id}: {finding.description}")  
+                    print(f"   {finding.issue_id}: {finding.description}")
                 if len(low) > 3:
                     print(f"   ... and {len(low) - 3} more")
-        
+
         print(f"\n📋 Full detailed report available in: {REPORT_FILE}")
-        
+
     except Exception as e:
         print(f"💥 ANALYSIS FAILED: {str(e)}")
         traceback.print_exc()

@@ -3,16 +3,15 @@ Infrastructure Status and Compliance Endpoints
 Comprehensive monitoring and reporting for DR, SOC2, and PII compliance
 """
 
-from fastapi import APIRouter, HTTPException, Depends
-from typing import Dict, List, Any, Optional
 from datetime import datetime, timedelta
-import asyncio
 
-from infrastructure.disaster_recovery_service import DisasterRecoveryService
-from infrastructure.disaster_recovery_runbook import DisasterRecoveryRunbook
-from compliance.soc2_evidence_service import SOC2EvidenceService
+from fastapi import APIRouter, Depends, HTTPException
+
 from compliance.pii_lineage_mapper import PIILineageMapper
 from compliance.soc2_evidence_collector import SOC2EvidenceCollector
+from compliance.soc2_evidence_service import SOC2EvidenceService
+from infrastructure.disaster_recovery_runbook import DisasterRecoveryRunbook
+from infrastructure.disaster_recovery_service import DisasterRecoveryService
 from middleware.auth import get_current_user
 from utils.logger import get_logger
 
@@ -32,18 +31,18 @@ async def get_infrastructure_status():
     try:
         # Get DR status for all applications
         dr_dashboard = await dr_service.get_global_dr_dashboard()
-        
+
         # Get SOC2 compliance status
         if not soc2_service._initialized:
             await soc2_service.initialize()
-        
+
         # Get PII compliance metrics
         if not pii_mapper.pii_inventory:
             await pii_mapper.discover_pii_elements()
-        
+
         pii_compliance = pii_mapper.generate_pii_compliance_report()
-        
-        status = {
+
+        return {
             "timestamp": datetime.utcnow().isoformat(),
             "disaster_recovery": {
                 "global_compliance_score": dr_dashboard["global_metrics"]["compliance_score"],
@@ -76,9 +75,8 @@ async def get_infrastructure_status():
                 "last_updated": datetime.utcnow().isoformat()
             }
         }
-        
-        return status
-        
+
+
     except Exception as e:
         logger.error(f"Failed to get infrastructure status: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to retrieve infrastructure status")
@@ -88,13 +86,13 @@ async def get_disaster_recovery_status():
     """Get detailed disaster recovery status"""
     try:
         dashboard = await dr_service.get_global_dr_dashboard()
-        
+
         # Add detailed application status
         app_details = {}
-        for app_name in dr_service.dr_config.keys():
+        for app_name in dr_service.dr_config:
             dr_status = await dr_service.get_dr_status(app_name)
             recent_backups = await dr_service.list_backups(app_name, limit=5)
-            
+
             app_details[app_name] = {
                 "compliance_status": dr_status.compliance_status,
                 "health_score": round(dr_status.backup_health_score, 1),
@@ -107,10 +105,10 @@ async def get_disaster_recovery_status():
                 "recent_backups": len(recent_backups),
                 "last_restore_test": dr_status.last_restore_test.isoformat() if dr_status.last_restore_test else None
             }
-        
+
         dashboard["application_details"] = app_details
         return dashboard
-        
+
     except Exception as e:
         logger.error(f"Failed to get DR status: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to retrieve disaster recovery status")
@@ -125,9 +123,9 @@ async def run_disaster_recovery_test(
     try:
         if app_name not in dr_service.dr_config:
             raise HTTPException(status_code=404, detail=f"Application {app_name} not found in DR configuration")
-        
+
         logger.info(f"Starting DR test for {app_name}: {test_type}")
-        
+
         if test_type == "backup_integrity":
             result = await dr_runbook.run_backup_integrity_test(app_name)
         elif test_type == "restore_functionality":
@@ -136,7 +134,7 @@ async def run_disaster_recovery_test(
             result = await dr_runbook.run_rto_validation_test(app_name)
         else:
             raise HTTPException(status_code=400, detail=f"Invalid test type: {test_type}")
-        
+
         return {
             "test_id": result.test_id,
             "app_name": result.app_name,
@@ -150,7 +148,7 @@ async def run_disaster_recovery_test(
             "remediation_actions": result.remediation_actions,
             "evidence_collected": result.evidence_collected
         }
-        
+
     except HTTPException:
         raise
     except Exception as e:
@@ -159,22 +157,22 @@ async def run_disaster_recovery_test(
 
 @router.get("/disaster-recovery/tests")
 async def get_disaster_recovery_test_results(
-    app_name: Optional[str] = None,
+    app_name: str | None = None,
     limit: int = 20
 ):
     """Get disaster recovery test results"""
     try:
         # Get test results from runbook
         all_results = dr_runbook.test_results
-        
+
         if app_name:
             filtered_results = [r for r in all_results if r.app_name == app_name]
         else:
             filtered_results = all_results
-        
+
         # Sort by start time, most recent first
         sorted_results = sorted(filtered_results, key=lambda r: r.start_time, reverse=True)[:limit]
-        
+
         test_results = []
         for result in sorted_results:
             test_results.append({
@@ -189,13 +187,13 @@ async def get_disaster_recovery_test_results(
                 "issues_count": len(result.issues_found),
                 "evidence_count": len(result.evidence_collected)
             })
-        
+
         return {
             "total_tests": len(test_results),
             "app_filter": app_name,
             "test_results": test_results
         }
-        
+
     except Exception as e:
         logger.error(f"Failed to get DR test results: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to retrieve test results")
@@ -206,15 +204,15 @@ async def get_soc2_compliance_status():
     try:
         if not soc2_service._initialized:
             await soc2_service.initialize()
-        
+
         # Get evidence collection report
         collection_report = soc2_collector.generate_evidence_collection_report()
-        
-        status = {
+
+        return {
             "compliance_overview": {
                 "audit_readiness": "85%",  # Based on evidence collection completeness
                 "evidence_items_collected": len(soc2_service.soc2_evidence),
-                "controls_covered": list(set(task.control_reference.value for task in soc2_collector.collection_tasks)),
+                "controls_covered": list({task.control_reference.value for task in soc2_collector.collection_tasks}),
                 "last_evidence_collection": datetime.utcnow().isoformat(),
                 "audit_period": soc2_collector.audit_period.value
             },
@@ -228,9 +226,8 @@ async def get_soc2_compliance_status():
             "controls_status": collection_report["controls_coverage"],
             "next_actions": collection_report["next_steps"]
         }
-        
-        return status
-        
+
+
     except Exception as e:
         logger.error(f"Failed to get SOC2 compliance status: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to retrieve SOC2 compliance status")
@@ -240,13 +237,13 @@ async def collect_soc2_evidence(current_user=Depends(get_current_user)):
     """Trigger SOC2 evidence collection"""
     try:
         logger.info("Starting SOC2 evidence collection")
-        
+
         # Run evidence collection
         collection_results = await soc2_collector.collect_all_evidence()
-        
+
         # Generate collection report
         collection_report = soc2_collector.generate_evidence_collection_report()
-        
+
         return {
             "collection_initiated": datetime.utcnow().isoformat(),
             "total_tasks": len(collection_results),
@@ -256,7 +253,7 @@ async def collect_soc2_evidence(current_user=Depends(get_current_user)):
             "evidence_artifacts": collection_report["evidence_artifacts"],
             "next_steps": collection_report["next_steps"]
         }
-        
+
     except Exception as e:
         logger.error(f"SOC2 evidence collection failed: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Evidence collection failed: {str(e)}")
@@ -268,10 +265,10 @@ async def get_pii_compliance_status():
         # Ensure PII discovery is complete
         if not pii_mapper.pii_inventory:
             await pii_mapper.discover_pii_elements()
-        
+
         # Generate comprehensive compliance report
         compliance_report = pii_mapper.generate_pii_compliance_report()
-        
+
         # Add privacy assessment summary
         privacy_assessments = [
             {
@@ -282,7 +279,7 @@ async def get_pii_compliance_status():
                 "approval_status": pia.approval_status
             } for pia in pii_mapper.privacy_assessments
         ]
-        
+
         return {
             "compliance_summary": compliance_report["summary"],
             "compliance_metrics": compliance_report["compliance_metrics"],
@@ -297,7 +294,7 @@ async def get_pii_compliance_status():
             "data_flows_mapped": len(pii_mapper.data_flows),
             "data_subject_requests": len(pii_mapper.data_subject_requests)
         }
-        
+
     except Exception as e:
         logger.error(f"Failed to get PII compliance status: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to retrieve PII compliance status")
@@ -307,10 +304,10 @@ async def run_pii_discovery(current_user=Depends(get_current_user)):
     """Run comprehensive PII discovery and lineage mapping"""
     try:
         logger.info("Starting comprehensive PII discovery and lineage mapping")
-        
+
         # Run comprehensive PII assessment
         results = await pii_mapper.run_comprehensive_pii_assessment()
-        
+
         return {
             "discovery_completed": datetime.utcnow().isoformat(),
             "pii_inventory": results["pii_inventory"],
@@ -319,7 +316,7 @@ async def run_pii_discovery(current_user=Depends(get_current_user)):
             "privacy_assessments": results["privacy_assessments"],
             "compliance_report": results["compliance_report"]["summary"]
         }
-        
+
     except Exception as e:
         logger.error(f"PII discovery failed: {str(e)}")
         raise HTTPException(status_code=500, detail=f"PII discovery failed: {str(e)}")
@@ -335,14 +332,14 @@ async def process_data_subject_request(
     try:
         if request_type not in ["access", "deletion", "rectification", "portability"]:
             raise HTTPException(status_code=400, detail="Invalid request type")
-        
+
         logger.info(f"Processing data subject request: {request_type} for {subject_id}")
-        
+
         # Process the request
         request_result = await pii_mapper.process_data_subject_request(
             request_type, subject_id, requester_verification
         )
-        
+
         return {
             "request_id": request_result.request_id,
             "request_type": request_result.request_type,
@@ -353,7 +350,7 @@ async def process_data_subject_request(
             "data_locations": len(request_result.data_locations),
             "actions_taken": request_result.actions_taken
         }
-        
+
     except HTTPException:
         raise
     except Exception as e:
@@ -369,7 +366,7 @@ async def infrastructure_health_check():
             "status": "healthy",
             "services": {
                 "disaster_recovery": "operational",
-                "soc2_compliance": "operational", 
+                "soc2_compliance": "operational",
                 "pii_compliance": "operational",
                 "evidence_collection": "operational"
             },
@@ -380,7 +377,7 @@ async def infrastructure_health_check():
                 "encryption_coverage": "0%"
             }
         }
-        
+
         # Check DR service health
         try:
             dr_dashboard = await dr_service.get_global_dr_dashboard()
@@ -388,7 +385,7 @@ async def infrastructure_health_check():
         except Exception as e:
             health_status["services"]["disaster_recovery"] = "degraded"
             logger.warning(f"DR service health check failed: {str(e)}")
-        
+
         # Check SOC2 service health
         try:
             if not soc2_service._initialized:
@@ -397,7 +394,7 @@ async def infrastructure_health_check():
         except Exception as e:
             health_status["services"]["soc2_compliance"] = "degraded"
             logger.warning(f"SOC2 service health check failed: {str(e)}")
-        
+
         # Check PII service health
         try:
             if not pii_mapper.pii_inventory:
@@ -408,7 +405,7 @@ async def infrastructure_health_check():
         except Exception as e:
             health_status["services"]["pii_compliance"] = "degraded"
             logger.warning(f"PII service health check failed: {str(e)}")
-        
+
         # Determine overall status
         service_statuses = list(health_status["services"].values())
         if "degraded" in service_statuses:
@@ -417,9 +414,9 @@ async def infrastructure_health_check():
             health_status["status"] = "healthy"
         else:
             health_status["status"] = "unknown"
-        
+
         return health_status
-        
+
     except Exception as e:
         logger.error(f"Infrastructure health check failed: {str(e)}")
         return {
@@ -434,9 +431,9 @@ async def get_compliance_dashboard():
     try:
         # Get infrastructure status
         infra_status = await get_infrastructure_status()
-        
+
         # Enhanced dashboard with additional metrics
-        dashboard = {
+        return {
             "dashboard_generated": datetime.utcnow().isoformat(),
             "executive_summary": {
                 "overall_compliance_score": infra_status["overall_health"]["infrastructure_score"],
@@ -473,9 +470,8 @@ async def get_compliance_dashboard():
                 "security_incidents": 0
             }
         }
-        
-        return dashboard
-        
+
+
     except Exception as e:
         logger.error(f"Failed to generate compliance dashboard: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to generate compliance dashboard")

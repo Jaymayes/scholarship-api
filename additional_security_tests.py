@@ -4,27 +4,28 @@ Additional Security and Edge Case Tests
 Supplementary QA testing for comprehensive coverage
 """
 
-import requests
 import json
+import os
+import sys
 import time
 from datetime import datetime
+
 from fastapi.testclient import TestClient
-import sys
-import os
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from main import app
 
+
 class AdditionalSecurityTests:
     """Additional security-focused tests"""
-    
+
     def __init__(self):
         self.client = TestClient(app)
         self.issues = []
-        
-    def log_issue(self, issue_id: str, location: str, description: str, 
-                  steps_to_reproduce: str, observed_output: str, 
+
+    def log_issue(self, issue_id: str, location: str, description: str,
+                  steps_to_reproduce: str, observed_output: str,
                   expected_output: str, severity: str):
         """Log identified issues"""
         issue = {
@@ -43,10 +44,10 @@ class AdditionalSecurityTests:
     def test_http_method_vulnerabilities(self):
         """Test for HTTP method vulnerabilities"""
         print("Testing HTTP method vulnerabilities...")
-        
+
         endpoints = ["/", "/health", "/api", "/search"]
         dangerous_methods = ["PUT", "DELETE", "PATCH", "TRACE", "OPTIONS"]
-        
+
         for endpoint in endpoints:
             for method in dangerous_methods:
                 try:
@@ -58,16 +59,16 @@ class AdditionalSecurityTests:
                             f"Endpoint accepts dangerous HTTP method: {method}",
                             f"1. Send {method} request to {endpoint}\n2. Check response",
                             f"Status: {response.status_code}",
-                            f"Status: 405 Method Not Allowed",
+                            "Status: 405 Method Not Allowed",
                             "Medium"
                         )
-                except Exception as e:
+                except Exception:
                     pass
 
     def test_information_disclosure(self):
         """Test for information disclosure vulnerabilities"""
         print("Testing information disclosure...")
-        
+
         # Test server headers
         response = self.client.get("/")
         server_header = response.headers.get("server", "").lower()
@@ -81,7 +82,7 @@ class AdditionalSecurityTests:
                 "Generic or no server header",
                 "Low"
             )
-        
+
         # Test error responses for version disclosure
         response = self.client.get("/nonexistent")
         if "fastapi" in response.text.lower() or "uvicorn" in response.text.lower():
@@ -98,14 +99,14 @@ class AdditionalSecurityTests:
     def test_parameter_pollution(self):
         """Test for HTTP parameter pollution"""
         print("Testing parameter pollution...")
-        
+
         # Test multiple parameters with same name
         test_cases = [
             "/search?q=test1&q=test2",
             "/api/v1/scholarships?keyword=test1&keyword=test2",
             "/eligibility/check?gpa=3.0&gpa=4.0"
         ]
-        
+
         for test_case in test_cases:
             try:
                 response = self.client.get(test_case)
@@ -119,13 +120,13 @@ class AdditionalSecurityTests:
                         "Graceful handling of duplicate parameters",
                         "Medium"
                     )
-            except Exception as e:
+            except Exception:
                 pass
 
     def test_content_type_vulnerabilities(self):
         """Test content-type related vulnerabilities"""
         print("Testing content-type vulnerabilities...")
-        
+
         # Test POST endpoints with different content types
         post_endpoints = ["/search", "/eligibility/check"]
         dangerous_content_types = [
@@ -133,7 +134,7 @@ class AdditionalSecurityTests:
             "text/xml",
             "application/x-www-form-urlencoded"
         ]
-        
+
         for endpoint in post_endpoints:
             for content_type in dangerous_content_types:
                 try:
@@ -149,22 +150,22 @@ class AdditionalSecurityTests:
                             "Only accept expected content types",
                             "Medium"
                         )
-                except Exception as e:
+                except Exception:
                     pass
 
     def test_timing_attacks(self):
         """Test for timing attack vulnerabilities"""
         print("Testing timing attacks...")
-        
+
         # Test authentication timing
         times = []
         for i in range(5):
             start = time.time()
-            response = self.client.get("/api/v1/scholarships", 
+            self.client.get("/api/v1/scholarships",
                                      headers={"Authorization": f"Bearer invalid_token_{i}"})
             end = time.time()
             times.append(end - start)
-        
+
         # Check for consistent timing (should be similar for all invalid tokens)
         if max(times) - min(times) > 0.5:  # More than 500ms difference
             self.log_issue(
@@ -180,10 +181,10 @@ class AdditionalSecurityTests:
     def test_file_upload_vulnerabilities(self):
         """Test for file upload vulnerabilities if any exist"""
         print("Testing file upload vulnerabilities...")
-        
+
         # Try to upload files to various endpoints
         endpoints = ["/", "/search", "/api/v1/scholarships"]
-        
+
         for endpoint in endpoints:
             try:
                 files = {"file": ("test.txt", "test content", "text/plain")}
@@ -198,14 +199,14 @@ class AdditionalSecurityTests:
                         "File uploads should be rejected",
                         "Medium"
                     )
-            except Exception as e:
+            except Exception:
                 pass
 
     def run_additional_tests(self):
         """Run all additional security tests"""
         print("🔒 Running Additional Security Tests...")
         print("=" * 50)
-        
+
         test_methods = [
             self.test_http_method_vulnerabilities,
             self.test_information_disclosure,
@@ -214,27 +215,27 @@ class AdditionalSecurityTests:
             self.test_timing_attacks,
             self.test_file_upload_vulnerabilities
         ]
-        
+
         for test_method in test_methods:
             try:
                 test_method()
             except Exception as e:
                 print(f"❌ Test {test_method.__name__} failed: {str(e)}")
-        
+
         print("=" * 50)
         print(f"🏁 Additional Security Testing Complete. Found {len(self.issues)} additional issues.")
-        
+
         return self.issues
 
 if __name__ == "__main__":
     security_tests = AdditionalSecurityTests()
     additional_issues = security_tests.run_additional_tests()
-    
+
     # Save additional findings
     with open("additional_security_findings.json", "w") as f:
         json.dump({
             "timestamp": datetime.utcnow().isoformat(),
             "additional_issues": additional_issues
         }, f, indent=2)
-    
-    print(f"📋 Additional security findings saved to additional_security_findings.json")
+
+    print("📋 Additional security findings saved to additional_security_findings.json")

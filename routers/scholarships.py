@@ -1,23 +1,28 @@
-from fastapi import APIRouter, HTTPException, Query, Depends, Request
-from typing import List, Optional
+from datetime import datetime
+
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
+
+from middleware.auth import User, require_auth
+from middleware.enhanced_rate_limiting import general_rate_limit, search_rate_limit
 from models.scholarship import (
-    Scholarship, ScholarshipSummary, SearchFilters, SearchResponse, 
-    FieldOfStudy, ScholarshipType
+    FieldOfStudy,
+    Scholarship,
+    ScholarshipSummary,
+    ScholarshipType,
+    SearchFilters,
+    SearchResponse,
 )
 from models.user import (
-    UserProfile, EligibilityCheck, EligibilityResult, 
-    RecommendationRequest
+    EligibilityCheck,
+    EligibilityResult,
+    RecommendationRequest,
+    UserProfile,
 )
-from services.scholarship_service import scholarship_service
-from services.eligibility_service import eligibility_service
-from services.search_service import search_service
 from services.analytics_service import analytics_service
-from middleware.auth import require_auth, User, get_current_user
-from middleware.enhanced_rate_limiting import general_rate_limit, search_rate_limit
-from config.settings import settings
+from services.eligibility_service import eligibility_service
+from services.scholarship_service import scholarship_service
+from services.search_service import search_service
 from utils.logger import get_logger
-from datetime import datetime
-import time
 
 logger = get_logger(__name__)
 router = APIRouter()
@@ -26,26 +31,26 @@ router = APIRouter()
 @search_rate_limit()  # QA FIX: Apply rate limiting to scholarships endpoint
 async def search_scholarships(
     request: Request,  # QA FIX: Add request parameter for rate limiting
-    keyword: Optional[str] = Query(None, description="Search keyword"),
-    fields_of_study: List[FieldOfStudy] = Query(default=[], description="Filter by fields of study"),
-    min_amount: Optional[float] = Query(None, ge=0, description="Minimum scholarship amount"),
-    max_amount: Optional[float] = Query(None, ge=0, description="Maximum scholarship amount"),
-    scholarship_types: List[ScholarshipType] = Query(default=[], description="Filter by scholarship types"),
-    states: List[str] = Query(default=[], description="Filter by US states"),
-    min_gpa: Optional[float] = Query(None, ge=0.0, le=4.0, description="Minimum GPA filter"),
-    citizenship: Optional[str] = Query(None, description="Citizenship requirement"),
-    deadline_after: Optional[datetime] = Query(None, description="Deadlines after this date"),
-    deadline_before: Optional[datetime] = Query(None, description="Deadlines before this date"),
+    keyword: str | None = Query(None, description="Search keyword"),
+    fields_of_study: list[FieldOfStudy] = Query(default=[], description="Filter by fields of study"),
+    min_amount: float | None = Query(None, ge=0, description="Minimum scholarship amount"),
+    max_amount: float | None = Query(None, ge=0, description="Maximum scholarship amount"),
+    scholarship_types: list[ScholarshipType] = Query(default=[], description="Filter by scholarship types"),
+    states: list[str] = Query(default=[], description="Filter by US states"),
+    min_gpa: float | None = Query(None, ge=0.0, le=4.0, description="Minimum GPA filter"),
+    citizenship: str | None = Query(None, description="Citizenship requirement"),
+    deadline_after: datetime | None = Query(None, description="Deadlines after this date"),
+    deadline_before: datetime | None = Query(None, description="Deadlines before this date"),
     limit: int = Query(20, ge=1, le=100, description="Number of results to return"),
     offset: int = Query(0, ge=0, description="Number of results to skip"),
-    user_id: Optional[str] = Query(None, description="User ID for analytics"),
+    user_id: str | None = Query(None, description="User ID for analytics"),
     # HOTFIX: Always require authentication - no bypass allowed
     current_user: User = Depends(require_auth())
 ):
     """
     Search scholarships with various filters and pagination support - QA-004 fix: Authentication enforced.
     Requires authentication unless PUBLIC_READ_ENDPOINTS feature flag is enabled.
-    
+
     This endpoint allows users to search through available scholarships using
     multiple criteria including keywords, fields of study, amount ranges, and more.
     """
@@ -65,7 +70,7 @@ async def search_scholarships(
             limit=limit,
             offset=offset
         )
-        
+
         # Log search interaction
         analytics_service.log_search(
             user_id=user_id,
@@ -73,15 +78,15 @@ async def search_scholarships(
             result_count=0,  # Will be updated after search
             filters=filters.model_dump()
         )
-        
+
         result = scholarship_service.search_scholarships(filters)
-        
+
         # Update analytics with actual result count
         if analytics_service.interactions:
             analytics_service.interactions[-1].metadata["result_count"] = result.total_count
-        
+
         return result
-        
+
     except Exception as e:
         logger.error(f"Error searching scholarships: {str(e)}")
         raise HTTPException(status_code=500, detail="Internal server error during search")
@@ -90,23 +95,23 @@ async def search_scholarships(
 @search_rate_limit()  # QA FIX: Apply rate limiting to smart search endpoint
 async def smart_search_scholarships(
     request: Request,  # QA FIX: Add request parameter for rate limiting
-    keyword: Optional[str] = Query(None, description="Search keyword"),
-    fields_of_study: List[FieldOfStudy] = Query(default=[], description="Filter by fields of study"),
-    min_amount: Optional[float] = Query(None, ge=0, description="Minimum scholarship amount"),
-    max_amount: Optional[float] = Query(None, ge=0, description="Maximum scholarship amount"),
-    scholarship_types: List[ScholarshipType] = Query(default=[], description="Filter by scholarship types"),
-    states: List[str] = Query(default=[], description="Filter by US states"),
-    min_gpa: Optional[float] = Query(None, ge=0.0, le=4.0, description="Minimum GPA filter"),
-    citizenship: Optional[str] = Query(None, description="Citizenship requirement"),
-    deadline_after: Optional[datetime] = Query(None, description="Deadlines after this date"),
-    deadline_before: Optional[datetime] = Query(None, description="Deadlines before this date"),
+    keyword: str | None = Query(None, description="Search keyword"),
+    fields_of_study: list[FieldOfStudy] = Query(default=[], description="Filter by fields of study"),
+    min_amount: float | None = Query(None, ge=0, description="Minimum scholarship amount"),
+    max_amount: float | None = Query(None, ge=0, description="Maximum scholarship amount"),
+    scholarship_types: list[ScholarshipType] = Query(default=[], description="Filter by scholarship types"),
+    states: list[str] = Query(default=[], description="Filter by US states"),
+    min_gpa: float | None = Query(None, ge=0.0, le=4.0, description="Minimum GPA filter"),
+    citizenship: str | None = Query(None, description="Citizenship requirement"),
+    deadline_after: datetime | None = Query(None, description="Deadlines after this date"),
+    deadline_before: datetime | None = Query(None, description="Deadlines before this date"),
     limit: int = Query(20, ge=1, le=100, description="Number of results to return"),
     offset: int = Query(0, ge=0, description="Number of results to skip"),
-    user_id: Optional[str] = Query(None, description="User ID for analytics")
+    user_id: str | None = Query(None, description="User ID for analytics")
 ):
     """
     Enhanced search with smart suggestions and search quality assessment.
-    
+
     This endpoint provides the same search functionality as the basic search
     but includes additional features like search suggestions and metadata.
     """
@@ -125,7 +130,7 @@ async def smart_search_scholarships(
             limit=limit,
             offset=offset
         )
-        
+
         # Log search interaction
         analytics_service.log_search(
             user_id=user_id,
@@ -133,15 +138,15 @@ async def smart_search_scholarships(
             result_count=0,
             filters=filters.model_dump()
         )
-        
+
         result = search_service.search_with_smart_suggestions(filters)
-        
+
         # Update analytics
         if analytics_service.interactions:
             analytics_service.interactions[-1].metadata["result_count"] = result["results"].total_count
-        
+
         return result
-        
+
     except Exception as e:
         logger.error(f"Error in smart search: {str(e)}")
         raise HTTPException(status_code=500, detail="Internal server error during smart search")
@@ -151,28 +156,28 @@ async def smart_search_scholarships(
 async def get_scholarship(
     request: Request,  # QA FIX: Add request parameter for rate limiting
     scholarship_id: str,
-    user_id: Optional[str] = Query(None, description="User ID for analytics")
+    user_id: str | None = Query(None, description="User ID for analytics")
 ):
     """
     Get detailed information about a specific scholarship.
-    
+
     Returns comprehensive scholarship details including eligibility criteria,
     application requirements, and deadlines.
     """
     try:
         scholarship = scholarship_service.get_scholarship_by_id(scholarship_id)
-        
+
         if not scholarship:
             raise HTTPException(
-                status_code=404, 
+                status_code=404,
                 detail=f"Scholarship with ID {scholarship_id} not found"
             )
-        
+
         # Log scholarship view
         analytics_service.log_scholarship_view(user_id, scholarship_id)
-        
+
         return scholarship
-        
+
     except HTTPException:
         raise
     except Exception as e:
@@ -183,7 +188,7 @@ async def get_scholarship(
 async def check_eligibility(eligibility_request: EligibilityCheck):
     """
     Check if a user profile meets the eligibility criteria for a specific scholarship.
-    
+
     This endpoint evaluates user information against scholarship requirements
     and provides detailed feedback on eligibility status.
     """
@@ -192,7 +197,7 @@ async def check_eligibility(eligibility_request: EligibilityCheck):
             eligibility_request.user_profile,
             eligibility_request.scholarship_id
         )
-        
+
         # Log eligibility check
         analytics_service.log_eligibility_check(
             user_id=eligibility_request.user_profile.id,
@@ -200,21 +205,21 @@ async def check_eligibility(eligibility_request: EligibilityCheck):
             eligible=result.eligible,
             match_score=result.match_score
         )
-        
+
         return result
-        
+
     except Exception as e:
         logger.error(f"Error checking eligibility: {str(e)}")
         raise HTTPException(status_code=500, detail="Error processing eligibility check")
 
-@router.post("/scholarships/bulk-eligibility-check", response_model=List[EligibilityResult])
+@router.post("/scholarships/bulk-eligibility-check", response_model=list[EligibilityResult])
 async def bulk_eligibility_check(
     user_profile: UserProfile,
-    scholarship_ids: List[str]
+    scholarship_ids: list[str]
 ):
     """
     Check eligibility for multiple scholarships at once.
-    
+
     This endpoint allows users to check their eligibility for multiple
     scholarships in a single request, improving efficiency.
     """
@@ -224,11 +229,11 @@ async def bulk_eligibility_check(
                 status_code=400,
                 detail="Maximum of 50 scholarships can be checked at once"
             )
-        
+
         results = eligibility_service.check_multiple_eligibilities(
             user_profile, scholarship_ids
         )
-        
+
         # Log bulk eligibility check
         for result in results:
             analytics_service.log_eligibility_check(
@@ -237,9 +242,9 @@ async def bulk_eligibility_check(
                 eligible=result.eligible,
                 match_score=result.match_score
             )
-        
+
         return results
-        
+
     except HTTPException:
         raise
     except Exception as e:
@@ -250,19 +255,19 @@ async def bulk_eligibility_check(
 async def get_recommendations(request: RecommendationRequest):
     """
     Get personalized scholarship recommendations based on user profile.
-    
+
     This endpoint uses the user's profile information to generate
     tailored scholarship recommendations with eligibility scoring.
     """
     try:
         recommendations = search_service.get_recommendations(request)
-        
+
         # Log recommendation request
         analytics_service.log_recommendation_request(
             user_id=request.user_profile.id,
             recommendation_count=len(recommendations)
         )
-        
+
         return {
             "user_profile_summary": {
                 "field_of_study": request.user_profile.field_of_study,
@@ -278,7 +283,7 @@ async def get_recommendations(request: RecommendationRequest):
                 "include_ineligible": request.include_ineligible
             }
         }
-        
+
     except Exception as e:
         logger.error(f"Error generating recommendations: {str(e)}")
         raise HTTPException(status_code=500, detail="Error generating recommendations")
@@ -286,22 +291,22 @@ async def get_recommendations(request: RecommendationRequest):
 @router.get("/scholarships/organization/{organization}")
 async def get_scholarships_by_organization(
     organization: str,
-    user_id: Optional[str] = Query(None, description="User ID for analytics")
+    user_id: str | None = Query(None, description="User ID for analytics")
 ):
     """
     Get all scholarships offered by a specific organization.
-    
+
     This endpoint returns scholarships filtered by the sponsoring organization.
     """
     try:
         scholarships = scholarship_service.get_scholarships_by_organization(organization)
-        
+
         if not scholarships:
             raise HTTPException(
                 status_code=404,
                 detail=f"No scholarships found for organization: {organization}"
             )
-        
+
         # Convert to summary format
         scholarship_summaries = [
             ScholarshipSummary(
@@ -316,13 +321,13 @@ async def get_scholarships_by_organization(
             )
             for sch in scholarships
         ]
-        
+
         return {
             "organization": organization,
             "scholarship_count": len(scholarship_summaries),
             "scholarships": scholarship_summaries
         }
-        
+
     except HTTPException:
         raise
     except Exception as e:
@@ -333,7 +338,7 @@ async def get_scholarships_by_organization(
 async def get_scholarships_by_field(
     field_of_study: FieldOfStudy,
     limit: int = Query(20, ge=1, le=100),
-    user_id: Optional[str] = Query(None, description="User ID for analytics")
+    user_id: str | None = Query(None, description="User ID for analytics")
 ):
     """
     Get scholarships available for a specific field of study.
@@ -353,14 +358,14 @@ async def get_scholarships_by_field(
             limit=limit,
             offset=0
         )
-        
+
         result = scholarship_service.search_scholarships(filters)
-        
+
         return {
             "field_of_study": field_of_study,
             "results": result
         }
-        
+
     except Exception as e:
         logger.error(f"Error retrieving scholarships for field {field_of_study}: {str(e)}")
         raise HTTPException(status_code=500, detail="Internal server error")

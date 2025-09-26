@@ -1,11 +1,13 @@
 # AI Scholarship Playbook - B2B Partner Models
 # Self-serve partner portal and marketplace functionality
 
-from pydantic import BaseModel, Field, EmailStr
-from datetime import datetime
-from typing import Optional, List, Dict, Any
-from enum import Enum
 import uuid
+from datetime import datetime
+from enum import Enum
+from typing import Any
+
+from pydantic import BaseModel, EmailStr, Field
+
 
 class PartnerType(str, Enum):
     FOUNDATION = "foundation"
@@ -33,92 +35,92 @@ class Partner(BaseModel):
     organization_name: str
     partner_type: PartnerType
     status: PartnerStatus = PartnerStatus.PENDING
-    
+
     # Contact Information
     primary_contact_name: str
     primary_contact_email: EmailStr
-    primary_contact_phone: Optional[str] = None
-    website_url: Optional[str] = None
-    
+    primary_contact_phone: str | None = None
+    website_url: str | None = None
+
     # Organization Details
-    tax_id: Optional[str] = None
-    nonprofit_status: Optional[bool] = None
+    tax_id: str | None = None
+    nonprofit_status: bool | None = None
     address_line1: str
-    address_line2: Optional[str] = None
+    address_line2: str | None = None
     city: str
     state: str
     zip_code: str
     country: str = "United States"
-    
+
     # Verification
     verification_status: VerificationStatus = VerificationStatus.PENDING
-    verification_documents: List[str] = Field(default_factory=list)
-    verified_at: Optional[datetime] = None
-    verified_by: Optional[str] = None
-    
+    verification_documents: list[str] = Field(default_factory=list)
+    verified_at: datetime | None = None
+    verified_by: str | None = None
+
     # Agreement and Terms
     agreement_signed: bool = False
-    agreement_signed_at: Optional[datetime] = None
-    terms_version: Optional[str] = None
-    
+    agreement_signed_at: datetime | None = None
+    terms_version: str | None = None
+
     # Metadata
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
-    onboarded_by: Optional[str] = None
+    onboarded_by: str | None = None
     pilot_program: bool = True
-    notes: Optional[str] = None
+    notes: str | None = None
 
 class PartnerScholarship(BaseModel):
     """Scholarship listing by partner"""
     listing_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     partner_id: str
-    
+
     # Basic Information
     title: str
     description: str
     award_amount: float = Field(..., gt=0)
     number_of_awards: int = Field(1, gt=0)
-    
+
     # Timing
     application_deadline: datetime
-    notification_date: Optional[datetime] = None
-    award_disbursement_date: Optional[datetime] = None
-    
+    notification_date: datetime | None = None
+    award_disbursement_date: datetime | None = None
+
     # Eligibility Criteria
-    min_gpa: Optional[float] = Field(None, ge=0.0, le=4.0)
-    max_age: Optional[int] = None
-    citizenship_requirements: List[str] = Field(default_factory=list)
-    field_of_study: List[str] = Field(default_factory=list)
-    geographic_restrictions: List[str] = Field(default_factory=list)
-    financial_need_required: Optional[bool] = None
-    
+    min_gpa: float | None = Field(None, ge=0.0, le=4.0)
+    max_age: int | None = None
+    citizenship_requirements: list[str] = Field(default_factory=list)
+    field_of_study: list[str] = Field(default_factory=list)
+    geographic_restrictions: list[str] = Field(default_factory=list)
+    financial_need_required: bool | None = None
+
     # Application Requirements
-    required_documents: List[str] = Field(default_factory=list)
+    required_documents: list[str] = Field(default_factory=list)
     essay_required: bool = False
-    essay_prompts: List[str] = Field(default_factory=list)
+    essay_prompts: list[str] = Field(default_factory=list)
     letters_of_recommendation: int = 0
     interview_required: bool = False
-    
+
     # Additional Criteria
-    community_service_hours: Optional[int] = None
+    community_service_hours: int | None = None
     leadership_experience: bool = False
-    first_generation_college: Optional[bool] = None
-    underrepresented_minority: Optional[bool] = None
-    
+    first_generation_college: bool | None = None
+    underrepresented_minority: bool | None = None
+
     # Application Process
-    application_url: Optional[str] = None
-    contact_email: Optional[EmailStr] = None
-    additional_instructions: Optional[str] = None
-    
+    application_url: str | None = None
+    contact_email: EmailStr | None = None
+    additional_instructions: str | None = None
+
     # Status and Visibility
     published: bool = False
-    published_at: Optional[datetime] = None
-    expires_at: Optional[datetime] = None
-    
+    published_at: datetime | None = None
+    expires_at: datetime | None = None
+
     # Analytics
     view_count: int = 0
     application_count: int = 0
-    
+
     # Metadata
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
@@ -129,27 +131,27 @@ class PartnerAnalytics(BaseModel):
     partner_id: str
     period_start: datetime
     period_end: datetime
-    
+
     # Listing Performance
     total_listings: int
     active_listings: int
     total_views: int
     total_applications: int
-    
+
     # Application Funnel
     view_to_application_rate: float = 0.0
     application_completion_rate: float = 0.0
-    
+
     # Applicant Demographics
-    applicant_demographics: Dict[str, Any] = Field(default_factory=dict)
-    
+    applicant_demographics: dict[str, Any] = Field(default_factory=dict)
+
     # Top Performing Listings
-    top_listings: List[Dict[str, Any]] = Field(default_factory=list)
-    
+    top_listings: list[dict[str, Any]] = Field(default_factory=list)
+
     # Engagement Metrics
-    avg_time_on_listing: Optional[float] = None
-    bounce_rate: Optional[float] = None
-    
+    avg_time_on_listing: float | None = None
+    bounce_rate: float | None = None
+
     generated_at: datetime = Field(default_factory=datetime.utcnow)
 
 class PartnerOnboardingStep(BaseModel):
@@ -159,14 +161,14 @@ class PartnerOnboardingStep(BaseModel):
     step_name: str
     step_description: str
     completed: bool = False
-    completed_at: Optional[datetime] = None
+    completed_at: datetime | None = None
     required: bool = True
     order_index: int
-    
+
     # Step-specific data
-    step_data: Dict[str, Any] = Field(default_factory=dict)
-    validation_rules: List[str] = Field(default_factory=list)
-    
+    step_data: dict[str, Any] = Field(default_factory=dict)
+    validation_rules: list[str] = Field(default_factory=list)
+
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
 
@@ -174,23 +176,23 @@ class PartnerSupportTicket(BaseModel):
     """Support ticket for partner assistance"""
     ticket_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     partner_id: str
-    
+
     # Ticket Details
     subject: str
     description: str
     priority: str = "medium"  # low, medium, high, urgent
     category: str  # onboarding, technical, billing, general
     status: str = "open"  # open, in_progress, resolved, closed
-    
+
     # Assignment
-    assigned_to: Optional[str] = None
-    assigned_at: Optional[datetime] = None
-    
+    assigned_to: str | None = None
+    assigned_at: datetime | None = None
+
     # Resolution
-    resolved_at: Optional[datetime] = None
-    resolution_notes: Optional[str] = None
-    satisfaction_rating: Optional[int] = Field(None, ge=1, le=5)
-    
+    resolved_at: datetime | None = None
+    resolution_notes: str | None = None
+    satisfaction_rating: int | None = Field(None, ge=1, le=5)
+
     # Metadata
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow)
@@ -201,20 +203,20 @@ class PartnerPortalSession(BaseModel):
     session_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     partner_id: str
     user_email: EmailStr
-    
+
     # Session Details
     login_at: datetime = Field(default_factory=datetime.utcnow)
     last_activity: datetime = Field(default_factory=datetime.utcnow)
-    ip_address: Optional[str] = None
-    user_agent: Optional[str] = None
-    
+    ip_address: str | None = None
+    user_agent: str | None = None
+
     # Session Status
     active: bool = True
     expires_at: datetime
-    
+
     # Activity Tracking
-    pages_visited: List[str] = Field(default_factory=list)
-    actions_performed: List[str] = Field(default_factory=list)
+    pages_visited: list[str] = Field(default_factory=list)
+    actions_performed: list[str] = Field(default_factory=list)
 
 # Default onboarding steps for partners
 DEFAULT_ONBOARDING_STEPS = [
@@ -274,7 +276,7 @@ SUPPORT_TIERS = {
     },
     "standard": {
         "name": "Standard",
-        "response_time": "48 hours", 
+        "response_time": "48 hours",
         "dedicated_support": False,
         "phone_support": False,
         "training_sessions": False,

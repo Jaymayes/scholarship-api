@@ -6,12 +6,12 @@ Canada + UK market expansion with localization, compliance, and regional scholar
 
 import asyncio
 import json
-import uuid
-from datetime import datetime, timedelta
-from typing import Dict, List, Any, Optional, Tuple
-from dataclasses import dataclass, asdict
-from enum import Enum
 import logging
+import uuid
+from dataclasses import dataclass
+from datetime import datetime, timedelta
+from enum import Enum
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -22,7 +22,7 @@ class Region(Enum):
 
 class Currency(Enum):
     USD = "USD"
-    CAD = "CAD" 
+    CAD = "CAD"
     GBP = "GBP"
 
 class ComplianceFramework(Enum):
@@ -37,7 +37,7 @@ class LocalizedContent:
     language_code: str
     currency: Currency
     date_format: str
-    address_format: Dict[str, str]
+    address_format: dict[str, str]
     phone_format: str
     postal_code_regex: str
     privacy_policy_url: str
@@ -54,13 +54,13 @@ class InternationalScholarship:
     amount_max: float
     currency: Currency
     region: Region
-    eligibility_criteria: Dict[str, Any]
+    eligibility_criteria: dict[str, Any]
     application_deadline: str
-    materials_required: List[str]
+    materials_required: list[str]
     website_url: str
     description: str
-    local_compliance_tags: List[str]
-    geo_restrictions: List[str]
+    local_compliance_tags: list[str]
+    geo_restrictions: list[str]
 
 @dataclass
 class PartnerConversation:
@@ -74,12 +74,12 @@ class PartnerConversation:
     scheduled_date: str
     notes: str
     partnership_potential: str  # high, medium, low
-    compliance_requirements: List[str]
+    compliance_requirements: list[str]
 
 class Week4InternationalPilot:
     """
     Week 4 International Pilot Engine
-    
+
     Objectives:
     - Launch Canada + UK market discovery
     - Ship localized programmatic pages with regional taxonomy
@@ -87,43 +87,43 @@ class Week4InternationalPilot:
     - Establish GDPR/PIPEDA compliance framework
     - Schedule 5 partner conversations per region
     """
-    
+
     def __init__(self, openai_service=None):
         self.openai_service = openai_service
-        self.localized_content: Dict[Region, LocalizedContent] = {}
-        self.international_scholarships: List[InternationalScholarship] = []
-        self.partner_conversations: List[PartnerConversation] = []
+        self.localized_content: dict[Region, LocalizedContent] = {}
+        self.international_scholarships: list[InternationalScholarship] = []
+        self.partner_conversations: list[PartnerConversation] = []
         self.target_scholarships_per_region = 25  # 50 total across CA/UK
         self.target_conversations_per_region = 5
-        
-    async def launch_international_pilot(self) -> Dict[str, Any]:
+
+    async def launch_international_pilot(self) -> dict[str, Any]:
         """Execute comprehensive international pilot launch"""
         try:
             logger.info("🌍 Week 4 International Pilot: Canada + UK expansion initiated")
-            
+
             # Phase 1: Setup localization infrastructure
             localization_setup = await self._setup_localization_infrastructure()
-            
+
             # Phase 2: Ingest regional scholarship data
-            scholarship_ingestion = await self._ingest_regional_scholarships()
-            
+            await self._ingest_regional_scholarships()
+
             # Phase 3: Create localized programmatic pages
             localized_pages = await self._generate_localized_pages()
-            
+
             # Phase 4: Establish compliance frameworks
             compliance_setup = await self._establish_compliance_frameworks()
-            
+
             # Phase 5: Schedule partner conversations
-            partner_outreach = await self._schedule_partner_conversations()
-            
+            await self._schedule_partner_conversations()
+
             # Phase 6: Create geo-targeted sitemaps
-            sitemap_generation = await self._generate_geo_targeted_sitemaps()
-            
+            await self._generate_geo_targeted_sitemaps()
+
             # Calculate success metrics
             total_scholarships = len(self.international_scholarships)
             total_conversations = len(self.partner_conversations)
             regions_active = len(self.localized_content)
-            
+
             results = {
                 "execution_status": "success",
                 "regions_launched": regions_active,
@@ -160,10 +160,10 @@ class Week4InternationalPilot:
                 "execution_time_seconds": 1756.8,
                 "next_phase_ready": True
             }
-            
+
             logger.info(f"✅ International Pilot Complete: {regions_active} regions, {total_scholarships} scholarships, {total_conversations} conversations")
             return results
-            
+
         except Exception as e:
             logger.error(f"❌ International pilot launch failed: {str(e)}")
             return {
@@ -172,10 +172,10 @@ class Week4InternationalPilot:
                 "regions_launched": 0,
                 "international_readiness": False
             }
-    
-    async def _setup_localization_infrastructure(self) -> Dict[str, Any]:
+
+    async def _setup_localization_infrastructure(self) -> dict[str, Any]:
         """Setup comprehensive localization for Canada and UK markets"""
-        
+
         # Canada localization configuration
         canada_config = LocalizedContent(
             region=Region.CANADA,
@@ -192,10 +192,10 @@ class Week4InternationalPilot:
             phone_format="+1 (XXX) XXX-XXXX",
             postal_code_regex="^[A-Za-z]\\d[A-Za-z] \\d[A-Za-z]\\d$",
             privacy_policy_url="/privacy/canada",
-            terms_url="/terms/canada", 
+            terms_url="/terms/canada",
             compliance_framework=ComplianceFramework.PIPEDA
         )
-        
+
         # UK localization configuration
         uk_config = LocalizedContent(
             region=Region.UNITED_KINGDOM,
@@ -215,11 +215,11 @@ class Week4InternationalPilot:
             terms_url="/terms/united-kingdom",
             compliance_framework=ComplianceFramework.GDPR
         )
-        
+
         self.localized_content[Region.CANADA] = canada_config
         self.localized_content[Region.UNITED_KINGDOM] = uk_config
-        
-        localization_setup = {
+
+        return {
             "regions_configured": 2,
             "date_formats": {
                 "canada": canada_config.date_format,
@@ -239,22 +239,21 @@ class Week4InternationalPilot:
             },
             "localization_ready": True
         }
-        
-        return localization_setup
-    
-    async def _ingest_regional_scholarships(self) -> Dict[str, Any]:
+
+
+    async def _ingest_regional_scholarships(self) -> dict[str, Any]:
         """Ingest 50+ scholarships from Canada and UK sources"""
-        
+
         # Canada scholarship data (25 scholarships)
         canada_scholarships = await self._generate_canada_scholarships()
-        
+
         # UK scholarship data (25 scholarships)
         uk_scholarships = await self._generate_uk_scholarships()
-        
+
         self.international_scholarships.extend(canada_scholarships)
         self.international_scholarships.extend(uk_scholarships)
-        
-        ingestion_results = {
+
+        return {
             "total_scholarships_ingested": len(self.international_scholarships),
             "canada_scholarships": len(canada_scholarships),
             "uk_scholarships": len(uk_scholarships),
@@ -275,13 +274,12 @@ class Week4InternationalPilot:
                 "current_deadlines": len([s for s in self.international_scholarships if s.application_deadline > datetime.now().isoformat()])
             }
         }
-        
-        return ingestion_results
-    
-    async def _generate_canada_scholarships(self) -> List[InternationalScholarship]:
+
+
+    async def _generate_canada_scholarships(self) -> list[InternationalScholarship]:
         """Generate comprehensive Canada scholarship dataset"""
         canada_scholarships = []
-        
+
         scholarship_templates = [
             {
                 "title": "Loran Scholars Foundation Award",
@@ -292,7 +290,7 @@ class Week4InternationalPilot:
             },
             {
                 "title": "Schulich Leader Scholarship",
-                "provider": "Schulich Foundation", 
+                "provider": "Schulich Foundation",
                 "amount_range": (60000, 120000),
                 "type": "stem_excellence",
                 "description": "Prestigious STEM scholarship for high school graduates pursuing science, technology, engineering or math"
@@ -319,9 +317,9 @@ class Week4InternationalPilot:
                 "description": "Supporting Indigenous students in post-secondary education across Canada"
             }
         ]
-        
+
         # Generate variations for each template (5 base templates × 5 variations = 25 scholarships)
-        for i, template in enumerate(scholarship_templates):
+        for _i, template in enumerate(scholarship_templates):
             for variation in range(5):
                 scholarship = InternationalScholarship(
                     scholarship_id=str(uuid.uuid4()),
@@ -346,13 +344,13 @@ class Week4InternationalPilot:
                     geo_restrictions=["canada_residents_only"] if variation < 3 else ["canada_and_international"]
                 )
                 canada_scholarships.append(scholarship)
-        
+
         return canada_scholarships
-    
-    async def _generate_uk_scholarships(self) -> List[InternationalScholarship]:
+
+    async def _generate_uk_scholarships(self) -> list[InternationalScholarship]:
         """Generate comprehensive UK scholarship dataset"""
         uk_scholarships = []
-        
+
         scholarship_templates = [
             {
                 "title": "Rhodes Scholarship",
@@ -390,9 +388,9 @@ class Week4InternationalPilot:
                 "description": "Scholarships for students from specific countries to study in the UK"
             }
         ]
-        
+
         # Generate variations for each template (5 base templates × 5 variations = 25 scholarships)
-        for i, template in enumerate(scholarship_templates):
+        for _i, template in enumerate(scholarship_templates):
             for variation in range(5):
                 scholarship = InternationalScholarship(
                     scholarship_id=str(uuid.uuid4()),
@@ -417,13 +415,13 @@ class Week4InternationalPilot:
                     geo_restrictions=["uk_study_only", "tier4_visa_eligible"] if variation < 4 else ["distance_learning_available"]
                 )
                 uk_scholarships.append(scholarship)
-        
+
         return uk_scholarships
-    
-    async def _generate_localized_pages(self) -> Dict[str, Any]:
+
+    async def _generate_localized_pages(self) -> dict[str, Any]:
         """Generate localized programmatic pages for Canada and UK"""
-        
-        page_generation = {
+
+        return {
             "canada": {
                 "pages_generated": 85,  # Academic years, provinces, fields, institutions
                 "page_types": {
@@ -435,7 +433,7 @@ class Week4InternationalPilot:
                 },
                 "localization_features": {
                     "currency_display": "CAD",
-                    "date_format": "DD/MM/YYYY", 
+                    "date_format": "DD/MM/YYYY",
                     "address_validation": "postal_codes",
                     "phone_formatting": "canadian_standard",
                     "privacy_compliance": "pipeda"
@@ -467,13 +465,12 @@ class Week4InternationalPilot:
                 "country_specific_sitemaps": True
             }
         }
-        
-        return page_generation
-    
-    async def _establish_compliance_frameworks(self) -> Dict[str, Any]:
+
+
+    async def _establish_compliance_frameworks(self) -> dict[str, Any]:
         """Establish GDPR and PIPEDA compliance frameworks"""
-        
-        compliance_setup = {
+
+        return {
             "gdpr": {
                 "compliant": True,
                 "lawful_basis": "Article 6(1)(a) - Consent and Article 6(1)(b) - Contract",
@@ -509,12 +506,11 @@ class Week4InternationalPilot:
                 "automated_compliance_monitoring": True
             }
         }
-        
-        return compliance_setup
-    
-    async def _schedule_partner_conversations(self) -> Dict[str, Any]:
+
+
+    async def _schedule_partner_conversations(self) -> dict[str, Any]:
         """Schedule 5 partner conversations per region"""
-        
+
         # Canada partner conversations
         canada_partners = [
             {
@@ -536,7 +532,7 @@ class Week4InternationalPilot:
             {
                 "organization": "Indspire",
                 "contact": "Jennifer Beardy",
-                "email": "partnerships@indspire.ca", 
+                "email": "partnerships@indspire.ca",
                 "stage": "discovery",
                 "potential": "medium",
                 "focus": "Indigenous student education support"
@@ -558,7 +554,7 @@ class Week4InternationalPilot:
                 "focus": "Development scholarships and global citizenship"
             }
         ]
-        
+
         # UK partner conversations
         uk_partners = [
             {
@@ -602,7 +598,7 @@ class Week4InternationalPilot:
                 "focus": "Scholarship search and application support"
             }
         ]
-        
+
         # Create conversation objects
         for partner in canada_partners:
             conversation = PartnerConversation(
@@ -618,7 +614,7 @@ class Week4InternationalPilot:
                 compliance_requirements=["pipeda", "canadian_privacy_laws", "provincial_education_regulations"]
             )
             self.partner_conversations.append(conversation)
-        
+
         for partner in uk_partners:
             conversation = PartnerConversation(
                 conversation_id=str(uuid.uuid4()),
@@ -633,8 +629,8 @@ class Week4InternationalPilot:
                 compliance_requirements=["gdpr", "uk_data_protection_act", "tier4_visa_compliance"]
             )
             self.partner_conversations.append(conversation)
-        
-        conversation_summary = {
+
+        return {
             "total_conversations_scheduled": len(self.partner_conversations),
             "canada_conversations": len([c for c in self.partner_conversations if c.region == Region.CANADA]),
             "uk_conversations": len([c for c in self.partner_conversations if c.region == Region.UNITED_KINGDOM]),
@@ -650,19 +646,18 @@ class Week4InternationalPilot:
             "first_calls_week": 7,  # Next week
             "pipeline_value": "high_strategic_value"
         }
-        
-        return conversation_summary
-    
-    async def _generate_geo_targeted_sitemaps(self) -> Dict[str, Any]:
+
+
+    async def _generate_geo_targeted_sitemaps(self) -> dict[str, Any]:
         """Generate geo-targeted sitemap sections for international SEO"""
-        
-        sitemap_structure = {
+
+        return {
             "main_sitemap": {
                 "url": "https://scholarships.com/sitemap.xml",
                 "includes": ["sitemap-ca.xml", "sitemap-uk.xml", "sitemap-us.xml"]
             },
             "canada_sitemap": {
-                "url": "https://scholarships.com/sitemap-ca.xml", 
+                "url": "https://scholarships.com/sitemap-ca.xml",
                 "pages": 85,
                 "geo_targeting": "ca",
                 "hreflang": "en-CA",
@@ -678,7 +673,7 @@ class Week4InternationalPilot:
                 "url": "https://scholarships.com/sitemap-uk.xml",
                 "pages": 75,
                 "geo_targeting": "gb",
-                "hreflang": "en-GB", 
+                "hreflang": "en-GB",
                 "priority_distribution": {
                     "homepage_uk": 1.0,
                     "country_guides": 0.9,
@@ -695,8 +690,7 @@ class Week4InternationalPilot:
             },
             "submission_schedule": "daily_automated_updates"
         }
-        
-        return sitemap_structure
+
 
 # Usage example for Week 4 execution
 if __name__ == "__main__":
@@ -704,5 +698,5 @@ if __name__ == "__main__":
         pilot = Week4InternationalPilot()
         result = await pilot.launch_international_pilot()
         print(json.dumps(result, indent=2))
-    
+
     asyncio.run(main())

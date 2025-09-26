@@ -3,17 +3,13 @@ SOC2 Evidence Collection and PII Lineage Service
 Global compliance service for evidence collection and data privacy tracking
 """
 
-import asyncio
-import json
 import os
-import hashlib
-import re
-from datetime import datetime, timedelta
-from typing import Dict, List, Optional, Any, Set
-from dataclasses import dataclass, asdict
-from enum import Enum
 import sys
-import os
+from dataclasses import dataclass
+from datetime import datetime
+from enum import Enum
+from typing import Any
+
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from utils.logger import get_logger
 
@@ -65,9 +61,9 @@ class PIIDataElement:
     encryption_at_rest: bool
     encryption_in_transit: bool
     access_logged: bool
-    last_accessed: Optional[datetime] = None
+    last_accessed: datetime | None = None
     consent_obtained: bool = False
-    consent_date: Optional[datetime] = None
+    consent_date: datetime | None = None
     lawful_basis: str = ""
 
 @dataclass
@@ -79,7 +75,7 @@ class DataLineageRecord:
     destination_system: str
     destination_field: str
     transformation_applied: str
-    data_types: List[PIIType]
+    data_types: list[PIIType]
     processing_purpose: DataProcessingPurpose
     created_at: datetime
     last_verified: datetime
@@ -96,19 +92,19 @@ class SOC2Evidence:
     collection_date: datetime
     verification_status: str
     notes: str
-    related_systems: List[str]
+    related_systems: list[str]
 
 class SOC2EvidenceService:
     """Global SOC2 evidence collection and PII lineage service"""
-    
+
     def __init__(self):
-        self.pii_elements: List[PIIDataElement] = []
-        self.data_lineage: List[DataLineageRecord] = []
-        self.soc2_evidence: List[SOC2Evidence] = []
+        self.pii_elements: list[PIIDataElement] = []
+        self.data_lineage: list[DataLineageRecord] = []
+        self.soc2_evidence: list[SOC2Evidence] = []
         self.compliance_config = self._load_compliance_config()
         self._initialized = False
-    
-    def _load_compliance_config(self) -> Dict[str, Any]:
+
+    def _load_compliance_config(self) -> dict[str, Any]:
         """Load compliance configuration"""
         return {
             "data_retention_policies": {
@@ -132,12 +128,12 @@ class SOC2EvidenceService:
             },
             "soc2_scope": [
                 "scholarship_api",
-                "auto_command_center", 
+                "auto_command_center",
                 "student_dashboard",
                 "partner_portal"
             ]
         }
-    
+
     async def _discover_pii_elements(self):
         """Automatically discover PII elements in the system"""
         # Scholarship API PII elements
@@ -188,10 +184,10 @@ class SOC2EvidenceService:
                 lawful_basis="Legitimate Interest - Educational Services"
             )
         ]
-        
+
         self.pii_elements.extend(scholarship_pii)
         logger.info(f"Discovered {len(scholarship_pii)} PII elements in scholarship_api")
-    
+
     async def _collect_baseline_evidence(self):
         """Collect baseline SOC2 evidence"""
         baseline_evidence = [
@@ -220,21 +216,21 @@ class SOC2EvidenceService:
                 related_systems=["scholarship_api"]
             )
         ]
-        
+
         self.soc2_evidence.extend(baseline_evidence)
         logger.info(f"Collected {len(baseline_evidence)} baseline SOC2 evidence items")
-    
+
     async def _ensure_initialized(self):
         """Ensure the service is initialized with data"""
         if not self._initialized:
             await self._discover_pii_elements()
             await self._collect_baseline_evidence()
             self._initialized = True
-    
-    async def get_compliance_dashboard(self) -> Dict[str, Any]:
+
+    async def get_compliance_dashboard(self) -> dict[str, Any]:
         """Get compliance dashboard for CEO/Marketing"""
         await self._ensure_initialized()
-        dashboard_data = {
+        return {
             "last_updated": datetime.utcnow().isoformat(),
             "compliance_overview": {
                 "soc2_readiness_score": 75.0,
@@ -252,10 +248,9 @@ class SOC2EvidenceService:
                 "pii_data_map": "/compliance/data_map.json"
             }
         }
-        
-        return dashboard_data
-    
-    async def scan_pii_compliance(self) -> Dict[str, Any]:
+
+
+    async def scan_pii_compliance(self) -> dict[str, Any]:
         """Scan PII elements for compliance violations"""
         return {
             "violations": [],
@@ -264,23 +259,23 @@ class SOC2EvidenceService:
             "compliant_elements": len(self.pii_elements),
             "compliance_percentage": 100.0
         }
-    
-    async def collect_security_evidence(self) -> List[SOC2Evidence]:
+
+    async def collect_security_evidence(self) -> list[SOC2Evidence]:
         """Collect security-related SOC2 evidence"""
         return self.soc2_evidence
-    
-    async def map_data_lineage(self, source_system: str, destination_system: str) -> List[DataLineageRecord]:
+
+    async def map_data_lineage(self, source_system: str, destination_system: str) -> list[DataLineageRecord]:
         """Map data lineage between systems"""
         return []
-    
+
     def _calculate_soc2_readiness(self) -> float:
         """Calculate SOC2 readiness score"""
         return 75.0
-    
-    def _get_soc2_control_status(self) -> Dict[str, Any]:
+
+    def _get_soc2_control_status(self) -> dict[str, Any]:
         """Get status of SOC2 controls"""
         return {}
-    
+
     async def export_compliance_report(self):
         """Export comprehensive compliance report"""
         return {
@@ -293,8 +288,8 @@ class SOC2EvidenceService:
             "critical_findings": [],
             "recommendations": []
         }
-    
-    async def generate_data_map(self) -> Dict[str, Any]:
+
+    async def generate_data_map(self) -> dict[str, Any]:
         """Generate comprehensive data map for privacy compliance"""
         return {
             "generated_at": datetime.utcnow().isoformat(),

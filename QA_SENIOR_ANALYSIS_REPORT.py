@@ -4,17 +4,18 @@ Senior QA Engineer Comprehensive Analysis Report
 Analysis-only examination of existing codebase without modifications
 """
 
-import os
 import json
+import os
 from datetime import datetime
 from pathlib import Path
 
+
 def analyze_codebase():
     """Perform comprehensive QA analysis"""
-    
+
     issues = []
     issue_id = 1
-    
+
     def add_issue(location, description, steps, observed, expected, severity):
         nonlocal issue_id
         issues.append({
@@ -27,17 +28,17 @@ def analyze_codebase():
             "severity": severity
         })
         issue_id += 1
-    
+
     print("🔍 Senior QA Engineer - Comprehensive Code Analysis")
     print("=" * 60)
-    
+
     # 1. Examine main.py for critical issues
     print("Analyzing main.py...")
-    
+
     try:
-        with open("main.py", "r") as f:
+        with open("main.py") as f:
             main_content = f.read()
-            
+
         # Check for production hardening issues
         if 'docs_url="/docs"' in main_content and 'settings.should_enable_docs' not in main_content:
             add_issue(
@@ -48,7 +49,7 @@ def analyze_codebase():
                 "Documentation should be conditionally enabled based on environment",
                 "Medium"
             )
-            
+
         # Check middleware ordering
         if "add_middleware" in main_content:
             lines = main_content.split('\n')
@@ -65,7 +66,7 @@ def analyze_codebase():
                         "SecurityHeadersMiddleware should be outermost (first added)",
                         "Medium"
                     )
-                    
+
     except Exception as e:
         add_issue(
             "main.py",
@@ -75,14 +76,14 @@ def analyze_codebase():
             "Successful file analysis",
             "High"
         )
-    
+
     # 2. Examine configuration security
     print("Analyzing configuration security...")
-    
+
     try:
-        with open("config/settings.py", "r") as f:
+        with open("config/settings.py") as f:
             settings_content = f.read()
-            
+
         # Check for hardcoded secrets
         if "secret" in settings_content.lower() and "test" in settings_content.lower():
             add_issue(
@@ -93,7 +94,7 @@ def analyze_codebase():
                 "No hardcoded secrets or test values",
                 "High"
             )
-            
+
         # Check JWT secret validation
         if "jwt_secret_key" in settings_content:
             if "len(" not in settings_content or "64" not in settings_content:
@@ -105,7 +106,7 @@ def analyze_codebase():
                     "JWT secrets should be validated as ≥64 characters",
                     "High"
                 )
-                
+
     except Exception as e:
         add_issue(
             "config/settings.py",
@@ -115,17 +116,17 @@ def analyze_codebase():
             "Successful configuration analysis",
             "Critical"
         )
-    
+
     # 3. Examine database security
     print("Analyzing database operations...")
-    
+
     db_files = ["database/session_manager.py", "models/scholarship.py", "services/scholarship_service.py"]
     for db_file in db_files:
         try:
             if os.path.exists(db_file):
-                with open(db_file, "r") as f:
+                with open(db_file) as f:
                     db_content = f.read()
-                
+
                 # Check for SQL injection vulnerabilities
                 if "SELECT" in db_content and "%" in db_content:
                     add_issue(
@@ -136,7 +137,7 @@ def analyze_codebase():
                         "All SQL queries should use parameterized queries",
                         "Critical"
                     )
-                
+
                 # Check for missing input validation
                 if "def" in db_content and "request" in db_content:
                     if "validate" not in db_content and "pydantic" not in db_content:
@@ -150,28 +151,28 @@ def analyze_codebase():
                         )
         except:
             pass
-    
+
     # 4. Examine middleware security
     print("Analyzing middleware implementations...")
-    
+
     middleware_files = list(Path("middleware").glob("*.py"))
     for middleware_file in middleware_files:
         try:
-            with open(middleware_file, "r") as f:
+            with open(middleware_file) as f:
                 middleware_content = f.read()
-            
+
             # Check rate limiting implementation
             if "rate" in str(middleware_file).lower():
                 if "redis" in middleware_content and "except" not in middleware_content:
                     add_issue(
                         str(middleware_file),
                         "Rate limiting missing error handling for Redis failures",
-                        f"1. Disable Redis\n2. Test rate limiting functionality",
+                        "1. Disable Redis\n2. Test rate limiting functionality",
                         "Rate limiting may fail without proper Redis error handling",
                         "Graceful fallback when Redis is unavailable",
                         "Medium"
                     )
-            
+
             # Check for security headers
             if "security" in str(middleware_file).lower():
                 required_headers = ["X-Content-Type-Options", "X-Frame-Options", "X-XSS-Protection"]
@@ -180,12 +181,12 @@ def analyze_codebase():
                     add_issue(
                         str(middleware_file),
                         f"Missing security headers: {missing_headers}",
-                        f"1. Check response headers\n2. Review security middleware",
+                        "1. Check response headers\n2. Review security middleware",
                         f"Security headers not implemented: {missing_headers}",
                         "All critical security headers should be present",
                         "Medium"
                     )
-                    
+
         except Exception as e:
             add_issue(
                 str(middleware_file),
@@ -195,16 +196,16 @@ def analyze_codebase():
                 "Successful middleware analysis",
                 "Medium"
             )
-    
+
     # 5. Examine API endpoints for vulnerabilities
     print("Analyzing API endpoints...")
-    
+
     router_files = list(Path("routers").glob("*.py"))
     for router_file in router_files:
         try:
-            with open(router_file, "r") as f:
+            with open(router_file) as f:
                 router_content = f.read()
-            
+
             # Check for missing authentication
             if "@router." in router_content:
                 if "dependencies" not in router_content and "auth" not in str(router_file).lower():
@@ -217,7 +218,7 @@ def analyze_codebase():
                             "Critical endpoints should require authentication",
                             "Medium"
                         )
-            
+
             # Check for input validation
             if "async def" in router_content:
                 if "Depends" not in router_content and "pydantic" not in router_content:
@@ -229,7 +230,7 @@ def analyze_codebase():
                         "All inputs should be validated with Pydantic models",
                         "High"
                     )
-                    
+
         except Exception as e:
             add_issue(
                 str(router_file),
@@ -239,13 +240,13 @@ def analyze_codebase():
                 "Successful router analysis",
                 "Medium"
             )
-    
+
     # 6. Check test coverage
     print("Analyzing test coverage...")
-    
+
     test_files = list(Path("tests").glob("*.py"))
     test_count = len([f for f in test_files if f.name.startswith("test_")])
-    
+
     if test_count < 5:
         add_issue(
             "tests/",
@@ -255,7 +256,7 @@ def analyze_codebase():
             "Comprehensive test suite with multiple test files",
             "Medium"
         )
-    
+
     # Check for security tests
     security_test_exists = any("security" in f.name for f in test_files)
     if not security_test_exists:
@@ -267,15 +268,15 @@ def analyze_codebase():
             "Security tests for authentication, authorization, input validation",
             "High"
         )
-    
+
     # 7. Check deployment configuration
     print("Analyzing deployment configuration...")
-    
+
     if os.path.exists("Dockerfile"):
         try:
-            with open("Dockerfile", "r") as f:
+            with open("Dockerfile") as f:
                 dockerfile_content = f.read()
-            
+
             # Check for security best practices
             if "USER root" in dockerfile_content:
                 add_issue(
@@ -286,7 +287,7 @@ def analyze_codebase():
                     "Container should run as non-root user",
                     "High"
                 )
-                
+
             if "COPY . ." in dockerfile_content:
                 add_issue(
                     "Dockerfile",
@@ -296,7 +297,7 @@ def analyze_codebase():
                     "Use .dockerignore and selective COPY commands",
                     "Medium"
                 )
-                
+
         except Exception as e:
             add_issue(
                 "Dockerfile",
@@ -306,15 +307,15 @@ def analyze_codebase():
                 "Successful Dockerfile analysis",
                 "Low"
             )
-    
+
     # 8. Environment and secrets analysis
     print("Analyzing environment configuration...")
-    
+
     if os.path.exists(".env.example"):
         try:
-            with open(".env.example", "r") as f:
+            with open(".env.example") as f:
                 env_content = f.read()
-            
+
             # Check for default secrets
             if "your-secret-key" in env_content or "changeme" in env_content:
                 add_issue(
@@ -325,40 +326,40 @@ def analyze_codebase():
                     "Example file should have clear placeholders without functional values",
                     "Low"
                 )
-                
-        except Exception as e:
+
+        except Exception:
             pass
-    
+
     # Generate comprehensive report
     print("\n" + "=" * 80)
     print("📊 COMPREHENSIVE QA ANALYSIS REPORT")
     print("=" * 80)
-    
+
     severity_counts = {"Critical": 0, "High": 0, "Medium": 0, "Low": 0}
     for issue in issues:
         severity_counts[issue["severity"]] += 1
-    
-    print(f"\n📈 EXECUTIVE SUMMARY:")
+
+    print("\n📈 EXECUTIVE SUMMARY:")
     print(f"Analysis Date: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     print(f"Total Issues Found: {len(issues)}")
     print(f"Critical: {severity_counts['Critical']}")
     print(f"High: {severity_counts['High']}")
     print(f"Medium: {severity_counts['Medium']}")
     print(f"Low: {severity_counts['Low']}")
-    
+
     if issues:
-        print(f"\n🔍 DETAILED FINDINGS:")
+        print("\n🔍 DETAILED FINDINGS:")
         print("-" * 80)
-        
+
         # Sort by severity
         severity_order = {"Critical": 0, "High": 1, "Medium": 2, "Low": 3}
         sorted_issues = sorted(issues, key=lambda x: severity_order[x["severity"]])
-        
+
         for issue in sorted_issues:
             print(f"\n{issue['issue_id']} [{issue['severity']}]")
             print(f"Location: {issue['location']}")
             print(f"Description: {issue['description']}")
-            print(f"Steps to Reproduce:")
+            print("Steps to Reproduce:")
             for step in issue['steps_to_reproduce'].split('\n'):
                 print(f"  {step}")
             print(f"Observed Output: {issue['observed_output']}")
@@ -366,7 +367,7 @@ def analyze_codebase():
             print("-" * 40)
     else:
         print("\n✅ EXCELLENT: No issues found in static analysis!")
-    
+
     # Save detailed JSON report
     report_data = {
         "analysis_timestamp": datetime.now().isoformat(),
@@ -378,23 +379,23 @@ def analyze_codebase():
         },
         "issues": issues
     }
-    
+
     with open("QA_SENIOR_ANALYSIS_REPORT.json", "w") as f:
         json.dump(report_data, f, indent=2)
-    
-    print(f"\n📄 Detailed JSON report saved: QA_SENIOR_ANALYSIS_REPORT.json")
-    
+
+    print("\n📄 Detailed JSON report saved: QA_SENIOR_ANALYSIS_REPORT.json")
+
     # Recommendations
-    print(f"\n🎯 KEY RECOMMENDATIONS:")
+    print("\n🎯 KEY RECOMMENDATIONS:")
     if severity_counts["Critical"] > 0:
         print("- Address CRITICAL issues immediately before deployment")
     if severity_counts["High"] > 0:
         print("- Resolve HIGH severity issues to improve security posture")
     if severity_counts["Medium"] > 0:
         print("- Consider addressing MEDIUM issues for production readiness")
-    
+
     print("\n✅ QA Analysis Complete - No code was modified during this analysis")
-    
+
     return len(issues)
 
 if __name__ == "__main__":

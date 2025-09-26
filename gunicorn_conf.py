@@ -3,8 +3,8 @@ Gunicorn configuration for production deployment
 Optimized for FastAPI with Uvicorn workers
 """
 
-import os
 import multiprocessing
+import os
 
 # Server socket
 bind = f"0.0.0.0:{os.getenv('PORT', '8000')}"

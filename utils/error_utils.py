@@ -5,11 +5,12 @@ Eliminates double-encoding by providing single source of truth for error format
 
 import time
 import uuid
-from typing import Optional, Dict, Any
+from typing import Any
+
 from fastapi import Request
 
 
-def get_trace_id(request: Optional[Request] = None) -> str:
+def get_trace_id(request: Request | None = None) -> str:
     """
     Get or generate trace ID for request tracking
     """
@@ -20,22 +21,22 @@ def get_trace_id(request: Optional[Request] = None) -> str:
 
 def build_error(
     code: str,
-    message: str, 
+    message: str,
     status: int,
-    details: Optional[Dict[str, Any]] = None,
-    trace_id: Optional[str] = None
-) -> Dict[str, Any]:
+    details: dict[str, Any] | None = None,
+    trace_id: str | None = None
+) -> dict[str, Any]:
     """
     Build standardized error response dict
-    
+
     Priority 2 Day 2: Enhanced unified error envelope
     Schema: {code, message, correlation_id, details?, status, timestamp, trace_id}
-    
+
     Returns plain dict - never JSON string to prevent double encoding
     All error handlers must use this and pass result directly to JSONResponse
     """
     correlation_id = trace_id or str(uuid.uuid4())
-    
+
     # Primary error schema - Priority 2 Day 2 compliant
     error_dict = {
         "code": code,
@@ -44,21 +45,21 @@ def build_error(
         "status": status,
         "timestamp": int(time.time())
     }
-    
+
     # Include details if provided
     if details:
         error_dict["details"] = details
-    
+
     # Keep trace_id for internal logging and backward compatibility
     error_dict["trace_id"] = correlation_id
-        
+
     return error_dict
 
 
 def build_rate_limit_error(
-    trace_id: Optional[str] = None,
+    trace_id: str | None = None,
     retry_after_seconds: int = 60
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Build rate limit specific error with retry information"""
     return build_error(
         code="RATE_LIMITED",
@@ -71,8 +72,8 @@ def build_rate_limit_error(
 
 def build_auth_error(
     message: str = "Authentication required",
-    trace_id: Optional[str] = None
-) -> Dict[str, Any]:
+    trace_id: str | None = None
+) -> dict[str, Any]:
     """Build authentication error response"""
     return build_error(
         code="UNAUTHORIZED",
@@ -84,9 +85,9 @@ def build_auth_error(
 
 def build_validation_error(
     message: str = "Invalid input data",
-    details: Optional[Dict[str, Any]] = None,
-    trace_id: Optional[str] = None
-) -> Dict[str, Any]:
+    details: dict[str, Any] | None = None,
+    trace_id: str | None = None
+) -> dict[str, Any]:
     """Build validation error response"""
     return build_error(
         code="VALIDATION_ERROR",
@@ -102,8 +103,8 @@ def build_error_response(
     code: str,
     message: str,
     status: int,
-    details: Optional[Dict[str, Any]] = None
-) -> Dict[str, Any]:
+    details: dict[str, Any] | None = None
+) -> dict[str, Any]:
     """
     Build error response - alias for build_error with specific parameter order
     Used by middleware for consistent error format

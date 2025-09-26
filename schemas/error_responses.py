@@ -2,8 +2,9 @@
 OpenAPI error response schemas for consistent documentation
 """
 
+from typing import Any
+
 from pydantic import BaseModel, Field
-from typing import Optional, Dict, Any, List
 
 
 class ErrorResponse(BaseModel):
@@ -13,7 +14,7 @@ class ErrorResponse(BaseModel):
     message: str = Field(..., description="Human-readable error message")
     status: int = Field(..., description="HTTP status code")
     timestamp: int = Field(..., description="Unix timestamp when error occurred")
-    details: Optional[Dict[str, Any]] = Field(None, description="Additional error details")
+    details: dict[str, Any] | None = Field(None, description="Additional error details")
 
     model_config = {
         "json_schema_extra": {
@@ -51,7 +52,7 @@ class ValidationErrorResponse(BaseModel):
     message: str = Field("Request validation failed", description="Error message")
     status: int = Field(422, description="HTTP status code")
     timestamp: int = Field(..., description="Unix timestamp")
-    details: Dict[str, List[ValidationErrorField]] = Field(..., description="Validation details")
+    details: dict[str, list[ValidationErrorField]] = Field(..., description="Validation details")
 
 
 class UnauthorizedErrorResponse(BaseModel):

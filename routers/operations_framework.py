@@ -4,37 +4,40 @@ Comprehensive AE + Partner Success Operations Framework for aggressive B2B ARR e
 
 Complete API access to:
 - Lead Routing Engine
-- Pipeline Management System  
+- Pipeline Management System
 - Success Playbooks
 - Sales Enablement Tools
 - Performance Dashboards
 """
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Body
-from sqlalchemy.orm import Session
-from typing import Dict, List, Any, Optional
+import logging
 from datetime import datetime
 from decimal import Decimal
-import logging
+from typing import Any
 
-from models.database import get_db
-from middleware.auth import require_auth, require_admin, User
+from fastapi import APIRouter, Body, Depends, HTTPException, Query
+
+from middleware.auth import User, require_admin, require_auth
 from services.lead_routing_engine import (
-    lead_routing_engine, Lead, LeadSegment, Territory, LeadSource, 
-    LeadStage, AssignmentType
+    LeadSegment,
+    LeadSource,
+    LeadStage,
+    Territory,
+    lead_routing_engine,
+)
+from services.performance_dashboards import TimeRange as DashboardTimeRange
+from services.performance_dashboards import (
+    performance_dashboard_system,
 )
 from services.pipeline_management_system import (
-    pipeline_management_system, Deal, DealStage, DealHealth
-)
-from services.success_playbooks import (
-    success_playbooks_engine, PlaybookType, PlaybookTrigger, 
-    CustomerHealthStatus
+    DealStage,
+    pipeline_management_system,
 )
 from services.sales_enablement_tools import (
-    sales_enablement_toolkit, CompetitorType, ContractType
+    sales_enablement_toolkit,
 )
-from services.performance_dashboards import (
-    performance_dashboard_system, PerformanceMetric, TimeRange as DashboardTimeRange
+from services.success_playbooks import (
+    success_playbooks_engine,
 )
 
 logger = logging.getLogger(__name__)
@@ -54,16 +57,16 @@ router = APIRouter(
     summary="Route new lead to appropriate sales rep",
     description="Automatically route lead based on segment, territory, ACV, and rep availability")
 async def route_lead(
-    lead_data: Dict[str, Any] = Body(...),
+    lead_data: dict[str, Any] = Body(...),
     request_id: str = Depends(lambda: f"req_{datetime.utcnow().strftime('%Y%m%d_%H%M%S_%f')[:-3]}"),
     user: User = Depends(require_auth(min_role="partner"))
 ):
     """Route incoming lead to appropriate sales rep"""
     try:
         lead, assigned_rep, routing_reason = lead_routing_engine.route_lead(lead_data)
-        
+
         logger.info(f"🎯 Lead routed by {user.user_id}: {lead.organization_name} → {assigned_rep.name}")
-        
+
         return {
             "success": True,
             "request_id": request_id,
@@ -84,7 +87,7 @@ async def route_lead(
                 "routing_reason": routing_reason
             }
         }
-        
+
     except Exception as e:
         logger.error(f"Failed to route lead: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to route lead: {str(e)}")
@@ -99,16 +102,16 @@ async def get_routing_analytics(
     """Get comprehensive routing analytics"""
     try:
         analytics = lead_routing_engine.get_routing_analytics()
-        
+
         logger.info(f"📊 Routing analytics requested by {user.user_id}")
-        
+
         return {
             "success": True,
             "request_id": request_id,
             "timestamp": datetime.utcnow().isoformat(),
             "analytics": analytics
         }
-        
+
     except Exception as e:
         logger.error(f"Failed to get routing analytics: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to retrieve routing analytics: {str(e)}")
@@ -126,9 +129,9 @@ async def reassign_lead(
     """Reassign lead to different sales rep"""
     try:
         lead = lead_routing_engine.reassign_lead(lead_id, new_rep_id, reason)
-        
+
         logger.warning(f"🔄 Lead reassigned by admin {user.user_id}: {lead_id} → {new_rep_id}")
-        
+
         return {
             "success": True,
             "request_id": request_id,
@@ -140,7 +143,7 @@ async def reassign_lead(
                 "reason": reason
             }
         }
-        
+
     except Exception as e:
         logger.error(f"Failed to reassign lead: {str(e)}")
         raise HTTPException(status_code=400, detail=str(e))
@@ -151,7 +154,7 @@ async def reassign_lead(
     summary="Create deal from qualified lead",
     description="Convert qualified lead into deal in pipeline management system")
 async def create_deal(
-    deal_data: Dict[str, Any] = Body(...),
+    deal_data: dict[str, Any] = Body(...),
     request_id: str = Depends(lambda: f"req_{datetime.utcnow().strftime('%Y%m%d_%H%M%S_%f')[:-3]}"),
     user: User = Depends(require_auth(min_role="partner"))
 ):
@@ -176,15 +179,15 @@ async def create_deal(
             fit_score=deal_data['fit_score'],
             created_at=datetime.utcnow()
         )
-        
+
         deal = pipeline_management_system.create_deal_from_lead(
             lead=lead,
             owner_id=deal_data['owner_id'],
             owner_name=deal_data['owner_name']
         )
-        
+
         logger.info(f"💼 Deal created by {user.user_id}: {deal.organization_name} (${deal.estimated_acv:,.0f})")
-        
+
         return {
             "success": True,
             "request_id": request_id,
@@ -199,7 +202,7 @@ async def create_deal(
                 "owner_name": deal.owner_name
             }
         }
-        
+
     except Exception as e:
         logger.error(f"Failed to create deal: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to create deal: {str(e)}")
@@ -221,9 +224,9 @@ async def advance_deal_stage(
             new_stage=DealStage(new_stage),
             notes=notes
         )
-        
+
         logger.info(f"📈 Deal advanced by {user.user_id}: {deal.organization_name} → {new_stage}")
-        
+
         return {
             "success": True,
             "request_id": request_id,
@@ -237,7 +240,7 @@ async def advance_deal_stage(
                 "health": deal.health.value
             }
         }
-        
+
     except Exception as e:
         logger.error(f"Failed to advance deal: {str(e)}")
         raise HTTPException(status_code=400, detail=str(e))
@@ -247,16 +250,16 @@ async def advance_deal_stage(
     description="Record sales activity (call, demo, meeting, etc.) for deal")
 async def add_deal_activity(
     deal_id: str,
-    activity_data: Dict[str, Any] = Body(...),
+    activity_data: dict[str, Any] = Body(...),
     request_id: str = Depends(lambda: f"req_{datetime.utcnow().strftime('%Y%m%d_%H%M%S_%f')[:-3]}"),
     user: User = Depends(require_auth(min_role="partner"))
 ):
     """Add activity to deal"""
     try:
         activity = pipeline_management_system.add_deal_activity(deal_id, activity_data)
-        
+
         logger.info(f"✅ Activity added by {user.user_id}: {activity.activity_type} for deal {deal_id}")
-        
+
         return {
             "success": True,
             "request_id": request_id,
@@ -270,7 +273,7 @@ async def add_deal_activity(
                 "outcome": activity.outcome
             }
         }
-        
+
     except Exception as e:
         logger.error(f"Failed to add activity: {str(e)}")
         raise HTTPException(status_code=400, detail=str(e))
@@ -279,16 +282,16 @@ async def add_deal_activity(
     summary="Get pipeline performance metrics",
     description="Comprehensive pipeline analytics and health metrics")
 async def get_pipeline_metrics(
-    owner_id: Optional[str] = Query(None, description="Filter by deal owner"),
+    owner_id: str | None = Query(None, description="Filter by deal owner"),
     request_id: str = Depends(lambda: f"req_{datetime.utcnow().strftime('%Y%m%d_%H%M%S_%f')[:-3]}"),
     user: User = Depends(require_auth(min_role="partner"))
 ):
     """Get pipeline performance metrics"""
     try:
         metrics = pipeline_management_system.get_pipeline_metrics(owner_id)
-        
+
         logger.info(f"📊 Pipeline metrics requested by {user.user_id}")
-        
+
         return {
             "success": True,
             "request_id": request_id,
@@ -304,7 +307,7 @@ async def get_pipeline_metrics(
                 "avg_sales_cycle": metrics.avg_sales_cycle
             }
         }
-        
+
     except Exception as e:
         logger.error(f"Failed to get pipeline metrics: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to retrieve pipeline metrics: {str(e)}")
@@ -320,16 +323,16 @@ async def get_deal_forecast(
     """Get revenue forecast based on pipeline"""
     try:
         forecast = pipeline_management_system.get_deal_forecast(time_period_days)
-        
+
         logger.info(f"📈 Forecast requested by {user.user_id} for {time_period_days} days")
-        
+
         return {
             "success": True,
             "request_id": request_id,
             "timestamp": datetime.utcnow().isoformat(),
             "forecast": forecast
         }
-        
+
     except Exception as e:
         logger.error(f"Failed to get forecast: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to generate forecast: {str(e)}")
@@ -340,7 +343,7 @@ async def get_deal_forecast(
     summary="Trigger playbook for customer",
     description="Initiate success playbook (onboarding, expansion, retention, escalation)")
 async def trigger_playbook(
-    playbook_data: Dict[str, Any] = Body(...),
+    playbook_data: dict[str, Any] = Body(...),
     request_id: str = Depends(lambda: f"req_{datetime.utcnow().strftime('%Y%m%d_%H%M%S_%f')[:-3]}"),
     user: User = Depends(require_auth(min_role="partner"))
 ):
@@ -352,9 +355,9 @@ async def trigger_playbook(
             assigned_to=playbook_data['assigned_to'],
             trigger_reason=playbook_data.get('trigger_reason', '')
         )
-        
+
         logger.info(f"🎯 Playbook triggered by {user.user_id}: {execution.playbook_name}")
-        
+
         return {
             "success": True,
             "request_id": request_id,
@@ -368,7 +371,7 @@ async def trigger_playbook(
                 "expected_completion": execution.expected_completion.isoformat()
             }
         }
-        
+
     except Exception as e:
         logger.error(f"Failed to trigger playbook: {str(e)}")
         raise HTTPException(status_code=400, detail=str(e))
@@ -386,9 +389,9 @@ async def complete_playbook_step(
     """Complete playbook step"""
     try:
         execution = success_playbooks_engine.complete_step(execution_id, step_number, completion_notes)
-        
+
         logger.info(f"✅ Playbook step completed by {user.user_id}: Step {step_number}")
-        
+
         return {
             "success": True,
             "request_id": request_id,
@@ -401,7 +404,7 @@ async def complete_playbook_step(
                 "status": execution.status.value
             }
         }
-        
+
     except Exception as e:
         logger.error(f"Failed to complete step: {str(e)}")
         raise HTTPException(status_code=400, detail=str(e))
@@ -410,7 +413,7 @@ async def complete_playbook_step(
     summary="Calculate customer health score",
     description="Calculate comprehensive customer health score and risk assessment")
 async def calculate_customer_health(
-    health_data: Dict[str, Any] = Body(...),
+    health_data: dict[str, Any] = Body(...),
     request_id: str = Depends(lambda: f"req_{datetime.utcnow().strftime('%Y%m%d_%H%M%S_%f')[:-3]}"),
     user: User = Depends(require_auth(min_role="partner"))
 ):
@@ -420,9 +423,9 @@ async def calculate_customer_health(
             customer_id=health_data['customer_id'],
             usage_data=health_data
         )
-        
+
         logger.info(f"📊 Health score calculated by {user.user_id}: {health_score.organization_name} | Score: {health_score.overall_score}")
-        
+
         return {
             "success": True,
             "request_id": request_id,
@@ -441,7 +444,7 @@ async def calculate_customer_health(
                 "playbook_recommendations": health_score.playbook_recommendations
             }
         }
-        
+
     except Exception as e:
         logger.error(f"Failed to calculate health score: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to calculate health score: {str(e)}")
@@ -456,16 +459,16 @@ async def get_playbook_analytics(
     """Get playbook performance analytics"""
     try:
         analytics = success_playbooks_engine.get_playbook_analytics()
-        
+
         logger.info(f"📊 Playbook analytics requested by {user.user_id}")
-        
+
         return {
             "success": True,
             "request_id": request_id,
             "timestamp": datetime.utcnow().isoformat(),
             "analytics": analytics
         }
-        
+
     except Exception as e:
         logger.error(f"Failed to get playbook analytics: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to retrieve playbook analytics: {str(e)}")
@@ -476,16 +479,16 @@ async def get_playbook_analytics(
     summary="Calculate ROI for prospect",
     description="Generate ROI calculation for value-based selling")
 async def calculate_roi(
-    prospect_data: Dict[str, Any] = Body(...),
+    prospect_data: dict[str, Any] = Body(...),
     request_id: str = Depends(lambda: f"req_{datetime.utcnow().strftime('%Y%m%d_%H%M%S_%f')[:-3]}"),
     user: User = Depends(require_auth(min_role="partner"))
 ):
     """Calculate ROI for prospect value demonstration"""
     try:
         roi_calculation = sales_enablement_toolkit.calculate_roi(prospect_data)
-        
+
         logger.info(f"💰 ROI calculated by {user.user_id}: {roi_calculation.prospect_name} | ROI: {roi_calculation.roi_percentage:.1f}%")
-        
+
         return {
             "success": True,
             "request_id": request_id,
@@ -503,7 +506,7 @@ async def calculate_roi(
                 "annual_cost_savings": float(roi_calculation.annual_cost_savings)
             }
         }
-        
+
     except Exception as e:
         logger.error(f"Failed to calculate ROI: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to calculate ROI: {str(e)}")
@@ -519,12 +522,12 @@ async def get_battle_card(
     """Get battle card for specific competitor"""
     try:
         battle_card = sales_enablement_toolkit.get_battle_card(competitor_name)
-        
+
         if not battle_card:
             raise HTTPException(status_code=404, detail=f"Battle card not found for competitor: {competitor_name}")
-        
+
         logger.info(f"⚔️ Battle card accessed by {user.user_id}: {battle_card.competitor_name}")
-        
+
         return {
             "success": True,
             "request_id": request_id,
@@ -543,7 +546,7 @@ async def get_battle_card(
                 "negotiation_tactics": battle_card.negotiation_tactics
             }
         }
-        
+
     except HTTPException:
         raise
     except Exception as e:
@@ -556,7 +559,7 @@ async def get_battle_card(
 async def get_pricing_guidance(
     segment: str = Query(..., description="Customer segment"),
     tier: str = Query(..., description="Pricing tier"),
-    deal_size: Optional[float] = Query(None, description="Deal size for volume discounts"),
+    deal_size: float | None = Query(None, description="Deal size for volume discounts"),
     request_id: str = Depends(lambda: f"req_{datetime.utcnow().strftime('%Y%m%d_%H%M%S_%f')[:-3]}"),
     user: User = Depends(require_auth(min_role="partner"))
 ):
@@ -564,12 +567,12 @@ async def get_pricing_guidance(
     try:
         deal_size_decimal = Decimal(str(deal_size)) if deal_size else None
         pricing_guidance = sales_enablement_toolkit.get_pricing_guidance(segment, tier, deal_size_decimal)
-        
+
         if not pricing_guidance:
             raise HTTPException(status_code=404, detail=f"Pricing guidance not found for {segment} {tier}")
-        
+
         logger.info(f"💰 Pricing guidance accessed by {user.user_id}: {segment} {tier}")
-        
+
         return {
             "success": True,
             "request_id": request_id,
@@ -587,7 +590,7 @@ async def get_pricing_guidance(
                 "multi_year_discount": pricing_guidance.multi_year_discount
             }
         }
-        
+
     except HTTPException:
         raise
     except Exception as e:
@@ -598,7 +601,7 @@ async def get_pricing_guidance(
     summary="Generate contract from template",
     description="Generate contract using template with populated data")
 async def generate_contract(
-    contract_request: Dict[str, Any] = Body(...),
+    contract_request: dict[str, Any] = Body(...),
     request_id: str = Depends(lambda: f"req_{datetime.utcnow().strftime('%Y%m%d_%H%M%S_%f')[:-3]}"),
     user: User = Depends(require_auth(min_role="partner"))
 ):
@@ -608,9 +611,9 @@ async def generate_contract(
             template_id=contract_request['template_id'],
             contract_data=contract_request['contract_data']
         )
-        
+
         logger.info(f"📄 Contract generated by {user.user_id}: {contract_request['template_id']}")
-        
+
         return {
             "success": True,
             "request_id": request_id,
@@ -621,7 +624,7 @@ async def generate_contract(
                 "generated_by": user.user_id
             }
         }
-        
+
     except Exception as e:
         logger.error(f"Failed to generate contract: {str(e)}")
         raise HTTPException(status_code=400, detail=str(e))
@@ -643,16 +646,16 @@ async def get_negotiation_strategy(
             segment=segment,
             deal_value=Decimal(str(deal_value))
         )
-        
+
         logger.info(f"🎯 Negotiation strategy requested by {user.user_id}: {competitor} | ${deal_value:,.0f}")
-        
+
         return {
             "success": True,
             "request_id": request_id,
             "timestamp": datetime.utcnow().isoformat(),
             "strategy": strategy
         }
-        
+
     except Exception as e:
         logger.error(f"Failed to get negotiation strategy: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to generate negotiation strategy: {str(e)}")
@@ -673,9 +676,9 @@ async def get_individual_scorecard(
         # Convert time period string to enum
         time_range = DashboardTimeRange(time_period.lower())
         scorecard = performance_dashboard_system.generate_individual_scorecard(rep_id, time_range)
-        
+
         logger.info(f"📊 Scorecard requested by {user.user_id}: {scorecard.rep_name}")
-        
+
         return {
             "success": True,
             "request_id": request_id,
@@ -709,7 +712,7 @@ async def get_individual_scorecard(
                 "action_items": scorecard.action_items
             }
         }
-        
+
     except Exception as e:
         logger.error(f"Failed to get scorecard: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to retrieve scorecard: {str(e)}")
@@ -727,9 +730,9 @@ async def get_team_performance(
     try:
         time_range = DashboardTimeRange(time_period.lower())
         team_performance = performance_dashboard_system.generate_team_performance(team_name, time_range)
-        
+
         logger.info(f"📊 Team performance requested by {user.user_id}: {team_name}")
-        
+
         return {
             "success": True,
             "request_id": request_id,
@@ -748,7 +751,7 @@ async def get_team_performance(
                 "average_activity_score": team_performance.average_activity_score
             }
         }
-        
+
     except Exception as e:
         logger.error(f"Failed to get team performance: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to retrieve team performance: {str(e)}")
@@ -765,16 +768,16 @@ async def get_quota_leaderboard(
     try:
         time_range = DashboardTimeRange(time_period.lower())
         leaderboard = performance_dashboard_system.get_quota_leaderboard(time_range)
-        
+
         logger.info(f"🏆 Quota leaderboard requested by {user.user_id}")
-        
+
         return {
             "success": True,
             "request_id": request_id,
             "timestamp": datetime.utcnow().isoformat(),
             "leaderboard": leaderboard
         }
-        
+
     except Exception as e:
         logger.error(f"Failed to get quota leaderboard: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to retrieve quota leaderboard: {str(e)}")
@@ -791,16 +794,16 @@ async def get_activity_leaderboard(
     try:
         time_range = DashboardTimeRange(time_period.lower())
         leaderboard = performance_dashboard_system.get_activity_leaderboard(time_range)
-        
+
         logger.info(f"⚡ Activity leaderboard requested by {user.user_id}")
-        
+
         return {
             "success": True,
             "request_id": request_id,
             "timestamp": datetime.utcnow().isoformat(),
             "leaderboard": leaderboard
         }
-        
+
     except Exception as e:
         logger.error(f"Failed to get activity leaderboard: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to retrieve activity leaderboard: {str(e)}")
@@ -815,16 +818,16 @@ async def get_executive_dashboard(
     """Get executive dashboard"""
     try:
         dashboard = performance_dashboard_system.get_executive_dashboard()
-        
+
         logger.info(f"👔 Executive dashboard requested by {user.user_id}")
-        
+
         return {
             "success": True,
             "request_id": request_id,
             "timestamp": datetime.utcnow().isoformat(),
             "dashboard": dashboard
         }
-        
+
     except Exception as e:
         logger.error(f"Failed to get executive dashboard: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to retrieve executive dashboard: {str(e)}")
@@ -846,7 +849,7 @@ async def get_unified_operations_analytics(
         playbook_analytics = success_playbooks_engine.get_playbook_analytics()
         enablement_analytics = sales_enablement_toolkit.get_enablement_analytics()
         executive_dashboard = performance_dashboard_system.get_executive_dashboard()
-        
+
         unified_analytics = {
             "operations_summary": {
                 "total_leads_routed": routing_analytics["summary"]["total_providers_in_funnel"],
@@ -880,16 +883,16 @@ async def get_unified_operations_analytics(
                 "performance_distribution": executive_dashboard["performance_distribution"]
             }
         }
-        
+
         logger.info(f"📊 Unified operations analytics requested by {user.user_id}")
-        
+
         return {
             "success": True,
             "request_id": request_id,
             "timestamp": datetime.utcnow().isoformat(),
             "unified_analytics": unified_analytics
         }
-        
+
     except Exception as e:
         logger.error(f"Failed to get unified analytics: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Failed to retrieve unified analytics: {str(e)}")

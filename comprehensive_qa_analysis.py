@@ -5,24 +5,23 @@ Senior QA Engineer Analysis - Identify all bugs, errors, and vulnerabilities
 DO NOT MODIFY EXISTING CODE - ANALYSIS ONLY
 """
 
-import os
-import sys
-import json
-import traceback
-import subprocess
-import importlib
 import ast
-from typing import List, Dict, Any
+import importlib
+import json
+import os
+import subprocess
+import traceback
 from datetime import datetime
+
 
 class QAAnalyzer:
     def __init__(self):
         self.findings = []
         self.test_results = []
         self.severity_levels = ["Low", "Medium", "High", "Critical"]
-        
-    def add_finding(self, issue_id: str, location: str, description: str, 
-                   reproduction_steps: str, observed_output: str, 
+
+    def add_finding(self, issue_id: str, location: str, description: str,
+                   reproduction_steps: str, observed_output: str,
                    expected_output: str, severity: str):
         """Add a finding to the report"""
         finding = {
@@ -36,19 +35,19 @@ class QAAnalyzer:
             "timestamp": datetime.now().isoformat()
         }
         self.findings.append(finding)
-        
+
     def analyze_syntax_errors(self):
         """Check for syntax errors across all Python files"""
         print("Analyzing syntax errors...")
         python_files = []
-        for root, dirs, files in os.walk('.'):
+        for root, _dirs, files in os.walk('.'):
             for file in files:
                 if file.endswith('.py'):
                     python_files.append(os.path.join(root, file))
-        
+
         for file_path in python_files:
             try:
-                with open(file_path, 'r', encoding='utf-8') as f:
+                with open(file_path, encoding='utf-8') as f:
                     content = f.read()
                 ast.parse(content)
             except SyntaxError as e:
@@ -71,17 +70,17 @@ class QAAnalyzer:
                     "Successful file parsing",
                     "High"
                 )
-    
+
     def analyze_import_errors(self):
         """Check for import errors and missing dependencies"""
         print("Analyzing import errors...")
-        
+
         # Test core module imports
         critical_modules = [
-            'main', 'config.settings', 'routers.scholarships', 
+            'main', 'config.settings', 'routers.scholarships',
             'services.scholarship_service', 'models.scholarship'
         ]
-        
+
         for module_name in critical_modules:
             try:
                 importlib.import_module(module_name)
@@ -105,31 +104,24 @@ class QAAnalyzer:
                     "Successful module loading",
                     "High"
                 )
-    
+
     def analyze_database_vulnerabilities(self):
         """Check for SQL injection and database security issues"""
         print("Analyzing database vulnerabilities...")
-        
+
         # Check for potential SQL injection patterns
-        sql_patterns = [
-            r".*\+.*sql.*",
-            r".*%.*sql.*",
-            r".*format.*sql.*",
-            r".*f\".*sql.*",
-            r".*execute\(.*\+.*\)",
-        ]
-        
+
         python_files = []
-        for root, dirs, files in os.walk('.'):
+        for root, _dirs, files in os.walk('.'):
             for file in files:
                 if file.endswith('.py'):
                     python_files.append(os.path.join(root, file))
-        
+
         for file_path in python_files:
             try:
-                with open(file_path, 'r', encoding='utf-8') as f:
+                with open(file_path, encoding='utf-8') as f:
                     lines = f.readlines()
-                
+
                 for line_num, line in enumerate(lines, 1):
                     if 'sql' in line.lower() or 'query' in line.lower():
                         if any(pattern in line.lower() for pattern in ['format', '+', '%', 'f"']):
@@ -143,27 +135,27 @@ class QAAnalyzer:
                                     "Parameterized queries using SQLAlchemy or prepared statements",
                                     "High"
                                 )
-            except Exception as e:
+            except Exception:
                 pass
-    
+
     def analyze_authentication_issues(self):
         """Check for authentication and authorization vulnerabilities"""
         print("Analyzing authentication issues...")
-        
+
         # Check for hardcoded secrets
         secret_patterns = ['password', 'secret', 'key', 'token', 'api_key']
-        
+
         python_files = []
-        for root, dirs, files in os.walk('.'):
+        for root, _dirs, files in os.walk('.'):
             for file in files:
                 if file.endswith('.py'):
                     python_files.append(os.path.join(root, file))
-        
+
         for file_path in python_files:
             try:
-                with open(file_path, 'r', encoding='utf-8') as f:
+                with open(file_path, encoding='utf-8') as f:
                     lines = f.readlines()
-                
+
                 for line_num, line in enumerate(lines, 1):
                     for pattern in secret_patterns:
                         if pattern in line.lower() and '=' in line and '"' in line:
@@ -179,25 +171,25 @@ class QAAnalyzer:
                                         "Secrets should be loaded from environment variables",
                                         "Medium"
                                     )
-            except Exception as e:
+            except Exception:
                 pass
-    
+
     def analyze_error_handling(self):
         """Check for proper error handling"""
         print("Analyzing error handling...")
-        
+
         python_files = []
-        for root, dirs, files in os.walk('.'):
+        for root, _dirs, files in os.walk('.'):
             for file in files:
                 if file.endswith('.py'):
                     python_files.append(os.path.join(root, file))
-        
+
         for file_path in python_files:
             try:
-                with open(file_path, 'r', encoding='utf-8') as f:
+                with open(file_path, encoding='utf-8') as f:
                     content = f.read()
                     lines = content.splitlines()
-                
+
                 # Check for bare except clauses
                 for line_num, line in enumerate(lines, 1):
                     if 'except:' in line and line.strip().endswith(':'):
@@ -210,17 +202,17 @@ class QAAnalyzer:
                             "Specific exception types should be caught",
                             "Medium"
                         )
-                
+
                 # Check for missing try-except around risky operations
                 risky_operations = ['requests.', 'json.', 'open(', 'int(', 'float(']
                 in_try_block = False
-                
+
                 for line_num, line in enumerate(lines, 1):
                     if 'try:' in line:
                         in_try_block = True
                     elif 'except' in line or line.strip() == '' or not line.startswith('    '):
                         in_try_block = False
-                    
+
                     for op in risky_operations:
                         if op in line and not in_try_block and not line.strip().startswith('#'):
                             self.add_finding(
@@ -232,18 +224,18 @@ class QAAnalyzer:
                                 "Risky operations should be wrapped in try-except blocks",
                                 "Low"
                             )
-            except Exception as e:
+            except Exception:
                 pass
-    
+
     def test_api_endpoints(self):
         """Test API endpoints for errors"""
         print("Testing API endpoints...")
-        
+
         try:
             import requests
-            
+
             base_url = "http://localhost:5000"
-            
+
             # Test critical endpoints
             endpoints = [
                 "/health",
@@ -252,11 +244,11 @@ class QAAnalyzer:
                 "/docs",
                 "/nonexistent"  # Should return 404
             ]
-            
+
             for endpoint in endpoints:
                 try:
                     response = requests.get(f"{base_url}{endpoint}", timeout=5)
-                    
+
                     if endpoint == "/nonexistent":
                         if response.status_code != 404:
                             self.add_finding(
@@ -278,7 +270,7 @@ class QAAnalyzer:
                             "Status code < 500",
                             "High"
                         )
-                        
+
                 except requests.exceptions.RequestException as e:
                     self.add_finding(
                         f"CONN-{len(self.findings):03d}",
@@ -289,7 +281,7 @@ class QAAnalyzer:
                         "Successful HTTP response",
                         "High"
                     )
-                        
+
         except ImportError:
             self.add_finding(
                 f"DEP-{len(self.findings):03d}",
@@ -300,17 +292,17 @@ class QAAnalyzer:
                 "Successful import of requests library",
                 "Medium"
             )
-    
+
     def test_edge_cases(self):
         """Test edge cases and boundary conditions"""
         print("Testing edge cases...")
-        
+
         try:
             # Test with various input types
             from services.scholarship_service import ScholarshipService
-            
+
             service = ScholarshipService()
-            
+
             # Test edge cases
             edge_cases = [
                 (None, "None input"),
@@ -322,7 +314,7 @@ class QAAnalyzer:
                 ([], "Empty list"),
                 ({}, "Empty dict")
             ]
-            
+
             for test_input, description in edge_cases:
                 try:
                     # Test search functionality
@@ -350,7 +342,7 @@ class QAAnalyzer:
                             "Graceful error handling or validation",
                             "Medium"
                         )
-                        
+
         except Exception as e:
             self.add_finding(
                 f"SERVICE-{len(self.findings):03d}",
@@ -361,21 +353,21 @@ class QAAnalyzer:
                 "Successful service instantiation",
                 "High"
             )
-    
+
     def analyze_configuration_issues(self):
         """Check for configuration and environment issues"""
         print("Analyzing configuration issues...")
-        
+
         try:
             from config.settings import settings
-            
+
             # Check for missing required environment variables
             required_env_vars = [
                 'DATABASE_URL',
                 'JWT_SECRET_KEY',
                 'REDIS_URL'
             ]
-            
+
             for var in required_env_vars:
                 if not os.environ.get(var):
                     self.add_finding(
@@ -387,7 +379,7 @@ class QAAnalyzer:
                         f"{var} should be properly configured",
                         "High"
                     )
-            
+
             # Check for default/insecure values
             if hasattr(settings, 'jwt_secret_key'):
                 if 'your-secret-key' in settings.jwt_secret_key.lower():
@@ -400,7 +392,7 @@ class QAAnalyzer:
                         "Unique, secure random key",
                         "Critical"
                     )
-                        
+
         except Exception as e:
             self.add_finding(
                 f"SETTINGS-{len(self.findings):03d}",
@@ -411,11 +403,11 @@ class QAAnalyzer:
                 "Successful settings loading",
                 "Critical"
             )
-    
+
     def run_pytest_analysis(self):
         """Run existing tests and analyze failures"""
         print("Running pytest analysis...")
-        
+
         try:
             result = subprocess.run(
                 ['python', '-m', 'pytest', '--tb=short', '-v'],
@@ -423,12 +415,12 @@ class QAAnalyzer:
                 text=True,
                 timeout=120
             )
-            
+
             if result.returncode != 0:
                 # Parse pytest output for specific failures
                 lines = result.stdout.split('\n') + result.stderr.split('\n')
                 current_test = ""
-                
+
                 for line in lines:
                     if '::' in line and 'FAILED' in line:
                         current_test = line
@@ -443,7 +435,7 @@ class QAAnalyzer:
                             "Medium"
                         )
                         current_test = ""
-                        
+
         except subprocess.TimeoutExpired:
             self.add_finding(
                 f"TIMEOUT-{len(self.findings):03d}",
@@ -464,22 +456,22 @@ class QAAnalyzer:
                 "Successful test execution",
                 "Medium"
             )
-    
+
     def generate_report(self):
         """Generate the final QA report"""
-        print(f"\nGenerating QA Analysis Report...")
+        print("\nGenerating QA Analysis Report...")
         print(f"Total findings: {len(self.findings)}")
-        
+
         # Sort by severity
         severity_order = {"Critical": 0, "High": 1, "Medium": 2, "Low": 3}
         self.findings.sort(key=lambda x: severity_order.get(x["severity"], 4))
-        
+
         # Generate summary
         severity_counts = {}
         for finding in self.findings:
             severity = finding["severity"]
             severity_counts[severity] = severity_counts.get(severity, 0) + 1
-        
+
         report = {
             "qa_analysis_summary": {
                 "timestamp": datetime.now().isoformat(),
@@ -499,40 +491,40 @@ class QAAnalyzer:
             },
             "findings": self.findings
         }
-        
+
         # Save detailed report
         with open("COMPREHENSIVE_QA_FINDINGS.json", "w") as f:
             json.dump(report, f, indent=2)
-        
+
         # Generate markdown report
         markdown_report = self.generate_markdown_report(report)
         with open("COMPREHENSIVE_QA_FINDINGS.md", "w") as f:
             f.write(markdown_report)
-        
-        print(f"Report saved to COMPREHENSIVE_QA_FINDINGS.json and COMPREHENSIVE_QA_FINDINGS.md")
+
+        print("Report saved to COMPREHENSIVE_QA_FINDINGS.json and COMPREHENSIVE_QA_FINDINGS.md")
         return report
-    
+
     def generate_markdown_report(self, report):
         """Generate markdown version of the report"""
         md = f"""# Comprehensive QA Analysis Report
 
 ## Executive Summary
 
-**Analysis Date:** {report['qa_analysis_summary']['timestamp']}  
+**Analysis Date:** {report['qa_analysis_summary']['timestamp']}
 **Total Findings:** {report['qa_analysis_summary']['total_findings']}
 
 ### Severity Breakdown
 """
-        
+
         for severity, count in report['qa_analysis_summary']['severity_breakdown'].items():
             md += f"- **{severity}:** {count} issues\n"
-        
+
         md += "\n## Detailed Findings\n\n"
-        
+
         for finding in report['findings']:
             md += f"""### {finding['issue_id']} - {finding['severity']} Severity
 
-**Location:** `{finding['location']}`  
+**Location:** `{finding['location']}`
 **Description:** {finding['description']}
 
 **Steps to Reproduce:**
@@ -553,9 +545,9 @@ class QAAnalyzer:
 ---
 
 """
-        
+
         return md
-    
+
     def run_full_analysis(self):
         """Run the complete QA analysis"""
         print("=" * 60)
@@ -564,7 +556,7 @@ class QAAnalyzer:
         print("OBJECTIVE: Identify all errors, bugs, and vulnerabilities")
         print("SCOPE: Complete codebase analysis")
         print("=" * 60)
-        
+
         try:
             self.analyze_syntax_errors()
             self.analyze_import_errors()
@@ -575,9 +567,9 @@ class QAAnalyzer:
             self.test_edge_cases()
             self.analyze_configuration_issues()
             self.run_pytest_analysis()
-            
+
             return self.generate_report()
-            
+
         except Exception as e:
             print(f"Analysis error: {str(e)}")
             traceback.print_exc()
@@ -586,7 +578,7 @@ class QAAnalyzer:
 if __name__ == "__main__":
     analyzer = QAAnalyzer()
     report = analyzer.run_full_analysis()
-    
+
     if report:
         print("\n" + "=" * 60)
         print("QA ANALYSIS COMPLETE")

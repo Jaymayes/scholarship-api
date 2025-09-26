@@ -6,19 +6,16 @@ Objective: Identify and report all errors, bugs, unexpected behavior, and vulner
 """
 
 import asyncio
-import httpx
 import json
-import time
 from datetime import datetime
-from typing import Dict, List, Any, Optional
-import traceback
-import sys
-import os
+
+import httpx
+
 
 class QAIssue:
     """Structured representation of a QA issue"""
-    def __init__(self, issue_id: str, location: str, description: str, 
-                 steps_to_reproduce: str, observed_output: str, 
+    def __init__(self, issue_id: str, location: str, description: str,
+                 steps_to_reproduce: str, observed_output: str,
                  expected_output: str, severity: str):
         self.issue_id = issue_id
         self.location = location
@@ -30,24 +27,24 @@ class QAIssue:
 
 class SeniorQAAnalyzer:
     """Senior QA Engineer comprehensive analysis framework"""
-    
+
     def __init__(self):
         self.base_url = "http://localhost:5000"
-        self.issues: List[QAIssue] = []
+        self.issues: list[QAIssue] = []
         self.test_results = {}
-        
-    def add_issue(self, issue_id: str, location: str, description: str, 
+
+    def add_issue(self, issue_id: str, location: str, description: str,
                   steps: str, observed: str, expected: str, severity: str):
         """Add a new issue to the tracking list"""
         issue = QAIssue(issue_id, location, description, steps, observed, expected, severity)
         self.issues.append(issue)
         print(f"🔍 [{severity}] {issue_id}: {description}")
-        
+
     async def run_comprehensive_analysis(self):
         """Execute comprehensive QA analysis across all components"""
         print("🎯 SENIOR QA COMPREHENSIVE ANALYSIS STARTING")
         print("=" * 60)
-        
+
         # Test categories
         await self.test_api_endpoints()
         await self.test_authentication_security()
@@ -59,14 +56,14 @@ class SeniorQAAnalyzer:
         await self.test_concurrent_requests()
         await self.analyze_code_vulnerabilities()
         await self.test_database_operations()
-        
+
         # Generate final report
         self.generate_comprehensive_report()
-        
+
     async def test_api_endpoints(self):
         """Test all API endpoints for basic functionality"""
         print("\n📡 Testing API Endpoints...")
-        
+
         endpoints = [
             ("GET", "/", "Root endpoint"),
             ("GET", "/healthz", "Health check"),
@@ -79,12 +76,12 @@ class SeniorQAAnalyzer:
             ("HEAD", "/", "HEAD method support"),
             ("OPTIONS", "/api/v1/scholarships", "CORS preflight")
         ]
-        
+
         async with httpx.AsyncClient(timeout=30.0) as client:
             for method, endpoint, description in endpoints:
                 try:
                     response = await client.request(method, f"{self.base_url}{endpoint}")
-                    
+
                     # Analyze response
                     if response.status_code >= 500:
                         self.add_issue(
@@ -93,7 +90,7 @@ class SeniorQAAnalyzer:
                             f"Server error in {description}",
                             f"Send {method} request to {endpoint}",
                             f"HTTP {response.status_code}: {response.text[:200]}",
-                            f"HTTP 2xx response with valid JSON/HTML",
+                            "HTTP 2xx response with valid JSON/HTML",
                             "High"
                         )
                     elif response.status_code == 404 and endpoint not in ["/favicon.ico"]:
@@ -103,7 +100,7 @@ class SeniorQAAnalyzer:
                             f"Endpoint not found: {description}",
                             f"Send {method} request to {endpoint}",
                             f"HTTP 404: {response.text[:200]}",
-                            f"HTTP 2xx response or proper documentation",
+                            "HTTP 2xx response or proper documentation",
                             "Medium"
                         )
                     elif method == "OPTIONS" and response.status_code == 400:
@@ -111,7 +108,7 @@ class SeniorQAAnalyzer:
                         pass
                     else:
                         print(f"   ✅ {method} {endpoint}: {response.status_code}")
-                        
+
                 except Exception as e:
                     self.add_issue(
                         f"API-{len(self.issues)+1:03d}",
@@ -119,26 +116,26 @@ class SeniorQAAnalyzer:
                         f"Connection/timeout error in {description}",
                         f"Send {method} request to {endpoint}",
                         f"Exception: {str(e)}",
-                        f"Successful HTTP response",
+                        "Successful HTTP response",
                         "Critical"
                     )
-                    
+
     async def test_authentication_security(self):
         """Test authentication and authorization mechanisms"""
         print("\n🔐 Testing Authentication Security...")
-        
+
         protected_endpoints = [
             "/api/v1/scholarships",
-            "/api/v1/search", 
+            "/api/v1/search",
             "/api/v1/eligibility/check"
         ]
-        
+
         async with httpx.AsyncClient(timeout=30.0) as client:
             for endpoint in protected_endpoints:
                 # Test without authentication
                 try:
                     response = await client.get(f"{self.base_url}{endpoint}")
-                    
+
                     # Check if authentication is properly enforced
                     if response.status_code == 200:
                         # This might be expected if PUBLIC_READ_ENDPOINTS is enabled
@@ -153,13 +150,13 @@ class SeniorQAAnalyzer:
                             "HTTP 401 Unauthorized",
                             "High"
                         )
-                    
+
                     # Test with malformed token
                     malformed_response = await client.get(
                         f"{self.base_url}{endpoint}",
                         headers={"Authorization": "Bearer invalid.token.here"}
                     )
-                    
+
                     if malformed_response.status_code == 200:
                         self.add_issue(
                             f"AUTH-{len(self.issues)+1:03d}",
@@ -170,7 +167,7 @@ class SeniorQAAnalyzer:
                             "HTTP 401 Unauthorized",
                             "High"
                         )
-                        
+
                 except Exception as e:
                     self.add_issue(
                         f"AUTH-{len(self.issues)+1:03d}",
@@ -181,13 +178,13 @@ class SeniorQAAnalyzer:
                         "Proper authentication response",
                         "Medium"
                     )
-                    
+
     async def test_rate_limiting(self):
         """Test rate limiting functionality and bypass attempts"""
         print("\n🚦 Testing Rate Limiting...")
-        
+
         test_endpoint = "/api/v1/search"
-        
+
         async with httpx.AsyncClient(timeout=30.0) as client:
             # Rapid fire requests to trigger rate limiting
             responses = []
@@ -195,7 +192,7 @@ class SeniorQAAnalyzer:
                 try:
                     response = await client.get(f"{self.base_url}{test_endpoint}")
                     responses.append(response.status_code)
-                    
+
                     if i > 10 and response.status_code == 429:
                         # Check if rate limiting headers are present
                         if "retry-after" not in response.headers and "ratelimit" not in str(response.headers).lower():
@@ -209,7 +206,7 @@ class SeniorQAAnalyzer:
                                 "Medium"
                             )
                         break
-                        
+
                 except Exception as e:
                     self.add_issue(
                         f"RATE-{len(self.issues)+1:03d}",
@@ -221,7 +218,7 @@ class SeniorQAAnalyzer:
                         "Medium"
                     )
                     break
-            
+
             # Check if rate limiting was triggered
             rate_limit_triggered = any(code == 429 for code in responses)
             if not rate_limit_triggered and len(responses) > 15:
@@ -234,19 +231,19 @@ class SeniorQAAnalyzer:
                     "429 Too Many Requests after threshold exceeded",
                     "High"
                 )
-                
+
     async def test_cors_security(self):
         """Test CORS configuration for security vulnerabilities"""
         print("\n🌐 Testing CORS Security...")
-        
+
         malicious_origins = [
             "https://malicious-attacker.com",
-            "https://evil.com", 
+            "https://evil.com",
             "https://phishing-site.net",
             "http://localhost:3000",  # Common dev port
             "https://random-domain.xyz"
         ]
-        
+
         async with httpx.AsyncClient(timeout=30.0) as client:
             for origin in malicious_origins:
                 try:
@@ -258,7 +255,7 @@ class SeniorQAAnalyzer:
                             "Access-Control-Request-Headers": "authorization"
                         }
                     )
-                    
+
                     # Check if malicious origin is allowed
                     if response.status_code == 200 and "access-control-allow-origin" in response.headers:
                         allowed_origin = response.headers.get("access-control-allow-origin")
@@ -272,17 +269,17 @@ class SeniorQAAnalyzer:
                                 "400 Bad Request or origin rejection",
                                 "High"
                             )
-                    
+
                 except Exception as e:
                     print(f"   ℹ️  CORS test for {origin} failed: {e}")
-                    
+
             # Test for wildcard CORS
             try:
                 response = await client.get(
                     f"{self.base_url}/",
                     headers={"Origin": "https://unknown-domain.com"}
                 )
-                
+
                 if response.headers.get("access-control-allow-origin") == "*":
                     self.add_issue(
                         f"CORS-{len(self.issues)+1:03d}",
@@ -293,14 +290,14 @@ class SeniorQAAnalyzer:
                         "Specific origin whitelist or no CORS header",
                         "High"
                     )
-                    
+
             except Exception as e:
                 print(f"   ℹ️  Wildcard CORS test failed: {e}")
-                
+
     async def test_input_validation(self):
         """Test input validation and sanitization"""
         print("\n🔍 Testing Input Validation...")
-        
+
         # SQL injection attempts
         sql_payloads = [
             "'; DROP TABLE scholarships; --",
@@ -308,7 +305,7 @@ class SeniorQAAnalyzer:
             "admin'--",
             "'; SELECT * FROM users; --"
         ]
-        
+
         # XSS attempts
         xss_payloads = [
             "<script>alert('xss')</script>",
@@ -316,16 +313,16 @@ class SeniorQAAnalyzer:
             "<img src=x onerror=alert('xss')>",
             "';alert(String.fromCharCode(88,83,83))//';alert(String.fromCharCode(88,83,83))//",
         ]
-        
+
         # Path traversal attempts
         path_payloads = [
             "../../etc/passwd",
             "..\\..\\windows\\system32\\drivers\\etc\\hosts",
             "%2e%2e%2f%2e%2e%2f%2e%2e%2f%65%74%63%2f%70%61%73%73%77%64"
         ]
-        
+
         all_payloads = sql_payloads + xss_payloads + path_payloads
-        
+
         async with httpx.AsyncClient(timeout=30.0) as client:
             for payload in all_payloads:
                 try:
@@ -334,7 +331,7 @@ class SeniorQAAnalyzer:
                         f"{self.base_url}/api/v1/search",
                         params={"keyword": payload}
                     )
-                    
+
                     # Check if payload is reflected or causes errors
                     response_text = response.text.lower()
                     if payload.lower() in response_text and response.status_code == 200:
@@ -347,7 +344,7 @@ class SeniorQAAnalyzer:
                             "Payload sanitized or rejected",
                             "High"
                         )
-                    
+
                     if response.status_code >= 500:
                         self.add_issue(
                             f"INPUT-{len(self.issues)+1:03d}",
@@ -358,86 +355,86 @@ class SeniorQAAnalyzer:
                             "HTTP 400 Bad Request with sanitized error",
                             "Medium"
                         )
-                        
+
                 except Exception as e:
                     print(f"   ℹ️  Input validation test failed for {payload[:20]}: {e}")
-                    
+
     async def test_error_handling(self):
         """Test error handling and information disclosure"""
         print("\n⚠️  Testing Error Handling...")
-        
+
         error_test_cases = [
             ("GET", "/nonexistent-endpoint", 404),
             ("POST", "/api/v1/scholarships", 405),  # Method not allowed
             ("GET", "/api/v1/scholarships/nonexistent-id", 404),
             ("GET", "/api/v1/eligibility/check", 400),  # Missing required params
         ]
-        
+
         async with httpx.AsyncClient(timeout=30.0) as client:
             for method, endpoint, expected_status in error_test_cases:
                 try:
                     response = await client.request(method, f"{self.base_url}{endpoint}")
-                    
+
                     if response.status_code != expected_status:
                         self.add_issue(
                             f"ERR-{len(self.issues)+1:03d}",
                             f"Error handling: {method} {endpoint}",
-                            f"Unexpected error status code",
+                            "Unexpected error status code",
                             f"Send {method} request to {endpoint}",
                             f"HTTP {response.status_code}: {response.text[:200]}",
                             f"HTTP {expected_status}",
                             "Medium"
                         )
-                    
+
                     # Check for information disclosure
                     response_text = response.text.lower()
                     sensitive_info = ["traceback", "stack trace", "exception", "internal error", "debug"]
-                    
+
                     for info in sensitive_info:
                         if info in response_text:
                             self.add_issue(
                                 f"ERR-{len(self.issues)+1:03d}",
                                 f"Information disclosure: {method} {endpoint}",
-                                f"Sensitive information leaked in error response",
+                                "Sensitive information leaked in error response",
                                 f"Send {method} request to {endpoint}",
                                 f"Response contains: {info}",
                                 "Generic error message without sensitive details",
                                 "Medium"
                             )
-                            
+
                 except Exception as e:
                     print(f"   ℹ️  Error handling test failed for {method} {endpoint}: {e}")
-                    
+
     async def test_edge_cases(self):
         """Test edge cases and boundary conditions"""
         print("\n🔬 Testing Edge Cases...")
-        
+
         edge_cases = [
             # Large parameter values
             ("GET", "/api/v1/search", {"keyword": "a" * 10000}),
             ("GET", "/api/v1/eligibility/check", {"gpa": "999999"}),
             ("GET", "/api/v1/scholarships", {"limit": "999999"}),
-            
+
             # Invalid data types
             ("GET", "/api/v1/eligibility/check", {"gpa": "not-a-number"}),
             ("GET", "/api/v1/scholarships", {"min_amount": "invalid"}),
-            
+
             # Boundary values
             ("GET", "/api/v1/eligibility/check", {"gpa": "5.0"}),  # Above max GPA
             ("GET", "/api/v1/eligibility/check", {"gpa": "-1.0"}),  # Below min GPA
             ("GET", "/api/v1/scholarships", {"limit": "0"}),  # Zero limit
             ("GET", "/api/v1/scholarships", {"offset": "-1"}),  # Negative offset
         ]
-        
+
         async with httpx.AsyncClient(timeout=30.0) as client:
             for method, endpoint, params in edge_cases:
                 try:
                     response = await client.request(
-                        method, 
+                        method,
                         f"{self.base_url}{endpoint}",
                         params=params
                     )
-                    
+
                     if response.status_code >= 500:
                         self.add_issue(
                             f"EDGE-{len(self.issues)+1:03d}",
@@ -457,33 +454,33 @@ class SeniorQAAnalyzer:
                                 f"Input validation: {endpoint}",
                                 f"Invalid input accepted: {params}",
                                 f"Send {method} to {endpoint} with params: {params}",
-                                f"HTTP 200: Request processed successfully",
+                                "HTTP 200: Request processed successfully",
                                 "HTTP 400 Bad Request with validation error",
                                 "Medium"
                             )
-                            
+
                 except Exception as e:
                     print(f"   ℹ️  Edge case test failed for {endpoint}: {e}")
-                    
+
     async def test_concurrent_requests(self):
         """Test system behavior under concurrent load"""
         print("\n🔄 Testing Concurrent Requests...")
-        
+
         async def single_request(client, endpoint):
             try:
                 response = await client.get(f"{self.base_url}{endpoint}")
                 return response.status_code
             except Exception as e:
                 return f"Error: {str(e)}"
-        
+
         async with httpx.AsyncClient(timeout=30.0) as client:
             # Test concurrent requests to same endpoint
             tasks = [single_request(client, "/api/v1/scholarships") for _ in range(20)]
             results = await asyncio.gather(*tasks, return_exceptions=True)
-            
+
             error_count = sum(1 for r in results if isinstance(r, Exception) or str(r).startswith("Error"))
             server_errors = sum(1 for r in results if isinstance(r, int) and r >= 500)
-            
+
             if error_count > 5:
                 self.add_issue(
                     f"CONC-{len(self.issues)+1:03d}",
@@ -494,7 +491,7 @@ class SeniorQAAnalyzer:
                     "Majority of requests should succeed",
                     "High"
                 )
-            
+
             if server_errors > 2:
                 self.add_issue(
                     f"CONC-{len(self.issues)+1:03d}",
@@ -505,11 +502,11 @@ class SeniorQAAnalyzer:
                     "No server errors under normal concurrent load",
                     "High"
                 )
-                
+
     async def analyze_code_vulnerabilities(self):
         """Static analysis of code for common vulnerabilities"""
         print("\n🔍 Analyzing Code Vulnerabilities...")
-        
+
         # LSP diagnostic issues already identified
         lsp_issues = [
             {
@@ -519,13 +516,13 @@ class SeniorQAAnalyzer:
                 "severity": "High"
             },
             {
-                "file": "middleware/rate_limiting.py", 
+                "file": "middleware/rate_limiting.py",
                 "lines": "219, 223, 227",
                 "issue": "'limit' is not a known member of 'None'",
                 "severity": "High"
             }
         ]
-        
+
         for issue in lsp_issues:
             self.add_issue(
                 f"CODE-{len(self.issues)+1:03d}",
@@ -536,7 +533,7 @@ class SeniorQAAnalyzer:
                 "Clean code without static analysis errors",
                 issue['severity']
             )
-            
+
         # Additional code smell analysis
         potential_issues = [
             {
@@ -545,12 +542,12 @@ class SeniorQAAnalyzer:
                 "severity": "Low"
             },
             {
-                "location": "config/settings.py:33-36", 
+                "location": "config/settings.py:33-36",
                 "description": "Hardcoded banned secrets list may need updates",
                 "severity": "Low"
             }
         ]
-        
+
         for issue in potential_issues:
             self.add_issue(
                 f"CODE-{len(self.issues)+1:03d}",
@@ -561,40 +558,40 @@ class SeniorQAAnalyzer:
                 "Best practice implementation",
                 issue['severity']
             )
-            
+
     async def test_database_operations(self):
         """Test database-related operations for vulnerabilities"""
         print("\n🗄️  Testing Database Operations...")
-        
+
         # Test endpoints that likely interact with database
         db_endpoints = [
             "/api/v1/scholarships",
             "/api/v1/search",
             "/api/v1/eligibility/check?gpa=3.5&grade_level=undergraduate"
         ]
-        
+
         async with httpx.AsyncClient(timeout=30.0) as client:
             for endpoint in db_endpoints:
                 try:
                     response = await client.get(f"{self.base_url}{endpoint}")
-                    
+
                     if response.status_code == 200:
                         # Check response time for potential performance issues
                         if hasattr(response, 'elapsed') and response.elapsed.total_seconds() > 5:
                             self.add_issue(
                                 f"DB-{len(self.issues)+1:03d}",
                                 f"Database performance: {endpoint}",
-                                f"Slow database query detected",
+                                "Slow database query detected",
                                 f"Send GET request to {endpoint}",
                                 f"Response time: {response.elapsed.total_seconds()}s",
                                 "Response time under 1 second for simple queries",
                                 "Medium"
                             )
-                        
+
                         # Check for potential data leakage
                         response_text = response.text.lower()
                         sensitive_patterns = ["password", "secret", "token", "key", "hash"]
-                        
+
                         for pattern in sensitive_patterns:
                             if pattern in response_text:
                                 self.add_issue(
@@ -606,37 +603,37 @@ class SeniorQAAnalyzer:
                                     "No sensitive data in API responses",
                                     "High"
                                 )
-                                
+
                 except Exception as e:
                     print(f"   ℹ️  Database test failed for {endpoint}: {e}")
-                    
+
     def generate_comprehensive_report(self):
         """Generate the final comprehensive QA report"""
         print("\n" + "="*80)
         print("📋 SENIOR QA COMPREHENSIVE ANALYSIS REPORT")
         print("="*80)
-        
+
         # Summary statistics
         total_issues = len(self.issues)
         severity_counts = {"Critical": 0, "High": 0, "Medium": 0, "Low": 0}
-        
+
         for issue in self.issues:
             severity_counts[issue.severity] += 1
-            
-        print(f"\n📊 EXECUTIVE SUMMARY:")
+
+        print("\n📊 EXECUTIVE SUMMARY:")
         print(f"   Total Issues Found: {total_issues}")
         print(f"   Critical: {severity_counts['Critical']}")
         print(f"   High: {severity_counts['High']}")
         print(f"   Medium: {severity_counts['Medium']}")
         print(f"   Low: {severity_counts['Low']}")
-        
-        print(f"\n🔍 DETAILED FINDINGS:")
+
+        print("\n🔍 DETAILED FINDINGS:")
         print("-" * 80)
-        
+
         # Sort issues by severity
         severity_order = {"Critical": 0, "High": 1, "Medium": 2, "Low": 3}
         sorted_issues = sorted(self.issues, key=lambda x: severity_order[x.severity])
-        
+
         for issue in sorted_issues:
             print(f"\nIssue ID: {issue.issue_id}")
             print(f"Location: {issue.location}")
@@ -646,7 +643,7 @@ class SeniorQAAnalyzer:
             print(f"Observed Output: {issue.observed_output}")
             print(f"Expected Output: {issue.expected_output}")
             print("-" * 40)
-            
+
         # Save to JSON file
         report_data = {
             "timestamp": datetime.now().isoformat(),
@@ -667,11 +664,11 @@ class SeniorQAAnalyzer:
                 for issue in sorted_issues
             ]
         }
-        
+
         with open("SENIOR_QA_COMPREHENSIVE_ANALYSIS_REPORT.json", "w") as f:
             json.dump(report_data, f, indent=2)
-            
-        print(f"\n💾 Report saved to: SENIOR_QA_COMPREHENSIVE_ANALYSIS_REPORT.json")
+
+        print("\n💾 Report saved to: SENIOR_QA_COMPREHENSIVE_ANALYSIS_REPORT.json")
         print(f"🎯 QA Analysis Complete - {total_issues} issues identified")
 
 async def main():

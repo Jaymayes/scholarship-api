@@ -4,12 +4,14 @@ Using slowapi with Redis backend and proper environment-aware configuration
 """
 
 import os
-import redis
-from slowapi import Limiter, _rate_limit_exceeded_handler
-from slowapi.util import get_remote_address
-from slowapi.errors import RateLimitExceeded
-from fastapi import Request, Response, HTTPException
 import time
+
+import redis
+from fastapi import Request, Response
+from slowapi import Limiter
+from slowapi.errors import RateLimitExceeded
+from slowapi.util import get_remote_address
+
 from config.settings import settings
 from utils.logger import get_logger
 
@@ -20,7 +22,7 @@ def get_user_identifier(request: Request) -> str:
     # Check if user is set in request state by auth middleware
     if hasattr(request.state, 'user') and request.state.user:
         return f"user:{request.state.user.user_id}"
-    
+
     # Extract from JWT token if available
     auth_header = request.headers.get("authorization", "")
     if auth_header.startswith("Bearer "):
@@ -28,24 +30,24 @@ def get_user_identifier(request: Request) -> str:
         token = auth_header[7:]  # Remove "Bearer "
         if len(token) > 20:
             return f"token:{token[-20:]}"
-    
+
     # Fall back to IP with X-Forwarded-For support
     forwarded_for = request.headers.get("x-forwarded-for")
     if forwarded_for:
         ip = forwarded_for.split(",")[0].strip()
         return f"ip:{ip}"
-    
+
     return f"ip:{get_remote_address(request)}"
 
 # Initialize limiter with environment-aware fallback
 def create_rate_limiter():
     """Create rate limiter with environment-aware Redis fallback"""
     rate_config = settings.get_rate_limit_config
-    
+
     if not rate_config["enabled"]:
         logger.info("📝 Rate limiting disabled via configuration")
         return None
-    
+
     # Check if Redis backend is explicitly disabled
     if settings.disable_rate_limit_backend:
         logger.info("📝 Redis rate limiting explicitly disabled - using in-memory fallback")
@@ -53,7 +55,7 @@ def create_rate_limiter():
             key_func=get_user_identifier,
             storage_uri="memory://"
         )
-    
+
     # Try Redis if configured
     if rate_config["backend_url"] and rate_config["backend_url"] != "memory://":
         try:
@@ -61,12 +63,12 @@ def create_rate_limiter():
             redis_client = redis.Redis.from_url(rate_config["backend_url"], socket_timeout=2)
             redis_client.ping()
             logger.info("✅ Redis rate limiting backend connected successfully")
-            
+
             return Limiter(
                 key_func=get_user_identifier,
                 storage_uri=rate_config["backend_url"]
             )
-            
+
         except Exception as e:
             # Handle Redis connection failure based on environment
             if settings.environment.value == "production":
@@ -78,12 +80,11 @@ def create_rate_limiter():
                     f"Production environment requires Redis rate limiting backend. "
                     f"Configure RATE_LIMIT_BACKEND_URL or set DISABLE_RATE_LIMIT_BACKEND=true. Error: {e}"
                 )
-            else:
-                # Development: clear warning with explicit fallback
-                logger.warning(
-                    f"⚠️  Development mode: Redis rate limiting unavailable, using in-memory fallback. "
-                    f"Error: {e}. This is acceptable for development but NOT for production."
-                )
+            # Development: clear warning with explicit fallback
+            logger.warning(
+                f"⚠️  Development mode: Redis rate limiting unavailable, using in-memory fallback. "
+                f"Error: {e}. This is acceptable for development but NOT for production."
+            )
     else:
         # No Redis URL configured
         if settings.environment.value == "production":
@@ -93,7 +94,7 @@ def create_rate_limiter():
             )
         else:
             logger.info("📝 Development mode: Using in-memory rate limiting (Redis not configured)")
-    
+
     # Fallback to in-memory limiter
     return Limiter(
         key_func=get_user_identifier,
@@ -125,9 +126,7 @@ def get_rate_limit_for_environment(base_limit: str) -> str:
 # Rate limit exception handler with unified error schema
 async def rate_limit_handler(request: Request, exc: RateLimitExceeded) -> Response:
     """Handle rate limit exceeded with unified error format and proper headers"""
-    from middleware.error_handlers import create_error_response
-    import time
-    
+
     # Record rate limiting metric
     try:
         from observability.metrics import rate_limit_rejected_total
@@ -140,10 +139,10 @@ async def rate_limit_handler(request: Request, exc: RateLimitExceeded) -> Respon
         ).inc()
     except Exception as e:
         logger.warning(f"Failed to record rate limit metrics: {str(e)}")
-    
+
     # Extract rate limit details
     limit_info = str(exc).split() if exc else []
-    
+
     # Calculate retry after (default to 60 seconds)
     retry_after = 60
     if len(limit_info) >= 2:
@@ -158,15 +157,15 @@ async def rate_limit_handler(request: Request, exc: RateLimitExceeded) -> Respon
                 retry_after = 1
         except:
             retry_after = 60
-    
+
     # CRITICAL FIX: Use central error builder to prevent double encoding
     from utils.error_utils import build_rate_limit_error, get_trace_id
-    
+
     error_data = build_rate_limit_error(
         trace_id=get_trace_id(request),
         retry_after_seconds=retry_after
     )
-    
+
     # Add standard rate limiting headers
     headers = {
         "Retry-After": str(retry_after),
@@ -174,10 +173,10 @@ async def rate_limit_handler(request: Request, exc: RateLimitExceeded) -> Respon
         "X-RateLimit-Remaining": "0",
         "X-RateLimit-Reset": str(int(time.time() + retry_after))
     }
-    
+
     # Import JSONResponse for proper response
     from fastapi.responses import JSONResponse
-    
+
     return JSONResponse(
         content=error_data,
         status_code=429,

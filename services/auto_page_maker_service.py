@@ -1,12 +1,9 @@
 # AI Scholarship Playbook - Auto Page Maker Engine
 # Programmatic SEO content generation with quality gates
 
-import logging
 import re
-from typing import Dict, List, Optional, Any, Tuple
-from datetime import datetime, timedelta
-import json
-import asyncio
+from datetime import datetime
+from typing import Any
 
 from models.scholarship import Scholarship
 from services.openai_service import OpenAIService
@@ -16,21 +13,21 @@ logger = get_logger(__name__)
 
 class ContentQualityAssurance:
     """Quality assessment for programmatic content"""
-    
+
     @staticmethod
     def calculate_readability_score(text: str) -> float:
         """Calculate Flesch-Kincaid readability score"""
         sentences = len(re.findall(r'[.!?]+', text))
         words = len(text.split())
         syllables = sum([ContentQualityAssurance._count_syllables(word) for word in text.split()])
-        
+
         if sentences == 0 or words == 0:
             return 0.0
-        
+
         # Flesch Reading Ease formula
         score = 206.835 - (1.015 * (words / sentences)) - (84.6 * (syllables / words))
         return max(0.0, min(100.0, score))
-    
+
     @staticmethod
     def _count_syllables(word: str) -> int:
         """Count syllables in a word"""
@@ -38,39 +35,39 @@ class ContentQualityAssurance:
         vowels = "aeiouy"
         syllables = 0
         prev_was_vowel = False
-        
+
         for char in word:
             is_vowel = char in vowels
             if is_vowel and not prev_was_vowel:
                 syllables += 1
             prev_was_vowel = is_vowel
-        
+
         return max(1, syllables)
-    
+
     @staticmethod
-    def assess_uniqueness(content: str, existing_content: List[str]) -> float:
+    def assess_uniqueness(content: str, existing_content: list[str]) -> float:
         """Assess content uniqueness against existing content"""
         if not existing_content:
             return 1.0
-        
+
         content_words = set(content.lower().split())
         similarities = []
-        
+
         for existing in existing_content:
             existing_words = set(existing.lower().split())
             if len(content_words) == 0 or len(existing_words) == 0:
                 similarities.append(0.0)
                 continue
-            
+
             intersection = len(content_words.intersection(existing_words))
             union = len(content_words.union(existing_words))
             similarity = intersection / union if union > 0 else 0
             similarities.append(similarity)
-        
+
         # Return inverse of maximum similarity
         max_similarity = max(similarities) if similarities else 0
         return 1.0 - max_similarity
-    
+
     @staticmethod
     def assess_value_score(content: str) -> float:
         """Assess content value based on actionable information"""
@@ -79,27 +76,27 @@ class ContentQualityAssurance:
             "tips", "strategy", "checklist", "step-by-step", "example",
             "award amount", "selection criteria", "contact information"
         ]
-        
+
         content_lower = content.lower()
         found_indicators = sum(1 for indicator in value_indicators if indicator in content_lower)
-        
+
         # Score based on presence of value indicators
         max_indicators = len(value_indicators)
         base_score = found_indicators / max_indicators
-        
+
         # Bonus for length (comprehensive content)
         length_bonus = min(0.3, len(content) / 5000)  # Up to 30% bonus for 5000+ chars
-        
+
         return min(1.0, base_score + length_bonus)
 
 class ScholarshipPageGenerator:
     """Generate individual scholarship pages"""
-    
+
     def __init__(self, openai_service: OpenAIService):
         self.openai_service = openai_service
         self.qa = ContentQualityAssurance()
-    
-    async def generate_scholarship_page(self, scholarship: Scholarship) -> Dict[str, Any]:
+
+    async def generate_scholarship_page(self, scholarship: Scholarship) -> dict[str, Any]:
         """Generate comprehensive scholarship page content"""
         try:
             # Generate main content sections
@@ -107,16 +104,16 @@ class ScholarshipPageGenerator:
             eligibility_section = await self._generate_eligibility_section(scholarship)
             application_section = await self._generate_application_section(scholarship)
             strategy_section = await self._generate_strategy_section(scholarship)
-            
+
             # Combine sections
             full_content = f"{overview_section}\n\n{eligibility_section}\n\n{application_section}\n\n{strategy_section}"
-            
+
             # Generate SEO metadata
             seo_metadata = await self._generate_seo_metadata(scholarship, full_content)
-            
+
             # Assess content quality
             quality_score = self._assess_content_quality(full_content)
-            
+
             return {
                 "scholarship_id": scholarship.id,
                 "slug": self._generate_slug(scholarship.name),
@@ -134,32 +131,32 @@ class ScholarshipPageGenerator:
                 "word_count": len(full_content.split()),
                 "generated_at": datetime.utcnow().isoformat()
             }
-            
+
         except Exception as e:
             logger.error(f"Failed to generate page for scholarship {scholarship.id}: {str(e)}")
             raise
-    
+
     async def _generate_overview_section(self, scholarship: Scholarship) -> str:
         """Generate scholarship overview section"""
         prompt = f"""
         Write a comprehensive overview section for the {scholarship.name} scholarship page.
-        
+
         Scholarship Details:
         - Title: {scholarship.name}
         - Award Amount: ${scholarship.amount:,}
         - Deadline: {scholarship.application_deadline.strftime('%B %d, %Y')}
         - Organization: {scholarship.organization}
         - Description: {scholarship.description}
-        
+
         Create an engaging overview that includes:
         1. Clear scholarship summary and value proposition
         2. Key details (amount, deadline, organization)
         3. Who should apply (target audience)
         4. Why this scholarship matters
-        
+
         Write in a helpful, informative tone. Use specific details. Keep it 300-400 words.
         """
-        
+
         # Use the OpenAI service to generate content
         try:
             response = await self.openai_service.client.chat.completions.create(
@@ -175,28 +172,28 @@ class ScholarshipPageGenerator:
         except Exception as e:
             logger.error(f"Error generating content: {e}")
             return f"Overview for {scholarship.name} scholarship. Award: ${scholarship.amount:,}. Deadline: {scholarship.application_deadline.strftime('%B %d, %Y')}."
-    
+
     async def _generate_eligibility_section(self, scholarship: Scholarship) -> str:
         """Generate detailed eligibility section"""
         prompt = f"""
         Create a detailed eligibility requirements section for {scholarship.name}.
-        
+
         Scholarship Context:
         - Award: ${scholarship.amount:,}
         - Field: {getattr(scholarship, 'field_of_study', 'General')}
         - Organization: {scholarship.organization}
-        
+
         Include:
         1. Academic requirements (GPA, grade level, etc.)
         2. Demographic requirements (if applicable)
         3. Field of study requirements
         4. Other specific criteria
         5. Common eligibility misconceptions to avoid
-        
+
         Format as clear sections with bullet points. Be specific and actionable.
         Target 250-300 words.
         """
-        
+
         # Use the OpenAI service to generate content
         try:
             response = await self.openai_service.client.chat.completions.create(
@@ -212,28 +209,28 @@ class ScholarshipPageGenerator:
         except Exception as e:
             logger.error(f"Error generating content: {e}")
             return f"Eligibility requirements for {scholarship.name} scholarship."
-    
+
     async def _generate_application_section(self, scholarship: Scholarship) -> str:
         """Generate application process section"""
         prompt = f"""
         Write a comprehensive application guide for {scholarship.name}.
-        
+
         Details:
         - Deadline: {scholarship.application_deadline.strftime('%B %d, %Y')}
         - Award: ${scholarship.amount:,}
         - Organization: {scholarship.organization}
-        
+
         Cover:
         1. Application timeline and key dates
         2. Required materials and documents
         3. Step-by-step application process
         4. Common application mistakes to avoid
         5. Tips for standing out
-        
+
         Make it actionable with specific steps. Include deadline reminders.
         Target 350-400 words.
         """
-        
+
         # Use the OpenAI service to generate content
         try:
             response = await self.openai_service.client.chat.completions.create(
@@ -249,28 +246,28 @@ class ScholarshipPageGenerator:
         except Exception as e:
             logger.error(f"Error generating content: {e}")
             return f"Application guide for {scholarship.name} scholarship. Deadline: {scholarship.application_deadline.strftime('%B %d, %Y')}."
-    
+
     async def _generate_strategy_section(self, scholarship: Scholarship) -> str:
         """Generate application strategy section"""
         prompt = f"""
         Create a strategic application advice section for {scholarship.name}.
-        
+
         Scholarship Profile:
         - Amount: ${scholarship.amount:,}
         - Organization: {scholarship.organization}
         - Competitiveness: {"High" if scholarship.amount > 5000 else "Medium"}
-        
+
         Include:
         1. Competition analysis and win likelihood factors
         2. What selection committees look for
         3. How to position your application effectively
         4. Related scholarships to also consider
         5. Success timeline and follow-up steps
-        
+
         Focus on strategic insights that help applicants succeed.
         Target 250-300 words.
         """
-        
+
         # Use the OpenAI service to generate content
         try:
             response = await self.openai_service.client.chat.completions.create(
@@ -286,20 +283,20 @@ class ScholarshipPageGenerator:
         except Exception as e:
             logger.error(f"Error generating content: {e}")
             return f"Strategic advice for {scholarship.name} scholarship application."
-    
-    async def _generate_seo_metadata(self, scholarship: Scholarship, content: str) -> Dict[str, Any]:
+
+    async def _generate_seo_metadata(self, scholarship: Scholarship, content: str) -> dict[str, Any]:
         """Generate SEO-optimized metadata"""
-        
+
         # Generate SEO title
         title = f"{scholarship.name} - ${scholarship.amount:,} Scholarship Application Guide"
         if len(title) > 60:
             title = f"{scholarship.name} - Application Guide"
-        
+
         # Generate meta description
         description = f"Apply for the ${scholarship.amount:,} {scholarship.name}. Complete eligibility requirements, application process, and winning strategies. Deadline: {scholarship.application_deadline.strftime('%B %d, %Y')}."
         if len(description) > 160:
             description = f"${scholarship.amount:,} {scholarship.name} application guide. Requirements, process, and strategies to win."
-        
+
         # Extract keywords
         keywords = [
             scholarship.name.lower(),
@@ -309,7 +306,7 @@ class ScholarshipPageGenerator:
             "scholarship application",
             "eligibility requirements"
         ]
-        
+
         # Generate structured data
         structured_data = {
             "@context": "https://schema.org/",
@@ -327,7 +324,7 @@ class ScholarshipPageGenerator:
             },
             "applicationDeadline": scholarship.application_deadline.isoformat()
         }
-        
+
         return {
             "title": title,
             "meta_description": description,
@@ -338,46 +335,46 @@ class ScholarshipPageGenerator:
             "og_description": description,
             "og_type": "article"
         }
-    
+
     def _generate_slug(self, title: str) -> str:
         """Generate URL-friendly slug"""
         slug = re.sub(r'[^\w\s-]', '', title.lower())
         slug = re.sub(r'[-\s]+', '-', slug)
         return slug.strip('-')
-    
-    def _assess_content_quality(self, content: str) -> Dict[str, float]:
+
+    def _assess_content_quality(self, content: str) -> dict[str, float]:
         """Assess overall content quality"""
         return {
             "readability_score": self.qa.calculate_readability_score(content),
             "value_score": self.qa.assess_value_score(content),
             "word_count": len(content.split()),
-            "overall_score": (self.qa.calculate_readability_score(content) * 0.3 + 
+            "overall_score": (self.qa.calculate_readability_score(content) * 0.3 +
                             self.qa.assess_value_score(content) * 0.7) / 100
         }
 
 class CategoryLandingPageGenerator:
     """Generate category-specific landing pages"""
-    
+
     def __init__(self, openai_service: OpenAIService):
         self.openai_service = openai_service
-    
-    async def generate_category_page(self, category: str, scholarships: List[Scholarship]) -> Dict[str, Any]:
+
+    async def generate_category_page(self, category: str, scholarships: list[Scholarship]) -> dict[str, Any]:
         """Generate category landing page (e.g., STEM scholarships)"""
-        
+
         # Calculate category stats
         total_amount = sum(s.amount for s in scholarships)
         avg_amount = total_amount / len(scholarships) if scholarships else 0
         upcoming_deadlines = [s for s in scholarships if s.application_deadline > datetime.now()]
-        
+
         prompt = f"""
         Create a comprehensive landing page for "{category}" scholarships.
-        
+
         Category Stats:
         - Total scholarships available: {len(scholarships)}
         - Combined award value: ${total_amount:,}
         - Average award: ${avg_amount:,.0f}
         - Upcoming deadlines: {len(upcoming_deadlines)}
-        
+
         Create content including:
         1. Category overview and importance
         2. Types of students who should apply
@@ -385,11 +382,11 @@ class CategoryLandingPageGenerator:
         4. Application strategy for this category
         5. Success stories and inspiration
         6. Timeline and planning advice
-        
+
         Write 800-1000 words that are helpful and motivating.
         Focus on actionable insights specific to {category} students.
         """
-        
+
         # Use the OpenAI service to generate content
         try:
             response = await self.openai_service.client.chat.completions.create(
@@ -405,11 +402,11 @@ class CategoryLandingPageGenerator:
         except Exception as e:
             logger.error(f"Error generating content: {e}")
             content = f"Comprehensive guide to {category} scholarships with {len(scholarships)} opportunities available."
-        
+
         # Generate scholarship highlights
         top_scholarships = sorted(scholarships, key=lambda s: s.amount, reverse=True)[:5]
         highlights = []
-        
+
         for scholarship in top_scholarships:
             highlights.append({
                 "title": scholarship.name,
@@ -418,7 +415,7 @@ class CategoryLandingPageGenerator:
                 "organization": scholarship.organization,
                 "slug": self._generate_slug(scholarship.name)
             })
-        
+
         return {
             "category": category,
             "slug": self._generate_slug(f"{category}-scholarships"),
@@ -434,7 +431,7 @@ class CategoryLandingPageGenerator:
             },
             "generated_at": datetime.utcnow().isoformat()
         }
-    
+
     def _generate_slug(self, title: str) -> str:
         """Generate URL-friendly slug"""
         slug = re.sub(r'[^\w\s-]', '', title.lower())
@@ -443,19 +440,19 @@ class CategoryLandingPageGenerator:
 
 class AutoPageMakerService:
     """Main service for automated SEO page generation"""
-    
+
     def __init__(self, openai_service: OpenAIService):
         self.openai_service = openai_service
         self.scholarship_generator = ScholarshipPageGenerator(openai_service)
         self.category_generator = CategoryLandingPageGenerator(openai_service)
         self.generated_pages = []
         self.sitemap_entries = []
-    
-    async def generate_programmatic_pages(self, scholarships: List[Scholarship]) -> Dict[str, Any]:
+
+    async def generate_programmatic_pages(self, scholarships: list[Scholarship]) -> dict[str, Any]:
         """Generate all programmatic pages for SEO"""
         try:
             logger.info(f"Starting programmatic page generation for {len(scholarships)} scholarships")
-            
+
             results = {
                 "individual_pages": [],
                 "category_pages": [],
@@ -467,9 +464,9 @@ class AutoPageMakerService:
                     "generation_time": 0
                 }
             }
-            
+
             start_time = datetime.utcnow()
-            
+
             # Generate individual scholarship pages
             for scholarship in scholarships[:50]:  # Start with 50 for demo
                 try:
@@ -483,7 +480,7 @@ class AutoPageMakerService:
                 except Exception as e:
                     logger.warning(f"Failed to generate page for scholarship {scholarship.id}: {str(e)}")
                     continue
-            
+
             # Generate category landing pages
             categories = ["STEM", "Women in Technology", "First-Generation College", "Community Service", "Academic Merit"]
             for category in categories:
@@ -500,7 +497,7 @@ class AutoPageMakerService:
                     except Exception as e:
                         logger.warning(f"Failed to generate category page for {category}: {str(e)}")
                         continue
-            
+
             # Calculate final stats
             all_pages = results["individual_pages"] + results["category_pages"]
             results["stats"] = {
@@ -509,22 +506,22 @@ class AutoPageMakerService:
                 "average_quality_score": sum(p.get("quality", {}).get("overall_score", 0) for p in all_pages) / len(all_pages) if all_pages else 0,
                 "generation_time": (datetime.utcnow() - start_time).total_seconds()
             }
-            
+
             # Generate sitemap
             await self._generate_sitemap()
-            
+
             logger.info(f"Generated {results['stats']['total_pages']} pages in {results['stats']['generation_time']:.1f} seconds")
             return results
-            
+
         except Exception as e:
             logger.error(f"Failed to generate programmatic pages: {str(e)}")
             raise
-    
+
     def _matches_category(self, scholarship: Scholarship, category: str) -> bool:
         """Check if scholarship matches category"""
         title_lower = scholarship.title.lower()
         desc_lower = scholarship.description.lower()
-        
+
         category_keywords = {
             "STEM": ["stem", "science", "technology", "engineering", "math", "computer", "data"],
             "Women in Technology": ["women", "female", "technology", "computer", "engineering"],
@@ -532,31 +529,31 @@ class AutoPageMakerService:
             "Community Service": ["community", "service", "volunteer", "civic"],
             "Academic Merit": ["academic", "merit", "gpa", "achievement", "excellence"]
         }
-        
+
         keywords = category_keywords.get(category, [])
         return any(keyword in title_lower or keyword in desc_lower for keyword in keywords)
-    
+
     async def _generate_sitemap(self) -> str:
         """Generate XML sitemap for generated pages"""
         sitemap_content = '<?xml version="1.0" encoding="UTF-8"?>\n'
         sitemap_content += '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
-        
+
         for entry in self.sitemap_entries:
-            sitemap_content += f'  <url>\n'
+            sitemap_content += '  <url>\n'
             sitemap_content += f'    <loc>https://scholarship-api.jamarrlmayes.replit.app{entry["url"]}</loc>\n'
             sitemap_content += f'    <lastmod>{entry["lastmod"]}</lastmod>\n'
             sitemap_content += f'    <priority>{entry["priority"]}</priority>\n'
-            sitemap_content += f'  </url>\n'
-        
+            sitemap_content += '  </url>\n'
+
         sitemap_content += '</urlset>'
-        
+
         # Save sitemap
         with open("sitemap.xml", "w") as f:
             f.write(sitemap_content)
-        
+
         return sitemap_content
-    
-    async def get_seo_performance_metrics(self) -> Dict[str, Any]:
+
+    async def get_seo_performance_metrics(self) -> dict[str, Any]:
         """Get SEO performance metrics for generated content"""
         # In production, this would integrate with Google Search Console
         return {

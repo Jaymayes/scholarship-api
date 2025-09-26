@@ -6,12 +6,11 @@ Boost coverage from 95.2% to ≥97% across three standardized portals with ≥90
 
 import asyncio
 import json
-import uuid
-from datetime import datetime
-from typing import Dict, List, Any, Optional, Tuple
-from dataclasses import dataclass, asdict
-from enum import Enum
 import logging
+import uuid
+from dataclasses import dataclass
+from enum import Enum
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -35,12 +34,12 @@ class FormField:
     field_name: str
     field_type: FieldType
     required: bool
-    ai_suggested_value: Optional[str]
+    ai_suggested_value: str | None
     confidence_level: ConfidenceLevel
     confidence_score: float
     user_editable: bool
-    transparency_note: Optional[str]
-    fallback_options: List[str]
+    transparency_note: str | None
+    fallback_options: list[str]
 
 @dataclass
 class ApplicationPortal:
@@ -48,7 +47,7 @@ class ApplicationPortal:
     portal_id: str
     provider_name: str
     application_url: str
-    fields: List[FormField]
+    fields: list[FormField]
     coverage_percentage: float
     submit_ready_rate: float
     processing_time_seconds: float
@@ -58,8 +57,8 @@ class ApplicationPortal:
 class AutomationMetrics:
     """Comprehensive automation performance tracking"""
     total_fields_processed: int
-    fields_by_confidence: Dict[str, int]
-    coverage_by_category: Dict[str, float]
+    fields_by_confidence: dict[str, int]
+    coverage_by_category: dict[str, float]
     user_edit_rate: float
     submit_success_rate: float
     time_savings_minutes: float
@@ -68,48 +67,48 @@ class AutomationMetrics:
 class Week3ApplicationEnhancer:
     """
     Week 3 Application Automation Enhancement Engine
-    
+
     Objectives:
     - Boost pre-fill coverage 95.2% → ≥97%
     - Deploy across 3 standardized portals
     - Achieve ≥90% submit-ready rate
     - Maintain responsible AI compliance (100%)
     """
-    
+
     def __init__(self, openai_service=None):
         self.openai_service = openai_service
-        self.portals: List[ApplicationPortal] = []
+        self.portals: list[ApplicationPortal] = []
         self.current_coverage = 0.952
         self.target_coverage = 0.97
         self.target_submit_ready = 0.90
-        
-    async def enhance_application_automation(self) -> Dict[str, Any]:
+
+    async def enhance_application_automation(self) -> dict[str, Any]:
         """Execute comprehensive application automation enhancement"""
         try:
             logger.info("📝 Week 3 Application Enhancement: 95.2% → 97%+ coverage initiated")
-            
+
             # Phase 1: Deploy three standardized portals
             portals = await self._deploy_standardized_portals()
-            
+
             # Phase 2: Implement enhanced field mapping with AI
-            field_mapping = await self._implement_enhanced_field_mapping()
-            
+            await self._implement_enhanced_field_mapping()
+
             # Phase 3: Deploy confidence scoring system
-            confidence_system = await self._deploy_confidence_scoring_system()
-            
+            await self._deploy_confidence_scoring_system()
+
             # Phase 4: Create read-only preview with user control
-            preview_system = await self._create_preview_system()
-            
+            await self._create_preview_system()
+
             # Phase 5: Implement graceful fallbacks
-            fallback_system = await self._implement_graceful_fallbacks()
-            
+            await self._implement_graceful_fallbacks()
+
             # Phase 6: Validate responsible AI compliance
             ethics_validation = await self._validate_responsible_ai_compliance()
-            
+
             # Calculate success metrics
             avg_coverage = sum(portal.coverage_percentage for portal in portals) / len(portals)
             avg_submit_ready = sum(portal.submit_ready_rate for portal in portals) / len(portals)
-            
+
             results = {
                 "execution_status": "success",
                 "coverage_achieved": avg_coverage,
@@ -139,10 +138,10 @@ class Week3ApplicationEnhancer:
                 "execution_time_seconds": 892.1,
                 "ready_for_production": True
             }
-            
+
             logger.info(f"✅ Application Enhancement Complete: {avg_coverage:.3f} coverage, {avg_submit_ready:.3f} submit-ready")
             return results
-            
+
         except Exception as e:
             logger.error(f"❌ Application enhancement failed: {str(e)}")
             return {
@@ -151,11 +150,11 @@ class Week3ApplicationEnhancer:
                 "coverage_achieved": self.current_coverage,
                 "enhancement_status": "failed"
             }
-    
-    async def _deploy_standardized_portals(self) -> List[ApplicationPortal]:
+
+    async def _deploy_standardized_portals(self) -> list[ApplicationPortal]:
         """Deploy three standardized application portals with enhanced automation"""
         portals = []
-        
+
         # Portal configurations with different complexity levels
         portal_configs = [
             {
@@ -166,7 +165,7 @@ class Week3ApplicationEnhancer:
                 "target_submit_ready": 0.92
             },
             {
-                "provider": "FastWeb Applications", 
+                "provider": "FastWeb Applications",
                 "complexity": "medium",
                 "field_count": 32,
                 "target_coverage": 0.970,
@@ -180,29 +179,29 @@ class Week3ApplicationEnhancer:
                 "target_submit_ready": 0.88
             }
         ]
-        
+
         for config in portal_configs:
             portal = await self._create_enhanced_portal(config)
             portals.append(portal)
-        
+
         return portals
-    
-    async def _create_enhanced_portal(self, config: Dict[str, Any]) -> ApplicationPortal:
+
+    async def _create_enhanced_portal(self, config: dict[str, Any]) -> ApplicationPortal:
         """Create enhanced application portal with comprehensive field mapping"""
         fields = await self._generate_comprehensive_field_set(config["field_count"])
-        
+
         # Calculate coverage based on field confidence distribution
         high_conf_fields = len([f for f in fields if f.confidence_level == ConfidenceLevel.HIGH])
         medium_conf_fields = len([f for f in fields if f.confidence_level == ConfidenceLevel.MEDIUM])
         low_conf_fields = len([f for f in fields if f.confidence_level == ConfidenceLevel.LOW])
-        
+
         # Coverage calculation: High=100%, Medium=90%, Low=70%, Manual=0%
         coverage = (high_conf_fields * 1.0 + medium_conf_fields * 0.9 + low_conf_fields * 0.7) / len(fields)
-        
+
         # Submit-ready rate: High and Medium confidence fields contribute
         submit_ready = (high_conf_fields + medium_conf_fields * 0.85) / len(fields)
-        
-        portal = ApplicationPortal(
+
+        return ApplicationPortal(
             portal_id=str(uuid.uuid4()),
             provider_name=config["provider"],
             application_url=f"https://{config['provider'].lower().replace(' ', '')}.com/apply",
@@ -212,13 +211,12 @@ class Week3ApplicationEnhancer:
             processing_time_seconds=2.5 + (config["field_count"] * 0.05),  # ~4.5s for 45 fields
             responsible_ai_compliant=True
         )
-        
-        return portal
-    
-    async def _generate_comprehensive_field_set(self, field_count: int) -> List[FormField]:
+
+
+    async def _generate_comprehensive_field_set(self, field_count: int) -> list[FormField]:
         """Generate comprehensive field set with enhanced AI mapping"""
         fields = []
-        
+
         # Standard field templates with enhanced mapping
         field_templates = [
             # Personal Information (High confidence, well-structured data)
@@ -231,7 +229,7 @@ class Week3ApplicationEnhancer:
             {"name": "city", "type": FieldType.PERSONAL, "confidence": 0.94, "required": True},
             {"name": "state", "type": FieldType.PERSONAL, "confidence": 0.96, "required": True},
             {"name": "zip_code", "type": FieldType.PERSONAL, "confidence": 0.95, "required": True},
-            
+
             # Academic Information (High to Medium confidence)
             {"name": "high_school_name", "type": FieldType.ACADEMIC, "confidence": 0.92, "required": True},
             {"name": "graduation_year", "type": FieldType.ACADEMIC, "confidence": 0.96, "required": True},
@@ -241,38 +239,38 @@ class Week3ApplicationEnhancer:
             {"name": "act_score", "type": FieldType.ACADEMIC, "confidence": 0.83, "required": False},
             {"name": "intended_major", "type": FieldType.ACADEMIC, "confidence": 0.89, "required": True},
             {"name": "college_plans", "type": FieldType.ACADEMIC, "confidence": 0.81, "required": True},
-            
+
             # Financial Information (Medium to Low confidence, sensitive data)
             {"name": "family_income", "type": FieldType.FINANCIAL, "confidence": 0.72, "required": False},
             {"name": "fafsa_efc", "type": FieldType.FINANCIAL, "confidence": 0.68, "required": False},
             {"name": "financial_need_statement", "type": FieldType.FINANCIAL, "confidence": 0.65, "required": False},
-            
+
             # Contact Information (High confidence)
             {"name": "parent_guardian_name", "type": FieldType.CONTACT, "confidence": 0.87, "required": False},
             {"name": "parent_guardian_email", "type": FieldType.CONTACT, "confidence": 0.82, "required": False},
             {"name": "emergency_contact", "type": FieldType.CONTACT, "confidence": 0.79, "required": False},
-            
+
             # Essay/Subjective (Manual only - responsible AI compliance)
             {"name": "personal_statement", "type": FieldType.ESSAY, "confidence": 0.0, "required": True},
             {"name": "why_deserve_scholarship", "type": FieldType.ESSAY, "confidence": 0.0, "required": True},
             {"name": "career_goals", "type": FieldType.ESSAY, "confidence": 0.0, "required": True},
             {"name": "leadership_experience", "type": FieldType.ESSAY, "confidence": 0.0, "required": False},
-            
+
             # Document Uploads (Low confidence, file-based)
             {"name": "transcript_upload", "type": FieldType.DOCUMENT, "confidence": 0.0, "required": True},
             {"name": "recommendation_letters", "type": FieldType.DOCUMENT, "confidence": 0.0, "required": True},
             {"name": "financial_documents", "type": FieldType.DOCUMENT, "confidence": 0.0, "required": False}
         ]
-        
+
         # Generate fields up to field_count, cycling through templates
         for i in range(field_count):
             template = field_templates[i % len(field_templates)]
-            
+
             # Add variation to field names for different portals
             field_name = template["name"]
             if i >= len(field_templates):
                 field_name = f"{template['name']}_variant_{i // len(field_templates)}"
-            
+
             # Determine confidence level from score
             confidence_score = template["confidence"]
             if confidence_score >= 0.95:
@@ -283,20 +281,20 @@ class Week3ApplicationEnhancer:
                 confidence_level = ConfidenceLevel.LOW
             else:
                 confidence_level = ConfidenceLevel.MANUAL
-            
+
             # Generate AI suggested value (except for essays/documents)
             ai_value = None
             if template["type"] not in [FieldType.ESSAY, FieldType.DOCUMENT] and confidence_score > 0.7:
                 ai_value = await self._generate_field_suggestion(template["name"], template["type"])
-            
+
             # User editability (essays are always manual, high-confidence can be edited)
             user_editable = (template["type"] == FieldType.ESSAY) or (confidence_score > 0.8)
-            
+
             # Transparency note for AI assistance
             transparency_note = None
             if ai_value and confidence_level in [ConfidenceLevel.HIGH, ConfidenceLevel.MEDIUM]:
                 transparency_note = f"AI suggested based on your profile (confidence: {confidence_score:.0%})"
-            
+
             field = FormField(
                 field_name=field_name,
                 field_type=template["type"],
@@ -309,15 +307,15 @@ class Week3ApplicationEnhancer:
                 fallback_options=await self._generate_fallback_options(template["name"])
             )
             fields.append(field)
-        
+
         return fields[:field_count]
-    
-    async def _generate_field_suggestion(self, field_name: str, field_type: FieldType) -> Optional[str]:
+
+    async def _generate_field_suggestion(self, field_name: str, field_type: FieldType) -> str | None:
         """Generate AI field suggestions with responsible constraints"""
         # Mock user profile data (in production, would come from user's actual profile)
         suggestions = {
             "first_name": "Emma",
-            "last_name": "Rodriguez", 
+            "last_name": "Rodriguez",
             "email_address": "emma.rodriguez@student.edu",
             "phone_number": "555-234-5678",
             "home_address": "123 Student Lane",
@@ -330,10 +328,10 @@ class Week3ApplicationEnhancer:
             "intended_major": "Computer Science",
             "sat_score": "1450"
         }
-        
+
         return suggestions.get(field_name, f"[AI suggested {field_name}]")
-    
-    async def _generate_fallback_options(self, field_name: str) -> List[str]:
+
+    async def _generate_fallback_options(self, field_name: str) -> list[str]:
         """Generate fallback options for fields with lower confidence"""
         fallbacks = {
             "class_rank": ["Top 10%", "Top 25%", "Top 50%", "Not reported"],
@@ -341,12 +339,12 @@ class Week3ApplicationEnhancer:
             "financial_need_statement": ["High need", "Moderate need", "Low need", "Prefer not to say"],
             "career_goals": ["STEM career", "Business/Finance", "Healthcare", "Education", "Other"]
         }
-        
+
         return fallbacks.get(field_name, ["Option A", "Option B", "Not sure"])
-    
-    async def _implement_enhanced_field_mapping(self) -> Dict[str, Any]:
+
+    async def _implement_enhanced_field_mapping(self) -> dict[str, Any]:
         """Implement enhanced field mapping with AI categorization"""
-        mapping_improvements = {
+        return {
             "field_recognition": {
                 "description": "AI-powered field type detection and categorization",
                 "accuracy_improvement": 0.08,  # 8% improvement in field recognition
@@ -368,12 +366,11 @@ class Week3ApplicationEnhancer:
                 "implementation": "Client-side validation with server-side verification"
             }
         }
-        
-        return mapping_improvements
-    
-    async def _deploy_confidence_scoring_system(self) -> Dict[str, Any]:
+
+
+    async def _deploy_confidence_scoring_system(self) -> dict[str, Any]:
         """Deploy 4-level confidence scoring system with transparency"""
-        confidence_system = {
+        return {
             "levels": {
                 ConfidenceLevel.HIGH: {
                     "range": "95-100%",
@@ -382,7 +379,7 @@ class Week3ApplicationEnhancer:
                     "user_control": "Can edit anytime"
                 },
                 ConfidenceLevel.MEDIUM: {
-                    "range": "85-94%", 
+                    "range": "85-94%",
                     "behavior": "Suggest with prominent edit option",
                     "transparency": "AI suggestion - please review",
                     "user_control": "Encouraged to review and edit"
@@ -402,7 +399,7 @@ class Week3ApplicationEnhancer:
             },
             "scoring_factors": [
                 "Data source reliability",
-                "Field type complexity", 
+                "Field type complexity",
                 "User profile completeness",
                 "Historical accuracy for field type",
                 "Cross-validation with other fields"
@@ -414,12 +411,11 @@ class Week3ApplicationEnhancer:
                 "no_hidden_automation": True
             }
         }
-        
-        return confidence_system
-    
-    async def _create_preview_system(self) -> Dict[str, Any]:
+
+
+    async def _create_preview_system(self) -> dict[str, Any]:
         """Create read-only preview system with full user control"""
-        preview_system = {
+        return {
             "features": {
                 "read_only_preview": {
                     "description": "Complete form preview before submission",
@@ -455,12 +451,11 @@ class Week3ApplicationEnhancer:
                 "data_privacy_protected": True
             }
         }
-        
-        return preview_system
-    
-    async def _implement_graceful_fallbacks(self) -> Dict[str, Any]:
+
+
+    async def _implement_graceful_fallbacks(self) -> dict[str, Any]:
         """Implement graceful fallback systems for incomplete data"""
-        fallback_system = {
+        return {
             "fallback_strategies": {
                 "smart_defaults": {
                     "description": "Contextually appropriate default values",
@@ -490,12 +485,11 @@ class Week3ApplicationEnhancer:
                 "manual_override": "Always allow manual completion"
             }
         }
-        
-        return fallback_system
-    
-    async def _validate_responsible_ai_compliance(self) -> Dict[str, Any]:
+
+
+    async def _validate_responsible_ai_compliance(self) -> dict[str, Any]:
         """Validate 100% responsible AI compliance"""
-        compliance_check = {
+        return {
             "compliant": True,
             "validation_results": {
                 "no_essay_ghostwriting": {
@@ -504,7 +498,7 @@ class Week3ApplicationEnhancer:
                     "evidence": "0% AI generation for FieldType.ESSAY fields"
                 },
                 "transparency_disclosure": {
-                    "status": "PASS", 
+                    "status": "PASS",
                     "details": "All AI assistance clearly disclosed with confidence levels",
                     "evidence": "100% of AI-suggested fields have transparency notes"
                 },
@@ -532,14 +526,13 @@ class Week3ApplicationEnhancer:
             },
             "compliance_score": 1.0  # 100% compliant
         }
-        
-        return compliance_check
 
-# Usage example for Week 3 execution  
+
+# Usage example for Week 3 execution
 if __name__ == "__main__":
     async def main():
         enhancer = Week3ApplicationEnhancer()
         result = await enhancer.enhance_application_automation()
         print(json.dumps(result, indent=2))
-    
+
     asyncio.run(main())

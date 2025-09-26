@@ -1,9 +1,10 @@
 """
 Global pytest configuration and fixtures
 """
-import pytest
 import os
-from unittest.mock import patch
+
+import pytest
+
 
 @pytest.fixture(autouse=True)
 def setup_test_environment():
@@ -21,20 +22,20 @@ def setup_test_environment():
         'TRUSTED_PROXY_IPS': '[]',
         'CORS_ALLOWED_ORIGINS': '*'
     }
-    
+
     # Save originals and set test values
     for key, value in test_vars.items():
         if key in os.environ:
             original_vars[key] = os.environ[key]
         os.environ[key] = value
-    
+
     # Clear settings cache if it exists
     from config.settings import get_settings
     if hasattr(get_settings, 'cache_clear'):
         get_settings.cache_clear()
-    
+
     yield
-    
+
     # Restore original values
     for key, value in test_vars.items():
         if key in original_vars:
@@ -46,5 +47,6 @@ def setup_test_environment():
 def test_client():
     """Get test client with proper configuration"""
     from fastapi.testclient import TestClient
+
     from main import app
     return TestClient(app)

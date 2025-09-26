@@ -4,9 +4,9 @@ Comprehensive test for all QA fixes implementation
 """
 
 import os
+
 import pytest
 from fastapi.testclient import TestClient
-from fastapi import status
 
 # Set test environment before imports
 os.environ.update({
@@ -26,7 +26,7 @@ client = TestClient(app)
 
 class TestEnvironmentAwareConfig:
     """Test environment-aware configuration system"""
-    
+
     def test_development_config_loads(self):
         """Test that development configuration loads without errors"""
         from config.settings import get_settings
@@ -34,7 +34,7 @@ class TestEnvironmentAwareConfig:
         assert settings.environment.value == "development"
         assert settings.jwt_secret_key is not None
         assert len(settings.jwt_secret_key) >= 32
-        
+
     def test_health_endpoints_work(self):
         """Test health endpoints are operational"""
         response = client.get("/health")
@@ -42,26 +42,26 @@ class TestEnvironmentAwareConfig:
         data = response.json()
         assert data["status"] == "healthy"
         assert "trace_id" in data
-        
-        response = client.get("/readiness") 
+
+        response = client.get("/readiness")
         assert response.status_code == 200
         data = response.json()
         assert data["status"] == "ready"
-        
+
     def test_security_headers_present(self):
         """Test that security headers are present"""
         response = client.get("/health")
         headers = response.headers
-        
+
         # Check required security headers
         assert "X-Content-Type-Options" in headers
         assert "X-Frame-Options" in headers
         assert "X-XSS-Protection" in headers
         assert "Referrer-Policy" in headers
-        
+
         # HSTS should not be present in development
         assert "Strict-Transport-Security" not in headers
-        
+
     def test_cors_wildcard_in_development(self):
         """Test CORS allows wildcard in development"""
         response = client.options("/health", headers={
@@ -69,27 +69,27 @@ class TestEnvironmentAwareConfig:
             "Access-Control-Request-Method": "GET"
         })
         assert response.status_code == 200
-        
+
     def test_api_docs_accessible_in_development(self):
         """Test API documentation is accessible in development"""
         response = client.get("/docs")
         assert response.status_code == 200
-        
-        response = client.get("/redoc") 
+
+        response = client.get("/redoc")
         assert response.status_code == 200
-        
+
         response = client.get("/openapi.json")
         assert response.status_code == 200
 
 class TestUnifiedErrorFormat:
     """Test unified error response format"""
-    
+
     def test_404_error_format(self):
         """Test 404 errors use unified format"""
         response = client.get("/nonexistent")
         assert response.status_code == 404
         data = response.json()
-        
+
         # Check unified error schema
         assert "trace_id" in data
         assert "code" in data
@@ -97,14 +97,14 @@ class TestUnifiedErrorFormat:
         assert "status" in data
         assert "timestamp" in data
         assert data["status"] == 404
-        
+
     def test_validation_error_format(self):
         """Test validation errors use unified format"""
         # Try invalid field type for eligibility check
         response = client.get("/eligibility/check?gpa=invalid")
         assert response.status_code == 422
         data = response.json()
-        
+
         assert "trace_id" in data
         assert "code" in data
         assert "message" in data
@@ -114,17 +114,17 @@ class TestUnifiedErrorFormat:
 
 class TestRateLimitingDisabled:
     """Test that rate limiting is properly disabled in test environment"""
-    
+
     def test_multiple_requests_no_rate_limiting(self):
         """Test multiple rapid requests don't get rate limited"""
         responses = []
-        for i in range(10):  # Make many requests
+        for _i in range(10):  # Make many requests
             response = client.get("/health")
             responses.append(response.status_code)
-            
+
         # All should succeed (no 429 responses)
         assert all(code == 200 for code in responses)
-        
+
     def test_sql_injection_patterns_processed(self):
         """Test SQL injection patterns are handled without rate limiting"""
         test_patterns = [
@@ -132,7 +132,7 @@ class TestRateLimitingDisabled:
             "' OR '1'='1",
             "admin'--"
         ]
-        
+
         for pattern in test_patterns:
             # These should return 422 (validation error) not 429 (rate limited)
             response = client.get(f"/eligibility/check?gpa={pattern}")
@@ -141,12 +141,12 @@ class TestRateLimitingDisabled:
 
 class TestProductionValidationStrict:
     """Test production validation prevents invalid startup"""
-    
+
     def test_production_mode_validation_fails(self):
         """Test production mode fails with missing config"""
         import subprocess
         import sys
-        
+
         # Try to start with production environment but missing config
         result = subprocess.run([
             sys.executable, "-c",
@@ -162,7 +162,7 @@ except (RuntimeError, Exception) as e:
     print(f'Error: {str(e)[:100]}...')
 """
         ], capture_output=True, text=True, timeout=10)
-        
+
         assert "SUCCESS: Production validation failed as expected" in result.stdout
 
 if __name__ == "__main__":

@@ -2,14 +2,15 @@
 Pydantic models for health check endpoints - QA-006 fix
 """
 
-from typing import Optional, Dict, Any
-from pydantic import BaseModel, Field, ConfigDict
 from enum import Enum
+
+from pydantic import BaseModel, ConfigDict, Field
+
 
 class HealthStatus(str, Enum):
     """Health check status values"""
     HEALTHY = "healthy"
-    DEGRADED = "degraded" 
+    DEGRADED = "degraded"
     UNHEALTHY = "unhealthy"
 
 class ServiceStatus(str, Enum):
@@ -23,37 +24,37 @@ class ServiceStatus(str, Enum):
 class BasicHealthResponse(BaseModel):
     """Basic health check response"""
     model_config = ConfigDict(extra="forbid")
-    
+
     status: str = Field(description="Health status")
     timestamp: int = Field(description="Unix timestamp")
-    environment: Optional[str] = Field(None, description="Environment name")
+    environment: str | None = Field(None, description="Environment name")
 
 class DatabaseHealthResponse(BaseModel):
     """Database health check response"""
     model_config = ConfigDict(extra="forbid")
-    
+
     status: str = Field(description="Health status")
     database: str = Field(description="Database connection status")
-    type: Optional[str] = Field(None, description="Database type")
+    type: str | None = Field(None, description="Database type")
     timestamp: int = Field(description="Unix timestamp")
-    note: Optional[str] = Field(None, description="Additional notes")
+    note: str | None = Field(None, description="Additional notes")
 
 class ServiceInfo(BaseModel):
     """Individual service information"""
     model_config = ConfigDict(extra="forbid")
-    
+
     status: ServiceStatus = Field(description="Service status")
-    backend: Optional[str] = Field(None, description="Backend information")
-    type: Optional[str] = Field(None, description="Service type")
-    note: Optional[str] = Field(None, description="Additional notes")
-    error: Optional[str] = Field(None, description="Error message if unhealthy")
+    backend: str | None = Field(None, description="Backend information")
+    type: str | None = Field(None, description="Service type")
+    note: str | None = Field(None, description="Additional notes")
+    error: str | None = Field(None, description="Error message if unhealthy")
 
 class ServicesHealthResponse(BaseModel):
     """Comprehensive services health check response"""
     model_config = ConfigDict(extra="forbid")
-    
+
     status: HealthStatus = Field(description="Overall health status")
-    services: Dict[str, ServiceInfo] = Field(description="Individual service statuses")
+    services: dict[str, ServiceInfo] = Field(description="Individual service statuses")
     timestamp: int = Field(description="Unix timestamp")
     environment: str = Field(description="Environment name")
 
@@ -96,7 +97,7 @@ class ReplitEnvConfig(BaseModel):
 class DebugConfigResponse(BaseModel):
     """Debug configuration response (development only)"""
     model_config = ConfigDict(extra="forbid")
-    
+
     environment: str = Field(description="Current environment")
     debug_mode: bool = Field(description="Debug mode enabled")
     cors: CorsConfig = Field(description="CORS configuration")

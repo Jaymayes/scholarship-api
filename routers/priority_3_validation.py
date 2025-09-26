@@ -2,15 +2,16 @@
 Priority 3 Validation Endpoints
 Execute production readiness tests and evidence collection
 """
-from fastapi import APIRouter, HTTPException
-from typing import Dict, Any
+from typing import Any
 
-from production.integration_tests import integration_validator
-from production.health_probes import health_manager
+from fastapi import APIRouter, HTTPException
+
+from observability.business_telemetry import business_telemetry_service
 from production.automated_rollback import rollback_manager
 from production.backup_restore import backup_manager
+from production.health_probes import health_manager
+from production.integration_tests import integration_validator
 from production.secrets_posture import secrets_manager
-from observability.business_telemetry import business_telemetry_service
 from utils.logger import setup_logger
 
 logger = setup_logger()
@@ -20,29 +21,29 @@ router = APIRouter(prefix="/api/v1/priority3", tags=["Priority 3 Validation"])
 async def run_comprehensive_validation():
     """
     Run comprehensive Priority 3 validation with evidence collection
-    
+
     Executes all production readiness tests:
     - Health probes and graceful shutdown
-    - Automated rollback demonstration  
+    - Automated rollback demonstration
     - Backup/restore with RPO/RTO validation
     - Secrets posture validation and rotation
     - Business telemetry integration
     """
     try:
         logger.info("🎯 Starting comprehensive Priority 3 validation via API")
-        
+
         results = await integration_validator.run_comprehensive_validation()
-        
+
         # Save evidence
         await integration_validator.save_validation_evidence(results)
-        
+
         return {
             "status": "completed",
             "validation_summary": results["validation_summary"],
             "evidence_saved": True,
             "next_steps": _get_next_steps(results)
         }
-        
+
     except Exception as e:
         logger.error(f"Comprehensive validation failed: {e}")
         raise HTTPException(status_code=500, detail=f"Validation failed: {str(e)}")
@@ -53,11 +54,11 @@ async def validate_health_probes():
     try:
         # Test liveness probe
         liveness = await health_manager.liveness_probe()
-        
+
         # Test request tracking
         health_manager.track_request()
         health_manager.untrack_request()
-        
+
         return {
             "liveness_probe": liveness,
             "request_tracking": {
@@ -69,12 +70,11 @@ async def validate_health_probes():
     except Exception as e:
         raise HTTPException(status_code=503, detail=str(e))
 
-@router.post("/validate/rollback-demo")  
+@router.post("/validate/rollback-demo")
 async def demonstrate_rollback():
     """Demonstrate automated rollback capability"""
     try:
-        demo_result = await rollback_manager.demonstrate_rollback()
-        return demo_result
+        return await rollback_manager.demonstrate_rollback()
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Rollback demo failed: {str(e)}")
 
@@ -82,8 +82,7 @@ async def demonstrate_rollback():
 async def demonstrate_backup_restore():
     """Demonstrate backup and restore with RPO/RTO validation"""
     try:
-        demo_result = await backup_manager.demonstrate_backup_restore()
-        return demo_result
+        return await backup_manager.demonstrate_backup_restore()
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Backup/restore demo failed: {str(e)}")
 
@@ -93,10 +92,10 @@ async def validate_secrets_posture():
     try:
         # Generate comprehensive report
         report = await secrets_manager.generate_secrets_posture_report()
-        
+
         # Demonstrate JWT rotation
         jwt_rotation = await secrets_manager.rotate_jwt_secret("API validation test")
-        
+
         return {
             "secrets_report_summary": {
                 "total_violations": report["scan_summary"]["total_violations"],
@@ -119,13 +118,13 @@ async def validate_business_telemetry():
         # Test telemetry tracking
         business_telemetry_service.track_search_request("validation", "success", "test_user")
         business_telemetry_service.track_student_interaction("api_test", "validation", "test")
-        
+
         # Test SLO-to-business impact model
         impact_model = business_telemetry_service.calculate_business_risk_from_slo(2.0, 50)
-        
+
         # Get health summary
         health_summary = business_telemetry_service.get_business_health_summary()
-        
+
         return {
             "telemetry_status": "active",
             "health_summary": health_summary,
@@ -145,7 +144,7 @@ async def get_priority_3_status():
         "priority_3_status": "implemented",
         "components": {
             "health_probes": "implemented",
-            "automated_rollback": "implemented", 
+            "automated_rollback": "implemented",
             "backup_restore": "implemented",
             "secrets_posture": "implemented",
             "business_telemetry": "implemented"
@@ -160,17 +159,17 @@ async def get_priority_3_status():
         ]
     }
 
-def _get_next_steps(results: Dict[str, Any]) -> list[str]:
+def _get_next_steps(results: dict[str, Any]) -> list[str]:
     """Generate next steps based on validation results"""
     next_steps = []
-    
+
     if not results["validation_summary"]["overall_ready"]:
         next_steps.append("Fix failed validation tests before proceeding")
-        
+
         for test_name, test_result in results["test_results"].items():
             if not test_result["success"]:
                 next_steps.append(f"Address {test_name} validation failures")
-    
+
     if results["validation_summary"]["overall_ready"]:
         next_steps.extend([
             "Proceed with canary deployment at 10% traffic",
@@ -178,5 +177,5 @@ def _get_next_steps(results: Dict[str, Any]) -> list[str]:
             "Escalate to 50% traffic after 6 hours if gates pass",
             "Complete Go-Live Ramp to 100% after 12 hours"
         ])
-    
+
     return next_steps

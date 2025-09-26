@@ -3,14 +3,19 @@ Database Operations Router
 Phase 2: Database Integration endpoints for testing and verification
 """
 
+from typing import Any
+
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy.orm import Session
-from typing import List, Optional, Dict, Any
 
+from middleware.auth import User, require_scopes
+from middleware.rate_limit_decorators import (
+    database_rate_limit,
+    low_database_rate_limit,
+    moderate_rate_limit,
+)
 from models.database import get_db
 from services.database_service import DatabaseService
-from middleware.auth import require_auth, require_scopes, User
-from middleware.rate_limit_decorators import database_rate_limit, low_database_rate_limit, moderate_rate_limit
 from utils.logger import get_logger
 
 logger = get_logger("database_router")
@@ -20,9 +25,9 @@ router = APIRouter(prefix="/api/v1/database", tags=["Database Operations"])
 @database_rate_limit()
 async def get_scholarships_from_db(
     request: Request,
-    keyword: Optional[str] = Query(None, description="Search keyword"),
-    min_amount: Optional[float] = Query(None, ge=0, description="Minimum amount"),
-    max_amount: Optional[float] = Query(None, ge=0, description="Maximum amount"),
+    keyword: str | None = Query(None, description="Search keyword"),
+    min_amount: float | None = Query(None, ge=0, description="Minimum amount"),
+    max_amount: float | None = Query(None, ge=0, description="Maximum amount"),
     limit: int = Query(20, ge=1, le=100, description="Results limit"),
     offset: int = Query(0, ge=0, description="Results offset"),
     db: Session = Depends(get_db),
@@ -38,10 +43,10 @@ async def get_scholarships_from_db(
             limit=limit,
             offset=offset
         )
-        
+
         logger.info(f"Retrieved {len(result['scholarships'])} scholarships from database for user {current_user.user_id}")
         return result
-        
+
     except Exception as e:
         logger.error(f"Error retrieving scholarships from database: {str(e)}")
         raise HTTPException(status_code=500, detail="Database query failed")
@@ -58,13 +63,13 @@ async def get_scholarship_from_db(
     try:
         db_service = DatabaseService(db)
         scholarship = db_service.get_scholarship_by_id(scholarship_id)
-        
+
         if not scholarship:
             raise HTTPException(status_code=404, detail="Scholarship not found")
-        
+
         logger.info(f"Retrieved scholarship {scholarship_id} from database for user {current_user.user_id}")
         return scholarship
-        
+
     except HTTPException:
         raise
     except Exception as e:
@@ -75,14 +80,14 @@ async def get_scholarship_from_db(
 @low_database_rate_limit()
 async def log_interaction_to_db(
     request: Request,
-    interaction_data: Dict[str, Any],
+    interaction_data: dict[str, Any],
     db: Session = Depends(get_db),
     current_user: User = Depends(require_scopes(["scholarships:read"]))
 ):
     """Log user interaction directly to PostgreSQL database"""
     try:
         db_service = DatabaseService(db)
-        
+
         interaction_id = db_service.log_user_interaction(
             user_id=current_user.user_id,
             scholarship_id=interaction_data.get("scholarship_id"),
@@ -94,10 +99,10 @@ async def log_interaction_to_db(
             session_id=interaction_data.get("session_id"),
             source=interaction_data.get("source", "direct")
         )
-        
+
         logger.info(f"Logged interaction {interaction_id} to database for user {current_user.user_id}")
         return {"interaction_id": interaction_id, "status": "logged"}
-        
+
     except Exception as e:
         logger.error(f"Error logging interaction to database: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to log interaction")
@@ -113,10 +118,10 @@ async def get_analytics_from_db(
     try:
         db_service = DatabaseService(db)
         summary = db_service.get_analytics_summary()
-        
+
         logger.info(f"Retrieved analytics summary from database for user {current_user.user_id}")
         return summary
-        
+
     except Exception as e:
         logger.error(f"Error retrieving analytics from database: {str(e)}")
         raise HTTPException(status_code=500, detail="Analytics query failed")
@@ -133,10 +138,10 @@ async def get_popular_scholarships_from_db(
     try:
         db_service = DatabaseService(db)
         popular = db_service.get_popular_scholarships(limit=limit)
-        
+
         logger.info(f"Retrieved {len(popular)} popular scholarships from database for user {current_user.user_id}")
         return {"popular_scholarships": popular}
-        
+
     except Exception as e:
         logger.error(f"Error retrieving popular scholarships from database: {str(e)}")
         raise HTTPException(status_code=500, detail="Popular scholarships query failed")
@@ -150,25 +155,25 @@ async def database_status(
     try:
         # Simple database connectivity test using minimal query
         from sqlalchemy import text
-        
+
         # Test basic connectivity with a simple query
         result = db.execute(text("SELECT 1")).scalar()
         if result != 1:
             raise RuntimeError("Database connectivity test failed")
-        
+
         # Get basic statistics without relying on user context
         from models.database import ScholarshipDB, UserInteractionDB
-        
+
         try:
-            scholarship_count = db.query(ScholarshipDB).filter(ScholarshipDB.is_active == True).count()
+            scholarship_count = db.query(ScholarshipDB).filter(ScholarshipDB.is_active).count()
         except Exception:
             scholarship_count = "unknown"
-            
+
         try:
             interaction_count = db.query(UserInteractionDB).count()
         except Exception:
             interaction_count = "unknown"
-        
+
         status = {
             "database_status": "connected",
             "total_scholarships": scholarship_count,
@@ -176,10 +181,10 @@ async def database_status(
             "database_type": "PostgreSQL",
             "connection_test": "passed"
         }
-        
+
         logger.info("Database status check completed successfully")
         return status
-        
+
     except Exception as e:
         logger.error(f"Database status check failed: {str(e)}")
         raise HTTPException(status_code=500, detail="Database connection failed")

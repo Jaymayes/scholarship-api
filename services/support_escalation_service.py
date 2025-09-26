@@ -3,16 +3,14 @@ Support Escalation and Incident Management Service
 Automated escalation procedures and support workflow integration
 """
 
-import asyncio
-import json
 import time
-from datetime import datetime, timedelta
-from typing import Dict, Any, List, Optional, Tuple
-from dataclasses import dataclass, asdict
+from dataclasses import dataclass
+from datetime import datetime
 from enum import Enum
 from pathlib import Path
+from typing import Any
 
-from services.partner_sla_service import SLATier, IncidentSeverity
+from services.partner_sla_service import IncidentSeverity, SLATier
 from utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -67,14 +65,14 @@ class SupportTicket:
     status: TicketStatus
     created_at: datetime
     updated_at: datetime
-    assigned_to: Optional[str]
+    assigned_to: str | None
     escalation_level: EscalationLevel
     response_sla_hours: int
     resolution_sla_hours: int
-    first_response_at: Optional[datetime]
-    resolved_at: Optional[datetime]
-    customer_satisfaction_score: Optional[int]
-    tags: List[str]
+    first_response_at: datetime | None
+    resolved_at: datetime | None
+    customer_satisfaction_score: int | None
+    tags: list[str]
 
 @dataclass
 class EscalationRule:
@@ -82,10 +80,10 @@ class EscalationRule:
     rule_id: str
     tier: SLATier
     priority: SupportPriority
-    trigger_conditions: List[str]
-    escalation_path: List[EscalationLevel]
-    response_time_hours: Dict[EscalationLevel, int]
-    notification_channels: List[str]
+    trigger_conditions: list[str]
+    escalation_path: list[EscalationLevel]
+    response_time_hours: dict[EscalationLevel, int]
+    notification_channels: list[str]
     auto_escalate: bool
     executive_notification: bool
 
@@ -96,12 +94,12 @@ class SupportAgent:
     name: str
     email: str
     phone: str
-    specializations: List[SupportTicketType]
+    specializations: list[SupportTicketType]
     escalation_level: EscalationLevel
     availability_hours: str
     current_workload: int
     max_capacity: int
-    languages: List[str]
+    languages: list[str]
 
 @dataclass
 class EscalationEvent:
@@ -119,7 +117,7 @@ class EscalationEvent:
 class SupportEscalationService:
     """
     Support Escalation and Incident Management Service
-    
+
     Features:
     - Tier-based response time commitments (2hr/4hr/8hr)
     - Automated escalation workflows based on priority and tier
@@ -129,26 +127,26 @@ class SupportEscalationService:
     - Customer satisfaction monitoring
     - 24/7 support for Enterprise customers
     """
-    
+
     def __init__(self):
         self.escalation_path = Path("production/support_escalation")
         self.escalation_path.mkdir(exist_ok=True)
-        
+
         # Support data
-        self.active_tickets: Dict[str, SupportTicket] = {}
+        self.active_tickets: dict[str, SupportTicket] = {}
         self.escalation_rules = self._initialize_escalation_rules()
         self.support_agents = self._initialize_support_agents()
-        self.escalation_events: List[EscalationEvent] = []
-        
+        self.escalation_events: list[EscalationEvent] = []
+
         logger.info("🎧 Support Escalation Service initialized")
         logger.info(f"📋 Escalation rules: {len(self.escalation_rules)} tier-based configurations")
         logger.info(f"👥 Support agents: {len(self.support_agents)} team members")
-        logger.info(f"⏰ Response commitments: Enterprise 2hr, Professional 4hr, Standard 8hr")
-        logger.info(f"🚨 Auto-escalation: Critical incidents escalated automatically")
-    
-    def _initialize_escalation_rules(self) -> List[EscalationRule]:
+        logger.info("⏰ Response commitments: Enterprise 2hr, Professional 4hr, Standard 8hr")
+        logger.info("🚨 Auto-escalation: Critical incidents escalated automatically")
+
+    def _initialize_escalation_rules(self) -> list[EscalationRule]:
         """Initialize tier-based escalation rules"""
-        
+
         return [
             # Enterprise Tier - Premium Support
             EscalationRule(
@@ -193,7 +191,7 @@ class SupportEscalationService:
                 auto_escalate=True,
                 executive_notification=False
             ),
-            
+
             # Professional Tier - Priority Support
             EscalationRule(
                 rule_id="ESC-PRO-P1",
@@ -216,7 +214,7 @@ class SupportEscalationService:
                 auto_escalate=True,
                 executive_notification=False
             ),
-            
+
             # Standard Tier - Standard Support
             EscalationRule(
                 rule_id="ESC-STD-P1",
@@ -238,10 +236,10 @@ class SupportEscalationService:
                 executive_notification=False
             )
         ]
-    
-    def _initialize_support_agents(self) -> List[SupportAgent]:
+
+    def _initialize_support_agents(self) -> list[SupportAgent]:
         """Initialize support team configuration"""
-        
+
         return [
             # L1 Support Team
             SupportAgent(
@@ -256,7 +254,7 @@ class SupportEscalationService:
                 max_capacity=15,
                 languages=["English", "Spanish"]
             ),
-            
+
             # L3 Senior Engineering
             SupportAgent(
                 agent_id="senior_eng_001",
@@ -270,7 +268,7 @@ class SupportEscalationService:
                 max_capacity=5,
                 languages=["English", "Korean"]
             ),
-            
+
             # L6 Executive Team
             SupportAgent(
                 agent_id="exec_001",
@@ -285,7 +283,7 @@ class SupportEscalationService:
                 languages=["English"]
             )
         ]
-    
+
     async def create_support_ticket(
         self,
         partner_id: str,
@@ -297,12 +295,12 @@ class SupportEscalationService:
         severity: IncidentSeverity = IncidentSeverity.SEV3_MEDIUM
     ) -> SupportTicket:
         """Create new support ticket with automatic assignment"""
-        
+
         ticket_id = f"TKT-{int(time.time())}-{hash(partner_id) % 1000:03d}"
-        
+
         # Determine SLA response times based on tier and priority
         response_sla, resolution_sla = self._get_sla_times(tier, priority)
-        
+
         ticket = SupportTicket(
             ticket_id=ticket_id,
             partner_id=partner_id,
@@ -324,17 +322,17 @@ class SupportEscalationService:
             customer_satisfaction_score=None,
             tags=[]
         )
-        
+
         # Store ticket
         self.active_tickets[ticket_id] = ticket
-        
+
         logger.info(f"🎫 SUPPORT TICKET CREATED: {ticket_id} - {title} - {tier.value}/{priority.value}")
-        
+
         return ticket
-    
-    def _get_sla_times(self, tier: SLATier, priority: SupportPriority) -> Tuple[int, int]:
+
+    def _get_sla_times(self, tier: SLATier, priority: SupportPriority) -> tuple[int, int]:
         """Get SLA response and resolution times"""
-        
+
         sla_matrix = {
             (SLATier.ENTERPRISE, SupportPriority.P1_CRITICAL): (2, 12),
             (SLATier.ENTERPRISE, SupportPriority.P2_HIGH): (2, 24),
@@ -343,16 +341,16 @@ class SupportEscalationService:
             (SLATier.STANDARD, SupportPriority.P1_CRITICAL): (8, 48),
             (SLATier.STANDARD, SupportPriority.P2_HIGH): (8, 72)
         }
-        
+
         return sla_matrix.get((tier, priority), (8, 72))
-    
-    async def get_support_dashboard(self, partner_id: Optional[str] = None) -> Dict[str, Any]:
+
+    async def get_support_dashboard(self, partner_id: str | None = None) -> dict[str, Any]:
         """Get support dashboard overview"""
-        
+
         if partner_id:
             # Partner-specific dashboard
             partner_tickets = [t for t in self.active_tickets.values() if t.partner_id == partner_id]
-            
+
             return {
                 "partner_id": partner_id,
                 "active_tickets": len([t for t in partner_tickets if t.status != TicketStatus.CLOSED]),
@@ -377,33 +375,32 @@ class SupportEscalationService:
                     "portal": "https://support.scholarship-api.com"
                 }
             }
-        else:
-            # System-wide dashboard
-            total_tickets = len(self.active_tickets)
-            open_tickets = len([t for t in self.active_tickets.values() if t.status == TicketStatus.OPEN])
-            escalated_tickets = len([t for t in self.active_tickets.values() if t.status == TicketStatus.ESCALATED])
-            
-            return {
-                "system_overview": {
-                    "total_active_tickets": total_tickets,
-                    "open_tickets": open_tickets,
-                    "in_progress_tickets": len([t for t in self.active_tickets.values() if t.status == TicketStatus.IN_PROGRESS]),
-                    "escalated_tickets": escalated_tickets,
-                    "closed_today": 15  # Simulated
-                },
-                "response_time_performance": {
-                    "enterprise_avg_response_hours": 1.2,
-                    "professional_avg_response_hours": 2.8,
-                    "standard_avg_response_hours": 5.5,
-                    "sla_compliance_percentage": 94.5
-                },
-                "escalation_summary": {
-                    "total_escalations_today": len(self.escalation_events),
-                    "auto_escalations": len([e for e in self.escalation_events if e.escalated_by == "auto_escalation_system"]),
-                    "manual_escalations": len([e for e in self.escalation_events if e.escalated_by != "auto_escalation_system"]),
-                    "executive_escalations": len([e for e in self.escalation_events if e.to_level == EscalationLevel.L6_EXECUTIVE])
-                }
+        # System-wide dashboard
+        total_tickets = len(self.active_tickets)
+        open_tickets = len([t for t in self.active_tickets.values() if t.status == TicketStatus.OPEN])
+        escalated_tickets = len([t for t in self.active_tickets.values() if t.status == TicketStatus.ESCALATED])
+
+        return {
+            "system_overview": {
+                "total_active_tickets": total_tickets,
+                "open_tickets": open_tickets,
+                "in_progress_tickets": len([t for t in self.active_tickets.values() if t.status == TicketStatus.IN_PROGRESS]),
+                "escalated_tickets": escalated_tickets,
+                "closed_today": 15  # Simulated
+            },
+            "response_time_performance": {
+                "enterprise_avg_response_hours": 1.2,
+                "professional_avg_response_hours": 2.8,
+                "standard_avg_response_hours": 5.5,
+                "sla_compliance_percentage": 94.5
+            },
+            "escalation_summary": {
+                "total_escalations_today": len(self.escalation_events),
+                "auto_escalations": len([e for e in self.escalation_events if e.escalated_by == "auto_escalation_system"]),
+                "manual_escalations": len([e for e in self.escalation_events if e.escalated_by != "auto_escalation_system"]),
+                "executive_escalations": len([e for e in self.escalation_events if e.to_level == EscalationLevel.L6_EXECUTIVE])
             }
+        }
 
 # Global service instance
 support_escalation_service = SupportEscalationService()

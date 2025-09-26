@@ -4,20 +4,20 @@ Automated collection of SOC2 Type II evidence across all systems
 """
 
 import asyncio
+import hashlib
 import json
 import os
-import boto3
-import psycopg2
-import subprocess
-from datetime import datetime, timedelta
-from typing import Dict, List, Optional, Any, Tuple
-from dataclasses import dataclass, asdict
-from enum import Enum
-from pathlib import Path
-import hashlib
 import zipfile
+from dataclasses import dataclass
+from datetime import datetime, timedelta
+from enum import Enum
+from typing import Any
 
-from compliance.soc2_evidence_service import SOC2EvidenceService, SOC2Evidence, SOC2Control
+from compliance.soc2_evidence_service import (
+    SOC2Control,
+    SOC2Evidence,
+    SOC2EvidenceService,
+)
 from utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -51,14 +51,14 @@ class EvidenceCollectionTask:
     automated: bool
     priority: str
     description: str
-    expected_artifacts: List[str]
+    expected_artifacts: list[str]
 
 @dataclass
 class CollectionResult:
     """Result of evidence collection"""
     task_id: str
     success: bool
-    artifacts_collected: List[str]
+    artifacts_collected: list[str]
     evidence_location: str
     collection_timestamp: datetime
     file_size_bytes: int
@@ -68,18 +68,18 @@ class CollectionResult:
 
 class SOC2EvidenceCollector:
     """Automated SOC2 evidence collection system"""
-    
+
     def __init__(self):
         self.soc2_service = SOC2EvidenceService()
-        self.collection_tasks: List[EvidenceCollectionTask] = []
-        self.collection_results: List[CollectionResult] = []
+        self.collection_tasks: list[EvidenceCollectionTask] = []
+        self.collection_results: list[CollectionResult] = []
         self.evidence_repository = "/tmp/soc2_evidence"  # In production: S3 bucket
         self.audit_period = AuditPeriod.LAST_90_DAYS
         self._initialize_collection_tasks()
-        
+
     def _initialize_collection_tasks(self):
         """Initialize SOC2 evidence collection tasks"""
-        
+
         # CC1 - Control Environment
         cc1_tasks = [
             EvidenceCollectionTask(
@@ -107,7 +107,7 @@ class SOC2EvidenceCollector:
                 expected_artifacts=["governance_policy.pdf", "oversight_procedures.pdf"]
             )
         ]
-        
+
         # CC2 - Communication and Information
         cc2_tasks = [
             EvidenceCollectionTask(
@@ -123,7 +123,7 @@ class SOC2EvidenceCollector:
                 expected_artifacts=["communication_policy.pdf", "information_flow_procedures.pdf"]
             )
         ]
-        
+
         # CC6 - Logical and Physical Access
         cc6_tasks = [
             EvidenceCollectionTask(
@@ -163,7 +163,7 @@ class SOC2EvidenceCollector:
                 expected_artifacts=["privileged_access_review.xlsx", "certification_forms.pdf"]
             )
         ]
-        
+
         # CC7 - System Operations
         cc7_tasks = [
             EvidenceCollectionTask(
@@ -191,7 +191,7 @@ class SOC2EvidenceCollector:
                 expected_artifacts=["backup_status_report.json", "restore_test_results.pdf"]
             )
         ]
-        
+
         # CC8 - Change Management
         cc8_tasks = [
             EvidenceCollectionTask(
@@ -207,33 +207,33 @@ class SOC2EvidenceCollector:
                 expected_artifacts=["git_commit_log.csv", "deployment_history.json", "code_review_evidence.pdf"]
             )
         ]
-        
+
         # Combine all tasks
         self.collection_tasks = cc1_tasks + cc2_tasks + cc6_tasks + cc7_tasks + cc8_tasks
-        
+
         logger.info(f"Initialized {len(self.collection_tasks)} SOC2 evidence collection tasks")
-    
-    async def collect_all_evidence(self) -> List[CollectionResult]:
+
+    async def collect_all_evidence(self) -> list[CollectionResult]:
         """Collect all scheduled SOC2 evidence"""
         logger.info(f"Starting comprehensive SOC2 evidence collection for {self.audit_period.value}")
-        
+
         # Create evidence repository
         os.makedirs(self.evidence_repository, exist_ok=True)
-        
+
         collection_results = []
-        
+
         for task in self.collection_tasks:
             try:
                 logger.info(f"Collecting evidence for {task.task_id}")
                 result = await self._execute_collection_task(task)
                 collection_results.append(result)
-                
+
                 # Create SOC2Evidence record
                 await self._create_evidence_record(task, result)
-                
+
             except Exception as e:
                 logger.error(f"Evidence collection failed for {task.task_id}: {str(e)}")
-                
+
                 # Create failed result record
                 failed_result = CollectionResult(
                     task_id=task.task_id,
@@ -247,39 +247,38 @@ class SOC2EvidenceCollector:
                     verification_status="failed"
                 )
                 collection_results.append(failed_result)
-        
+
         self.collection_results = collection_results
-        
+
         # Generate collection summary
         successful_collections = len([r for r in collection_results if r.success])
         logger.info(f"Evidence collection completed: {successful_collections}/{len(collection_results)} tasks successful")
-        
+
         return collection_results
-    
+
     async def _execute_collection_task(self, task: EvidenceCollectionTask) -> CollectionResult:
         """Execute individual evidence collection task"""
-        
+
         if task.collection_method == "system_export":
             return await self._collect_system_configuration(task)
-        elif task.collection_method == "database_export":
+        if task.collection_method == "database_export":
             return await self._collect_database_evidence(task)
-        elif task.collection_method == "log_aggregation":
+        if task.collection_method == "log_aggregation":
             return await self._collect_log_evidence(task)
-        elif task.collection_method == "backup_report":
+        if task.collection_method == "backup_report":
             return await self._collect_backup_evidence(task)
-        elif task.collection_method == "document_export":
+        if task.collection_method == "document_export":
             return await self._collect_document_evidence(task)
-        elif task.collection_method == "git_export":
+        if task.collection_method == "git_export":
             return await self._collect_change_management_evidence(task)
-        else:
-            return await self._collect_manual_evidence(task)
-    
+        return await self._collect_manual_evidence(task)
+
     async def _collect_system_configuration(self, task: EvidenceCollectionTask) -> CollectionResult:
         """Collect system configuration evidence"""
         artifacts = []
         evidence_dir = os.path.join(self.evidence_repository, task.task_id)
         os.makedirs(evidence_dir, exist_ok=True)
-        
+
         # Collect authentication middleware configuration
         if task.target_system == "scholarship_api":
             auth_config = {
@@ -296,23 +295,23 @@ class SOC2EvidenceCollector:
                     "credentials_allowed": True
                 }
             }
-            
+
             config_file = os.path.join(evidence_dir, "auth_config.json")
             with open(config_file, 'w') as f:
                 json.dump(auth_config, f, indent=2)
             artifacts.append(config_file)
-            
+
             # Copy middleware configuration
             middleware_source = "middleware/auth.py"
             if os.path.exists(middleware_source):
                 middleware_dest = os.path.join(evidence_dir, "middleware_config.py")
-                with open(middleware_source, 'r') as src, open(middleware_dest, 'w') as dst:
+                with open(middleware_source) as src, open(middleware_dest, 'w') as dst:
                     dst.write(src.read())
                 artifacts.append(middleware_dest)
-        
+
         # Create archive
         archive_path = await self._create_evidence_archive(evidence_dir, f"{task.task_id}.zip")
-        
+
         return CollectionResult(
             task_id=task.task_id,
             success=True,
@@ -324,13 +323,13 @@ class SOC2EvidenceCollector:
             notes=f"Collected {len(artifacts)} configuration artifacts",
             verification_status="verified"
         )
-    
+
     async def _collect_database_evidence(self, task: EvidenceCollectionTask) -> CollectionResult:
         """Collect database-related evidence (user listings, access logs)"""
         artifacts = []
         evidence_dir = os.path.join(self.evidence_repository, task.task_id)
         os.makedirs(evidence_dir, exist_ok=True)
-        
+
         # Simulate user access listing
         user_access_data = [
             {
@@ -364,13 +363,13 @@ class SOC2EvidenceCollector:
                 "system": "scholarship_api"
             }
         ]
-        
+
         # Export user access report
         user_report_file = os.path.join(evidence_dir, "user_access_report.json")
         with open(user_report_file, 'w') as f:
             json.dump(user_access_data, f, indent=2)
         artifacts.append(user_report_file)
-        
+
         # Export role assignments
         role_assignments = [
             {
@@ -392,15 +391,15 @@ class SOC2EvidenceCollector:
                 "last_modified": datetime.utcnow().isoformat()
             }
         ]
-        
+
         roles_file = os.path.join(evidence_dir, "role_assignments.json")
         with open(roles_file, 'w') as f:
             json.dump(role_assignments, f, indent=2)
         artifacts.append(roles_file)
-        
+
         # Create archive
         archive_path = await self._create_evidence_archive(evidence_dir, f"{task.task_id}.zip")
-        
+
         return CollectionResult(
             task_id=task.task_id,
             success=True,
@@ -412,13 +411,13 @@ class SOC2EvidenceCollector:
             notes=f"Collected user access data for {len(user_access_data)} users",
             verification_status="verified"
         )
-    
+
     async def _collect_log_evidence(self, task: EvidenceCollectionTask) -> CollectionResult:
         """Collect system logs and monitoring evidence"""
         artifacts = []
         evidence_dir = os.path.join(self.evidence_repository, task.task_id)
         os.makedirs(evidence_dir, exist_ok=True)
-        
+
         # Generate system monitoring evidence
         monitoring_data = {
             "monitoring_period": {
@@ -442,7 +441,7 @@ class SOC2EvidenceCollector:
                     "resolution_time_minutes": 15
                 },
                 {
-                    "alert_id": "ALT002", 
+                    "alert_id": "ALT002",
                     "timestamp": (datetime.utcnow() - timedelta(days=14)).isoformat(),
                     "severity": "info",
                     "description": "Scheduled maintenance window",
@@ -457,12 +456,12 @@ class SOC2EvidenceCollector:
                 "audit_logs": "7 years"
             }
         }
-        
+
         monitoring_file = os.path.join(evidence_dir, "system_monitoring_report.json")
         with open(monitoring_file, 'w') as f:
             json.dump(monitoring_data, f, indent=2)
         artifacts.append(monitoring_file)
-        
+
         # Generate security log summary
         security_logs = [
             {
@@ -476,21 +475,21 @@ class SOC2EvidenceCollector:
             {
                 "timestamp": (datetime.utcnow() - timedelta(hours=2)).isoformat(),
                 "event_type": "permission_check",
-                "user_id": "dev_001", 
+                "user_id": "dev_001",
                 "resource": "/api/v1/scholarships",
                 "action": "read",
                 "result": "allowed"
             }
         ]
-        
+
         security_log_file = os.path.join(evidence_dir, "security_logs_sample.json")
         with open(security_log_file, 'w') as f:
             json.dump(security_logs, f, indent=2)
         artifacts.append(security_log_file)
-        
+
         # Create archive
         archive_path = await self._create_evidence_archive(evidence_dir, f"{task.task_id}.zip")
-        
+
         return CollectionResult(
             task_id=task.task_id,
             success=True,
@@ -502,13 +501,13 @@ class SOC2EvidenceCollector:
             notes=f"Collected monitoring data for 30-day period with {len(security_logs)} security events",
             verification_status="verified"
         )
-    
+
     async def _collect_backup_evidence(self, task: EvidenceCollectionTask) -> CollectionResult:
         """Collect backup and disaster recovery evidence"""
         artifacts = []
         evidence_dir = os.path.join(self.evidence_repository, task.task_id)
         os.makedirs(evidence_dir, exist_ok=True)
-        
+
         # Generate backup status report
         backup_status = {
             "report_period": {
@@ -564,15 +563,15 @@ class SOC2EvidenceCollector:
                 }
             ]
         }
-        
+
         backup_report_file = os.path.join(evidence_dir, "backup_status_report.json")
         with open(backup_report_file, 'w') as f:
             json.dump(backup_status, f, indent=2)
         artifacts.append(backup_report_file)
-        
+
         # Create archive
         archive_path = await self._create_evidence_archive(evidence_dir, f"{task.task_id}.zip")
-        
+
         return CollectionResult(
             task_id=task.task_id,
             success=True,
@@ -584,13 +583,13 @@ class SOC2EvidenceCollector:
             notes="Collected backup status and restore test evidence",
             verification_status="verified"
         )
-    
+
     async def _collect_document_evidence(self, task: EvidenceCollectionTask) -> CollectionResult:
         """Collect policy documents and governance evidence"""
         artifacts = []
         evidence_dir = os.path.join(self.evidence_repository, task.task_id)
         os.makedirs(evidence_dir, exist_ok=True)
-        
+
         # Generate policy documentation
         if "governance" in task.task_id or "communication" in task.task_id:
             policy_content = f"""
@@ -638,15 +637,15 @@ Non-compliance may result in disciplinary action up to and including termination
 | 1.1     | 2024-06-01 | Annual review update | CEO |
 | 1.2     | {datetime.utcnow().strftime('%Y-%m-%d')} | SOC2 compliance update | CEO |
 """
-            
+
             policy_file = os.path.join(evidence_dir, f"{task.task_id}_policy.md")
             with open(policy_file, 'w') as f:
                 f.write(policy_content)
             artifacts.append(policy_file)
-        
+
         # Create archive
         archive_path = await self._create_evidence_archive(evidence_dir, f"{task.task_id}.zip")
-        
+
         return CollectionResult(
             task_id=task.task_id,
             success=True,
@@ -658,13 +657,13 @@ Non-compliance may result in disciplinary action up to and including termination
             notes=f"Collected policy documentation: {len(artifacts)} documents",
             verification_status="verified"
         )
-    
+
     async def _collect_change_management_evidence(self, task: EvidenceCollectionTask) -> CollectionResult:
         """Collect change management and deployment evidence"""
         artifacts = []
         evidence_dir = os.path.join(self.evidence_repository, task.task_id)
         os.makedirs(evidence_dir, exist_ok=True)
-        
+
         # Generate deployment history
         deployment_history = [
             {
@@ -692,12 +691,12 @@ Non-compliance may result in disciplinary action up to and including termination
                 "deployment_status": "success"
             }
         ]
-        
+
         deployment_file = os.path.join(evidence_dir, "deployment_history.json")
         with open(deployment_file, 'w') as f:
             json.dump(deployment_history, f, indent=2)
         artifacts.append(deployment_file)
-        
+
         # Generate code review evidence
         code_reviews = [
             {
@@ -712,15 +711,15 @@ Non-compliance may result in disciplinary action up to and including termination
                 "testing_verification": "passed"
             }
         ]
-        
+
         review_file = os.path.join(evidence_dir, "code_review_evidence.json")
         with open(review_file, 'w') as f:
             json.dump(code_reviews, f, indent=2)
         artifacts.append(review_file)
-        
+
         # Create archive
         archive_path = await self._create_evidence_archive(evidence_dir, f"{task.task_id}.zip")
-        
+
         return CollectionResult(
             task_id=task.task_id,
             success=True,
@@ -732,14 +731,14 @@ Non-compliance may result in disciplinary action up to and including termination
             notes=f"Collected change management evidence: {len(deployment_history)} deployments",
             verification_status="verified"
         )
-    
+
     async def _collect_manual_evidence(self, task: EvidenceCollectionTask) -> CollectionResult:
         """Handle manual evidence collection tasks"""
         # For manual tasks, create placeholder with instructions
         artifacts = []
         evidence_dir = os.path.join(self.evidence_repository, task.task_id)
         os.makedirs(evidence_dir, exist_ok=True)
-        
+
         instructions = f"""
 # Manual Evidence Collection Required
 
@@ -769,15 +768,15 @@ Non-compliance may result in disciplinary action up to and including termination
 ## Contact:
 For questions regarding this evidence collection, contact the audit coordinator.
 """
-        
+
         instruction_file = os.path.join(evidence_dir, "COLLECTION_INSTRUCTIONS.md")
         with open(instruction_file, 'w') as f:
             f.write(instructions)
         artifacts.append(instruction_file)
-        
+
         # Create archive
         archive_path = await self._create_evidence_archive(evidence_dir, f"{task.task_id}_instructions.zip")
-        
+
         return CollectionResult(
             task_id=task.task_id,
             success=True,
@@ -789,20 +788,20 @@ For questions regarding this evidence collection, contact the audit coordinator.
             notes="Manual collection instructions generated - awaiting completion",
             verification_status="pending_manual_completion"
         )
-    
+
     async def _create_evidence_archive(self, evidence_dir: str, archive_name: str) -> str:
         """Create compressed archive of evidence"""
         archive_path = os.path.join(self.evidence_repository, archive_name)
-        
+
         with zipfile.ZipFile(archive_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
-            for root, dirs, files in os.walk(evidence_dir):
+            for root, _dirs, files in os.walk(evidence_dir):
                 for file in files:
                     file_path = os.path.join(root, file)
                     arcname = os.path.relpath(file_path, evidence_dir)
                     zipf.write(file_path, arcname)
-        
+
         return archive_path
-    
+
     async def _calculate_file_checksum(self, file_path: str) -> str:
         """Calculate SHA-256 checksum of file"""
         sha256_hash = hashlib.sha256()
@@ -810,7 +809,7 @@ For questions regarding this evidence collection, contact the audit coordinator.
             for byte_block in iter(lambda: f.read(4096), b""):
                 sha256_hash.update(byte_block)
         return sha256_hash.hexdigest()
-    
+
     async def _create_evidence_record(self, task: EvidenceCollectionTask, result: CollectionResult):
         """Create formal SOC2 evidence record"""
         evidence = SOC2Evidence(
@@ -825,38 +824,38 @@ For questions regarding this evidence collection, contact the audit coordinator.
             notes=result.notes,
             related_systems=[task.target_system] if task.target_system != "all_systems" else ["scholarship_api", "auto_command_center", "student_dashboard"]
         )
-        
+
         self.soc2_service.soc2_evidence.append(evidence)
-    
-    def generate_evidence_collection_report(self) -> Dict[str, Any]:
+
+    def generate_evidence_collection_report(self) -> dict[str, Any]:
         """Generate comprehensive evidence collection report"""
-        
+
         total_tasks = len(self.collection_tasks)
         completed_tasks = len([r for r in self.collection_results if r.success])
         failed_tasks = len([r for r in self.collection_results if not r.success])
         pending_manual = len([r for r in self.collection_results if r.verification_status == "pending_manual_completion"])
-        
+
         # Group by control
         controls_coverage = {}
         for task in self.collection_tasks:
             control = task.control_reference.value
             if control not in controls_coverage:
                 controls_coverage[control] = {"total": 0, "completed": 0, "evidence_types": set()}
-            
+
             controls_coverage[control]["total"] += 1
             controls_coverage[control]["evidence_types"].add(task.evidence_type.value)
-            
+
             # Check if completed
             task_result = next((r for r in self.collection_results if r.task_id == task.task_id), None)
             if task_result and task_result.success:
                 controls_coverage[control]["completed"] += 1
-        
+
         # Convert sets to lists for JSON serialization
         for control_data in controls_coverage.values():
             control_data["evidence_types"] = list(control_data["evidence_types"])
             control_data["completion_rate"] = (control_data["completed"] / control_data["total"]) * 100 if control_data["total"] > 0 else 0
-        
-        report = {
+
+        return {
             "report_generated": datetime.utcnow().isoformat(),
             "audit_period": self.audit_period.value,
             "collection_summary": {
@@ -888,16 +887,15 @@ For questions regarding this evidence collection, contact the audit coordinator.
                 "Schedule quarterly evidence refresh"
             ]
         }
-        
-        return report
-    
+
+
     async def prepare_audit_package(self) -> str:
         """Prepare comprehensive audit evidence package"""
         logger.info("Preparing comprehensive SOC2 audit evidence package")
-        
+
         package_dir = os.path.join(self.evidence_repository, "AUDIT_PACKAGE")
         os.makedirs(package_dir, exist_ok=True)
-        
+
         # Copy all evidence archives
         evidence_files = []
         for result in self.collection_results:
@@ -906,14 +904,14 @@ For questions regarding this evidence collection, contact the audit coordinator.
                 import shutil
                 shutil.copy2(result.evidence_location, package_file)
                 evidence_files.append(package_file)
-        
+
         # Generate comprehensive report
         collection_report = self.generate_evidence_collection_report()
         report_file = os.path.join(package_dir, "EVIDENCE_COLLECTION_REPORT.json")
         with open(report_file, 'w') as f:
             json.dump(collection_report, f, indent=2, default=str)
         evidence_files.append(report_file)
-        
+
         # Generate audit index
         audit_index = {
             "package_created": datetime.utcnow().isoformat(),
@@ -928,21 +926,21 @@ For questions regarding this evidence collection, contact the audit coordinator.
                     "checksum": await self._calculate_file_checksum(f)
                 } for f in evidence_files
             ],
-            "controls_covered": list(set(task.control_reference.value for task in self.collection_tasks)),
+            "controls_covered": list({task.control_reference.value for task in self.collection_tasks}),
             "total_evidence_items": len(evidence_files),
             "package_integrity_verified": True
         }
-        
+
         index_file = os.path.join(package_dir, "AUDIT_INDEX.json")
         with open(index_file, 'w') as f:
             json.dump(audit_index, f, indent=2)
-        
+
         # Create final audit package archive
         package_archive = os.path.join(self.evidence_repository, f"SOC2_AUDIT_PACKAGE_{datetime.utcnow().strftime('%Y%m%d')}.zip")
         await self._create_evidence_archive(package_dir, os.path.basename(package_archive))
-        
+
         logger.info(f"SOC2 audit package prepared: {package_archive}")
-        
+
         return package_archive
 
 # Initialize SOC2 Evidence Collector
@@ -951,18 +949,18 @@ soc2_collector = SOC2EvidenceCollector()
 async def run_comprehensive_soc2_evidence_collection():
     """Run comprehensive SOC2 evidence collection"""
     logger.info("Starting comprehensive SOC2 evidence collection")
-    
+
     # Collect all evidence
     collection_results = await soc2_collector.collect_all_evidence()
-    
+
     # Generate collection report
     collection_report = soc2_collector.generate_evidence_collection_report()
-    
+
     # Prepare audit package
     audit_package = await soc2_collector.prepare_audit_package()
-    
+
     logger.info("SOC2 evidence collection completed")
-    
+
     return {
         "collection_results": len(collection_results),
         "successful_collections": len([r for r in collection_results if r.success]),

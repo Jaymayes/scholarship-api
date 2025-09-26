@@ -6,12 +6,11 @@ Scale from 125 to 300+ programmatic pages with 92%+ quality and 70%+ index cover
 
 import asyncio
 import json
-import time
-from datetime import datetime, timedelta
-from typing import Dict, List, Any, Optional, Tuple
-from dataclasses import dataclass, asdict
-from concurrent.futures import ThreadPoolExecutor, as_completed
 import logging
+import time
+from dataclasses import dataclass
+from datetime import datetime
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -23,13 +22,13 @@ class SEOPage:
     meta_description: str
     h1_heading: str
     content_body: str
-    schema_org: Dict[str, Any]
-    internal_links: List[str]
+    schema_org: dict[str, Any]
+    internal_links: list[str]
     canonical_url: str
     pillar_category: str
     quality_score: float
     word_count: int
-    target_keywords: List[str]
+    target_keywords: list[str]
     last_updated: str
 
 @dataclass
@@ -38,7 +37,7 @@ class PillarGuide:
     guide_type: str  # FAFSA, essays, deadlines, financial_literacy, scholarship_scams
     title: str
     slug: str
-    sections: List[Dict[str, str]]
+    sections: list[dict[str, str]]
     authority_score: float
     target_audience: str
     cta_conversion_goal: str
@@ -46,14 +45,14 @@ class PillarGuide:
 class Week3SEOScaler:
     """
     Week 3 SEO Scaling Engine
-    
+
     Objectives:
     - Scale 125 → 300+ pages (2.4x growth)
     - Maintain 92%+ quality score
     - Achieve 70%+ index coverage
     - Target 25K MAUs with 55%+ organic
     """
-    
+
     def __init__(self, openai_service=None):
         self.openai_service = openai_service
         self.pages_generated = 0
@@ -62,33 +61,33 @@ class Week3SEOScaler:
         self.pillar_guides = []
         self.internal_linking_graph = {}
         self.sitemap_entries = []
-        
-    async def scale_to_300_pages(self) -> Dict[str, Any]:
+
+    async def scale_to_300_pages(self) -> dict[str, Any]:
         """Execute comprehensive 300+ page generation with quality gates"""
         try:
             logger.info("🚀 Week 3 SEO Scaling: 125 → 300+ pages initiated")
-            
+
             # Phase 1: Generate programmatic scholarship pages (200 pages)
             scholarship_pages = await self._generate_scholarship_pages(200)
-            
+
             # Phase 2: Create location-based landing pages (75 pages)
             location_pages = await self._generate_location_pages(75)
-            
+
             # Phase 3: Build category hub pages (25 pages)
             category_hubs = await self._generate_category_hubs(25)
-            
+
             # Phase 4: Create 5 pillar authority guides
             pillar_guides = await self._generate_pillar_guides()
-            
+
             # Phase 5: Build internal linking network
             linking_network = await self._build_internal_linking_network()
-            
+
             # Phase 6: Generate XML sitemap with priorities
             sitemap_data = await self._generate_xml_sitemap()
-            
+
             total_pages = len(scholarship_pages) + len(location_pages) + len(category_hubs) + len(pillar_guides)
             avg_quality = sum(page.quality_score for page in scholarship_pages + location_pages + category_hubs) / total_pages if total_pages > 0 else 0
-            
+
             results = {
                 "execution_status": "success",
                 "pages_generated": total_pages,
@@ -118,10 +117,10 @@ class Week3SEOScaler:
                 "execution_time_seconds": time.time(),
                 "ready_for_indexing": True
             }
-            
+
             logger.info(f"✅ SEO Scaling Complete: {total_pages} pages at {avg_quality:.3f} quality")
             return results
-            
+
         except Exception as e:
             logger.error(f"❌ SEO scaling failed: {str(e)}")
             return {
@@ -130,8 +129,8 @@ class Week3SEOScaler:
                 "pages_generated": 0,
                 "quality_achieved": 0.0
             }
-    
-    async def _generate_scholarship_pages(self, count: int) -> List[SEOPage]:
+
+    async def _generate_scholarship_pages(self, count: int) -> list[SEOPage]:
         """Generate scholarship-specific programmatic pages"""
         pages = []
         scholarship_types = [
@@ -139,12 +138,12 @@ class Week3SEOScaler:
             "stem", "arts", "community-service", "leadership", "military",
             "first-generation", "women", "international", "graduate", "undergraduate"
         ]
-        
+
         for i in range(count):
             scholarship_type = scholarship_types[i % len(scholarship_types)]
-            state = ["california", "texas", "florida", "new-york", "illinois", "pennsylvania", 
+            state = ["california", "texas", "florida", "new-york", "illinois", "pennsylvania",
                     "ohio", "georgia", "north-carolina", "michigan"][i % 10]
-            
+
             page = SEOPage(
                 url_slug=f"{scholarship_type}-scholarships-{state}-{i+1:03d}",
                 title=f"{scholarship_type.replace('-', ' ').title()} Scholarships in {state.replace('-', ' ').title()} - 2024 Guide",
@@ -161,10 +160,10 @@ class Week3SEOScaler:
                 last_updated=datetime.now().isoformat()
             )
             pages.append(page)
-        
+
         return pages
-    
-    async def _generate_location_pages(self, count: int) -> List[SEOPage]:
+
+    async def _generate_location_pages(self, count: int) -> list[SEOPage]:
         """Generate location-based landing pages"""
         pages = []
         locations = [
@@ -174,10 +173,10 @@ class Week3SEOScaler:
             "alabama", "louisiana", "kentucky", "south-carolina", "iowa", "arkansas",
             "utah", "nevada", "new-mexico", "west-virginia", "hawaii", "maine"
         ]
-        
+
         for i in range(min(count, len(locations))):
             location = locations[i]
-            
+
             page = SEOPage(
                 url_slug=f"scholarships-{location}",
                 title=f"Scholarships in {location.replace('-', ' ').title()} - Complete 2024 Guide",
@@ -194,10 +193,10 @@ class Week3SEOScaler:
                 last_updated=datetime.now().isoformat()
             )
             pages.append(page)
-        
+
         return pages[:count]
-    
-    async def _generate_category_hubs(self, count: int) -> List[SEOPage]:
+
+    async def _generate_category_hubs(self, count: int) -> list[SEOPage]:
         """Generate category hub pages for internal linking authority"""
         hubs = []
         categories = [
@@ -211,7 +210,7 @@ class Week3SEOScaler:
             {"name": "journalism", "full": "Journalism and Communications"},
             {"name": "athletics", "full": "Athletic and Sports Scholarships"}
         ]
-        
+
         for i, category in enumerate(categories[:count]):
             page = SEOPage(
                 url_slug=f"{category['name']}-scholarships-hub",
@@ -229,13 +228,13 @@ class Week3SEOScaler:
                 last_updated=datetime.now().isoformat()
             )
             hubs.append(page)
-        
+
         return hubs
-    
-    async def _generate_pillar_guides(self) -> List[PillarGuide]:
+
+    async def _generate_pillar_guides(self) -> list[PillarGuide]:
         """Create 5 authoritative pillar guides for topical authority"""
         guides = []
-        
+
         pillar_configs = [
             {
                 "type": "FAFSA",
@@ -248,7 +247,7 @@ class Week3SEOScaler:
             {
                 "type": "essays",
                 "title": "Scholarship Essay Writing: Expert Strategies & Examples",
-                "slug": "scholarship-essay-guide", 
+                "slug": "scholarship-essay-guide",
                 "authority_score": 0.93,
                 "audience": "scholarship_applicants",
                 "conversion_goal": "essay_assistance_signup"
@@ -266,7 +265,7 @@ class Week3SEOScaler:
                 "title": "College Financial Planning: Beyond Scholarships",
                 "slug": "college-financial-planning-guide",
                 "authority_score": 0.89,
-                "audience": "students_and_parents", 
+                "audience": "students_and_parents",
                 "conversion_goal": "financial_planning_tools"
             },
             {
@@ -278,7 +277,7 @@ class Week3SEOScaler:
                 "conversion_goal": "trust_building"
             }
         ]
-        
+
         for config in pillar_configs:
             guide = PillarGuide(
                 guide_type=config["type"],
@@ -290,12 +289,12 @@ class Week3SEOScaler:
                 cta_conversion_goal=config["conversion_goal"]
             )
             guides.append(guide)
-        
+
         return guides
-    
-    async def _build_internal_linking_network(self) -> Dict[str, List[str]]:
+
+    async def _build_internal_linking_network(self) -> dict[str, list[str]]:
         """Build strategic internal linking for SEO authority distribution"""
-        network = {
+        return {
             "pillar_to_clusters": {
                 "fafsa-complete-guide": ["need-based-scholarships", "financial-aid-calculator", "college-cost-calculator"],
                 "scholarship-essay-guide": ["essay-examples", "writing-tips", "essay-review-service"],
@@ -314,28 +313,27 @@ class Week3SEOScaler:
                 "category-hubs": ["specific-scholarships", "application-guides", "deadline-calendars"]
             }
         }
-        
-        return network
-    
-    async def _generate_xml_sitemap(self) -> List[Dict[str, Any]]:
+
+
+    async def _generate_xml_sitemap(self) -> list[dict[str, Any]]:
         """Generate prioritized XML sitemap for 300+ pages"""
         sitemap_entries = []
-        
+
         # Priority scoring:
         # 1.0 = Homepage, main pillar guides
-        # 0.8 = Category hubs, major landing pages  
+        # 0.8 = Category hubs, major landing pages
         # 0.6 = State-specific pages
         # 0.4 = Individual scholarship pages
-        
+
         priorities = {
             "pillar_authority": 1.0,
-            "authority_hub": 0.8, 
+            "authority_hub": 0.8,
             "geographic_targeting": 0.6,
             "scholarship_discovery": 0.4
         }
-        
+
         base_url = "https://scholarships.com"
-        
+
         # Generate entries for all page types
         for category, priority in priorities.items():
             entries_count = {
@@ -344,7 +342,7 @@ class Week3SEOScaler:
                 "geographic_targeting": 75,
                 "scholarship_discovery": 200
             }[category]
-            
+
             for i in range(entries_count):
                 sitemap_entries.append({
                     "url": f"{base_url}/page-{category}-{i+1:03d}",
@@ -352,19 +350,19 @@ class Week3SEOScaler:
                     "changefreq": "weekly" if priority >= 0.8 else "monthly",
                     "priority": priority
                 })
-        
+
         return sitemap_entries
-    
+
     async def _generate_page_content(self, scholarship_type: str, location: str) -> str:
         """Generate high-quality page content using AI"""
         if not self.openai_service:
             return f"Comprehensive guide to {scholarship_type.replace('-', ' ')} scholarships in {location.replace('-', ' ').title()}. [Content would be AI-generated in production]"
-        
+
         try:
-            prompt = f"""Create SEO-optimized content for {scholarship_type.replace('-', ' ')} scholarships in {location.replace('-', ' ').title()}. 
-            Include: eligibility requirements, application process, deadlines, tips for success. 
+            prompt = f"""Create SEO-optimized content for {scholarship_type.replace('-', ' ')} scholarships in {location.replace('-', ' ').title()}.
+            Include: eligibility requirements, application process, deadlines, tips for success.
             Target 1200+ words, maintain 92%+ quality score."""
-            
+
             response = await self.openai_service.generate_response(
                 prompt=prompt,
                 max_tokens=1500,
@@ -374,16 +372,16 @@ class Week3SEOScaler:
         except Exception as e:
             logger.warning(f"AI content generation failed: {e}")
             return f"High-quality content for {scholarship_type.replace('-', ' ')} scholarships in {location.replace('-', ' ').title()}. [Fallback content]"
-    
+
     async def _generate_location_content(self, location: str) -> str:
         """Generate location-specific content"""
         return f"Comprehensive scholarship opportunities for students in {location.replace('-', ' ').title()}. Local foundations, state programs, and national scholarships available to residents."
-    
-    async def _generate_hub_content(self, category: Dict) -> str:
+
+    async def _generate_hub_content(self, category: dict) -> str:
         """Generate category hub content"""
         return f"Complete resource hub for {category['full'].lower()} scholarships. Detailed guides, eligibility requirements, and application strategies."
-    
-    async def _generate_pillar_sections(self, guide_type: str) -> List[Dict[str, str]]:
+
+    async def _generate_pillar_sections(self, guide_type: str) -> list[dict[str, str]]:
         """Generate sections for pillar guides"""
         sections = {
             "FAFSA": [
@@ -417,10 +415,10 @@ class Week3SEOScaler:
                 {"title": "Reporting Scams and Getting Help", "content": "Resources for scam victims and prevention"}
             ]
         }
-        
+
         return sections.get(guide_type, [{"title": "Guide Content", "content": "Authoritative guide content"}])
-    
-    def _generate_scholarship_schema(self, scholarship_type: str, location: str) -> Dict[str, Any]:
+
+    def _generate_scholarship_schema(self, scholarship_type: str, location: str) -> dict[str, Any]:
         """Generate Schema.org structured data for scholarship pages"""
         return {
             "@context": "https://schema.org",
@@ -442,8 +440,8 @@ class Week3SEOScaler:
                 "@id": f"https://scholarships.com/{scholarship_type}-scholarships-{location}"
             }
         }
-    
-    def _generate_location_schema(self, location: str) -> Dict[str, Any]:
+
+    def _generate_location_schema(self, location: str) -> dict[str, Any]:
         """Generate Schema.org for location pages"""
         return {
             "@context": "https://schema.org",
@@ -451,7 +449,7 @@ class Week3SEOScaler:
             "headline": f"Scholarships in {location.replace('-', ' ').title()}",
             "description": f"Complete directory of scholarships available to {location.replace('-', ' ').title()} students",
             "author": {
-                "@type": "Organization", 
+                "@type": "Organization",
                 "name": "Scholarship Discovery Platform"
             },
             "datePublished": datetime.now().isoformat(),
@@ -460,8 +458,8 @@ class Week3SEOScaler:
                 "name": location.replace('-', ' ').title()
             }
         }
-    
-    def _generate_hub_schema(self, category: Dict) -> Dict[str, Any]:
+
+    def _generate_hub_schema(self, category: dict) -> dict[str, Any]:
         """Generate Schema.org for category hub pages"""
         return {
             "@context": "https://schema.org",
@@ -470,7 +468,7 @@ class Week3SEOScaler:
             "description": f"Comprehensive resource for {category['full'].lower()} scholarship opportunities",
             "author": {
                 "@type": "Organization",
-                "name": "Scholarship Discovery Platform" 
+                "name": "Scholarship Discovery Platform"
             },
             "datePublished": datetime.now().isoformat(),
             "mainEntity": {
@@ -485,5 +483,5 @@ if __name__ == "__main__":
         scaler = Week3SEOScaler()
         result = await scaler.scale_to_300_pages()
         print(json.dumps(result, indent=2))
-    
+
     asyncio.run(main())

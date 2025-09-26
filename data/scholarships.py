@@ -1,6 +1,10 @@
-from datetime import datetime, timedelta
+from datetime import datetime
+
 from models.scholarship import (
-    Scholarship, EligibilityCriteria, ScholarshipType, FieldOfStudy
+    EligibilityCriteria,
+    FieldOfStudy,
+    Scholarship,
+    ScholarshipType,
 )
 
 # Mock scholarship data as requested in success criteria
@@ -31,9 +35,9 @@ MOCK_SCHOLARSHIPS = [
         contact_email="scholarships@engineering-excellence.org",
         renewable=True
     ),
-    
+
     Scholarship(
-        id="sch_002", 
+        id="sch_002",
         name="Future Healthcare Leaders Award",
         organization="Medical Professionals Association",
         description="Supporting the next generation of healthcare professionals through financial assistance and mentorship opportunities. Open to students pursuing careers in medicine, nursing, pharmacy, physical therapy, and other healthcare fields.",
@@ -58,7 +62,7 @@ MOCK_SCHOLARSHIPS = [
         application_url="https://example.com/apply/healthcare-scholarship",
         contact_email="awards@medical-professionals.org"
     ),
-    
+
     Scholarship(
         id="sch_003",
         name="Business Innovation Grant",
@@ -85,7 +89,7 @@ MOCK_SCHOLARSHIPS = [
         contact_email="grants@entrepreneurship-institute.org",
         renewable=True
     ),
-    
+
     Scholarship(
         id="sch_004",
         name="Need-Based Student Support Fund",
@@ -111,7 +115,7 @@ MOCK_SCHOLARSHIPS = [
         contact_email="support@community-education.org",
         renewable=True
     ),
-    
+
     Scholarship(
         id="sch_005",
         name="Arts and Creativity Scholarship",
@@ -137,7 +141,7 @@ MOCK_SCHOLARSHIPS = [
         application_url="https://example.com/apply/arts-creativity",
         contact_email="scholarships@creative-arts-society.org"
     ),
-    
+
     Scholarship(
         id="sch_006",
         name="STEM Excellence Award",
@@ -164,7 +168,7 @@ MOCK_SCHOLARSHIPS = [
         contact_email="awards@stem-foundation.org",
         renewable=True
     ),
-    
+
     Scholarship(
         id="sch_007",
         name="Community Service Leadership Award",
@@ -188,7 +192,7 @@ MOCK_SCHOLARSHIPS = [
         application_url="https://example.com/apply/community-service",
         contact_email="awards@civic-engagement.org"
     ),
-    
+
     Scholarship(
         id="sch_008",
         name="First-Generation College Student Grant",
@@ -214,7 +218,7 @@ MOCK_SCHOLARSHIPS = [
         contact_email="grants@educational-access.org",
         renewable=True
     ),
-    
+
     Scholarship(
         id="sch_009",
         name="International Student Excellence Award",
@@ -238,7 +242,7 @@ MOCK_SCHOLARSHIPS = [
         application_url="https://example.com/apply/international-excellence",
         contact_email="international@global-education.org"
     ),
-    
+
     Scholarship(
         id="sch_010",
         name="Women in Technology Scholarship",
@@ -265,7 +269,7 @@ MOCK_SCHOLARSHIPS = [
         contact_email="scholarships@tech-diversity.org",
         renewable=True
     ),
-    
+
     Scholarship(
         id="sch_011",
         name="Rural Community Education Fund",
@@ -292,7 +296,7 @@ MOCK_SCHOLARSHIPS = [
         contact_email="rural-fund@development-alliance.org",
         renewable=True
     ),
-    
+
     Scholarship(
         id="sch_012",
         name="Graduate Research Excellence Award",
@@ -316,7 +320,7 @@ MOCK_SCHOLARSHIPS = [
         application_url="https://example.com/apply/graduate-research",
         contact_email="research-awards@academic-council.org"
     ),
-    
+
     Scholarship(
         id="sch_013",
         name="Legal Studies Scholarship",
@@ -342,7 +346,7 @@ MOCK_SCHOLARSHIPS = [
         application_url="https://example.com/apply/legal-studies",
         contact_email="legal-scholarships@justice-education.org"
     ),
-    
+
     Scholarship(
         id="sch_014",
         name="Social Sciences Research Grant",
@@ -368,7 +372,7 @@ MOCK_SCHOLARSHIPS = [
         application_url="https://example.com/apply/social-sciences",
         contact_email="grants@behavioral-research.org"
     ),
-    
+
     Scholarship(
         id="sch_015",
         name="Athletic Academic Achievement Award",

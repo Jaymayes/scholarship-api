@@ -3,15 +3,12 @@ Institutional Documentation Service
 Enterprise security questionnaires, data processing agreements, and business continuity plans
 """
 
-import asyncio
 import json
-import os
+from dataclasses import asdict, dataclass
 from datetime import datetime, timedelta
-from typing import Dict, Any, List, Optional, Tuple
-from dataclasses import dataclass, asdict
 from enum import Enum
 from pathlib import Path
-import hashlib
+from typing import Any
 
 from utils.logger import get_logger
 
@@ -48,8 +45,8 @@ class SecurityQuestionnaireResponse:
     category: str
     question: str
     response: str
-    evidence_reference: Optional[str]
-    compliance_framework: Optional[str]
+    evidence_reference: str | None
+    compliance_framework: str | None
     last_updated: datetime
 
 @dataclass
@@ -59,15 +56,15 @@ class DataProcessingAgreement:
     institution_type: InstitutionType
     institution_name: str
     effective_date: datetime
-    expiry_date: Optional[datetime]
-    data_categories: List[str]
-    processing_purposes: List[str]
-    retention_periods: Dict[str, int]  # Data category -> retention days
+    expiry_date: datetime | None
+    data_categories: list[str]
+    processing_purposes: list[str]
+    retention_periods: dict[str, int]  # Data category -> retention days
     cross_border_transfers: bool
-    safeguards_implemented: List[str]
-    contact_details: Dict[str, str]
-    signature_date: Optional[datetime]
-    signed_by: Optional[str]
+    safeguards_implemented: list[str]
+    contact_details: dict[str, str]
+    signature_date: datetime | None
+    signed_by: str | None
 
 @dataclass
 class BusinessContinuityPlan:
@@ -79,28 +76,28 @@ class BusinessContinuityPlan:
     review_frequency: str
     recovery_time_objective: int  # RTO in minutes
     recovery_point_objective: int  # RPO in minutes
-    critical_systems: List[str]
-    backup_procedures: Dict[str, Any]
-    failover_procedures: Dict[str, Any]
-    communication_plan: Dict[str, Any]
-    testing_schedule: Dict[str, Any]
+    critical_systems: list[str]
+    backup_procedures: dict[str, Any]
+    failover_procedures: dict[str, Any]
+    communication_plan: dict[str, Any]
+    testing_schedule: dict[str, Any]
 
 @dataclass
 class ComplianceAttestation:
     """Compliance framework attestation"""
     attestation_id: str
     framework: str
-    institution_requirements: List[str]
+    institution_requirements: list[str]
     compliance_status: str
     attestation_date: datetime
     valid_until: datetime
-    auditor_signature: Optional[str]
-    evidence_package: List[str]
+    auditor_signature: str | None
+    evidence_package: list[str]
 
 class InstitutionalDocumentationService:
     """
     Comprehensive Institutional Documentation Service
-    
+
     Provides:
     - Enterprise security questionnaire responses (CAIQ, SIG, custom)
     - Data processing agreements for global compliance
@@ -109,26 +106,26 @@ class InstitutionalDocumentationService:
     - Compliance attestations and certifications
     - Custom documentation for specific institution requirements
     """
-    
+
     def __init__(self):
         self.docs_path = Path("production/institutional_docs")
         self.docs_path.mkdir(exist_ok=True)
-        
+
         # Initialize documentation templates and responses
         self.security_questionnaire_responses = self._initialize_security_questionnaire()
         self.dpa_templates = self._initialize_dpa_templates()
         self.business_continuity_plan = self._initialize_business_continuity_plan()
         self.compliance_attestations = self._initialize_compliance_attestations()
-        
+
         logger.info("📋 Institutional Documentation Service initialized")
         logger.info(f"🔍 Security questionnaire: {len(self.security_questionnaire_responses)} responses")
         logger.info(f"📄 DPA templates: {len(self.dpa_templates)} institution types")
-        logger.info(f"🔄 Business continuity: Comprehensive DR/BCP documentation")
+        logger.info("🔄 Business continuity: Comprehensive DR/BCP documentation")
         logger.info(f"✅ Compliance attestations: {len(self.compliance_attestations)} frameworks")
-    
-    def _initialize_security_questionnaire(self) -> List[SecurityQuestionnaireResponse]:
+
+    def _initialize_security_questionnaire(self) -> list[SecurityQuestionnaireResponse]:
         """Initialize comprehensive security questionnaire responses"""
-        
+
         return [
             # Data Security and Encryption
             SecurityQuestionnaireResponse(
@@ -149,7 +146,7 @@ class InstitutionalDocumentationService:
                 compliance_framework="FERPA, GDPR Article 32",
                 last_updated=datetime(2024, 10, 30)
             ),
-            
+
             # Access Control and Identity Management
             SecurityQuestionnaireResponse(
                 question_id="AC-001",
@@ -161,7 +158,7 @@ class InstitutionalDocumentationService:
                 last_updated=datetime(2024, 11, 20)
             ),
             SecurityQuestionnaireResponse(
-                question_id="AC-002", 
+                question_id="AC-002",
                 category="Access Control",
                 question="What authentication methods are supported?",
                 response="Multi-factor authentication using TOTP, SMS, hardware tokens (FIDO2/WebAuthn), and biometric authentication. Single sign-on (SSO) integration with SAML 2.0 and OpenID Connect. Support for enterprise identity providers including Active Directory, Okta, and Azure AD.",
@@ -169,7 +166,7 @@ class InstitutionalDocumentationService:
                 compliance_framework="NIST 800-63B",
                 last_updated=datetime(2024, 12, 1)
             ),
-            
+
             # Incident Response and Business Continuity
             SecurityQuestionnaireResponse(
                 question_id="IR-001",
@@ -189,7 +186,7 @@ class InstitutionalDocumentationService:
                 compliance_framework="SOC 2 Type II - CC9.1",
                 last_updated=datetime(2024, 9, 30)
             ),
-            
+
             # Compliance and Audit
             SecurityQuestionnaireResponse(
                 question_id="CO-001",
@@ -209,7 +206,7 @@ class InstitutionalDocumentationService:
                 compliance_framework="GDPR, CCPA, PIPEDA, LGPD",
                 last_updated=datetime(2024, 11, 10)
             ),
-            
+
             # Vendor Management and Supply Chain
             SecurityQuestionnaireResponse(
                 question_id="VM-001",
@@ -220,7 +217,7 @@ class InstitutionalDocumentationService:
                 compliance_framework="SOC 2 Type II - CC9.2",
                 last_updated=datetime(2024, 10, 25)
             ),
-            
+
             # Privacy and Data Protection
             SecurityQuestionnaireResponse(
                 question_id="PR-001",
@@ -240,7 +237,7 @@ class InstitutionalDocumentationService:
                 compliance_framework="FERPA 34 CFR Part 99",
                 last_updated=datetime(2024, 8, 15)
             ),
-            
+
             # Physical and Environmental Security
             SecurityQuestionnaireResponse(
                 question_id="PS-001",
@@ -251,7 +248,7 @@ class InstitutionalDocumentationService:
                 compliance_framework="SOC 2 Type II - CC6.4",
                 last_updated=datetime(2024, 9, 10)
             ),
-            
+
             # Network and Application Security
             SecurityQuestionnaireResponse(
                 question_id="NS-001",
@@ -272,12 +269,12 @@ class InstitutionalDocumentationService:
                 last_updated=datetime(2024, 10, 20)
             )
         ]
-    
-    def _initialize_dpa_templates(self) -> Dict[InstitutionType, DataProcessingAgreement]:
+
+    def _initialize_dpa_templates(self) -> dict[InstitutionType, DataProcessingAgreement]:
         """Initialize Data Processing Agreement templates"""
-        
+
         base_date = datetime(2024, 7, 1)
-        
+
         return {
             InstitutionType.UNIVERSITY: DataProcessingAgreement(
                 dpa_id="DPA-UNIV-001",
@@ -309,7 +306,7 @@ class InstitutionalDocumentationService:
                 signed_by=None
             ),
             InstitutionType.FOUNDATION: DataProcessingAgreement(
-                dpa_id="DPA-FOUND-001", 
+                dpa_id="DPA-FOUND-001",
                 institution_type=InstitutionType.FOUNDATION,
                 institution_name="[Foundation Name]",
                 effective_date=base_date,
@@ -347,7 +344,7 @@ class InstitutionalDocumentationService:
                 processing_purposes=["Program administration", "Analytics", "Reporting", "Customer support"],
                 retention_periods={
                     "employee_data": 1095,           # 3 years
-                    "program_metrics": 1825,         # 5 years  
+                    "program_metrics": 1825,         # 5 years
                     "usage_analytics": 730,          # 2 years
                     "business_contacts": 1095        # 3 years
                 },
@@ -367,10 +364,10 @@ class InstitutionalDocumentationService:
                 signed_by=None
             )
         }
-    
+
     def _initialize_business_continuity_plan(self) -> BusinessContinuityPlan:
         """Initialize comprehensive business continuity plan"""
-        
+
         return BusinessContinuityPlan(
             plan_id="BCP-2024-001",
             version="2.8",
@@ -382,7 +379,7 @@ class InstitutionalDocumentationService:
             critical_systems=[
                 "API Gateway and Load Balancers",
                 "Scholarship Search Service",
-                "Eligibility Assessment Engine", 
+                "Eligibility Assessment Engine",
                 "User Authentication Service",
                 "Database Cluster (Primary/Secondary)",
                 "Partner Portal and Dashboard",
@@ -390,7 +387,7 @@ class InstitutionalDocumentationService:
             ],
             backup_procedures={
                 "database_backups": {
-                    "frequency": "Every 6 hours", 
+                    "frequency": "Every 6 hours",
                     "retention": "90 days",
                     "encryption": "AES-256 with customer-managed keys",
                     "testing": "Monthly restore testing",
@@ -398,7 +395,7 @@ class InstitutionalDocumentationService:
                 },
                 "application_backups": {
                     "frequency": "Daily",
-                    "retention": "30 days", 
+                    "retention": "30 days",
                     "version_control": "Git-based with tagged releases",
                     "deployment_artifacts": "Container images with immutable tags"
                 },
@@ -471,10 +468,10 @@ class InstitutionalDocumentationService:
                 }
             }
         )
-    
-    def _initialize_compliance_attestations(self) -> List[ComplianceAttestation]:
+
+    def _initialize_compliance_attestations(self) -> list[ComplianceAttestation]:
         """Initialize compliance framework attestations"""
-        
+
         return [
             ComplianceAttestation(
                 attestation_id="ATT-SOC2-2024",
@@ -543,16 +540,16 @@ class InstitutionalDocumentationService:
                 ]
             )
         ]
-    
-    async def get_security_questionnaire_response(self, question_id: Optional[str] = None) -> Dict[str, Any]:
+
+    async def get_security_questionnaire_response(self, question_id: str | None = None) -> dict[str, Any]:
         """Get security questionnaire responses"""
-        
+
         if question_id:
             response = next((r for r in self.security_questionnaire_responses if r.question_id == question_id), None)
             if not response:
                 raise ValueError(f"Question ID {question_id} not found")
             return asdict(response)
-        
+
         # Return all responses grouped by category
         responses_by_category = {}
         for response in self.security_questionnaire_responses:
@@ -560,27 +557,27 @@ class InstitutionalDocumentationService:
             if category not in responses_by_category:
                 responses_by_category[category] = []
             responses_by_category[category].append(asdict(response))
-        
+
         return {
             "questionnaire_overview": {
                 "total_questions": len(self.security_questionnaire_responses),
                 "categories": list(responses_by_category.keys()),
                 "last_updated": max(r.last_updated for r in self.security_questionnaire_responses).isoformat(),
-                "compliance_frameworks_covered": list(set(
-                    r.compliance_framework for r in self.security_questionnaire_responses 
+                "compliance_frameworks_covered": list({
+                    r.compliance_framework for r in self.security_questionnaire_responses
                     if r.compliance_framework
-                ))
+                })
             },
             "responses_by_category": responses_by_category
         }
-    
+
     async def generate_dpa(self, institution_type: InstitutionType, institution_name: str) -> DataProcessingAgreement:
         """Generate customized Data Processing Agreement"""
-        
+
         template = self.dpa_templates.get(institution_type)
         if not template:
             raise ValueError(f"No DPA template available for {institution_type}")
-        
+
         # Create customized DPA
         customized_dpa = DataProcessingAgreement(
             dpa_id=f"DPA-{institution_type.value.upper()}-{hash(institution_name) % 10000:04d}",
@@ -597,24 +594,24 @@ class InstitutionalDocumentationService:
             signature_date=None,
             signed_by=None
         )
-        
+
         # Save DPA
         dpa_file = self.docs_path / f"dpa_{customized_dpa.dpa_id}.json"
         with open(dpa_file, 'w') as f:
             json.dump(asdict(customized_dpa), f, indent=2, default=str)
-        
+
         logger.info(f"📄 DPA generated: {customized_dpa.dpa_id} for {institution_name}")
-        
+
         return customized_dpa
-    
-    async def get_business_continuity_documentation(self) -> Dict[str, Any]:
+
+    async def get_business_continuity_documentation(self) -> dict[str, Any]:
         """Get comprehensive business continuity documentation"""
-        
+
         return {
             "business_continuity_plan": asdict(self.business_continuity_plan),
             "executive_summary": {
                 "rto_commitment": f"{self.business_continuity_plan.recovery_time_objective} minutes",
-                "rpo_commitment": f"{self.business_continuity_plan.recovery_point_objective} minutes", 
+                "rpo_commitment": f"{self.business_continuity_plan.recovery_point_objective} minutes",
                 "last_tested": self.business_continuity_plan.last_reviewed.isoformat(),
                 "next_test": (self.business_continuity_plan.last_reviewed + timedelta(days=180)).isoformat(),
                 "compliance_status": "Fully compliant with SOC 2 Type II requirements"
@@ -632,16 +629,16 @@ class InstitutionalDocumentationService:
                 "general": "Comprehensive insurance coverage for business interruption"
             }
         }
-    
-    async def get_compliance_attestations(self, framework: Optional[str] = None) -> Dict[str, Any]:
+
+    async def get_compliance_attestations(self, framework: str | None = None) -> dict[str, Any]:
         """Get compliance framework attestations"""
-        
+
         if framework:
             attestation = next((a for a in self.compliance_attestations if a.framework.lower() == framework.lower()), None)
             if not attestation:
                 raise ValueError(f"No attestation found for framework: {framework}")
             return asdict(attestation)
-        
+
         return {
             "attestations_overview": {
                 "total_frameworks": len(self.compliance_attestations),
@@ -656,12 +653,12 @@ class InstitutionalDocumentationService:
                 "iso_27001": "International information security management standard (in progress)"
             }
         }
-    
-    async def generate_vendor_assessment_package(self, institution_name: str, assessment_scope: List[str]) -> Dict[str, Any]:
+
+    async def generate_vendor_assessment_package(self, institution_name: str, assessment_scope: list[str]) -> dict[str, Any]:
         """Generate comprehensive vendor assessment package"""
-        
+
         package_id = f"VAP-{hash(institution_name) % 10000:04d}-{datetime.utcnow().strftime('%Y%m%d')}"
-        
+
         assessment_package = {
             "package_id": package_id,
             "institution_name": institution_name,
@@ -691,7 +688,7 @@ class InstitutionalDocumentationService:
                 },
                 "reference_customers": {
                     "universities": "Available upon NDA execution",
-                    "foundations": "Available upon NDA execution", 
+                    "foundations": "Available upon NDA execution",
                     "corporates": "Available upon NDA execution",
                     "testimonials": "https://scholarship-api.com/testimonials"
                 }
@@ -704,14 +701,14 @@ class InstitutionalDocumentationService:
                 "customer_success": "success@scholarship-api.com"
             }
         }
-        
+
         # Save assessment package
         package_file = self.docs_path / f"vendor_assessment_{package_id}.json"
         with open(package_file, 'w') as f:
             json.dump(assessment_package, f, indent=2, default=str)
-        
+
         logger.info(f"📦 Vendor assessment package generated: {package_id} for {institution_name}")
-        
+
         return assessment_package
 
 # Global service instance

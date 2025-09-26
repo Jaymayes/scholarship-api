@@ -2,7 +2,7 @@
 WAF Rules Configuration
 
 Defines production-ready WAF rules for blocking common attacks:
-- SQL injection patterns  
+- SQL injection patterns
 - XSS payloads
 - Command injection attempts
 - Authorization enforcement
@@ -12,14 +12,14 @@ These rules implement OWASP security guidelines and provide
 comprehensive edge-level protection.
 """
 
-from typing import Dict, List, Any, Optional
 from dataclasses import dataclass
 from enum import Enum
-import re
+from typing import Any
+
 
 class RuleAction(str, Enum):
     BLOCK = "block"
-    LOG = "log" 
+    LOG = "log"
     RATE_LIMIT = "rate_limit"
 
 class RuleSeverity(str, Enum):
@@ -44,22 +44,22 @@ class WAFRule:
 class WAFRulesConfig:
     """
     Production WAF rules configuration
-    
+
     Implements OWASP security controls with specific focus on:
     - SQL injection prevention
-    - Authorization enforcement 
+    - Authorization enforcement
     - Attack pattern detection
     - Rate limiting for malicious traffic
     """
-    
+
     def __init__(self):
         self.rules = self._initialize_rules()
-        
-    def _initialize_rules(self) -> Dict[str, WAFRule]:
+
+    def _initialize_rules(self) -> dict[str, WAFRule]:
         """Initialize production WAF rules"""
-        
+
         rules = {}
-        
+
         # SQL INJECTION RULES (CRITICAL)
         rules["SQLI_001"] = WAFRule(
             id="SQLI_001",
@@ -69,25 +69,25 @@ class WAFRulesConfig:
             action=RuleAction.BLOCK,
             severity=RuleSeverity.CRITICAL
         )
-        
+
         rules["SQLI_002"] = WAFRule(
-            id="SQLI_002", 
+            id="SQLI_002",
             name="SQL Injection - Boolean Logic",
             description="Detects OR/AND boolean logic injection",
             pattern=r"\b(or|and)\s+['\"]?\w+['\"]?\s*=\s*['\"]?\w+['\"]?",
             action=RuleAction.BLOCK,
             severity=RuleSeverity.CRITICAL
         )
-        
+
         rules["SQLI_003"] = WAFRule(
             id="SQLI_003",
-            name="SQL Injection - Comments", 
+            name="SQL Injection - Comments",
             description="Detects SQL comment injection (--,#,/**/)",
             pattern=r"(--|\#|\/\*|\*\/)",
             action=RuleAction.BLOCK,
             severity=RuleSeverity.HIGH
         )
-        
+
         rules["SQLI_004"] = WAFRule(
             id="SQLI_004",
             name="SQL Injection - Information Schema",
@@ -96,7 +96,7 @@ class WAFRulesConfig:
             action=RuleAction.BLOCK,
             severity=RuleSeverity.CRITICAL
         )
-        
+
         rules["SQLI_005"] = WAFRule(
             id="SQLI_005",
             name="SQL Injection - Time-based",
@@ -105,7 +105,7 @@ class WAFRulesConfig:
             action=RuleAction.BLOCK,
             severity=RuleSeverity.HIGH
         )
-        
+
         # AUTHORIZATION ENFORCEMENT RULES (CRITICAL)
         rules["AUTH_001"] = WAFRule(
             id="AUTH_001",
@@ -115,35 +115,35 @@ class WAFRulesConfig:
             action=RuleAction.BLOCK,
             severity=RuleSeverity.CRITICAL
         )
-        
+
         rules["AUTH_002"] = WAFRule(
             id="AUTH_002",
-            name="Malformed Authorization Header", 
+            name="Malformed Authorization Header",
             description="Validates Bearer token format",
             pattern=r"^Bearer\s+[A-Za-z0-9\-_]+\.[A-Za-z0-9\-_]+\.[A-Za-z0-9\-_]+$",
             action=RuleAction.BLOCK,
             severity=RuleSeverity.HIGH
         )
-        
+
         # XSS PREVENTION RULES (HIGH)
         rules["XSS_001"] = WAFRule(
-            id="XSS_001", 
+            id="XSS_001",
             name="XSS - Script Tags",
             description="Detects script tag injection",
             pattern=r"<\s*script\b[^<]*(?:(?!<\/\s*script\s*>)<[^<]*)*<\/\s*script\s*>",
             action=RuleAction.BLOCK,
             severity=RuleSeverity.HIGH
         )
-        
+
         rules["XSS_002"] = WAFRule(
             id="XSS_002",
             name="XSS - JavaScript Protocol",
-            description="Detects javascript: protocol injection", 
+            description="Detects javascript: protocol injection",
             pattern=r"javascript\s*:",
             action=RuleAction.BLOCK,
             severity=RuleSeverity.HIGH
         )
-        
+
         rules["XSS_003"] = WAFRule(
             id="XSS_003",
             name="XSS - Event Handlers",
@@ -152,7 +152,7 @@ class WAFRulesConfig:
             action=RuleAction.BLOCK,
             severity=RuleSeverity.MEDIUM
         )
-        
+
         # COMMAND INJECTION RULES (HIGH)
         rules["CMD_001"] = WAFRule(
             id="CMD_001",
@@ -162,7 +162,7 @@ class WAFRulesConfig:
             action=RuleAction.BLOCK,
             severity=RuleSeverity.HIGH
         )
-        
+
         rules["CMD_002"] = WAFRule(
             id="CMD_002",
             name="Command Injection - Shell Operators",
@@ -171,7 +171,7 @@ class WAFRulesConfig:
             action=RuleAction.BLOCK,
             severity=RuleSeverity.HIGH
         )
-        
+
         # PATH TRAVERSAL RULES (MEDIUM)
         rules["PATH_001"] = WAFRule(
             id="PATH_001",
@@ -181,16 +181,16 @@ class WAFRulesConfig:
             action=RuleAction.BLOCK,
             severity=RuleSeverity.MEDIUM
         )
-        
+
         rules["PATH_002"] = WAFRule(
-            id="PATH_002", 
+            id="PATH_002",
             name="Path Traversal - URL Encoded",
             description="Detects URL-encoded path traversal",
             pattern=r"(\%2e\%2e\%2f|\%2e\%2e\%5c|\%252e\%252e\%252f)",
             action=RuleAction.BLOCK,
             severity=RuleSeverity.MEDIUM
         )
-        
+
         # RATE LIMITING RULES
         rules["RATE_001"] = WAFRule(
             id="RATE_001",
@@ -202,53 +202,53 @@ class WAFRulesConfig:
             rate_limit_window=60,
             rate_limit_max=100
         )
-        
+
         rules["RATE_002"] = WAFRule(
             id="RATE_002",
             name="Search Rate Limiting",
-            description="Search endpoint specific rate limiting", 
+            description="Search endpoint specific rate limiting",
             pattern=r"^/api/v1/(search|scholarships)",
             action=RuleAction.RATE_LIMIT,
             severity=RuleSeverity.LOW,
             rate_limit_window=60,
             rate_limit_max=30
         )
-        
+
         return rules
-    
-    def get_active_rules(self) -> Dict[str, WAFRule]:
+
+    def get_active_rules(self) -> dict[str, WAFRule]:
         """Get only enabled rules"""
         return {k: v for k, v in self.rules.items() if v.enabled}
-    
-    def get_rules_by_severity(self, severity: RuleSeverity) -> Dict[str, WAFRule]:
+
+    def get_rules_by_severity(self, severity: RuleSeverity) -> dict[str, WAFRule]:
         """Get rules by severity level"""
         return {k: v for k, v in self.rules.items() if v.severity == severity and v.enabled}
-    
-    def get_blocking_rules(self) -> Dict[str, WAFRule]:
+
+    def get_blocking_rules(self) -> dict[str, WAFRule]:
         """Get rules that block requests"""
         return {k: v for k, v in self.rules.items() if v.action == RuleAction.BLOCK and v.enabled}
-    
+
     def enable_rule(self, rule_id: str) -> bool:
         """Enable a specific rule"""
         if rule_id in self.rules:
             self.rules[rule_id].enabled = True
             return True
         return False
-    
+
     def disable_rule(self, rule_id: str) -> bool:
         """Disable a specific rule"""
         if rule_id in self.rules:
             self.rules[rule_id].enabled = False
             return True
         return False
-    
-    def get_rule_stats(self) -> Dict[str, Any]:
+
+    def get_rule_stats(self) -> dict[str, Any]:
         """Get WAF rules statistics"""
         total_rules = len(self.rules)
         enabled_rules = len(self.get_active_rules())
         critical_rules = len(self.get_rules_by_severity(RuleSeverity.CRITICAL))
         blocking_rules = len(self.get_blocking_rules())
-        
+
         return {
             "total_rules": total_rules,
             "enabled_rules": enabled_rules,
