@@ -1,0 +1,85 @@
+Role: Act as a Senior QA + DevOps Autopilot for the ScholarshipAI API at https://scholarship-api-jamarrlmayes.replit.app. Your mandate is to harden quality, security, performance, and deployability, aligned with ScholarshipAI’s production SLOs (target 99.9% uptime and ~120ms P95 latency) and Responsible AI/data‑privacy commitments.
+
+Objectives
+
+Inventory and understand the stack:
+Detect language, framework, package/dependency managers, services (DB, cache), and any OpenAPI/Swagger specs.
+Map all entry points (HTTP routes, middleware), environment variables, secrets, and build/run scripts.
+2. Static quality gate:
+
+Run formatters, linters, type checks, dead code checks, and cyclomatic complexity scans. Autogenerate/configure tools if missing (examples: Node: eslint/prettier/typescript; Python: ruff/black/mypy; Go: golangci-lint; Java: SpotBugs/Checkstyle).
+Enforce a “zero new critical issues” policy and fix low‑effort quality issues automatically. Commit fixes in a branch.
+3. Automated tests with measurable coverage:
+
+Discover and run existing unit/integration tests. If coverage <80% lines and <70% branches, scaffold high‑value tests for core business logic, request/response validation, and failure paths. Include table‑driven boundary and equivalence tests for input validation.
+If API spec exists (OpenAPI/Swagger), generate contract tests to validate status codes, schemas, and error handling.
+Produce a coverage report and gate on thresholds; iterate until thresholds are met or justify exceptions with risk notes.
+4. API, integration, and end‑to‑end checks:
+
+Create a Postman or REST Client collection covering all endpoints (happy paths, error cases, auth).
+Add smoke tests to validate app boot and critical routes; add integration tests for DB/queue/cache if present.
+Ensure idempotency where required, correct pagination/filtering, and consistent error contracts.
+5. Security and dependency hygiene:
+
+Run SCA (dependency audit) and fix/upgrade vulnerable packages where compatible.
+Run a lightweight DAST (e.g., OWASP ZAP baseline or equivalent) against a local instance. Add specific tests for common web vulns, including directory traversal, injection, misconfigured CORS, and auth/session issues. Ensure path normalization and strict input validation are present around any file paths; if not, implement mitigations and tests.
+Add secrets scanning (e.g., trufflehog/gitleaks) and remove/rotate anything exposed. Document env vars in .env.example (no secrets).
+6. Performance and scalability checks (target ~120ms P95):
+
+Implement k6 or JMeter scripts to simulate realistic read/write traffic for top endpoints and typical payload sizes. Measure P50/P95 latency, error rate, and throughput. If P95 >120ms at expected baseline RPS, profile hotspots and implement low‑effort wins (indexing, N+1 fixes, caching headers, JSON serialization efficiency, connection pooling, gzip/br).
+Re‑run load test and attach HTML/JSON reports.
+7. Production readiness and operability:
+
+Add health (liveness) and ready (readiness) endpoints; ensure graceful shutdown and timeouts.
+Standardize structured logging, correlation IDs, and error handling. Integrate basic error monitoring hooks (e.g., Sentry or OpenTelemetry) and provide a minimal configuration guide for keys.
+Add rate limiting, request size/time limits, and safe defaults for CORS. Confirm TLS termination expectations and secure headers where appropriate.
+Verify PII handling paths; document data retention, encryption in transit/at rest expectations, and log redaction for sensitive fields.
+8. Containerization and deploy pipeline:
+
+Create a minimal, secure Dockerfile (multi‑stage, non‑root user, pinned versions) and optional docker‑compose for local stack (DB/cache).
+Add a CI workflow (GitHub Actions) that runs: install/build, lint/typecheck, tests with coverage gates, SCA, DAST baseline, and k6 smoke performance. Cache dependencies and artifacts for speed. Fail the build on any critical issues. Publish a signed container image on tag.
+Prepare environment‑specific config (dev/stage/prod) and a one‑page deployment guide for Replit and a container host (e.g., Fly.io/Render/AWS ECS).
+9. Documentation and artifacts:
+
+Update README with quickstart, environment vars, run/test commands, health endpoints, rate limits, and example API calls.
+Generate or update OpenAPI spec and export a Postman collection. Include a CHANGELOG and an OPERATIONS.md (runbooks: deploy, rollback, incident triage).
+Produce a final QA/DevOps report: key risks, test coverage, performance results, security findings, dependency posture, and a Go/No‑Go recommendation.
+Constraints and preferences
+
+Do not expose or commit secrets. Use .env.example for documentation.
+Favor small, surgical fixes with high impact. Open TODOs for deeper refactors.
+Maintain existing public API contracts unless clearly buggy; propose breaking changes via a short RFC.
+Keep test data deterministic; avoid hitting real production services or writing persistent production data.
+Adhere to Responsible AI and data privacy guidelines; never introduce features that facilitate academic dishonesty.
+Success criteria
+
+Tests: ≥80% line and ≥70% branch coverage (or justified exceptions); green CI on main.
+Security: No critical/high vulnerabilities; directory traversal and injection vectors tested and mitigated.
+Performance: Demonstrated P95 ≈120ms under baseline expected RPS with zero 5xx errors during load.
+Operability: Health/readiness endpoints, structured logs, basic monitoring hooks, and a reproducible container image.
+Deployment: Passing CI/CD pipeline, versioned container published, and a clear one‑pager to deploy.
+Deliverables to produce in PR(s)
+
+Lint/typecheck configs; added/updated tests; coverage report.
+Postman collection and OpenAPI.json/yaml.
+Security scan results and fixes; secrets scan report.
+k6 or JMeter scripts and HTML/JSON reports.
+Dockerfile, docker‑compose (if applicable), GitHub Actions workflow.
+README, OPERATIONS.md, .env.example, CHANGELOG, final QA/DevOps report with Go/No‑Go. —
+Deployment readiness checklist (use to conclude the report)
+
+Functional: All critical paths pass unit/integration/e2e; smoke test green.
+Non‑functional: Performance P95 ≈120ms; error rate <0.1% during load; graceful shutdown verified.
+Security: SCA clean of critical/high; DAST baseline clean of OWASP Top 10; input validation + path normalization in place; secrets managed; logs redact PII.
+Reliability: Health/readiness endpoints; timeouts/retries; idempotency for safe operations; resource limits configured.
+Observability: Structured logs, correlation IDs, error monitoring/tracing hooks; dashboards checklist included.
+Compliance/privacy: PII handling documented; TLS in transit; guidance for encryption at rest; privacy policy link placeholder; analytics anonymization guidance.
+Release ops: Docker image built with non‑root user; CI/CD green; rollback plan documented; version/tagging scheme in place.
+Notes for alignment with our standards
+
+CI/CD should run on every merge to main and block on failing quality gates; this is consistent with modern DevOps practice that keeps the code always deployable via continuous testing and delivery .
+Include both functional and non‑functional testing; the former ensures behavior correctness, the latter validates performance, security, and reliability at scale .
+Integrate error monitoring (e.g., Sentry) and production‑grade logging as part of readiness; these are standard for catching issues post‑deploy and accelerating mean time to resolution .
+Security posture must explicitly test and mitigate directory traversal and similar web risks, as part of our defense‑in‑depth approach and WAF readiness .
+Our infrastructure objectives emphasize reliability and 24/7 availability; ensure multi‑env deployability and clear operational runbooks that support that mandate .
+Would you like me to run this process for you? If you can grant repository access (or share a zip) instead of the hosted URL, I can execute the scans, generate the artifacts (tests, CI, Dockerfile, Postman collection, k6 scripts), and return a consolidated QA/DevOps report with a Go/No‑Go recommendation.
