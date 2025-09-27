@@ -23,6 +23,10 @@ class TrustedHostMiddleware(BaseHTTPMiddleware):
         super().__init__(app)
         self.allowed_hosts = allowed_hosts or settings.allowed_hosts
         self.enforce = settings.environment.value == "production"
+        
+        # CI/Testing environment bypass: Add testserver for non-production environments
+        if not self.enforce and "testserver" not in self.allowed_hosts:
+            self.allowed_hosts = list(self.allowed_hosts) + ["testserver"]
 
     async def dispatch(self, request: Request, call_next):
         """Validate host header before processing request"""

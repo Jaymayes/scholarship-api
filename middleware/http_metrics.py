@@ -6,7 +6,7 @@ Tracks all HTTP requests for Prometheus metrics
 import time
 from collections.abc import Callable
 
-from fastapi import Request, Response
+from fastapi import HTTPException, Request, Response
 from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 
@@ -37,12 +37,32 @@ class HTTPMetricsMiddleware(BaseHTTPMiddleware):
         # Record start time
         start_time = time.time()
 
-        # Process request
+        # Process request - CRITICAL FIX: Don't catch HTTPExceptions, let them propagate
         try:
             response = await call_next(request)
             status_code = response.status_code
+        except HTTPException as e:
+            # HTTPExceptions (400, 401, 403, 404, etc.) should propagate unchanged
+            # Record metrics but re-raise the exception to preserve error response
+            status_code = e.status_code
+            duration = time.time() - start_time
+            endpoint = self._normalize_endpoint(request.url.path)
+            
+            # Record metrics for HTTP errors but don't convert to 500
+            try:
+                self.metrics_service.record_http_request(
+                    method=request.method,
+                    endpoint=endpoint,
+                    status=status_code,
+                    duration=duration
+                )
+            except Exception as metrics_error:
+                logger.warning(f"Failed to record HTTP metrics: {str(metrics_error)}")
+            
+            # Re-raise the HTTPException to preserve proper error response
+            raise e
         except Exception as e:
-            # Handle exceptions and track as 500 errors
+            # Only catch non-HTTP exceptions (true server errors)
             logger.error(f"Request failed with exception: {str(e)}")
             status_code = 500
             response = JSONResponse(

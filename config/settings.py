@@ -65,6 +65,7 @@ class Settings(BaseSettings):
     allowed_hosts: list[str] = Field(
         default_factory=lambda: [
             "localhost", "127.0.0.1",
+            "testserver",  # FastAPI TestClient default host for CI/testing
             "*.replit.app", "*.replit.dev", "*.repl.co",
             # Dynamic Replit development domains pattern
             "*.picard.replit.dev", "*.kirk.replit.dev", "*.spock.replit.dev"
