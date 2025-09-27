@@ -11,6 +11,10 @@ from typing import Dict, List, Any
 from dataclasses import dataclass
 from enum import Enum
 
+import sys
+import os
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 from staging.go_no_go_scorecard import staging_scorecard, GateStatus
 from config.staging_config import staging_config, ALERT_THRESHOLDS
 
