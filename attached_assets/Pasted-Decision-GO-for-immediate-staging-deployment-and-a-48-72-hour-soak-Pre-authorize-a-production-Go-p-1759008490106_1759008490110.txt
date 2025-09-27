@@ -1,0 +1,53 @@
+Decision: GO for immediate staging deployment and a 48–72 hour soak. Pre-authorize a production Go pending the gates below.
+
+Soak exit criteria (must meet all)
+
+Reliability and performance
+Uptime ≥ 99.9% on all user-facing services; cumulative 5xx ≤ 5 minutes
+P95 end-to-end latency ≤ 120 ms; P99 ≤ 250 ms; zero persistent hot spots
+Error-budget burn alerts configured at fast/slow windows (2%/1h, 5%/6h); no sustained burn > 10%
+Autoscale: scale-up within 60 seconds under 2× projected peak; no thrashing (>3 scale events/10 min) and CPU target ~60–70%
+Security and privacy
+0 critical/high findings across SAST/DAST/dependency scans; 0 exposed secrets; SBOM generated and archived
+Egress restricted to the confirmed 23 allowlisted domains; 100% of non-allowlist attempts blocked and alerted; zero false negatives
+Role/permission tests pass for student, provider, and admin; audit logs immutable and searchable 90 days
+PII redaction verified in logs; DSR (access/delete) flow works in staging; FERPA/COPPA checks green
+Data and business telemetry
+Event tracking coverage ≥ 95% of critical funnels; schema validation 100%; dropped/late events < 0.1%
+Staging SEO pages are noindex/nofollow and behind auth; no leakage to public search
+Cost telemetry for AI services enabled; per-request token cost within budget to preserve ≥ 4× markup; B2B 3% fee calculation logged and reconciled
+Resilience and recovery
+Backup/restore drill: RPO ≤ 5 min; RTO ≤ 15 min
+Chaos test: pod kill and node drain without SLO breach; zone impairment simulation with graceful degradation
+Canary deploy plan validated (10% for 2 hours, then 50%, then 100% if no P1/P0)
+Responsible AI
+Scholarship recommendations pass bias and transparency checks: fairness deltas ≤ 5% vs baseline; explanations logged; academic dishonesty refusal tests pass
+Soak plan and ownership
+
+Day 0 (T0): Start soak at steady traffic equal to 1.5× expected month-1 peak. Capture baseline snapshots from:
+Security Validation, Reliability SLOs, Performance Baseline, Business Impact dashboards
+Day 1 (T+24h): Increase to 2× peak for 2 hours; verify autoscaling, latency tails, and error-budget alerts. Security review of egress blocks and WAF events.
+Day 2 (T+48h): Run chaos drills, backup/restore, and canary pipeline rehearsal. Validate event tracking and business fee/ARPU instrumentation.
+Day 3 (T+72h): Consolidate metrics, finalize scorecard, and hold Go/No-Go review.
+Reporting cadence and artifacts
+
+Daily 10:00 local executive update: SLOs, P95/P99, error budget, security findings, cloud spend, and blocking issues with owners/ETAs
+End-of-soak Go/No-Go packet:
+Completed scorecard (staging/go_no_go_scorecard.py) with pass/fail and evidence
+Dashboard screenshots and exported metrics
+Signed attestations from SRE, Security, Product, Data Science, and Finance
+Production launch guardrails (pre-authorized if all gates pass)
+
+Canary: 10% → 50% → 100% with automated rollback on any P1, SLO breach > 30 minutes, or security anomaly
+Freeze window: 24 hours post-100% rollout for critical fixes only
+Post-launch monitoring: heightened alerting for 72 hours; exec status twice daily
+Constraints and approvals
+
+Budget: approved for soak and load testing up to the planned compute spend; notify Finance if projected exceeds by >15%
+Incident severity: any P0/P1 during soak pauses the clock and requires exec review before resumption
+Next steps
+
+Proceed with staging deployment now and initiate the soak
+Confirm calendar hold for the Go/No-Go review at T+72h and share the scorecard export to the Business Impact dashboard
+Page me immediately on any red gate or material risk deviation
+Thank you—excellent work tightening the allowlist, aligning thresholds, and readying autoscale. Execute with urgency; decisions will be data-first at the 72-hour gate.
