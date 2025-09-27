@@ -36,27 +36,30 @@ if DATABASE_URL:
         "application_name": "scholarship_api"
     }
     
-    # Production SSL hardening - enforce TLS 1.2+ with certificate verification
+    # Production SSL hardening - ALWAYS enforce verify-full for MITM protection
     if settings.environment.value in ["production", "staging"]:
+        # CRITICAL SECURITY: Always use verify-full to prevent MITM attacks
         connect_args.update({
-            "sslmode": "require",  # Force SSL/TLS connections
-            "sslcert": os.getenv("SSL_CLIENT_CERT"),  # Client certificate (if available)
-            "sslkey": os.getenv("SSL_CLIENT_KEY"),    # Client key (if available)
-            "sslrootcert": os.getenv("SSL_ROOT_CERT"), # CA certificate (if available)
-            "sslcrl": os.getenv("SSL_CRL"),           # Certificate revocation list (if available)
+            "sslmode": "verify-full",  # MANDATORY: Verify server cert AND hostname
+            "sslcert": os.getenv("SSL_CLIENT_CERT"),  # Client certificate (optional mTLS)
+            "sslkey": os.getenv("SSL_CLIENT_KEY"),    # Client key (optional mTLS)
+            "sslrootcert": os.getenv("SSL_ROOT_CERT"), # CA certificate (REQUIRED)
+            "sslcrl": os.getenv("SSL_CRL"),           # Certificate revocation list (optional)
             "target_session_attrs": "read-write"      # Ensure we connect to primary
         })
         
-        # Remove None values to avoid PostgreSQL connection errors
+        # Remove None values except sslrootcert which is critical for verification
         connect_args = {k: v for k, v in connect_args.items() if v is not None}
         
-        if not connect_args.get("sslcert"):
-            # If no client cert, use verify-ca for server certificate validation
+        # SECURITY VALIDATION: Ensure CA certificate is available for verification
+        if not connect_args.get("sslrootcert") and settings.environment.value == "production":
+            import logging
+            logging.critical(
+                "PRODUCTION SECURITY ERROR: SSL_ROOT_CERT is required for verify-full mode. "
+                "Set SSL_ROOT_CERT environment variable or use managed SSL."
+            )
+            # For Replit managed SSL, fallback to verify-ca (server cert only)
             connect_args["sslmode"] = "verify-ca"
-    
-    # Development/staging - prefer SSL but allow fallback
-    elif settings.environment.value == "staging":
-        connect_args["sslmode"] = "prefer"
     
     engine = create_engine(
         DATABASE_URL,

@@ -4,6 +4,7 @@ Enterprise-grade connection management for production reliability
 """
 
 import logging
+import random
 import time
 from functools import wraps
 from typing import Any, Callable, TypeVar
@@ -70,11 +71,14 @@ def with_db_retry(
                         logger.error(f"Database operation failed after {max_retries} retries: {str(e)}")
                         raise DatabaseConnectionError(f"Database connection failed after {max_retries} retries") from e
                     
-                    # Calculate exponential backoff delay
-                    delay = min(
+                    # Calculate exponential backoff delay with jitter to prevent thundering herd
+                    base_delay = min(
                         backoff_base * (backoff_multiplier ** attempt),
                         max_backoff
                     )
+                    # Add ±25% jitter to prevent synchronized retries
+                    jitter = random.uniform(-0.25, 0.25) * base_delay
+                    delay = max(0.1, base_delay + jitter)  # Minimum 100ms delay
                     
                     logger.warning(
                         f"Database operation failed (attempt {attempt + 1}/{max_retries + 1}), "
@@ -189,20 +193,36 @@ class DatabaseConnectionManager:
             return "unknown"
     
     def _validate_ssl_configuration(self, ssl_info: dict[str, Any]) -> None:
-        """Validate SSL configuration meets security requirements"""
+        """Validate SSL configuration meets enterprise security requirements"""
         from config.settings import settings
         
-        if settings.environment.value == "production":
+        if settings.environment.value in ["production", "staging"]:
             if not ssl_info.get("ssl_active"):
-                raise DatabaseSSLError("SSL/TLS is required for production database connections")
+                raise DatabaseSSLError("SSL/TLS is REQUIRED for production/staging database connections")
             
             ssl_version = ssl_info.get("version", "")
             if ssl_version:
-                # Ensure TLS 1.2 or higher
+                # SECURITY: Enforce TLS 1.2+ (server-side must be configured)
                 if "TLSv1.2" not in ssl_version and "TLSv1.3" not in ssl_version:
-                    logger.warning(f"SSL version may be outdated: {ssl_version}")
+                    logger.warning(
+                        f"⚠️ SSL version may be outdated: {ssl_version}. "
+                        "Ensure server enforces TLS 1.2+ via ssl_min_protocol_version"
+                    )
                 
-                logger.info(f"Production SSL validation passed: {ssl_version}")
+                logger.info(f"✅ Production SSL validation passed: {ssl_version}")
+                
+                # Additional security validation
+                cipher = ssl_info.get("cipher", "")
+                if cipher and any(weak in cipher.lower() for weak in ["rc4", "des", "md5"]):
+                    logger.warning(f"⚠️ Potentially weak cipher detected: {cipher}")
+            
+            # Validate SSL mode configuration
+            engine_url = str(self.engine.url)
+            if "verify-full" not in engine_url and "verify-ca" not in engine_url:
+                logger.warning(
+                    "⚠️ SSL verification mode not detected in connection string. "
+                    "Ensure sslmode=verify-full for maximum security."
+                )
     
     @with_db_retry(max_retries=2)
     def get_session(self):
