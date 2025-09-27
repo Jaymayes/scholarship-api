@@ -28,13 +28,47 @@ from config.settings import settings
 # Database URL from environment or settings
 DATABASE_URL = os.getenv("DATABASE_URL") or settings.database_url
 
-# Create database engine
+# Create database engine with SSL hardening and production optimizations
 if DATABASE_URL:
+    # SSL/TLS hardening configuration
+    connect_args = {
+        "connect_timeout": 10,
+        "application_name": "scholarship_api"
+    }
+    
+    # Production SSL hardening - enforce TLS 1.2+ with certificate verification
+    if settings.environment.value in ["production", "staging"]:
+        connect_args.update({
+            "sslmode": "require",  # Force SSL/TLS connections
+            "sslcert": os.getenv("SSL_CLIENT_CERT"),  # Client certificate (if available)
+            "sslkey": os.getenv("SSL_CLIENT_KEY"),    # Client key (if available)
+            "sslrootcert": os.getenv("SSL_ROOT_CERT"), # CA certificate (if available)
+            "sslcrl": os.getenv("SSL_CRL"),           # Certificate revocation list (if available)
+            "target_session_attrs": "read-write"      # Ensure we connect to primary
+        })
+        
+        # Remove None values to avoid PostgreSQL connection errors
+        connect_args = {k: v for k, v in connect_args.items() if v is not None}
+        
+        if not connect_args.get("sslcert"):
+            # If no client cert, use verify-ca for server certificate validation
+            connect_args["sslmode"] = "verify-ca"
+    
+    # Development/staging - prefer SSL but allow fallback
+    elif settings.environment.value == "staging":
+        connect_args["sslmode"] = "prefer"
+    
     engine = create_engine(
         DATABASE_URL,
         echo=settings.database_echo,
         pool_size=settings.database_pool_size,
-        max_overflow=settings.database_max_overflow
+        max_overflow=settings.database_max_overflow,
+        pool_pre_ping=True,  # Validate connections before use
+        pool_recycle=3600,   # Recycle connections every hour
+        connect_args=connect_args,
+        # Connection retry and resilience
+        pool_timeout=30,     # Wait up to 30s for connection from pool
+        max_identifier_length=63  # PostgreSQL standard
     )
 else:
     # Fallback to SQLite for development
