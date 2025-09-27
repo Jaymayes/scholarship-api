@@ -34,8 +34,8 @@ class StagingDashboard:
                         "type": "stat",
                         "targets": [
                             {
-                                "expr": "rate(http_requests_total{status_code='400',error_code='INVALID_HOST'}[5m])",
-                                "legend": "Unknown Host Rejections/sec"
+                                "expr": "rate(http_requests_total{status_code=\"400\"}[5m])",
+                                "legend": "400 Errors/sec (includes host validation)"
                             }
                         ],
                         "thresholds": [
@@ -61,8 +61,8 @@ class StagingDashboard:
                         "min": 98,
                         "max": 100,
                         "alert_rule": {
-                            "condition": f"value < {100 - ALERT_THRESHOLDS['security']['ssl_handshake_failures_per_minute']}",
-                            "severity": "critical",
+                            "condition": f"value < 99.9",  # ≥99.9% success = ≤0.1% failures
+                            "severity": "critical", 
                             "message": "SSL handshake failure rate exceeds 0.1% threshold"
                         }
                     },

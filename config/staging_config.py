@@ -5,7 +5,8 @@ Enterprise-grade staging deployment with 48-72 hour soak validation
 
 import os
 from typing import Dict, Any
-from pydantic import BaseSettings, Field
+from pydantic import Field
+from pydantic_settings import BaseSettings
 
 class StagingValidationConfig(BaseSettings):
     """Staging validation configuration with executive-mandated gates"""
@@ -79,54 +80,45 @@ ALERT_THRESHOLDS = {
     }
 }
 
-# Staging Environment Allowlist (SEO + Health Checks)
+# Staging Environment Allowlist (TIGHTENED - Service Domains Only)
 STAGING_HOST_ALLOWLIST = [
-    # Core hosts
+    # Core development hosts
     "localhost",
     "127.0.0.1",
     "testserver",
     
-    # Replit staging domains
-    "*.replit.app",
-    "*.replit.dev", 
-    "*.repl.co",
-    "*.picard.replit.dev",
-    "*.kirk.replit.dev",
-    "*.spock.replit.dev",
+    # Specific Replit staging domains (NO BROAD WILDCARDS)
+    "scholarship-api-staging.replit.app",
+    "scholarship-api-dev.replit.app",
+    "scholarship-api.picard.replit.dev",
+    "scholarship-api.kirk.replit.dev",
+    "scholarship-api.spock.replit.dev",
     
     # SEO Auto Page Maker domains (CRITICAL for CAC protection)
     "seo-staging.scholarship-api.com",
-    "auto-pages-staging.scholarship-api.com",
+    "auto-pages-staging.scholarship-api.com", 
     "scholarships-preview.education",
     "staging-scholarships.education",
-    "*.scholarship-api.com",
+    "staging.scholarship-api.com",
+    "api-staging.scholarship-api.com",
     
-    # Health check and monitoring
+    # Health check and monitoring (SPECIFIC DOMAINS)
     "healthcheck.internal",
-    "monitoring.internal",
+    "monitoring.internal", 
     "uptime.staging",
+    "health.staging.scholarship-api.com",
     
-    # CDN and edge hosts
-    "*.cloudflare.com",
-    "*.fastly.com",
-    "cdn.staging.scholarship-api.com",
-    
-    # Search engine crawlers (CRITICAL for SEO)
-    "crawler.google.com",
-    "crawler.bing.com", 
-    "crawler.duckduckgo.com",
-    "bot.crawler",
-    "googlebot",
-    "bingbot",
-    
-    # Load balancer health checks
+    # Load balancer health checks (SPECIFIC)
     "lb-health.staging",
-    "elb-healthcheck",
-    "health.aws",
+    "elb-healthcheck.internal",
+    "health.aws.internal",
     
     # Provider testing endpoints
     "provider-test.staging",
-    "api-test.partners"
+    "api-test.partners",
+    
+    # REMOVED: Crawler/bot hostnames (not valid Host headers)
+    # REMOVED: CDN wildcards (CDNs don't appear as Host headers)
 ]
 
 def get_staging_dashboard_config() -> Dict[str, Any]:
@@ -184,12 +176,12 @@ def get_staging_dashboard_config() -> Dict[str, Any]:
     }
 
 def validate_host_allowlist_coverage() -> Dict[str, bool]:
-    """Validate critical hosts are covered in allowlist"""
+    """Validate critical service domains are covered in allowlist (CORRECTED)"""
     critical_checks = {
         "seo_domains_covered": any("seo" in host or "auto-pages" in host for host in STAGING_HOST_ALLOWLIST),
         "health_checks_covered": any("health" in host for host in STAGING_HOST_ALLOWLIST),
-        "crawler_bots_covered": any("bot" in host or "crawler" in host for host in STAGING_HOST_ALLOWLIST),
-        "replit_domains_covered": any("replit" in host for host in STAGING_HOST_ALLOWLIST),
-        "cdn_coverage": any("cdn" in host or "cloudflare" in host or "fastly" in host for host in STAGING_HOST_ALLOWLIST)
+        "staging_api_covered": any("staging.scholarship-api.com" in host for host in STAGING_HOST_ALLOWLIST),
+        "replit_app_domains_covered": any("replit.app" in host for host in STAGING_HOST_ALLOWLIST),
+        "provider_endpoints_covered": any("provider" in host for host in STAGING_HOST_ALLOWLIST)
     }
     return critical_checks
