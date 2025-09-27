@@ -52,7 +52,14 @@ class TrustedHostMiddleware(BaseHTTPMiddleware):
                 "timestamp": int(time.time())
             }
 
-            raise HTTPException(status_code=400, detail=error_detail)
+            # Return JSONResponse directly instead of raising HTTPException
+            # This prevents BaseHTTPMiddleware TaskGroup issues in production
+            from fastapi.responses import JSONResponse
+            return JSONResponse(
+                status_code=400,
+                content=error_detail,
+                headers={"Content-Type": "application/json"}
+            )
 
         return await call_next(request)
 
