@@ -1,0 +1,82 @@
+Excellent work. Deployment is clean, gates are green, and the soak plan is appropriately rigorous.
+
+Executive decision
+
+Proceed with the 72-hour soak as planned.
+Pre-authorize production rollout at T+72h contingent on passing the measurable gates below. Default is GO unless a red gate triggers.
+Go/No-Go criteria (must all be met during Day 1 and Day 2 peak/chaos windows)
+Reliability and performance
+
+Availability per service ≥99.9%; error rate ≤0.5% overall and ≤1% during chaos windows.
+Latency: P95 ≤120ms, P99 ≤250ms at 100 RPS and during spike tests.
+Error budget burn: <25% per day, <50% cumulative over the soak.
+Autoscaling: no thrash; cold-start P95 ≤200ms; scale-out reacts in ≤60s under 2x load step.
+Security and compliance
+
+SAST/DAST: 0 critical/high; SBOM delta introduces 0 criticals; dependency scan pass.
+Egress allowlist intact (no bypasses); RBAC tests pass; audit logs immutable (write-once verified).
+PII redaction: 0 leaks; DSR flow e2e validated with audit trail.
+Data integrity and resilience
+
+Backup/restore drill: RTO ≤15 minutes, RPO ≤5 minutes with data checksums passing.
+Chaos tests: graceful degradation works; MTTR for induced incidents ≤10 minutes; all alerts fired and were actionable.
+Database and TLS hardening
+
+TLS verify-full enforced; handshake failure rate <0.1% of connections; cert rotation runbook exercised.
+DB: P95 query latency <30ms; P99 <100ms; connection pool saturation <80%; deadlocks ≤1/hour; replica lag P95 <100ms.
+Business protection (must hold to protect growth engines)
+
+SEO: crawl success ≥99%, sitemaps and robots.txt validated, Core Web Vitals unchanged (LCP, INP, CLS within prior baselines).
+Auto Page Maker: 95th percentile build <3s; publish queue <5 minutes; no indexation regressions in staging test harness.
+Provider API: health ≥99.5%; timeout rate <0.2%; webhook success ≥99%; 0 auth scope regressions.
+Observability
+
+100% telemetry ingestion for logs/metrics/traces; no cardinality explosions; redaction filters verified in traces.
+Runbooks linked to every page; on-call drill completed with ≤5 minutes acknowledgement.
+Day-by-day directives
+Day 0 (active now)
+
+Capture baseline by service and endpoint, including saturation (CPU <70% P95, memory headroom >20%, GC pause P99 <50ms), DB metrics above, and cache hit ratios.
+Day 1 (100 RPS + scale)
+
+Perform step load: 50→100→150 RPS in 5-minute increments. Record scale decisions, cold starts, and cost per 1k requests.
+Spike test: 3x in ≤5 minutes to simulate launch surge; verify rate limiting, circuit breakers, and graceful degradation.
+Validate CDN/WAF interplay with Host Validation and 4xx preservation; ensure no 4xx are rewritten to 5xx at the edge.
+Day 2 (chaos + recovery)
+
+Fail DB primary with controlled switchover; verify zero data loss within RPO; MTTR ≤10 minutes.
+Induce provider API outage; confirm retries, backoff, and user messaging; no queue dead-letter growth beyond thresholds.
+Network partition and DNS failover test; validate egress policy enforcement and deny logs.
+Execute full backup/restore drill with checksums and event replay.
+Day 3 (decision window)
+
+10:00 local: deliver executive packet and recommendation with scorecard against the Go/No-Go criteria and a diff from Day 0.
+18:00 UTC: If green, begin production canary.
+Production rollout plan (pre-authorized)
+
+Freeze window: no non-critical changes during canary.
+Canary: 10% traffic for 30 minutes → 50% for 30 minutes → 100%. Rollback if any SLO breached for two consecutive 5-minute windows or any red gate triggers.
+Rollback: blue/green or canary disable in ≤5 minutes; data migration reversibility documented.
+Comms: stakeholder notice T-2 hours; status updates at each canary step; post-mortem if rollback.
+Business and finance instrumentation
+
+Report unit economics from Day 1: cost per 1k requests by service, projected infra cost at 5x and 10x Day 1 load. Confirm margins remain ≥4x markup on AI services under peak.
+Validate no impact to SEO engine throughput and provider API revenue protection. Include: simulated indexation rate, crawl depth coverage, provider webhook latency distribution.
+Open asks for the daily 10:00 report
+
+SLO scorecard by service, error budget burn-down, and top-3 regressions with owners.
+Security delta: SBOM diff, dependency updates, DAST endpoint coverage %, and any medium findings with risk notes.
+Data integrity: backup/restore timings and checksum results; DSR test artifacts.
+Business protection: SEO crawl metrics, Auto Page Maker build/publish times, provider API timeout/error distributions.
+Cost: infra $/1k requests and projected monthly at current and 5x load.
+Risks to watch
+
+TLS handshake spikes after verify-full under load.
+Autoscaling thrash leading to tail latency degradation.
+CDN/WAF header normalization breaking Host Validation.
+Provider rate limits during chaos tests causing cascading retries.
+Decision policy
+
+If all gates above are green at T+72h, proceed to production without additional executive meeting.
+If any red gate triggers, page me immediately and hold for executive review.
+Thank you—keep the dashboards live and page on any red gate.
