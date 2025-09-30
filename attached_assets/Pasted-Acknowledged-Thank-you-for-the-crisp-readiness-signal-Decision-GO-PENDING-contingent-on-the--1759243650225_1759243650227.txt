@@ -1,0 +1,63 @@
+Acknowledged. Thank you for the crisp readiness signal.
+
+Decision: GO PENDING — contingent on the prerequisites below being met on time and evidenced. I will issue the formal GO at T-2h once the evidence package is reviewed.
+
+What I need, by deadline
+
+By 18:00 UTC today (hard stop):
+CTO: Named DRIs, Incident Commander confirmation, and T0 window confirmation.
+Calendar holds for all DRIs covering T-2h to T+4h.
+By T-12h:
+Infrastructure: Cloudflare config live in staging, dashboards/alerts verified, on-call schedule posted.
+Security: DPIA/log hygiene review complete; WAF ruleset and SIEM visibility validated with test events.
+App: JWT rotation #2 dry run results and rollback steps documented; key custody/escrow verified.
+By T-2h (for formal GO):
+Evidence package posted: dashboards screenshots, alert tests, JWT dry-run logs, WAF/SIEM test hits, rollback playbook link, DB snapshot confirmation, and comms plan.
+Cutover window and cadence
+
+Target window: 02:00–04:00 UTC.
+War room opens at T-2h. Update cadence every 15 minutes during T0–T+120, then hourly through T+24h.
+Checkpoints: T0+15, T0+60, T0+120 for explicit go/hold decisions on ramp, based on metrics below.
+SLOs and success metrics (first 24h)
+
+Availability ≥ 99.9%
+P95 latency ≤ 120 ms at edge
+Error rate ≤ 0.5%
+Auth success rate ≥ 98%
+WAF false positives ≤ 0.5% Note: You’re currently meeting targets (P95 ~118 ms, 0% errors, 100% availability). Maintain current baselines as pre-cutover reference.
+Halt and rollback triggers
+
+Immediate rollback (RTO < 5 minutes) if any of the following persist beyond the stated windows:
+Error rate > 2% for 2 consecutive minutes
+Auth success rate < 97% for 5 consecutive minutes
+P95 latency > 250 ms for 5 consecutive minutes
+WAF false positives > 1% sustained for 10 minutes or clear evidence of legitimate traffic blocked at material scale
+Security anomaly: JWT validation failures attributable to key mismatch rising > 0.5% over baseline for 5 minutes
+Temporary hold and triage if:
+Error rate 1–2% for 5 minutes
+P95 latency 180–250 ms for 10 minutes
+WAF false positives 0.5–1% for 10 minutes
+Risk controls and de-risking steps
+
+Traffic strategy: Prefer staged ramp if feasible (e.g., 10% → 50% → 100% or limited geo canary) versus big-bang. Incident Commander retains discretion to adapt ramp in real time.
+Data protection: Confirm DB snapshot and configuration export at T-1h; verify restore path.
+JWT rotation #2: Confirm dual-key overlap window duration, key priority order, and automated revert script tested.
+Observability: Ensure golden signals dashboards (latency, errors, saturation, traffic, auth) pre-pinned; alert thresholds aligned to triggers above.
+Budget and approvals
+
+Redis HA: Approved up to $1,500/month as a Day 1–2 priority. CFO sign-off required before provisioning; if CFO is unavailable during the window, I authorize a temporary 30-day approval within the $1,500 cap with post-facto CFO ratification within 72 hours.
+Comms and incident management
+
+Roles: Incident Commander (IC) leads; App Lead and Security Lead execute within their lanes. CEO will not override IC on operational calls.
+Internal comms: 15-minute cadence updates; decision logs timestamped; single source of truth doc link in war room.
+External comms: If user-facing impact > 15 minutes, IC to prepare a status page note; Security Lead to review language for privacy/compliance.
+Post-cutover acceptance and exit criteria
+
+At T+2h: If all SLOs green and error/auth metrics stable within 10% of baseline, proceed to 100% traffic (if staged).
+At T+24h: Formal acceptance review. Deliverables: stability report, incident log (if any), performance deltas vs baseline, lessons learned, and backlog items.
+What I need confirmed back
+
+DRI roster and IC by 18:00 UTC.
+Evidence package delivery plan and owner.
+Explicit statement on whether ramped traffic is feasible; if not, provide rationale and compensating controls.
+Once the above are in, I will issue the formal GO at T-2h. Stay in freeze, hold posture, and maintain your current baselines. Keep execution tight and data-first.
