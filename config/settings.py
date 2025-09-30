@@ -137,7 +137,7 @@ class Settings(BaseSettings):
     # CORS Configuration - QA FIX: Replace wildcard with allowlist
     cors_allowed_origins: str = Field(
         default="",
-        alias="ALLOWED_ORIGINS",
+        alias="CORS_ALLOWED_ORIGINS",
         description="Comma-separated list of allowed origins for production"
     )
     cors_allow_credentials: bool = Field(False, alias="ALLOW_CREDENTIALS")  # QA FIX: Default false

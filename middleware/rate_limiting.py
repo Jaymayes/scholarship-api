@@ -71,14 +71,12 @@ def create_rate_limiter():
 
         except Exception as e:
             # Handle Redis connection failure based on environment
+            # DAY 0 CEO DIRECTIVE: Allow graceful degradation for Redis (DEF-005 remediation pending)
             if settings.environment.value == "production":
-                logger.critical(
-                    f"💥 PRODUCTION ERROR: Redis rate limiting backend required but unavailable. "
-                    f"Error: {e}. Set DISABLE_RATE_LIMIT_BACKEND=true to bypass (NOT recommended)."
-                )
-                raise RuntimeError(
-                    f"Production environment requires Redis rate limiting backend. "
-                    f"Configure RATE_LIMIT_BACKEND_URL or set DISABLE_RATE_LIMIT_BACKEND=true. Error: {e}"
+                logger.error(
+                    f"💥 PRODUCTION DEGRADED: Redis rate limiting backend unavailable. "
+                    f"Error: {e}. Falling back to in-memory (single-instance only). "
+                    "REMEDIATION REQUIRED: DEF-005 Redis provisioning (Day 1-2 priority)"
                 )
             # Development: clear warning with explicit fallback
             logger.warning(

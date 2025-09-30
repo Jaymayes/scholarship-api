@@ -72,10 +72,13 @@ class EnhancedRateLimiter:
             )
 
         except Exception as e:
+            # DAY 0 CEO DIRECTIVE: Allow graceful degradation for Redis (DEF-005 remediation pending)
             if settings.environment.value == "production":
-                logger.error(f"❌ PRODUCTION ERROR: Redis rate limiting required: {e}")
-                # QA FIX: Fail fast in production rather than degrade
-                raise RuntimeError(f"Rate limiting backend required in production: {e}")
+                logger.error(
+                    f"💥 PRODUCTION DEGRADED: Redis rate limiting backend unavailable. "
+                    f"Error: {e}. Falling back to in-memory (single-instance only). "
+                    "REMEDIATION REQUIRED: DEF-005 Redis provisioning (Day 1-2 priority)"
+                )
             logger.warning(f"⚠️ Development: Using in-memory rate limiting. Redis error: {e}")
             return Limiter(
                 key_func=self._get_client_identifier,
