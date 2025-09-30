@@ -190,12 +190,17 @@ async def log_route_inventory():
     logger.info("=" * 80)
 
 # QA-001 fix: Add middleware in correct order (outermost first, applied last)
-# Order: Security & Host Protection → CORS → Request Processing → Rate Limiting → Routing
+# Order: CEO Pre-Filter → Security & Host Protection → CORS → Request Processing → Rate Limiting → Routing
 from middleware.body_limit import BodySizeLimitMiddleware
 from middleware.database_session import DatabaseSessionMiddleware
 from middleware.security_headers import SecurityHeadersMiddleware
 from middleware.trusted_host import TrustedHostMiddleware
 from middleware.url_length import URLLengthMiddleware
+from middleware.debug_block_prefilter import DebugPathBlockerMiddleware
+
+# 0. CEO DIRECTIVE DEF-002: Pre-Router Debug Path Blocker (TOP OF STACK - FAIL CLOSED)
+# This MUST be first to prevent any routing/mounting bypass scenarios
+app.add_middleware(DebugPathBlockerMiddleware)
 
 # 1. Security and host protection middleware (outermost - first line of defense)
 # DAY 0 CEO DIRECTIVE: WAF AFTER AUTH (DEF-003 fix - auth middleware must execute before WAF for authenticated routes)

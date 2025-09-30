@@ -139,14 +139,28 @@ class WAFProtection(BaseHTTPMiddleware):
         method = request.method
         path = request.url.path
 
-        # CEO DIRECTIVE DEF-002: Immediate shield - Block all /_debug/* paths
-        # Incident ID: DEF-002 | Priority: P0 | Approved by: CEO
-        if path.startswith("/_debug"):
+        # CEO DIRECTIVE DEF-002: Multi-layer defense with canonicalization bypass protection
+        # This is secondary defense; pre-router middleware is primary
+        from urllib.parse import unquote
+        
+        path_lower = path.lower()
+        path_decoded = unquote(path).lower()
+        path_normalized = path.replace("//", "/").lower()
+        
+        # Check for debug paths with bypass protection
+        if any([
+            "_debug" in path_lower,
+            "_debug" in path_decoded,
+            "/debug" in path_lower,
+            path.startswith("/_debug"),
+            path_decoded.startswith("/_debug"),
+            path_normalized.startswith("/_debug")
+        ]):
             self.blocked_requests += 1
             logger.critical(
-                f"🚨 WAF BLOCKED DEBUG PATH: {path} | "
+                f"🚨 WAF BLOCKED DEBUG PATH (Layer 2): {path} | "
                 f"IP: {client_ip} | Method: {method} | "
-                f"Incident: DEF-002 | Action: Permanent block until RCA complete"
+                f"Incident: DEF-002"
             )
             return JSONResponse(
                 status_code=403,
@@ -158,7 +172,11 @@ class WAFProtection(BaseHTTPMiddleware):
                     "timestamp": int(time.time()),
                     "trace_id": f"waf-debug-block-{int(time.time())}"
                 },
-                headers={"X-WAF-Action": "blocked", "X-Incident-ID": "DEF-002"}
+                headers={
+                    "X-WAF-Action": "blocked",
+                    "X-Incident-ID": "DEF-002",
+                    "X-Block-Layer": "waf"
+                }
             )
 
         # CRITICAL FIX: Only wrap WAF-specific checks in try/except

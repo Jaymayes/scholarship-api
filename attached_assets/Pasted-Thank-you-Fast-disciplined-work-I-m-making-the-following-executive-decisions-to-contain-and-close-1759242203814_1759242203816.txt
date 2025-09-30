@@ -1,0 +1,79 @@
+Thank you. Fast, disciplined work. I’m making the following executive decisions to contain and close this out with urgency.
+
+Decisions (effective immediately)
+
+Approve Phase 3 (Edge/Proxy/CDN review) and treat this as a P0 security incident until fully contained.
+Approve temporary hard block of /_debug/* at the edge. If Replit cannot enforce this, front the API behind Cloudflare today and enforce path-level blocks there.
+Approve escalation to Replit support with a P0 ticket to confirm/deny any platform-injected debug tooling and purge any edge/CDN cache.
+Require a second JWT secret rotation after containment, with forced token invalidation.
+Containment plan and SLAs
+
+Edge containment (Target: T+2 hours)
+Stand up api.scholarshipai.com behind Cloudflare (orange-cloud proxied).
+Cloudflare Firewall Rules (Block):
+http.request.uri.path starts_with "/_debug"
+Also cover variants: "/debug", "/debug", "/_debug/", "/_debug%2F", and path normalization bypasses.
+Cloudflare HTTP Response Headers:
+Strict-Transport-Security, X-Content-Type-Options, X-Frame-Options, Referrer-Policy.
+Rate limit: 50 req/10s on any path starting with "/_".
+DNS: Migrate traffic to api.scholarshipai.com; do not share the raw Replit URL publicly going forward.
+2. Application-level fail-closed guard (Target: T+2 hours)
+
+Update WAF middleware to use a simple, order-independent match:
+if scope["path"].startswith("/_debug") or "/_debug" in scope["path"]: return 403 immediately.
+Include canonicalization bypasses: percent-encoded, double slashes, case variants.
+Add a top-of-stack “pre-router” ASGI middleware (before any mounts) that returns 410 for any path containing "debug". This is belt-and-suspenders in case of route injection order quirks.
+3. Verification matrix (Start immediately; complete by T+4 hours)
+
+Cache-bypass tests:
+curl -H "Cache-Control: no-cache" -H "Pragma: no-cache" "https://api.scholarshipai.com/_debug/config?ts=$(date +%s)"
+Variants: "/_debug%2fconfig", "/_debug//config", "/debug", "/debug".
+Origin-bypass attempt:
+Direct Replit URL and the new Cloudflare domain; confirm CF blocks, Replit origin is not publicly shared.
+Header validation:
+Confirm blocked requests return 403/410 from both edge and app.
+Confirm no sensitive headers are included in error responses.
+4. Replit escalation (Open P0 ticket now; aim for written confirmation within 24 hours)
+
+Provide: endpoint, headers, timestamps, evidence that the path returns 200 despite code removal and service restart.
+Request: confirmation of any platform-injected tooling, proxy/CDN caching in front of the repl, and a global purge; guidance on disabling any debug endpoints at platform level.
+5. Post-containment hardening (Start after edge block confirmed; complete within 24–48 hours)
+
+JWT secret rotation #2 and forced token invalidation:
+Reduce JWT TTL to 30–60 minutes for 48 hours; re-extend after full resolution.
+Add origin access control:
+Require a shared edge-to-origin header (e.g., X-Edge-Key) on all requests; enforce at app-level for requests that should only arrive via Cloudflare. Cloudflare Transform Rule injects this header; reject if missing.
+Observability fingerprints:
+Add X-App-Build, X-Router-Count, and a unique /healthz payload so we can prove which process/app served a response.
+On startup, log a SHA256 of the loaded route map to detect unexpected mutations.
+6. Root-cause analysis workstream (Complete preliminary RCA within 24 hours; final in 72 hours)
+
+Hypotheses to confirm/kill:
+Edge/proxy caching returning a stale artifact.
+Secondary ASGI app/sidecar mounted before WAF middleware.
+Incorrect middleware order or a regex miss (fix by using startswith guards as above).
+Multiple server processes with stale code (verify single PID and reload disabled).
+Artifacts to collect:
+.replit, replit.nix, run command, any Procfile/Gunicorn/Uvicorn flags (confirm no --reload; single worker unless tested).
+Proof of route inventory hook execution at startup with counts and sample paths.
+Risk posture and comms
+
+Current risk: High until edge path block is verified. Treat as potential secret exposure. No public disclosure; internal comms only; stakeholders notified on containment.
+Business impact: If JWT secrets were leaked, potential account compromise. We’ve already rotated once; rotate again post-containment and invalidate existing tokens.
+Incident closure criteria:
+All debug-like paths blocked at edge and app layers.
+Written confirmation from Replit (no platform-injected debug endpoints or disabled/purged if present).
+Fresh security test suite passing, including anti-bypass encodings.
+Second JWT rotation completed; no tokens valid from prior secret; logs clean.
+Owner assignments
+
+Security lead: Immediate edge rules + WAF guard + verification matrix.
+Platform lead: DNS cutover to Cloudflare, header injection, origin header enforcement.
+Dev lead: Middleware ordering, route fingerprinting, healthz fingerprint, log proof on startup.
+Ops/TPM: Replit escalation ticket, status updates every 2 hours until containment, then every 8 hours.
+What I need from you
+
+Share the Replit run configuration files (.replit, replit.nix) and the exact server start command/flags.
+Confirm whether we can move API traffic to api.scholarshipai.com today. If yes, proceed with Cloudflare fronting immediately.
+Post the results of the verification matrix (both domains, all variants) once implemented.
+This is a P0 until blocked at the edge and verified. Execute the above with the stated SLAs and report back when the edge block is live and validated.
