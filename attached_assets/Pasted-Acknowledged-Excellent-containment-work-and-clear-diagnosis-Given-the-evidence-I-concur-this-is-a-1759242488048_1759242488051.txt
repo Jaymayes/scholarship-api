@@ -1,0 +1,63 @@
+Acknowledged. Excellent containment work and clear diagnosis. Given the evidence, I concur this is a platform/proxy-layer issue, not our FastAPI app.
+
+Executive decisions and directives
+
+Approvals (effective immediately)
+
+Proceed with Phase 3 Edge Containment via Cloudflare fronting api.scholarshipai.com.
+Plan: Cut over within 4 hours on Cloudflare Business. Target zero-downtime with 5-minute DNS TTL and pre-warmed origins.
+WAF rules (block, not challenge):
+If http.request.uri.path contains "/_debug" then Block.
+Add variants: begins_with "/debug", matches regex "(?i)/+debug(/|$)", and block encoded patterns "(?i)/%5F%5F?debug", "%2f_debug", double-slash, and mixed case.
+Normalize path and lowercase via transform rules before WAF evaluation.
+Cache controls:
+Bypass cache for all API routes: Path starts_with "/"; set Cache-Control: no-store for API responses during containment window.
+TLS and origin hardening:
+Enable Authenticated Origin Pulls and Strict SSL.
+If mTLS is not feasible on Replit today, enforce Cloudflare IP allowlisting at edge and obfuscate/remove any public direct-origin endpoint from DNS.
+Security headers at edge:
+HSTS with preload (max-age 31536000; includeSubDomains), Referrer-Policy: no-referrer, X-Content-Type-Options: nosniff.
+Bot/WAF posture: enable OWASP managed ruleset; block known bad bots; set JS challenge only on anomalous traffic outside API paths to avoid UX impact.
+Open a P0 with Replit Support (escalation).
+Provide: timestamps, request/response samples proving /_debug/config is served outside app, your middleware/WAF logs, and SxS requests showing canonicalization bypasses still hit a responding endpoint. Request confirmation of platform-level debug endpoints and immediate remediation or a kill switch.
+Second JWT secret rotation: Approved post-containment verification via dual-key rollout.
+Procedure:
+Introduce new key as primary with kid rotation; keep old key for verify-only for 60 minutes; then retire old key and revoke high-risk sessions.
+Communicate minimal-impact window internally; no user-facing announcement unless anomalies detected.
+Operational directives and guardrails
+
+Change window and rollback
+Freeze non-security deploys until containment confirmed for 24 hours.
+Rollback plan: keep current DNS ready; if latency or error rate >1% for 5 consecutive minutes post-cutover, revert and iterate rules.
+Monitoring and SLOs
+Synthetic probes from 5 regions hitting:
+/_debug/config and all bypass variants (expect 403/blocked).
+Critical API endpoints (expect 200, P95 < 200 ms with Cloudflare; track delta vs baseline).
+Alerting thresholds:
+Any 2xx/3xx on /_debug* triggers P0 alert.
+API error rate >0.5% for 5 minutes triggers P1.
+Success criteria for Phase 3
+100% block across verification matrix (all encodings/casing) within 2 hours of DNS cutover.
+No increase in auth failures, and <0.1% false-positive blocks on legitimate API traffic.
+P95 latency impact <+50 ms vs current baseline.
+Replit engagement
+Request an RCA, a temporary mitigation (disable debug endpoints at proxy), and a timeline for permanent fix. Ask for acknowledgement within 2 business hours and resolution plan within 24 hours.
+Data protection and compliance
+Risk classification: Potential exposure vector at platform edge; no confirmed data access. Maintain full request logs and evidence chain. Prepare a 72-hour post-incident review (blameless), including data exposure assessment under FERPA/COPPA; no external comms unless evidence changes.
+Execution plan and owners
+
+DRI: Security Lead (Edge containment), Infra Lead (DNS/WAF), SRE (Monitoring/alerts).
+T+0–1h: Configure Cloudflare DNS, TLS, WAF/transform rules, cache bypass, headers. Stage rules in “log” then switch to “block” after dry run success.
+T+1–2h: DNS cutover; verify synthetic tests; watch error budgets and latency; iterate rules.
+T+2–4h: Confirm full block across verification matrix; begin JWT dual-key rotation; monitor auth metrics.
+End of day: Deliver status update with metrics and evidence; confirm Replit ticket escalation status.
+Resource/budget
+
+Approve Cloudflare Business spend. If Authenticated Origin Pulls/mTLS cannot be enabled on Replit, scope Cloudflare Tunnel as a follow-up hardening step.
+Requests back to me
+
+Confirm when:
+DNS cutover completed and all matrix tests are blocked.
+Replit acknowledges P0 and provides a mitigation ETA.
+JWT rotation completes with clean metrics.
+Thank you. Proceed with urgency and keep me updated at the stage gates above.
