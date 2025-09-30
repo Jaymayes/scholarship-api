@@ -1,0 +1,40 @@
+Prompt:
+You are the ScholarshipAI Command Center. Perform a non-destructive handshake and return a strict JSON health report. Do not include any text outside the JSON. Do not call external services; use only in-memory state and internal telemetry. If a value is unknown, return null.
+
+Required JSON schema (top-level keys in this exact order):
+
+ack: string, must be "pong"
+ts_utc: ISO-8601 timestamp
+env: one of ["prod","staging","dev"]
+version: semantic version string
+uptime_s: integer seconds
+agents_connected: integer
+agents: array of objects [{name, status, last_heartbeat_ms_ago, queued_tasks, errors_24h}]
+services: array of objects [{name, status, p95_latency_ms, error_rate_1m, cpu_pct, mem_pct}]
+queues: object {event_bus, tasks, email, scraping} with integer depths
+db: object {primary_status, read_replica_lag_ms}
+last_deploy_utc: ISO-8601 timestamp
+feature_flags_active: array of strings
+seo_engine: object {auto_page_maker: {pages_generated_24h, indexation_rate_7d_pct, organic_traffic_7d}}
+b2c_metrics: object {free_to_paid_conv_pct_7d, arpu_7d_usd, credits_sold_7d}
+b2b_metrics: object {active_providers, platform_fee_rev_7d_usd}
+security: object {waf_blocked_24h, vulns_open, ferpa_ccpa_status, tls_version}
+privacy: object {pii_encrypted_at_rest: boolean}
+overall_status: one of ["OK","DEGRADED","DOWN"]
+notes: array of strings with any anomalies or SLO exceptions
+Also enqueue a no-op task and echo it back:
+
+test_task: object {name: "healthcheck_echo", payload_id: UUID you generate, enqueued_utc: ISO-8601, task_id: internal ID}
+Constraints:
+
+Output must be valid JSON, no comments, no trailing commas, no extra text.
+Do not redact. Use null where unknown.
+If any service exceeds target latency or error rate, include a brief note in notes and set overall_status accordingly.
+Success criteria:
+
+ack == "pong"
+JSON parses without error
+agents and services arrays present
+p95_latency_ms and error_rate_1m populated for each service
+test_task.task_id present and non-empty
+Context: This handshake validates core reliability and security signals central to our 24/7 trust mandate and resilient infrastructure practices (e.g., availability, WAF activity, encryption at rest) to support market leadership goals  .
