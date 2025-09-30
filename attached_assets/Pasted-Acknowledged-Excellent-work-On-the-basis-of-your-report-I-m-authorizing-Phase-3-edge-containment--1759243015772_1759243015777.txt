@@ -1,0 +1,59 @@
+Acknowledged. Excellent work. On the basis of your report, I’m authorizing Phase 3 edge containment with a staged rollout, contingent on the pre-flight checklist below.
+
+Executive decision
+
+Go for Phase 3 cutover using staged WAF rules (Log → Block) exactly as specified in the implementation guide.
+Schedule T0 in a low-traffic window within the next 24–48 hours. Preference: 02:00–04:00 UTC.
+Maintain SLOs: 99.9% uptime, target P95 ~120ms (hard cap 200ms during cutover), zero unexplained auth regressions.
+Pre-flight checklist (must be green before T0)
+
+Baselines captured (last 24h): P50/P95 latency, 5xx rate, auth success rate, WAF anomaly count, top routes by traffic.
+Dashboards and alerts live: edge (Cloudflare), application, and DB; P0/P1/P2 paging tested.
+Freeze: application deploys frozen T-4h to T+4h; migrations locked.
+Rollback prepared: DNS/TLS rollback plan validated; application rollback image tagged and tested.
+Redis plan: confirm Day 1–2 provisioning owner and ETA (to replace in-memory rate limiting) with HA config.
+T0 runbook (staged rollout)
+
+Stage 1 (Log-only, 45–60 min): Enable Cloudflare rules in log mode; warm caches; monitor diffs vs baselines.
+Stage 2 (Block, limited rules, 60 min): Turn on block for high-confidence rules; monitor false positives; keep transform rules active.
+Stage 3 (Full policy): Ramp remaining rules; confirm no material impact on auth conversion or error rates.
+Live cutover KPIs and guardrails
+
+5xx error rate: maintain ≤0.5%; rollback threshold sustained >1.0% for 10 min.
+Auth success rate: no more than +0.2% absolute drop; rollback if ≥0.5% drop for 10 min.
+P95 latency: stay ≤200ms; investigate if >200ms for 10 min; rollback if >250ms for 10 min.
+WAF false positives: ≤0.05% of requests; if ≥0.1% for 10 min with student impact, revert last rule change.
+Traffic integrity: no surge in anomalous routes; confirm path normalization working.
+JWT rotation #2
+
+Execute dual-key rollover post-Stages 1–2 stabilization (same maintenance window).
+Overlap window ≥30 minutes; live-monitor auth success and token verification logs.
+Success criteria: zero spike in 401s/403s; confirm old key fully retired.
+Ownership and comms
+
+Incident Commander (Infra): owns go/no-go and rule ramp decisions.
+Security Lead: owns WAF policy, transform rules, and rollback triggers tied to false positives.
+App Lead: owns application health, JWT rotation #2, and route inventory snapshots.
+Comms Lead: owns internal status updates every 30 minutes and external status page if needed.
+Replit P0: submit the prepared template at T0, target 2-hour acknowledgment; attach live evidence.
+Rollback criteria (any one triggers rollback)
+
+Breach of any guardrail above for >10 minutes.
+Material student sign-in or submission impact confirmed by logs or support signals.
+Cloudflare configuration anomalies (DNS/SSL/TLS) not correctable within 10 minutes.
+Post-cutover (T+24h and T+72h)
+
+T+24h stabilization report: KPIs vs baseline, rule adjustments, incident log, and student impact analysis.
+T+72h post-incident review: root cause of platform/proxy exposure, control efficacy, remaining risks, and next actions.
+Additional priorities (next 48–72h)
+
+Redis rate limiting: deploy HA Redis (AOF on, multi-AZ), migrate from in-memory, run synthetic load to validate.
+Logpush/analytics: enable Cloudflare Logpush to centralized storage; join with app logs for false-positive analysis.
+Synthetic monitoring: two external vantage points for sign-in and top three student flows; alert to P95 and error thresholds.
+Admin surface hardening: confirm Cloudflare IP allowlist for admin endpoints; enforce TLS 1.2+, HSTS, disable 0-RTT for auth endpoints.
+What I need from you to proceed
+
+Proposed T0 window and named owners for the four roles above.
+Current 24h baselines for latency, error rate, auth success, and top routes.
+Confirmation that Replit P0 ticket is pre-drafted and ready to send at T0.
+Once I have those three items, I’ll issue the formal go order. Stay in a ready posture; assume go within 24 hours.
