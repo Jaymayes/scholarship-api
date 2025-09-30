@@ -1,0 +1,61 @@
+Approved. Proceed with the 3‑day remediation sprint.
+
+Executive directives and guardrails
+
+Day 0 priorities (must be completed before any load testing)
+DEF-002: Remove /_debug/config and rotate any secrets exposed by that endpoint (JWT, DB, API keys). Validate no other debug routes exist. Owner reports completion in war room with proof via cURL and 200→404/403.
+Set environment to “production.” Confirm production-safe configs: secure cookies, HSTS/CSP active, gzip/brotli, connection pooling limits, autoscaling on.
+WAF ordering hotfix: auth before WAF for authenticated routes, plus explicit allowlist for known-good paths. Keep core OWASP rules enabled.
+Logging/PII compensating controls: immediately mask PII in logs; disable verbose request/response logging for auth and PII endpoints; restrict log retention to 7 days until policy finalized.
+Command Center: bring up dashboards, golden signals, alerts, and kill‑switch. Page a synthetic test failure to validate on-call flow.
+2. Execution plan (Days 1–2)
+
+Run all five DEF tickets in parallel as planned; keep a single-threaded change window for each deploy (no overlapping production pushes).
+Freeze non-remediation feature merges. All changes go through the war room with rollback plans linked to each deploy.
+3. Acceptance gates for Day 3 Go/No‑Go
+Operational SLOs (measured during 2‑hour soak at 50 RPS):
+
+P95 latency ≤ 120 ms
+Error rate < 0.1%
+Availability ≥ 99.9% during soak
+WAF false-positive rate = 0 on authenticated routes; attack probes still blocked Security gates:
+No accessible debug endpoints; env=production verified
+Secrets rotated; JWT key length and algorithm policy enforced (RS256/EdDSA preferred; no HS256 with weak secrets)
+No PII in logs across last 24h; log sampling safe; data access telemetry enabled
+Rate limiting enforced with graceful degradation; no auth bypasses found in cURL/HAR tests Operational readiness:
+Command Center dashboards green; alerts tuned (no alert storms)
+Runbooks validated via drills; kill‑switch exercised and restores within 5 minutes
+PagerDuty test page acknowledged within on‑call SLA
+Any failure of the above gates = No‑Go and automatic rollback to pre-sprint baseline.
+
+4. KPIs to track in real time
+
+Core: P95 latency, error rate, saturation (CPU/mem/DB pool), throughput (RPS), synthetic pass rate
+Security: WAF block ratio by rule, auth success/failure, 429 rate (rate limit), “PII in logs” detections
+Reliability: deploy MTTR, change failure rate, rollback count Post‑launch Day 0–7: track the same plus crash‑free sessions.
+5. Risk mitigation and compensating controls (3‑day window)
+
+PII at rest: if field‑level encryption cannot be completed this sprint, restrict access via feature flags and role‑based controls; encrypt snapshots/backups immediately; ensure KMS policies in place. Commit full field‑level envelope encryption to next sprint.
+Token lifecycle: if refresh + revocation list won’t land in 3 days, shorten access‑token TTL (≤15 min), enable immediate server-side logout via revocation store, and schedule full refresh/rotation and blacklist for next sprint.
+Remove mock users from production code now. Block merges that reintroduce them.
+6. Budget and resourcing approvals
+
+Approved: overtime for SRE/Security/Platform; temporary load-test environment; incremental Grafana/PagerDuty costs; Redis capacity uplift. Cap: up to $15k for this sprint without additional approval. Flag anything beyond.
+7. Communications and cadence
+
+War room: 9:00 and 17:00 updates, plus live incident thread if any P1/P0.
+Daily CEO summary: 18:00 with traffic-light status, deltas to plan, and blockers.
+No external comms yet. Prepare a “Trust & Reliability” post for after stable release (T+7 days) highlighting SLOs and security improvements.
+8. Next-sprint commitments (schedule immediately after Go)
+
+Field‑level PII encryption with envelope/KMS
+Comprehensive log redaction and privacy review; data retention/RTBF endpoints
+Full token refresh/rotation, revocation list, and JWKS; secret hygiene policy
+Formal FERPA/CCPA controls review and audit trail enhancements
+Immediate asks from me
+
+Confirm by EOD today: DEF‑002 removed, env=production, WAF ordering fixed, logging masked, Command Center live with a successful test page.
+Share a screenshot or link to Command Center showing golden signals green and the synthetic checks passing.
+Post the cURL script outputs for the 5 critical checks in the war room channel.
+Identify any blockers to hitting P95 ≤120 ms and <0.1% errors at 50 RPS.
+You have the go-ahead. Execute with speed and discipline. I will make the Day 3 Go/No-Go call based on the gates above.

@@ -157,52 +157,6 @@ async def services_health_check():
         environment=settings.environment.value
     )
 
-@router.get("/_debug/repl", response_model=DebugConfigResponse)
-async def repl_debug_config():
-    """
-    Development-only configuration diagnostics
-    Returns sanitized configuration info for Replit debugging
-    """
-    # Only allow in development environments
-    if settings.environment == settings.environment.PRODUCTION:
-        raise HTTPException(
-            status_code=404,
-            detail="Debug endpoint not available in production"
-        )
-
-    # Sanitized config info for debugging
-    cors_origins = settings.get_cors_origins
-
-    return DebugConfigResponse(
-        environment=settings.environment.value,
-        debug_mode=settings.debug,
-        cors=CorsConfig(
-            origins_count=len(cors_origins) if cors_origins != ["*"] else "wildcard",
-            wildcard_enabled="*" in cors_origins,
-            replit_origin_detected=any("replit" in origin for origin in cors_origins if isinstance(origin, str))
-        ),
-        rate_limiting=RateLimitConfig(
-            backend_type=getattr(settings, 'get_rate_limiter_info', 'Redis'),
-            per_minute_limit=settings.get_rate_limit_per_minute,
-            enabled=settings.rate_limit_enabled
-        ),
-        database=DatabaseConfig(
-            type=getattr(settings, 'get_database_info', 'PostgreSQL'),
-            configured=bool(settings.database_url)
-        ),
-        jwt=JwtConfig(
-            algorithm=settings.jwt_algorithm,
-            secret_configured=bool(settings.jwt_secret_key),
-            secret_length=len(settings.jwt_secret_key) if settings.jwt_secret_key else 0
-        ),
-        features=FeatureConfig(
-            analytics=settings.analytics_enabled,
-            metrics=settings.metrics_enabled,
-            tracing=settings.tracing_enabled
-        ),
-        replit_env=ReplitEnvConfig(
-            repl_id=os.getenv("REPL_ID", "not_set"),
-            repl_owner=os.getenv("REPL_OWNER", "not_set"),
-            port=os.getenv("PORT", "not_set")
-        )
-    )
+# DEF-002 SECURITY FIX: Debug endpoint removed per CEO directive (Day 0 Priority #1)
+# Previously exposed JWT secret length, database config, Replit env details
+# Endpoint completely removed - no development exception

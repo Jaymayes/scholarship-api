@@ -37,10 +37,10 @@ class Settings(BaseSettings):
         "secret", "dev", "development", "test", "changeme", "default"
     }
 
-    # Environment - defaults to development to avoid production validation issues
-    environment: Environment = Field(Environment.DEVELOPMENT, alias="ENVIRONMENT")
-    strict_config_validation: bool | None = Field(None, alias="STRICT_CONFIG_VALIDATION")
-    debug: bool = Field(True, alias="DEBUG")
+    # Environment - DAY 0 CEO DIRECTIVE: Set to production
+    environment: Environment = Field(Environment.PRODUCTION, alias="ENVIRONMENT")
+    strict_config_validation: bool | None = Field(True, alias="STRICT_CONFIG_VALIDATION")
+    debug: bool = Field(False, alias="DEBUG")
 
     # API Configuration
     api_title: str = Field("Scholarship Discovery & Search API", alias="API_TITLE")

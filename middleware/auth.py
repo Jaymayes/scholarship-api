@@ -59,33 +59,39 @@ class User(BaseModel):
     scopes: list[str] = []
     is_active: bool = True
 
-# Mock user database (replace with real database in production)
-MOCK_USERS = {
-    "admin": {
-        "user_id": "admin",
-        "email": "admin@scholarship-api.com",
-        "hashed_password": pwd_context.hash("admin123"),
-        "roles": ["admin"],
-        "scopes": ["scholarships:read", "scholarships:write", "analytics:read", "analytics:write"],
-        "is_active": True
-    },
-    "partner": {
-        "user_id": "partner",
-        "email": "partner@university.edu",
-        "hashed_password": pwd_context.hash("partner123"),
-        "roles": ["partner"],
-        "scopes": ["scholarships:read", "scholarships:write", "analytics:read"],
-        "is_active": True
-    },
-    "readonly": {
-        "user_id": "readonly",
-        "email": "readonly@client.com",
-        "hashed_password": pwd_context.hash("readonly123"),
-        "roles": ["read-only"],
-        "scopes": ["scholarships:read"],
-        "is_active": True
+# DAY 0 CEO DIRECTIVE: MOCK_USERS REMOVED FROM PRODUCTION
+# Security risk: hardcoded credentials with weak passwords
+# Production must use database-backed authentication only
+MOCK_USERS: dict = {}
+
+# Development-only mock users (strictly controlled by environment)
+if settings.environment == settings.environment.DEVELOPMENT:
+    MOCK_USERS = {
+        "admin": {
+            "user_id": "admin",
+            "email": "admin@scholarship-api.com",
+            "hashed_password": pwd_context.hash("admin123"),
+            "roles": ["admin"],
+            "scopes": ["scholarships:read", "scholarships:write", "analytics:read", "analytics:write"],
+            "is_active": True
+        },
+        "partner": {
+            "user_id": "partner",
+            "email": "partner@university.edu",
+            "hashed_password": pwd_context.hash("partner123"),
+            "roles": ["partner"],
+            "scopes": ["scholarships:read", "scholarships:write", "analytics:read"],
+            "is_active": True
+        },
+        "readonly": {
+            "user_id": "readonly",
+            "email": "readonly@client.com",
+            "hashed_password": pwd_context.hash("readonly123"),
+            "roles": ["read-only"],
+            "scopes": ["scholarships:read"],
+            "is_active": True
+        }
     }
-}
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     """Verify a password against its hash"""

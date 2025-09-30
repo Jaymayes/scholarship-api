@@ -149,7 +149,7 @@ from middleware.trusted_host import TrustedHostMiddleware
 from middleware.url_length import URLLengthMiddleware
 
 # 1. Security and host protection middleware (outermost - first line of defense)
-app.add_middleware(WAFProtection, enable_block_mode=True)  # WAF - FIRST LINE OF DEFENSE
+# DAY 0 CEO DIRECTIVE: WAF AFTER AUTH (DEF-003 fix - auth middleware must execute before WAF for authenticated routes)
 app.add_middleware(SecurityHeadersMiddleware)  # Security headers (must be first)
 # CRITICAL FIX: ForwardedHeadersMiddleware breaks route matching on Replit - corrupts ASGI scope paths
 app.add_middleware(TrustedHostMiddleware)      # Validate Host header against whitelist
@@ -186,6 +186,10 @@ app.middleware("http")(trace_id_middleware)
 
 # 4.5 CRITICAL SECURITY: API Rate Limiting Enforcement
 app.add_middleware(APIRateLimitMiddleware)  # Global API rate limiting enforcement
+
+# DEF-003 CEO DIRECTIVE: WAF must execute AFTER authentication (authenticated routes need auth context)
+# This prevents WAF from blocking legitimate authenticated requests
+app.add_middleware(WAFProtection, enable_block_mode=True)  # WAF with auth context available
 
 # 5. Rate limiting handled by decorators (applied at route level)
 
@@ -319,8 +323,7 @@ async def root():
             "health": "/healthz",
             "api_info": "/api",
             "search": "/api/v1/search?q=<query>",
-            "documentation": "/docs",
-            "debug": "/_debug/config"
+            "documentation": "/docs"
         },
         "example": "Try: /api/v1/search?q=engineering"
     }
@@ -390,37 +393,9 @@ async def readiness_check():
         }
     }
 
-@app.get("/_debug/config")
-async def main_debug_config():
-    """Development-only debug endpoint showing sanitized runtime configuration"""
-    if settings.environment == Environment.PRODUCTION:
-        raise HTTPException(status_code=404, detail="Not found")
-
-    return {
-        "environment": settings.environment.value,
-        "host": settings.host,
-        "port": settings.port,
-        "cors_mode": "wildcard" if settings.environment != Environment.PRODUCTION else "strict",
-        "rate_limiter": {
-            "enabled": settings.rate_limit_enabled,
-            "backend_type": "redis" if not settings.disable_rate_limit_backend else "memory",
-            "per_minute": settings.get_rate_limit_per_minute
-        },
-        "database": {
-            "engine": "PostgreSQL",
-            "configured": bool(settings.database_url)
-        },
-        "security": {
-            "jwt_configured": bool(settings.jwt_secret_key),
-            "docs_enabled": settings.should_enable_docs,
-            "public_read_endpoints": settings.public_read_endpoints
-        },
-        "middleware_order": [
-            "SecurityHeaders", "TrustedHost", "ForwardedHeaders",
-            "DocsProtection", "DatabaseSession", "RequestID",
-            "CORS", "URLLength", "BodySize", "RateLimit"
-        ]
-    }
+# DEF-002 SECURITY FIX: Debug endpoint removed per CEO directive (Day 0 Priority #1)
+# Exposed JWT secret length, database config, and internal architecture
+# All exposed secrets must be rotated immediately
 
 if __name__ == "__main__":
     # Replit-specific port handling - must use PORT environment variable
