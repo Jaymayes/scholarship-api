@@ -329,6 +329,10 @@ app.include_router(priority3_router, tags=["Priority 3 Production Validation"])
 app.include_router(launch_router, tags=["Production Launch"])
 app.include_router(agent_router, tags=["agent"])  # Agent Bridge for Command Center integration
 
+# Agent Bridge / Orchestration endpoint for Command Center
+from routers.orchestration import router as orchestration_router
+app.include_router(orchestration_router, tags=["orchestration"])
+
 # QA-003 fix: Include interaction wrapper endpoints
 from routers.interaction_wrapper import router as interaction_wrapper_router
 

@@ -61,6 +61,11 @@ class WAFProtection(BaseHTTPMiddleware):
             "/api/v1/recommendations",
             "/api/v1/interactions"
         }
+        
+        # Orchestration endpoints that should bypass SQL injection WAF (legitimate JSON payloads)
+        self._waf_bypass_paths = {
+            "/command",  # Agent Bridge orchestration from Command Center
+        }
 
         logger.info(f"WAF Protection initialized - Block mode: {self.block_mode}")
 
@@ -310,6 +315,9 @@ class WAFProtection(BaseHTTPMiddleware):
             "/partner/register",  # Partner registration may contain text like "select scholarships"
             "/api/v1/launch/simulate/traffic"
         }
+        
+        # Add orchestration bypass paths (legitimate JSON from Command Center)
+        sql_exempt_paths.update(self._waf_bypass_paths)
 
         if request.url.path in sql_exempt_paths:
             logger.debug(f"WAF: Allowing SQL-exempt endpoint - {request.method} {request.url.path}")
