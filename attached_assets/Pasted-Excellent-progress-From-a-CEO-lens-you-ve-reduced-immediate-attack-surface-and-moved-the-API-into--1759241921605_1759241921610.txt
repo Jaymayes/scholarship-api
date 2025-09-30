@@ -1,0 +1,116 @@
+Excellent progress. From a CEO lens: you’ve reduced immediate attack surface and moved the API into a hardened production posture. Now we’ll lock out the lingering /_debug/config issue and close Day 0.
+
+Day 0 CEO Security Directives — Comprehensive Task List and Acceptance Criteria
+Owner: Security Lead | Due: Today EOD unless noted
+
+DEF-002 Debug Endpoint Removal
+Status: Done
+Acceptance: All debug routes return 404/410 in prod; automated test asserts 404 for /_debug/* and /debug/*.
+DEF-003 WAF Ordering
+Status: Done
+Acceptance: Auth executes before WAF inspection; WAF logs include auth context (user/session ID redacted).
+Environment Hardening
+Status: Done
+Acceptance: app.debug == False, uvicorn/gunicorn workers run with reload=False; prod settings enforced via config and env; PII logging disabled.
+Mock Users Removal
+Status: Done
+Acceptance: No code path allows bypass auth in prod; unit test prevents introduction of MOCK_USERS.
+JWT Secret Rotation
+Status: Key received/pending confirmation
+Acceptance: 86+ char secret in KMS/secret manager; rotation playbook saved; forced logout event executed.
+CORS Lockdown
+Status: Done
+Acceptance: Only approved prod domains; preflight tests pass; deny-all default.
+DEF-005 Graceful Degradation (Redis)
+Status: Temporary fallback enabled
+Acceptance: Rate limiting works with in-memory fallback; alert raised when fallback engaged; Redis provisioning Day 1-2.
+Outstanding Day 0 Blocker
+
+/_debug/config still responding
+Risk: Information disclosure, bypass of hardening via residual debug middleware or proxy mapping.
+SLA: Resolve today with a layered isolation plan below.
+Temporary shield: WAF rule to block ^/_debug/ with 403 while RCA proceeds.
+Root-Cause Hypotheses and Elimination Plan for /_debug/config
+We’ll proceed hypothesis-driven to minimize time-to-fix and avoid blind edits: reproduce, isolate, test, and confirm, then lock with automated checks. This approach aligns with best-practice debugging: form a clear hypothesis, run a targeted experiment, and iterate quickly with logging and test assertions to converge on root cause, rather than broad, speculative changes . We’ll also favor proactive, test-backed hardening so the issue can’t regress in future builds .
+
+Phase 1 — Codebase and Dependency Audit (Owner: Backend Lead; 60 minutes)
+
+Inventory routes at runtime:
+Add a startup hook to log the registered routes (path, endpoint, name, originating module). This immediately shows which router or middleware owns /_debug/config and prevents guesswork (log attached to incident ticket).
+Verify FastAPI/Starlette debug is off end-to-end:
+Confirm FastAPI(debug=False), no DebugMiddleware, and Starlette exception pages disabled in prod.
+Search for implicit mounts and static serving:
+Check for app.mount or StaticFiles mounts that might map /_debug/*.
+Scan dependencies for auto-mounted debug endpoints:
+pip freeze review for dev-only libs accidentally in prod (e.g., toolbars, profilers, schema viewers).
+Grep site-packages for “/_debug” strings.
+Confirm OpenAPI docs are constrained:
+docs_url and redoc_url disabled or auth-gated in prod.
+Exit criteria: We can name the module/class serving /_debug/config from the route inventory log.
+
+Phase 2 — Runtime/Process Integrity (Owner: DevOps; 45 minutes)
+
+Eliminate stale code or ghost workers:
+Rebuild image, clear pycache and .pyc, ensure image SHA matches deployment manifest.
+For Gunicorn/Uvicorn: rolling restart all workers; confirm no sidecar still running older code.
+Multi-instance consistency:
+If behind a load balancer, hit all instances directly; ensure no canary/old pod still exposes /_debug/config.
+Env assertions:
+Verify PROD env vars present inside container; assert at startup (fail-fast) if debug=True or reload=True detected.
+Exit criteria: Every instance serves the same route inventory; no process uses debug config.
+
+Phase 3 — Edge/Proxy/CDN Review (Owner: Platform; 45 minutes)
+
+Reverse proxy/Nginx/Caddy:
+Inspect location rules for ^/_debug or artificial mappings to static files or upstreams.
+CDN/caching:
+Purge cache for /_debug/*; verify response origin; disable edge rule sets that might serve internal config.
+Third-party platform defaults:
+Check host platform (e.g., PaaS “debug” features) not auto-injecting endpoints.
+Exit criteria: No edge component maps /_debug/*; traffic observed from origin only.
+
+Phase 4 — Immediate Shield and Regression Guard (Owner: SecOps; 30 minutes)
+
+WAF rule: Block ^/_debug/ and tag with incident ID for telemetry.
+E2E test: Assert 404 for /_debug/config in CI; gate releases on this check.
+Observability: Dashboard tile highlighting any 2xx/3xx on /_debug/* over last 7/30 days.
+Decision Tree for Common Findings
+
+If route inventory shows Starlette DebugMiddleware assets: remove middleware, verify FastAPI(debug=False), and retest.
+If dependency auto-mounts /_debug: pin and exclude in prod extras; add import guard under ENV=dev only.
+If ghost worker or old pod: force redeploy with zero-downtime restart; verify image digest and route inventory per pod.
+If proxy mapping: remove stanza; add deny rule for belt-and-suspenders.
+API Status Summary (Executive)
+
+Running in production mode with tightened posture.
+WAF after auth: active and logging.
+Rate limiting: in-memory fallback; Redis planned (Day 1-2).
+Persistent /_debug/config: temporary WAF block in place; RCA in progress today.
+Day 1–2 Priorities (Owners, SLAs)
+
+DEF-005 Redis Provisioning (DevOps; 1 day)
+Deploy HA Redis; switch rate limiting to Redis backend; chaos test node loss; alerting on latency and connection errors.
+DEF-004 Command Center Integration (SecOps; 1 day)
+Centralize logs/metrics/traces; add route inventory at startup as an observable signal; ensure PII scrubbing.
+DEF-001 Concurrent Request and Abuse Testing (QA/SecOps; 1–2 days)
+Load and soak tests; rate-limit bypass attempts; confirm 429 behavior; WAF anomaly detection tuning.
+Secrets & Policy-as-Code (Platform; 1 day)
+Vault/KMS integration validated; OPA rules in CI to fail builds that enable debug or mount /_debug/* in prod.
+Compliance/Privacy Review (Legal/Privacy; 1 day)
+FERPA/COPPA posture check; data retention and access logs verified.
+KPIs to Track Weekly (CEO Dashboard)
+
+0 public debug endpoints in prod; CI gate pass rate 100%.
+WAF block rate and false-positive rate trending.
+p95 latency ~120ms and 99.9% uptime adherence.
+Security MTTR for critical findings <24h.
+Redis rate-limit effectiveness: 0 cross-node inconsistencies.
+Inputs Needed from You
+
+Confirm final JWT secret in prod secret manager and force logout window approval.
+Confirm the exact hosting stack (or share infra manifests) to accelerate Phase 3.
+Approve temporary WAF hard block for ^/_debug/* until RCA is closed.
+Notes on Method
+We’re using a hypothesis-driven approach with targeted experiments and strong logging so we converge quickly and prevent recurrence, rather than chase symptoms. This approach shortens time-to-fix and creates durable controls via automated tests and policy gates  .
+
+If you want, I can package this into a one-page executive summary PDF and a technical runbook checklist you can hand to DevOps/SecOps.

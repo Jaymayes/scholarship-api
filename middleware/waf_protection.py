@@ -132,12 +132,34 @@ class WAFProtection(BaseHTTPMiddleware):
         return [re.compile(pattern, re.IGNORECASE) for pattern in path_patterns]
 
     async def dispatch(self, request: Request, call_next):
-        """Main WAF processing logic"""
+        """Main WAF processing logic with CEO-mandated debug path blocking"""
 
         start_time = time.time()
         client_ip = getattr(request.client, 'host', '127.0.0.1') if request.client else '127.0.0.1'
         method = request.method
         path = request.url.path
+
+        # CEO DIRECTIVE DEF-002: Immediate shield - Block all /_debug/* paths
+        # Incident ID: DEF-002 | Priority: P0 | Approved by: CEO
+        if path.startswith("/_debug"):
+            self.blocked_requests += 1
+            logger.critical(
+                f"🚨 WAF BLOCKED DEBUG PATH: {path} | "
+                f"IP: {client_ip} | Method: {method} | "
+                f"Incident: DEF-002 | Action: Permanent block until RCA complete"
+            )
+            return JSONResponse(
+                status_code=403,
+                content={
+                    "error": "Forbidden",
+                    "code": "WAF_DEBUG_BLOCK",
+                    "message": "Access to debug endpoints is forbidden",
+                    "status": 403,
+                    "timestamp": int(time.time()),
+                    "trace_id": f"waf-debug-block-{int(time.time())}"
+                },
+                headers={"X-WAF-Action": "blocked", "X-Incident-ID": "DEF-002"}
+            )
 
         # CRITICAL FIX: Only wrap WAF-specific checks in try/except
         # Do NOT catch exceptions from call_next() - let auth exceptions propagate properly
