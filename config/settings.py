@@ -41,6 +41,10 @@ class Settings(BaseSettings):
     environment: Environment = Field(Environment.PRODUCTION, alias="ENVIRONMENT")
     strict_config_validation: bool | None = Field(True, alias="STRICT_CONFIG_VALIDATION")
     debug: bool = Field(False, alias="DEBUG")
+    
+    # Feature Flags - CEO Executive Directive: Default payments OFF until validated
+    payments_enabled: bool = Field(False, alias="PAYMENTS_ENABLED")
+    essay_assistance_enabled: bool = Field(False, alias="ESSAY_ASSISTANCE_ENABLED")
 
     # API Configuration
     api_title: str = Field("Scholarship Discovery & Search API", alias="API_TITLE")

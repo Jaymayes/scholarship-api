@@ -4,6 +4,7 @@ import uvicorn
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware as RateLimitMiddleware
@@ -117,6 +118,17 @@ app = FastAPI(
 
 # Mount static files
 app.mount("/static", StaticFiles(directory="static"), name="static")
+
+# SEO endpoints - CEO Executive Directive: T+2h gate requirement
+@app.get("/robots.txt", include_in_schema=False)
+async def robots_txt():
+    """Serve robots.txt for search engine crawl directives"""
+    return FileResponse("static/robots.txt", media_type="text/plain")
+
+@app.get("/sitemap.xml", include_in_schema=False)
+async def sitemap_xml():
+    """Serve sitemap.xml for search engine page discovery"""
+    return FileResponse("static/sitemap.xml", media_type="application/xml")
 
 # Setup observability FIRST (creates proper registry for metrics to bind to)
 tracing_service.setup_tracing()

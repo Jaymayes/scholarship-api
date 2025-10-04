@@ -1,0 +1,69 @@
+Acknowledged. Here are my executive directives to reach the 8-hour checkpoint with minimum risk and maximum signal.
+
+Executive stance
+
+Conditional launch remains in effect. Payments will default to feature-flagged OFF unless fully configured and validated before the gate.
+Essay assistance remains disabled until AI Ethics guardrails are approved. No exceptions.
+SEO and Auth are the critical path. WAF/auth must be green first.
+Immediate directives and acceptance criteria
+
+Security Lead + Backend Lead (WAF/auth) — due T+3h
+Action: Add a temporary, least-privilege WAF bypass for auth endpoints only (e.g., POST /auth/, /oauth/), retaining IP reputation, rate limits, and bot checks. Do not weaken protections for non-auth endpoints.
+Tests: Run negative tests (SQLi/XSS), then a 30-minute auth soak test.
+Acceptance: 0 WAF false positives on auth endpoints; auth success ≥99.5%; no material increase in blocked attacks on non-auth traffic.
+2. QA Lead (13 auth-dependent tests) — start immediately after WAF patch; due T+4h
+
+Action: Execute all 13 tests. Provide an evidence bundle (commands, responses, screenshots).
+Acceptance: 100% pass. If any fail, open P0 tickets and re-run within the window.
+3. SEO Lead (robots.txt + sitemap.xml) — due T+2h
+
+Action: Publish robots.txt that allows site-wide crawl except admin paths, and references sitemap. Publish sitemap.xml including core pages plus Auto Page Maker index and canonical rules.
+Validation: curl checks + Search Console readiness verified.
+Acceptance: Live, reachable, and valid (no errors in simple validators).
+4. Payments Engineer + DevOps (Stripe) — decision point T+5h; final status by T+6h
+
+Default: payments_enabled=false in prod until validated.
+If proceeding: configure secrets, run $0.50 test charge, verify webhook and credit grant, and confirm UI states for success/failure.
+Acceptance to turn ON: 3 successful end-to-end test charges, 0 webhook drops, correct credit issuance, and refund path verified. If not met by T+6h, remain OFF and hide purchase CTAs.
+5. SRE Lead (Observability) — due T+3h
+
+Dashboards: Auth success rate (overall and by endpoint), WAF triggers by rule/endpoint, P95 latency, error rate, funnel metrics.
+Alerts: Auth success <99.5% for 5 min; P95 >120ms for 10 min; error rate ≥1% for 5 min; spike in WAF false positives.
+Acceptance: All dashboards live; alerts firing in test; on-call rota confirmed.
+6. Platform Lead (Rate limiting plan) — prep now, implement Week 1
+
+Action: Confirm design for centralized Redis rate limiting (keys, limits, burst, penalties), with a plan to protect auth, search, and application submission endpoints first.
+Output: 1-page plan and rollout steps.
+7. SRE Lead (Rollback) — staging drill today; Week 1 prod drill
+
+Action: 15-minute staging rollback rehearsal now; document steps, RTO, and owners.
+Acceptance: RTO ≤10 minutes in staging; issues captured with owners.
+8. Head of AI Ethics (Guardrails) — 48-hour SLA
+
+Action: Policy + enforcement for essay assistance. Until approved, block essay generation features; allow only brainstorming/templates that avoid academic dishonesty.
+Acceptance: Documented policy, test suite, red-team findings, enforcement in place.
+Go/No-Go checkpoint (T+8h)
+All gates must be GREEN:
+
+Auth: ≥99.5% login success; 0 WAF false positives on auth endpoints
+13 tests: 100% pass with evidence bundle
+SEO: robots.txt + sitemap.xml live and validated
+Observability: dashboards and alerts active and tested
+Payments: Stripe fully validated OR feature-flagged OFF with correct UI state
+SLO confidence: P95 ≤120ms; error rate <1%
+Cadence and comms
+
+Checkpoints: T+2h (WAF/SEO status), T+5h (Stripe decision), T+8h (Go/No-Go).
+Escalation: Any RED for auth/WAF triggers immediate exec review and holds the launch.
+Single source of truth: Update the Pre-Launch Readiness Report V2 with live statuses, links to dashboards, and test evidence.
+Your immediate tasks (standing by role)
+
+SEO: If not already in progress, generate robots.txt and sitemap.xml placeholders now for the SEO Lead to review and deploy.
+QA: Prepare the automated test run so it can start the moment the WAF patch lands; have the reporting template ready.
+Observability: Partner with SRE to validate alert firing via synthetic triggers and capture screenshots for the report.
+Please confirm:
+
+The default feature flag for payments is set to OFF in prod.
+The auth WAF patch ETA and the exact auth endpoints to be exempted.
+The domain(s) to reference in robots.txt and sitemap.xml.
+The scheduled times for T+2h, T+5h, and T+8h check-ins and the DRI for each.
