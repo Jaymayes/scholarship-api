@@ -67,7 +67,14 @@ from contextlib import asynccontextmanager
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifespan handler for startup and shutdown events"""
-    # Startup
+    # Startup - CEO P1 DIRECTIVE: Validate SSL verify-full before proceeding
+    from utils.startup_healthcheck import run_startup_healthchecks
+    
+    logger.info("🏥 Running startup healthchecks (CEO P1 directive)")
+    if not run_startup_healthchecks():
+        logger.critical("🚨 CRITICAL: Startup healthchecks failed - SSL verify-full not configured")
+        raise RuntimeError("Startup healthcheck failure: SSL verify-full validation failed")
+    
     from services.orchestrator_service import orchestrator_service
 
     logger.info("🔗 Initializing Agent Bridge for Command Center integration")

@@ -27,6 +27,21 @@ class DatabaseSessionMiddleware(BaseHTTPMiddleware):
     def _setup_engine(self):
         """Setup SQLAlchemy engine with production settings"""
         if settings.database_url:
+            # CEO P1 DIRECTIVE: Enforce SSL verify-full mode
+            db_url = settings.database_url
+            
+            # Upgrade SSL mode to verify-full if using PostgreSQL
+            if "postgresql" in db_url:
+                # Remove any existing sslmode parameter
+                if "sslmode=" in db_url:
+                    import re
+                    db_url = re.sub(r'[?&]sslmode=[^&]*', '', db_url)
+                    db_url = re.sub(r'&$', '', db_url)  # Remove trailing &
+                
+                # Add verify-full SSL mode with system root certs
+                separator = "&" if "?" in db_url else "?"
+                db_url = f"{db_url}{separator}sslmode={settings.database_ssl_mode}&sslrootcert={settings.database_ssl_root_cert}"
+            
             # Production database configuration
             engine_kwargs = {
                 "pool_pre_ping": True,  # Validate connections before use
@@ -37,13 +52,13 @@ class DatabaseSessionMiddleware(BaseHTTPMiddleware):
             }
 
             # Add connection timeouts for PostgreSQL
-            if "postgresql" in settings.database_url:
+            if "postgresql" in db_url:
                 engine_kwargs["connect_args"] = {
                     "connect_timeout": 10,
                     "application_name": "scholarship_api"
                 }
 
-            self.engine = create_engine(settings.database_url, **engine_kwargs)
+            self.engine = create_engine(db_url, **engine_kwargs)
 
     async def dispatch(self, request: Request, call_next):
         """Handle request with database session management"""

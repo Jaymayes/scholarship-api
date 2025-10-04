@@ -1,0 +1,54 @@
+Acknowledged. Strong progress. Here are my CEO decisions and directives for the next 8 hours, aligned to our 5‑year plan and operating principles.
+
+Decisions now
+
+Payments remain OFF until the T+5h gate. To turn ON at T+5h, all of the following must be green: successful test purchase + refund in Stripe sandbox, idempotent webhook handling with retries, observability on payment failures, and SSL verify-full configured for the database. If any are not green, we stay OFF and keep CTAs hidden. This keeps us consistent with the hybrid freemium+B2B model while we harden the stack .
+WAF exemptions for auth endpoints approved as specified. Implement least-privilege exemptions and preserve all other protections. Immediately after deployment, run synthetic attack tests and verify WAF rule telemetry by endpoint to confirm no over-broad allowlist. This is consistent with our defense-in-depth posture called for in the Playbook’s security section (prevent traversal, enforce allow lists, and deploy a WAF at the edge) .
+Proceed with “conditional launch” path only if the auth success ≥99.5% and zero WAF false positives are demonstrated during the 30-minute soak, and P95 ≤120ms and error rate <1% remain green. If auth/WAF misses the mark at T+8h, we pivot to a closed beta behind restricted access while we fix, leveraging private deployment controls to limit exposure .
+P1 and P0 production issues
+
+P1: SSL verify-full. Owner: SRE Lead with Platform Lead. Action: Set SSL_ROOT_CERT via Secrets; validate DB connection in verify-full; add startup healthcheck that fails fast if TLS verification is not strict. Complete by T+3h. Replit Secrets is the approved mechanism for these credentials and certificates .
+P0-to-P1: Redis rate limiting backend unavailable. This is an acceptable risk for a single-instance soft launch, but increases risk as traffic scales. Owner: Platform Lead. Action: Keep conservative in-memory limits; Week 1 provision Redis per plan; add retry with exponential backoff and circuit breaker around any external dependencies so a Redis transition cannot cascade failures .
+Observability and gates (deliverables are mandatory by T+3h unless otherwise noted)
+
+Auth/WAF dashboards: Auth success rate, WAF triggers by rule and endpoint, error funnel, P95 duration. Use deployment logs + request duration analytics to validate latency and error distributions .
+Synthetic triggers: Fire test alerts for auth failure spikes, WAF block spikes, and 5xx rate >1%. Confirm alert routing.
+Soak test: 30 minutes post WAF patch with traffic mix from the 13‑test plan.
+B2C/B2B growth directives (48–72h plan)
+
+SEO flywheel: Auto Page Maker is our low-CAC engine; expand from 19 to 200+ indexed pages this week (program pages, category hubs, Q&A). Measure daily: new indexed pages, organic sessions, CTR, and scholarship detail-page dwell. This supports our strategy to build the free student base at the lowest possible cost and to power the B2B marketplace monetization .
+Provider pipeline: BD to secure first three providers for Week 1 onboarding into a self-serve portal flow. Follow the four-step partner onboarding approach (self-service, e‑signing, clear tooling/training, feedback loop) to spin the marketplace flywheel .
+Responsible AI and ethics
+
+Essay assistance stays OFF until guardrails are in place to ensure coaching, not ghostwriting, with transparent user controls and auditability (brainstorming, structure, and refinement support only). This adheres to our “Responsible AI” stance and the Playbook’s framing of an essay coach rather than a writer .
+SLOs and platform posture
+
+Maintain current SLO targets for launch: P95 ≤120ms and error rate <1%. Use the deployment dashboard and request duration analytics to validate and preserve these thresholds; flag if machine sizing or query hotspots threaten latency .
+Continue to plan for multi‑AZ, managed services, and failover as we graduate from Replit to cloud for scale; resilience and 24/7 availability remain core product features tied to trust and brand equity .
+Owner-specific directives and deadlines
+
+Security Lead (by T+3h): Ship WAF auth exemptions per spec; document exact rule IDs exempted; deliver before/after WAF logs showing no auth false positives and unchanged protection elsewhere. This aligns with our WAF-in-front, defense-in-depth model .
+QA Lead (start immediately after WAF patch; finish by T+4h): Execute the 13-test suite and produce the evidence bundle with timings for each category (auth, search, eligibility, recommendations, B2B CRUD).
+SRE Lead (by T+3h): Stand up dashboards and alerts; validate with synthetic events; deliver a one-page risk note on any alert blind spots based on our current Replit deployment telemetry model .
+Payments Engineer (T+5h decision package): Provide a readiness memo including sandbox charge/refund evidence, webhook idempotency tests, failure injection results, and observability screenshots. No GO without this package.
+SEO Lead (continuous): Keep robots/sitemap fresh and demonstrate daily growth in index coverage and organic sessions.
+Go/No‑Go logic at T+8h
+
+GO if all gates are green: Auth ≥99.5% with 0 WAF false positives, 13/13 tests passed with evidence, SEO verified, dashboards live and alerts firing, payments decision made (ON with proof or OFF with correct UI), and SLOs met.
+NO‑GO fallback: If auth/WAF is not green, we do not open to the public. We move to a restricted access beta (private deployment) until fixed, protecting brand trust while we close the gap .
+Strategic rationale
+
+These choices maximize student value and preserve trust while compounding our SEO-led, low-CAC acquisition engine that underpins the freemium-to-marketplace path to $10M ARR. We prioritize resilience, security, and an exceptional partner onboarding loop to power the two‑sided marketplace flywheel as described in the Playbook .
+Report back cadence
+
+T+2h: Confirm WAF patch in progress and observability work underway.
+T+3h: Confirm SSL verify-full fixed; dashboards live; synthetic alerts validated.
+T+4h: Deliver 13-test evidence bundle with pass/fail and P95 timings.
+T+5h: Payments decision package; I will approve GO/NO‑GO on payments.
+T+8h: Final GO/NO‑GO, or pivot to restricted beta.
+Requests for the next update
+
+Include WAF rule IDs exempted, before/after WAF logs, and soak test stats.
+Attach screenshots from dashboards: auth success, request duration, error rate, and WAF triggers by endpoint.
+Provide Stripe sandbox receipts/logs and webhook retry logs if proposing GO on payments.
+Proceed with urgency.

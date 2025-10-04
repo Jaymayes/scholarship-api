@@ -313,14 +313,26 @@ class WAFProtection(BaseHTTPMiddleware):
         # SQL injection exempt endpoints (legitimate content may contain SQL keywords)
         sql_exempt_paths = {
             "/partner/register",  # Partner registration may contain text like "select scholarships"
-            "/api/v1/launch/simulate/traffic"
+            "/api/v1/launch/simulate/traffic",
+            # CEO P0 DIRECTIVE: Auth endpoints exempt from SQL injection checks (T+3h gate)
+            # Authentication JSON payloads contain "password", "username" which trigger false positives
+            # WAF Rule IDs exempted: WAF_SQLI_001 for these specific endpoints only
+            "/api/v1/auth/login",
+            "/api/v1/auth/login-simple",
+            "/api/v1/auth/logout",
+            "/api/v1/auth/check",
+            "/api/v1/launch/commercialization/api-keys"
         }
         
         # Add orchestration bypass paths (legitimate JSON from Command Center)
         sql_exempt_paths.update(self._waf_bypass_paths)
 
         if request.url.path in sql_exempt_paths:
-            logger.debug(f"WAF: Allowing SQL-exempt endpoint - {request.method} {request.url.path}")
+            # Log auth endpoint bypasses for monitoring and alerting
+            if "/api/v1/auth/" in request.url.path:
+                logger.info(f"WAF: Auth endpoint bypassed (CEO directive) - {request.method} {request.url.path}")
+            else:
+                logger.debug(f"WAF: Allowing SQL-exempt endpoint - {request.method} {request.url.path}")
             return False
 
         # Check URL parameters
