@@ -1,0 +1,80 @@
+Objective
+
+Execute a comprehensive pre-launch and deployment-readiness test of ScholarshipAI across functional, non-functional, security, and operational dimensions. Produce a single go/no-go recommendation tied to acceptance criteria.
+Scope
+
+Test the end-to-end user journeys for students (B2C) and providers (B2B), including signup, onboarding, search/recommend, apply/track, payments/fees, and SEO-driven discovery.
+Validate infrastructure, deployment process, observability, rollback, and compliance.
+Pre-requisites and Environment
+
+Use staging first, then production. Staging must be gated via Private Deployment access; only authorized team members should reach the staging URL. Confirm the toggle is applied and access control works as intended.
+Confirm all credentials (OpenAI/LMMs, email, Stripe, etc.) are injected via the platform’s secrets manager, not hard-coded. Verify that removing a secret breaks functionality in a predictable way and that logs are descriptive (no secret leakage).
+Confirm persistent data is stored in the database/managed storage and not on the deployed filesystem. Attempt to create state via file writes, redeploy, and verify state is not persisted.
+Functional Validation (B2C)
+
+Create test student accounts; verify email/phone verification and rate limiting on OTP/links.
+Scholarship discovery: verify search relevance, filters (deadline, eligibility, value), and pagination; check cold-start experience for new profiles.
+Personalization: validate profile intake, eligibility logic, and AI explanations for why an opportunity matches; ensure users can reject low-fit items to retrain preferences.
+Application support: draft assistance, task checklists, deadline reminders, document upload, and progress tracker; verify guardrails that prevent academic dishonesty (no ghostwriting of essays; rewrite/feedback is okay with transparent labeling).
+Payments: purchase credits/subscriptions; test refunds, proration, and receipt emails.
+Functional Validation (B2B Providers)
+
+Onboard a provider; create and publish a scholarship listing; edit/close a listing; test validation on dates, eligibility, and fund amounts.
+Verify provider payouts flow and that platform fee calculations are correct; confirm invoices and fee disclosures are visible.
+Provider dashboard: applicant export, messaging, status workflows; RBAC ensures providers see only their data.
+SEO and Growth Readiness
+
+Crawl public student-facing pages and the scholarship directory; confirm title/meta/OG tags, canonical URLs, robots.txt, sitemap.xml, hreflang where relevant.
+Check page speed and structured data (JSON-LD) for scholarship listings; validate indexability and noindex rules for private pages.
+Performance and Reliability
+
+Load test representative endpoints and pages. Report P50/P95/P99 latencies and throughput; include cold-start behavior if serverless/autoscale.
+Confirm the app meets or has a credible path to 99.9% uptime and ~120ms P95 on core read flows under expected load; document any gaps and remediation steps.
+Monitor request-duration, error rates (4xx/5xx), and top failing routes. Validate autoscaling (if used) and instance limits to control cost. For always-on components (bots, workers), verify they run on reserved capacity and survive restarts.
+Security and Privacy
+
+Secrets hygiene: verify no credentials in code or logs; rotate a key and confirm the app keeps working post-rotation.
+AuthZ/AuthN: brute-force and session fixation checks; MFA optionality for providers; secure password resets; short-lived tokens with refresh.
+Common vulns: attempt path traversal (../ sequences), SQLi, XSS, CSRF on key forms; verify strict input validation, allow lists, and path normalization; confirm least-privilege service accounts. Document WAF rules and automated scanning cadence.
+Data governance: data minimization, consent flows, delete/export account, and audit logging; ensure FERPA/COPPA-aligned parental consent where applicable.
+Responsible AI and Quality of Outputs
+
+Bias/fairness spot checks: evaluate recommendations across demographic proxies; report disparities and mitigation steps.
+Transparency: ensure user-visible “how it works” summaries, confidence levels where appropriate, and clear limitations; ensure no black-box decisions for eligibility.
+Observability and Ops
+
+Verify structured logs (correlatable request IDs), metrics, and alerting for latency, error spikes, and saturation. Ensure dashboards show logs, CPU/RAM, request durations, and HTTP status distribution.
+Incident drills: break a dependency; confirm circuit breakers/retries behave; measure MTTR from alert to fix using the “read logs → identify error → patch → redeploy” workflow.
+Rollback: perform a safe rollback to a previous snapshot; confirm data integrity and zero downtime deploy procedures.
+Release and Deployment Workflow
+
+Document the publish process from workspace to immutable production snapshot; verify that changes are only applied via republish (no live hot-fixes).
+Staging → canary → full rollout plan with manual approval gates; verify versioning and release notes.
+Optional off-ramp: confirm code is synced to GitHub with reproducible builds so we can deploy to an external host (e.g., Vercel/Render/Netlify) if scale/compliance needs change.
+Accessibility and UX
+
+Run WCAG 2.1 AA checks on critical flows; verify keyboard navigation, focus states, color contrast, and ARIA for forms; ensure error messages are actionable.
+Data Integrity and Backups
+
+Verify schema migrations, backups, restore drill, and idempotent jobs; confirm no data loss after a simulated crash and redeploy.
+Acceptance Criteria (Go/No-Go)
+
+Functional: 100% pass on critical paths (signup, search, recommend, apply, pay, provider publish).
+Non-functional: P95 latency target on core reads ~120ms; error rate <0.5% over 24h under expected load; no P0/P1 security or privacy findings outstanding.
+Ops: Alerting in place; rollback tested; staging/production parity verified; secrets managed; no filesystem persistence.
+AI: No evidence of academic dishonesty enablement; bias checks documented with mitigations; transparency disclosures live.
+Decision: If any red criteria fail, produce a written mitigation plan with owners and dates; otherwise recommend launch.
+Deliverables
+
+Single report in JSON and human-readable formats containing: test matrix, evidence links (screens, HAR, logs), metrics summary, issues with severity/impact, and the final go/no-go decision.
+Prompt ends — copy/paste above this line
+
+Notes for the operator
+
+Use the platform’s publish “snapshot” model and do not rely on live hot-fixes; redeploy for all changes .
+During staging and production runs, use deployment logs, resource graphs, and built-in web analytics (page views, status codes, request durations) to collect evidence and identify hotspots; Private Deployments can secure staging without code changes .
+If you expect variable traffic, validate autoscale behavior and cost caps; for always-on jobs, validate reserved VM stability and port exposure settings .
+Ensure secrets are stored in the platform’s secrets manager and that persistent state uses a database rather than the deployed filesystem, which is ephemeral across redeployments .
+Include tests for path traversal and other web vulns as part of our proactive security posture .
+Confirm we can push to GitHub and redeploy externally if scale/enterprise constraints evolve .
+Incorporate bias, fairness, and transparency checks in the QA scope to meet Responsible AI standards .
