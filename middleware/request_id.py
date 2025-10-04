@@ -1,7 +1,9 @@
 """
 Request ID Middleware for Request Tracing
+CEO Soft Launch Directive: Structured JSON logging with required fields
 """
 
+import json
 import time
 import uuid
 from collections.abc import Callable
@@ -38,18 +40,26 @@ class RequestIDMiddleware(BaseHTTPMiddleware):
             # Add request ID to response headers
             response.headers["X-Request-ID"] = request_id
 
-            # Log request completion
-            logger.info(
-                f"{request.method} {request.url.path} - {response.status_code}",
-                extra={
-                    "trace_id": request_id,
-                    "method": request.method,
-                    "path": str(request.url.path),
-                    "status": response.status_code,
-                    "latency_ms": latency_ms,
-                    "user_agent": request.headers.get("user-agent", "unknown")[:100]
-                }
-            )
+            # CEO SOFT LAUNCH: Structured JSON logging with required fields
+            # Extract auth and WAF results from request state (set by other middleware)
+            auth_result = getattr(request.state, "auth_result", "no_auth_required")
+            waf_rule = getattr(request.state, "waf_rule", None)
+            
+            # Build structured log entry
+            log_entry = {
+                "ts": time.time(),
+                "method": request.method,
+                "path": str(request.url.path),
+                "status_code": response.status_code,
+                "latency_ms": latency_ms,
+                "auth_result": auth_result,
+                "waf_rule": waf_rule,
+                "request_id": request_id,
+                "user_agent": request.headers.get("user-agent", "unknown")[:100]
+            }
+            
+            # Log as JSON string for structured parsing
+            logger.info(f"REQUEST_LOG: {json.dumps(log_entry)}")
 
             return response
 

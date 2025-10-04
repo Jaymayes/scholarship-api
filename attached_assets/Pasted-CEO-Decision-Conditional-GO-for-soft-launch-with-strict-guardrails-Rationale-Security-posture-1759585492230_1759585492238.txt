@@ -1,0 +1,53 @@
+CEO Decision: Conditional GO for soft launch with strict guardrails
+
+Rationale
+
+Security posture is strong: SSL/TLS in transit is enforced end-to-end; the platform also serves apps over HTTPS by default, aligning with our requirement to encrypt all connections . WAF authorization behavior is correct.
+Test status is acceptable for soft launch given production auth is locked down; auth-dependent tests require seeded credentials.
+The blocker is observability. While dashboards are not delivered, we can temporarily rely on deployment logs, HTTP status breakdowns, request durations, and resource graphs available in the deployment console to monitor health while dashboards are built within 24 hours .
+Acting with urgency while capping risk is consistent with our operating model; but we must impose explicit stop-loss criteria and a 24-hour observability deadline. Operational excellence requires we close the monitoring gap quickly and under tight governance .
+Preconditions to proceed now (soft launch)
+
+Traffic gating and blast radius
+Limit exposure to invite-only or a small, controlled cohort. Maintain strict WAF rules.
+Interim monitoring coverage (until dashboards are live)
+Use deployment Logs, HTTP Statuses, Request Durations, and Resource Usage in the console for active watch during the launch window; these provide immediate visibility into 2xx/4xx/5xx, latency, CPU, and memory .
+Enable structured JSON logs for every request: ts, method, path, status_code, latency_ms, auth_result, waf_rule, request_id.
+Temporary SLO guardrails and stop-loss
+Trigger rollback if any of the following sustain for 5 consecutive minutes:
+5xx >= 1.0%
+P95 latency >= 300 ms on public endpoints
+Auth failures on valid tokens spike 3x over 15-minute baseline
+Rollback path: switch to maintenance splash while keeping database intact.
+Data protection
+Do not enable public read endpoints. Maintain current auth posture.
+No production mock users. If needed for smoke checks, create one time-limited, non-PII, least-privilege “smoke-test” service account after launch window stabilizes.
+24-hour follow-up deliverables (non-negotiable)
+
+Auth dashboard
+Metrics: 2xx/4xx/5xx by endpoint, P50/P95 latency, token issuance/error rates, login failure breakdown.
+WAF dashboard
+Blocks by rule and endpoint, false-positive review queue, top offending IPs/ASNs, allowlist hit rate.
+Infra dashboard
+Uptime, CPU and memory utilization, container restarts, P50/P95/P99 latency, error rates. These should align with the metrics surfaced in our deployment console and expand on them for ongoing operations .
+Synthetic monitors (4 paths)
+Health, login, authenticated search, authenticated scholarships listing. Page on-call via Slack/email when thresholds breach.
+Test suite remediation
+Seed a single, least-privilege test account and keys for production smoke tests to move 13-test suite to 12/13+ within 24 hours. Remove or rotate credentials post-validation.
+Acceptance criteria at T+24h
+
+Dashboards and synthetics are live, continuously populating, and reviewed in a recorded walkthrough.
+SLOs are met in soft launch: uptime 99.9% and P95 latency near 120 ms target for core reads.
+Error budget intact; no security regressions.
+If any item is unmet, we pause further exposure until resolved.
+Why this is the right call
+
+We preserve our strong security posture (TLS/SSL, strict auth) during soft launch, consistent with platform defaults and best practices for secure inter-service communication .
+We maintain operational discipline by rapidly closing the observability gap, which is essential for production-grade operations and aligns with our governance standards for resilient systems .
+We move forward with urgency while explicitly limiting risk and defining automated stop-loss criteria, leveraging existing console capabilities for logs, HTTP status distributions, request durations, and resource monitoring in the interim .
+Directive to team
+
+Proceed with soft launch under the above preconditions immediately.
+Appoint DRI: Observability lead to own the 24-hour deliverables and schedule a T+24h review.
+Keep me updated hourly for the first 6 hours with a brief ops snapshot: requests/min, 2xx/4xx/5xx, P95 latency, WAF blocks by rule, and any anomalies.
+This is a Conditional GO. If any precondition is not met or an alert threshold is breached, execute rollback without waiting for further approval.
