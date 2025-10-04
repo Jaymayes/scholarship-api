@@ -1,0 +1,72 @@
+Acknowledged. Strong progress. Here’s the executive review, decisions, and directives for the T+3h gate.
+
+Executive assessment
+
+WAF auth exemption: Approved as implemented. Scope is least-privilege and telemetry confirms bypass only on auth endpoints; before/after evidence is sound.
+SSL verify-full: Code deployed, but no proof-of-enforcement yet. This is the single highest-priority blocker for the T+3h decision.
+Observability: Metrics and rules exist; dashboards and synthetic validation are the remaining gap. This must be closed before the gate.
+SEO assets: Green. Good foundation for low-CAC growth. We’ll expand on this after the gate.
+Decisions for T+3h gate
+
+Conditional Go: We proceed only if both SSL verify-full validation evidence and observability dashboards + synthetic alert tests are delivered as specified below within the next hour.
+If either item is not delivered to spec by T+3h: No-Go. We hold until completion.
+Required deliverables and acceptance criteria (due by T+3h)
+
+SSL verify-full validation (Backend Lead)
+Evidence to capture:
+Application logs showing connections established with sslmode=verify-full and the resolved DB hostname used for verification.
+Negative tests (expected failures) with screenshots/logs:
+Hostname mismatch: same CA, wrong host → connection must fail with a hostname verification error.
+Invalid CA: set sslrootcert to a bogus CA → connection must fail with a certificate verify error.
+Positive test (expected success): correct host + valid CA → connection succeeds.
+Acceptance criteria:
+100% of application DB connections are verify-full.
+All negative tests fail fast with clear TLS errors.
+No plaintext or non-verified connection paths exist in config, migrations, or background jobs.
+Note: Apply the same fix to the B2B Provider Service within 24 hours; it is non-critical for the gate but must not linger beyond Day 1.
+2. Observability dashboards and synthetic alert validation (SRE Lead)
+
+Dashboards (provide screenshots):
+Auth dashboard: 2xx/4xx/5xx by endpoint, 401 vs 403 ratio, P50/P95/P99 latency, login failure reasons.
+WAF dashboard: blocks by rule ID, endpoint, and source; dedicated view of auth endpoints showing 0 SQLI blocks but normal 401s.
+Infra dashboard: uptime, CPU/memory, pod restarts, DB connection count, Prometheus target health.
+Synthetic tests (show triggered alerts and resolution):
+Invalid login canary every minute: expect 401, alert on anomaly in success rate or latency.
+WAF SQLi payload to a non-auth endpoint: expect 403 and alert.
+WAF SQLi payload to an auth endpoint: expect 401 (bypass working), no WAF block alert.
+Liveness/readiness probe failure simulation: alert fires within 1 minute, auto-resolves on recovery.
+Acceptance criteria:
+100% of synthetic checks execute and generate expected alerts and recoveries.
+Dashboards render accurate real-time and 15m windows without missing metrics.
+Execute now
+
+QA Lead: Start the 13-test suite immediately.
+Pass criteria: 13/13 green; zero WAF false positives; app-level 401 only for invalid creds; no 5xx.
+Attach initial results at T+3h even if partial; include failures with logs if any.
+SRE Lead: Finish dashboards and run synthetic tests; post screenshots and alert logs.
+Backend Lead: Run SSL positive/negative tests; deliver logs and brief summary.
+30-minute auth soak test (after T+3h, contingent on gate Go)
+
+Target: 1000 requests, 99.5%+ success, P95 < 120ms, WAF false positives = 0, app 5xx < 0.5%, CPU < 70%, memory headroom > 30%.
+Deliver: Timeseries of success/fail, latency distribution, resource headroom, WAF event summary.
+Risk calls and mitigations
+
+WAF exemption scope: Keep exemption narrowly scoped to the listed endpoints and methods. Ensure content-type gating (application/json) and retain all non-SQLi protections. Remove “CEO directive” string from logs post-validation to avoid disclosing internal decision context.
+Redis rate limiting fallback: Acceptable for Week 1. Add an alert for degraded rate-limiter mode and daily error-budget review. Prioritize Redis HA cutover in the Week 1 plan.
+Logging hygiene: Ensure no PII/credentials in logs, especially around auth and SSL error traces (FERPA/COPPA posture).
+B2B Provider Service SSL: Schedule fix within 24 hours; owner: Backend Lead; confirm parity with verify-full.
+SEO next step checklist (post T+3h)
+
+Submit sitemap to Google Search Console/Bing Webmaster Tools, enable canonical tags, and add basic structured data on scholarship pages (schema.org MonetaryGrant/Scholarship) to improve CTR. Ensure server-side rendering for Auto Page Maker pages and stable URL patterns.
+Add metrics: impressions, clicks, CTR, and indexed pages to weekly CEO dashboard; set leading indicators for organic growth and CAC.
+KPIs and alignment to 5-year plan
+
+SLO health is above target (latency, errors, uptime). That’s necessary for trust and conversion.
+SEO assets live aligns with our low-CAC growth strategy.
+Security hardening (verify-full) protects brand and partner trust, directly impacting B2B provider acquisition.
+Owner-by-owner summary for T+3h
+
+QA Lead: 13-test suite in flight; send preliminary results and any blockers.
+SRE Lead: Deliver dashboards + synthetic alert evidence; close the yellow.
+Backend Lead: Produce SSL verify-full evidence; unblock the gate.
+I’ll make the Go/No-Go at T+3h based on your evidence packages. Keep momentum high.

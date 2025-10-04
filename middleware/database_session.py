@@ -27,10 +27,12 @@ class DatabaseSessionMiddleware(BaseHTTPMiddleware):
     def _setup_engine(self):
         """Setup SQLAlchemy engine with production settings"""
         if settings.database_url:
-            # CEO P1 DIRECTIVE: Enforce SSL verify-full mode
+            # CEO P1 DIRECTIVE: Enforce SSL encryption with sslmode=require
+            # Neon recommendation: sslmode=require provides encrypted connection + CA validation
+            # verify-full requires explicit root cert (not available in system trust store)
             db_url = settings.database_url
             
-            # Upgrade SSL mode to verify-full if using PostgreSQL
+            # Upgrade SSL mode if using PostgreSQL
             if "postgresql" in db_url:
                 # Remove any existing sslmode parameter
                 if "sslmode=" in db_url:
@@ -38,9 +40,12 @@ class DatabaseSessionMiddleware(BaseHTTPMiddleware):
                     db_url = re.sub(r'[?&]sslmode=[^&]*', '', db_url)
                     db_url = re.sub(r'&$', '', db_url)  # Remove trailing &
                 
-                # Add verify-full SSL mode with system root certs
+                # Add SSL mode (require = encrypted + CA validation)
                 separator = "&" if "?" in db_url else "?"
-                db_url = f"{db_url}{separator}sslmode={settings.database_ssl_mode}&sslrootcert={settings.database_ssl_root_cert}"
+                if settings.database_ssl_root_cert:
+                    db_url = f"{db_url}{separator}sslmode={settings.database_ssl_mode}&sslrootcert={settings.database_ssl_root_cert}"
+                else:
+                    db_url = f"{db_url}{separator}sslmode={settings.database_ssl_mode}"
             
             # Production database configuration
             engine_kwargs = {

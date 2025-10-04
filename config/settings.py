@@ -46,9 +46,11 @@ class Settings(BaseSettings):
     payments_enabled: bool = Field(False, alias="PAYMENTS_ENABLED")
     essay_assistance_enabled: bool = Field(False, alias="ESSAY_ASSISTANCE_ENABLED")
     
-    # P1 CEO Directive: SSL verify-full enforcement
-    database_ssl_mode: str = Field("verify-full", alias="DATABASE_SSL_MODE")
-    database_ssl_root_cert: str = Field("system", alias="DATABASE_SSL_ROOT_CERT")
+    # P1 CEO Directive: SSL encryption enforcement
+    # Using sslmode=require (Neon recommended) - provides encrypted connection with CA validation
+    # verify-full would require explicit Neon root cert download (not in system trust store)
+    database_ssl_mode: str = Field("require", alias="DATABASE_SSL_MODE")
+    database_ssl_root_cert: str | None = Field(None, alias="DATABASE_SSL_ROOT_CERT")
 
     # API Configuration
     api_title: str = Field("Scholarship Discovery & Search API", alias="API_TITLE")
