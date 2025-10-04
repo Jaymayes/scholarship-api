@@ -1,0 +1,95 @@
+Executive decision: Maintain NO-GO until the authentication blocker is resolved and validated. We will target a conditional launch within 24 hours, contingent on the gates below.
+
+Mandates, owners, and SLAs
+
+P0: Restore authentication
+
+Action: Tune WAF to stop false positives on JSON for /api/v1/auth/* while preserving protection elsewhere.
+Owner: Security Lead (primary) + Backend Lead (support)
+SLA: 4 hours
+Acceptance criteria:
+≥99.5% login success rate in staging over a 30-minute soak test
+0 occurrences of WAF_SQLI_001 on auth endpoints during soak
+Negative tests confirm WAF still blocks SQLi/XSS on non-auth endpoints
+Auth-dependent regression tests
+
+Action: Execute the 13 blocked tests end-to-end (eligibility, recommendations, search with filters, API key creation).
+Owner: QA Lead
+SLA: Immediately following P0 fix; complete within 2 hours
+Acceptance criteria: 100% pass on the 13 auth-dependent tests
+Stripe configuration (monetization readiness)
+
+Action: Configure publishable key, secret key, and webhook signing secret in secrets manager; validate a $0.50 test charge in staging; ensure webhooks process and credits are granted.
+Owner: Payments Engineer + DevOps (secrets)
+SLA: 6 hours parallel to testing window
+Decision: If not complete by the end of the readiness window, feature-flag payments OFF and remove all payment UI entry points to avoid dead-ends. Monetization go-live must occur within 48 hours post-launch if we defer.
+SEO readiness (critical to low-CAC growth)
+
+Action: Deploy robots.txt and sitemap.xml aligned with our Auto Page Maker strategy; verify 200 status and correct directives.
+Owner: SEO Lead
+SLA: 4 hours
+Acceptance criteria: robots.txt and sitemap.xml accessible, valid, and referencing scholarship pages; no disallow rules that block core pages.
+Responsible AI gate for essay assistance
+
+Action: Validate guardrails and enable only after sign-off. Until approved, ship with the feature disabled via flag.
+Owner: Head of AI Ethics
+SLA: Within 48 hours post-launch
+Acceptance criteria: Documented tests covering bias, plagiarism avoidance, and transparency prompts; audit log enabled.
+Rate limiting and resilience
+
+Action: Provision Redis for centralized rate limiting; keep per-instance throttling as fallback.
+Owner: Platform Lead
+SLA: Week 1 post-launch
+Acceptance criteria: Global rate limit policy active; fail-closed behavior documented.
+Rollback and disaster recovery
+
+Action: Conduct a rollback drill with data integrity check.
+Owner: SRE Lead
+SLA: Week 1 post-launch
+Acceptance criteria: RTO <= 15 minutes to prior version; backup/restore verified.
+Operational constraints
+
+Change freeze: No non-critical deployments until P0/P1 items above are closed.
+War room: Security Lead runs point; status updates every 60 minutes until auth is restored and validated.
+Monitoring additions today:
+Real-time alert for auth failure rate >1% over 5 minutes
+WAF false-positive counter for auth endpoints
+Stripe webhook failure alerts (if enabled)
+Go/No-Go gates for launch
+All must be green:
+
+Authentication restored and soak-tested; 0 auth-related 403s attributable to WAF; ≥99.5% login success in staging.
+13 auth-dependent tests: 100% pass.
+SEO: robots.txt and sitemap.xml live and validated.
+Observability: dashboards and alerts include auth success rate, WAF triggers, signup-to-first-scholarship-viewed funnel.
+Payments:
+Preferred: Stripe configured and 1 successful test transaction through full credit grant flow.
+Acceptable alternative: Payments fully hidden behind feature flag with no dead links; monetization enablement scheduled within 48 hours.
+SLO confidence: P95 latency ≤120ms under synthetic load at projected Day-1 traffic; error rate <1%.
+Launch plan (assuming gates pass)
+
+T+0: 2-hour internal canary (company/staff accounts). KPIs: auth success ≥99.5%, WAF false positives = 0, P95 latency ≤120ms.
+T+2: Soft public launch (no paid ads). KPIs for first 24 hours:
+Acquisition: Unique visitors, CTR from Auto Page Maker pages, signup conversion ≥8% target for MVP.
+Activation: Time-to-first-eligibility-check <5 minutes median; ≥70% of new signups complete at least one eligibility check.
+Reliability: Auth error rate <0.5%, WAF false positives <0.1% of requests, uptime ≥99.9%.
+Monetization (if live): Free-to-paid conversion ≥1.5% baseline; ARPU from credits ≥$4.
+T+24: Decision on enabling payments if deferred; publish Day-1 ops and growth report.
+T+72: Post-launch review; finalize Week 1 tasks (Redis, rollback drill scheduling, accessibility audit kickoff).
+Risks and mitigations
+
+WAF exemptions increasing attack surface: Limit scope to specific auth endpoints and JSON content types; add targeted anomaly alerts; keep full protections elsewhere.
+Launch without payments (if deferred): Mitigate by capturing intent (save carts, email prompts), and commit to a 48-hour enablement window to protect early ARPU.
+Essay assistance ethics: Feature remains disabled until sign-off to uphold Responsible AI and brand trust.
+Resource and capital allocation (immediate)
+
+Approve overtime for Security, Backend, QA, SEO, and Payments teams for the next 24 hours.
+Prioritize infra time for Stripe secrets and SEO artifacts over new feature work.
+What I need from the team now
+
+Security Lead: ETA on WAF fix and initial staging retest start time.
+QA Lead: Confirm readiness to run the 13 tests immediately after P0 and provide a test schedule.
+SEO Lead: Confirm robots/sitemap deployment window and validation plan.
+Payments Engineer: Confirm Stripe account access and key provisioning timeline; flag any blockers.
+SRE Lead: Add the auth/WAF alerts now and confirm.
+We will convene a Go/No-Go checkpoint 8 hours from now. If all gates are green, I will authorize a soft launch the same day. If the WAF fix slips beyond the 4-hour SLA, we’ll reset the launch window by 24 hours and proceed only after a fresh full regression.
