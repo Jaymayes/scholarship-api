@@ -10,6 +10,9 @@ from fastapi import APIRouter
 from prometheus_client import REGISTRY
 from utils.logger import get_logger
 
+# Import metrics module at module level to ensure counters are registered
+from observability import metrics as _metrics_module  # noqa
+
 logger = get_logger("dashboards")
 
 router = APIRouter(prefix="/api/v1/observability", tags=["observability"])
@@ -40,9 +43,10 @@ def collect_metrics_by_labels(metric_name: str, label_name: str):
         for metric in REGISTRY.collect():
             if metric.name == metric_name:
                 for sample in metric.samples:
-                    if hasattr(sample, 'labels'):
-                        labels_dict = dict(zip(sample.labels.keys(), sample.labels.values()))
-                        key = labels_dict.get(label_name, 'unknown')
+                    # Skip _created timestamp samples
+                    if not sample.name.endswith('_created'):
+                        # sample.labels is already a dict
+                        key = sample.labels.get(label_name, 'unknown')
                         result[key] += sample.value
     except Exception as e:
         logger.error(f"Failed to collect {metric_name} by {label_name}: {str(e)}")
@@ -54,39 +58,68 @@ async def auth_dashboard():
     """Authentication Dashboard - Real-time auth metrics"""
     
     try:
-        # Collect all auth request metrics
+        # Import metrics to ensure they're registered
+        from observability import metrics as _  # noqa
+        
+        # Collect all possible label combinations from recent samples
+        # This is necessary because get_sample_value requires exact label match
+        endpoints_statuses = set()
+        for metric_family in REGISTRY.collect():
+            if metric_family.name == "auth_requests_total":
+                for sample in metric_family.samples:
+                    if not sample.name.endswith('_created'):
+                        endpoint = sample.labels.get('endpoint')
+                        status = sample.labels.get('status')
+                        result = sample.labels.get('result')
+                        if endpoint and status and result:
+                            endpoints_statuses.add((endpoint, status, result))
+        
+        # Now aggregate using get_sample_value for multiprocess safety
         total_2xx = 0
         total_4xx = 0
         total_5xx = 0
+        requests_by_endpoint = {}
         
-        for metric in REGISTRY.collect():
-            if metric.name == "auth_requests_total":
-                for sample in metric.samples:
-                    if sample.name == "auth_requests_total":
-                        status_str = str(sample.labels.get('status', ''))
-                        if status_str.startswith('2'):
-                            total_2xx += sample.value
-                        elif status_str.startswith('4'):
-                            total_4xx += sample.value
-                        elif status_str.startswith('5'):
-                            total_5xx += sample.value
+        for endpoint, status, result in endpoints_statuses:
+            val = REGISTRY.get_sample_value('auth_requests_total', {
+                'endpoint': endpoint,
+                'result': result,
+                'status': status
+            }) or 0
+            
+            if status.startswith('2'):
+                total_2xx += val
+            elif status.startswith('4'):
+                total_4xx += val
+            elif status.startswith('5'):
+                total_5xx += val
+            
+            requests_by_endpoint[endpoint] = requests_by_endpoint.get(endpoint, 0) + val
         
-        # Collect token metrics
+        # Collect token operations
         token_creates = 0
         token_failures = 0
+        ops_statuses = set()
         
-        for metric in REGISTRY.collect():
-            if metric.name == "auth_token_operations_total":
-                for sample in metric.samples:
-                    if sample.name == "auth_token_operations_total":
-                        op = sample.labels.get('operation', '')
-                        st = sample.labels.get('status', '')
-                        if op == 'create' and st == 'success':
-                            token_creates += sample.value
-                        if op == 'validate' and st == 'failure':
-                            token_failures += sample.value
+        for metric_family in REGISTRY.collect():
+            if metric_family.name == "auth_token_operations_total":
+                for sample in metric_family.samples:
+                    if not sample.name.endswith('_created'):
+                        op = sample.labels.get('operation')
+                        st = sample.labels.get('status')
+                        if op and st:
+                            ops_statuses.add((op, st))
         
-        requests_by_endpoint = collect_metrics_by_labels("auth_requests_total", "endpoint")
+        for op, st in ops_statuses:
+            val = REGISTRY.get_sample_value('auth_token_operations_total', {
+                'operation': op,
+                'status': st
+            }) or 0
+            
+            if op == 'create' and st == 'success':
+                token_creates += val
+            if op == 'validate' and st == 'failure':
+                token_failures += val
         
         total_requests = total_2xx + total_4xx + total_5xx
         success_rate = (total_2xx / total_requests * 100) if total_requests > 0 else 0
@@ -122,9 +155,28 @@ async def waf_dashboard():
     """WAF Dashboard - Real-time WAF blocks and allowlist metrics"""
     
     try:
-        blocks_by_rule = collect_metrics_by_labels("waf_blocks_total", "rule_id")
-        blocks_by_endpoint = collect_metrics_by_labels("waf_blocks_total", "endpoint")
-        allowlist_bypasses = collect_metrics_by_labels("waf_allowlist_bypasses_total", "endpoint")
+        # Access WAF metrics directly from Counter objects
+        from observability.metrics import waf_blocks_total, waf_allowlist_bypasses_total
+        
+        blocks_by_rule = {}
+        blocks_by_endpoint = {}
+        allowlist_bypasses = {}
+        
+        # Get WAF blocks from Counter
+        for sample in waf_blocks_total.collect()[0].samples:
+            if sample.name.endswith('_created'):
+                continue
+            rule = sample.labels.get('rule_id', 'unknown')
+            endpoint = sample.labels.get('endpoint', 'unknown')
+            blocks_by_rule[rule] = blocks_by_rule.get(rule, 0) + sample.value
+            blocks_by_endpoint[endpoint] = blocks_by_endpoint.get(endpoint, 0) + sample.value
+        
+        # Get allowlist bypasses from Counter
+        for sample in waf_allowlist_bypasses_total.collect()[0].samples:
+            if sample.name.endswith('_created'):
+                continue
+            endpoint = sample.labels.get('endpoint', 'unknown')
+            allowlist_bypasses[endpoint] = allowlist_bypasses.get(endpoint, 0) + sample.value
         
         total_blocks = sum(blocks_by_rule.values())
         total_bypasses = sum(allowlist_bypasses.values())
@@ -163,21 +215,22 @@ async def infrastructure_dashboard():
         cpu_percent = psutil.cpu_percent(interval=0.1)
         memory = psutil.virtual_memory()
         
+        # Access HTTP metrics directly from Counter
+        from observability.metrics import http_requests_total
+        
         total_requests = 0
         total_5xx = 0
         total_4xx = 0
         
-        for metric in REGISTRY.collect():
-            if metric.name == "http_requests_total":
-                for sample in metric.samples:
-                    total_requests += sample.value
-                    if hasattr(sample, 'labels'):
-                        labels_dict = dict(zip(sample.labels.keys(), sample.labels.values()))
-                        status = labels_dict.get('status', '')
-                        if status.startswith('5'):
-                            total_5xx += sample.value
-                        elif status.startswith('4'):
-                            total_4xx += sample.value
+        for sample in http_requests_total.collect()[0].samples:
+            if sample.name.endswith('_created'):
+                continue
+            total_requests += sample.value
+            status = str(sample.labels.get('status', ''))
+            if status.startswith('5'):
+                total_5xx += sample.value
+            elif status.startswith('4'):
+                total_4xx += sample.value
         
         latency_p95 = 0
         latency_p50 = 0
