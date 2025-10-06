@@ -305,6 +305,14 @@ async def handle_rate_limit_error(request: Request, exc: RateLimitExceeded):
 
 @app.exception_handler(Exception)
 async def handle_general_error(request: Request, exc: Exception):
+    # Try APIError handler first
+    from middleware.error_handlers import api_error_handler
+    from middleware.error_handling import APIError
+    
+    if isinstance(exc, APIError):
+        return await api_error_handler(request, exc)
+    
+    # Fall back to general exception handler
     return await general_exception_handler(request, exc)
 
 # Specific status code handlers - ENABLED FOR UNIFIED ERROR SCHEMA

@@ -33,7 +33,7 @@ ACCESS_TOKEN_EXPIRE_MINUTES = settings.access_token_expire_minutes
 
 # Password hashing
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-security = HTTPBearer(auto_error=True)  # SECURITY FIX: Enforce authentication required
+security = HTTPBearer(auto_error=False)  # Let custom auth logic handle errors properly
 
 class Token(BaseModel):
     access_token: str
@@ -46,6 +46,8 @@ class JWTPayload(BaseModel):
     roles: list[str] = Field(default=[], description="User roles")
     scopes: list[str] = Field(default=[], description="User scopes")
     iat: int | None = Field(None, description="Issued at timestamp")
+    iss: str | None = Field(None, description="Issuer")
+    aud: str | None = Field(None, description="Audience")
 
 class TokenData(BaseModel):
     user_id: str = Field(..., description="User identifier")
@@ -120,17 +122,26 @@ def create_access_token(data: dict[str, Any], expires_delta: timedelta | None = 
     else:
         expire = now + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
 
+    # Create base payload
+    payload_dict = {
+        "sub": str(data["sub"]),
+        "exp": int(expire.timestamp()),
+        "iat": int(now.timestamp()),
+        "roles": data.get("roles", []),
+        "scopes": data.get("scopes", [])
+    }
+    
+    # Add issuer and audience if configured (required for validation)
+    if hasattr(settings, 'jwt_issuer') and settings.jwt_issuer:
+        payload_dict["iss"] = settings.jwt_issuer
+    if hasattr(settings, 'jwt_audience') and settings.jwt_audience:
+        payload_dict["aud"] = settings.jwt_audience
+    
     # Create typed payload
-    payload = JWTPayload(
-        sub=str(data["sub"]),
-        exp=int(expire.timestamp()),
-        iat=int(now.timestamp()),
-        roles=data.get("roles", []),
-        scopes=data.get("scopes", [])
-    )
+    payload = JWTPayload(**payload_dict)
 
     # Always use the current JWT secret for signing new tokens
-    return jwt.encode(payload.model_dump(), get_jwt_secret_key(), algorithm=get_jwt_algorithm())
+    return jwt.encode(payload.model_dump(exclude_none=True), get_jwt_secret_key(), algorithm=get_jwt_algorithm())
 
 def decode_token(token: str) -> TokenData | None:
     """Decode and validate JWT with hardened security"""
@@ -158,33 +169,37 @@ def decode_token(token: str) -> TokenData | None:
             continue
 
         try:
+            # Build decode options
+            decode_options = {
+                "require_exp": True,
+                "require_iat": True,
+                "verify_exp": True,
+                "verify_iat": True,
+                "verify_signature": True
+            }
+            
+            # Build decode kwargs
+            decode_kwargs = {
+                "algorithms": [get_jwt_algorithm()],
+                "options": decode_options
+            }
+            
+            # Add issuer and audience validation if configured
+            if hasattr(settings, 'jwt_issuer') and settings.jwt_issuer:
+                decode_kwargs["issuer"] = settings.jwt_issuer
+            if hasattr(settings, 'jwt_audience') and settings.jwt_audience:
+                decode_kwargs["audience"] = settings.jwt_audience
+            
             # SECURITY: Pin algorithm, require all time claims
-            payload = jwt.decode(
-                token,
-                secret_key,
-                algorithms=[get_jwt_algorithm()],
-                options={
-                    "require_exp": True,
-                    "require_iat": True,
-                    "verify_exp": True,
-                    "verify_iat": True,
-                    "verify_signature": True
-                }
-            )
+            payload = jwt.decode(token, secret_key, **decode_kwargs)
 
             # Extract and validate required fields
             user_id = payload.get("sub")
             if not user_id or not isinstance(user_id, str) or len(user_id.strip()) == 0:
                 continue
 
-            # Security: Validate issuer and audience
-            if hasattr(settings, 'jwt_issuer') and settings.jwt_issuer:
-                if payload.get("iss") != settings.jwt_issuer:
-                    continue
-            if hasattr(settings, 'jwt_audience') and settings.jwt_audience:
-                if payload.get("aud") != settings.jwt_audience:
-                    continue
-
+            # Note: issuer and audience are validated by jwt.decode if configured
+            
             roles = payload.get("roles", [])
             scopes = payload.get("scopes", [])
 
@@ -222,13 +237,13 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials | None = De
 def require_auth(min_role: str = "user", scopes: list[str] | None = None):
     """Require authentication with optional role and scope requirements"""
     def auth_dependency(user: User | None = Depends(get_current_user)) -> User:
-        from middleware.error_handling import APIError
-
+        from fastapi import HTTPException
+        
         if not user:
-            raise APIError(
-                message="Authentication required",
+            # Use HTTPException directly for proper FastAPI error handling
+            raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                error_code="AUTH_001"
+                detail="Authentication required"
             )
 
         if not user.is_active:
@@ -270,7 +285,7 @@ def require_admin():
 
 def require_scopes(required_scopes: list[str]):
     """Require specific scopes for endpoint access"""
-    def scope_checker(user: User = Depends(require_auth)) -> User:
+    def scope_checker(user: User = Depends(require_auth())) -> User:
         from middleware.error_handling import APIError
         for scope in required_scopes:
             if scope not in user.scopes:
@@ -284,7 +299,7 @@ def require_scopes(required_scopes: list[str]):
 
 def require_roles(required_roles: list[str]):
     """Require specific roles for endpoint access"""
-    def role_checker(user: User = Depends(require_auth)) -> User:
+    def role_checker(user: User = Depends(require_auth())) -> User:
         from middleware.error_handling import APIError
         user_has_required_role = any(role in user.roles for role in required_roles)
         if not user_has_required_role:

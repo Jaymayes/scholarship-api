@@ -33,6 +33,38 @@ def create_error_response(
     return build_error(error_code, message, status_code, details, trace_id)
 
 
+async def api_error_handler(request: Request, exc: Exception) -> JSONResponse:
+    """Handle custom APIError exceptions with standardized error format"""
+    from middleware.error_handling import APIError
+    
+    if not isinstance(exc, APIError):
+        # If it's not an APIError, let it propagate
+        raise exc
+    
+    trace_id = get_trace_id(request)
+    
+    error_response = create_error_response(
+        request, exc.status_code, exc.error_code, exc.message
+    )
+    
+    # Log appropriate level based on status code
+    if exc.status_code >= 500:
+        logger.error(
+            f"Server error {exc.status_code} on {request.method} {request.url.path}: {exc.message}",
+            extra={"trace_id": trace_id, "status_code": exc.status_code}
+        )
+    else:
+        logger.warning(
+            f"Client error {exc.status_code} on {request.method} {request.url.path}: {exc.message}",
+            extra={"trace_id": trace_id, "status_code": exc.status_code}
+        )
+    
+    return JSONResponse(
+        status_code=exc.status_code,
+        content=error_response
+    )
+
+
 async def http_exception_handler(request: Request, exc: HTTPException) -> JSONResponse:
     """Handle HTTP exceptions with standardized error format"""
     trace_id = getattr(request.state, "trace_id", "unknown")

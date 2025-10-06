@@ -6,14 +6,15 @@ Phase 4: Quality Gates Implementation
 import pytest
 from fastapi.testclient import TestClient
 
-from main import app
-
-client = TestClient(app)
+@pytest.fixture
+def client(test_client):
+    """Use the test client from conftest"""
+    return test_client
 
 class TestAuthentication:
     """Test authentication endpoints and security"""
 
-    def test_login_success(self):
+    def test_login_success(self, client):
         """Test successful login with valid credentials"""
         response = client.post(
             "/api/v1/auth/login-simple",
@@ -24,16 +25,18 @@ class TestAuthentication:
         assert "access_token" in data
         assert data["token_type"] == "bearer"
 
-    def test_login_invalid_credentials(self):
+    def test_login_invalid_credentials(self, client):
         """Test login with invalid credentials"""
         response = client.post(
             "/api/v1/auth/login-simple",
             json={"username": "admin", "password": "wrongpassword"}
         )
         assert response.status_code == 401
-        assert "Incorrect username or password" in response.json()["error"]["message"]
+        data = response.json()
+        assert "Incorrect username or password" in data["message"]
+        assert data["code"] == "UNAUTHORIZED"
 
-    def test_login_nonexistent_user(self):
+    def test_login_nonexistent_user(self, client):
         """Test login with non-existent user"""
         response = client.post(
             "/api/v1/auth/login-simple",
@@ -41,13 +44,15 @@ class TestAuthentication:
         )
         assert response.status_code == 401
 
-    def test_protected_endpoint_without_auth(self):
+    def test_protected_endpoint_without_auth(self, client):
         """Test accessing protected endpoint without authentication"""
         response = client.get("/api/v1/auth/me")
         assert response.status_code == 401
-        assert "Authentication required" in response.json()["error"]["message"]
+        data = response.json()
+        assert "Authentication required" in data["message"]
+        assert data["code"] == "UNAUTHORIZED"
 
-    def test_protected_endpoint_with_auth(self):
+    def test_protected_endpoint_with_auth(self, client):
         """Test accessing protected endpoint with valid authentication"""
         # First login to get token
         login_response = client.post(
@@ -66,7 +71,7 @@ class TestAuthentication:
         assert data["user_id"] == "admin"
         assert "admin" in data["roles"]
 
-    def test_auth_check_authenticated(self):
+    def test_auth_check_authenticated(self, client):
         """Test authentication check with valid token"""
         # Get token
         login_response = client.post(
@@ -85,7 +90,7 @@ class TestAuthentication:
         assert data["authenticated"] is True
         assert data["user_id"] == "readonly"
 
-    def test_auth_check_unauthenticated(self):
+    def test_auth_check_unauthenticated(self, client):
         """Test authentication check without token"""
         response = client.get("/api/v1/auth/check")
         assert response.status_code == 200
@@ -95,7 +100,7 @@ class TestAuthentication:
 class TestRateLimiting:
     """Test rate limiting functionality"""
 
-    def test_rate_limiting_applies(self):
+    def test_rate_limiting_applies(self, client):
         """Test that rate limiting is applied to endpoints"""
         # Make multiple rapid requests to trigger rate limiting
         # Note: This test may need adjustment based on actual rate limits
@@ -107,7 +112,7 @@ class TestRateLimiting:
         # All should succeed or some should be rate limited
         assert all(status in [200, 429] for status in responses)
 
-    def test_rate_limit_headers(self):
+    def test_rate_limit_headers(self, client):
         """Test that rate limit headers are present when limits are exceeded"""
         # This test would need actual rate limiting to trigger
         # For now, just verify normal responses don't have rate limit errors
@@ -117,7 +122,7 @@ class TestRateLimiting:
 class TestErrorHandling:
     """Test unified error handling"""
 
-    def test_404_error_format(self):
+    def test_404_error_format(self, client):
         """Test 404 error has standardized format"""
         response = client.get("/nonexistent")
         assert response.status_code == 404
@@ -130,7 +135,7 @@ class TestErrorHandling:
         assert data["code"] == "NOT_FOUND"
         assert data["status"] == 404
 
-    def test_validation_error_format(self):
+    def test_validation_error_format(self, client):
         """Test validation errors have standardized format"""
         response = client.post(
             "/api/v1/auth/login-simple",
@@ -139,10 +144,10 @@ class TestErrorHandling:
         assert response.status_code == 422
         data = response.json()
         assert "trace_id" in data
-        assert data["error"]["code"] == "VALIDATION_ERROR"
-        assert "field_errors" in data["error"]["details"]
+        assert data["code"] == "VALIDATION_ERROR"
+        assert "fields" in data.get("details", {})
 
-    def test_trace_id_header(self):
+    def test_trace_id_header(self, client):
         """Test that trace ID is included in response headers"""
         response = client.get("/")
         assert "X-Trace-ID" in response.headers

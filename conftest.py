@@ -31,9 +31,17 @@ def setup_test_environment():
         os.environ[key] = value
 
     # Clear settings cache if it exists
-    from config.settings import get_settings
-    if hasattr(get_settings, 'cache_clear'):
-        get_settings.cache_clear()
+    try:
+        from config.settings import get_settings
+        if callable(getattr(get_settings, 'cache_clear', None)):
+            get_settings.cache_clear()
+        
+        # Force reload of settings module to pick up new env vars
+        import config.settings
+        import importlib
+        importlib.reload(config.settings)
+    except Exception as e:
+        print(f"Warning: Could not reload settings: {e}")
 
     yield
 

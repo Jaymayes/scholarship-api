@@ -92,7 +92,7 @@ async def login_simple(login_data: LoginRequest):
     }
 
 @router.get("/me", response_model=UserResponse)
-async def get_current_user_info(current_user: User = Depends(require_auth)):
+async def get_current_user_info(current_user: User = Depends(require_auth())):
     """Get current user information"""
     return UserResponse(
         user_id=current_user.user_id,
@@ -103,7 +103,7 @@ async def get_current_user_info(current_user: User = Depends(require_auth)):
     )
 
 @router.post("/logout")
-async def logout(current_user: User = Depends(require_auth)):
+async def logout(current_user: User = Depends(require_auth())):
     """Logout user (client should discard token)"""
     logger.info(f"User logged out: {current_user.user_id}")
     return {"message": "Successfully logged out"}

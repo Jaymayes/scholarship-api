@@ -20,7 +20,7 @@ logger = get_logger(__name__)
 def get_user_identifier(request: Request) -> str:
     """Get client identifier prioritizing authenticated user over IP"""
     # Check if user is set in request state by auth middleware
-    if hasattr(request.state, 'user') and request.state.user:
+    if hasattr(request.state, 'user') and request.state.user and hasattr(request.state.user, 'user_id'):
         return f"user:{request.state.user.user_id}"
 
     # Extract from JWT token if available

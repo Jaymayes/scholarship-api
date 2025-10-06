@@ -70,7 +70,7 @@ async def validate_partner_access(user: User, partner_id: str) -> bool:
     # Default deny
     return False
 
-async def require_partner_access(partner_id: str, user: User = Depends(require_auth)) -> User:
+async def require_partner_access(partner_id: str, user: User = Depends(require_auth())) -> User:
     """
     Dependency to require authenticated access to specific partner data
 
@@ -759,7 +759,7 @@ async def get_data_protection_policies(
 @router.post("/maintenance/schedule")
 async def schedule_maintenance_window(
     maintenance: MaintenanceRequest,
-    current_user: User = Depends(require_auth)
+    current_user: User = Depends(require_auth())
 ) -> dict[str, Any]:
     """
     📅 SCHEDULE MAINTENANCE WINDOW

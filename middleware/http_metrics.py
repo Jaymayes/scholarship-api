@@ -37,7 +37,7 @@ class HTTPMetricsMiddleware(BaseHTTPMiddleware):
         # Record start time
         start_time = time.time()
 
-        # Process request - CRITICAL FIX: Don't catch HTTPExceptions, let them propagate
+        # Process request - CRITICAL FIX: Don't catch HTTPExceptions or APIErrors, let them propagate
         try:
             response = await call_next(request)
             status_code = response.status_code
@@ -62,6 +62,22 @@ class HTTPMetricsMiddleware(BaseHTTPMiddleware):
             # Re-raise the HTTPException to preserve proper error response
             raise e
         except Exception as e:
+            # Check if it's an APIError (custom error that should be handled by error handler)
+            if e.__class__.__name__ == 'APIError':
+                # Record metrics and re-raise to let error handler process it
+                status_code = getattr(e, 'status_code', 500)
+                duration = time.time() - start_time
+                endpoint = self._normalize_endpoint(request.url.path)
+                try:
+                    self.metrics_service.record_http_request(
+                        method=request.method,
+                        endpoint=endpoint,
+                        status=status_code,
+                        duration=duration
+                    )
+                except Exception as metrics_error:
+                    logger.warning(f"Failed to record HTTP metrics: {str(metrics_error)}")
+                raise e
             # Only catch non-HTTP exceptions (true server errors)
             logger.error(f"Request failed with exception: {str(e)}")
             status_code = 500
