@@ -53,6 +53,32 @@ rate_limit_rejected_total = Counter(
     ['endpoint', 'method', 'limit_type']
 )
 
+# Auth metrics for dashboard
+auth_requests_total = Counter(
+    'auth_requests_total',
+    'Total authentication requests',
+    ['endpoint', 'result', 'status']
+)
+
+auth_token_operations_total = Counter(
+    'auth_token_operations_total',
+    'Total token operations (create, validate, refresh)',
+    ['operation', 'status']
+)
+
+# WAF metrics for dashboard
+waf_blocks_total = Counter(
+    'waf_blocks_total',
+    'Total WAF blocks',
+    ['rule_id', 'endpoint', 'method']
+)
+
+waf_allowlist_bypasses_total = Counter(
+    'waf_allowlist_bypasses_total',
+    'Total requests bypassing WAF via allowlist',
+    ['endpoint']
+)
+
 # Active scholarships gauge for real-time tracking
 # METRICS DUPLICATION FIX: Removed Gauge - using only CustomCollector approach
 
@@ -152,6 +178,59 @@ class MetricsService:
             ).inc()
         except Exception as e:
             logger.warning(f"Failed to record interaction metrics: {str(e)}")
+
+    def record_auth_request(self, endpoint: str, result: str, status: int):
+        """Record authentication request metrics"""
+        if not self.enabled:
+            return
+
+        try:
+            auth_requests_total.labels(
+                endpoint=endpoint,
+                result=result,
+                status=status
+            ).inc()
+        except Exception as e:
+            logger.warning(f"Failed to record auth metrics: {str(e)}")
+
+    def record_token_operation(self, operation: str, status: str):
+        """Record token operation metrics (create, validate, refresh)"""
+        if not self.enabled:
+            return
+
+        try:
+            auth_token_operations_total.labels(
+                operation=operation,
+                status=status
+            ).inc()
+        except Exception as e:
+            logger.warning(f"Failed to record token operation metrics: {str(e)}")
+
+    def record_waf_block(self, rule_id: str, endpoint: str, method: str):
+        """Record WAF block event"""
+        if not self.enabled:
+            return
+
+        try:
+            waf_blocks_total.labels(
+                rule_id=rule_id,
+                endpoint=endpoint,
+                method=method
+            ).inc()
+        except Exception as e:
+            logger.warning(f"Failed to record WAF block metrics: {str(e)}")
+
+    def record_waf_allowlist_bypass(self, endpoint: str):
+        """Record WAF allowlist bypass event"""
+        if not self.enabled:
+            return
+
+        try:
+            waf_allowlist_bypasses_total.labels(
+                endpoint=endpoint
+            ).inc()
+        except Exception as e:
+            logger.warning(f"Failed to record WAF bypass metrics: {str(e)}")
 
     def update_scholarship_count(self, count: int):
         """Update active scholarship count - using CustomCollector only (no duplication)"""

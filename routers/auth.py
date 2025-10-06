@@ -37,9 +37,12 @@ class UserResponse(BaseModel):
 @router.post("/login", response_model=Token)
 async def login(form_data: OAuth2PasswordRequestForm = Depends()):
     """Authenticate user and return JWT token"""
+    from observability.metrics import metrics_service
+    
     user = authenticate_user(form_data.username, form_data.password)
     if not user:
         logger.warning(f"Failed login attempt for username: {form_data.username}")
+        metrics_service.record_auth_request("/api/v1/auth/login", "failure", 401)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect username or password",
@@ -57,6 +60,7 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends()):
     )
 
     logger.info(f"Successful login for user: {user.user_id}")
+    metrics_service.record_auth_request("/api/v1/auth/login", "success", 200)
 
     return {
         "access_token": access_token,
@@ -66,9 +70,12 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends()):
 @router.post("/login-simple", response_model=Token)
 async def login_simple(login_data: LoginRequest):
     """Simple login endpoint for JSON requests"""
+    from observability.metrics import metrics_service
+    
     user = authenticate_user(login_data.username, login_data.password)
     if not user:
         logger.warning(f"Failed login attempt for username: {login_data.username}")
+        metrics_service.record_auth_request("/api/v1/auth/login-simple", "failure", 401)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect username or password"
@@ -85,6 +92,7 @@ async def login_simple(login_data: LoginRequest):
     )
 
     logger.info(f"Successful login for user: {user.user_id}")
+    metrics_service.record_auth_request("/api/v1/auth/login-simple", "success", 200)
 
     return {
         "access_token": access_token,

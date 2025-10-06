@@ -22,6 +22,7 @@ from middleware.request_id import RequestIDMiddleware
 from middleware.waf_protection import WAFProtection
 from observability.metrics import setup_metrics
 from observability.tracing import tracing_service
+from observability.dashboards import router as observability_router
 from routers.agent import router as agent_router
 from routers.ai import router as ai_router
 from routers.analytics import router as analytics_router
@@ -394,6 +395,9 @@ app.include_router(devrel_router, tags=["Developer Relations"])
 app.include_router(auto_seo_router, tags=["Auto SEO Pages"])
 app.include_router(scholarship_pages_router, tags=["Canonical Scholarship Pages"])
 app.include_router(public_router, tags=["Public Status"])  # Status page and docs
+
+# Observability dashboards for monitoring
+app.include_router(observability_router, tags=["Observability"])
 
 # Metrics already setup above - this was the wrong location causing route shadowing
 

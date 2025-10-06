@@ -193,7 +193,8 @@ class WAFProtection(BaseHTTPMiddleware):
                     "Missing required Authorization header",
                     "WAF_AUTH_001",
                     client_ip,
-                    path
+                    path,
+                    method
                 )
 
             # 2. SQL INJECTION DETECTION
@@ -203,7 +204,8 @@ class WAFProtection(BaseHTTPMiddleware):
                     "SQL injection attempt detected",
                     "WAF_SQLI_001",
                     client_ip,
-                    path
+                    path,
+                    method
                 )
 
             # 3. XSS DETECTION
@@ -213,7 +215,8 @@ class WAFProtection(BaseHTTPMiddleware):
                     "Cross-site scripting attempt detected",
                     "WAF_XSS_001",
                     client_ip,
-                    path
+                    path,
+                    method
                 )
 
             # 4. COMMAND INJECTION DETECTION
@@ -222,7 +225,8 @@ class WAFProtection(BaseHTTPMiddleware):
                     "Command injection attempt detected",
                     "WAF_CMD_001",
                     client_ip,
-                    path
+                    path,
+                    method
                 )
 
             # 5. PATH TRAVERSAL DETECTION
@@ -231,7 +235,8 @@ class WAFProtection(BaseHTTPMiddleware):
                     "Path traversal attempt detected",
                     "WAF_PATH_001",
                     client_ip,
-                    path
+                    path,
+                    method
                 )
 
         except Exception as e:
@@ -329,8 +334,11 @@ class WAFProtection(BaseHTTPMiddleware):
 
         if request.url.path in sql_exempt_paths:
             # Log auth endpoint bypasses for monitoring and alerting
+            from observability.metrics import metrics_service
+            
             if "/api/v1/auth/" in request.url.path:
                 logger.info(f"WAF: Auth endpoint bypassed (CEO directive) - {request.method} {request.url.path}")
+                metrics_service.record_waf_allowlist_bypass(request.url.path)
             else:
                 logger.debug(f"WAF: Allowing SQL-exempt endpoint - {request.method} {request.url.path}")
             return False
@@ -428,10 +436,14 @@ class WAFProtection(BaseHTTPMiddleware):
         except:
             return None
 
-    async def _block_request(self, message: str, error_code: str, client_ip: str, path: str) -> JSONResponse:
+    async def _block_request(self, message: str, error_code: str, client_ip: str, path: str, method: str = "unknown") -> JSONResponse:
         """Block malicious request with structured response"""
+        from observability.metrics import metrics_service
 
         self.blocked_requests += 1
+        
+        # Record WAF block metric
+        metrics_service.record_waf_block(error_code, path, method)
 
         if not self.block_mode:
             # Monitor mode - log but don't block

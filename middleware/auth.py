@@ -116,6 +116,8 @@ def authenticate_user(username: str, password: str) -> User | None:
 
 def create_access_token(data: dict[str, Any], expires_delta: timedelta | None = None) -> str:
     """Create a JWT access token with properly typed payload"""
+    from observability.metrics import metrics_service
+    
     now = datetime.utcnow()
     if expires_delta:
         expire = now + expires_delta
@@ -141,11 +143,19 @@ def create_access_token(data: dict[str, Any], expires_delta: timedelta | None = 
     payload = JWTPayload(**payload_dict)
 
     # Always use the current JWT secret for signing new tokens
-    return jwt.encode(payload.model_dump(exclude_none=True), get_jwt_secret_key(), algorithm=get_jwt_algorithm())
+    encoded_jwt = jwt.encode(payload.model_dump(exclude_none=True), get_jwt_secret_key(), algorithm=get_jwt_algorithm())
+    
+    # Record token creation metric
+    metrics_service.record_token_operation("create", "success")
+    
+    return encoded_jwt
 
 def decode_token(token: str) -> TokenData | None:
     """Decode and validate JWT with hardened security"""
+    from observability.metrics import metrics_service
+    
     if not token or not isinstance(token, str) or len(token.strip()) == 0:
+        metrics_service.record_token_operation("validate", "failure")
         return None
 
     # Security: Reject tokens with 'none' algorithm
@@ -209,6 +219,7 @@ def decode_token(token: str) -> TokenData | None:
             if not isinstance(scopes, list) or not all(isinstance(s, str) for s in scopes):
                 scopes = []
 
+            metrics_service.record_token_operation("validate", "success")
             return TokenData(user_id=user_id, roles=roles, scopes=scopes)
         except (JWTError, ValueError, KeyError, TypeError) as e:
             # Log security events
@@ -216,6 +227,7 @@ def decode_token(token: str) -> TokenData | None:
             logging.warning(f"JWT validation failed: {type(e).__name__}")
             continue
 
+    metrics_service.record_token_operation("validate", "failure")
     return None
 
 async def get_current_user(credentials: HTTPAuthorizationCredentials | None = Depends(security)) -> User | None:
