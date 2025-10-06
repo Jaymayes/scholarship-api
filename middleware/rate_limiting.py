@@ -226,12 +226,24 @@ def analytics_rate_limit():
 # Generic rate limiters
 def public_rate_limit(limit: str = "60/minute"):
     """Rate limit for public endpoints"""
+    if limiter is None:
+        def no_op_decorator(func):
+            return func
+        return no_op_decorator
     return limiter.limit(get_rate_limit_for_environment(limit))
 
 def authenticated_rate_limit(limit: str = "300/minute"):
     """Rate limit for authenticated endpoints"""
+    if limiter is None:
+        def no_op_decorator(func):
+            return func
+        return no_op_decorator
     return limiter.limit(get_rate_limit_for_environment(limit))
 
 def admin_rate_limit(limit: str = "1000/minute"):
     """Rate limit for admin endpoints"""
+    if limiter is None:
+        def no_op_decorator(func):
+            return func
+        return no_op_decorator
     return limiter.limit(get_rate_limit_for_environment(limit))

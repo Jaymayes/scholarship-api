@@ -13,12 +13,13 @@ def setup_test_environment():
     original_vars = {}
     test_vars = {
         'ENVIRONMENT': 'development',
+        'STRICT_CONFIG_VALIDATION': 'false',
         'DISABLE_RATE_LIMIT_BACKEND': 'true',
         'RATE_LIMIT_ENABLED': 'false',
         'PUBLIC_READ_ENDPOINTS': 'true',
         'DEBUG': 'true',
-        'JWT_SECRET_KEY': 'test-secret-key-at-least-32-chars-long-for-testing-purposes',
-        'ALLOWED_HOSTS': '[]',
+        'JWT_SECRET_KEY': 'test-secret-key-for-testing-must-be-at-least-64-characters-long-to-pass-production-validation-checks',
+        'ALLOWED_HOSTS': '["localhost","127.0.0.1","testserver"]',
         'TRUSTED_PROXY_IPS': '[]',
         'CORS_ALLOWED_ORIGINS': '*'
     }
@@ -45,8 +46,29 @@ def setup_test_environment():
 
 @pytest.fixture
 def test_client():
-    """Get test client with proper configuration"""
+    """Get test client with proper configuration and test user fixtures"""
     from fastapi.testclient import TestClient
+    
+    # Load test auth fixtures and populate MOCK_USERS for tests
+    import json
+    from pathlib import Path
+    from middleware.auth import MOCK_USERS, pwd_context
+    
+    fixtures_path = Path(__file__).parent / "tests" / "fixtures" / "auth_fixtures.json"
+    if fixtures_path.exists():
+        with open(fixtures_path) as f:
+            auth_fixtures = json.load(f)
+        
+        # Populate MOCK_USERS with test fixtures
+        for username, fixture in auth_fixtures.items():
+            MOCK_USERS[username] = {
+                "user_id": fixture["user_id"],
+                "email": fixture["email"],
+                "hashed_password": pwd_context.hash(fixture["password"]),
+                "roles": fixture["roles"],
+                "scopes": fixture["scopes"],
+                "is_active": fixture["is_active"]
+            }
 
     from main import app
     return TestClient(app)

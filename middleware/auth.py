@@ -212,21 +212,12 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials | None = De
     if not token_data:
         return None
 
-    # Try to get user from mock database first
+    # Get user from mock database - token_data.user_id is guaranteed to be str by TokenData model
     user_data = MOCK_USERS.get(token_data.user_id)
-    if user_data:
-        return User(**user_data)
-    
-    # WORKSTREAM C: Support JWT-only auth for test fixtures in production
-    # If MOCK_USERS is empty (production), construct User from JWT claims
-    # This allows test suite to work with pre-generated JWT tokens
-    return User(
-        user_id=token_data.user_id,
-        email=f"{token_data.user_id}@test.com",  # Placeholder email from JWT
-        roles=token_data.roles,
-        scopes=token_data.scopes,
-        is_active=True
-    )
+    if not user_data:
+        return None
+
+    return User(**user_data)
 
 def require_auth(min_role: str = "user", scopes: list[str] | None = None):
     """Require authentication with optional role and scope requirements"""

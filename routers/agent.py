@@ -6,7 +6,7 @@ Handles task execution, registration, and capabilities endpoints
 
 from fastapi import APIRouter, BackgroundTasks, Depends, Header, HTTPException, Request
 
-from middleware.rate_limiting import limiter
+from middleware.rate_limiting import authenticated_rate_limit
 from schemas.orchestrator import AgentCapabilities, Task, TaskResult, TaskStatus
 from services.orchestrator_service import orchestrator_service
 from utils.logger import setup_logger
@@ -57,7 +57,7 @@ async def verify_agent_auth(authorization: str | None = Header(None)) -> dict:
 
 
 @router.post("/task", response_model=dict, status_code=202)
-@limiter.limit("50/minute")  # Production rate limit
+@authenticated_rate_limit("50/minute")  # Production rate limit
 async def receive_task(
     request: Request,
     task_request: Task,

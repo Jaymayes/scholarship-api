@@ -13,6 +13,10 @@ router = APIRouter(prefix="/api/v1", tags=["recommendations"])
 
 # Rate limiting for recommendations endpoint (30 rpm as specified)
 def recommendations_rate_limit():
+    if limiter is None:
+        def no_op_decorator(func):
+            return func
+        return no_op_decorator
     return limiter.limit("30/minute")
 
 class RecommendationResponse(BaseModel):
