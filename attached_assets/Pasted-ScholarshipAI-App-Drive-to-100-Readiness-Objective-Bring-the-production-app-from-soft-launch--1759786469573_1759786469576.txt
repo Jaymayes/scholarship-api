@@ -1,0 +1,147 @@
+ScholarshipAI App — Drive to 100% Readiness
+
+Objective
+Bring the production app from soft-launch to full operational readiness with zero regressions. Close all known gaps; preserve current security posture and stop-loss protections. Maintain invite-only access.
+
+Context
+
+Current performance exceeds targets (P95 ~9.87ms, 0% 5xx; structured logs active; WAF in block mode; SSL enforced; Bearer auth strict).
+Known gaps: Redis unavailable (using in-memory rate limiting), observability dashboards pending, test suite at 8/13 due to auth seeding.
+Stop-loss policies must remain live and unmodified.
+Private/invite-only access must remain enforced. Private deployments are appropriate for closed beta/invite-only scenarios and add infra-level access control without code changes .
+Post-launch monitoring and dashboards should leverage deployment logs, resource usage, request durations and status breakdowns available in the deployment environment .
+Security, resilience, and 24/7 availability are foundational; follow our playbook principles on defense-in-depth, privacy, and high availability .
+Use secrets management correctly; never hardcode credentials. Design for retries, backoff, and graceful degradation in distributed components .
+Guardrails
+
+Do not relax WAF, auth, or SSL.
+Do not enable Payments or Essay features.
+Any change must keep P95 latency below 120ms and 5xx < 1% at all times.
+Use environment secrets for all new credentials; no plaintext in code or logs .
+Maintain private/invite-only access during this phase (verify private deployment settings remain enforced) .
+Workstream A — Production-Grade Rate Limiting with Redis
+Goal: Replace in-memory rate limiting with Redis-backed token bucket, with automatic fallback to in-memory if Redis is down; zero user-visible regressions.
+
+Tasks
+
+Provision and Configure Redis
+Provision a managed Redis instance suitable for production (single region, low-latency).
+Add secrets: REDIS_URL, REDIS_TLS=true if applicable. Store via platform secrets manager; never commit credentials .
+2. Implement Redis Adapter and Fallback
+
+Create a rate_limiter module with two backends: RedisTokenBucket and InMemoryTokenBucket.
+Health check Redis on startup and periodically; if unavailable, auto-fallback to in-memory and raise a WARN log once per 5 minutes, not per-request.
+Key by user_id when present, else IP. Include sliding window or token bucket to avoid burst abuse. Respect existing WAF decisions before app-level limits.
+3. Observability and Logs
+
+Enrich request logs with: rate_limit_state (allow|throttle|block), rate_limit_key, tokens_remaining, rl_backend (redis|memory).
+Keep existing fields (ts, method, path, status_code, latency_ms, auth_result, waf_rule, request_id).
+4. Load Validation
+
+Run a safe load test against a staging slot or maintenance window: target burst + sustained RPS matching 10x soft-launch traffic.
+Verify: no 5xx from limiter, <0.5% 429 overall, P95 latency within 2x baseline and <120ms.
+Document results and attach to the readiness report.
+Acceptance Criteria
+
+Redis limiter live in production, with auto-fallback verified.
+Logs show rl_backend=redis in steady state.
+Load test report meets thresholds; no SLO breaches.
+Workstream B — T+24h Observability Dashboards and Alerts
+Goal: Build and publish dashboards and alerts for Auth, WAF, Infra, and Synthetics; deliver an on-call runbook. Use platform deployment dashboards and logs: status codes, durations, resource graphs, and traffic analytics .
+
+Tasks
+
+Auth Dashboard
+Metrics: 2xx/4xx/5xx, token errors (missing/invalid/expired), request_duration P50/P95/P99, login/signup success rates.
+Alerts: token errors > 3x baseline for 5m; 5xx > 1% for 5m; P95 > 300ms for 5m. These mirror stop-loss.
+2. WAF Dashboard
+
+Metrics: blocks by rule, endpoint, IP ASN; false positives trend.
+Alerts: sudden spike in blocks on a single endpoint or rule > 5x baseline, sustained 5m.
+3. Infra Dashboard
+
+Metrics: uptime, CPU and memory utilization over time; request rate; request durations P50/P95/P99. Use deployment “Resources” and “Analytics” tabs for visibility and correlate with logs .
+4. Synthetic Monitors
+
+Create 4 HTTP checks (public-health, auth-required path, typical student flow path, provider flow path).
+Validate SSL, auth header, and expected 2xx response and body markers.
+Alerts to Slack: any 2 consecutive failures at 1-minute interval.
+5. On-Call Runbook
+
+Document alert routing, triage steps, rollback trigger thresholds (match stop-loss), and commands for quick status:
+grep REQUEST_LOG /tmp/logs/FastAPI_Server_*.log | sed 's/.*REQUEST_LOG: //' | jq .
+/tmp/hour_0_snapshot_final.sh
+Deliverables
+
+Link to each dashboard and alert policy.
+Synthetic monitor definitions exported as JSON/YAML.
+On-call runbook in docs/ONCALL_RUNBOOK.md referencing deployment logs, resources, and analytics features .
+Acceptance Criteria
+
+All dashboards populated with last 1h and 24h views.
+Alerts tested via controlled fault injection; Slack notifications verified.
+Synthetics green on all 4 paths.
+Workstream C — Test Suite to 13/13 Green
+Goal: Seed auth; fix and expand tests to full pass; include security regression tests aligned with our playbook.
+
+Tasks
+
+Auth Seeding
+Create a deterministic seeding script: one admin, one provider, one student; generate JWT fixtures securely; store secrets in env manager.
+2. Fix/Expand Tests
+
+Get 13/13 passing; add tests for:
+Directory traversal prevention and input sanitization (block ../ and similar patterns) as per defense-in-depth guidance .
+WAF behavior on known attack payloads (expect 403).
+Rate limiting: bursts vs sustained; assert 429 thresholds and no 5xx.
+3. Automation
+
+Wire /tmp/run_13_test_suite.sh to run post-deploy and post-rollback smoke.
+Publish test reports to /tmp and attach path in the readiness report.
+Acceptance Criteria
+
+13/13 green locally and in deployment pipeline.
+Security regression tests passing.
+Workstream D — Security and Access Posture Verification
+Goal: Re-validate defense-in-depth and privacy posture in line with our platform commitments to 24/7 availability and trust  .
+
+Tasks
+
+Confirm private/invite-only access still enforced at deployment-level access control; screenshot/timestamp settings page .
+Verify all secrets stored in env manager; scan code for hardcoded tokens/URLs .
+Re-run security smoke tests (traversal, SQLi placeholders, auth bypass).
+Update SECURITY_READINESS.md with results and mitigations.
+Acceptance Criteria
+
+No public endpoints; private deployment access gate verified.
+Security smoke tests clean.
+Reporting and Handoffs
+
+Post Hourly CEO updates for first 6 hours after change window using /tmp/hour_0_snapshot_final.sh.
+Deliver a single “READINESS_PACKAGE” folder with:
+Dashboards links + exported definitions
+Alert policies
+Synthetics definitions
+Test reports (before/after)
+Load test report for rate limiter
+Updated runbooks and SECURITY_READINESS.md
+Confirm no SLO or stop-loss breaches during rollout.
+Rollout Plan and Rollback
+
+Staged rollout: deploy Redis-enabled limiter behind a feature flag RATE_LIMIT_BACKEND=redis; enable canary at 10% traffic for 30 minutes; then 100%.
+Automatic rollback if 5xx ≥ 1% for 5 minutes, or P95 ≥ 300ms for 5 minutes, or auth failures 3x baseline for 5 minutes. Keep maintenance splash ready.
+On rollback, attach logs and diffs in the status post.
+Definition of Done (100% Readiness)
+
+Redis-backed rate limiting live with automatic fallback; logs enriched and load-tested.
+Auth, WAF, Infra dashboards live with alerts; synthetics green and alerting to Slack.
+Tests 13/13 green with added security regressions; automated reports in place.
+Security posture re-verified; private access intact; docs updated.
+No SLO breaches; P95 < 120ms; 5xx < 1%.
+End of prompt.
+
+Rationale from CEO
+
+This closes the operational gaps while preserving our secure, invite-only posture and stop-loss governance. It leverages built-in deployment monitoring/logs and private access controls for a low-CAC, low-risk ramp-up consistent with our operating model .
+It aligns with our Responsible AI and platform trust commitments—security, availability, and privacy are core product features, not afterthoughts .
+Resiliency and secrets discipline are explicitly mandated to avoid brittle failures as we scale usage and traffic .

@@ -45,6 +45,12 @@ class RequestIDMiddleware(BaseHTTPMiddleware):
             auth_result = getattr(request.state, "auth_result", "no_auth_required")
             waf_rule = getattr(request.state, "waf_rule", None)
             
+            # CEO 100% READINESS: Extract rate limiting fields (Workstream A)
+            rate_limit_state = getattr(request.state, "rate_limit_state", "allow")
+            rate_limit_key = getattr(request.state, "rate_limit_key", None)
+            tokens_remaining = getattr(request.state, "tokens_remaining", None)
+            rl_backend = getattr(request.state, "rl_backend", "memory")
+            
             # Build structured log entry
             log_entry = {
                 "ts": time.time(),
@@ -55,6 +61,10 @@ class RequestIDMiddleware(BaseHTTPMiddleware):
                 "auth_result": auth_result,
                 "waf_rule": waf_rule,
                 "request_id": request_id,
+                "rate_limit_state": rate_limit_state,
+                "rate_limit_key": rate_limit_key,
+                "tokens_remaining": tokens_remaining,
+                "rl_backend": rl_backend,
                 "user_agent": request.headers.get("user-agent", "unknown")[:100]
             }
             
