@@ -40,6 +40,7 @@ from routers.db_status import router as db_status_router
 from routers.devrel import router as devrel_router
 from routers.disaster_recovery import router as disaster_recovery_router
 from routers.eligibility import router as eligibility_router
+from routers.external_billing import router as external_billing_router
 from routers.health import router as health_router
 from routers.infrastructure_status import router as infrastructure_router
 from routers.operations_framework import router as operations_framework_router
@@ -374,6 +375,7 @@ app.include_router(onboarding_router, tags=["Magic Onboarding"])
 # AI Scholarship Playbook: Monetization endpoints (Credit System)
 from routers.monetization import router as monetization_router
 
+app.include_router(external_billing_router, tags=["External Billing"])
 app.include_router(monetization_router, tags=["Monetization"])
 
 # AI Scholarship Playbook: B2B Partner Portal endpoints

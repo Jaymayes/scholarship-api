@@ -400,11 +400,18 @@ class MonetizationService:
         amount_usd: float,
         payment_method_id: str
     ) -> bool:
-        """Process payment via Stripe (stubbed for MVP)"""
-        # In production, this would integrate with Stripe
-        logger.info(f"Processing ${amount_usd} payment for user {user_id}")
-        await asyncio.sleep(0.1)  # Simulate payment processing
-        return True  # Assume success for MVP
+        """
+        Payment processing externalized to billing apps
+        This method should not be called - use external billing endpoints instead
+        """
+        logger.error(
+            f"DEPRECATED: In-app payment processing called for user {user_id}. "
+            f"Payments are externalized - use /billing/external/credit-grant instead"
+        )
+        raise ValueError(
+            "In-app payment processing is disabled. "
+            "Use external billing app to process payments and grant credits."
+        )
 
     def _calculate_savings_vs_payperuse(self, transactions: list[CreditTransaction]) -> float:
         """Calculate user savings vs hypothetical pay-per-use pricing"""

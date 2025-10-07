@@ -6,7 +6,18 @@ The business vision is to provide a comprehensive, intelligent platform that con
 
 ## Recent Progress (2025-10-07)
 
-### P0 Blockers - Launch Readiness (LATEST)
+### External Billing Implementation (LATEST)
+- **Payment Externalization**: ✅ COMPLETE - All in-app payment processing removed per CEO directive
+  - **Removed**: Stripe SDK, in-app checkout, payment stubs
+  - **Implemented**: External billing API with HMAC signature validation (SHA-256, 5-min expiry)
+  - **Endpoints**: `/billing/external/credit-grant`, `/billing/external/provider-fee-paid`
+  - **Security**: Bearer token auth, idempotency via external_tx_id, WAF bypass for legitimate JSON
+  - **Analytics**: PaymentCompletedExternal, ProviderFeePaidExternal, CreditBalanceUpdated events
+  - **Credit Economy**: Preserved - consumption/confirm flows unchanged, balance sharing verified
+- **Feature Flags**: `payments_external_enabled=true`, `payments_external_test_mode=false`
+- **B2C/B2B KPIs**: Analytics events track amount_usd, credits, source_app for revenue metrics
+
+### P0 Blockers - Launch Readiness
 - **P0-1 Health Endpoints**: ✅ COMPLETE - Two-tier health architecture approved by architect
   - **Fast endpoint** (`/api/v1/health`): P95 145.6ms < 150ms target - DB & Redis checks for external monitors
   - **Deep endpoint** (`/api/v1/health/deep`): P95 869ms < 1000ms target - Comprehensive validation with real AI service checks
@@ -16,7 +27,7 @@ The business vision is to provide a comprehensive, intelligent platform that con
   - PostgreSQL 16.9 on Neon with Let's Encrypt validation
   - TLS 1.3 active, connection pooling (5+10), 0% error rate
 - **P0-2 Redis**: 🟡 PENDING - Requires managed Redis provisioning (external dependency)
-- **P0-3 Payments**: 🔴 PENDING - Requires E2E testing (external dependency)
+- **P0-3 Payments**: ✅ EXTERNALIZED - Payment processing moved to external billing apps (see above)
 
 ### Previous Work
 - **Dashboard Metrics Fix**: ✅ RESOLVED - All 3 dashboards (auth, WAF, infrastructure) now operational with real-time metrics from Prometheus REGISTRY

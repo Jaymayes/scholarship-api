@@ -45,7 +45,21 @@ class Settings(BaseSettings):
     
     # Feature Flags - CEO Executive Directive: Default payments OFF until validated
     payments_enabled: bool = Field(False, alias="PAYMENTS_ENABLED")
+    payments_external_enabled: bool = Field(True, alias="PAYMENTS_EXTERNAL_ENABLED")
+    payments_external_test_mode: bool = Field(False, alias="PAYMENTS_EXTERNAL_TEST_MODE")
     essay_assistance_enabled: bool = Field(False, alias="ESSAY_ASSISTANCE_ENABLED")
+    
+    # External Billing Security
+    external_billing_secret: str = Field(
+        "dev-secret-key-change-in-production",
+        alias="EXTERNAL_BILLING_SECRET",
+        description="HMAC secret for validating external billing callbacks"
+    )
+    external_billing_api_key: str = Field(
+        "dev-api-key-change-in-production",
+        alias="EXTERNAL_BILLING_API_KEY",
+        description="API key for external billing app authentication"
+    )
     
     # P1 CEO Directive: SSL encryption enforcement
     # Using sslmode=require (Neon recommended) - provides encrypted connection with CA validation

@@ -90,34 +90,28 @@ async def purchase_credits(
     request_data: PurchaseCreditsRequest,
     current_user: User = Depends(require_auth())
 ) -> PurchaseCreditsResponse:
-    """Purchase credit package with payment processing"""
-    try:
-        # Find the package
-        package = next((p for p in CREDIT_PACKAGES if p.package_id == request_data.package_id), None)
-        if not package:
-            raise HTTPException(status_code=400, detail="Invalid credit package")
-
-        # Process purchase
-        transaction, balance = await monetization_service.purchase_credits(
-            user_id=current_user.user_id,
-            package_id=request_data.package_id,
-            payment_method_id=request_data.payment_method_id
-        )
-
-        return PurchaseCreditsResponse(
-            success=True,
-            transaction_id=transaction.transaction_id,
-            new_balance=balance.available_credits,
-            credits_purchased=package.credits,
-            bonus_credits=package.bonus_credits,
-            total_cost_usd=package.price_usd
-        )
-
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e))
-    except Exception as e:
-        logger.error(f"Credit purchase failed: {str(e)}")
-        raise HTTPException(status_code=500, detail="Credit purchase failed")
+    """
+    DEPRECATED: In-app credit purchases are externalized
+    
+    **This endpoint is disabled.** Credit purchases are now handled by external billing apps.
+    
+    To purchase credits:
+    1. Redirect user to external billing app
+    2. External app processes payment via Stripe/other gateway
+    3. External app calls POST /billing/external/credit-grant to grant credits
+    
+    **Response:** Returns 410 Gone - feature moved to external billing
+    """
+    raise HTTPException(
+        status_code=410,
+        detail={
+            "error": "In-app purchases externalized",
+            "message": "Credit purchases are now processed by external billing apps",
+            "action": "Redirect user to external billing URL for payment",
+            "external_billing_url": "https://billing.scholarshipai.app/purchase",
+            "available_packages": [p.model_dump() for p in CREDIT_PACKAGES]
+        }
+    )
 
 @router.post("/consume")
 @rate_limit()

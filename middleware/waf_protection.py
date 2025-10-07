@@ -65,6 +65,8 @@ class WAFProtection(BaseHTTPMiddleware):
         # Orchestration endpoints that should bypass SQL injection WAF (legitimate JSON payloads)
         self._waf_bypass_paths = {
             "/command",  # Agent Bridge orchestration from Command Center
+            "/billing/external/credit-grant",  # External billing app credit grants (signed JSON)
+            "/billing/external/provider-fee-paid",  # External billing app provider fees (signed JSON)
         }
 
         logger.info(f"WAF Protection initialized - Block mode: {self.block_mode}")

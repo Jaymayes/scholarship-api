@@ -1,0 +1,111 @@
+Approved. We will externalize all billing to other apps and fully remove in-app payment processing. Guardrails: do not break the credit economy or our KPI instrumentation for B2C conversion, ARPU, and B2B provider revenue; those metrics remain core to the plan and forecasts in the Playbook, even if collection occurs elsewhere  .
+
+Copy-paste prompt for the engineering agent
+
+Title: Decommission in-app payments and externalize billing
+
+Objective
+
+Remove all first-party payment processing (Stripe, Checkout, webhooks, fee capture) from the codebase.
+Preserve core business flows: credit consumption for AI features and provider marketplace operations.
+Replace in-app purchase flows with externalized payment links and a secure “credit grant”/“fee paid” callback API from external billing apps.
+Maintain analytics needed for KPIs: B2C conversion events, ARPU, and B2B 3% fee tracking, even if revenue is recorded as external-payment events .
+Scope of change
+
+Delete or disable all Stripe dependencies, keys, endpoints, and webhooks.
+Remove any “assume success for MVP” payment stubs and purchase endpoints.
+Replace purchase entry points with:
+External payment link handoff for students purchasing credits.
+External invoice/payment workflow for provider fees.
+Add a secure server-to-server endpoint for external apps to:
+Grant credits to a user after payment success.
+Record provider fee payments and reconcile balances.
+Keep credit ledger, entitlements, and provider records intact.
+Maintain event tracking for revenue-related analytics.
+Detailed tasks
+
+Code and dependencies
+Remove Stripe SDK imports, clients, and webhook handlers across backend services.
+Remove or gate all payment-related feature flags to default OFF.
+Replace PaymentService with NoOpPaymentService + ExternalBillingAdapter:
+NoOpPaymentService: returns “not supported” for create/confirm charges.
+ExternalBillingAdapter: validates signed requests from external billing apps to update internal state (see API below).
+2. Data model and migrations
+
+Do not drop historical payment tables; mark them deprecated and read-only.
+Add tables/fields:
+external_credit_grants(id, user_id, credits, external_tx_id, source_app, amount_usd, granted_at).
+external_provider_fee_payments(id, provider_id, external_tx_id, amount_usd, period_start, period_end, paid_at).
+users.external_payment_links (nullable) for deep links to the external checkout, if needed.
+Add indexes on user_id/provider_id and external_tx_id for reconciliation.
+3. Public/server APIs for external billing apps
+
+POST /billing/external/credit-grant
+Headers: Authorization: Bearer <service_key>
+Body: user_id, credits, amount_usd, external_tx_id, source_app, signature, timestamp
+Behavior: idempotent by external_tx_id; on success, increment user credit_balance and append to external_credit_grants; emit analytics events (see 5).
+POST /billing/external/provider-fee-paid
+Headers: Authorization: Bearer <service_key>
+Body: provider_id, amount_usd, period_start, period_end, external_tx_id, signature, timestamp
+Behavior: idempotent; mark fee as paid for the period and record in external_provider_fee_payments; emit analytics events.
+4. UI/UX changes
+
+Replace “Buy credits” with “Purchase credits” leading to external link or instruction.
+For providers, replace “Pay 3% fee” with “View invoice” and a status badge that reflects external payment state via reconciliation API.
+Remove any embedded card forms or in-app checkout UI.
+5. Analytics and KPIs (must keep)
+
+Emit events on external callbacks:
+PaymentCompletedExternal (user_id, amount_usd, credits, source_app, external_tx_id)
+ProviderFeePaidExternal (provider_id, amount_usd, period)
+CreditBalanceUpdated (user_id, delta, reason=external_grant)
+Continue calculating:
+B2C conversion to credit purchase and ARPU from external events.
+B2B provider fee revenue from external fee events. These metrics are critical to our 5-year plan assumptions on conversion and ARPU .
+6. Security and reliability
+
+Require HMAC signature + timestamp on all external billing callbacks; reject if expired or signature invalid.
+Enforce idempotency on external_tx_id.
+Return 2xx only after DB commit is complete.
+Log all accepts/rejects with redaction of PII and secrets.
+Store credentials in environment secrets; no hard-coded keys (aligns with secure secret management guidance) .
+7. Feature flags and rollout
+
+Introduce flag payments.external_enabled=false to disable any residual paths.
+Add payments.external_test_mode flag to allow sandbox dry runs with no credit grant.
+Ship behind flag; run smoke tests; then remove dead UI affordances in a follow-up PR.
+8. Data retention and compliance
+
+Archive or migrate legacy payment data to a secure, read-only store; do not delete historical records.
+Remove any display of partial card data; purge unused payment-related PII from live tables.
+Update privacy policy references where applicable.
+9. Removal checklist
+
+All Stripe keys and webhook secrets purged from secrets manager.
+All Stripe routes return 410 Gone or are removed.
+Build passes without Stripe SDK.
+No references to card, checkout, or “payment_intent” in codebase.
+UI contains no in-app payment forms.
+Testing and acceptance criteria
+
+Unit tests: credit grant endpoint (auth, idempotency, signature), provider fee endpoint, ledger updates.
+Integration tests: external callback grants credits; user can spend credits; provider fee status updates after external payment.
+Analytics validation: PaymentCompletedExternal and ProviderFeePaidExternal events appear and feed KPI dashboards for conversion and revenue.
+Security: invalid signature/timestamp rejected; replay prevented; secrets not logged.
+Migration: zero data loss; historical payment views are read-only.
+Rollback plan
+
+Keep the old payment code on an archived branch.
+Changes are feature-flagged; rollback by re-enabling legacy payments if needed.
+Maintain a mapping doc for external_tx_id to legacy payment_id if reverting.
+Deliverables
+
+PR removing in-app payments and adding external endpoints.
+DB migration scripts.
+Updated environment variable manifest (without any payment keys).
+Runbook: how external apps call our endpoints and how ops reconciles revenue.
+Changelog and comms to support/documentation.
+Notes for the agent
+
+Be surgical: preserve the credit economy, provider workflows, and KPI instrumentation tied to B2C/B2B revenue as defined in the Playbook’s monetization architecture and projections .
+If you want, I can also provide a one-page runbook for finance/ops on reconciliation with the external billing apps.
