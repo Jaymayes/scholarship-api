@@ -1,0 +1,61 @@
+Executive decision: proceed with a tightly controlled soft launch; full public launch remains blocked until all P0 issues pass acceptance criteria below. This aligns with our Playbook mandate to prioritize platform trust, security, and resilience as core product features, not afterthoughts , and to scale via organic, low-CAC channels once foundations are sound . Compliance and privacy controls will be validated prior to any broad exposure, consistent with our FERPA/CCPA and transparency commitments, including clear privacy policies and anonymized analytics for partners  .
+
+Authorizations (effective immediately)
+
+Yes: Fix all P0 blockers now and set up the missing /api/v1/health endpoint.
+Yes: Run end-to-end payment validation and wire production canary gating.
+Yes: Verify database configuration and secrets management.
+Yes: Begin COPPA/FERPA gap validation and load-test prep in parallel.
+24-hour P0 plan with acceptance criteria
+Owner assignments are suggestions; use our on-call matrix to confirm.
+
+P0-1 Health endpoint (Platform Eng, SRE) — target 60 minutes
+
+Action: Implement /api/v1/health returning 200 with JSON including service checks: db: ok, redis: ok, ai: ok, version, commit_sha, uptime_s.
+Acceptance: External monitor observes >99.9% success over 30 minutes with P95 <150ms; alerts wired to on-call. Visibility in deployment dashboards per our ops tooling to minimize MTTR .
+Resilience: Add retries with exponential backoff for dependency checks and short-circuit failures (circuit breaker) to prevent cascading issues .
+P0-2 Redis provisioning for rate limiting (Platform Eng) — target 3 hours
+
+Action: Provision managed Redis with TLS and auth; configure rate limiting middleware with centralized store; set safe defaults (e.g., 100 req/min per IP, burst handling).
+Acceptance: Load test the rate limiter at 3k RPS for 10 minutes with <1% 429 error rate for typical traffic shape; confirm no in-memory fallback in production.
+Resilience: Implement circuit breaker and fallback behavior (graceful degrade to conservative limits if Redis unreachable) and alarms on connection errors .
+P0-3 Payment flow E2E (Payments + QA) — target 6 hours
+
+Action: Test card, SCA/3DS, refunds, error paths, webhook signature verification, and idempotency; validate receipts and ledger entries. Gate live charges behind a 5% canary cohort until 20 consecutive successful live transactions with <1% failure.
+Acceptance: Green test matrix for success and failure cases; production webhooks verified; settlement events reflected in our revenue logs and BI extract. Monitor via dashboards; ship with kill switch.
+Rationale: Revenue capture integrity is a hard gate to our ARR plan and B2C monetization path; we don’t scale paid until this is bulletproof .
+P0-4 Database configuration (SRE/DevOps) — target 3 hours
+
+Action: Restore missing config file; move secrets to managed secrets store; validate connection pooling, SSL/TLS, and failover.
+Acceptance: Migration dry-run succeeds; read/write probe from app and from an external runner; connection error rate <0.1% over 30 minutes; backup snapshot verified.
+48-hour P1 plan (start in parallel; must finish within two days)
+
+COPPA/FERPA validation (Legal/Privacy Eng): Confirm age gating and parental consent workflow, data minimization, encryption in transit/at rest, DSR processes, retention policies, and updated privacy policy language reflecting collection and sharing practices. This follows our privacy and compliance blueprint and transparency commitments .
+Load testing at 2x peak (SRE/Perf): Execute 2x expected Day 1 peak with success criteria P95 <200ms and zero 5xx, validating auto-scaling and multi-AZ resilience patterns the Playbook calls for .
+Auto Page Maker QA (Growth/SEO): Verify sample output quality, indexability, canonical links, schema, and internal linking. This underpins our low-CAC acquisition strategy and Year 1 organic growth goals .
+KPI dashboards (Data): Stand up ARPU, CAC, free→paid conversion, MAU, and B2B provider metrics. We will not scale spend until these are live.
+Soft launch constraints and guardrails
+
+Audience: Private beta cohort only; staggered invites. Payments enabled only after P0-3 acceptance; otherwise run free features-only mode.
+Observability: Require live SLO panels (uptime, P95, 5xx, rate-limit stats, payment success) and deployment logs to accelerate MTTR .
+Resilience patterns: Ensure retries, circuit breakers, and graceful fallbacks are in place for all critical dependencies to prevent cascading failures during soft launch .
+Go/No-Go gates for full public launch
+
+All P0 acceptances passed in production and stable for 12 hours.
+COPPA/FERPA checks signed off by Legal; privacy policy deployed; encryption validated per Playbook 5.3 .
+Load test at 2x peak passes; auto-scaling and multi-AZ failover demonstrated per Playbook 5.1 .
+KPI dashboards live; initial soft launch baselines established. We keep paid growth aligned to organic SEO flywheel and partner acquisition, per strategy to scale efficiently toward $10M ARR (with B2B >80% of revenue by maturity) .
+Immediate next actions (execute now)
+
+Please implement the /api/v1/health endpoint and confirm green external checks within 60 minutes.
+Provision managed Redis and switch rate limiting to the shared store; post load test results.
+Run the payment E2E test suite; then enable a 5% live canary after QA sign-off.
+Restore DB config, rotate secrets, and validate connectivity.
+Reply back with:
+
+Health endpoint JSON sample and external monitor screenshot.
+Redis connection details (redacted), limiter config, and load test summary.
+Payment test matrix results and webhook verification logs.
+DB connectivity test results and backup verification.
+Thank you for the thorough readiness work. Execute with urgency and keep me posted on each acceptance as it passes. Once P0s are cleared, we will approve expanding the soft launch cohort; full launch will wait for compliance and 2x load gates per our platform trust mandates  .
+

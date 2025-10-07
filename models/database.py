@@ -36,30 +36,34 @@ if DATABASE_URL:
         "application_name": "scholarship_api"
     }
     
-    # Production SSL hardening - ALWAYS enforce verify-full for MITM protection
+    # Production SSL hardening - ALWAYS enforce certificate verification
     if settings.environment.value in ["production", "staging"]:
-        # CRITICAL SECURITY: Always use verify-full to prevent MITM attacks
-        connect_args.update({
-            "sslmode": "verify-full",  # MANDATORY: Verify server cert AND hostname
-            "sslcert": os.getenv("SSL_CLIENT_CERT"),  # Client certificate (optional mTLS)
-            "sslkey": os.getenv("SSL_CLIENT_KEY"),    # Client key (optional mTLS)
-            "sslrootcert": os.getenv("SSL_ROOT_CERT"), # CA certificate (REQUIRED)
-            "sslcrl": os.getenv("SSL_CRL"),           # Certificate revocation list (optional)
-            "target_session_attrs": "read-write"      # Ensure we connect to primary
-        })
+        ssl_root_cert = os.getenv("SSL_ROOT_CERT")
         
-        # Remove None values except sslrootcert which is critical for verification
-        connect_args = {k: v for k, v in connect_args.items() if v is not None}
-        
-        # SECURITY VALIDATION: Ensure CA certificate is available for verification
-        if not connect_args.get("sslrootcert") and settings.environment.value == "production":
+        if ssl_root_cert:
+            # CRITICAL SECURITY: Full verification when root cert available
+            connect_args.update({
+                "sslmode": "verify-full",  # Verify server cert AND hostname
+                "sslcert": os.getenv("SSL_CLIENT_CERT"),  # Client certificate (optional mTLS)
+                "sslkey": os.getenv("SSL_CLIENT_KEY"),    # Client key (optional mTLS)
+                "sslrootcert": ssl_root_cert, # CA certificate
+                "sslcrl": os.getenv("SSL_CRL"),           # Certificate revocation list (optional)
+                "target_session_attrs": "read-write"      # Ensure we connect to primary
+            })
+            # Remove None values
+            connect_args = {k: v for k, v in connect_args.items() if v is not None}
+        else:
+            # CRITICAL SECURITY: Use system CA bundle for managed cloud databases
+            # Neon uses Let's Encrypt (ISRG Root X1) which is in system trust store
             import logging
-            logging.critical(
-                "PRODUCTION SECURITY ERROR: SSL_ROOT_CERT is required for verify-full mode. "
-                "Set SSL_ROOT_CERT environment variable or use managed SSL."
+            logging.info(
+                "Production SSL: Using system CA bundle (/etc/ssl/certs/ca-certificates.crt) "
+                "for certificate verification with sslmode=verify-full"
             )
-            # For Replit managed SSL, fallback to verify-ca (server cert only)
-            connect_args["sslmode"] = "verify-ca"
+            # verify-full: Full validation (cert + hostname) using system CA bundle
+            # Neon/RDS/managed providers have valid public certs in Ubuntu trust store
+            connect_args["sslmode"] = "verify-full"
+            connect_args["sslrootcert"] = "/etc/ssl/certs/ca-certificates.crt"
     
     engine = create_engine(
         DATABASE_URL,
