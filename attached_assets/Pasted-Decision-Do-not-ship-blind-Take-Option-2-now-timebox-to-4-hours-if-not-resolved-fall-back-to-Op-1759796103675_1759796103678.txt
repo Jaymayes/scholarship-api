@@ -1,0 +1,46 @@
+Decision: Do not ship blind. Take Option 2 now, timebox to 4 hours; if not resolved, fall back to Option 3 behind a feature flag for staging only. Do not accept Option 1 beyond dev.
+
+Rationale
+
+Observability is a production gate. Shipping without working dashboards violates our SLO governance and increases operational risk.
+The issue is likely multiprocess Prometheus client configuration and registry usage. This should be solvable within 2–4 hours and gives us a robust, scalable fix.
+A temporary parser fallback is acceptable only as a short-term safety net if the root-cause fix slips.
+Execution plan (immediate)
+
+Confirm process model
+Are we running multiple workers (gunicorn/uvicorn)? If yes, we must use Prometheus multiprocess mode.
+2. Implement correct multiprocess setup
+
+Set PROMETHEUS_MULTIPROC_DIR at process start; clear this directory on every app boot.
+Initialize a fresh CollectorRegistry and attach multiprocess.MultiProcessCollector(registry) before creating/serving metrics.
+Ensure the /metrics endpoint uses generate_latest(registry) from the MultiProcessCollector-backed registry.
+Do not access private attributes like _registry.
+3. Make dashboards read from the same registry
+
+The JSON dashboard endpoints should read from the MultiProcessCollector-backed registry (REGISTRY.collect() on the correct registry) and aggregate across workers.
+Common pitfall: metrics defined before multiprocess collector initialization or in a module imported before the registry is configured. Ensure initialization order is: set PROMETHEUS_MULTIPROC_DIR -> build registry + attach MultiProcessCollector -> import modules that define metrics.
+4. Validation (automated)
+
+Spin up with 2+ workers, issue known auth and WAF actions, then assert:
+/metrics shows non-zero counters
+Dashboard JSON returns matching non-zero values
+Add a unit/integration test that validates dashboards > 0 after synthetic transactions.
+5. Timebox and fallback
+
+Timebox: 4 hours engineering time.
+If unresolved at T+4h, enable a temporary parser fallback for staging only:
+Parse generate_latest(registry) via prometheus_client.parser to populate dashboard JSON.
+Mark as temporary; log technical debt and target removal next sprint.
+Guardrails and acceptance criteria
+
+Dashboards must reflect non-zero values that match /metrics within 1% for counters after synthetic runs.
+Works under multi-worker configuration (min 2 workers).
+No private API usage; no reliance on single-worker assumptions.
+Include a runbook: bootstrap order, env vars, cleanup of PROMETHEUS_MULTIPROC_DIR, and known failure modes.
+Add an alert if dashboards return all zeros for >5 minutes in production.
+Ownership and next steps
+
+Assign: Observability lead engineer owns fix; SRE partner verifies multiprocess env and start-up scripts.
+Deadline: Today EOD for root-cause fix; if fallback is needed, staging only by EOD, and schedule root fix in the next sprint (first item).
+Status cadence: Post an update at T+2h with findings; final update at T+4h with go/no-go on the fallback.
+If you need it, I can approve a 0.5-day SRE assist to accelerate the multiprocess setup and boot order audit.

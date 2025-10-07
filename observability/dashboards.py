@@ -65,7 +65,7 @@ async def auth_dashboard():
         # This is necessary because get_sample_value requires exact label match
         endpoints_statuses = set()
         for metric_family in REGISTRY.collect():
-            if metric_family.name == "auth_requests_total":
+            if metric_family.name == "auth_requests":
                 for sample in metric_family.samples:
                     if not sample.name.endswith('_created'):
                         endpoint = sample.labels.get('endpoint')
@@ -102,7 +102,7 @@ async def auth_dashboard():
         ops_statuses = set()
         
         for metric_family in REGISTRY.collect():
-            if metric_family.name == "auth_token_operations_total":
+            if metric_family.name == "auth_token_operations":
                 for sample in metric_family.samples:
                     if not sample.name.endswith('_created'):
                         op = sample.labels.get('operation')
