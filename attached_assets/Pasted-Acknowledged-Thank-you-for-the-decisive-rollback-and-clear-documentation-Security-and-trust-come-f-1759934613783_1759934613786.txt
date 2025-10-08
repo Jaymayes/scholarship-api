@@ -1,0 +1,46 @@
+Acknowledged. Thank you for the decisive rollback and clear documentation. Security and trust come first; the rollback aligns with our Responsible AI and uptime commitments while protecting our organic growth engine.
+
+Executive decisions and directives
+
+Proceed with the 3-phase plan as proposed, with the following acceptance criteria and guardrails:
+Phase 1 (RCA, by T+4:30)
+Deliver a sequence diagram of Edge → Proxy → WAF → Auth → App with captured headers from both localhost and true external traffic, plus a minimal cURL reproducer for the failing/working paths.
+Include a diff of middleware ordering and a unit test that asserts the intended order (monitor-only wrapper vs. auth check). Governance of security-critical order is a must-have going forward, not a best-effort (aligns with our “human-in-the-loop” architectural governance over autonomous implementation) .
+Phase 2 (Surgical fix, by T+5:30)
+WAF must respect proxy headers and apply policy post header normalization.
+Implement scoped exceptions for designated public GET endpoints only; maintain required auth for search APIs.
+Bot protection: allowlist verified search engine crawlers using forward-confirmed reverse DNS (not UA string alone) and cap request rates per bot to protect latency SLAs. Keep credentials and controls out of code via Secrets management and maintain full TLS in transit for all services .
+Phase 3 (Canary, T+5:30–T+6:30, 5% traffic)
+Success thresholds:
+2xx success rate within 0.5 percentage points of pre-rollback baseline.
+WAF false-positive rate on public GET endpoints <0.10%; 0% on sitemap and top traffic landing pages.
+Bot crawl success (verified Googlebot/Bingbot) ≥98% for top 100 SEO pages during canary; track with logs and live fetch from verified IPs.
+P95 latency ≤120 ms (our SLO), no material regression at P99.
+No increase in 5xx rate; error budget remains intact.
+Rollout plan: if canary passes, ramp 5% → 25% → 50% → 100% with 15-minute soaks and active rollback lever. Ensure operational monitoring and dashboards are in place per our deployment readiness standards .
+2. SEO and public content protection (critical to CAC and organic growth)
+
+Keep all public content cacheable and crawlable; ensure public GET endpoints remain served without auth while sensitive operations stay behind auth. Favor static delivery or edge caching for the Auto Page Maker pages to minimize origin exposure and latency where practical (static/edge paths are a cost-effective, high-performance option) .
+Maintain strict auth on search APIs; do not reintroduce optional auth. If anonymous read is needed for UI, front it with a read-only, cached aggregator or static prerender—do not expose the full search API anonymously.
+3. Reliability and safety nets
+
+Implement integration tests that simulate external traffic with realistic proxy headers and spoof attempts; include negative tests for UA spoofing. Add circuit-breaker/timeout protections to avoid cascading failures if WAF misconfiguration reappears under load; we design for failure, not hope against it .
+Preserve one-click rollback and feature flag gating for WAF policy toggles going forward. Canary-first is mandated for all policy changes touching routing, auth, or WAF.
+4. Reporting and communications
+
+By T+4:30: Post the RCA snapshot (diagram, headers, tests) in NO_GO_REPORT.md and ping me.
+By T+6:30: Provide the canary report with the five metrics above, plus a short commentary on observed bot behavior.
+Publish a brief, low-friction status note on our status page and provider channel: “Temporary rollback to ensure stable access; no data or security risk; returning with a measured canary.” Keep it concise and factual.
+Schedule a 30-minute post-incident review within 24 hours to codify permanent test coverage for middleware ordering and bot verification. Reinforce disciplined secrets handling and TLS-by-default across services, as consistently recommended for secure inter-service communication on our platform .
+5. Business/KPI lens
+
+Growth: Quantify the impact on crawl activity and organic sessions during the incident window and during canary (compare baseline 2xx rates and crawl success). This ties directly to CAC and our SEO-led acquisition thesis.
+SLOs: We met latency at 108 ms post-rollback; maintain ≤120 ms P95 throughout remediation and canary. Any violation pauses rollout.
+Cost/risk: Keep the remediation within the 2-hour timebox; beyond that, we hold the rollback and reassess for a larger change package in the next deployment window.
+Strategic note
+
+This incident underscores why architectural governance must remain human-led while agents execute. Policy/middleware ordering, security posture, and rollout discipline are executive guardrails; the system automates the how, we own the what/why . Our deployment and monitoring rigor is an explicit part of production readiness and protects both uptime and growth economics .
+Approval
+
+Approved to execute Phases 1–3 under the criteria above. The Go/No-Go at T+6:30 is data-driven; no exceptions. If any metric misses, we extend the rollback, refine, and retry via canary.
+Blockers or resourcing gaps? Flag immediately.
