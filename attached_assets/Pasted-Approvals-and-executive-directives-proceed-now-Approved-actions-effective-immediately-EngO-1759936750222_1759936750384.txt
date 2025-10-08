@@ -1,0 +1,49 @@
+Approvals and executive directives — proceed now
+
+Approved actions (effective immediately)
+
+EngOps: Send the P0 email now.
+Use P0_EMAIL_READY_TO_SEND.txt; attach RCA_PHASE1_FINDINGS.md, P0_INCIDENT_TRACKER.md, NO_GO_REPORT.md.
+Request an acknowledgement and estimated time to resolution (ETR) within 15 minutes and a technical contact for live triage.
+Incident Commander: Publish the status page and post the #incidents-p0 update now.
+Use STATUS_PAGE_MESSAGE.txt; update cadence: next at T+5:30, then every 30 minutes until green.
+Run synthetic_monitoring_setup.sh to capture baseline and verify external reachability from all 5 regions before and after any change.
+Marketing: Pause paid campaigns to /scholarships and /search and reroute brand to /credits/packages. Confirm in #incidents-p0 with campaign IDs and spend at risk.
+Finance/RevOps: Execute the impact model and post in #exec within 30 minutes: hourly conversion loss, ARR impact, CAC waste. Highlight SEO risk exposure.
+Option B auto-deploy — confirmed and gated
+
+Go decision: Proceed automatically at T+6:20 unless Replit provides both (a) a confirmed root cause on their side and (b) a credible, written ETR ≤ 30 minutes with mitigation steps underway by T+6:15. If both are met, hold for 30 minutes; otherwise ship Option B at T+6:20.
+Success criteria to declare “green”:
+GET /scholarships and GET /search return 200/304 externally; SEO crawlers receive 200/304.
+P95 latency < 120 ms; error rate < 0.1%; no auth bypass on any mutation verbs.
+Rate limiting preserved; audit logs populated (IP, timestamp, scope).
+Rollback/abort conditions (feature flag one-command):
+Any region shows sustained (≥5 minutes) P95 latency ≥ 200 ms or error rate ≥ 0.5%.
+Token validation anomalies or secret exposure signals.
+SEO signals indicate unexpected crawler blocks beyond 10 minutes after cutover.
+Security and ops notes:
+Store the bypass token in Replit Secrets; limit scope and rotate daily (owner: Security). This aligns with our Replit deployment playbook for secure secrets handling and production hygiene .
+Expect a brief restart window consistent with autoscale/reserved VM behavior; monitor immediately after restart per our Replit ops guidance on deployments and post-launch monitoring .
+Execute the QA_VALIDATION_CHECKLIST.md at T+8:20; treat it as a quality gate per our standardized test governance practices .
+SEO risk mitigation
+
+If Option B is not live by T+6:40, serve 503 with a Retry-After header on /scholarships and /search as documented, not permanent redirects. This protects crawl budgets and indexing integrity while we restore 200s.
+Communications and ethics
+
+External language should be student-first, transparent, and non-accusatory. Emphasize that browsing of public scholarships is temporarily impacted; no user accounts or PII are affected. Continue to reinforce our Responsible AI and data minimization posture.
+KPIs to monitor continuously
+
+Technical: P95 latency, error rate, 5-region availability; synthetic probe pass rate.
+SEO: Share of 200/304 responses to Googlebot/Bingbot; crawl stats deltas after mitigation.
+Revenue: Hourly conversion loss, CAC waste from paused campaigns; ARPU shift due to reroute to /credits/packages.
+Ownership and confirmations (post in #incidents-p0)
+
+EngOps: “P0 email sent + ticket ID + requested 15-min ACK.” Due now.
+Incident Commander: “Status page published + next update T+5:30; synthetic monitoring baseline complete.” Due now.
+Marketing: “Campaigns paused/rerouted + spend-at-risk summary.” Due within 15 minutes.
+Finance/RevOps: “Revenue impact posted to #exec.” Due within 30 minutes.
+Security: “Bypass token owner + rotation schedule confirmed.” Due by T+6:10.
+Rationale
+
+Proceeding protects our core B2C acquisition and conversion engine by restoring read-only GET access for students and crawlers while maintaining strict auth on mutations and preserving our low-CAC, SEO-led growth strategy. Secrets management and post-deploy monitoring follow our Replit production readiness standards, minimizing operational and security risk during incident response .
+Please execute and confirm in channel now.
