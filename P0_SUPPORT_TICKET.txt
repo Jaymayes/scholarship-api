@@ -1,0 +1,158 @@
+TO: support@replit.com
+SUBJECT: P0: Replit WAF (Google Frontend) incorrectly blocking public GET endpoints
+PRIORITY: P0 - Customer Impacting
+
+================================================================================
+REPLIT PROJECT DETAILS
+================================================================================
+
+Repl Name: scholarship-api
+Repl Owner: jamarrlmayes  
+Production URL: https://scholarship-api-jamarrlmayes.replit.app
+Environment: Production deployment (live customer traffic)
+
+================================================================================
+ISSUE SUMMARY
+================================================================================
+
+External GET requests to our public scholarship discovery endpoints are being 
+blocked by Replit's infrastructure WAF (Google Frontend / Cloud Armor) with 
+403 Forbidden responses. This breaks core student discovery functionality and 
+SEO indexing, causing 100% failure rate for external users.
+
+AFFECTED ENDPOINTS:
+- GET /api/v1/scholarships (scholarship listing)
+- GET /api/v1/search (scholarship search)
+
+BUSINESS IMPACT:
+- SEO: Search engine crawlers (Googlebot/Bingbot) cannot index scholarships
+- Conversion: Students cannot browse available scholarships externally
+- Revenue: Paid acquisition traffic wasting CAC on broken endpoints
+
+================================================================================
+EVIDENCE & ROOT CAUSE
+================================================================================
+
+1. RESPONSE HEADERS (External requests):
+```
+HTTP/2 403
+server: Google Frontend
+via: 1.1 google
+x-waf-rule: WAF_AUTH_001
+x-waf-status: blocked
+```
+
+2. APPLICATION BEHAVIOR:
+✅ Localhost: All endpoints return 200 OK (application code working)
+✅ Localhost + proxy headers: 200 OK (headers are NOT the issue)
+❌ External requests: 403 Forbidden (blocked BEFORE reaching application)
+✅ GET /api/v1/credits/packages: 200 OK (proves different WAF rule)
+
+3. APPLICATION LOGS: 
+ZERO WAF block entries for external requests in application logs, proving 
+blocks occur at Replit infrastructure layer (Google Frontend), not in 
+application code.
+
+4. ROOT CAUSE:
+Replit infrastructure WAF is enforcing authentication requirements on endpoints
+that our application intends to be publicly accessible for student browsing and
+SEO indexing. Application-level WAF correctly allows all GET requests (verified
+via extensive localhost testing, middleware unit tests, and header simulations).
+
+================================================================================
+REPRODUCTION STEPS
+================================================================================
+
+FAILS (External - blocked by Replit infrastructure WAF):
+```bash
+curl -v https://scholarship-api-jamarrlmayes.replit.app/api/v1/scholarships
+# Returns: HTTP/2 403 Forbidden
+# Headers: server: Google Frontend, x-waf-rule: WAF_AUTH_001
+```
+
+WORKS (Localhost - proves application code correct):
+```bash
+curl -v http://localhost:5000/api/v1/scholarships  
+# Returns: HTTP/1.1 200 OK
+# Application logs show successful request processing
+```
+
+WORKS (Localhost + proxy headers - proves headers not the issue):
+```bash
+curl -v http://localhost:5000/api/v1/scholarships \
+  -H "X-Forwarded-For: 1.2.3.4" \
+  -H "X-Real-IP: 1.2.3.4" \
+  -H "X-Forwarded-Proto: https"
+# Returns: HTTP/1.1 200 OK
+```
+
+================================================================================
+REQUESTED FIX
+================================================================================
+
+Please add WAF exceptions at the Replit infrastructure level (Google Cloud 
+Armor) for the following public endpoints:
+
+ALLOW:
+- GET /api/v1/scholarships (public scholarship discovery)
+- GET /api/v1/search (public search for students)
+
+PRESERVE AUTHENTICATION (keep current blocking):  
+- POST /api/v1/scholarships (mutations require auth)
+- PUT /api/v1/scholarships/* (mutations require auth)
+- PATCH /api/v1/scholarships/* (mutations require auth)
+- DELETE /api/v1/scholarships/* (mutations require auth)
+
+This configuration allows public read access for student discovery and SEO 
+while maintaining security for mutations.
+
+================================================================================
+TECHNICAL DOCUMENTATION ATTACHED
+================================================================================
+
+1. RCA_PHASE1_FINDINGS.md - Complete root cause analysis including:
+   - Sequence diagrams (localhost vs external request flows)
+   - Header comparison (all request types)
+   - Middleware ordering verification + unit tests
+   - Full curl reproducers
+
+2. P0_INCIDENT_TRACKER.md - Incident timeline and business impact
+
+3. Application logs showing zero WAF blocks for external requests
+
+4. Middleware code proving GET requests allowed at application layer
+
+================================================================================
+URGENCY & SLA REQUEST
+================================================================================
+
+Priority: P0 - Customer Facing
+Impact: 100% external failure rate on core discovery endpoints
+Timeline: 2-hour fallback plan to application workaround if not resolved
+
+REQUEST:
+1. Please confirm ticket receipt
+2. Provide ETA for WAF configuration update
+3. Advise if additional information needed
+
+We have a prepared application-level workaround but prefer infrastructure-side
+resolution to avoid technical debt and maintain clean separation of concerns.
+
+================================================================================
+CONTACT INFORMATION
+================================================================================
+
+Primary: jamarrlmayes (Replit account owner)
+Incident Commander: EngOps Lead
+Incident Channel: Available for immediate follow-up
+
+Thank you for urgent attention to this production issue.
+
+================================================================================
+ATTACHMENTS
+================================================================================
+
+See attached files in Repl workspace:
+- RCA_PHASE1_FINDINGS.md
+- P0_INCIDENT_TRACKER.md  
+- NO_GO_REPORT.md

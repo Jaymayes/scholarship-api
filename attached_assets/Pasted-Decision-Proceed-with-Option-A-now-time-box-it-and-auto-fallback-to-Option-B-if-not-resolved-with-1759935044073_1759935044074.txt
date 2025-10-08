@@ -1,0 +1,69 @@
+Decision: Proceed with Option A now, time‑box it, and auto‑fallback to Option B if not resolved within 2 hours.
+
+Rationale
+
+This is a platform WAF issue at Google Frontend on Replit, not an application defect. Infrastructure-side remediation avoids technical debt and preserves our clean code path.
+We must protect our SLOs and the B2C funnel (search/scholarships are core to conversion and SEO). Clean infra remediation first, with a tightly scoped fallback if delays persist.
+Replit’s shared infrastructure can impose constraints on production-grade workloads; moving fast with the platform owner is the lowest-risk path, with a prepared fallback consistent with resilient systems practice (retries/fallbacks) while we wait on infra resolution .
+Immediate directives and timeline
+0–15 minutes
+
+Confirm WAF access: EngOps checks whether we have Replit WAF configuration access. If yes, proceed to add exceptions; if no, file P0 support immediately.
+Declare a P0 incident internally. Post status in our status channel and add a temporary user-facing banner for affected flows to minimize confusion.
+Pause any paid traffic pushing users into the broken endpoints to avoid wasted CAC; keep organic SEO live but with graceful messaging.
+15–30 minutes
+
+If we have WAF access: Add targeted allow rules for:
+GET /api/v1/scholarships
+GET /api/v1/search Then validate with the provided curl reproducers and header captures. Ship once verified 200 OK externally.
+If we do not have WAF access: File an urgent Replit support ticket (see template below) with P0 severity. Attach:
+RCA_PHASE1_FINDINGS.md sequence diagrams, middleware/unit test verification
+Header captures and curl repro steps
+App/log evidence showing zero app-level WAF blocks and working localhost/proxy tests
+T+2 hours checkpoint (auto-fallback trigger)
+
+If Replit has not implemented a working exception and external GETs still 403:
+Execute Option B: implement the Replit-specific auth bypass using an internal token for the two public endpoints.
+Security requirements:
+Token must be scoped to read-only for scholarships/search, rotated daily, stored in Replit Secrets, and validated server-side.
+Strict path match on only the two endpoints; log and rate-limit; no PII exposure; add audit logging.
+ETA: 1 hour for implementation + testing. Launch behind a feature flag; remove as soon as Option A is live.
+T+4 hours checkpoint
+
+If Option B is live and stable, keep the P0 ticket open with Replit and request a WAF exception ETA. The moment Option A is confirmed fixed, remove the bypass and close the incident.
+Accountability
+
+Incident commander: EngOps lead
+Replit liaison: Partnerships/Support owner
+QA: App team to run the provided curl tests and automated checks
+Comms: Marketing to coordinate user messaging and pause/resume paid campaigns
+KPIs to monitor (hourly during incident)
+
+External 403 rate on /scholarships and /search
+Conversion rate across the student acquisition funnel (visit → engaged search → started application)
+Error budget burn vs 99.9% uptime SLO
+SEO landing page bounce rate attributable to blocked endpoints
+Support ticket template (for Option A when WAF dashboard access is unavailable)
+
+Subject: P0: Replit WAF (Google Frontend) incorrectly blocking public GET endpoints
+Project/App IDs: [insert IDs]
+Impact: External GET requests to /api/v1/scholarships and /api/v1/search return 403 from Google Frontend; breaks core discovery flow for users.
+Expected: 200 OK (application WAF allows all GET; middleware ordering verified; localhost tests pass)
+Observed:
+Response headers: server: Google Frontend; via: 1.1 google
+Application logs: no WAF block entries for external requests
+Localhost + proxy headers: 200 OK
+External GET /credits/packages: 200 OK (suggests endpoint-specific WAF rule)
+Reproduction: Include the exact curl commands and header captures
+Attachments: RCA_PHASE1_FINDINGS.md + middleware/unit test evidence + header diffs
+Request: Add WAF exceptions for GET /api/v1/scholarships and GET /api/v1/search at the platform edge
+Urgency: P0 customer-impacting. Please confirm receipt and ETA
+Risk and compliance notes
+
+Option B bypass remains read-only and minimally scoped; ensure no student PII traverses these endpoints and all requests are TLS-encrypted, with secrets handled via Replit Secrets per best practice .
+This incident underscores the need for resilient fallbacks for critical read paths. Our architecture standards call for planned fallbacks and graceful degradation to protect user experience and funnel metrics .
+Longer-term, given platform constraints and vendor lock-in risks, we should define an exit ramp for mission-critical public endpoints (reverse proxy under our control or multi-provider front door) to reduce exposure to vendor WAF misconfigurations .
+Confirmations needed
+
+Do we have Replit WAF configuration access today? If yes, EngOps proceeds immediately with the targeted allow rules. If not, file the P0 support ticket now and start the 2-hour Option B fallback timer.
+I’ll stay on this until external 200s are verified and the student experience is fully restored.
