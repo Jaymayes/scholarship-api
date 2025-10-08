@@ -1,0 +1,49 @@
+Approve Option A with guardrails.
+
+Directive
+
+Switch WAF to monitor-only (detect/log, no block) for GET requests on public, read-only endpoints immediately to hit the T+7:00 deadline.
+Maintain full blocking for all mutating methods (POST/PUT/PATCH/DELETE) and for any endpoint that handles PII or payments.
+Scope (effective now)
+
+Monitor-only, no-block: GET /api/v1/scholarships, GET /api/v1/credits/packages, GET /api/v1/search
+Keep blocking: all non-GET methods; any admin/provider endpoints; checkout/payment flows; account/profile/auth flows.
+Compensating controls (must be in place before flip)
+
+Rate limiting: keep current limits on public GET; add per-IP and per-User-Agent ceilings (burst + sustained).
+Query safety for search:
+Hard cap query length (e.g., 128 chars), page size (max 25), and total offset ceilings.
+Parameterized queries only; no string concatenation; explicit allowlist for sort fields.
+Read-only DB role for these endpoints.
+Header normalization: strip/normalize proxy-injected headers before WAF evaluation and logging to avoid noisy matches; log both raw and normalized snapshots for diffing.
+Telemetry: log WAF rule hits (WAF_AUTH_001, WAF_SQLI_001) in monitor mode with request fingerprint (path, IP hash, UA, country, rule_id, matched_field), response code, and latency.
+Execution plan (ETA ~10–15 minutes)
+
+Toggle: Add conditional in WAF middleware to set mode=monitor for method==GET and path in public_allowlist.
+Deploy: Roll to production behind a 15-minute observation window.
+Smoke tests from external network:
+GET /api/v1/scholarships -> 200 OK, 15 items
+GET /api/v1/credits/packages -> 200 OK
+GET /api/v1/search?q=test -> 200 OK with results
+Confirm logs show WAF_AUTH_001 and/or WAF_SQLI_001 as “logged-only,” not blocked.
+KPI checks (live):
+P95 latency stays ~120ms target on read endpoints.
+Error rate <0.5% on these routes.
+No spike in 4xx/5xx beyond baseline.
+Follow-up (parallel, 60–90 minutes)
+
+Root-cause task force: diff localhost vs external requests
+Capture request/response pairs including headers from both paths.
+Identify which headers/patterns trigger WAF_AUTH_001, WAF_SQLI_001.
+Propose surgical ruleset update (e.g., ignore specific proxy headers, adjust regex sensitivity for GET bodies, path-specific rule overrides).
+Prepare rollback patch to re-enable blocking for GET at the endpoint level once the surgical fix is validated.
+Risk posture and timebox
+
+This monitor-only mode is temporary (max 24 hours). If the surgical fix is not ready in 24h, escalate for decision to keep monitor mode on specific endpoints only or revert.
+We are protected by: read-only endpoints, strict query caps, parameterized queries, rate limits, and real-time anomaly monitoring.
+Decision owner and comms
+
+Eng Lead: implement toggle + deploy now.
+Security Lead: verify compensating controls and monitor logs in real time.
+Ops: post status in #war-room every 15 minutes with WAF hit counts, latency, and error rates.
+Approve and proceed.
