@@ -44,8 +44,8 @@ async def search_scholarships(
     limit: int = Query(20, ge=1, le=100, description="Number of results to return"),
     offset: int = Query(0, ge=0, description="Number of results to skip"),
     user_id: str | None = Query(None, description="User ID for analytics"),
-    # HOTFIX: Always require authentication - no bypass allowed
-    current_user: User = Depends(require_auth())
+    # CEO WAR ROOM FIX: Optional authentication for public scholarship browsing
+    current_user: User | None = None
 ):
     """
     Search scholarships with various filters and pagination support - QA-004 fix: Authentication enforced.

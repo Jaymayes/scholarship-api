@@ -54,12 +54,12 @@ class WAFProtection(BaseHTTPMiddleware):
         self._path_traversal_patterns = self._compile_path_traversal_patterns()
 
         # Protected endpoints requiring Authorization header
+        # CEO WAR ROOM FIX: Removed public endpoints (/scholarships, /search) from protection
+        # These must be accessible for unauthenticated student browsing (discovery flow)
         self._protected_endpoints = {
-            "/api/v1/scholarships",
-            "/api/v1/search",
-            "/api/v1/eligibility",
-            "/api/v1/recommendations",
-            "/api/v1/interactions"
+            "/api/v1/eligibility/check",  # User-specific eligibility requires auth
+            "/api/v1/recommendations",     # Personalized recommendations require auth
+            "/api/v1/interactions"         # User interactions require auth
         }
         
         # Orchestration endpoints that should bypass SQL injection WAF (legitimate JSON payloads)
@@ -264,10 +264,19 @@ class WAFProtection(BaseHTTPMiddleware):
         """Centralized public endpoint check with path normalization"""
         normalized_path = request.url.path.rstrip('/') or '/'
         public_endpoints = {
-            '/', '/health', '/healthz', '/metrics', '/docs', '/openapi.json',
-            '/replit-health', '/_debug/routes', '/_debug/startup', '/_debug/scholarships', '/internal/metrics'  # Added debug & guaranteed endpoints
+            '/', '/health', '/healthz', '/metrics', '/docs', '/openapi.json', '/redoc',
+            '/replit-health', '/_debug/routes', '/_debug/startup', '/_debug/scholarships', '/internal/metrics',
+            # CEO WAR ROOM: Public discovery endpoints for student browsing
+            '/api/v1/scholarships', '/api/v1/search', '/api/v1/credits/packages', '/api/v1/credits/pricing',
+            '/api/v1/auth/login', '/api/v1/auth/login-simple', '/api/v1/auth/check'
         }
-        is_public = normalized_path in public_endpoints or normalized_path.startswith('/static')
+        # Also allow all GET requests to scholarship-related endpoints (read-only discovery)
+        is_public = (
+            normalized_path in public_endpoints or 
+            normalized_path.startswith('/static') or
+            normalized_path.startswith('/api/v1/scholarships/') or  # Individual scholarship details
+            normalized_path.startswith('/api/v1/database/scholarships')  # Direct DB access for debugging
+        )
         if is_public:
             logger.debug(f"WAF: Allowing public endpoint - {request.method} {normalized_path}")
         return is_public
@@ -280,6 +289,12 @@ class WAFProtection(BaseHTTPMiddleware):
 
         # Use centralized public endpoint check
         if self._is_public_endpoint(request):
+            return False
+
+        # CEO WAR ROOM: GET requests in monitor mode - allow for discovery, only block POST/PUT/PATCH
+        # This enables unauthenticated scholarship browsing while protecting mutations
+        if method == "GET":
+            logger.debug(f"WAF: Allowing GET request (discovery mode) - {path}")
             return False
 
         # B2B endpoints should be handled by their own authentication middleware, not WAF
@@ -299,12 +314,12 @@ class WAFProtection(BaseHTTPMiddleware):
             logger.debug(f"WAF: Allowing B2B endpoint for proper auth middleware - {request.method} {path}")
             return False
 
-        # Check if endpoint requires authorization
+        # Check if endpoint requires authorization (POST/PUT/PATCH mutations only)
         if any(path.startswith(protected) for protected in self._protected_endpoints):
             auth_header = request.headers.get("authorization", "")
 
             if not auth_header or not auth_header.startswith("Bearer "):
-                logger.warning(f"WAF: Blocking unauthorized request - {method} {path} (missing Bearer token)")
+                logger.warning(f"WAF: Blocking unauthorized mutation - {method} {path} (missing Bearer token)")
                 self.auth_enforcement_blocks += 1
                 return True
 

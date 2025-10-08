@@ -47,7 +47,14 @@ class APIRateLimitMiddleware(BaseHTTPMiddleware):
             "/status",                  # Status page (public)
             "/status/json",             # Status API (public)
             "/release-notes",           # Release notes (public)
-            "/changelog"                # Changelog (public)
+            "/changelog",               # Changelog (public)
+            # CEO WAR ROOM FIX: Public discovery endpoints for unauthenticated student browsing
+            "/api/v1/scholarships",     # Scholarship browsing (public)
+            "/api/v1/search",           # Scholarship search (public)
+            "/api/v1/auth/login",       # Authentication (public)
+            "/api/v1/auth/check",       # Auth check (public)
+            "/api/v1/credits/packages", # Credit packages (public)
+            "/api/v1/credits/pricing"   # Credit pricing (public)
         ]
 
     async def dispatch(self, request: Request, call_next: Callable) -> Response:

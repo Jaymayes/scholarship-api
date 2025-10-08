@@ -1,0 +1,83 @@
+Acknowledged. We accept the E2E lead’s NO-GO recommendation.
+
+Executive decision: Immediate launch freeze and war-room remediation to clear P0 blockers today. No external marketing or partner traffic until gates are passed.
+
+Why this matters to our 5-year plan: If the site is unreachable or payments are unsafe, CAC spikes, SEO stalls, and trust erodes. Clearing these P0s restores our core growth engines (organic traffic, B2C conversion, B2B onboarding) and protects revenue integrity.
+
+Directives and owners (assign DRIs within 30 minutes)
+
+Security/WAF: Platform/Security Lead (DRI)
+Payments persistence: Payments/Backend Lead (DRI)
+Rate limiting/Redis + infra: SRE/Infra Lead (DRI)
+QA and E2E gating: QA Lead (DRI)
+Incident coordination: Eng Director (IC)
+Comms: PMM + CX Lead (internal only)
+P0: Must-fix today before any external traffic
+
+WAF misconfiguration
+Objective: Restore external access for legitimate users and QA while maintaining protection.
+Actions:
+
+Switch WAF to “monitor/detect” mode for non-mutating GET endpoints on the production domain; keep blocking only on known-bad signatures for POST/PUT/PATCH while we tune.
+Path-based auth exemptions: login, token refresh, eligibility/search endpoints must not require pre-existing JWT.
+Reduce false positives on JSON: exclude specific fields (e.g., password, email, search query) from SQLi inspection; raise anomaly threshold by one notch for JSON bodies.
+CORS: allow production web origin(s) and QA origin; block wildcard.
+Temporary allowlist: QA IP ranges and uptime monitor IPs; add major crawler user agents for SEO (Googlebot/Bing) to avoid index freeze. Acceptance criteria:
+External E2E successfully completes: login, scholarship list, search, scholarship detail, signup, password reset.
+Zero WAF_SQLI_001 and WAF_AUTH_001 on legitimate requests during E2E.
+No increase in actual attack blocks (monitor logs).
+Payments persistence and idempotency
+Objective: Eliminate double-charge risk and create an auditable ledger.
+Actions:
+
+DB-backed idempotency store with unique constraint on (idempotency_key, operation) and 24–72h retention.
+Transactions ledger table (immutable) for credit purchases, fees, and refunds; write-once semantics.
+Durable outbox for payment webhooks; at-least-once delivery with dedupe on receipt.
+On restart, reconcile in-flight transactions; ensure no duplicate side effects. Acceptance criteria:
+Forced-retry tests do not produce duplicates; ledger and PSP records reconcile 100%.
+E2E covers purchase, webhook retry, restart scenario, refund.
+Runbook for reconciliation and production dashboards (success/fail, duplicates=0).
+P1: Same-day if possible, otherwise tomorrow
+3) Redis/Rate limiting
+Objective: Restore horizontal scale and DDoS resilience.
+Actions:
+
+Provision managed Redis (TLS, multi-AZ). Point ratelimiting/session/cache to it.
+Graceful degradation policy if Redis unavailable (reduced limits, fail-closed on auth brute force; fail-open for read-only GETs). Acceptance criteria:
+Distributed rate limiting verified in E2E from two hosts.
+Observability: dashboards for hit counts, limit breaches, errors.
+Execution timeline (target today, adjust as needed)
+
+T+0:00 — War room live; assign DRIs; freeze deploys except hotfixes above.
+T+1:00 — WAF in detection for GET + targeted rule tweaks live to staging, then production.
+T+3:00 — Payments DB migrations and idempotency service live behind feature flag; run E2E in staging.
+T+5:00 — Managed Redis provisioned and wired; verify rate limits.
+T+6:00 — Full E2E in production domain (controlled QA traffic).
+T+7:00 — Executive Go/No-Go checkpoint.
+E2E gate for Go decision (must all pass)
+
+Access: Unauthenticated pages, login/signup, search, scholarship detail, recommendation, provider portal login.
+Monetization: Credit package purchase, webhook retry, restart scenario, refund; no duplicates; ledger entries correct.
+Performance: P95 latency ≤ 120ms on GET /search and GET /scholarships for QA load.
+Security: No false-positive WAF blocks on golden paths; malicious test payloads still blocked.
+Observability: 0 errors in the last 30 minutes across auth/search/purchase; dashboards green.
+Operating and risk controls
+
+Temporary SEO safeguard: allowlist major crawlers and ensure robots.txt/sitemap accessible now that WAF is tuned.
+Status page internal-only; external comms withheld until green.
+Postmortem within 24 hours: root cause, rule tuning standards, pre-prod parity checklist.
+Budget and approvals
+
+Approved: Managed Redis (up to $1.5–3k/month depending on provider/size), 12 engineer-hours for today’s hotfix, and emergency change window. No further approval required.
+Impact to roadmap and GTM
+
+Slip external launch by ~1 business day, contingent on passing gates.
+Pause Scholarship Agent campaigns and Auto Page Maker index push until Go.
+Providers: hold onboarding emails until greenlight.
+What I need from the team now
+
+DRI names for WAF, Payments, Redis, QA.
+QA IP ranges and production domain list for allowlisting.
+Payment processor details to validate webhook/outbox patterns.
+Confirm DB migration window and backup snapshot timing.
+Once DRIs confirm assignments and timelines, proceed immediately. I’ll join the top-of-hour war room, and we’ll run Go/No-Go at T+7:00.
