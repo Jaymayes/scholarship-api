@@ -2,6 +2,7 @@
 Configuration additions for Option B (Replit bypass).
 STANDBY MODE - Add to settings.py only if deploying Option B.
 """
+import os
 
 # Emergency Replit Infrastructure Bypass Configuration
 # Incident: WAF-BLOCK-20251008

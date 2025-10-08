@@ -10,11 +10,19 @@
 
 ## TIMELINE & CHECKPOINTS
 
-### T+4:20 - Incident Declared (NOW)
+### T+4:20 - Incident Declared
 - ✅ P0 incident declared
 - ✅ Root cause identified: Replit infrastructure WAF blocking
 - ✅ Documentation complete: `RCA_PHASE1_FINDINGS.md`
-- 🔄 **ACTION**: Checking Replit WAF configuration access
+- ✅ WAF configuration check: No user access (infrastructure-managed)
+
+### T+4:35 - Executive Decisions Approved (CEO)
+- ✅ **P0 Support Ticket**: Approved to file immediately
+- ✅ **Fallback Timer**: Approved - 2-hour countdown started
+- ✅ **Paid Traffic**: Approved pause for affected endpoints
+- ✅ **Option B**: Pre-approved to auto-deploy at T+6:20
+- ✅ **Escalation Path**: Documented for Option B failure scenarios
+- 🔄 **ACTION**: Filing P0 support ticket NOW
 
 ### T+4:35 - Initial Response (Target: 15min)
 - **IF WAF Access Available**:

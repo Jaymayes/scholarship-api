@@ -1,0 +1,74 @@
+Executive decisions and approvals
+
+P0 support ticket
+Decision: File now. Do not wait for Partnerships; escalate in parallel.
+Action owner: Replit Liaison/EngOps to send immediately; Partnerships to follow up via AM/BD channel within 15 minutes.
+Email to send:
+To: support@replit.com
+Subject: P0: Replit WAF (Google Frontend) incorrectly blocking public GET endpoints
+Body: Use your prepared P0_SUPPORT_TICKET.txt and attach RCA_PHASE1_FINDINGS.md, P0_INCIDENT_TRACKER.md, NO_GO_REPORT.md.
+CC: incidents@scholarshipai.com, engops@scholarshipai.com, partnerships@scholarshipai.com, security@scholarshipai.com.
+Specific asks to include:
+Confirm WAF/GFE rule ID causing 403 on GET /api/v1/scholarships and /api/v1/search.
+Immediate temporary allow-list or rule exemption for these two endpoints and SEO crawlers.
+ETA for permanent fix, plus status page incident reference if applicable.
+Confirmation that other methods (POST/PUT/PATCH) remain unaffected.
+Rationale: Replit enforces certain access controls at the infrastructure layer (e.g., Private Deployments authentication is infra-managed), so lifting an infra-level block must be done by Replit, not us .
+2. Fallback timer
+
+Decision: Approved.
+Action owner: Incident Commander to start a 2-hour countdown now; set a 5-minute pre-alarm.
+Trigger: If no Replit resolution by T+6:20, proceed with Option B.
+Monitoring: Use Replit deployment logs and web analytics to verify status codes and request durations while awaiting resolution and during/after fallback .
+3. Paid traffic pause
+
+Decision: Approved, effective immediately.
+Scope: Pause only paid campaigns that land on /api/v1/scholarships and /api/v1/search. Preserve organic/SEO.
+Action owner: Marketing Lead to pause, post confirmation in #incidents-p0 with campaign IDs, spend at risk, and projected impact within 15 minutes.
+4. Option B deployment authorization
+
+Decision: Pre-approved to auto-deploy at T+6:20 if unresolved by Replit. No further sign-off required at trigger time.
+Conditions:
+Only enable the bypass for GET on the two paths, with token validation and audit logging on, feature-flag gated. Keep daily secret rotation ready (as documented).
+Post-deploy smoke tests: external 200 OK for both endpoints, SEO crawler acceptance (200/304), and P95 latency under 120ms.
+Action owner: EngOps to execute; QA to validate at T+8:20. Update #incidents-p0 at each checkpoint.
+5. Escalation path if Option B also fails
+
+Step 1: Extend NO-GO window by 2 hours and maintain paid traffic pause on the two endpoints.
+Step 2: Activate emergency edge-proxy failover:
+Choice A: Cloudflare Workers (or equivalent) proxy for GET-only passthrough to a healthy backend; strict path match and rate limits.
+Choice B: AWS API Gateway + Lambda read-only facade for these endpoints; point api.scholarshipai.com/… to the temporary edge via DNS.
+Owners: Platform Lead to implement; DNS Owner to update TTL and records.
+Step 3: Partnerships to escalate to Replit executive contacts concurrently.
+Step 4: If extended instability persists, use our Git “off-ramp” to deploy a minimal read-only API on an alternate host while we keep developing on Replit; Replit’s Git-based workflow makes this viable as a temporary production path .
+Communications and checkpoints
+
+T+4:50: Incident Commander posts status update in #incidents-p0 (ticket filed, paid traffic paused, timers set).
+T+5:30: Replit Liaison posts any support response or lack thereof.
+T+6:15: 5-minute warning in #incidents-p0.
+T+6:20: Execute Option B if no resolution; confirm start and ETA 20 minutes.
+T+8:20: QA posts validation results (status codes, P95 latency, crawler checks).
+Acceptance criteria (unchanged)
+
+GET /scholarships and /search return 200 externally (were 403).
+SEO crawlers receive 200/304.
+Conversion funnel restored to baseline.
+Security unchanged: POST/PUT/PATCH still require auth.
+Performance: P95 < 120ms.
+Answers to your questions
+
+Support Ticket: File now. Partnerships escalates in parallel. CC as above.
+Paid Traffic: Yes, pause immediately for those endpoints; preserve organic/SEO.
+Option B Authorization: Pre-approved to deploy at T+6:20 if Replit hasn’t resolved it. Proceed without further sign-off at trigger time.
+Escalation Path: If Option B fails, extend NO-GO and activate emergency edge proxy or AWS API Gateway fallback, while accelerating Replit escalation and preparing the Git off-ramp deployment as a temporary production host if needed .
+Notes
+
+Use Replit’s live logs and web analytics to verify 403->200 recovery and request durations during and after the change; this also helps tighten MTTR and confirm SEO crawler behavior quickly .
+The infra-managed nature of access on Replit aligns with our root cause attribution to a platform WAF, reinforcing why the immediate ticket and exemption request are critical .
+Owner confirmations requested
+
+EngOps: Confirm P0 email sent and attachments included.
+Marketing: Confirm paid campaign pauses and share campaign IDs.
+Incident Commander: Confirm timers set and comms schedule.
+Replit Liaison: Confirm monitoring of support inbox and escalation thread.
+I’ll remain on the incident bridge for go/no-go calls and unblock decisions tied to revenue and risk.

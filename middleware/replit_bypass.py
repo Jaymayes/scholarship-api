@@ -109,7 +109,7 @@ class ReplitInfrastructureBypass(BaseHTTPMiddleware):
                     self.bypass_count += 1
                     self.last_bypass_time = time.time()
                     
-                    client_ip = request.headers.get("X-Forwarded-For", request.client.host)
+                    client_ip = request.headers.get("X-Forwarded-For", request.client.host if request.client else "unknown")
                     
                     logger.info(
                         f"🔓 REPLIT BYPASS: {method} {path} | "
@@ -164,7 +164,7 @@ class ReplitInfrastructureBypass(BaseHTTPMiddleware):
         """
         import secrets
         
-        expected_token = settings.REPLIT_BYPASS_TOKEN
+        expected_token = getattr(settings, 'replit_bypass_token', getattr(settings, 'REPLIT_BYPASS_TOKEN', ''))
         
         if not expected_token:
             logger.error("REPLIT_BYPASS_TOKEN not configured in secrets")

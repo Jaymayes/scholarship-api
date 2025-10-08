@@ -1,0 +1,154 @@
+TO: support@replit.com
+CC: incidents@scholarshipai.com, engops@scholarshipai.com, partnerships@scholarshipai.com, security@scholarshipai.com
+SUBJECT: P0: Replit WAF (Google Frontend) incorrectly blocking public GET endpoints
+
+================================================================================
+URGENT: P0 CUSTOMER-IMPACTING INCIDENT
+================================================================================
+
+Dear Replit Support Team,
+
+We have a P0 production incident where Replit's infrastructure WAF (Google Frontend / Cloud Armor) is incorrectly blocking public GET requests to our scholarship discovery endpoints, causing 100% external failure rate for students and SEO crawlers.
+
+REPLIT PROJECT DETAILS
+================================================================================
+Repl Name: scholarship-api
+Repl Owner: jamarrlmayes  
+Production URL: https://scholarship-api-jamarrlmayes.replit.app
+Environment: Production deployment (live customer traffic)
+
+AFFECTED ENDPOINTS
+================================================================================
+❌ GET /api/v1/scholarships (scholarship listing) - 403 Forbidden
+❌ GET /api/v1/search (scholarship search) - 403 Forbidden
+✅ GET /api/v1/credits/packages - 200 OK (working - different WAF rule)
+
+BUSINESS IMPACT
+================================================================================
+- SEO: Googlebot/Bingbot blocked from indexing scholarships
+- Conversion: Students cannot browse scholarships externally (100% failure)
+- Revenue: Paid acquisition traffic wasting CAC on broken endpoints
+- Timeline: Incident active since deployment, escalated to P0 at T+4:20
+
+ROOT CAUSE ANALYSIS
+================================================================================
+Our engineering team has completed comprehensive root cause analysis and confirmed the issue is at Replit's infrastructure layer, NOT application code:
+
+EVIDENCE:
+1. Response headers show "server: Google Frontend" + "x-waf-rule: WAF_AUTH_001"
+2. Application logs have ZERO WAF block entries (requests never reach application)
+3. Localhost testing: All endpoints return 200 OK (application code correct)
+4. Localhost + proxy headers: 200 OK (proxy headers are NOT the issue)
+5. Middleware verified correct via unit tests
+6. GET /credits/packages works externally (proves different WAF rule group)
+
+TECHNICAL DETAILS:
+- Replit infrastructure WAF is enforcing authentication on endpoints our application intends as public
+- Application-level WAF correctly allows all GET requests (verified via extensive testing)
+- Policy mismatch between application intent and infrastructure enforcement
+
+REPRODUCTION STEPS
+================================================================================
+
+FAILS (External - blocked by Replit infrastructure):
+```bash
+curl -v https://scholarship-api-jamarrlmayes.replit.app/api/v1/scholarships
+# Returns: HTTP/2 403 Forbidden
+# Headers: server: Google Frontend, x-waf-rule: WAF_AUTH_001, via: 1.1 google
+```
+
+WORKS (Localhost - proves application correct):
+```bash
+curl -v http://localhost:5000/api/v1/scholarships
+# Returns: HTTP/1.1 200 OK
+# Application logs show successful processing
+```
+
+SPECIFIC REQUESTS TO REPLIT
+================================================================================
+
+1. **Confirm WAF/GFE Rule ID**: 
+   - What is the specific Google Cloud Armor / Frontend rule causing 403 on GET /api/v1/scholarships and /api/v1/search?
+   - Is this rule applied at project level, deployment level, or domain level?
+
+2. **Immediate Temporary Allow-list**:
+   - Please add infrastructure-level exceptions for:
+     • GET /api/v1/scholarships (public scholarship discovery)
+     • GET /api/v1/search (public search for students)
+   - Include SEO crawlers (Googlebot, Bingbot, verified bot UAs)
+
+3. **ETA for Permanent Fix**:
+   - What is the expected timeline for WAF configuration update?
+   - Is there a Replit status page incident reference we should monitor?
+
+4. **Confirmation on Other Methods**:
+   - Please confirm POST/PUT/PATCH/DELETE remain protected (auth required)
+   - We want to preserve security for mutations while allowing public read access
+
+REQUESTED CONFIGURATION
+================================================================================
+
+Please configure Replit infrastructure WAF to:
+
+ALLOW (Public Access):
+- GET /api/v1/scholarships
+- GET /api/v1/search
+- Verified SEO crawler user agents
+
+PRESERVE AUTH REQUIREMENTS (Current Blocking):
+- POST /api/v1/scholarships
+- PUT /api/v1/scholarships/*
+- PATCH /api/v1/scholarships/*
+- DELETE /api/v1/scholarships/*
+
+This allows public read access for student discovery and SEO while maintaining security for data mutations.
+
+ATTACHMENTS
+================================================================================
+
+Please see attached comprehensive technical documentation:
+
+1. RCA_PHASE1_FINDINGS.md - Complete root cause analysis including:
+   - Sequence diagrams (localhost vs external request flows)
+   - Header comparison showing Google Frontend blocking
+   - Middleware ordering verification + unit tests
+   - Full curl reproducers for all test cases
+
+2. P0_INCIDENT_TRACKER.md - Incident timeline and business impact details
+
+3. NO_GO_REPORT.md - Launch decision documentation and rollback evidence
+
+URGENCY & TIMELINE
+================================================================================
+
+Priority: P0 - Customer Facing
+Impact: 100% external failure rate on core student discovery endpoints
+Fallback Plan: We have prepared an application-level workaround (Option B) that deploys automatically in 2 hours (T+6:20) if infrastructure fix not available
+
+We strongly prefer infrastructure-side resolution to avoid technical debt and maintain clean separation of concerns.
+
+REQUEST FOR IMMEDIATE ACTION:
+1. Please confirm ticket receipt and assignment
+2. Provide ETA for WAF configuration update
+3. Advise if additional information needed
+4. Share any interim workarounds available from Replit side
+
+CONTACT INFORMATION
+================================================================================
+
+Primary: jamarrlmayes (Replit account owner)
+Incident Commander: EngOps Lead  
+Replit Liaison: Partnerships Team
+Incident Channel: incidents@scholarshipai.com
+
+We are standing by for immediate follow-up and can provide additional technical details, debugging access, or live troubleshooting as needed.
+
+Thank you for urgent attention to this P0 production incident.
+
+Best regards,
+Scholarship API Engineering Team
+
+================================================================================
+INCIDENT REFERENCE: WAF-BLOCK-20251008
+FILED: 2025-10-08 T+4:35
+================================================================================
