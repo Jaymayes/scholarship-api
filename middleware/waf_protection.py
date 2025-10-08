@@ -46,15 +46,6 @@ class WAFProtection(BaseHTTPMiddleware):
         self.sql_injection_blocks = 0
         self.xss_blocks = 0
         self.auth_enforcement_blocks = 0
-        
-        # CEO WAR ROOM: Monitor-only mode for public GET endpoints (T+2:30 directive)
-        # These endpoints run in detect/log mode only, no blocking
-        self.monitor_only_paths = {
-            "/api/v1/scholarships",     # Public scholarship browsing
-            "/api/v1/search",            # Public search
-            "/api/v1/credits/packages",  # Public pricing info
-            "/api/v1/credits/pricing"    # Public pricing info
-        }
 
         # Compile security patterns for performance
         self._sql_patterns = self._compile_sql_patterns()
@@ -200,70 +191,55 @@ class WAFProtection(BaseHTTPMiddleware):
         try:
             # 1. AUTHORIZATION ENFORCEMENT (Critical for SQLi protection)
             if await self._check_authorization_requirement(request):
-                block_response = await self._block_request(
+                return await self._block_request(
                     "Missing required Authorization header",
                     "WAF_AUTH_001",
                     client_ip,
                     path,
-                    method,
-                    request
+                    method
                 )
-                if block_response:
-                    return block_response
 
             # 2. SQL INJECTION DETECTION
             if await self._detect_sql_injection(request):
                 self.sql_injection_blocks += 1
-                block_response = await self._block_request(
+                return await self._block_request(
                     "SQL injection attempt detected",
                     "WAF_SQLI_001",
                     client_ip,
                     path,
-                    method,
-                    request
+                    method
                 )
-                if block_response:
-                    return block_response
 
             # 3. XSS DETECTION
             if await self._detect_xss(request):
                 self.xss_blocks += 1
-                block_response = await self._block_request(
+                return await self._block_request(
                     "Cross-site scripting attempt detected",
                     "WAF_XSS_001",
                     client_ip,
                     path,
-                    method,
-                    request
+                    method
                 )
-                if block_response:
-                    return block_response
 
             # 4. COMMAND INJECTION DETECTION
             if await self._detect_command_injection(request):
-                block_response = await self._block_request(
+                return await self._block_request(
                     "Command injection attempt detected",
                     "WAF_CMD_001",
                     client_ip,
                     path,
-                    method,
-                    request
+                    method
                 )
-                if block_response:
-                    return block_response
 
             # 5. PATH TRAVERSAL DETECTION
             if await self._detect_path_traversal(request):
-                block_response = await self._block_request(
+                return await self._block_request(
                     "Path traversal attempt detected",
                     "WAF_PATH_001",
                     client_ip,
                     path,
-                    method,
-                    request
+                    method
                 )
-                if block_response:
-                    return block_response
 
         except Exception as e:
             logger.error(f"WAF check processing error: {str(e)}")
@@ -477,31 +453,19 @@ class WAFProtection(BaseHTTPMiddleware):
         except:
             return None
 
-    async def _block_request(self, message: str, error_code: str, client_ip: str, path: str, method: str = "unknown", request: Request | None = None) -> JSONResponse | None:
-        """Block malicious request with structured response or log in monitor mode"""
+    async def _block_request(self, message: str, error_code: str, client_ip: str, path: str, method: str = "unknown") -> JSONResponse:
+        """Block malicious request with structured response"""
         from observability.metrics import metrics_service
 
         self.blocked_requests += 1
         
         # Record WAF block metric
         metrics_service.record_waf_block(error_code, path, method)
-        
-        # CEO WAR ROOM: Monitor-only mode for public GET endpoints
-        # Check if this is a public GET request that should only be logged
-        is_monitor_only = (
-            method == "GET" and 
-            any(path.startswith(monitor_path) for monitor_path in self.monitor_only_paths)
-        )
 
-        if not self.block_mode or is_monitor_only:
+        if not self.block_mode:
             # Monitor mode - log but don't block
-            logger.warning(
-                f"WAF MONITOR-ONLY: {message} | "
-                f"Path: {path} | Method: {method} | IP: {client_ip} | "
-                f"Rule: {error_code} | Action: LOGGED_NOT_BLOCKED"
-            )
-            # Return None to signal "continue to application"
-            return None
+            logger.warning(f"WAF MONITOR: {message} - {client_ip} {path}")
+            # Continue to application (would be: return await call_next(request))
 
         # Block mode - return HTTP 403
         logger.error(f"WAF BLOCKED: {message} - {client_ip} {path}")

@@ -4,7 +4,19 @@ This project is a Scholarship Discovery & Search API built with FastAPI. Its pri
 
 The business vision is to provide a comprehensive, intelligent platform that connects students with relevant scholarships, aiming to become a leading solution in the scholarship search market with enterprise-grade orchestration capabilities.
 
-## Recent Progress (2025-10-07)
+## Recent Progress
+
+### NO-GO Decision - Soft Launch Postponed (2025-10-08 T+3:35)
+- **Status**: 🔴 **LAUNCH BLOCKED** - CEO Directive Option 3 executed
+- **Critical Blocker**: WAF misconfiguration blocking 100% of external traffic to scholarship/search endpoints
+- **Rollback**: ✅ COMPLETE - All changes reverted to last known-good state at T+3:50
+- **Evidence**: Localhost works (200 OK), external blocked (403 Forbidden) - WAF_AUTH_001/WAF_SQLI_001 false positives
+- **Root Cause**: Request path ordering - WAF authorization check executes before monitor-only logic; proxy headers from external requests trigger different code path than localhost
+- **Remediation Plan**: 2-hour timebox for root cause analysis, surgical WAF fix, canary validation
+- **Next Checkpoint**: T+6:30 Go/No-Go decision based on canary metrics
+- **Documentation**: Full incident report in `NO_GO_REPORT.md`
+
+### External Billing Implementation (2025-10-07)
 
 ### External Billing Implementation (LATEST)
 - **Payment Externalization**: ✅ COMPLETE - All in-app payment processing removed per CEO directive

@@ -144,7 +144,7 @@ async def search_scholarships_post(
 @router.get("/search")
 async def search_scholarships_get(
     request: Request,
-    q: str | None = Query(None, max_length=128, description="Search query (max 128 chars)"),
+    q: str | None = Query(None, description="Search query"),
     _rate_limit: bool = Depends(search_rate_limit),
     fields_of_study: list[FieldOfStudy] = Query(default=[], description="Filter by fields of study"),
     min_amount: float | None = Query(None, ge=0, description="Minimum scholarship amount"),
@@ -155,20 +155,18 @@ async def search_scholarships_get(
     citizenship: str | None = Query(None, description="Citizenship requirement"),
     deadline_after: datetime | None = Query(None, description="Deadlines after this date"),
     deadline_before: datetime | None = Query(None, description="Deadlines before this date"),
-    limit: int = Query(20, ge=1, le=25, description="Number of results (max 25)"),
-    offset: int = Query(0, ge=0, le=500, description="Offset (max 500)"),
-    # CEO WAR ROOM: Optional auth for public browsing with query safety caps
-    current_user: User | None = None
+    limit: int = Query(20, ge=1, le=100, description="Number of results to return"),
+    offset: int = Query(0, ge=0, description="Number of results to skip"),
+    current_user: User = Depends(require_auth())  # HOTFIX: Always require authentication
 ):
     """
-    Search scholarships using GET with query parameters - PUBLIC ACCESS ENABLED
-    Optional authentication for enhanced personalization.
+    Search scholarships using GET with query parameters - QA-005 fix: Authentication enforced
+    Requires authentication unless PUBLIC_READ_ENDPOINTS feature flag is enabled.
 
     Returns the same metadata-rich response format as POST endpoint.
-    Query safety: max_length=128, limit<=25, offset<=500
     """
-    # Optional authentication - use user_id if available
-    user_id = current_user.user_id if current_user else None
+    # Authentication enforced by dependency injection - no additional check needed
+    user_id = current_user.user_id
 
     return await execute_search(
         keyword=q,

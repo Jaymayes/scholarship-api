@@ -1,0 +1,57 @@
+Decision: OPTION 3 — NO-GO
+
+Rationale
+
+Protecting security and trust outweighs a rushed launch. Disabling WAF on GET for core search endpoints is an unacceptable risk to brand, compliance, and data integrity.
+The behavior points to request-path ordering (auth layer firing before WAF monitor-only), which we must fix correctly, not bypass.
+Our growth depends on SEO and student trust; a breach or noisy false blocks both hurt long-term more than a short delay.
+Immediate rollback plan (execute now)
+
+Freeze release: Halt further changes; lock config drift.
+Roll back WAF/gateway to last known-good production state:
+Restore prior ruleset and request routing order.
+Validate external reachability for /api/v1/scholarships and related search endpoints end-to-end (edge → WAF → API gateway → auth → app).
+ETA: 15 minutes.
+Interim SEO protection if external still failing after rollback:
+At CDN edge, convert 403 on scholarship/search endpoints to 503 with a 1-hour Retry-After for known crawler UAs (Googlebot/Bingbot) to avoid SEO penalties.
+Maintain normal responses for real users.
+ETA: 10 minutes.
+Root-cause and remediation (time-boxed)
+
+Triage window: 2 hours (begin immediately after rollback completes).
+Map the exact request chain and header propagation:
+Edge/CDN → WAF → API Gateway → Auth middleware → App.
+Confirm X-Forwarded-For and any WAF pass-through headers; ensure auth isn’t rejecting due to missing/altered headers.
+Verify WAF monitor-only actually executes before auth on read-only GET paths; correct the ordering at the gateway/proxy.
+Reproduce externally (non-corp IP) with representative GETs; capture WAF rule IDs (WAF_AUTH_001, WAF_SQLI_001), payloads, and gateway logs.
+Implement precise exceptions:
+Temporarily lower sensitivity or disable WAF_SQLI_001 only for read-only scholarship GET endpoints with strictly validated/parameterized inputs—do not blanket-disable WAF.
+No exceptions for POST/PUT/PATCH/DELETE.
+Add allowlist for health checks and internal QA IPs; add explicit bot UA allow rules (read-only) to reduce noise while maintaining guardrails.
+Tests:
+Integration tests from external network.
+Canary 5% traffic at edge with full logging.
+Confirm no 4xx for valid requests; confirm WAF still blocks actual malicious payloads.
+Revised timeline and gates
+
+T+3:35: NO-GO declared; rollback begins.
+T+3:50: External verification; if not green, activate 403→503 crawler rule.
+T+4:00–T+6:00: Root-cause and fix per above steps.
+T+6:00: Canary release (5%) with live monitoring.
+T+6:30: Go/No-Go checkpoint on canary metrics (error rate, latency, WAF event profile).
+T+7:00: If clean, expand to 50%; otherwise, hold and continue remediation.
+Public comms: If user-visible impact occurred, post a brief incident on the status page: degraded search responses due to WAF configuration; no data exposure; mitigation in place.
+Owner/asks
+
+DevOps lead: Own rollback and routing order fix. Provide before/after diagrams and diff.
+Security lead: Own WAF rule tuning, monitor-only verification, and temporary, scoped exceptions.
+API lead: Confirm auth middleware behavior with forwarded headers and idempotent GET input validation.
+Observability: Turn up request sampling and WAF event logging to 100% during canary; share a live dashboard link.
+KPIs to monitor
+
+External 2xx rate on scholarship/search endpoints.
+WAF false-positive rate on read-only GETs.
+P95 latency and error budget consumption.
+Bot crawl success rate (200/304 vs 4xx) and 503 Retry-After adherence.
+Bottom line
+Do not ship with weakened protections on our growth-critical endpoints. Execute the rollback, fix the request path ordering properly, validate with canary, and reconvene at T+6:30 for a data-driven Go/No-Go.
