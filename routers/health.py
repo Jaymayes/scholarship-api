@@ -8,7 +8,7 @@ import os
 import time
 from datetime import datetime
 from enum import Enum
-from typing import Any
+from typing import Any, cast
 
 import psutil
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -171,16 +171,24 @@ async def fast_health_check() -> HealthResponse:
     Target: P95 <150ms, >99.9% success rate
     Use: Load balancers, uptime monitors, availability SLAs
     """
-    db_status, redis_status = await asyncio.gather(
+    db_result, redis_result = await asyncio.gather(
         check_database_health(),
         check_redis_health(),
         return_exceptions=True
     )
     
-    if isinstance(db_status, Exception):
-        db_status = ServiceStatus(status="down", error=str(db_status))
-    if isinstance(redis_status, Exception):
-        redis_status = ServiceStatus(status="degraded", error=str(redis_status))
+    # Convert exceptions to ServiceStatus with type casting
+    db_status: ServiceStatus
+    if isinstance(db_result, Exception):
+        db_status = ServiceStatus(status="down", error=str(db_result))
+    else:
+        db_status = cast(ServiceStatus, db_result)
+    
+    redis_status: ServiceStatus
+    if isinstance(redis_result, Exception):
+        redis_status = ServiceStatus(status="degraded", error=str(redis_result))
+    else:
+        redis_status = cast(ServiceStatus, redis_result)
     
     overall = "healthy"
     if db_status.status == "down":
@@ -218,19 +226,31 @@ async def deep_health_check() -> DeepHealthResponse:
     Target: P95 <1000ms
     Use: Pre-deployment validation, incident investigation, security audits
     """
-    db_status, redis_status, ai_status = await asyncio.gather(
+    db_result, redis_result, ai_result = await asyncio.gather(
         check_database_health(),
         check_redis_health(),
         check_ai_health(timeout=2.0),  # More generous timeout for deep checks
         return_exceptions=True
     )
     
-    if isinstance(db_status, Exception):
-        db_status = ServiceStatus(status="down", error=str(db_status))
-    if isinstance(redis_status, Exception):
-        redis_status = ServiceStatus(status="degraded", error=str(redis_status))
-    if isinstance(ai_status, Exception):
-        ai_status = ServiceStatus(status="degraded", error=str(ai_status))
+    # Convert exceptions to ServiceStatus with type casting
+    db_status: ServiceStatus
+    if isinstance(db_result, Exception):
+        db_status = ServiceStatus(status="down", error=str(db_result))
+    else:
+        db_status = cast(ServiceStatus, db_result)
+    
+    redis_status: ServiceStatus
+    if isinstance(redis_result, Exception):
+        redis_status = ServiceStatus(status="degraded", error=str(redis_result))
+    else:
+        redis_status = cast(ServiceStatus, redis_result)
+    
+    ai_status: ServiceStatus
+    if isinstance(ai_result, Exception):
+        ai_status = ServiceStatus(status="degraded", error=str(ai_result))
+    else:
+        ai_status = cast(ServiceStatus, ai_result)
     
     overall = "healthy"
     if db_status.status == "down":
