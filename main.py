@@ -88,6 +88,49 @@ async def lifespan(app: FastAPI):
     scholarship_count = len(scholarship_service.scholarships)
     metrics_service.update_scholarship_count(scholarship_count)
     logger.info(f"🎯 Forced metrics initialization: active_scholarships_total set to {scholarship_count}")
+    
+    # CEO DIRECTIVE: Phase 1 - Route Inventory for /_debug/config RCA
+    logger.info("=" * 80)
+    logger.info("🔍 ROUTE INVENTORY - Security Audit for DEF-002")
+    logger.info("=" * 80)
+    
+    debug_routes_found = []
+    total_routes = 0
+    
+    for route in app.routes:
+        total_routes += 1
+        path = getattr(route, "path", "N/A")
+        name = getattr(route, "name", "N/A")
+        methods = getattr(route, "methods", set())
+        
+        # Log all routes for audit trail
+        logger.info(f"Route: {path} | Methods: {methods} | Name: {name}")
+        
+        # Flag debug routes for incident investigation
+        if "debug" in path.lower():
+            debug_routes_found.append({
+                "path": path,
+                "name": name,
+                "methods": methods,
+                "endpoint": getattr(route, "endpoint", None)
+            })
+            logger.critical(f"🚨 DEBUG ROUTE DETECTED: {path} | Name: {name} | Endpoint: {getattr(route, 'endpoint', 'Unknown')}")
+    
+    logger.info("=" * 80)
+    logger.info(f"📊 Total routes registered: {total_routes}")
+    logger.info(f"⚠️  Debug routes found: {len(debug_routes_found)}")
+    
+    if debug_routes_found:
+        logger.critical("🔴 SECURITY INCIDENT: Debug routes detected in production!")
+        for debug_route in debug_routes_found:
+            logger.critical(f"   Path: {debug_route['path']}")
+            logger.critical(f"   Name: {debug_route['name']}")
+            logger.critical(f"   Endpoint Module: {debug_route['endpoint'].__module__ if debug_route['endpoint'] else 'Unknown'}")
+            logger.critical(f"   Endpoint Name: {debug_route['endpoint'].__name__ if debug_route['endpoint'] else 'Unknown'}")
+    else:
+        logger.info("✅ No debug routes detected in route registry")
+    
+    logger.info("=" * 80)
 
     # Start Command Center registration in background (non-blocking)
     import asyncio
@@ -147,68 +190,7 @@ tracing_service.instrument_app(app)
 setup_metrics(app)
 
 # Agent Bridge initialization moved to lifespan for reliability
-
-# Defensive startup hook fallback (for environments where lifespan doesn't execute)
-@app.on_event("startup")
-async def reconcile_metrics():
-    """Fallback metrics reconciliation for production reliability"""
-    try:
-        from observability.metrics import metrics_service
-        from services.scholarship_service import scholarship_service
-        scholarship_count = len(scholarship_service.scholarships)
-        metrics_service.update_scholarship_count(scholarship_count)
-        logger.info(f"🔄 Startup hook: Reconciled active_scholarships_total to {scholarship_count}")
-    except Exception as e:
-        logger.warning(f"Failed startup hook metrics reconciliation: {e}")
-
-# CEO DIRECTIVE: Phase 1 - Route Inventory for /_debug/config RCA
-@app.on_event("startup")
-async def log_route_inventory():
-    """
-    Day 0 Security Directive: Log all registered routes to identify /_debug/config source
-    Incident ID: DEF-002 | Priority: P0 | Owner: Security Lead
-    """
-    logger.info("=" * 80)
-    logger.info("🔍 ROUTE INVENTORY - Security Audit for DEF-002")
-    logger.info("=" * 80)
-    
-    debug_routes_found = []
-    total_routes = 0
-    
-    for route in app.routes:
-        total_routes += 1
-        path = getattr(route, "path", "N/A")
-        name = getattr(route, "name", "N/A")
-        methods = getattr(route, "methods", set())
-        
-        # Log all routes for audit trail
-        logger.info(f"Route: {path} | Methods: {methods} | Name: {name}")
-        
-        # Flag debug routes for incident investigation
-        if "debug" in path.lower():
-            debug_routes_found.append({
-                "path": path,
-                "name": name,
-                "methods": methods,
-                "endpoint": getattr(route, "endpoint", None)
-            })
-            logger.critical(f"🚨 DEBUG ROUTE DETECTED: {path} | Name: {name} | Endpoint: {getattr(route, 'endpoint', 'Unknown')}")
-    
-    logger.info("=" * 80)
-    logger.info(f"📊 Total routes registered: {total_routes}")
-    logger.info(f"⚠️  Debug routes found: {len(debug_routes_found)}")
-    
-    if debug_routes_found:
-        logger.critical("🔴 SECURITY INCIDENT: Debug routes detected in production!")
-        for debug_route in debug_routes_found:
-            logger.critical(f"   Path: {debug_route['path']}")
-            logger.critical(f"   Name: {debug_route['name']}")
-            logger.critical(f"   Endpoint Module: {debug_route['endpoint'].__module__ if debug_route['endpoint'] else 'Unknown'}")
-            logger.critical(f"   Endpoint Name: {debug_route['endpoint'].__name__ if debug_route['endpoint'] else 'Unknown'}")
-    else:
-        logger.info("✅ No debug routes detected in route registry")
-    
-    logger.info("=" * 80)
+# Deprecated @app.on_event("startup") handlers removed - all startup logic now in lifespan
 
 # QA-001 fix: Add middleware in correct order (outermost first, applied last)
 # Order: CEO Pre-Filter → Security & Host Protection → CORS → Request Processing → Rate Limiting → Routing

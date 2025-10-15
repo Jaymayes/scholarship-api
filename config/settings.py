@@ -97,7 +97,16 @@ class Settings(BaseSettings):
         ],
         alias="ALLOWED_HOSTS"
     )
-    trusted_proxy_ips: list[str] = Field(default_factory=list, alias="TRUSTED_PROXY_IPS")
+    trusted_proxy_ips: list[str] = Field(
+        default_factory=lambda: [
+            "127.0.0.1",  # localhost
+            "::1",  # IPv6 localhost
+            "10.0.0.0/8",  # Private network (Replit internal)
+            "172.16.0.0/12",  # Private network (Replit internal)
+            "192.168.0.0/16",  # Private network
+        ],
+        alias="TRUSTED_PROXY_IPS"
+    )
 
     @field_validator('allowed_hosts', mode='before')
     @classmethod
