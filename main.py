@@ -206,9 +206,8 @@ setup_metrics(app)
 # Agent Bridge initialization moved to lifespan for reliability
 # Deprecated @app.on_event("startup") handlers removed - all startup logic now in lifespan
 
-# P95 OPTIMIZATION: Middleware reordering for faster request rejection
-# Order (outermost first, applied last): 
-# HTTP Metrics → Rate Limit (early rejection) → Request Validation → CORS → WAF → Security → Database
+# QA-001 fix: Add middleware in correct order (outermost first, applied last)
+# Order: CEO Pre-Filter → Security & Host Protection → CORS → Request Processing → Rate Limiting → Routing
 from middleware.body_limit import BodySizeLimitMiddleware
 from middleware.database_session import DatabaseSessionMiddleware
 from middleware.security_headers import SecurityHeadersMiddleware
@@ -230,12 +229,7 @@ app.add_middleware(TrustedHostMiddleware)      # Validate Host header against wh
 # app.add_middleware(DocsProtectionMiddleware)   # Block docs in production
 app.add_middleware(DatabaseSessionMiddleware)  # Database lifecycle management
 
-# 2. WAF Protection (security checks before expensive operations)
-# DEF-003 CEO DIRECTIVE: WAF must execute AFTER authentication (authenticated routes need auth context)
-# This prevents WAF from blocking legitimate authenticated requests
-app.add_middleware(WAFProtection, enable_block_mode=True)  # WAF with auth context available
-
-# 3. CORS (must be early to handle preflight requests) - Replit compatible
+# 2. CORS (must be early to handle preflight requests) - Replit compatible
 cors_config = settings.get_cors_config
 cors_origins = cors_config["allow_origins"]
 
@@ -253,11 +247,23 @@ app.add_middleware(
     max_age=cors_config["max_age"]
 )
 
-# 4. Request validation (check request size/length before processing)
+# 3. Request validation (check request before processing)
 app.add_middleware(URLLengthMiddleware, max_length=settings.max_url_length)
 app.add_middleware(BodySizeLimitMiddleware, max_size=settings.max_request_size_bytes)
 
-# 5. Rate limiting (OPTIMIZED: Moved earlier for faster rejection of excessive requests)
+# 4. Request identification and tracing (before error handling)
+app.add_middleware(RequestIDMiddleware)
+app.middleware("http")(trace_id_middleware)
+
+# 4.5 CRITICAL SECURITY: API Rate Limiting Enforcement
+app.add_middleware(APIRateLimitMiddleware)  # Global API rate limiting enforcement
+
+# DEF-003 CEO DIRECTIVE: WAF must execute AFTER authentication (authenticated routes need auth context)
+# This prevents WAF from blocking legitimate authenticated requests
+app.add_middleware(WAFProtection, enable_block_mode=True)  # WAF with auth context available
+
+# 5. Rate limiting handled by decorators (applied at route level)
+
 # Add rate limiter middleware for proper enforcement
 if limiter:
     app.state.limiter = limiter
@@ -265,14 +271,7 @@ if limiter:
 else:
     print("⚠️ Rate limiter not configured")
 
-# 5.5 CRITICAL SECURITY: API Rate Limiting Enforcement
-app.add_middleware(APIRateLimitMiddleware)  # Global API rate limiting enforcement
-
-# 6. Request identification and tracing (before error handling)
-app.add_middleware(RequestIDMiddleware)
-app.middleware("http")(trace_id_middleware)
-
-# 7. HTTP Metrics (AFTER authentication/authorization middleware)
+# 6. HTTP Metrics (AFTER authentication/authorization middleware)
 # This ensures HTTP errors are properly recorded but not converted to 500s
 from middleware.http_metrics import HTTPMetricsMiddleware
 app.add_middleware(HTTPMetricsMiddleware, enable_metrics=True)

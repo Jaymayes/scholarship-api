@@ -1,125 +1,8 @@
 # Overview
 
-This project is a Scholarship Discovery & Search API built with FastAPI. Its primary purpose is to serve as a system-of-record for scholarships, offering advanced search, filtering, and eligibility checking using semantic and keyword search. The API also provides analytics on user interactions and feeds data to Student Dashboards and Landing Pages. It now includes orchestration capabilities through the Agent Bridge, allowing it to participate in distributed workflows coordinated by the Auto Command Center, alongside other services like Auto Page Maker, Student Pilot, and Scholarship Sage.
+This project is a Scholarship Discovery & Search API built with FastAPI. Its primary purpose is to serve as a system-of-record for scholarships, offering advanced search, filtering, and eligibility checking using semantic and keyword search. The API also provides analytics on user interactions and feeds data to Student Dashboards and Landing Pages. It includes orchestration capabilities through the Agent Bridge, allowing it to participate in distributed workflows coordinated by the Auto Command Center, alongside other services like Auto Page Maker, Student Pilot, and Scholarship Sage.
 
 The business vision is to provide a comprehensive, intelligent platform that connects students with relevant scholarships, aiming to become a leading solution in the scholarship search market with enterprise-grade orchestration capabilities.
-
-**📊 Executive Documentation:** See `CEO_APPLICATION_REPORT.md` for comprehensive application functionality report including all features, technical architecture, business value, and deployment status.
-
-## Recent Progress
-
-### ✅ OPERATIONAL INFRASTRUCTURE COMPLETE (2025-10-27)
-- **Status**: 🚀 **Production Operations Ready**
-- **Deliverables**: 4 operational scripts + 3 REST API endpoints + comprehensive runbooks
-- **Artifacts**: All ops outputs go to `ops/scholarship-api/` directory
-- **Documentation**: `OPERATIONS_RUNBOOK.md`, `DAILY_OPS_QUICKSTART.md`, `OPS_PROMPTS_REFERENCE.md`
-
-**Operational Scripts Created:**
-1. **Daily Ops** (`scripts/daily_ops.py`) - Health summary, latency dashboard, KPI report
-   - Artifact: `ops/scholarship-api/daily_ops_snapshot.json`
-   - Success: Baseline captured, slow endpoints identified
-   
-2. **Release/Validation** (`scripts/release_validation.py`) - 48-hour optimization plan
-   - Artifact: `ops/scholarship-api/optimization_before_after.md`
-   - Goal: -80 to -120ms P95 reduction
-   
-3. **KPI Reporting** (`scripts/kpi_reporting.py`) - Usage, conversion, revenue metrics
-   - Artifact: `ops/scholarship-api/kpi_24h.txt`
-   - Tracks: Quick-wins/stretch endpoints → applications → MRR
-   
-4. **Incident Response** (`scripts/incident_response.py`) - Hot-path stress tests
-   - Artifact: `ops/scholarship-api/stress_test_results.md`
-   - Rollback triggers: Error rate >5% OR auth failures >0.5%
-
-**New REST API Endpoints:**
-- `GET /api/v1/observability/health-summary` - Quick health snapshot
-- `GET /api/v1/observability/latency-dashboard` - P50/P95/P99 by endpoint group
-- `GET /api/v1/observability/kpi-report?period_hours=24` - Business metrics
-
-**Stress Test Infrastructure:**
-- `tests/stress_test_hot_paths.py` - Validates predictive matching, document hub, quick-wins, stretch-opportunities
-- Validates: P95 latency, error rate, auth regressions, concurrent load handling
-- Pass criteria: Error rate <5%, auth failures <0.5%, stable P95
-
-**Next Steps**: Use operational scripts for daily monitoring, pre-release validation, and incident response
-
-### 📋 COMPREHENSIVE SYSTEM AUDIT COMPLETE (2025-10-27)
-- **Status**: ✅ **88% Implementation Complete** - Excellent foundation with minor strategic gaps
-- **Audit Report**: See `SCHOLARSHIP_AGENT_AUDIT_CORRECTED.md` for full analysis
-- **Key Finding**: B2C credit system is FULLY OPERATIONAL (95% complete) - initial audit error corrected by architect
-- **Implementation Quality**:
-  - ✅ Core search & discovery (100%)
-  - ✅ B2B infrastructure (95%)
-  - ✅ B2C monetization system (95%) - credit balance, consumption, packages, transparent pricing
-  - ✅ AI intelligence (90%)
-  - ✅ Agent orchestration (100%)
-  - ✅ Performance (100% - <150ms P95)
-  - 🟡 Student experience (80% - tracker missing, document hub not exposed)
-- **Critical Gaps Identified**:
-  1. **Application Tracker** (0% - service not implemented, 8-12 hours)
-  2. **Document Hub API** (65% - service exists but no router, 2-4 hours)
-  3. **Predictive Matching API** (service ready, not exposed, 2-3 hours)
-- **Corrected Finding**: Credit system exists with routers/monetization.py (419 lines) - starter grants, packages, consumption, external billing
-- **Next Steps**: Execute Week 1 plan (12-19 hours) to complete student experience and expose hidden services
-
-### 🎉 DEPLOYMENT READY - Production Approval (2025-10-15)
-- **Status**: ✅ **ARCHITECT APPROVED** - Production-ready and satisfies all deployment acceptance gates
-- **requirements.txt**: Created from pyproject.toml with 42 dependencies for Replit deployment compatibility
-- **Deployment Config**: Autoscale deployment with uvicorn server configured
-- **Run Command**: `sh -c "uvicorn main:app --host 0.0.0.0 --port ${PORT:-5000}"` (Replit autoscale-compatible)
-- **Build**: Auto-detected `pip install -r requirements.txt`
-- **Type Safety**: Zero LSP errors - Fixed asyncio.gather type narrowing with explicit cast()
-- **Code Quality**: No deprecation warnings (lifespan handlers), TRUSTED_PROXY_IPS configured
-- **Application Health**: Server running cleanly with all services initialized (degraded Redis fallback is expected)
-- **Security**: WAF active, SSL configured, debug paths blocked, authentication working (401 on protected endpoints)
-- **Core Endpoints Verified**: /, /api/v1/health, /metrics all responding correctly
-- **Next Steps**: Deploy to production, monitor health/metrics endpoints, plan Redis provisioning to clear degraded flag
-
-### P0 INCIDENT ACTIVE - Infrastructure WAF Blocking (2025-10-08 T+4:55)
-- **Status**: 🔴 **P0 INCIDENT DECLARED** - WAF-BLOCK-20251008
-- **Critical Blocker**: Replit infrastructure WAF (Google Frontend) blocking 100% of external traffic
-- **Root Cause**: Platform-level WAF blocking at Google Cloud Armor layer, NOT application code issue
-- **Evidence**: Localhost 200 OK, external 403 Forbidden - "server: Google Frontend" in headers
-- **Application Code**: ✅ VERIFIED CORRECT via extensive testing (localhost, proxy headers, unit tests)
-- **Synthetic Monitoring**: 100% 403 rate across 5 regions, all SEO crawlers blocked
-- **Remediation**: Option A (Replit support ticket filed) + Option B (bypass code ready, auto-deploys T+6:20)
-- **Next Checkpoint**: T+6:15 Go/No-Go decision on Option B deployment
-- **Documentation**: `P0_INCIDENT_TRACKER.md`, `RCA_PHASE1_FINDINGS.md`, `OPTION_B_GATE_CONDITIONS.md`
-
-### External Billing Implementation (2025-10-07)
-
-### External Billing Implementation (LATEST)
-- **Payment Externalization**: ✅ COMPLETE - All in-app payment processing removed per CEO directive
-  - **Removed**: Stripe SDK, in-app checkout, payment stubs
-  - **Implemented**: External billing API with HMAC signature validation (SHA-256, 5-min expiry)
-  - **Endpoints**: `/billing/external/credit-grant`, `/billing/external/provider-fee-paid`
-  - **Security**: Bearer token auth, idempotency via external_tx_id, WAF bypass for legitimate JSON
-  - **Analytics**: PaymentCompletedExternal, ProviderFeePaidExternal, CreditBalanceUpdated events
-  - **Credit Economy**: Preserved - consumption/confirm flows unchanged, balance sharing verified
-- **Feature Flags**: `payments_external_enabled=true`, `payments_external_test_mode=false`
-- **B2C/B2B KPIs**: Analytics events track amount_usd, credits, source_app for revenue metrics
-
-### P0 Blockers - Launch Readiness
-- **P0-1 Health Endpoints**: ✅ COMPLETE - Two-tier health architecture approved by architect
-  - **Fast endpoint** (`/api/v1/health`): P95 145.6ms < 150ms target - DB & Redis checks for external monitors
-  - **Deep endpoint** (`/api/v1/health/deep`): P95 869ms < 1000ms target - Comprehensive validation with real AI service checks
-  - Circuit breakers active, real downstream validation, no false positives
-- **P0-4 Database SSL**: ✅ COMPLETE - Production-ready SSL configuration approved by architect
-  - SSL Mode: verify-full with system CA bundle (/etc/ssl/certs/ca-certificates.crt)
-  - PostgreSQL 16.9 on Neon with Let's Encrypt validation
-  - TLS 1.3 active, connection pooling (5+10), 0% error rate
-- **P0-2 Redis**: 🟡 PENDING - Requires managed Redis provisioning (external dependency)
-- **P0-3 Payments**: ✅ EXTERNALIZED - Payment processing moved to external billing apps (see above)
-
-### Previous Work
-- **Dashboard Metrics Fix**: ✅ RESOLVED - All 3 dashboards (auth, WAF, infrastructure) now operational with real-time metrics from Prometheus REGISTRY
-- **Root Cause**: Workflow restart resolved module import/caching issue preventing dashboard access to metrics. Metric naming was correct (dashboards use `_total` suffix for Counter samples, metric families use base names)
-- **Auth Test Suite**: 12/12 tests passing (100%) - Fixed critical JWT authentication bugs including issuer/audience validation, dependency injection issues, and error handling
-- **Production Rate Limiting**: Redis-backed rate limiting with graceful in-memory fallback, enriched structured logging with 4 CEO-required fields
-- **Test Infrastructure**: Auth seeding system with production safeguards, deterministic test fixtures
-- **Observability Dashboards**: Deployed auth, WAF, and infrastructure monitoring dashboards with real-time metrics at `/api/v1/observability/dashboards/*`
-- **Synthetic Monitoring**: Created automated health check system with Python-based monitors (health, auth login, authenticated search)
-- **Metrics Instrumentation**: Auth middleware records token operations (create/validate), WAF middleware records blocks and allowlist bypasses
 
 # User Preferences
 
@@ -157,16 +40,6 @@ Includes CORS middleware, structured logging, and a centralized error handling s
 
 ## Production Readiness
 The API is fully functional on port 5000, supporting integration with Student Dashboards, landing pages, third-party developers, and analytics systems. It features enterprise-grade containerization, production middleware stack, strict production validation, and comprehensive CI/CD pipeline support.
-
-**Soft Launch Status (2025-10-07):** P0 BLOCKERS 50% COMPLETE (2/4)
-- **P0-1 Health Endpoints**: ✅ COMPLETE - Fast (145.6ms) + Deep (869ms) endpoints operational
-- **P0-4 Database SSL**: ✅ COMPLETE - verify-full with Let's Encrypt validation active
-- **P0-2 Redis**: 🟡 PENDING - Requires managed Redis provisioning (3h ETA)
-- **P0-3 Payments**: 🔴 PENDING - Requires E2E testing (6h ETA)
-- Structured JSON logging active (ts, method, path, status_code, latency_ms, auth_result, waf_rule, request_id)
-- Security posture strong: WAF active, SSL verify-full enforced, auth required, no public endpoints
-- Stop-loss triggers configured: 5xx≥1%, P95≥300ms, auth failures 3x baseline
-- Monitoring: Two-tier health checks ready for external monitors
 
 # External Dependencies
 
