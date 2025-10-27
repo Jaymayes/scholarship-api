@@ -23,6 +23,7 @@ from middleware.waf_protection import WAFProtection
 from observability.metrics import setup_metrics
 from observability.tracing import tracing_service
 from observability.dashboards import router as observability_router
+from routers.observability_api import router as observability_api_router
 from routers.agent import router as agent_router
 from routers.ai import router as ai_router
 from routers.analytics import router as analytics_router
@@ -388,6 +389,7 @@ app.include_router(public_router, tags=["Public Status"])  # Status page and doc
 
 # Observability dashboards for monitoring
 app.include_router(observability_router, tags=["Observability"])
+app.include_router(observability_api_router)  # New: Daily ops dashboards and KPI reporting
 
 # Metrics already setup above - this was the wrong location causing route shadowing
 
