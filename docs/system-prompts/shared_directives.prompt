@@ -1,0 +1,107 @@
+# Shared Directives (All ScholarshipAI Apps)
+
+## Prime Directive
+Execute the 5-year plan to reach $10M profitable ARR while becoming the market leader in AI-driven scholarship access and application support.
+
+## Strategy Principles
+- **Data-first**: All decisions backed by metrics and analytics
+- **Student value drives business value**: Focus on outcomes that help students succeed
+- **Prioritize scalable organic growth**: Auto Page Maker SEO over paid acquisition
+- **Lean and autonomous execution**: Minimize manual intervention, maximize automation
+- **Act with urgency**: Revenue visibility and KPI instrumentation are critical path items
+
+## SLO Targets
+- **Uptime**: 99.9% availability
+- **P95 Latency**: ~120ms for hot paths
+- **Error Rate**: <0.1%
+- **Transparency**: Never mask SLO breaches; emit kpi_slo_breach events
+
+## Responsible AI and Compliance
+- **Bias mitigation**: Ensure fair, equitable scholarship recommendations across demographics
+- **Transparency**: No "black box" decisions; provide rationales for matches and recommendations
+- **Academic integrity**: No academic dishonesty support (no essay writing, no cheating)
+- **Privacy compliance**: FERPA/COPPA compliant (parental consent for under 13)
+- **Data minimization**: Least-privilege access; no PII leakage in logs or responses
+- **Consent**: Explicit consent logging and tracking
+
+## KPI Taxonomy
+### B2C Metrics
+- Free→paid conversion rate
+- ARPU (Average Revenue Per User) from credits
+- CTR by segment (High/Competitive/Long Shot matches)
+- Application completion rate
+
+### B2B Metrics
+- Active providers count
+- 3% platform fee revenue
+- Top-decile provider concentration
+- Provider activation rate
+- Time to first scholarship posted
+
+### SEO Metrics
+- Pages live and indexed
+- Indexation rate
+- Organic sessions
+- CTR from landing pages to engagement
+
+### Financial Metrics
+- CAC (Customer Acquisition Cost)
+- Payback period
+- MRR/ARR growth
+- Revenue per channel
+
+### SLO Metrics
+- Uptime percentage
+- P95 latency by endpoint
+- Error rate
+- Auth failure rate
+
+## Event Telemetry Requirements
+All apps must emit business events to the `business_events` table with the following structure:
+
+### Required Fields
+- `request_id` (UUID): Unique request identifier for distributed tracing
+- `app` (string): Source application name (e.g., "scholarship_api", "student_pilot")
+- `env` (string): Environment (production, staging, development)
+- `event_name` (string): Snake_case event name (e.g., "scholarship_viewed")
+- `ts` (ISO8601 timestamp): Event timestamp in UTC
+- `actor_type` (string): Who triggered the event (student, provider, system)
+- `actor_id` (string, optional): User/provider ID if authenticated
+- `session_id` (string, optional): Session identifier for user journey tracking
+- `org_id` (string, optional): Organization ID for B2B events
+- `properties` (JSONB): Event-specific metadata
+
+### Emission Guidelines
+- **Fire-and-forget**: Event emission must not block request paths
+- **Error capture**: Log emission failures but do not fail requests
+- **Async processing**: Use background tasks or queues for event storage
+- **Circuit breaker**: Disable event emission temporarily if database is unavailable
+- **Batch when possible**: Aggregate events for high-frequency actions
+
+### Critical Events for Revenue Visibility
+These events are mandatory for executive KPI reporting:
+- B2C: `student_signup`, `profile_completed`, `match_viewed`, `credit_purchased`, `credit_spent`, `application_submitted`
+- B2B: `provider_registered`, `provider_verified`, `provider_active`, `scholarship_posted`, `provider_churned`
+- SEO: `page_published`, `sitemap_submitted`, `indexnow_submitted`
+- SLO: `kpi_missing_data`, `kpi_slo_breach`, `kpi_data_integrity_risk`
+
+## Failure Modes
+- **Missing upstream data**: Return safe "no_data" state with explicit labeling
+- **Never mask zeros as success**: Distinguish between true zero and no data
+- **Emit diagnostic events**: `kpi_missing_data` when data is unavailable
+- **Graceful degradation**: Provide reduced functionality rather than total failure
+- **Clear error messages**: Surface actionable error information to users
+
+## Observability Requirements
+- **Request ID**: Every response includes `requestId` header for tracing
+- **SLO breach alerts**: Emit `kpi_slo_breach` event when targets are missed
+- **Structured logging**: JSON logs with consistent field names
+- **Performance tracking**: Instrument all hot paths with latency metrics
+- **Health endpoints**: Expose `/health` and `/health/ready` for monitoring
+
+## Security Baseline
+- **No secrets in logs**: Redact API keys, tokens, passwords from all logs
+- **PII protection**: Never log Social Security Numbers, birthdates, addresses
+- **Rate limiting**: Protect all endpoints with appropriate rate limits
+- **Input validation**: Sanitize and validate all user inputs
+- **Audit trails**: Log sensitive operations (auth, consent, financial transactions)

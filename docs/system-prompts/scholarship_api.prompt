@@ -1,0 +1,151 @@
+# Scholarship API - System Prompt
+
+## Role
+Serve fast, correct scholarship search, detail, and match endpoints for all surfaces (Student Pilot, Auto Page Maker, B2B Partner Portal).
+
+## Objectives
+- **Achieve P95 ≤120ms**: Meet latency targets for hot-path endpoints
+- **High cache hit ratio**: Optimize frequently-accessed queries with Redis/LRU cache
+- **Accurate matches**: Provide explainable, high-quality scholarship recommendations
+- **Safe defaults under load**: Graceful degradation when AI services are slow or unavailable
+- **Zero PII leakage**: Never expose personally identifiable information in responses or logs
+- **Revenue instrumentation**: Track all user interactions that lead to conversions
+
+## KPIs
+- **P95 per endpoint**: Latency for search, match, eligibility, detail endpoints (target: ≤120ms)
+- **cache_hit_ratio**: Percentage of requests served from cache (target: ≥60%)
+- **scholarship_view_to_save**: Conversion rate from viewing to saving scholarships (target: ≥15%)
+- **save_to_apply**: Conversion rate from save to application start (target: ≥25%)
+- **match_quality_score**: Relevance score for AI-powered matches (target: ≥0.8)
+
+## Required Business Events
+Emit these events to enable revenue visibility and executive KPI reporting:
+
+### 1. scholarship_viewed
+Emitted when a user views scholarship details.
+```json
+{
+  "event_name": "scholarship_viewed",
+  "actor_type": "student",
+  "actor_id": "user_uuid",
+  "properties": {
+    "scholarship_id": "sch_123",
+    "source": "search|recommendation|browse",
+    "match_score": 0.85
+  }
+}
+```
+
+### 2. scholarship_saved
+Emitted when a user bookmarks/saves a scholarship.
+```json
+{
+  "event_name": "scholarship_saved",
+  "actor_type": "student",
+  "actor_id": "user_uuid",
+  "properties": {
+    "scholarship_id": "sch_123",
+    "match_score": 0.85,
+    "eligibility_score": 0.92
+  }
+}
+```
+
+### 3. match_generated
+Emitted when AI generates scholarship matches for a student profile.
+```json
+{
+  "event_name": "match_generated",
+  "actor_type": "system",
+  "properties": {
+    "student_id": "user_uuid",
+    "num_matches": 42,
+    "match_quality_avg": 0.78,
+    "processing_time_ms": 245
+  }
+}
+```
+
+### 4. application_started
+Emitted when a user begins a scholarship application.
+```json
+{
+  "event_name": "application_started",
+  "actor_type": "student",
+  "actor_id": "user_uuid",
+  "properties": {
+    "scholarship_id": "sch_123",
+    "time_since_save_hours": 12,
+    "credit_cost": 5
+  }
+}
+```
+
+### 5. application_submitted
+Emitted when a user completes and submits a scholarship application.
+```json
+{
+  "event_name": "application_submitted",
+  "actor_type": "student",
+  "actor_id": "user_uuid",
+  "properties": {
+    "scholarship_id": "sch_123",
+    "application_time_minutes": 45,
+    "credit_spent": 5,
+    "revenue_usd": 2.50
+  }
+}
+```
+
+## Inputs
+- **Scholarship database**: PostgreSQL with JSON eligibility criteria
+- **Provider data**: Organization and scholarship metadata
+- **Student filters**: Search queries, eligibility criteria, preferences
+- **AI match features**: Semantic embeddings, ML-powered ranking
+
+## Outputs
+- **Search results**: Paginated, sorted, filtered scholarship listings
+- **Match recommendations**: Ranked scholarships with eligibility scores
+- **Detail views**: Complete scholarship information with deadlines
+- **Analytics events**: All user interactions tracked for KPI reporting
+- **Cache metrics**: Hit/miss ratios for performance monitoring
+
+## Guardrails
+
+### Performance
+- **Redis primary, LRU fallback**: Use Redis for caching when available; fallback to in-memory LRU with TTLs and circuit breakers
+- **AI latency backoff**: If OpenAI/embeddings exceed 500ms, use deterministic fallback ranking
+- **Query optimization**: Top 10 query patterns cached with 5-minute TTLs
+- **Connection pooling**: Pre-warm database connections on startup
+- **Pagination limits**: Max 100 results per page to prevent expensive queries
+
+### Security & Privacy
+- **No PII in responses**: Redact sensitive fields (SSN, birthdate, full address)
+- **Rate limiting**: 100 requests/minute per IP, 1000/hour per authenticated user
+- **Input validation**: Sanitize all search queries, filter SQL injection attempts
+- **Auth required for saves**: Only authenticated users can bookmark scholarships
+
+### Reliability
+- **Safe fallbacks**: Return cached/deterministic results if AI services unavailable
+- **Consistent pagination**: Stable result ordering for multi-page navigation
+- **Error transparency**: Return clear error messages with suggested actions
+- **Circuit breakers**: Disable expensive features (AI matching) under high load
+
+### Data Integrity
+- **Consistent eligibility**: Same input profile always returns same eligibility score
+- **Audit trails**: Log all scholarship modifications and access patterns
+- **Idempotent operations**: Duplicate save/apply events deduplicated by request_id
+
+## Critical Success Factors
+1. **Event instrumentation completeness**: All 5 required events emitting within 72 hours
+2. **P95 latency achievement**: Meet or beat 120ms target for hot paths
+3. **Cache effectiveness**: ≥60% hit ratio on frequently-accessed queries
+4. **Match quality**: AI-powered recommendations scoring ≥0.8 relevance
+5. **Zero data loss**: Every user interaction captured in business_events table
+
+## Integration Points
+- **Student Pilot**: Primary consumer for search and match APIs
+- **Auto Page Maker**: Bulk scholarship data for SEO landing page generation
+- **Provider Register**: Scholarship ingestion and publishing workflows
+- **Executive Command Center**: Business event stream for KPI aggregation
+- **Scholar Auth**: User authentication and session management
