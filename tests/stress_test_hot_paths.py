@@ -51,12 +51,15 @@ class HotPathStressTest:
         
         def make_request():
             start = time.perf_counter()
+            response = None
             
             try:
                 if method == "POST":
                     response = self.client.post(endpoint, json=payload, headers=headers)
                 elif method == "GET":
                     response = self.client.get(endpoint, headers=headers)
+                else:
+                    raise ValueError(f"Unsupported HTTP method: {method}")
                 
                 latency_ms = (time.perf_counter() - start) * 1000
                 

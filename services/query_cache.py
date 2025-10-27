@@ -77,10 +77,10 @@ class QueryOptimizationService:
         self.cache_hits += 1
         return f"scholarship:{scholarship_id}"
     
-    def get_cache_stats(self) -> Dict[str, int]:
+    def get_cache_stats(self) -> Dict[str, Any]:
         """Get cache performance statistics"""
         total_requests = self.cache_hits + self.cache_misses
-        hit_rate = (self.cache_hits / total_requests * 100) if total_requests > 0 else 0
+        hit_rate: float = (self.cache_hits / total_requests * 100) if total_requests > 0 else 0.0
         
         return {
             "cache_hits": self.cache_hits,
