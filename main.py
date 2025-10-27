@@ -59,6 +59,7 @@ from routers.search import router as search_router
 from routers.week2_acceleration import router as week2_router
 from routers.week3_execution import router as week3_router
 from routers.week4_global_expansion import router as week4_router
+from routers.applications import router as applications_router
 from schemas.error_responses import ERROR_RESPONSES
 from utils.logger import setup_logger
 
@@ -325,6 +326,7 @@ async def handle_method_not_allowed(request: Request, exc: HTTPException):
 # Include routers
 app.include_router(auth_router)
 app.include_router(scholarships_router, prefix="/api/v1", tags=["scholarships"])
+app.include_router(applications_router, prefix="/api/v1", tags=["applications"])
 
 # Search endpoints - available at both root and /api/v1 for backward compatibility
 app.include_router(search_router, tags=["search"])
