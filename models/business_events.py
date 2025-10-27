@@ -60,6 +60,7 @@ def create_scholarship_viewed_event(
         actor_type="student",
         actor_id=actor_id,
         session_id=session_id,
+        org_id=None,
         properties={
             "scholarship_id": scholarship_id,
             "source": source,
@@ -83,6 +84,7 @@ def create_scholarship_saved_event(
         actor_type="student",
         actor_id=actor_id,
         session_id=session_id,
+        org_id=None,
         properties={
             "scholarship_id": scholarship_id,
             "match_score": match_score,
@@ -103,6 +105,9 @@ def create_match_generated_event(
         request_id=request_id or uuid.uuid4(),
         event_name="match_generated",
         actor_type="system",
+        actor_id=None,
+        session_id=None,
+        org_id=None,
         properties={
             "student_id": student_id,
             "num_matches": num_matches,
@@ -127,6 +132,7 @@ def create_application_started_event(
         actor_type="student",
         actor_id=actor_id,
         session_id=session_id,
+        org_id=None,
         properties={
             "scholarship_id": scholarship_id,
             "time_since_save_hours": time_since_save_hours,
@@ -151,6 +157,7 @@ def create_application_submitted_event(
         actor_type="student",
         actor_id=actor_id,
         session_id=session_id,
+        org_id=None,
         properties={
             "scholarship_id": scholarship_id,
             "application_time_minutes": application_time_minutes,
@@ -171,6 +178,9 @@ def create_kpi_missing_data_event(
         request_id=request_id or uuid.uuid4(),
         event_name="kpi_missing_data",
         actor_type="system",
+        actor_id=None,
+        session_id=None,
+        org_id=None,
         properties={
             "metric_name": metric_name,
             "reason": reason,
@@ -192,6 +202,9 @@ def create_kpi_slo_breach_event(
         request_id=request_id or uuid.uuid4(),
         event_name="kpi_slo_breach",
         actor_type="system",
+        actor_id=None,
+        session_id=None,
+        org_id=None,
         properties={
             "slo_type": slo_type,
             "endpoint": endpoint,
