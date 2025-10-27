@@ -173,8 +173,19 @@ async def get_scholarship(
                 detail=f"Scholarship with ID {scholarship_id} not found"
             )
 
-        # Log scholarship view
+        # Log scholarship view (existing analytics)
         analytics_service.log_scholarship_view(user_id, scholarship_id)
+        
+        # Emit business event for KPI tracking (NEW: CEO directive)
+        from services.event_emission import emit_scholarship_viewed
+        import asyncio
+        asyncio.create_task(emit_scholarship_viewed(
+            scholarship_id=scholarship_id,
+            source="detail",  # User directly accessed scholarship detail page
+            match_score=None,  # No match score for direct access
+            actor_id=user_id,
+            session_id=None  # TODO: Extract from request headers
+        ))
 
         return scholarship
 
