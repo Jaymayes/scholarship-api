@@ -97,13 +97,18 @@ Created central event tracking system for Executive Command Center KPI reporting
 5. Comprehensive instrumentation guide created (`docs/BUSINESS_EVENTS_INSTRUMENTATION_GUIDE.md`)
 6. System prompt files created for Scholarship API
 
-**⏳ IN PROGRESS (Remaining 48 hours):**
-1. scholarship_saved - Create save endpoint with event emission
-2. application_started - Create application start endpoint
-3. application_submitted - Create application submission endpoint (CRITICAL for revenue tracking)
-4. match_generated - Instrument recommendation endpoints
-5. Expand scholarship_viewed to search results and recommendations
-6. Session ID extraction across all instrumented endpoints
+**✅ COMPLETED:**
+1. ✅ scholarship_saved - Save endpoint created at POST /api/v1/scholarships/{id}/save
+2. ✅ application_started - Application start endpoint at POST /api/v1/applications/start
+3. ✅ application_submitted - Application submit endpoint at POST /api/v1/applications/submit (REVENUE CRITICAL)
+4. ✅ match_generated - Instrumented in GET /api/v1/recommendations
+5. ✅ scholarship_viewed - Instrumented in GET /api/v1/scholarships/{id}
+6. ✅ Session ID extraction - Implemented in all endpoints via utils/session.py
+
+**⚠️ ARCHITECT FINDINGS (Known Limitations):**
+- Fire-and-forget emission pattern may drop events in edge cases (request finishes before background task)
+- Circuit breaker recovery strategy not yet implemented (manual restart required if circuit opens)
+- No automated integration tests for event persistence (manual SQL verification required)
 
 ### KPIs Unlocked (Post-Instrumentation)
 Once all events are emitting:
