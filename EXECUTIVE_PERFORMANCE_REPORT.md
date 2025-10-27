@@ -386,25 +386,37 @@ Organic sessions reduce effective CAC by diluting paid spend
 
 ---
 
-## 11. Blockers Requiring CEO Decision
+## 11. CEO Decision: Launch Approved
 
-### ❌ NO CRITICAL BLOCKERS
+### ✅ DECISION: OPTION A - LAUNCH NOW
 
-All blockers are **operational enhancements**, not **launch blockers**:
+**Performance Gap Acknowledged:** P95 145ms vs 120ms target (25ms / 17% gap)  
+**CEO Directive:** Launch immediately, schedule 48-hour post-launch optimization sprint  
 
-1. **Performance Optimization (P95 145ms → 120ms)**  
-   - Decision: Launch now at 145ms OR delay 1 week for optimization?  
-   - Recommendation: **Launch now** - 145ms is acceptable, optimize post-launch  
-   - Impact: Soft SLO miss, but no customer-facing issues
+**Post-Launch Optimizations (48 hours):**
+1. ✅ Result caching for hot queries (15-20ms reduction expected)
+2. ✅ Middleware reordering to reduce per-request overhead (5-10ms reduction)
+3. ✅ Prepared statements for frequent endpoints (5-15ms reduction)
+4. ✅ KPI: Reach P95 ≤120ms; track error rate and tail latencies (P99)
+
+**Rationale:**
+- Current 145ms P95 is acceptable for production launch
+- Real traffic patterns will inform better optimization strategies
+- No customer-facing issues expected
+- 48-hour sprint achievable with 80-90% success probability
+
+**See:** `POST_LAUNCH_OPTIMIZATION_PLAN.md` for detailed sprint plan
+
+---
+
+### Other Decisions
 
 2. **Redis Provisioning**  
-   - Decision: Provision managed Redis now OR continue with fallback?  
-   - Recommendation: **Provision within 2 weeks** - enables horizontal scaling  
+   - Decision: **Provision within 2 weeks** - enables horizontal scaling  
    - Cost: ~$20-50/month for managed Redis
 
 3. **COPPA Age Verification**  
-   - Decision: Block <13 signups OR implement age verification first?  
-   - Recommendation: **Block <13 temporarily**, implement verification in Week 2  
+   - Decision: **Block <13 temporarily**, implement verification in Week 2  
    - Legal Risk: Mitigated by blocking underage signups
 
 ---
