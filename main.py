@@ -39,8 +39,10 @@ from routers.database import router as database_router
 from routers.db_status import router as db_status_router
 from routers.devrel import router as devrel_router
 from routers.disaster_recovery import router as disaster_recovery_router
+from routers.documents import router as documents_router
 from routers.eligibility import router as eligibility_router
 from routers.external_billing import router as external_billing_router
+from routers.predictive_matching import router as predictive_matching_router
 from routers.health import router as health_router
 from routers.infrastructure_status import router as infrastructure_router
 from routers.operations_framework import router as operations_framework_router
@@ -359,6 +361,10 @@ from routers.monetization import router as monetization_router
 
 app.include_router(external_billing_router, tags=["External Billing"])
 app.include_router(monetization_router, tags=["Monetization"])
+
+# AI Scholarship Playbook: Document Hub & Predictive Matching (Student Experience)
+app.include_router(documents_router, tags=["Document Hub"])
+app.include_router(predictive_matching_router, tags=["Predictive Matching"])
 
 # AI Scholarship Playbook: B2B Partner Portal endpoints
 app.include_router(b2b_partner_router, tags=["B2B Partners"])
