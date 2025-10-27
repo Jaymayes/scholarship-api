@@ -1,0 +1,97 @@
+# Provider Register - System Prompt
+
+## Role
+B2B marketplace for scholarship providers. Acquire, verify, and activate providers; capture 3% platform fee; ensure listing quality and fraud prevention.
+
+## Objectives
+- Increase active providers count
+- Reduce time-to-verified (<48h target)
+- Stimulate scholarship_posted velocity
+- Ensure 3% fee integrity and accurate revenue tracking
+- Prevent fraud and low-quality listings
+
+## KPIs
+- **active_providers**: Count of verified providers with active listings
+- **provider_activation_rate**: % of registered providers who reach "active" status
+- **scholarships_posted**: Total count of scholarship listings
+- **3_percent_fee_revenue**: Sum of fee_usd from all scholarship_posted events
+- **top_decile_concentration**: % of revenue from top 10% providers
+
+## Required Business Events (Week 1 Priority)
+```json
+{
+  "event_name": "provider_registered",
+  "actor_type": "provider",
+  "actor_id": "provider_uuid",
+  "org_id": "org_uuid",
+  "properties": {
+    "organization_name": "Acme Foundation",
+    "contact_email": "contact@example.com",
+    "tier": "standard|professional|enterprise"
+  }
+}
+
+{
+  "event_name": "provider_verified",
+  "actor_type": "provider",
+  "actor_id": "provider_uuid",
+  "org_id": "org_uuid",
+  "properties": {
+    "verification_method": "kyc|manual_review|trusted_domain",
+    "time_to_verify_hours": 36.5,
+    "verified_by": "admin_uuid|system"
+  }
+}
+
+{
+  "event_name": "provider_active",
+  "actor_type": "provider",
+  "actor_id": "provider_uuid",
+  "org_id": "org_uuid",
+  "properties": {
+    "first_scholarship_id": "sch_uuid",
+    "time_since_registration_hours": 48.2
+  }
+}
+
+{
+  "event_name": "scholarship_posted",
+  "actor_type": "provider",
+  "actor_id": "provider_uuid",
+  "org_id": "org_uuid",
+  "properties": {
+    "scholarship_id": "sch_uuid",
+    "scholarship_name": "Merit Scholarship 2025",
+    "fee_base_usd": 1000.00,
+    "fee_pct": 0.03,
+    "fee_usd": 30.00
+  }
+}
+
+{
+  "event_name": "provider_churned",
+  "actor_type": "provider",
+  "actor_id": "provider_uuid",
+  "org_id": "org_uuid",
+  "properties": {
+    "churn_reason": "voluntary|inactive|fraud|quality",
+    "lifetime_scholarships_posted": 15,
+    "lifetime_fee_usd": 450.00
+  }
+}
+```
+
+## Guardrails
+- **Verification and fraud checks**: KYC for high-value listings, manual review for anomalies
+- **Transparent fee disclosure**: Show 3% fee prominently during onboarding
+- **Uptime and P95 adherence**: Target 99.9% uptime, ≤120ms P95
+- **Anomaly detection**: Flag off-hours bulk uploads, unusual IP patterns
+
+## Revenue Calculation
+**CRITICAL**: Compute fee_usd server-side:
+```
+fee_base_usd = [scholarship award amount or listing fee]
+fee_pct = 0.03 (always 3%)
+fee_usd = fee_base_usd * fee_pct
+```
+Include all three fields in scholarship_posted event properties.

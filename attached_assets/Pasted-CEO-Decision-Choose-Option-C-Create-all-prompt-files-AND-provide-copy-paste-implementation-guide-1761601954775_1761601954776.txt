@@ -1,0 +1,143 @@
+CEO Decision
+
+Choose Option C: Create all prompt files AND provide copy-paste implementation guides for each app owner.
+Additionally authorized: Complete instrumentation for the three priority apps (Student Pilot, Provider Register, Scholarship API) to achieve the 72-hour first non-zero revenue report. Acceptance criteria and verification steps are defined below.
+Prompt Pack Organization (file → app → purpose → must-emit events)
+Use these exact filenames under docs/system-prompts/. Each app loads shared_directives.prompt first, then its overlay.
+
+docs/system-prompts/shared_directives.prompt
+
+Applies to: All 8 apps
+Purpose: Global Prime Directive ($10M ARR), SLOs, Responsible AI, KPI taxonomy, event schema, and telemetry rules.
+docs/system-prompts/executive_command_center.prompt → Executive Command Center
+
+Purpose: Central telemetry, KPI aggregation, daily Slack briefs, anomaly detection.
+Must-emit: kpi_generated, kpi_missing_data, scheduler_job_run, exec_alert_created.
+docs/system-prompts/student_pilot.prompt → Student Pilot (B2C)
+
+Purpose: Student onboarding, matching, credit monetization, applications.
+Must-emit (Week 1): student_signup, profile_completed, match_viewed, credit_purchased, credit_spent, application_submitted.
+docs/system-prompts/provider_register.prompt → Provider Register (B2B)
+
+Purpose: Provider onboarding, verification, scholarship listings, fee capture.
+Must-emit (Week 1): provider_registered, provider_verified, provider_active, scholarship_posted (include fee_base_usd and fee_pct=0.03), provider_churned.
+docs/system-prompts/scholarship_api.prompt → Scholarship API (Engagement core)
+
+Purpose: Search/match, save, start/submit applications; funnel telemetry.
+Must-emit (Week 1): scholarship_viewed, scholarship_saved, match_generated, application_started, application_submitted.
+docs/system-prompts/scholar_auth.prompt → Scholar Auth (Identity & Consent)
+
+Purpose: OAuth, login security, email verification, COPPA/FERPA consent.
+Must-emit: email_verified, consent_recorded, login_succeeded, login_failed.
+docs/system-prompts/auto_page_maker.prompt → Auto Page Maker (SEO Engine)
+
+Purpose: Programmatic SEO pages, indexing, attribution to CAC.
+Must-emit: page_published, page_updated, page_indexed, serp_click, conversion_attributed.
+docs/system-prompts/scholarship_agent.prompt → Scholarship Agent (Growth Automation)
+
+Purpose: Campaigns, experiments, referral/UTM tracking, CAC/LTV learning.
+Must-emit: campaign_launched, campaign_step_completed, ab_test_started, ab_test_converted, link_clicked.
+docs/system-prompts/scholarship_sage.prompt → Scholarship Sage (AI Advisor)
+
+Purpose: Guidance sessions, checklists, ethical guardrails, student value.
+Must-emit: guidance_session_started, guidance_recommendation_viewed, checklist_created, checklist_completed.
+How each app should load and use prompts (copy-paste owner guide)
+
+Load order: shared_directives.prompt → <app>.prompt (concatenate with a clear delimiter; last-wins on conflicting directives).
+Caching: Cache merged prompt in-memory with a version/hash; expose GET /api/prompts/:app to return {app, version, hash}.
+Verification: Add GET /api/prompts/verify to validate all 9 files resolve correctly and hashes are unique.
+Environment flags: PROMPT_ENV=production|staging to allow environment-specific clauses inside prompts if needed.
+Business event instrumentation rules (all apps)
+
+Use the shared event library (emitBusinessEvent) in a fire-and-forget pattern; never block request paths.
+Required fields: app, env, eventName, ts, actorType, actorId (if available), orgId (for providers), sessionId, properties (json).
+Revenue normalization:
+For credit_purchased: properties.revenue_usd and payment_id.
+For credit_spent/application_submitted: properties.revenue_usd and credit_amount.
+For scholarship_posted: properties.fee_base_usd, fee_pct=0.03, fee_usd=fee_base_usd*0.03 (compute server-side).
+Privacy/compliance: Do not log PII beyond userId/email hash; include consent flags when relevant (e.g., consent_recorded).
+72-hour CEO milestone plan and acceptance criteria
+
+T0 (Now)
+
+Approve Option C (done).
+Run: npm run db:push --force and confirm “+ business_events (create table)”.
+Set SLACK_WEBHOOK_URL on Executive Command Center.
+T+6 hours (Priority apps)
+
+Student Pilot: Ensure 6 events emit with revenue_usd on credit_purchased/credit_spent and application_submitted.
+Provider Register: Ensure scholarship_posted emits fee_base_usd and fee_usd computed; provider_verified and provider_active wired.
+Scholarship API: Ensure match_generated, scholarship_saved, application_started, application_submitted emit with session_id.
+T+24 hours (Verification)
+
+Smoke tests: Trigger each event once via real flows.
+Confirm writes: SELECT COUNT(*) FROM business_events WHERE ts > NOW() - interval '24 hours';
+Prompts: GET /api/prompts/verify returns success; GET /api/prompts lists 9 entries with hashes.
+T+48 hours (Reporting dry-run)
+
+Manual KPI generation: POST /api/executive/kpi/generate returns B2C MRR > $0 OR B2B ARR > $0 and non-zero funnel counts.
+Slack: Daily 09:00 UTC brief posts successfully to #executive-dashboard.
+T+72 hours (Acceptance)
+
+First daily KPI report shows:
+B2C: credit_purchased > 0 OR application_submitted > 0 with revenue attribution.
+B2B: fee_usd > 0 from scholarship_posted.
+Engagement: match_generated, scholarship_viewed non-zero.
+Per-app owner quick-start (copy/paste)
+
+Student Pilot
+
+Load: shared_directives + student_pilot.prompt.
+Instrument endpoints:
+Signup flow → student_signup
+Profile completion API → profile_completed (>=70%)
+Match detail GET → match_viewed
+Payments flow → credit_purchased (revenue_usd)
+Credit deduction path → credit_spent (revenue_usd)
+Application submit → application_submitted (applicationId, scholarshipId, revenue_usd if credits consumed)
+Verify with 1 synthetic user journey end-to-end.
+Provider Register
+
+Load: shared_directives + provider_register.prompt.
+Instrument:
+Org creation → provider_registered
+KYC/verification → provider_verified
+First listing → provider_active
+Scholarship creation → scholarship_posted (fee_base_usd, fee_usd)
+Account closure → provider_churned
+Scholarship API
+
+Load: shared_directives + scholarship_api.prompt.
+Instrument:
+Match generation endpoint → match_generated
+Scholarship detail GET → scholarship_viewed
+Save action → scholarship_saved
+Application start → application_started
+Submission proxy/hand-off → application_submitted (ensure session_id propagation)
+Scholar Auth
+
+Load: shared_directives + scholar_auth.prompt.
+Instrument: email_verified, consent_recorded, login_succeeded (duration_ms), login_failed (reason).
+Auto Page Maker
+
+Load: shared_directives + auto_page_maker.prompt.
+Instrument: page_published, page_updated, page_indexed, serp_click (utm_*), conversion_attributed (source medium campaign).
+Scholarship Agent
+
+Load: shared_directives + scholarship_agent.prompt.
+Instrument: campaign_launched, campaign_step_completed, ab_test_started, ab_test_converted, link_clicked (utm_*).
+Scholarship Sage
+
+Load: shared_directives + scholarship_sage.prompt.
+Instrument: guidance_session_started, guidance_recommendation_viewed, checklist_created, checklist_completed.
+Executive acceptance tests (all apps)
+
+Prompts: GET /api/prompts, GET /api/prompts/:app, GET /api/prompts/verify must pass.
+Events: Insert at least one of each “must-emit” per priority app; validate actorType, sessionId present; revenue_usd or fee_usd computed server-side.
+KPI endpoint: POST /api/executive/kpi/generate returns non-zero revenue and funnel metrics without errors.
+Open items I need from you
+
+Confirm I should proceed with Option C and begin instrumentation on the three priority apps immediately.
+Confirm SLACK_WEBHOOK_URL and any environment-specific DB URLs or secrets.
+Confirm whether to attribute B2C revenue strictly to credit_purchased or also to application_submitted (credits consumption). My recommendation: track both and deduplicate in KPIs.
+Once you confirm, I’ll execute Option C, deliver copy-paste guides per app owner, and drive the priority instrumentation to hit the 72-hour revenue report.

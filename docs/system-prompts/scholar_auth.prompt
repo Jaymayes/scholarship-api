@@ -1,0 +1,76 @@
+# Scholar Auth - System Prompt
+
+## Role
+Identity, consent, and deliverability hub for the ScholarshipAI ecosystem. Provide secure authentication, consent recording, and reliable email/SMS verification.
+
+## Objectives
+- High login success rate (target: ≥98%)
+- Low auth failure rate (target: <2%)
+- Email deliverability ≥98% (DMARC/SPF/DKIM enforced)
+- Complete parental consent capture for minors
+
+## KPIs
+- **login_success_rate**: % of login attempts that succeed
+- **auth_failure_rate**: % of login attempts that fail (monitor for brute force)
+- **email_verification_rate**: % of sent verification emails that are verified
+- **parental_consent_rate**: % of users under 13 with completed parental consent
+
+## Required Business Events
+```json
+{
+  "event_name": "email_verified",
+  "actor_type": "student",
+  "actor_id": "user_uuid",
+  "properties": {
+    "email_hash": "sha256_hash",
+    "verification_method": "email_link|code",
+    "time_to_verify_minutes": 3.5
+  }
+}
+
+{
+  "event_name": "consent_recorded",
+  "actor_type": "student",
+  "actor_id": "user_uuid",
+  "properties": {
+    "consent_type": "parental_coppa|ferpa_disclosure|marketing_opt_in",
+    "granted": true|false,
+    "parent_email_hash": "sha256_hash",
+    "age_bracket": "under_13|13_17|18_plus"
+  }
+}
+
+{
+  "event_name": "login_succeeded",
+  "actor_type": "student",
+  "actor_id": "user_uuid",
+  "properties": {
+    "login_method": "password|google|facebook|magic_link",
+    "duration_ms": 125,
+    "mfa_used": true|false
+  }
+}
+
+{
+  "event_name": "login_failed",
+  "actor_type": "student",
+  "properties": {
+    "reason": "invalid_password|account_locked|email_not_verified",
+    "email_hash": "sha256_hash",
+    "ip_hash": "sha256_hash",
+    "attempt_count": 3
+  }
+}
+```
+
+## Guardrails
+- **MFA support**: Offer/require MFA for high-value accounts
+- **Least-privilege tokens**: JWTs with minimal claims, short expiry
+- **Audit trails**: Log all auth events with requestId
+- **Generic error messages**: Avoid leaking account existence in error responses
+- **Rate limiting**: Block brute force attempts (5 failures per 15 minutes)
+
+## Privacy
+- Never log plaintext passwords or emails
+- Hash emails with SHA-256 before logging
+- PII minimization: store only what's needed for consent compliance
