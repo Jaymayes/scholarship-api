@@ -23,9 +23,14 @@ from services.eligibility_service import eligibility_service
 from services.scholarship_service import scholarship_service
 from services.search_service import search_service
 from utils.logger import get_logger
+from utils.session import extract_session_id, extract_actor_id
+from models.business_events import create_scholarship_saved_event
+from services.event_emission import EventEmissionService
 
 logger = get_logger(__name__)
 router = APIRouter()
+
+event_emitter = EventEmissionService()
 
 @router.get("/scholarships", response_model=SearchResponse)
 @search_rate_limit()  # QA FIX: Apply rate limiting to scholarships endpoint
@@ -177,15 +182,18 @@ async def get_scholarship(
         analytics_service.log_scholarship_view(user_id, scholarship_id)
         
         # Emit business event for KPI tracking (NEW: CEO directive)
-        from services.event_emission import emit_scholarship_viewed
-        import asyncio
-        asyncio.create_task(emit_scholarship_viewed(
+        session_id = extract_session_id(request)
+        actor_id = extract_actor_id(request) or user_id
+        
+        from models.business_events import create_scholarship_viewed_event
+        event = create_scholarship_viewed_event(
             scholarship_id=scholarship_id,
-            source="detail",  # User directly accessed scholarship detail page
-            match_score=None,  # No match score for direct access
-            actor_id=user_id,
-            session_id=None  # TODO: Extract from request headers
-        ))
+            source="detail",
+            match_score=None,
+            actor_id=actor_id,
+            session_id=session_id
+        )
+        await event_emitter.emit(event)
 
         return scholarship
 
@@ -194,6 +202,74 @@ async def get_scholarship(
     except Exception as e:
         logger.error(f"Error retrieving scholarship {scholarship_id}: {str(e)}")
         raise HTTPException(status_code=500, detail="Internal server error")
+
+
+from pydantic import BaseModel, Field
+from typing import Optional as OptionalType
+
+
+class SaveScholarshipRequest(BaseModel):
+    """Request to save a scholarship for later"""
+    match_score: OptionalType[float] = Field(None, description="Match quality score (0-1)")
+    eligibility_score: OptionalType[float] = Field(None, description="Eligibility score (0-1)")
+
+
+class SaveScholarshipResponse(BaseModel):
+    """Response after saving a scholarship"""
+    scholarship_id: str
+    saved: bool = True
+    message: str = "Scholarship saved successfully"
+
+
+@router.post("/scholarships/{scholarship_id}/save", response_model=SaveScholarshipResponse)
+@general_rate_limit()
+async def save_scholarship(
+    request: Request,
+    scholarship_id: str,
+    data: SaveScholarshipRequest,
+    current_user: User = Depends(require_auth())
+):
+    """
+    Save a scholarship to user's saved list.
+    
+    Emits scholarship_saved business event for scholarship_view_to_save KPI tracking.
+    Required for view→save→apply conversion funnel.
+    """
+    try:
+        session_id = extract_session_id(request)
+        actor_id = extract_actor_id(request) or current_user.user_id if current_user else None
+        
+        scholarship = scholarship_service.get_scholarship_by_id(scholarship_id)
+        if not scholarship:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Scholarship with ID {scholarship_id} not found"
+            )
+        
+        event = create_scholarship_saved_event(
+            scholarship_id=scholarship_id,
+            match_score=data.match_score,
+            eligibility_score=data.eligibility_score,
+            actor_id=actor_id,
+            session_id=session_id
+        )
+        
+        await event_emitter.emit(event)
+        
+        logger.info(f"Scholarship saved: {scholarship_id} by user {actor_id}")
+        
+        return SaveScholarshipResponse(
+            scholarship_id=scholarship_id,
+            saved=True,
+            message=f"Saved {scholarship.name}"
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error saving scholarship {scholarship_id}: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to save scholarship")
+
 
 @router.post("/scholarships/eligibility-check", response_model=EligibilityResult)
 async def check_eligibility(eligibility_request: EligibilityCheck):

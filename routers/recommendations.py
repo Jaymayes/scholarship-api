@@ -4,12 +4,17 @@ Recommendations router - minimal implementation for production readiness
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from pydantic import BaseModel
+import time
 
 from config.settings import settings
 from middleware.auth import get_current_user
 from middleware.rate_limiting import limiter
+from models.business_events import create_match_generated_event
+from services.event_emission import EventEmissionService
+from utils.session import extract_session_id, extract_actor_id
 
 router = APIRouter(prefix="/api/v1", tags=["recommendations"])
+event_emitter = EventEmissionService()
 
 # Rate limiting for recommendations endpoint (30 rpm as specified)
 def recommendations_rate_limit():
@@ -47,6 +52,22 @@ async def get_recommendations(
             status_code=401,
             detail="Authentication required for recommendations endpoint"
         )
+    
+    start_time = time.time()
+    
+    # Emit match_generated event (even for disabled feature, for KPI tracking)
+    session_id = extract_session_id(request)
+    actor_id = extract_actor_id(request) or (current_user.get("user_id") if current_user else user_id)
+    
+    processing_time_ms = (time.time() - start_time) * 1000
+    
+    event = create_match_generated_event(
+        student_id=actor_id or "anonymous",
+        num_matches=0,
+        match_quality_avg=0.0,
+        processing_time_ms=processing_time_ms
+    )
+    await event_emitter.emit(event)
 
     # Return feature-disabled response with proper structure
     return RecommendationResponse(

@@ -8,17 +8,19 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 
 from middleware.auth import User, require_auth
-from middleware.simple_rate_limiter import general_rate_limit
+from middleware.enhanced_rate_limiting import general_rate_limit
 from models.business_events import (
     create_application_started_event,
     create_application_submitted_event
 )
-from services.event_emission import event_emitter
+from services.event_emission import EventEmissionService
 from utils.logger import get_logger
 from utils.session import extract_session_id, extract_actor_id
 
 logger = get_logger(__name__)
 router = APIRouter()
+
+event_emitter = EventEmissionService()
 
 
 class ApplicationStartRequest(BaseModel):
@@ -69,7 +71,7 @@ async def start_application(
     """
     try:
         session_id = extract_session_id(request)
-        actor_id = extract_actor_id(request) or str(current_user.id) if current_user else None
+        actor_id = extract_actor_id(request) or current_user.user_id if current_user else None
         
         application_id = f"app_{data.scholarship_id}_{int(datetime.utcnow().timestamp())}"
         
@@ -111,7 +113,7 @@ async def submit_application(
     """
     try:
         session_id = extract_session_id(request)
-        actor_id = extract_actor_id(request) or str(current_user.id) if current_user else None
+        actor_id = extract_actor_id(request) or current_user.user_id if current_user else None
         
         application_id = f"app_{data.scholarship_id}_{int(datetime.utcnow().timestamp())}"
         
