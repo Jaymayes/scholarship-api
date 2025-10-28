@@ -142,15 +142,17 @@ Once all events are emitting:
 - v1.1.0 (Oct 28, 2025): Structured sections (A-H), automatic app detection, enhanced event schema
 
 **T+0 (Complete):**
-- ✅ Universal prompt v1.1 deployed (7,686 bytes - Agent3 Router with embedded instructions, 29% smaller than v1.0)
+- ✅ Universal prompt v1.1 deployed (8,480 bytes - CEO Directive version, 21% smaller than v1.0)
 - ✅ Scholarship API fully instrumented (10/10 events)
 - ✅ Dual architecture operational (universal + individual fallback)
 - ✅ Verification endpoints live and tested
 - ✅ Overlay extraction supports v1.0, v1.1a, and v1.1b formats
-- ✅ Team instructions embedded directly in universal prompt
+- ✅ CEO-approved directive format with success criteria
 - ✅ Detailed event schemas with "Allowed actions" and "Must not" constraints
 - ✅ Server-side calculation enforcement documented
 - ✅ Self-contained: routing, revenue rules, compliance, SLOs, verification, and rollout plan in one file
+- ✅ Per-app quick starts created for all 8 teams
+- ✅ SQL validation pack created for revenue and compliance checks
 
 **T+24h (Next):**
 - Scholarship Agent: Implement campaign/A/B test events
