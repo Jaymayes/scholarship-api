@@ -71,7 +71,8 @@ Adopted ScholarshipAI ecosystem-wide system prompts with **dual architecture sup
 - **Automatic app detection** via ENV (`APP_OVERLAY`) or hostname pattern matching
 - **Feature flag support:** `PROMPT_MODE=universal` or `PROMPT_MODE=separate`
 - Structured sections: Company Core, Guardrails, KPIs, SLOs, App Overlays, Operating Procedures
-- Bootstrap event: `overlay_health_checked(app_id, version_hash)` required on init
+- Bootstrap event: `overlay_selected(app_key, detection_method, host, mode)` required on init
+- Enhanced detection: ENV → hostname → AUTH_CLIENT_ID → APP_NAME → default fallback
 
 **Individual Architecture (backward compatible):**
 - `docs/system-prompts/shared_directives.prompt` - Global foundation
@@ -141,11 +142,12 @@ Once all events are emitting:
 - v1.1.0 (Oct 28, 2025): Structured sections (A-H), automatic app detection, enhanced event schema
 
 **T+0 (Complete):**
-- ✅ Universal prompt v1.1 deployed (10,411 bytes)
+- ✅ Universal prompt v1.1 deployed (9,210 bytes - compact production version)
 - ✅ Scholarship API fully instrumented (10/10 events)
 - ✅ Dual architecture operational (universal + individual fallback)
 - ✅ Verification endpoints live and tested
 - ✅ Overlay extraction supports both v1.0 and v1.1 formats
+- ✅ Integration guide created with rollout instructions
 
 **T+24h (Next):**
 - Scholarship Agent: Implement campaign/A/B test events

@@ -70,12 +70,14 @@ Clear completion criteria:
 - KPI moved or learning captured
 - Runbook updated
 
-### **7. Bootstrap Health Check**
-Required event on app initialization:
+### **7. Bootstrap Telemetry**
+Required event on app initialization (first action of every run):
 ```python
-overlay_health_checked(
-    app_id="scholarship_api",
-    version_hash="e34e195ad521772c"
+overlay_selected(
+    app_key="scholarship_api",
+    detection_method="hostname",  # or "env_var", "auth_client_id", "app_name", "default"
+    host="scholarship-api-abc123.replit.app",
+    mode="universal"
 )
 ```
 
