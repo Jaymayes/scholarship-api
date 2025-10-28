@@ -66,10 +66,11 @@ The API is fully functional on port 5000, supporting integration with Student Da
 Adopted ScholarshipAI ecosystem-wide system prompts with **dual architecture support**:
 
 **Universal Architecture (v1.0.0) - ACTIVE:**
-- `docs/system-prompts/shared_directives.prompt` - Global foundation
-- `docs/system-prompts/universal.prompt` - All 8 app overlays in one file
+- `docs/system-prompts/shared_directives.prompt` - Global foundation (4,939 bytes)
+- `docs/system-prompts/universal.prompt` - All 8 app overlays in one file (10,790 bytes)
 - Runtime selection of `[APP: scholarship_api]` overlay based on app context
-- Verification hash: `fd9a8f19cdc8146d`
+- Verification hash: `0d53e9f1ec9d5463`
+- Bootstrap event: `overlay_selected(app=app_key, hash=combined_hash)` required on init
 
 **Individual Architecture (backward compatible):**
 - `docs/system-prompts/shared_directives.prompt` - Global foundation
@@ -132,8 +133,22 @@ Once all events are emitting:
 - **Revenue (24h)**: Total revenue from application_submitted events
 - **ARPU**: Average revenue per user from credit spending
 
-### Next Steps
-1. Complete remaining 4 event instrumentations (application endpoints priority)
-2. Verify events populating in business_events table with test queries
-3. Enable Executive Command Center daily KPI brief generation
-4. Configure Slack webhook for automated executive reporting
+### Rollout Status (Option C Hybrid)
+**T+0 (Complete):**
+- ✅ Universal prompt v1.0.0 deployed (10,790 bytes)
+- ✅ Scholarship API fully instrumented (5/5 events)
+- ✅ Dual architecture operational (universal + individual fallback)
+- ✅ Verification endpoints live and tested
+
+**T+24h (Next):**
+- Scholarship Agent: Implement campaign/A/B test events
+- Monitor: Event volumes, P95 latency, error rates
+
+**T+48h (Critical Path):**
+- Student Pilot: B2C revenue events (`credits_purchased.revenue_usd`)
+- Provider Register: B2B fee events (`scholarship_posted.fee_usd`)
+
+**T+72h (CEO Directive):**
+- Executive Command Center: Daily KPI brief at 09:00 UTC with real revenue
+- All 8 apps emitting to `business_events`
+- Revenue visibility unlocked
