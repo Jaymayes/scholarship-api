@@ -28,6 +28,7 @@ class PromptVerification(BaseModel):
     total_size_bytes: int
     verification_hash: str
     prompts: List[PromptInfo]
+    architecture: str  # "universal" or "individual"
 
 
 def get_prompt_info(prompt_path: str) -> PromptInfo:
@@ -60,31 +61,46 @@ async def verify_prompts():
     """
     Verify that system prompts are properly loaded.
     
-    Returns verification status for:
-    - shared_directives.prompt (global foundation)
-    - scholarship_api.prompt (app-specific overlay)
+    Supports two loading strategies:
+    1. Universal: shared_directives.prompt + universal.prompt (with app overlay selection)
+    2. Individual: shared_directives.prompt + scholarship_api.prompt
     
     This endpoint validates the CEO directive's system prompt pack implementation.
     """
     prompt_dir = Path("docs/system-prompts")
     
-    # Check shared directives
+    # Check shared directives (always required)
     shared_path = prompt_dir / "shared_directives.prompt"
     shared_info = get_prompt_info(str(shared_path))
     
-    # Check app-specific prompt
+    # Check for universal prompt (v1.0.0 architecture)
+    universal_path = prompt_dir / "universal.prompt"
+    universal_info = get_prompt_info(str(universal_path))
+    
+    # Check app-specific prompt (individual file approach)
     app_path = prompt_dir / "scholarship_api.prompt"
     app_info = get_prompt_info(str(app_path))
     
-    prompts = [shared_info, app_info]
+    # Determine loading strategy (prefer universal if available)
+    if universal_info.exists:
+        # Universal prompt architecture (v1.0.0)
+        prompts = [shared_info, universal_info]
+        app_specific_loaded = True  # App overlay [APP: scholarship_api] is in universal.prompt
+        architecture = "universal"
+    else:
+        # Individual file architecture
+        prompts = [shared_info, app_info]
+        app_specific_loaded = app_info.exists
+        architecture = "individual"
+    
     total_size = sum(p.size_bytes for p in prompts if p.exists)
     
-    # Create verification hash (both prompts combined)
+    # Create verification hash (combined prompts)
     verification_content = ""
-    if shared_info.exists:
-        verification_content += shared_path.read_text()
-    if app_info.exists:
-        verification_content += app_path.read_text()
+    for prompt in prompts:
+        if prompt.exists:
+            path = Path(prompt.path)
+            verification_content += path.read_text()
     
     verification_hash = hashlib.sha256(verification_content.encode()).hexdigest()[:16]
     
@@ -93,10 +109,11 @@ async def verify_prompts():
         prompts_loaded=sum(1 for p in prompts if p.exists),
         prompts_expected=2,
         shared_directives_loaded=shared_info.exists,
-        app_specific_loaded=app_info.exists,
+        app_specific_loaded=app_specific_loaded,
         total_size_bytes=total_size,
         verification_hash=verification_hash,
-        prompts=prompts
+        prompts=prompts,
+        architecture=architecture
     )
 
 
@@ -105,9 +122,9 @@ async def list_all_prompts():
     """
     List all system prompts in the ScholarshipAI ecosystem.
     
-    Returns information about all 9 prompts:
+    Returns information about all prompts:
     - 1 shared directive (global)
-    - 8 app-specific overlays
+    - 1 universal prompt (all 8 app overlays) OR 8 individual app prompts
     """
     prompt_dir = Path("docs/system-prompts")
     
@@ -121,8 +138,13 @@ async def list_all_prompts():
         info = get_prompt_info(str(prompt_file))
         prompts_info.append(info)
     
+    # Determine architecture
+    has_universal = any(p.name == "universal.prompt" for p in prompts_info)
+    architecture = "universal" if has_universal else "individual"
+    
     return {
         "total_prompts": len(prompts_info),
+        "architecture": architecture,
         "prompts": prompts_info
     }
 
@@ -134,6 +156,7 @@ async def get_prompt(prompt_name: str):
     
     Examples:
     - GET /api/prompts/shared_directives
+    - GET /api/prompts/universal
     - GET /api/prompts/scholarship_api
     """
     # Remove .prompt extension if provided
@@ -145,7 +168,7 @@ async def get_prompt(prompt_name: str):
     if not prompt_path.exists():
         raise HTTPException(
             status_code=404,
-            detail=f"Prompt '{prompt_name}' not found. Available prompts: shared_directives, scholarship_api, student_pilot, provider_register, scholar_auth, auto_page_maker, scholarship_agent, scholarship_sage, executive_command_center"
+            detail=f"Prompt '{prompt_name}' not found. Available prompts: shared_directives, universal, scholarship_api, student_pilot, provider_register, scholar_auth, auto_page_maker, scholarship_agent, scholarship_sage, executive_command_center"
         )
     
     content = prompt_path.read_text()
@@ -162,30 +185,103 @@ async def get_prompt(prompt_name: str):
 @router.get("/merge/scholarship_api")
 async def get_merged_prompt():
     """
-    Get the merged prompt for Scholarship API (shared + app-specific).
+    Get the merged prompt for Scholarship API.
     
-    This is the actual prompt that should be used by the application,
-    following the load order: shared_directives → scholarship_api.
+    Load order (universal architecture):
+    1. shared_directives.prompt
+    2. universal.prompt → select [APP: scholarship_api] overlay
+    
+    Load order (individual architecture):
+    1. shared_directives.prompt
+    2. scholarship_api.prompt
     """
     shared_path = Path("docs/system-prompts/shared_directives.prompt")
+    universal_path = Path("docs/system-prompts/universal.prompt")
     app_path = Path("docs/system-prompts/scholarship_api.prompt")
     
     if not shared_path.exists():
         raise HTTPException(status_code=404, detail="shared_directives.prompt not found")
     
-    if not app_path.exists():
-        raise HTTPException(status_code=404, detail="scholarship_api.prompt not found")
-    
     shared_content = shared_path.read_text()
-    app_content = app_path.read_text()
     
-    # Merge with separator
-    merged_content = f"{shared_content}\n\n---\n\n{app_content}"
+    # Prefer universal architecture
+    if universal_path.exists():
+        universal_content = universal_path.read_text()
+        merged_content = f"{shared_content}\n\n---\n\n{universal_content}"
+        load_order = ["shared_directives.prompt", "universal.prompt"]
+        architecture = "universal"
+        note = "App overlay [APP: scholarship_api] is selected at runtime from universal.prompt"
+    elif app_path.exists():
+        app_content = app_path.read_text()
+        merged_content = f"{shared_content}\n\n---\n\n{app_content}"
+        load_order = ["shared_directives.prompt", "scholarship_api.prompt"]
+        architecture = "individual"
+        note = "Individual app-specific prompt loaded"
+    else:
+        raise HTTPException(
+            status_code=404,
+            detail="Neither universal.prompt nor scholarship_api.prompt found"
+        )
     
     return {
         "app": "scholarship_api",
-        "load_order": ["shared_directives.prompt", "scholarship_api.prompt"],
+        "architecture": architecture,
+        "load_order": load_order,
         "total_size_bytes": len(merged_content),
         "hash": hashlib.sha256(merged_content.encode()).hexdigest()[:16],
+        "note": note,
         "content": merged_content
+    }
+
+
+@router.get("/overlay/scholarship_api")
+async def get_app_overlay():
+    """
+    Extract the [APP: scholarship_api] overlay from universal.prompt.
+    
+    This endpoint is useful for verifying app-specific requirements
+    when using the universal prompt architecture.
+    """
+    universal_path = Path("docs/system-prompts/universal.prompt")
+    
+    if not universal_path.exists():
+        raise HTTPException(
+            status_code=404,
+            detail="universal.prompt not found. This endpoint only works with universal architecture."
+        )
+    
+    content = universal_path.read_text()
+    
+    # Extract [APP: scholarship_api] section
+    start_marker = "[APP: scholarship_api]"
+    end_marker = "[APP:"  # Next app section
+    
+    if start_marker not in content:
+        raise HTTPException(
+            status_code=404,
+            detail="[APP: scholarship_api] overlay not found in universal.prompt"
+        )
+    
+    start_idx = content.find(start_marker)
+    # Find next app section or end of overlays
+    remaining = content[start_idx + len(start_marker):]
+    end_idx = remaining.find(end_marker)
+    
+    if end_idx == -1:
+        # Last app in the file, find [OPERATIONS: section
+        end_idx = remaining.find("[OPERATIONS:")
+    
+    if end_idx == -1:
+        overlay_content = remaining
+    else:
+        overlay_content = remaining[:end_idx]
+    
+    overlay_content = overlay_content.strip()
+    
+    return {
+        "app": "scholarship_api",
+        "architecture": "universal",
+        "overlay_size_bytes": len(overlay_content),
+        "hash": hashlib.sha256(overlay_content.encode()).hexdigest()[:16],
+        "content": overlay_content
     }

@@ -63,10 +63,24 @@ The API is fully functional on port 5000, supporting integration with Student Da
 ## October 27, 2025: Business Event Instrumentation (CEO Directive)
 
 ### System Prompt Pack Adoption
-Adopted ScholarshipAI ecosystem-wide system prompts (8 apps):
-- **Shared Directives**: Prime directive to reach $10M ARR, SLO targets (99.9% uptime, P95 ≤120ms), responsible AI, KPI taxonomy
-- **Scholarship API Prompt**: Role, objectives, required events, KPIs, guardrails specific to this service
-- Location: `docs/system-prompts/shared_directives.prompt` and `docs/system-prompts/scholarship_api.prompt`
+Adopted ScholarshipAI ecosystem-wide system prompts with **dual architecture support**:
+
+**Universal Architecture (v1.0.0) - ACTIVE:**
+- `docs/system-prompts/shared_directives.prompt` - Global foundation
+- `docs/system-prompts/universal.prompt` - All 8 app overlays in one file
+- Runtime selection of `[APP: scholarship_api]` overlay based on app context
+- Verification hash: `fd9a8f19cdc8146d`
+
+**Individual Architecture (backward compatible):**
+- `docs/system-prompts/shared_directives.prompt` - Global foundation
+- `docs/system-prompts/scholarship_api.prompt` - App-specific overlay
+- Plus 7 other individual app prompts
+
+**Prompt Verification Endpoints:**
+- `GET /api/prompts/verify` - Auto-detects architecture, verifies 2/2 loaded
+- `GET /api/prompts/list` - Lists all 10 prompts with hashes
+- `GET /api/prompts/overlay/scholarship_api` - Extracts app overlay from universal
+- `GET /api/prompts/merge/scholarship_api` - Returns merged prompt for runtime use
 
 ### Business Events Infrastructure  
 Created central event tracking system for Executive Command Center KPI reporting:
