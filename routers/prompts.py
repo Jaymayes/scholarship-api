@@ -234,10 +234,12 @@ async def get_merged_prompt():
     }
 
 
-@router.get("/overlay/scholarship_api")
-async def get_app_overlay():
+@router.get("/overlay/{app_key}")
+async def get_app_overlay(app_key: str):
     """
-    Extract the [APP: scholarship_api] overlay from universal.prompt.
+    Extract the app overlay from universal.prompt.
+    
+    Supports both v1.0 ([APP: {app_key}]) and v1.1 (### Overlay: {app_key}) formats.
     
     This endpoint is useful for verifying app-specific requirements
     when using the universal prompt architecture.
@@ -252,36 +254,70 @@ async def get_app_overlay():
     
     content = universal_path.read_text()
     
-    # Extract [APP: scholarship_api] section
-    start_marker = "[APP: scholarship_api]"
-    end_marker = "[APP:"  # Next app section
+    # Try v1.1 format first (### Overlay: {app_key})
+    start_marker_v11 = f"### Overlay: {app_key}"
+    end_marker_v11 = "### Overlay:"
     
-    if start_marker not in content:
-        raise HTTPException(
-            status_code=404,
-            detail="[APP: scholarship_api] overlay not found in universal.prompt"
-        )
+    if start_marker_v11 in content:
+        # v1.1 format
+        start_idx = content.find(start_marker_v11)
+        remaining = content[start_idx:]
+        
+        # Find next overlay section
+        next_section_idx = remaining.find(end_marker_v11, len(start_marker_v11))
+        
+        if next_section_idx == -1:
+            # Last overlay, find Section G or end
+            next_section_idx = remaining.find("## Section G")
+        
+        if next_section_idx == -1:
+            overlay_content = remaining
+        else:
+            overlay_content = remaining[:next_section_idx]
+        
+        overlay_content = overlay_content.strip()
+        
+        return {
+            "app": app_key,
+            "architecture": "universal",
+            "version": "1.1",
+            "overlay_size_bytes": len(overlay_content),
+            "hash": hashlib.sha256(overlay_content.encode()).hexdigest()[:16],
+            "content": overlay_content
+        }
     
-    start_idx = content.find(start_marker)
-    # Find next app section or end of overlays
-    remaining = content[start_idx + len(start_marker):]
-    end_idx = remaining.find(end_marker)
+    # Try v1.0 format ([APP: {app_key}])
+    start_marker_v10 = f"[APP: {app_key}]"
+    end_marker_v10 = "[APP:"
     
-    if end_idx == -1:
-        # Last app in the file, find [OPERATIONS: section
-        end_idx = remaining.find("[OPERATIONS:")
+    if start_marker_v10 in content:
+        # v1.0 format
+        start_idx = content.find(start_marker_v10)
+        remaining = content[start_idx + len(start_marker_v10):]
+        end_idx = remaining.find(end_marker_v10)
+        
+        if end_idx == -1:
+            # Last app in the file, find operations section
+            end_idx = remaining.find("[OPERATIONS:")
+        
+        if end_idx == -1:
+            overlay_content = remaining
+        else:
+            overlay_content = remaining[:end_idx]
+        
+        overlay_content = overlay_content.strip()
+        
+        return {
+            "app": app_key,
+            "architecture": "universal",
+            "version": "1.0",
+            "overlay_size_bytes": len(overlay_content),
+            "hash": hashlib.sha256(overlay_content.encode()).hexdigest()[:16],
+            "content": overlay_content
+        }
     
-    if end_idx == -1:
-        overlay_content = remaining
-    else:
-        overlay_content = remaining[:end_idx]
-    
-    overlay_content = overlay_content.strip()
-    
-    return {
-        "app": "scholarship_api",
-        "architecture": "universal",
-        "overlay_size_bytes": len(overlay_content),
-        "hash": hashlib.sha256(overlay_content.encode()).hexdigest()[:16],
-        "content": overlay_content
-    }
+    # Not found
+    raise HTTPException(
+        status_code=404,
+        detail=f"Overlay for '{app_key}' not found in universal.prompt. Available: executive_command_center, auto_page_maker, student_pilot, provider_register, scholarship_api, scholarship_agent, scholar_auth, scholarship_sage"
+    )

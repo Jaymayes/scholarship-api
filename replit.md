@@ -65,12 +65,13 @@ The API is fully functional on port 5000, supporting integration with Student Da
 ### System Prompt Pack Adoption
 Adopted ScholarshipAI ecosystem-wide system prompts with **dual architecture support**:
 
-**Universal Architecture (v1.0.0) - ACTIVE:**
+**Universal Architecture (v1.1) - ACTIVE:**
 - `docs/system-prompts/shared_directives.prompt` - Global foundation (4,939 bytes)
-- `docs/system-prompts/universal.prompt` - All 8 app overlays in one file (10,790 bytes)
-- Runtime selection of `[APP: scholarship_api]` overlay based on app context
-- Verification hash: `0d53e9f1ec9d5463`
-- Bootstrap event: `overlay_selected(app=app_key, hash=combined_hash)` required on init
+- `docs/system-prompts/universal.prompt` - All 8 app overlays in structured sections (v1.1)
+- **Automatic app detection** via ENV (`APP_OVERLAY`) or hostname pattern matching
+- **Feature flag support:** `PROMPT_MODE=universal` or `PROMPT_MODE=separate`
+- Structured sections: Company Core, Guardrails, KPIs, SLOs, App Overlays, Operating Procedures
+- Bootstrap event: `overlay_health_checked(app_id, version_hash)` required on init
 
 **Individual Architecture (backward compatible):**
 - `docs/system-prompts/shared_directives.prompt` - Global foundation
@@ -80,8 +81,9 @@ Adopted ScholarshipAI ecosystem-wide system prompts with **dual architecture sup
 **Prompt Verification Endpoints:**
 - `GET /api/prompts/verify` - Auto-detects architecture, verifies 2/2 loaded
 - `GET /api/prompts/list` - Lists all 10 prompts with hashes
-- `GET /api/prompts/overlay/scholarship_api` - Extracts app overlay from universal
+- `GET /api/prompts/overlay/{app_key}` - Extracts any app overlay (supports v1.0 & v1.1)
 - `GET /api/prompts/merge/scholarship_api` - Returns merged prompt for runtime use
+- `GET /api/prompts/{prompt_name}` - Retrieves individual prompt file content
 
 ### Business Events Infrastructure  
 Created central event tracking system for Executive Command Center KPI reporting:
@@ -134,11 +136,16 @@ Once all events are emitting:
 - **ARPU**: Average revenue per user from credit spending
 
 ### Rollout Status (Option C Hybrid)
+**Version History:**
+- v1.0.0 (Oct 27, 2025): Initial universal prompt with 8 app overlays
+- v1.1.0 (Oct 28, 2025): Structured sections (A-H), automatic app detection, enhanced event schema
+
 **T+0 (Complete):**
-- ✅ Universal prompt v1.0.0 deployed (10,790 bytes)
-- ✅ Scholarship API fully instrumented (5/5 events)
+- ✅ Universal prompt v1.1 deployed (10,411 bytes)
+- ✅ Scholarship API fully instrumented (10/10 events)
 - ✅ Dual architecture operational (universal + individual fallback)
 - ✅ Verification endpoints live and tested
+- ✅ Overlay extraction supports both v1.0 and v1.1 formats
 
 **T+24h (Next):**
 - Scholarship Agent: Implement campaign/A/B test events
