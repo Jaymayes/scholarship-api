@@ -1,17 +1,18 @@
 # Universal Prompt v1.1 Changelog
 
-## 🚀 v1.1 Ultimate Compact (October 28, 2025) - PRODUCTION
+## 🚀 v1.1 Agent3 Router (October 28, 2025) - PRODUCTION
 
-**File Size:** 5,537 bytes (49% reduction from v1.0)
+**File Size:** 7,686 bytes (29% reduction from v1.0, includes embedded usage instructions)
 
 ### Major Improvements
-- ✨ **Ultimate compact format** with numbered overlays (### N. app_name)
+- ✨ **Agent3 Router format** - Self-contained with embedded usage instructions
 - ✨ **"Allowed actions" and "Must not"** constraints per overlay
-- ✨ **Team instructions document** created for T+24h/T+48h rollout
+- ✨ **Team instructions embedded** - Install, routing, revenue, compliance, SLOs, verification, rollout
 - ✨ **Explicit server-side calculation** enforcement for revenue events
 - ✨ **Clearer section structure** (A-H) with simplified language
 - ✨ **Backward compatible** with v1.0, v1.1a, v1.1b formats
-- ✨ **49% size reduction** from v1.0 (5,537 bytes vs 10,790 bytes)
+- ✨ **29% size reduction** from v1.0 (7,686 bytes vs 10,790 bytes)
+- ✨ **All-in-one** - No need to reference external team instruction docs
 
 ### Event Schema Enhancements
 - **B2C:** `credit_purchase_succeeded {revenue_usd, credits_purchased, sku}`
