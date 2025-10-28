@@ -239,7 +239,8 @@ async def get_app_overlay(app_key: str):
     """
     Extract the app overlay from universal.prompt.
     
-    Supports both v1.0 ([APP: {app_key}]) and v1.1 (### Overlay: {app_key}) formats.
+    Supports v1.0 ([APP: {app_key}]), v1.1a (### Overlay: {app_key}), 
+    and v1.1b (### N. {app_key}) formats.
     
     This endpoint is useful for verifying app-specific requirements
     when using the universal prompt architecture.
@@ -254,21 +255,60 @@ async def get_app_overlay(app_key: str):
     
     content = universal_path.read_text()
     
-    # Try v1.1 format first (### Overlay: {app_key})
-    start_marker_v11 = f"### Overlay: {app_key}"
-    end_marker_v11 = "### Overlay:"
+    # Try v1.1b format (### N. app_key) - numbered overlays
+    # Handle both with and without extra labels like "(B2C revenue)"
+    import re
     
-    if start_marker_v11 in content:
-        # v1.1 format
-        start_idx = content.find(start_marker_v11)
+    # Pattern: ### N. app_key or ### N. app_key (label)
+    pattern_v11b = rf"### \d+\.\s+{re.escape(app_key)}(?:\s+\([^)]+\))?"
+    match = re.search(pattern_v11b, content)
+    
+    if match:
+        # v1.1b format (numbered)
+        start_idx = match.start()
+        remaining = content[start_idx:]
+        
+        # Find next overlay (### N. ...) or next major section (## G)
+        next_overlay = re.search(r"###\s+\d+\.", remaining[len(match.group()):])
+        if next_overlay:
+            overlay_content = remaining[:len(match.group()) + next_overlay.start()]
+        else:
+            # Last overlay, find next section
+            next_section_idx = remaining.find("## G)")
+            if next_section_idx == -1:
+                next_section_idx = remaining.find("---\n\n## G)")
+            if next_section_idx > 0:
+                overlay_content = remaining[:next_section_idx]
+            else:
+                overlay_content = remaining
+        
+        overlay_content = overlay_content.strip()
+        
+        return {
+            "app": app_key,
+            "architecture": "universal",
+            "version": "1.1b",
+            "overlay_size_bytes": len(overlay_content),
+            "hash": hashlib.sha256(overlay_content.encode()).hexdigest()[:16],
+            "content": overlay_content
+        }
+    
+    # Try v1.1a format (### Overlay: {app_key})
+    start_marker_v11a = f"### Overlay: {app_key}"
+    
+    if start_marker_v11a in content:
+        # v1.1a format
+        start_idx = content.find(start_marker_v11a)
         remaining = content[start_idx:]
         
         # Find next overlay section
-        next_section_idx = remaining.find(end_marker_v11, len(start_marker_v11))
+        next_section_idx = remaining.find("### Overlay:", len(start_marker_v11a))
         
         if next_section_idx == -1:
-            # Last overlay, find Section G or end
+            # Last overlay, find Section G
             next_section_idx = remaining.find("## Section G")
+            if next_section_idx == -1:
+                next_section_idx = remaining.find("## G)")
         
         if next_section_idx == -1:
             overlay_content = remaining
@@ -280,7 +320,7 @@ async def get_app_overlay(app_key: str):
         return {
             "app": app_key,
             "architecture": "universal",
-            "version": "1.1",
+            "version": "1.1a",
             "overlay_size_bytes": len(overlay_content),
             "hash": hashlib.sha256(overlay_content.encode()).hexdigest()[:16],
             "content": overlay_content

@@ -10,8 +10,8 @@ Successfully deployed **Universal Prompt v1.1** for the ScholarshipAI ecosystem 
 
 | Metric | Value | Status |
 |--------|-------|--------|
-| **Version** | 1.1 | ✅ Production |
-| **File Size** | 9,210 bytes | ✅ 11% smaller than v1.0 |
+| **Version** | 1.1 (Final) | ✅ Production |
+| **File Size** | 9,184 bytes | ✅ 15% smaller than v1.0 |
 | **Architecture** | Hybrid (Option C) | ✅ Universal + Individual |
 | **Apps Supported** | 8 | ✅ All overlays operational |
 | **Detection Methods** | 5 | ✅ ENV, hostname, client ID, app name, default |
@@ -57,10 +57,10 @@ overlay_selected(
 
 ### **4. Revenue Tracking (CEO Priority)**
 **Student Pilot (B2C):**
-- `credit_purchase_succeeded` with `revenue_usd`
+- `credit_purchase_succeeded` with detailed schema: `{revenue_usd, credits_purchased, sku}`
 
 **Provider Register (B2B):**
-- `fee_accrued` with `fee_usd = award_amount * 0.03` (server-side)
+- `fee_accrued` with detailed schema: `{scholarship_id, fee_usd, award_amount}` where `fee_usd = award_amount × 0.03` (computed server-side only)
 
 ---
 

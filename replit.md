@@ -142,12 +142,13 @@ Once all events are emitting:
 - v1.1.0 (Oct 28, 2025): Structured sections (A-H), automatic app detection, enhanced event schema
 
 **T+0 (Complete):**
-- ✅ Universal prompt v1.1 deployed (9,210 bytes - compact production version)
+- ✅ Universal prompt v1.1 deployed (9,184 bytes - final compact production version)
 - ✅ Scholarship API fully instrumented (10/10 events)
 - ✅ Dual architecture operational (universal + individual fallback)
 - ✅ Verification endpoints live and tested
-- ✅ Overlay extraction supports both v1.0 and v1.1 formats
+- ✅ Overlay extraction supports v1.0, v1.1a, and v1.1b formats
 - ✅ Integration guide created with rollout instructions
+- ✅ Detailed event schemas for revenue tracking (B2C and B2B)
 
 **T+24h (Next):**
 - Scholarship Agent: Implement campaign/A/B test events
