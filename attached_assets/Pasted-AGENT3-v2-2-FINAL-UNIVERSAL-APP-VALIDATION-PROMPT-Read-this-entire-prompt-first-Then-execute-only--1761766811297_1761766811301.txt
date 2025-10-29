@@ -1,0 +1,252 @@
+AGENT3 v2.2 FINAL UNIVERSAL APP VALIDATION PROMPT
+Read this entire prompt first. Then execute only the APP BLOCK that matches your app. Ignore all other app blocks. If any required input is missing, STOP and output a clear error explaining what is missing.
+
+Role, Objective, and Scope Control
+Your role: Automated QA and readiness validator for one app in the Scholar AI Advisor ecosystem.
+Prime objective: Produce definitive, versioned readiness artifacts and a targeted fix plan that, if executed, will bring your assigned app to a score ≥4/5 (≥5/5 for SEO app) and unblock ecosystem gates.
+Critical scope rule: You must only test and produce artifacts for the app that matches APP_NAME. Do not test or reference any other app. Do not perform actions intended for other apps’ blocks.
+Ecosystem gates context (for awareness; do not act on other apps):
+T+24h Infrastructure Gate: scholar_auth, scholarship_api, scholarship_agent, scholarship_sage must each score ≥4/5.
+T+48h Revenue Gate: student_pilot and provider_register must each score ≥4/5.
+T+72h SEO Gate: auto_page_maker must score 5/5 (strict).
+Internal tool: auto_com_center should be ≥4/5 but is not a hard gate.
+2. Inputs (Required)
+Provide these as environment variables or input parameters before execution:
+
+APP_NAME: one of [scholar_auth, scholarship_api, scholarship_agent, scholarship_sage, student_pilot, provider_register, auto_page_maker, auto_com_center].
+APP_BASE_URL: absolute URL of your assigned app (example values):
+scholar_auth: https://scholar-auth-jamarrlmayes.replit.app
+scholarship_api: https://scholarship-api-jamarrlmayes.replit.app
+scholarship_agent: https://scholarship-agent-jamarrlmayes.replit.app
+scholarship_sage: https://scholarship-sage-jamarrlmayes.replit.app
+student_pilot: https://student-pilot-jamarrlmayes.replit.app
+provider_register: https://provider-register-jamarrlmayes.replit.app
+auto_page_maker: https://auto-page-maker-jamarrlmayes.replit.app
+auto_com_center: https://auto-com-center-jamarrlmayes.replit.app
+RUN_OPTION: one of [validate, fixplan, both]. Default: both.
+If APP_NAME or APP_BASE_URL is missing, STOP and output: “Missing required input: APP_NAME and/or APP_BASE_URL.”
+
+3. Outputs (Per-App; your app only)
+Create exactly these files in your per-app folder (do not generate other apps’ files):
+
+e2e/reports/<APP_NAME>/readiness_report_v2.2.md
+e2e/reports/<APP_NAME>/fix_plan_v2.2.yaml Contribute one row to the shared CSV only if you are explicitly told you are the orchestrator; otherwise, do not create or modify ecosystem_readiness_matrix_v2.2.csv.
+4. Evidence Format (Mandatory)
+
+Every evidence line must follow: [YYYY-MM-DDTHH:MM:SSZ] METHOD URL → STATUS, ttfb_ms=NNN, content_type=VALUE, notes=TEXT
+Use ISO-8601 UTC timestamps.
+Include at least 3 samples per critical route; compute p95 TTFB per route (round up).
+5. Universal Warm-up Protocol
+
+Before any evidence sampling:
+HEAD / and GET /health once each (if /health exists).
+Do not record these warm-up requests as evidence.
+6. Universal Security and Performance Checks (Apply to your app only)
+
+Security headers: Expect these 6 to be present and sane:
+Content-Security-Policy
+Strict-Transport-Security
+X-Content-Type-Options
+X-Frame-Options
+Referrer-Policy
+Permissions-Policy
+Performance SLO: p95 TTFB ≤ 120ms per critical route (unless otherwise specified in your APP BLOCK).
+Content-type correctness: JSON APIs must set application/json; HTML pages must set text/html.
+7. Scoring Rubric (Apply to your app only)
+
+5/5: Meets all mandatory routes/behaviors; security headers present; p95 TTFB ≤ 120ms; special checks pass.
+4/5: Minor deviations; all mandatory routes present; no hard-cap violations.
+3/5: Multiple issues, but core requirements reachable without major rework.
+2/5: Hard-cap triggered or ≥2 major requirements missing.
+1/5: App fundamentally misconfigured (wrong app served, critical endpoints failing, or >50% checks fail).
+Apply the hard caps exactly as specified in your APP BLOCK.
+8. Ethics, Privacy, and Safety
+
+Do not collect PII.
+Do not attempt live auth flows with real credentials.
+Do not perform destructive actions.
+Ensure findings and fix plans align with FERPA/COPPA principles and Responsible AI (no dark patterns, no academic dishonesty enablement).
+9. Report Structure (readiness_report_v2.2.md)
+
+Title: <APP_NAME> v2.2 FINAL Readiness Report
+Summary: final score, pass/fail for your gate, key blockers.
+Evidence: grouped by check; include all evidence lines and computed p95.
+Security: header presence and values overview.
+Performance: p95 TTFB table by route.
+Special Checks: per-app mandatory checks and their outcomes.
+Scoring: show rubric application and any caps invoked.
+Decision: READY (≥ needed score) or BLOCKED, with rationale.
+Next Steps: reference to fix_plan_v2.2.yaml items by ID.
+10. Fix Plan Structure (fix_plan_v2.2.yaml)
+
+metadata: app: <APP_NAME> version: v2.2 owner: team/component target_score: 4 or 5
+tasks: list of:
+id: FP-XXX title: short description severity: P0/P1/P2 eta_hours: N acceptance_criteria: bullet list implementation_notes: detailed steps (safe, non-destructive) risk: low/med/high rollback: how to revert
+quick_wins: list of sub-1h improvements
+verification_steps: exact evidence lines to collect post-fix
+11. Execution Options
+
+If RUN_OPTION=validate: run checks and produce the report.
+If RUN_OPTION=fixplan: analyze current gaps and produce only the fix plan.
+If RUN_OPTION=both: produce both files.
+APP BLOCKS
+Important: Use only the APP BLOCK that exactly matches APP_NAME. Ignore all others.
+
+A) APP BLOCK: scholar_auth (OIDC Provider)
+Hard requirements:
+
+/.well-known/openid-configuration → 200 JSON, includes issuer, authorization_endpoint, token_endpoint, jwks_uri.
+/.well-known/jwks.json → 200 JSON with at least one valid JWK (kid, kty, use, n/crv, e, etc.).
+/health → 200 JSON {ok:true} or similar.
+Security headers: 6/6 present.
+Performance: p95 TTFB ≤ 120ms on the above routes. Hard caps:
+If openid-configuration or jwks.json missing/invalid → cap at 1/5.
+If Content-Type not application/json for JSON endpoints → cap at 2/5. Special checks:
+Token and auth endpoints may be stubs, but must exist if declared in configuration. Known fast fix patterns (for fix_plan):
+If JWKS 500s: add static /.well-known/jwks.json; ensure server returns 200 and application/json.
+Ensure openid-configuration references live URLs and correct issuer (exact base URL). Acceptance criteria examples:
+Evidence shows 200 JSON for both well-known endpoints; p95 ≤ 120ms; 6/6 headers OK.
+B) APP BLOCK: scholarship_api (Core API)
+Hard requirements:
+
+/health → 200 JSON
+/v1/status or equivalent → 200 JSON
+OpenAPI (e.g., /openapi.json or /swagger.json) → 200 JSON if available
+CORS: Access-Control-Allow-Origin present and correct for intended clients
+Security headers: 6/6 present (where applicable)
+Performance: p95 TTFB ≤ 120ms for core endpoints Hard caps:
+If /health missing or non-JSON → cap at 2/5.
+If OpenAPI advertised but 404/invalid → cap at 3/5. Special checks:
+Rate limiting header presence if implemented. Fix patterns:
+Add explicit res.json(...) with application/json; enable gzip/brotli; cache GETs with reasonable TTL.
+C) APP BLOCK: scholarship_agent (Orchestrator)
+Hard requirements:
+
+/canary → 200 application/json with valid JSON body {ok:true, ...}
+/health → 200 JSON
+SPA routing must not intercept /canary (place API route before catch-all)
+Security headers: 6/6
+Performance: p95 TTFB ≤ 120ms (including /canary) Hard caps:
+If /canary not application/json (e.g., HTML) → cap at 2/5. Special checks:
+Canary includes ISO timestamp and a static capability count integer. Fix patterns:
+Before SPA catch-all: router.get('/canary', (req,res) => { res.setHeader('Content-Type','application/json'); res.status(200).json({ ok:true, status:'healthy', capabilities:9, timestamp:new Date().toISOString() }); }); Acceptance:
+Evidence shows /canary 200 JSON, content_type=application/json, p95 ≤ 120ms, headers OK.
+D) APP BLOCK: scholarship_sage (Analytics/Observability)
+Hard requirements:
+
+Metrics endpoint (e.g., /api/slo/status) → 200 JSON containing: memory_utilization_pct error_rate_pct db_p95_ms redis_hit_rate_pct (or state)
+Security headers: 6/6
+Performance: p95 TTFB ≤ 120ms Capacity thresholds (must be validated if metrics exist):
+Memory < 75%
+Error rate < 0.15%
+DB p95 < 45ms
+Redis hit rate > 70% Scoring cap:
+If ≥2 capacity thresholds breached → cap at 2/5.
+If no metrics endpoint exists → mark capacity “inconclusive” (do not auto-fail; score per other criteria). Fix patterns:
+Enable query/result caching; add DB indices; fix N+1 queries; ensure Redis connected; add circuit breakers; reduce memory footprint via pooling and bounded queues.
+E) APP BLOCK: student_pilot (B2C App)
+Hard requirements:
+
+/pricing → 200 HTML publicly accessible (no auth)
+/billing → 200 HTML (can be placeholder; no PII)
+/help → 200 HTML
+/settings → 200 HTML (stub allowed; no PII)
+Basic SEO: valid <title>, meta description, canonical, H1
+Security headers: 6/6
+Performance: p95 TTFB ≤ 120ms for core routes Hard caps:
+If /pricing missing or auth-gated → cap at 2/5. Fix patterns:
+Add public route handlers/components for the four pages; ensure correct Content-Type; prerender static pages; add cache-control: public, max-age=300; add Permissions-Policy.
+F) APP BLOCK: provider_register (B2B App)
+Hard requirements:
+
+/register → 200 HTML publicly accessible (no auth)
+Basic SEO: <title>, meta description, canonical, H1
+Security headers: 6/6
+Performance: p95 TTFB ≤ 120ms Hard caps:
+If /register missing or auth-gated → cap at 2/5. Fix patterns:
+Add static SSR route at /register; ensure 200 and text/html; prerender and cache.
+G) APP BLOCK: auto_page_maker (SEO Engine)
+Hard requirements:
+
+robots.txt → 200 text/plain
+sitemap.xml → 200 application/xml
+Generated public pages render with unique title, meta description, H1, canonical
+Security headers: 6/6
+Performance: p95 TTFB ≤ 120ms on generated pages Gate rule:
+Must achieve 5/5 to pass T+72h SEO gate. Hard caps:
+If robots.txt or sitemap.xml missing → cap at 3/5. Fix patterns:
+Pre-generate static pages; use CDN caching; ensure strong LCP via server-side render; ensure canonical correctness to avoid duplicate content.
+H) APP BLOCK: auto_com_center (Admin)
+Hard requirements:
+
+/admin (or specified admin root) → 200 HTML
+Verify admin dashboard JS/CSS assets load with 200 and correct content-types
+Security headers: 6/6
+Performance: p95 TTFB ≤ 120ms Hard caps:
+If admin root 404 or assets fail to load → cap at 2/5. Fix patterns:
+Ensure build outputs are referenced with absolute paths; correct static file middleware; prefetch critical assets; set cache headers.
+Execution Steps (Apply to your app only)
+
+Initialize
+Confirm APP_NAME and APP_BASE_URL.
+Load your APP BLOCK only. Ignore others.
+2. Warm-up
+
+HEAD / and GET /health (if exists). Do not record as evidence.
+3. Discovery Set (public-only; no auth, no PII)
+
+Routes per your APP BLOCK. Minimum checks:
+HTML pages: /, app-specific required pages
+JSON APIs: /health, special endpoints
+robots.txt, sitemap.xml (if SEO app)
+For each route: collect ≥3 samples and compute p95 TTFB.
+4. Security Headers
+
+Record presence and values for the 6 headers.
+Note any missing or unsafe values.
+5. Content-Type Validation
+
+Ensure JSON endpoints send application/json.
+Ensure HTML pages send text/html.
+6. Special Checks
+
+Execute the mandatory special checks from your APP BLOCK (e.g., /canary JSON, JWKS validity, capacity thresholds).
+7. Scoring and Caps
+
+Calculate 1–5 score per rubric and apply hard caps if triggered.
+Document exact reasons for any cap.
+8. Artifacts
+
+Write readiness_report_v2.2.md with structured sections and evidence.
+Write fix_plan_v2.2.yaml with P0/P1 tasks, acceptance criteria, and verification steps.
+9. Decision and Handoff
+
+If score meets gate requirement (≥4/5 or 5/5 for SEO), mark READY.
+Else mark BLOCKED and prioritize P0 tasks with realistic ETAs.
+Known Critical Blockers and Canonical Fix Tasks (Include only if relevant to your APP BLOCK)
+
+scholarship_agent: FP-AGENT-CANARY-JSON
+Severity: P0; ETA: 4–8h
+Implement JSON /canary route before SPA catch-all; acceptance: 200, application/json, p95 ≤ 120ms.
+student_pilot: FP-PILOT-PRICING
+Severity: P0; ETA: 2–4h
+Add public /pricing; acceptance: 200 HTML, public, SEO tags, p95 ≤ 120ms.
+provider_register: FP-PROVIDER-REGISTER
+Severity: P0; ETA: 2–4h
+Add public /register; acceptance: 200 HTML, SEO tags, p95 ≤ 120ms.
+scholar_auth: FP-AUTH-JWKS
+Severity: P0; ETA: 2–4h
+Serve valid /.well-known/jwks.json and /.well-known/openid-configuration; acceptance: 200 JSON, valid fields, p95 ≤ 120ms.
+scholarship_sage: FP-SAGE-CAPACITY
+Severity: P0; ETA: 4–6h
+Reduce memory, error rate, DB p95; ensure Redis hit rate >70%; acceptance: thresholds met, new evidence.
+Stop Conditions
+
+If any required endpoint for your APP BLOCK is missing, record evidence, apply cap, produce both artifacts with clear P0 tasks, and STOP.
+If APP_NAME does not match any APP BLOCK, STOP and output: “Unknown APP_NAME; must be one of the 8 defined apps.”
+Reminder
+
+Operate only within your APP BLOCK.
+Do not perform cross-app tests.
+Do not access credentials or private data.
+Produce clean, versioned v2.2 artifacts with ISO-8601 evidence lines.

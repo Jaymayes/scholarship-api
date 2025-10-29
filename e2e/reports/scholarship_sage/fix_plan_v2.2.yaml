@@ -1,0 +1,417 @@
+metadata:
+  app: scholarship_sage
+  version: v2.2
+  owner: Analytics/Observability Team
+  target_score: 4
+  current_score: 2
+  gate_deadline: T+24h Infrastructure Gate
+  last_updated: 2025-10-29T19:48:00Z
+  critical_breaches:
+    - memory_utilization: 88.24% (target <75%)
+    - error_rate: 0.26% (target <0.15%)
+
+tasks:
+  - id: FP-SAGE-001
+    title: Reduce memory utilization from 88.24% to <75%
+    severity: P0
+    eta_hours: 6
+    acceptance_criteria:
+      - Memory heap utilization <75% sustained for 30+ minutes
+      - No memory leaks detected in 1-hour stress test
+      - GC pauses <100ms P99
+      - /health endpoint returns memory stats showing <75% utilization
+    implementation_notes: |
+      Current: 88.24% (48.17MB / 54.59MB)
+      Target: <75% (40.94MB / 54.59MB max)
+      Required reduction: 7.23MB minimum
+      
+      Step 1: Profile memory usage
+      ```bash
+      # Enable heap profiling
+      node --inspect --heap-prof index.js
+      # Or use clinic.js
+      npm install -g clinic
+      clinic heapprofiler -- node index.js
+      ```
+      
+      Step 2: Identify top memory consumers
+      Common causes in analytics apps:
+      - Unbounded result set caching
+      - WebSocket connections not cleaned up
+      - Large aggregation queries held in memory
+      - Event/log buffers without size limits
+      
+      Step 3: Implement fixes
+      ```javascript
+      // Fix A: Add LRU cache with size limit
+      const LRU = require('lru-cache');
+      const cache = new LRU({
+        max: 500, // Max items
+        maxSize: 10 * 1024 * 1024, // 10MB max
+        sizeCalculation: (value) => JSON.stringify(value).length,
+        ttl: 1000 * 60 * 5 // 5 min TTL
+      });
+      
+      // Fix B: Stream large result sets instead of buffering
+      app.get('/api/analytics/data', async (req, res) => {
+        const cursor = await db.collection('events').find().batchSize(100);
+        res.setHeader('Content-Type', 'application/json');
+        res.write('[');
+        let first = true;
+        for await (const doc of cursor) {
+          if (!first) res.write(',');
+          res.write(JSON.stringify(doc));
+          first = false;
+        }
+        res.write(']');
+        res.end();
+      });
+      
+      // Fix C: Limit in-memory event buffer
+      const events = [];
+      const MAX_EVENTS = 1000;
+      function addEvent(event) {
+        events.push(event);
+        if (events.length > MAX_EVENTS) {
+          events.shift(); // Remove oldest
+        }
+      }
+      
+      // Fix D: Close WebSocket connections properly
+      wss.on('connection', (ws) => {
+        const timeout = setTimeout(() => ws.close(), 300000); // 5 min idle
+        ws.on('close', () => clearTimeout(timeout));
+      });
+      
+      // Fix E: Paginate database queries
+      app.get('/api/data', async (req, res) => {
+        const page = parseInt(req.query.page) || 1;
+        const limit = Math.min(parseInt(req.query.limit) || 50, 100);
+        const offset = (page - 1) * limit;
+        const data = await db.query('SELECT * FROM events LIMIT $1 OFFSET $2', [limit, offset]);
+        res.json({ data, page, limit });
+      });
+      ```
+      
+      Step 4: Monitor and verify
+      - Check /health memory stats every 5 minutes for 30 minutes
+      - Run load test (1000 concurrent requests)
+      - Verify heap utilization stays <75%
+    risk: medium
+    rollback: |
+      If memory fixes cause data loss or performance regression:
+      1. Revert code changes via git
+      2. Restart service with previous version
+      3. Monitor for memory leak recurrence
+      4. Implement fixes incrementally (one at a time)
+    notes: |
+      Memory optimization is iterative; start with highest-impact fixes first.
+      
+      Priority order:
+      1. Add LRU cache limits (quick win, low risk)
+      2. Paginate large queries (medium effort, high impact)
+      3. Stream responses instead of buffering (higher effort, highest impact)
+      4. Fix WebSocket cleanup (quick, prevents leaks)
+
+  - id: FP-SAGE-002
+    title: Reduce error rate from 0.26% to <0.15%
+    severity: P0
+    eta_hours: 4
+    acceptance_criteria:
+      - Error rate <0.15% sustained for 30+ minutes
+      - /api/slo/status shows errorRate.status = "green"
+      - No 5xx errors for /health endpoint (currently 1/3 timeouts)
+      - All user-facing endpoints respond within 10 seconds (no timeouts)
+    implementation_notes: |
+      Current: 0.26% (0.002618 decimal)
+      Target: <0.15% (0.0015 decimal)
+      Required reduction: 0.11 percentage points
+      
+      Root causes (likely):
+      1. Timeouts due to capacity constraints (root page, sitemap taking >10s)
+      2. External API failures (OpenAI in CSP)
+      3. Database connection pool exhaustion
+      4. Unhandled promise rejections
+      
+      Fixes:
+      ```javascript
+      // Fix A: Add request timeout middleware
+      const timeout = require('connect-timeout');
+      app.use(timeout('5s')); // 5-second timeout
+      app.use((req, res, next) => {
+        if (!req.timedout) next();
+      });
+      
+      // Fix B: Add circuit breaker for external APIs
+      const CircuitBreaker = require('opossum');
+      const openaiBreaker = new CircuitBreaker(callOpenAI, {
+        timeout: 3000, // 3s timeout
+        errorThresholdPercentage: 50,
+        resetTimeout: 30000 // 30s cooldown
+      });
+      
+      // Fix C: Increase database connection pool
+      const pool = new Pool({
+        max: 20, // Increase from default 10
+        idleTimeoutMillis: 30000,
+        connectionTimeoutMillis: 2000
+      });
+      
+      // Fix D: Handle all promise rejections
+      process.on('unhandledRejection', (reason, promise) => {
+        console.error('Unhandled Rejection:', reason);
+        // Log to error tracking (Sentry, Datadog, etc.)
+      });
+      
+      // Fix E: Add error middleware
+      app.use((err, req, res, next) => {
+        console.error(err);
+        res.status(err.status || 500).json({
+          error: 'internal_server_error',
+          message: process.env.NODE_ENV === 'production' ? 'An error occurred' : err.message
+        });
+      });
+      ```
+      
+      Verification:
+      - Monitor /api/slo/status for 30 minutes
+      - Run 1000-request load test; verify error rate <0.15%
+      - Check logs for unhandled rejections
+    risk: low
+    rollback: |
+      If error handling changes cause new issues:
+      1. Remove timeout middleware temporarily
+      2. Disable circuit breaker (passthrough mode)
+      3. Revert to previous error handling
+    notes: |
+      Error rate reduction often improves naturally after fixing timeouts (FP-SAGE-003).
+      Consider running FP-SAGE-003 first, then re-measure error rate.
+
+  - id: FP-SAGE-003
+    title: Fix root page and sitemap timeouts (>10 seconds)
+    severity: P0
+    eta_hours: 6
+    acceptance_criteria:
+      - GET / returns 200 within 5 seconds (P95 ≤120ms target)
+      - GET /sitemap.xml returns 200 within 5 seconds
+      - No blocking synchronous operations on event loop
+      - All database queries use indexes and complete <100ms
+    implementation_notes: |
+      Current: Both endpoints timeout at >10 seconds
+      Target: P95 TTFB ≤120ms
+      
+      Step 1: Profile slow endpoints
+      ```bash
+      # Use clinic.js to identify bottlenecks
+      clinic flame -- node index.js
+      # Load / and /sitemap.xml in browser
+      # Analyze flame graph for blocking operations
+      ```
+      
+      Step 2: Common timeout causes and fixes
+      ```javascript
+      // BAD: Synchronous file I/O blocks event loop
+      const data = fs.readFileSync('/large-file.json'); // BLOCKS!
+      
+      // GOOD: Async file I/O
+      const data = await fs.promises.readFile('/large-file.json');
+      
+      // BAD: N+1 query problem
+      for (const scholarship of scholarships) {
+        scholarship.details = await db.query('SELECT * FROM details WHERE id = $1', [scholarship.id]);
+      }
+      
+      // GOOD: Batched query
+      const ids = scholarships.map(s => s.id);
+      const details = await db.query('SELECT * FROM details WHERE id = ANY($1)', [ids]);
+      const detailsMap = Object.fromEntries(details.rows.map(d => [d.id, d]));
+      scholarships.forEach(s => s.details = detailsMap[s.id]);
+      
+      // FIX: Cache sitemap.xml generation
+      let sitemapCache = null;
+      let sitemapCacheTime = 0;
+      const SITEMAP_TTL = 3600000; // 1 hour
+      
+      app.get('/sitemap.xml', async (req, res) => {
+        const now = Date.now();
+        if (!sitemapCache || now - sitemapCacheTime > SITEMAP_TTL) {
+          sitemapCache = await generateSitemap(); // Expensive operation
+          sitemapCacheTime = now;
+        }
+        res.setHeader('Content-Type', 'application/xml');
+        res.setHeader('Cache-Control', 'public, max-age=3600');
+        res.send(sitemapCache);
+      });
+      
+      // FIX: Add database indexes for common queries
+      // Check EXPLAIN ANALYZE output for sequential scans
+      // CREATE INDEX idx_scholarships_deadline ON scholarships(deadline);
+      // CREATE INDEX idx_events_timestamp ON events(timestamp);
+      ```
+      
+      Step 3: Optimize root page rendering
+      ```javascript
+      // If using SSR, consider:
+      // 1. Static site generation (SSG) for landing page
+      // 2. Edge caching (Cloudflare, Fastly)
+      // 3. Lazy-load non-critical data client-side
+      // 4. Reduce initial data fetching (defer to API calls)
+      ```
+      
+      Verification:
+      - curl -w "%{time_total}" / → <1 second
+      - curl -w "%{time_total}" /sitemap.xml → <1 second
+      - Run 3 samples, P95 ≤120ms
+    risk: medium
+    rollback: |
+      If optimizations break functionality:
+      1. Disable caching temporarily
+      2. Revert query changes
+      3. Roll back to previous version
+      4. Apply fixes incrementally
+    notes: |
+      Timeout fixes are highest priority; they directly reduce error rate.
+      Once timeouts are resolved, error rate should drop significantly.
+
+  - id: FP-SAGE-004
+    title: Add Permissions-Policy header
+    severity: P1
+    eta_hours: 1
+    acceptance_criteria:
+      - Permissions-Policy header present on all endpoints
+      - Security headers count: 6/6
+      - curl -I / shows permissions-policy header
+    implementation_notes: |
+      Current: 5/6 headers (missing Permissions-Policy)
+      
+      Fix:
+      ```javascript
+      // Using helmet
+      app.use(helmet({
+        permissionsPolicy: {
+          features: {
+            camera: ["'none'"],
+            microphone: ["'none'"],
+            geolocation: ["'none'"],
+            payment: ["'none'"]
+          }
+        }
+      }));
+      
+      // Or manual
+      app.use((req, res, next) => {
+        res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=(), payment=()');
+        next();
+      });
+      ```
+    risk: low
+    rollback: |
+      Remove header if it blocks legitimate features.
+    notes: |
+      Non-blocking; can be done post-P0 fixes.
+
+  - id: FP-SAGE-005
+    title: Remove duplicate HSTS header
+    severity: P2
+    eta_hours: 1
+    acceptance_criteria:
+      - Only one Strict-Transport-Security header present
+      - Header value: max-age=63072000; includeSubDomains; preload
+    implementation_notes: |
+      Current: Two HSTS headers (2-year and 1-year)
+      
+      Root cause: Likely set by both helmet and custom middleware.
+      
+      Fix: Keep only one (2-year version with preload).
+    risk: low
+    rollback: |
+      Non-breaking change; HSTS is cached by browsers.
+    notes: |
+      Cosmetic; lowest priority.
+
+quick_wins:
+  - id: QW-001
+    title: Add LRU cache with 10MB limit (immediate memory reduction)
+    eta_minutes: 15
+    steps:
+      - npm install lru-cache
+      - Replace unbounded cache with LRU cache (max 10MB)
+      - Restart server
+      - Monitor /health memory stats
+    impact: Reduces memory by 5-10MB immediately
+  
+  - id: QW-002
+    title: Increase database connection pool to 20
+    eta_minutes: 5
+    steps:
+      - Update database config max connections from 10 to 20
+      - Restart server
+      - Monitor for connection pool exhaustion errors
+    impact: Reduces connection timeout errors by ~50%
+  
+  - id: QW-003
+    title: Add request timeout middleware (5 seconds)
+    eta_minutes: 10
+    steps:
+      - npm install connect-timeout
+      - Add app.use(timeout('5s')) before routes
+      - Add timeout error handler
+      - Restart server
+    impact: Prevents hung requests from accumulating; reduces error rate
+
+verification_steps:
+  - step: 1
+    action: Check memory utilization
+    expected: |
+      curl https://scholarship-sage-jamarrlmayes.replit.app/health | jq '.memory.heapUsed, .memory.heapTotal'
+      Calculate: heapUsed / heapTotal < 0.75 (75%)
+  
+  - step: 2
+    action: Check error rate
+    expected: |
+      curl https://scholarship-sage-jamarrlmayes.replit.app/api/slo/status | jq '.errorRate'
+      Expected: {
+        "current": <0.0015,
+        "target": 0.001,
+        "status": "green"
+      }
+  
+  - step: 3
+    action: Test root page and sitemap (no timeouts)
+    expected: |
+      curl -w "%{time_total}\n" https://scholarship-sage-jamarrlmayes.replit.app/ → <1s
+      curl -w "%{time_total}\n" https://scholarship-sage-jamarrlmayes.replit.app/sitemap.xml → <1s
+  
+  - step: 4
+    action: Re-run full Agent3-QA/2.2 validation
+    expected: |
+      Final score: ≥4/5
+      - Memory < 75% (green)
+      - Error rate < 0.15% (green)
+      - Root page responds <5s
+      - Sitemap responds <5s
+      - Security headers: 6/6
+  
+  - step: 5
+    action: Load test (1000 requests, 100 concurrent)
+    expected: |
+      ab -n 1000 -c 100 https://scholarship-sage-jamarrlmayes.replit.app/health
+      - 0% failed requests
+      - P95 latency <500ms
+      - Memory stable <75%
+
+notes: |
+  Post-fix validation checklist:
+  - Memory utilization <75% sustained 30+ minutes
+  - Error rate <0.15% sustained 30+ minutes
+  - No timeouts for /, /sitemap.xml, /health
+  - Security headers 6/6
+  - P95 TTFB ≤120ms (or <500ms with documented plan to optimize)
+  
+  If score reaches 4/5: T+24h Infrastructure Gate UNBLOCKED
+  If score reaches 5/5: Excellent; analytics service production-ready
+  
+  ETA to 4/5: 10-12 hours (all P0 tasks completed)
+  ETA to 5/5: 13-15 hours (all P0/P1 tasks completed)
+  
+  CRITICAL PATH: FP-SAGE-001, FP-SAGE-002, FP-SAGE-003 (P0) must be completed for T+24h gate.

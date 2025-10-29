@@ -1,0 +1,326 @@
+metadata:
+  app: scholarship_agent
+  version: v2.2
+  owner: Agent Infrastructure Team
+  target_score: 4
+  current_score: 2
+  gate_deadline: T+24h Infrastructure Gate
+  last_updated: 2025-10-29T19:46:00Z
+
+tasks:
+  - id: FP-AGENT-001
+    title: Add /canary JSON endpoint (register before SPA catch-all)
+    severity: P0
+    eta_hours: 4
+    acceptance_criteria:
+      - GET /canary returns 200 OK
+      - Content-Type is application/json (not text/html)
+      - Response contains valid JSON with required fields
+          - ok (boolean, must be true)
+          - status (string, "healthy" or "ok")
+          - capabilities (integer, e.g., 9)
+          - timestamp (ISO-8601 format)
+      - P95 TTFB ≤ 120ms across 3 samples
+      - Endpoint accessible without authentication
+      - SPA routing does not intercept /canary
+    implementation_notes: |
+      Root cause: /canary API route is either not registered, or registered AFTER the SPA catch-all route (`app.get('*', ...)`), causing all unmatched paths to serve index.html.
+      
+      CRITICAL FIX: Register /canary route BEFORE the SPA catch-all.
+      
+      Implementation (Express.js):
+      ```javascript
+      const express = require('express');
+      const app = express();
+      
+      // STEP 1: Register static files middleware
+      app.use(express.static('public'));
+      
+      // STEP 2: Register /health endpoint (currently working)
+      app.get('/health', (req, res) => {
+        res.setHeader('Content-Type', 'application/json');
+        res.status(200).json({
+          status: 'ok',
+          agent_id: 'scholarship-agent',
+          name: 'scholarship_agent',
+          last_seen: new Date().toISOString(),
+          capabilities: 9,
+          version: '1.0.0'
+        });
+      });
+      
+      // STEP 3: Register /canary endpoint (NEW - BEFORE CATCH-ALL)
+      app.get('/canary', (req, res) => {
+        res.setHeader('Content-Type', 'application/json');
+        res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
+        res.status(200).json({
+          ok: true,
+          status: 'healthy',
+          capabilities: 9,
+          timestamp: new Date().toISOString(),
+          agent_id: 'scholarship-agent',
+          version: '1.0.0',
+          uptime_s: Math.floor(process.uptime())
+        });
+      });
+      
+      // STEP 4: Register SPA catch-all route (LAST)
+      app.get('*', (req, res) => {
+        res.sendFile(path.join(__dirname, 'public', 'index.html'));
+      });
+      
+      app.listen(PORT, () => console.log(`Server on port ${PORT}`));
+      ```
+      
+      Alternative (if using React Router or similar):
+      - Ensure server-side routes are registered in a separate router/middleware
+      - Mount API routes before client-side rendering middleware
+      
+      Verification steps:
+      1. Start server locally
+      2. Test: `curl -H "Accept: application/json" http://localhost:PORT/canary`
+      3. Verify response is JSON (not HTML)
+      4. Verify Content-Type: application/json header
+      5. Deploy to production
+      6. Re-run Agent3-QA/2.2 validation
+    risk: low
+    rollback: |
+      If /canary breaks SPA routing:
+      1. Comment out /canary route
+      2. Restart server
+      3. SPA will resume serving index.html for /canary
+      
+      If deployment fails:
+      1. Revert git commit
+      2. Redeploy previous version
+    notes: |
+      QUICK WIN: Copy /health endpoint logic to /canary (1-line change).
+      
+      Minimal implementation (5 minutes):
+      ```javascript
+      app.get('/canary', (req, res) => {
+        res.setHeader('Content-Type', 'application/json');
+        res.status(200).json({ ok: true, status: 'healthy', capabilities: 9, timestamp: new Date().toISOString() });
+      });
+      ```
+      
+      This immediately unblocks T+24h Infrastructure Gate.
+      
+      IMPORTANT: Place this route BEFORE `app.get('*', ...)` or it will never execute.
+
+  - id: FP-AGENT-002
+    title: Remove duplicate HSTS header
+    severity: P2
+    eta_hours: 1
+    acceptance_criteria:
+      - Only one Strict-Transport-Security header present in responses
+      - Header value is max-age=63072000; includeSubDomains (2-year)
+      - No duplicate headers in curl -I output
+    implementation_notes: |
+      Current state: Two HSTS headers present
+      - strict-transport-security: max-age=63072000; includeSubDomains
+      - strict-transport-security: max-age=31536000; includeSubDomains; preload
+      
+      Root cause: HSTS likely set by both helmet middleware and custom middleware.
+      
+      Fix:
+      ```javascript
+      // Option A: Use helmet only
+      const helmet = require('helmet');
+      app.use(helmet({
+        hsts: {
+          maxAge: 63072000, // 2 years
+          includeSubDomains: true,
+          preload: true // Add preload flag
+        }
+      }));
+      // Remove custom HSTS middleware
+      
+      // Option B: Use custom middleware only
+      app.use((req, res, next) => {
+        res.setHeader('Strict-Transport-Security', 'max-age=63072000; includeSubDomains; preload');
+        // Remove helmet HSTS or disable: helmet({ hsts: false })
+        next();
+      });
+      ```
+      
+      Recommendation: Keep 2-year (63072000) version with preload flag for maximum security.
+    risk: low
+    rollback: |
+      HSTS changes are low-risk; browsers cache max-age so removing/changing is non-breaking.
+    notes: |
+      Non-blocking; cosmetic issue. Browsers use the more restrictive value.
+
+  - id: FP-AGENT-003
+    title: Optimize root page P95 TTFB (126ms → <120ms)
+    severity: P2
+    eta_hours: 3
+    acceptance_criteria:
+      - GET / P95 TTFB ≤ 120ms (currently 126ms)
+      - No performance regression on other endpoints
+      - Static assets use cache headers
+    implementation_notes: |
+      Current P95 TTFB: 126ms (6ms over target)
+      
+      Optimizations:
+      1. Enable gzip/brotli compression for HTML:
+         ```javascript
+         const compression = require('compression');
+         app.use(compression());
+         ```
+      
+      2. Add cache headers for static assets:
+         ```javascript
+         app.use(express.static('public', {
+           maxAge: '1d', // Cache static assets for 1 day
+           etag: true
+         }));
+         ```
+      
+      3. Preload critical resources in index.html:
+         ```html
+         <link rel="preload" href="/main.js" as="script">
+         <link rel="preload" href="/styles.css" as="style">
+         ```
+      
+      4. Consider SSG (Static Site Generation) for landing page:
+         - Pre-render index.html at build time
+         - Serve from CDN/edge
+      
+      5. Enable HTTP/2 server push for critical assets (if supported by platform)
+    risk: low
+    rollback: |
+      Disable compression middleware if it causes issues:
+      - Comment out `app.use(compression())`
+      - Restart server
+    notes: |
+      6ms over target is marginal; this is a nice-to-have optimization.
+      Focus P0 effort on /canary JSON endpoint first.
+
+  - id: FP-AGENT-004
+    title: Add /status endpoint (currently SPA catch-all)
+    severity: P1
+    eta_hours: 2
+    acceptance_criteria:
+      - GET /status returns 200 JSON (not HTML)
+      - Contains uptime, version, health status fields
+      - P95 TTFB ≤ 120ms
+    implementation_notes: |
+      Current state: /status returns HTML (SPA catch-all)
+      
+      Recommended implementation (similar to /health and /canary):
+      ```javascript
+      app.get('/status', (req, res) => {
+        res.setHeader('Content-Type', 'application/json');
+        res.setHeader('Cache-Control', 'no-cache');
+        res.status(200).json({
+          status: 'operational',
+          uptime_s: Math.floor(process.uptime()),
+          version: '1.0.0',
+          environment: process.env.NODE_ENV || 'production',
+          timestamp: new Date().toISOString(),
+          agent_id: 'scholarship-agent'
+        });
+      });
+      ```
+      
+      Register BEFORE SPA catch-all (same as /canary fix).
+    risk: low
+    rollback: |
+      Remove /status route if not needed; SPA will resume serving HTML.
+    notes: |
+      Optional endpoint; useful for orchestration but not required by v2.2 APP BLOCK.
+
+quick_wins:
+  - id: QW-001
+    title: Copy /health logic to /canary (instant fix)
+    eta_minutes: 5
+    steps:
+      - Locate /health route handler in server code
+      - Duplicate route as /canary with minor adjustments
+          - Change response to include ok:true field
+          - Set Cache-Control to no-cache
+      - Register /canary BEFORE app.get('*', ...)
+      - Restart server
+      - Test with curl -H "Accept: application/json" /canary
+    impact: Unblocks T+24h Infrastructure Gate immediately (score 2/5 → 4/5)
+  
+  - id: QW-002
+    title: Test /canary endpoint locally before deployment
+    eta_minutes: 10
+    steps:
+      - Run server in dev: npm run dev
+      - curl -v http://localhost:PORT/canary
+      - Verify Content-Type: application/json
+      - Verify JSON body with ok:true
+      - Deploy to production with confidence
+    impact: De-risks production deployment
+  
+  - id: QW-003
+    title: Add /canary to robots.txt Disallow (already done)
+    eta_minutes: 0
+    steps:
+      - Verify robots.txt contains "Disallow: /canary"
+      - Already present - no action needed
+    impact: Prevents search engine indexing of internal endpoint
+
+verification_steps:
+  - step: 1
+    action: GET /canary (3 samples with 300ms delay)
+    expected: |
+      [YYYY-MM-DDTHH:MM:SSZ] GET https://scholarship-agent-jamarrlmayes.replit.app/canary
+      → 200, ttfb_ms≤120, content_type=application/json; charset=utf-8
+      Payload: {"ok":true,"status":"healthy","capabilities":9,"timestamp":"..."}
+  
+  - step: 2
+    action: Verify Content-Type header
+    expected: |
+      curl -I https://scholarship-agent-jamarrlmayes.replit.app/canary
+      HTTP/2 200
+      content-type: application/json; charset=utf-8
+      (NOT text/html)
+  
+  - step: 3
+    action: Verify JSON structure
+    expected: |
+      curl https://scholarship-agent-jamarrlmayes.replit.app/canary | jq .
+      {
+        "ok": true,
+        "status": "healthy",
+        "capabilities": 9,
+        "timestamp": "2025-10-29T...",
+        ...
+      }
+  
+  - step: 4
+    action: Re-run full Agent3-QA/2.2 validation
+    expected: |
+      Final score: ≥4/5 (target 4/5 to unblock T+24h gate)
+      - /canary endpoint: 200 application/json with valid body
+      - Security headers: 6/6 (already passing)
+      - P95 TTFB: ≤120ms
+  
+  - step: 5
+    action: Test with Accept header variations
+    expected: |
+      curl -H "Accept: application/json" /canary → JSON (not HTML)
+      curl -H "Accept: text/html" /canary → JSON (not HTML - ignore Accept for API)
+      curl -H "Accept: */*" /canary → JSON
+
+notes: |
+  Post-fix validation checklist:
+  - /canary returns 200 JSON with ok:true, status, capabilities, timestamp
+  - Content-Type: application/json (critical)
+  - P95 TTFB ≤120ms
+  - No SPA intercept (verified by checking Content-Type)
+  - /health still works (no regression)
+  - Security headers still 6/6
+  
+  If score reaches 4/5: T+24h Infrastructure Gate UNBLOCKED
+  If score reaches 5/5: Excellent; agent service production-ready
+  
+  ETA to 4/5: 4 hours (FP-AGENT-001 completed)
+  ETA to 5/5: 10 hours (all P0/P1 tasks completed)
+  
+  CRITICAL PATH: FP-AGENT-001 (P0) must be completed for T+24h gate.
+  P1/P2 tasks are nice-to-haves and can be deferred post-gate.
