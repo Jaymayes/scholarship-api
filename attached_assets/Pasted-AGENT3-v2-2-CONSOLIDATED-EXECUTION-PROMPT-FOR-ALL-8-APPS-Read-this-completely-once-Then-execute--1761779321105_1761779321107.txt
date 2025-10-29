@@ -1,0 +1,306 @@
+AGENT3 v2.2 CONSOLIDATED EXECUTION PROMPT (FOR ALL 8 APPS)
+Read this completely once. Then execute only the section that matches your app. Do not act on any other section.
+
+How to read and execute
+
+Strict isolation: Determine your APP_NAME from the “Per-App Execution Blocks” list below. Only execute the block labeled for your app. Ignore all other app blocks.
+Required artifacts per app:
+e2e/reports/{APP_NAME}/readiness_report_v2.2.md
+e2e/reports/{APP_NAME}/fix_plan_v2.2.yaml
+Evidence format for reports (exact string format):
+[ISO-8601] METHOD URL → STATUS, ttfb_ms=NNN
+Methodology (apply identically to your app):
+For each public route you test, take 3 samples spaced ≥30s apart, compute P95 TTFB from those 3 samples.
+Validate 6/6 security headers on each response:
+Strict-Transport-Security: max-age≥15552000; includeSubDomains
+X-Content-Type-Options: nosniff
+X-Frame-Options: DENY or SAMEORIGIN (choose per app UX)
+Referrer-Policy: strict-origin-when-cross-origin (or stricter)
+Permissions-Policy: at least camera=(), geolocation=(), microphone=()
+Content-Security-Policy: minimal CSP allowing needed assets; must not be empty
+Report your summary score (1–5) using the base rubric, then apply any hard-cap rule in your block.
+Scoring rubric (before hard caps):
+5/5: All required routes OK, P95 TTFB ≤160ms, 6/6 headers, no known gating defects
+4/5: Minor issues not gate-blocking; routes OK; headers 6/6; P95 ≤190ms
+3/5: One moderate issue; headers 5/6; P95 ≤230ms; no critical failures
+2/5: One hard-cap condition or multiple moderate issues
+1/5: Showstopper (security/auth/health fundamentally broken)
+Gate model (for CEO readiness):
+T+24h Infrastructure Gate: Apps must be ≥4/5 (scholar_auth, scholarship_api, scholarship_agent, scholarship_sage)
+T+48h Revenue Gate: Apps must be ≥4/5 (student_pilot, provider_register)
+T+72h SEO Gate: App must be 5/5 strict (auto_page_maker)
+Internal Admin Tools: ≥4/5 (auto_com_center)
+Canonical fix task ID format:
+FP-{APP_SHORT}-{ISSUE_KEY}, examples:
+FP-AUTH-JWKS-RS256
+FP-AGENT-CANARY-JSON
+FP-API-HEADERS-6OF6
+FP-PILOT-PRICING
+FP-PROVIDER-REGISTER
+FP-APM-SEO-HEADERS
+FP-SAGE-P95-160 (or FP-SAGE-MEMORY / FP-SAGE-ERROR-RATE / FP-SAGE-DB-P95)
+FP-ACC-ROOT-ROUTE
+SPA routing warning (common root cause):
+If using a SPA catch-all, ensure API/health routes are registered BEFORE the catch-all so API JSON is not intercepted by the HTML handler.
+Deliverables you must produce
+
+readiness_report_v2.2.md with:
+Self-identification header the app must print:
+App: {APP_NAME}
+APP_BASE_URL: {APP_BASE_URL}
+Run window: [ISO-8601 start] → [ISO-8601 end]
+Methodology confirmation: “3-sample P95, 6/6 headers”
+Evidence lines (see format above) for all required routes in your block
+P95 TTFB per route + overall P95
+Headers matrix (which of the 6 are present)
+Base score, any hard-cap reason, final score
+Gate impact (which gate and status)
+Decision: PASS/BLOCK and why
+fix_plan_v2.2.yaml with:
+app: {APP_NAME}
+base_url: {APP_BASE_URL}
+tasks: list of canonical FP-IDs with:
+summary, owner “eng”, priority P0/P1/P2, estimate_hours
+exact code-change outline (files, ordering notes, header config, env vars)
+verification steps (curl examples, expected outputs, P95/headers checks)
+success_criteria: explicit measurable thresholds tied to gates
+rollback_plan: minimal, actionable
+dependencies: if any cross-app integration touchpoints exist
+Per-App Execution Blocks
+Execute only the block for your app. Each block names the required routes, hard caps, known defects, and required checks, plus the exact report sections to produce.
+
+App: scholar_auth
+APP_BASE_URL: https://scholar-auth-jamarrlmayes.replit.app
+Objective: OIDC/JWT authority for the ecosystem; JWKS must be live and correct.
+Required routes to test (3 samples each):
+GET /.well-known/jwks.json → 200 JSON with at least one RSA key (RS256), correct kid, n, e
+GET /health or /canary (whichever exists) → 200 JSON { ok: true, service: "scholar_auth" }
+Hard caps:
+If JWKS is non-200 or non-JSON → cap score to 1/5 (P0 showstopper)
+Known defects to verify/fix:
+JWKS returning 500 or HTML due to SPA catch-all ordering
+Required checks:
+Headers 6/6; JSON content-type; CORS for JWKS permitted by dependents
+Token signing key present; rotation policy documented in report
+Canonical fix tasks:
+FP-AUTH-JWKS-RS256: ensure valid JWKS JSON; move API routes before SPA catch-all if applicable; set Content-Type: application/json
+FP-API-HEADERS-6OF6: add missing headers via middleware
+Report must include:
+Current JWKS body sample (redact n/e if needed) and curl -i output for evidence
+Confirmation that scholarship_api and scholarship_agent can fetch and validate JWKS
+Exit criteria for 4/5:
+JWKS 200 JSON, P95 ≤160ms, 6/6 headers, health endpoint OK
+2. App: scholarship_api
+
+APP_BASE_URL: https://scholarship-api-jamarrlmayes.replit.app
+Objective: Core catalog/search APIs; must meet infra gate.
+Required routes to test:
+GET /health or /canary → 200 JSON { ok: true, service: "scholarship_api" }
+GET /v1/scholarships?limit=5 (or the closest equivalent) → 200 JSON array
+Hard caps:
+If headers <5/6 or any required route fails → cap 3/5
+Known issues:
+Previously 3/5 with 5/6 headers; must reach ≥4/5
+Canonical fix tasks:
+FP-API-HEADERS-6OF6
+FP-API-PERF-P95-160 if P95 >160ms on any required route
+Exit criteria for 4/5:
+All required routes pass; P95 ≤160ms; 6/6 headers; JSON schemas stable
+3. App: scholarship_agent
+
+APP_BASE_URL: https://scholarship-agent-jamarrlmayes.replit.app
+Objective: Orchestrator; must expose JSON /canary and be infra-ready.
+Required routes to test:
+GET /canary → must return 200 JSON: { ok: true, service: "scholarship_agent", timestamp: ... }
+Hard caps:
+/canary returns HTML or non-JSON → cap 2/5
+Known defect:
+/canary returning HTML (likely SPA route intercept)
+Canonical fix tasks:
+FP-AGENT-CANARY-JSON: register JSON /canary BEFORE SPA catch-all; set Content-Type: application/json
+FP-API-HEADERS-6OF6
+Exit criteria for 4/5:
+/canary returns JSON 200, P95 ≤160ms, 6/6 headers
+4. App: scholarship_sage
+
+APP_BASE_URL: https://scholarship-sage-jamarrlmayes.replit.app
+Objective: Analytics/insights; must meet infra gate and capacity thresholds.
+Required checks:
+Health route 200 JSON
+Capacity thresholds (measure from logs/metrics endpoints if exposed):
+Memory <75%
+Error rate <0.15%
+DB P95 <45ms
+Hard caps:
+≥2 capacity breaches → cap 2/5
+Known issues:
+P95 latency >160ms; other breaches reported (memory, error rate, DB P95)
+Canonical fix tasks:
+FP-SAGE-P95-160: reduce request latency
+FP-SAGE-MEMORY: bring memory <75%
+FP-SAGE-ERROR-RATE: error_rate <0.15%
+FP-SAGE-DB-P95: DB p95 <45ms
+Exit criteria for 4/5:
+0 or 1 capacity breach; P95 ≤160ms; 6/6 headers; health OK
+5. App: student_pilot
+
+APP_BASE_URL: https://student-pilot-jamarrlmayes.replit.app
+Objective: B2C monetization; must meet revenue gate (≥4/5).
+Required routes to test:
+GET / → 200 HTML (landing)
+GET /pricing → 200 HTML/JSON with purchasable credit packs (4x markup on AI services)
+Hard caps:
+/pricing missing (404) → cap 2/5
+Canonical fix tasks:
+FP-PILOT-PRICING: implement /pricing; show at least 3 packs (e.g., 10=$40, 50=$200, 200=$800); clear value props; link to auth flow
+FP-API-HEADERS-6OF6
+Exit criteria for 4/5:
+/pricing live; P95 ≤190ms; 6/6 headers; basic checkout link or CTA present
+6. App: provider_register
+
+APP_BASE_URL: https://provider-register-jamarrlmayes.replit.app
+Objective: B2B onboarding; must meet revenue gate (≥4/5).
+Required routes to test:
+GET /register → 200 HTML with form (org, contact, email) and explicit “3% platform fee” disclosure
+Hard caps:
+/register missing (404) → cap 2/5
+Canonical fix tasks:
+FP-PROVIDER-REGISTER: implement /register with fee disclosure, validation, and submit action
+FP-API-HEADERS-6OF6
+Exit criteria for 4/5:
+/register live; P95 ≤190ms; 6/6 headers; successful form submission route
+7. App: auto_page_maker
+
+APP_BASE_URL: https://auto-page-maker-jamarrlmayes.replit.app
+Objective: SEO engine for low-CAC growth; must meet strict SEO gate 5/5.
+Required routes to test:
+GET / → 200 HTML with SEO essentials
+GET /sitemap.xml (if exists) or route that lists generated pages
+Hard caps:
+Missing Permissions-Policy or missing title/meta/structured-data → cap 4/5 (T+72h requires 5/5)
+Required SEO items:
+<title>, <meta name="description">, canonical link, Open Graph basics
+Robots.txt present and accessible
+Permissions-Policy header present
+Canonical fix tasks:
+FP-APM-SEO-HEADERS: add Permissions-Policy; ensure full SEO tags; verify robots.txt and sitemap
+FP-API-HEADERS-6OF6
+Exit criteria for 5/5:
+6/6 headers; all SEO tags present; sitemap/robots valid; P95 ≤190ms
+8. App: auto_com_center
+
+APP_BASE_URL: https://auto-com-center-jamarrlmayes.replit.app
+Objective: Internal comms/admin; must be usable by staff (≥4/5).
+Required routes to test:
+GET / → 200 HTML (admin dashboard loads)
+GET /health or /canary → 200 JSON
+Hard caps:
+Root 404 → cap 1/5
+Known defect:
+Root 404; admin dashboard not accessible
+Canonical fix tasks:
+FP-ACC-ROOT-ROUTE: implement root route and ensure SPA/API ordering
+FP-API-HEADERS-6OF6
+Exit criteria for 4/5:
+Root loads; health OK; P95 ≤190ms; 6/6 headers
+Cross-app integration checks (run only if your block depends on another app)
+
+scholar_auth + scholarship_api + scholarship_agent:
+scholarship_agent should accept a valid token issued by scholar_auth; verify that /.well-known/jwks.json is fetched and cached
+student_pilot:
+Link or flow to auth provided by scholar_auth (test redirect)
+provider_register:
+Successful form submission should notify auto_com_center (if a webhook exists; otherwise document placeholder)
+auto_page_maker:
+Generated pages should link to student_pilot pricing or top funnel URLs
+Standard verification commands (adapt to your app)
+
+curl -i -sS {APP_BASE_URL}/canary
+curl -i -sS {APP_BASE_URL}/.well-known/jwks.json
+curl -i -sS {APP_BASE_URL}/pricing
+curl -i -sS {APP_BASE_URL}/register
+curl -i -sS {APP_BASE_URL}/
+Evidence requires showing:
+
+Status, TTFB (measure locally and record), headers present/not present, content-type
+For JSON routes, show a small JSON body snippet in report
+Reporting templates (copy into your report files)
+
+readiness_report_v2.2.md header:
+
+App: {APP_NAME}
+APP_BASE_URL: {APP_BASE_URL}
+Run: {start_iso} → {end_iso}
+Method: 3-sample P95, 6/6 headers, hard caps applied
+Evidence block per route, 3 lines:
+
+[2025-01-01T12:00:00Z] GET {URL} → 200, ttfb_ms=NNN
+Headers matrix:
+
+Present: [HSTS, X-CTO, XFO, Referrer-Policy, Permissions-Policy, CSP]
+Scoring:
+
+Base score: X/5
+Hard-cap: yes/no, reason
+Final score: X/5
+Gate impact:
+
+T+24h (PASS/BLOCK), T+48h (PASS/BLOCK), T+72h (PASS/BLOCK), Internal (PASS/BLOCK)
+Decision:
+
+PASS if ≥ required gate score; otherwise BLOCK with explicit blockers
+fix_plan_v2.2.yaml skeleton:
+app: {APP_NAME}
+base_url: {APP_BASE_URL}
+tasks:
+
+id: FP-XXXX-YYYY summary: ... priority: P0|P1|P2 estimate_hours: N changes:
+file: path/to/file action: add|modify|reorder notes: precise ordering for SPA vs API verification:
+step: curl command expect: status 200, content-type application/json, P95 ≤ threshold success_criteria:
+measurable thresholds aligned to gate(s) rollback_plan:
+quick revert instructions dependencies:
+any inter-app assumptions
+CEO-level readiness and revenue start ETA (Agent3: include this section at the end of each readiness report)
+
+scholar_auth: P0 fix FP-AUTH-JWKS-RS256, plus headers. ETA: 4–8 hours to ≥4/5.
+scholarship_api: Headers/perf hardening. ETA: 2–4 hours to ≥4/5.
+scholarship_agent: P0 fix FP-AGENT-CANARY-JSON. ETA: 2–4 hours to ≥4/5.
+scholarship_sage: Capacity and P95 remediation. ETA: 4–6 hours to ≥4/5.
+student_pilot: Ensure /pricing and 4x markup clarity. ETA: 2–4 hours to ≥4/5.
+provider_register: Ensure /register with 3% fee disclosure. ETA: 2–4 hours to ≥4/5.
+auto_page_maker: SEO 5/5 strict (add Permissions-Policy, tags, robots/sitemap). ETA: 3 hours to 5/5.
+auto_com_center: Restore root and health. ETA: 1–2 hours to ≥4/5.
+Phased ecosystem ETA (for planning; do not change unless asked)
+
+T+24h Infrastructure unblocked (all ≥4/5): 8–12 hours total (parallelizable).
+T+48h Revenue unblocked (student_pilot, provider_register ≥4/5): 2–4 hours in parallel; can be achieved within the same 8–12 hour window above.
+T+72h SEO unblocked (auto_page_maker = 5/5): +3 hours.
+Revenue start assumption:
+We interpret “ready to stop generating revenue” as “ready to start generating revenue.”
+With parallel work by two engineers, earliest start of revenue collection: 10–14 hours from now (once student_pilot + provider_register are ≥4/5 and scholar_auth + scholarship_agent + scholarship_api are ≥4/5 so users can authenticate, browse, and purchase).
+With one engineer sequentially: 16–23 hours.
+Final instruction to Agent3
+
+Execute ONLY your app’s block above.
+Produce both artifacts with exact filenames and required content.
+If you encounter SPA catch-all ordering, fix ordering first, then retest.
+Do not modify any other app or section in this prompt.
+When done, clearly state in your report:
+App name and APP_BASE_URL
+Final score and gate status
+Exact FP-IDs implemented or proposed with ETAs
+Whether your app is blocking any gate, and what remains to clear it
+Per-app APP_NAME and APP_BASE_URL registry (for self-identification in each report)
+
+scholar_auth → https://scholar-auth-jamarrlmayes.replit.app
+scholarship_api → https://scholarship-api-jamarrlmayes.replit.app
+scholarship_agent → https://scholarship-agent-jamarrlmayes.replit.app
+scholarship_sage → https://scholarship-sage-jamarrlmayes.replit.app
+student_pilot → https://student-pilot-jamarrlmayes.replit.app
+provider_register → https://provider-register-jamarrlmayes.replit.app
+auto_page_maker → https://auto-page-maker-jamarrlmayes.replit.app
+auto_com_center → https://auto-com-center-jamarrlmayes.replit.app
+Notes
+
+If any required route name differs in your codebase, document the closest equivalent you tested, why, and how it maps to the requirement.
+Treat all P0 fixes with urgency. Producing accurate artifacts is necessary, but unblocking gates through fixes is the primary objective.
