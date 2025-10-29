@@ -1,0 +1,243 @@
+AGENT3 UNIVERSAL QA AUTOMATION v2.2 — COMBINED APPS (READ-ONLY)
+
+Executive intent
+
+Mission: Validate production readiness for each app independently and verify ecosystem cohesion, so all apps are 100% ready and work together for the 72-hour Universal Prompt rollout.
+Scope: HTTP-only, read-only E2E checks. No data mutations beyond safe GETs and documented self-tests. No code changes. Produce standardized artifacts and a single ecosystem matrix.
+Critical instruction: Only use the section for your app. Ignore all other app sections except the explicit cross-app pings inside your section.
+App directory and selection
+
+Apps and base URLs:
+auto_com_center: https://auto-com-center-jamarrlmayes.replit.app
+scholar_auth: https://scholar-auth-jamarrlmayes.replit.app
+student_pilot: https://student-pilot-jamarrlmayes.replit.app
+provider_register: https://provider-register-jamarrlmayes.replit.app
+auto_page_maker: https://auto-page-maker-jamarrlmayes.replit.app
+scholarship_api: https://scholarship-api-jamarrlmayes.replit.app
+scholarship_agent: https://scholarship-agent-jamarrlmayes.replit.app
+scholarship_sage: https://scholarship-sage-jamarrlmayes.replit.app
+App selection protocol (mandatory):
+If env var AGENT3_APP is set, use that exact app section.
+Else, if the base URL you were invoked with matches one of the above, use that app’s section.
+Else, call GET /agent/capabilities or GET /health or GET / to discover the app identity from headers or JSON (e.g., appName).
+If identity remains ambiguous, stop and ask for operator input. Do not run multi-app checks.
+Common rules for all apps (apply to your app only)
+
+Read-only execution. Do not POST/PUT/PATCH/DELETE. If a self-test endpoint requires a token, document that fact and skip.
+Rate limiting: ≤ 1 request per endpoint per second. ≤ 3 samples per endpoint for TTFB/P95 estimation.
+Evidence-first: For every finding, capture response code, timing (TTFB), selected headers, and a small JSON snippet (or HTML title) to prove correctness.
+Security headers checklist (score individually): Strict-Transport-Security, Content-Security-Policy, X-Frame-Options, X-Content-Type-Options, Referrer-Policy, Permissions-Policy.
+Performance target: P95 TTFB ≤ 120ms for critical endpoints.
+Uptime/SLO proxy: Health endpoints must return 200 consistently during sampling unless app’s section specifies a degraded but acceptable dev-mode behavior.
+SEO checklist (where relevant): robots.txt 200, sitemap.xml 200, meta title and description present on root page, canonical tag on content pages.
+Observability and error handling: 404/422/500 error responses should be structured JSON for APIs (with correlation_id or trace_id if applicable). No PII in error payloads.
+Authentication and authZ: Public endpoints should not require auth; protected endpoints should; do not attempt login unless the app’s section explicitly permits a read-only check.
+Artifacts (you must produce all):
+e2e/reports/{app}/readiness_report.md (detailed evidence, pass/fail by criterion, timings)
+e2e/reports/{app}/fix_plan.yaml (prioritized P0/P1/P2, code/config snippets, ETA, risk, validation/rollback notes)
+e2e/reports/ecosystem_readiness_matrix.csv (append or update 1 line for your app; keep header)
+Scoring rubric (report a single integer 1–5):
+5/5: All acceptance criteria pass; P95 TTFB ≤ 120ms; security headers pass (≥ 5/6, none critical missing); no blockers.
+4/5: Acceptance criteria pass; minor performance or security deviations; no blockers; clear fix plan to reach 5/5.
+3/5: One or more acceptance criteria fail; not production-ready.
+2/5 or 1/5: Multiple critical failures; not production-ready.
+Gate mapping (include your gate view in the report):
+T+24h gate: Infrastructure/API core healthy (scholar_auth, scholarship_api, and any infra-labeled apps must be ≥ 4/5).
+T+48h gate: Revenue apps (student_pilot, provider_register) must be 5/5.
+T+72h gate: All apps ≥ 4/5, with revenue apps still 5/5; security and performance SLOs green.
+Standard data you must record in your report (for your app)
+
+Endpoint inventory tested with method, status code, and 3 timing samples; P95 as reported.
+Security headers presence/absence with examples.
+SEO file validity (robots.txt, sitemap.xml) and core page meta tags.
+Error-handling examples (404/invalid-id).
+Known issues (from your section) re-validated as present or resolved.
+Final score, risk, and whether your app blocks any gate.
+Your single-line CSV row fields: app,status,p95_ttfb_ms,security_headers,key_blocker,eta_hours_to_resolve,notes
+status = pass|conditional|fail
+security_headers = pass|partial|fail
+key_blocker = brief description or none
+Per-app sections (only use the section that matches your app)
+
+auto_com_center (Executive Command Center)
+Base URL: https://auto-com-center-jamarrlmayes.replit.app
+Critical endpoints to test:
+GET / (root)
+GET /health and GET /healthz
+GET /agent/capabilities
+GET /api/monitoring/dashboard
+GET /api/executive/kpi/latest
+GET /api/executive/kpi/history
+GET /robots.txt, GET /sitemap.xml
+Acceptance criteria:
+All endpoints 200 OK except healthz may report degraded in dev with clear messaging.
+P95 TTFB ≤ 120ms for critical endpoints (root, dashboard, kpi/latest). kpi/history ideally ≤ 120ms but may be documented if temporarily > 120ms with fix plan.
+Security headers: ≥ 5/6 present; CSP must not be “Report-Only” in production.
+Executive endpoints require API key in production (document dev fallback behavior).
+External app reachability check: record per-app GET /health or root TTFB for the other 7 apps (do not treat their failures as your failures—just report).
+Known issues to re-validate:
+Occasional high memory leading to /healthz degraded.
+KPI history endpoint > 120ms.
+Slow sitemap.xml generation; needs caching.
+CSP enforcement and Exec API key requirement in production.
+Fix plan guidance:
+Add cache for sitemap.xml.
+Create indexes/caching for KPI history or materialized rollups.
+Enforce API key checks outside dev; enforce CSP (no report-only).
+Memory profiling; increase heap or remove hotspots.
+Deliverables: Create readiness_report.md, fix_plan.yaml, update ecosystem_readiness_matrix.csv.
+2. scholar_auth (OIDC/SSO)
+
+Base URL: https://scholar-auth-jamarrlmayes.replit.app
+Critical endpoints to test:
+GET /health
+GET /.well-known/openid-configuration
+GET /oauth/authorize (no redirect follow; only status and key headers)
+GET /robots.txt, GET /sitemap.xml
+Acceptance criteria:
+health returns 200 with basic service info.
+OIDC discovery document returns 200 with issuer, authorization_endpoint, token_endpoint, jwks_uri, scopes_supported.
+P95 TTFB ≤ 120ms for health and discovery.
+Security headers ≥ 5/6.
+No sensitive data in error responses; CORS policies reasonable for relying parties.
+Known issues to re-validate:
+None pre-loaded; verify production readiness posture.
+Fix plan guidance:
+Ensure stable JWKS caching and rotation window.
+Document token lifetimes, refresh policies.
+Optional: Add Permissions-Policy.
+Deliverables: readiness_report.md, fix_plan.yaml, matrix update.
+3. student_pilot (B2C revenue funnel)
+
+Base URL: https://student-pilot-jamarrlmayes.replit.app
+Pages to test (GET only; do not log in if it requires POST):
+/ (landing), /login, /signup, /dashboard (read-only page load), /onboarding, /matches, /profile, /scholarships, /pricing
+Acceptance criteria:
+All 9 pages load 200 with no severe console errors (record title if possible).
+Stripe in test mode is detectable via static flags or script presence (do not attempt charges).
+Health endpoint (if present) 200; main scholarships listing 200.
+P95 TTFB ≤ 120ms on root and scholarships; if slightly above, document and propose fix.
+Security headers: ≥ 5/6 and SEO meta title/description present at least on root.
+Known issues to re-validate:
+Reports conflict on headers and performance; your job is to measure and resolve inconsistency with evidence.
+Fix plan guidance:
+Add HSTS, CSP, X-Frame-Options, X-Content-Type-Options, Referrer-Policy, Permissions-Policy if missing.
+Optimize slow pages (cache API calls, static render, CDN).
+Add required meta tags.
+Deliverables: readiness_report.md, fix_plan.yaml, matrix update.
+4. provider_register (B2B onboarding)
+
+Base URL: https://provider-register-jamarrlmayes.replit.app
+Critical endpoints/pages:
+GET / (root), GET /register, GET /pricing, GET /dashboard (static shell), GET /api/health (or /health)
+Acceptance criteria:
+Root and key pages return 200; health returns 200 if present.
+OIDC redirects are not followed; only capture that endpoint exists and responds.
+P95 TTFB ≤ 120ms for root; if higher, document and propose fix.
+Security headers: ≥ 5/6.
+Known issues to re-validate:
+Missing /api/health; root ~226ms.
+Fix plan guidance:
+Add health endpoint; set caching headers for static assets; consider server-side render of critical above-the-fold content.
+Deliverables: readiness_report.md, fix_plan.yaml, matrix update.
+5. auto_page_maker (SEO engine)
+
+Base URL: https://auto-page-maker-jamarrlmayes.replit.app
+Critical endpoints/pages:
+GET / (root)
+GET /robots.txt
+GET /sitemap.xml
+Sample content page (select one linked from sitemap) GET only
+Acceptance criteria:
+robots.txt and sitemap.xml return 200 with valid content.
+At least one content page returns 200 and includes title, meta description, canonical URL, and noindex directives where appropriate.
+P95 TTFB ≤ 120ms on root and sample content.
+Security headers: ≥ 5/6.
+Known issues to re-validate:
+2 security headers missing in prior runs.
+Fix plan guidance:
+Add missing headers; verify canonical and hreflang if internationalization present; ensure sitemap partitioning if >50k URLs.
+Deliverables: readiness_report.md, fix_plan.yaml, matrix update.
+6. scholarship_api (core data API)
+
+Base URL: https://scholarship-api-jamarrlmayes.replit.app
+Critical endpoints:
+GET /health
+GET /api/v1/scholarships
+GET /api/v1/scholarships/{valid_id} (choose one from list)
+GET /api/v1/scholarships/invalid-id-999 (expect 404 structured)
+GET /robots.txt, GET /sitemap.xml
+Acceptance criteria:
+All return expected codes; list returns 200 with array and schema fields: id, name, amount, eligibility_criteria (record example).
+404 is structured with correlation_id or trace_id; no PII.
+P95 TTFB ≤ 120ms for all critical endpoints.
+Security headers: ≥ 5/6 (note Permissions-Policy if missing).
+Known issues to re-validate:
+Previously missing Permissions-Policy (non-blocking).
+Fix plan guidance:
+Add Permissions-Policy; consider ETag/Cache-Control for list endpoints; optional health TTFB optimization.
+Deliverables: readiness_report.md, fix_plan.yaml, matrix update.
+7. scholarship_agent (campaign/canary agent)
+
+Base URL: https://scholarship-agent-jamarrlmayes.replit.app
+Critical endpoints:
+GET / (root), GET /health
+GET /api/canary/summary, GET /api/canary/status, GET /api/canary/metrics (if exist)
+Acceptance criteria:
+Root and health 200 with P95 TTFB ≤ 120ms.
+Canary endpoints exist and return 200 or are documented as intentionally disabled with a clear operator flag; missing unexpectedly is a gap.
+Security headers ≥ 5/6.
+Known issues to re-validate:
+Missing 3 monitoring endpoints in prior reports. Confirm current state with evidence.
+Fix plan guidance:
+Implement or re-enable canary endpoints behind auth or feature flag; document safe-read patterns; ensure redaction for secrets.
+Deliverables: readiness_report.md, fix_plan.yaml, matrix update.
+8. scholarship_sage (advisor/chat + analytics)
+
+Base URL: https://scholarship-sage-jamarrlmayes.replit.app
+Critical endpoints/pages (GET only; do not send chats):
+GET / (root), GET /dashboard, GET /analytics, GET /api/health
+GET /api/v1/insights (read-only metrics), GET /api/v1/config, GET /ws (handshake status only if safe via GET)
+GET /robots.txt, GET /sitemap.xml
+Acceptance criteria:
+Health 200 with clear status; analytics/config endpoints 200 (or documented with devMode true and empty datasets).
+P95 TTFB ≤ 120ms across critical endpoints.
+Security headers ≥ 5/6.
+No 404s for declared public endpoints.
+Known issues to re-validate (critical if present):
+Memory 81–87% (target < 80%; preferred < 75% sustained).
+Error rate ~2.68% (target < 0.20%).
+DB P95 65–85ms (target < 50ms; preferred < 45ms).
+Redis disconnected; 2 missing endpoints causing 404s; zeroed analytics.
+Fix plan guidance (priorities and success criteria):
+P0 capacity: reduce memory to <75% sustained 30+ min; error rate <0.15% sustained; DB P95 <45ms sustained; reconnect Redis with cache hit rate >70%; restore missing endpoints to 200.
+P1 monitoring/analytics: reinstate RUM/metrics; validate dashboards.
+P2 improvements: minor config and header polish.
+Deliverables: readiness_report.md, fix_plan.yaml, matrix update.
+Execution workflow (for your app only)
+
+Identify your app using the selection protocol. Abort if ambiguous.
+Inventory endpoints as listed in your section. Perform up to 3 timed GETs per endpoint; record min/avg/P95 from your samples. Respect rate limits.
+Capture security headers for at least root, health, and one critical API.
+Validate SEO files (where relevant) and at least one content page’s basic meta tags.
+Trigger only safe invalid-id checks documented in your section to validate error handling.
+Cross-app ping (only if your section explicitly instructs it). Do not score other apps; just note connectivity latencies.
+Score your app using the rubric and determine gate impact.
+Generate artifacts:
+readiness_report.md: executive summary, evidence table, acceptance criteria status, performance/security sections, gate result, final score, and explicit next steps to reach or sustain 5/5.
+fix_plan.yaml: list fixes with fields [id, priority: P0/P1/P2, description, rationale, snippet_or_command, owner_role, eta_hours, risk_level, validation_steps, rollback_plan].
+ecosystem_readiness_matrix.csv: update or append one line with your app’s status. Preserve the header row.
+Exit cleanly. Do not modify app state. If any acceptance criterion remains ambiguous due to missing docs, mark as “needs verification” and specify the exact evidence required.
+Scoring and gates reminder
+
+Your final output must include a single readiness score (1–5) and whether your app blocks T+24h, T+48h, or T+72h.
+Revenue apps (student_pilot, provider_register) must be 5/5 to clear T+48h.
+All apps must be ≥ 4/5 by T+72h; revenue apps remain 5/5.
+Operator handoff
+
+If any required endpoint is missing, document the exact route, the expected behavior, and include a minimal code/config snippet in fix_plan.yaml to add it.
+If performance exceeds P95 120ms target, propose concrete caching/indexing/CDN steps with expected improvement and validation method.
+If a security header is missing, provide a one-liner configuration example (e.g., Express, Nginx) and explain the intended policy briefly.
+Reminder
+
+Only use the part of this prompt that applies to your app. Ignore other sections unless your section explicitly includes cross-app reachability checks. The objective is to deliver your three artifacts and an accurate line in the ecosystem_readiness_matrix.csv that decision-makers can trust.
