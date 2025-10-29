@@ -1,22 +1,22 @@
 # Universal E2E Test Framework - Quick Start
 
-**v2.1 Compact - Production-Ready for Agent3**
+**v2.1 Final Compact - Copy-Paste Ready for Agent3**
 
 ---
 
-## 🚀 How to Use (3 Steps)
+## 🚀 3-Step Workflow
 
-### **Step 1: Paste the Prompt**
+### **Step 1: Copy the System Prompt**
 
 Open: `testing/UNIVERSAL_TEST_PROMPT_CEO_APPROVED.txt`  
-Copy the **entire prompt**  
+Copy everything between **BEGIN** and **END** markers  
 Paste into **Agent3 as the system message**
 
 ### **Step 2: Run a Test**
 
 **Single app:**
 ```
-Test https://auto-com-center-jamarrlmayes.replit.app
+Test https://student-pilot-jamarrlmayes.replit.app
 ```
 
 **Gate tests:**
@@ -26,12 +26,14 @@ T+48h gate: Test Student Pilot and Provider Register
 T+72h gate: Test all apps
 ```
 
-### **Step 3: Review YAML Output**
+### **Step 3: Review YAML & Fix**
 
-Check:
+Agent3 returns YAML with:
 - `readiness_score_0_to_5` (0-5)
 - `rollout_gate_status.meets_gate` (true/false)
-- `recommended_actions` (prioritized fixes)
+- `recommended_actions` (up to 5 fixes)
+
+Fix issues and re-run until gates pass.
 
 ---
 
@@ -45,37 +47,41 @@ Check:
 
 ---
 
-## 📊 App Keys and URLs
+## 📊 App Routing (Automatic)
 
-| app_key | URL |
-|---------|-----|
-| `scholarship_api` | https://scholarship-api-jamarrlmayes.replit.app |
-| `scholarship_agent` | https://scholarship-agent-jamarrlmayes.replit.app |
-| `student_pilot` | https://student-pilot-jamarrlmayes.replit.app |
-| `provider_register` | https://provider-register-jamarrlmayes.replit.app |
-| `auto_page_maker` | https://auto-page-maker-jamarrlmayes.replit.app |
-| `scholar_auth` | https://scholar-auth-jamarrlmayes.replit.app |
-| `auto_com_center` | https://auto-com-center-jamarrlmayes.replit.app |
-| `scholarship_sage` | https://scholarship-sage-jamarrlmayes.replit.app |
+| Pattern | app_key |
+|---------|---------|
+| `scholarship-api-*.replit.app` | scholarship_api |
+| `scholarship-agent-*.replit.app` | scholarship_agent |
+| `student-pilot-*.replit.app` | student_pilot |
+| `provider-register-*.replit.app` | provider_register |
+| `auto-page-maker-*.replit.app` | auto_page_maker |
+| `scholar-auth-*.replit.app` | scholar_auth |
+| `auto-com-center-*.replit.app` | auto_com_center |
+| `scholarship-sage-*.replit.app` | scholarship_sage |
+
+Unknown host → `app_key: unknown_host` (graceful error)
 
 ---
 
-## 📊 Scoring
+## 📊 Scoring Rubric
 
-| Score | Meaning | Action |
-|-------|---------|--------|
-| **5** | ✅ Production-ready | → Proceed |
-| **4** | 🟢 Near-ready | → Proceed |
-| **3** | 🟡 Usable with issues | → Proceed with monitoring |
-| **2** | 🔴 Critical issues | → HOLD |
-| **1** | ❌ Major blockers | → STOP |
-| **0** | ❌ Not reachable | → STOP |
+| Score | Meaning |
+|-------|---------|
+| **5** | ✅ Fully production-grade (strong headers, TTFB ~120ms, zero errors) |
+| **4** | 🟢 Production-ready with minor gaps |
+| **3** | 🟡 Mostly OK (some missing headers, TTFB above target) |
+| **2** | 🔴 Unstable (missing key headers, badly over target, console errors) |
+| **1** | ❌ Barely reachable (major issues) |
+| **0** | ❌ Unreachable (DNS/TLS/HTTP failure) |
 
 ---
 
 ## ⚡ Performance Target
 
 **TTFB:** ~120ms (tracked in `evidence.http.ttfb_ms`)
+
+Flagged in notes if above target.
 
 ---
 
@@ -90,30 +96,27 @@ readiness_score_0_to_5: 5
 rollout_gate_status:
   gate: T+48h
   meets_gate: true
-  note: Revenue-ready for B2C credit purchases
+  note: Revenue-ready; all checks pass
 
 evidence:
   dns_tls: resolved/TLS-valid
   http:
     status_chain: [200]
     ttfb_ms: 94
+    content_type: text/html
   security_headers_present:
-    - HSTS
-    - CSP
+    - Strict-Transport-Security
+    - Content-Security-Policy
     - X-Frame-Options
     - X-Content-Type-Options
     - Referrer-Policy
+  robots_sitemap:
+    robots_txt: present
+    sitemap_xml: absent
   console_errors_count: 0
-  seo:
-    title: "Student Pilot - Scholarship Application Assistant"
-    description_present: true
-    canonical_present: true
-    robots_txt_accessible: true
-    sitemap_xml_accessible: false
   notes:
     - Login page loads cleanly
     - Stripe CSP configured correctly
-    - Zero console errors
     - TTFB well under 120ms target
 
 recommended_actions:
@@ -127,18 +130,7 @@ recommended_actions:
 ✅ **Methods:** GET/HEAD/OPTIONS only  
 ❌ **Forbidden:** POST/PUT/PATCH/DELETE, forms, auth, PII  
 ⏱️ **Rate limit:** ≤1 req/path/10s, ≤20 total/app  
-🔒 **Compliance:** FERPA/COPPA-aligned  
-
----
-
-## ⚠️ Special Case: Auto Com Center
-
-**Admin dashboard handling:**
-
-✅ **Available:** 200 on login page OR 302/307 redirect to login  
-❌ **Blocker:** 404 on root (score ≤2)  
-
-Focus: availability + security headers + no console errors
+🔒 **Compliance:** FERPA/COPPA-aligned (no PII collection)  
 
 ---
 
@@ -150,19 +142,27 @@ Focus: availability + security headers + no console errors
 | **T+48h** | ✅ **PASSED** (both revenue apps 5/5) 🔥 |
 | **T+72h** | ⚠️ **On Track** (6/8 ready, 2 fixes needed) |
 
+**Production-ready apps (6/8):**
+- ✅ scholarship_api (TTFB: 244ms)
+- ✅ scholarship_agent (TTFB: 103ms)
+- ✅ student_pilot (TTFB: 94ms) 🔥 B2C
+- ✅ provider_register (TTFB: 78ms) 🔥 B2B
+- ✅ auto_page_maker (TTFB: 46ms)
+- ✅ scholar_auth (TTFB: 51ms)
+
 **Needs fixes:**
-- 🔴 auto_com_center (2/5) - HTTP 404
-- ❌ scholarship_sage (0/5) - Not reachable
+- 🔴 auto_com_center (HTTP 404)
+- ❌ scholarship_sage (Not reachable)
 
 ---
 
-## 🆕 What's New in v2.1
+## 🆕 What's New in v2.1 Final
 
-✅ **120ms TTFB target** - Global performance benchmark  
-✅ **app_key standardization** - Machine-readable identifiers  
-✅ **Gate auto-expansion** - Automatic app set expansion  
-✅ **Per-app scoring** - Clear 4 vs 5 criteria  
-✅ **FERPA/COPPA compliance** - Education data safety  
+✅ **BEGIN/END markers** - Easy copy-paste  
+✅ **Wildcard routing** - `scholarship-api-*.replit.app`  
+✅ **robots_sitemap section** - Structured SEO evidence  
+✅ **Unknown host handling** - Graceful errors  
+✅ **Clearer per-app goals** - Concise module descriptions  
 
 ---
 
@@ -174,11 +174,24 @@ cd testing/reporting
 python3 generate_readiness_report.py
 ```
 
-Less comprehensive than Agent3 but fast.
+---
+
+## 💡 Ready-to-Use Commands
+
+```
+Single apps:
+  Test https://scholarship-api-jamarrlmayes.replit.app
+  Test https://student-pilot-jamarrlmayes.replit.app
+
+Gates:
+  T+24h gate: Test Scholarship API and Scholarship Agent
+  T+48h gate: Test Student Pilot and Provider Register
+  T+72h gate: Test all apps
+```
 
 ---
 
-**Version:** 2.1 (CEO-Approved Final Compact)  
+**Version:** 2.1 Final Compact (CEO-Approved)  
 **Performance:** 120ms TTFB target  
 **Compliance:** FERPA/COPPA-aligned  
-**Output:** YAML with app_key
+**Output:** Standardized YAML with app_key
