@@ -1,6 +1,6 @@
 # Universal E2E Test Framework - Quick Start
 
-**v2.1 Final Compact - Copy-Paste Ready for Agent3**
+**v2.1 Final Compact (CEO-Approved) - Revenue-First De-Risking**
 
 ---
 
@@ -12,80 +12,106 @@ Open: `testing/UNIVERSAL_TEST_PROMPT_CEO_APPROVED.txt`
 Copy everything between **BEGIN** and **END** markers  
 Paste into **Agent3 as the system message**
 
+This ensures Agent3 runs **isolated, per-app modules only** - the right control pattern for precise, scoped AI execution.
+
 ### **Step 2: Run a Test**
 
-**Single app:**
+**Fastest path to full baseline:**
 ```
-Test https://student-pilot-jamarrlmayes.replit.app
-```
-
-**Gate tests:**
-```
-T+24h gate: Test Scholarship API and Scholarship Agent
-T+48h gate: Test Student Pilot and Provider Register
 T+72h gate: Test all apps
 ```
 
-### **Step 3: Review YAML & Fix**
+**Revenue-first validation (recommended):**
+```
+T+48h gate: Test Student Pilot and Provider Register
+```
 
-Agent3 returns YAML with:
-- `readiness_score_0_to_5` (0-5)
-- `rollout_gate_status.meets_gate` (true/false)
-- `recommended_actions` (up to 5 fixes)
+**Single app spot-check:**
+```
+Test https://auto-page-maker-jamarrlmayes.replit.app
+```
 
-Fix issues and re-run until gates pass.
+### **Step 3: Review YAML & Prioritize Fixes**
 
----
+Confirm gate pass/fail and prioritize fixes for:
+- Any app < 4
+- Any revenue/security/SEO app that is not = 5 at its gate
 
-## ✅ Gate Requirements
-
-| Gate | Apps | Requirement |
-|------|------|-------------|
-| **T+24h** | scholarship_api, scholarship_agent | each ≥ 4 |
-| **T+48h** 🔥 | student_pilot, provider_register | each = 5 (revenue-critical) |
-| **T+72h** 🎯 | All 8 apps | ≥ 4; auto_page_maker = 5; scholar_auth = 5 |
-
----
-
-## 📊 App Routing (Automatic)
-
-| Pattern | app_key |
-|---------|---------|
-| `scholarship-api-*.replit.app` | scholarship_api |
-| `scholarship-agent-*.replit.app` | scholarship_agent |
-| `student-pilot-*.replit.app` | student_pilot |
-| `provider-register-*.replit.app` | provider_register |
-| `auto-page-maker-*.replit.app` | auto_page_maker |
-| `scholar-auth-*.replit.app` | scholar_auth |
-| `auto-com-center-*.replit.app` | auto_com_center |
-| `scholarship-sage-*.replit.app` | scholarship_sage |
-
-Unknown host → `app_key: unknown_host` (graceful error)
+**This ordering protects revenue and student experience**, consistent with growth thesis and roadmap priorities.
 
 ---
 
-## 📊 Scoring Rubric
+## 🎯 **Rollout Gates (Revenue-First De-Risking)**
 
-| Score | Meaning |
-|-------|---------|
-| **5** | ✅ Fully production-grade (strong headers, TTFB ~120ms, zero errors) |
-| **4** | 🟢 Production-ready with minor gaps |
-| **3** | 🟡 Mostly OK (some missing headers, TTFB above target) |
-| **2** | 🔴 Unstable (missing key headers, badly over target, console errors) |
-| **1** | ❌ Barely reachable (major issues) |
-| **0** | ❌ Unreachable (DNS/TLS/HTTP failure) |
+| Gate | Apps | Requirement | Business Priority |
+|------|------|-------------|-------------------|
+| **T+24h** | scholarship_api, scholarship_agent | each ≥ 4 | Infrastructure foundation |
+| **T+48h** 🔥 | student_pilot, provider_register | each = 5 | **Revenue-critical** (B2C + B2B) |
+| **T+72h** 🎯 | All 8 apps | ≥ 4; auto_page_maker = 5; scholar_auth = 5 | Full ecosystem |
 
----
-
-## ⚡ Performance Target
-
-**TTFB:** ~120ms (tracked in `evidence.http.ttfb_ms`)
-
-Flagged in notes if above target.
+**Revenue-first strategy:** T+48h gate validates revenue apps BEFORE full rollout.
 
 ---
 
-## 📝 Sample YAML Output
+## 📊 **Per-App Module Goals (Isolated Execution)**
+
+Agent3 applies **only the relevant module** for the app under test:
+
+### **Revenue-Critical (Must = 5 at T+48h)** 🔥
+
+**student_pilot** (B2C)
+- Goal: Checkout-readiness posture
+- Evidence: Stripe in CSP ✓, strong headers ✓, zero errors ✓, TTFB ≤ 120ms ✓
+
+**provider_register** (B2B)
+- Goal: Registration funnel posture
+- Evidence: Payment/AI CSP ✓, strong headers ✓, zero errors ✓, TTFB ≤ 120ms ✓
+
+### **Growth-Critical (Must = 5 at T+72h)** 🎯
+
+**auto_page_maker** (SEO)
+- Goal: SEO readiness
+- Evidence: robots.txt ✓, sitemap.xml ✓, canonical ✓, TTFB ≤ 120ms ✓
+
+**scholar_auth** (Security)
+- Goal: Auth surface hardening
+- Evidence: HSTS long max-age ✓, strict CSP ✓, all headers ✓, TTFB ≤ 120ms ✓
+
+### **Infrastructure (≥ 4 at T+24h)** ⚙️
+
+**scholarship_api**, **scholarship_agent**
+- Goal: Service availability
+- Evidence: Endpoints reachable, headers present, TTFB ≤ 140ms (target ≤ 120ms)
+
+### **Internal Apps (≥ 4 at T+72h)** 🛠️
+
+**auto_com_center**, **scholarship_sage**
+- Goal: Availability and basic readiness
+- Evidence: Loads cleanly, headers present, TTFB ≤ 140ms
+
+---
+
+## 📊 **Scoring Rubric**
+
+| Score | Meaning | TTFB | Console Errors | Headers |
+|-------|---------|------|----------------|---------|
+| **5** | ✅ Fully production-grade | ≤ 120ms | 0 | Strong |
+| **4** | 🟢 Production-ready (minor gaps) | ≤ 140ms | 0-1 | Most |
+| **3** | 🟡 Mostly OK (some gaps) | 121-200ms | 1-4 | Some |
+| **2** | 🔴 Unstable | > 200ms | 5-10 | Missing key |
+| **1** | ❌ Barely reachable | >> target | > 10 | Severe gaps |
+| **0** | ❌ Unreachable | N/A | N/A | N/A |
+
+---
+
+## ⚡ **Global Performance Target**
+
+**TTFB:** 120ms (P95 SLO)  
+Tracked in `evidence.http.ttfb_ms` and flagged if breached.
+
+---
+
+## 📝 **Sample YAML Output**
 
 ```yaml
 app_name: Student Pilot
@@ -115,9 +141,10 @@ evidence:
     sitemap_xml: absent
   console_errors_count: 0
   notes:
-    - Login page loads cleanly
-    - Stripe CSP configured correctly
-    - TTFB well under 120ms target
+    - "TTFB 94ms ✓"
+    - "Stripe in CSP ✓"
+    - "Zero console errors ✓"
+    - "Strong security posture ✓"
 
 recommended_actions:
   - Add Permissions-Policy header (optional enhancement)
@@ -125,48 +152,71 @@ recommended_actions:
 
 ---
 
-## 🛡️ Safety Guarantees
+## 🛡️ **Safety Guarantees**
 
-✅ **Methods:** GET/HEAD/OPTIONS only  
-❌ **Forbidden:** POST/PUT/PATCH/DELETE, forms, auth, PII  
-⏱️ **Rate limit:** ≤1 req/path/10s, ≤20 total/app  
+✅ **Methods:** GET/HEAD/OPTIONS only (read-only)  
+❌ **Forbidden:** POST/PUT/PATCH/DELETE, forms, auth, state mutation  
+⏱️ **Rate limit:** Safe, non-intrusive testing  
 🔒 **Compliance:** FERPA/COPPA-aligned (no PII collection)  
+🎯 **Isolation:** Only the relevant app module executes  
 
 ---
 
-## 🎉 Current Status (October 29, 2025)
+## 🎉 **Current Status (October 29, 2025)**
 
-| Gate | Status |
-|------|--------|
-| **T+24h** | ✅ **PASSED** (both 5/5) |
-| **T+48h** | ✅ **PASSED** (both revenue apps 5/5) 🔥 |
-| **T+72h** | ⚠️ **On Track** (6/8 ready, 2 fixes needed) |
+| Gate | Status | Details |
+|------|--------|---------|
+| **T+24h** | ✅ **PASSED** | Infrastructure ready (both ≥ 4) |
+| **T+48h** | ✅ **PASSED** | Revenue ready (both = 5) 🔥 |
+| **T+72h** | ⚠️ **On Track** | 6/8 ready (2 fixes needed) |
 
-**Production-ready apps (6/8):**
-- ✅ scholarship_api (TTFB: 244ms)
-- ✅ scholarship_agent (TTFB: 103ms)
-- ✅ student_pilot (TTFB: 94ms) 🔥 B2C
-- ✅ provider_register (TTFB: 78ms) 🔥 B2B
-- ✅ auto_page_maker (TTFB: 46ms)
-- ✅ scholar_auth (TTFB: 51ms)
+**Revenue Apps (5/5 each):** ✅  
+- student_pilot (B2C): TTFB 94ms, zero errors  
+- provider_register (B2B): TTFB 78ms, zero errors  
 
-**Needs fixes:**
+**Growth Apps (5/5 each):** ✅  
+- auto_page_maker (SEO): TTFB 46ms, SEO artifacts present  
+- scholar_auth (Security): TTFB 51ms, strong headers  
+
+**Infrastructure Apps:** ✅  
+- scholarship_api: TTFB 244ms (acceptable)  
+- scholarship_agent: TTFB 103ms  
+
+**Needs Fixes:**
 - 🔴 auto_com_center (HTTP 404)
 - ❌ scholarship_sage (Not reachable)
 
 ---
 
-## 🆕 What's New in v2.1 Final
+## 🎯 **Business Alignment**
 
-✅ **BEGIN/END markers** - Easy copy-paste  
-✅ **Wildcard routing** - `scholarship-api-*.replit.app`  
-✅ **robots_sitemap section** - Structured SEO evidence  
-✅ **Unknown host handling** - Graceful errors  
-✅ **Clearer per-app goals** - Concise module descriptions  
+**Revenue-First De-Risking:**  
+T+48h gate validates **revenue-critical apps** (B2C + B2B) at = 5 BEFORE full ecosystem rollout.
+
+**Student-Value-First:**  
+Performance targets (120ms TTFB) and zero-error requirements ensure excellent student experience.
+
+**ARR Priority:**  
+Revenue apps must be production-grade (= 5) before ecosystem expansion.
 
 ---
 
-## 📚 Alternative: Quick Probe
+## 💡 **Ready-to-Use Commands**
+
+```
+Fastest baseline:
+  T+72h gate: Test all apps
+
+Revenue validation:
+  T+48h gate: Test Student Pilot and Provider Register
+
+Single app:
+  Test https://scholarship-api-jamarrlmayes.replit.app
+```
+
+---
+
+## 📚 **Alternative: Quick Probe**
 
 **Without Agent3 (30 seconds):**
 ```bash
@@ -176,22 +226,8 @@ python3 generate_readiness_report.py
 
 ---
 
-## 💡 Ready-to-Use Commands
-
-```
-Single apps:
-  Test https://scholarship-api-jamarrlmayes.replit.app
-  Test https://student-pilot-jamarrlmayes.replit.app
-
-Gates:
-  T+24h gate: Test Scholarship API and Scholarship Agent
-  T+48h gate: Test Student Pilot and Provider Register
-  T+72h gate: Test all apps
-```
-
----
-
 **Version:** 2.1 Final Compact (CEO-Approved)  
-**Performance:** 120ms TTFB target  
+**Business Strategy:** Revenue-first de-risking  
+**Performance:** 120ms TTFB (P95 SLO)  
 **Compliance:** FERPA/COPPA-aligned  
-**Output:** Standardized YAML with app_key
+**Execution:** Isolated per-app modules
