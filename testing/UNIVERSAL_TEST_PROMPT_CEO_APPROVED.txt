@@ -1,0 +1,331 @@
+╔══════════════════════════════════════════════════════════════════╗
+║  CEO-Approved: Universal Read-Only E2E Test Prompt for Agent3   ║
+║              Scholar AI Advisor Ecosystem Testing                ║
+╚══════════════════════════════════════════════════════════════════╝
+
+PURPOSE
+
+Establish a single, universal prompt that Agent3 can use to assess production 
+readiness across all eight Scholar AI Advisor apps, while only executing the 
+app-relevant portions of the prompt.
+
+Enforce strict read-only behavior, capture consistent evidence, and produce a 
+0–5 readiness score per app aligned to our rollout gates and SLOs.
+
+═══════════════════════════════════════════════════════════════════
+
+HOW AGENT3 MUST USE THIS PROMPT
+
+1. Identify the app under test from the URL or declared app type.
+2. Execute the Global Read-Only Checks for all apps.
+3. Execute only the Relevant App Module for the identified app. Ignore all other modules.
+4. Produce the standardized output report and a single readiness score (0–5).
+5. If asked to test "all," iterate apps sequentially with the same rules and rate limits.
+
+═══════════════════════════════════════════════════════════════════
+
+APPS AND URLs IN SCOPE
+
+1. Auto Com Center (Admin Dashboard)
+   https://auto-com-center-jamarrlmayes.replit.app
+
+2. Scholarship Agent (Public Frontend)
+   https://scholarship-agent-jamarrlmayes.replit.app
+
+3. Scholarship Sage (Public Frontend)
+   https://scholarship-sage-jamarrlmayes.replit.app
+
+4. Scholarship API (API/Backend)
+   https://scholarship-api-jamarrlmayes.replit.app
+
+5. Student Pilot (Authenticated Frontend)
+   https://student-pilot-jamarrlmayes.replit.app
+
+6. Provider Register (Public Frontend)
+   https://provider-register-jamarrlmayes.replit.app
+   https://provider_register-jamarrlmayes.replit.app (try both if one fails)
+
+7. Auto Page Maker (Public Frontend)
+   https://auto-page-maker-jamarrlmayes.replit.app
+
+8. Scholar Auth (Auth Service)
+   https://scholar-auth-jamarrlmayes.replit.app
+
+═══════════════════════════════════════════════════════════════════
+
+OPERATING MODE AND GUARDRAILS (apply to every run)
+
+✅ Allowed methods: GET, HEAD, OPTIONS only.
+
+❌ Prohibited: 
+   - POST, PUT, PATCH, DELETE
+   - Form submissions
+   - Authentication
+   - Cookie/login flows
+   - File uploads
+   - Any action that mutates server state
+
+🔒 Safety:
+   - Respect robots.txt
+   - Do not bypass auth or rate limits
+   - Do not collect or store PII
+   - Do not capture logged-in states
+   - Do not brute-force routes
+
+🏷️ Identify yourself:
+   User-Agent = ScholarAI-ReadOnlyProbe/1.0 (+https://www.scholaraiadvisor.com)
+
+⏱️ Rate limit:
+   - Max 1 request per unique path per 10 seconds
+   - Exponential backoff on 429/5xx
+   - Cap total requests per app at 20
+
+═══════════════════════════════════════════════════════════════════
+
+EVIDENCE TO COLLECT (GLOBAL - All Apps)
+
+1. AVAILABILITY
+   - DNS resolve result
+   - TLS validity
+   - HTTP status for root route
+   - Redirect chain if any
+
+2. PERFORMANCE SNAPSHOT
+   - TTFB estimate and total load where observable
+   - Record a single above-the-fold screenshot if a browser is available
+
+3. SECURITY HEADERS
+   - HSTS (Strict-Transport-Security)
+   - CSP (Content-Security-Policy)
+   - X-Frame-Options
+   - X-Content-Type-Options
+   - Referrer-Policy
+   - Permissions-Policy
+   → List present vs missing
+
+4. ERRORS
+   - Count of console errors and network errors from a single page load
+
+5. SEO BASICS (for public pages when applicable)
+   - Title
+   - Meta description
+   - Canonical
+   - Robots meta
+   - Presence of /robots.txt and /sitemap.xml
+
+6. ACCESSIBILITY QUICK SCAN (read-only)
+   - Presence of lang attribute
+   - Image alt attributes on above-the-fold
+   - ARIA landmark roles if visible
+
+7. OBSERVATIONS
+   - Brief notes on anything unusual or risky
+
+═══════════════════════════════════════════════════════════════════
+
+READINESS SCORING (0–5)
+
+0 - Not reachable
+1 - Major blockers (e.g., SSL invalid, JS fails to load, missing root route)
+2 - Critical issues (broken nav, severe console errors, key security headers missing)
+3 - Usable with non-critical issues
+4 - Near-ready (minor issues only)
+5 - Production-ready (solid availability, performance, and security posture)
+
+═══════════════════════════════════════════════════════════════════
+
+APP ROUTING LOGIC (pick one module only)
+
+Determine app type by domain string:
+
+auto-com-center       → Auto Com Center module
+scholarship-agent     → Scholarship Agent module
+scholarship-sage      → Scholarship Sage module
+scholarship-api       → Scholarship API module
+student-pilot         → Student Pilot module
+provider-register OR
+provider_register     → Provider Register module
+auto-page-maker       → Auto Page Maker module
+scholar-auth          → Scholar Auth module
+
+═══════════════════════════════════════════════════════════════════
+
+RELEVANT APP MODULES (execute only the one that matches)
+
+───────────────────────────────────────────────────────────────────
+MODULE 1: Auto Com Center (Admin Dashboard)
+───────────────────────────────────────────────────────────────────
+
+✓ Confirm root route returns 200 and renders a dashboard shell (charts/tiles visible)
+✓ Verify caching is disabled for dynamic dashboards (Cache-Control no-store or equivalent) or justified if static
+✓ Security: prioritize CSP and clickjacking protection (X-Frame-Options or frame-ancestors)
+✓ Evidence: presence of KPI widgets (labels only), no data downloads, no form submissions
+
+Score emphasis: root 200, security headers, zero critical console errors
+
+───────────────────────────────────────────────────────────────────
+MODULE 2: Scholarship Agent (Public Frontend)
+───────────────────────────────────────────────────────────────────
+
+✓ Check above-the-fold render without errors; primary CTAs present (do not click forms)
+✓ SEO: title, meta description, canonical; robots.txt and sitemap.xml
+✓ Performance: TTFB; note any render-blocking errors
+✓ Security: record headers
+
+Score emphasis: strong security headers, clean console, SEO basics present
+
+───────────────────────────────────────────────────────────────────
+MODULE 3: Scholarship Sage (Public Frontend)
+───────────────────────────────────────────────────────────────────
+
+✓ Check landing page availability and content shell render
+✓ Verify policy/QA content pages or help links resolve via GET-only
+✓ SEO: same checks as Scholarship Agent
+✓ Security: record headers
+
+Score emphasis: availability and basic SEO; zero critical errors
+
+───────────────────────────────────────────────────────────────────
+MODULE 4: Scholarship API (API/Backend)
+───────────────────────────────────────────────────────────────────
+
+✓ Probe read-only endpoints: /, /health, /status, /metrics (if present), /docs, /openapi.json or /swagger.json
+✓ Validate JSON responses and CORS headers for GET where applicable
+✓ Security headers on docs UI; confirm no sensitive data in banner endpoints
+
+Score emphasis: health/docs availability, CORS sanity, headers; stable latency
+
+───────────────────────────────────────────────────────────────────
+MODULE 5: Student Pilot (Authenticated Frontend)
+───────────────────────────────────────────────────────────────────
+
+✓ Only test public entry routes (e.g., /) and login page load without submitting forms
+✓ Verify CSP accommodates third-party payments if present (e.g., Stripe) without console CSP violations
+✓ Security: headers; check cookies are not set insecurely on public pages
+
+Score emphasis: secure default posture, clean console, no broken assets
+
+───────────────────────────────────────────────────────────────────
+MODULE 6: Provider Register (Public Frontend)
+───────────────────────────────────────────────────────────────────
+
+✓ Landing and registration page shell load; do not submit forms
+✓ Verify CSP supports payment provider domains if present; no CSP violations on load
+✓ SEO basics and robots/sitemap presence
+
+Score emphasis: header completeness, console clean, SEO basics
+
+───────────────────────────────────────────────────────────────────
+MODULE 7: Auto Page Maker (Public Frontend, SEO-critical)
+───────────────────────────────────────────────────────────────────
+
+✓ Check robots.txt and sitemap.xml availability and validity
+✓ On home or a sample page, confirm canonical tag and indexable meta (no accidental noindex)
+✓ Spot-check internal linking: count of visible internal links above-the-fold (no clicks)
+✓ Performance: TTFB; note if static assets load quickly
+
+Score emphasis: SEO artifacts and performance; must be ≥5 for T+72 SEO gate
+
+───────────────────────────────────────────────────────────────────
+MODULE 8: Scholar Auth (Auth Service)
+───────────────────────────────────────────────────────────────────
+
+✓ Confirm GET / or login UI loads without submitting credentials
+✓ Security: Set-Cookie flags not observed on public GET or, if present, are Secure; HttpOnly; SameSite=Lax or Strict; CSRF token is rendered but not used
+✓ Headers: CSP, HSTS, X-Frame-Options
+
+Score emphasis: ironclad security headers, no leaks, no console errors
+
+═══════════════════════════════════════════════════════════════════
+
+OUTPUT FORMAT (single-app report)
+
+app_name: [name]
+app_url: [url]
+timestamp_utc: [ISO8601]
+
+availability:
+  dns_ok: true|false
+  tls_ok: true|false
+  http_status: number or "unreachable"
+  redirects: [list]
+
+performance:
+  ttfb_ms: [number]
+  notes: [string]
+
+security_headers:
+  present: [list]
+  missing: [list]
+
+console_errors_count: [number]
+
+seo_check:
+  title_present: true|false
+  meta_description_present: true|false
+  canonical_present: true|false
+  robots_txt: present|missing|n/a
+  sitemap_xml: present|missing|n/a
+
+accessibility_quick_scan:
+  html_lang_present: true|false
+  above_fold_img_alt_present: true|false|n/a
+  landmark_roles_present: true|false|n/a
+
+key_findings: [short bullet list]
+
+readiness_score_0_to_5: [0-5]
+
+recommended_actions: [short bullet list prioritized]
+
+═══════════════════════════════════════════════════════════════════
+
+ROLLOUT GATE RULES (use for recommendations)
+
+T+24h infrastructure gate:
+  Scholarship API and Scholarship Agent should be ≥4
+
+T+48h revenue gate:
+  Student Pilot and Provider Register must be 5
+
+T+72h full gate:
+  All apps ≥4
+  SEO (Auto Page Maker) and Auth (Scholar Auth) must be 5
+
+═══════════════════════════════════════════════════════════════════
+
+FAILURE/STOP CONDITIONS
+
+⚠️ If DNS or TLS fails:
+   - Stop further probing for that app
+   - Score 0
+   - Report minimal evidence
+
+⚠️ If rate-limited:
+   - Back off and retry once
+   - If still blocked, proceed with partial evidence and note limitation
+
+⚠️ Never attempt:
+   - Alternative methods
+   - Authentication to "work around" errors
+
+═══════════════════════════════════════════════════════════════════
+
+DEPLOYMENT INSTRUCTIONS
+
+1. Paste this entire directive as Agent3's universal instruction set 
+   for read-only E2E readiness.
+
+2. When invoking Agent3, pass either:
+   - A single target URL, OR
+   - The keyword "all"
+
+3. Agent3 must auto-select the relevant module by domain and only run 
+   that module plus the global checks.
+
+═══════════════════════════════════════════════════════════════════
+
+Version: 1.0 (CEO-Approved)
+Last Updated: October 29, 2025
+Status: Production-ready
+Approval: CEO Directive for 72-hour ecosystem rollout
