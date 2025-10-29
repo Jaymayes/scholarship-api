@@ -1,0 +1,71 @@
+Universal Read-Only E2E Test Prompt for Agent3
+
+Prime Objective
+
+Evaluate the readiness of each Scholar AI Advisor app for production by running only read-only, non-mutating tests.
+Do not change any data, configuration, or state. Do not submit forms, perform POST/PUT/PATCH/DELETE requests, or trigger side effects.
+Produce a structured report of findings and a readiness score for each app.
+
+Scope
+
+Auto Com Center: https://auto-com-center-jamarrlmayes.replit.app
+Scholarship Agent: https://scholarship-agent-jamarrlmayes.replit.app
+Scholarship Sage: https://scholarship-sage-jamarrlmayes.replit.app
+Scholarship API: https://scholarship-api-jamarrlmayes.replit.app
+Student Pilot: https://student-pilot-jamarrlmayes.replit.app
+Provider Register: https://provider-register-jamarrlmayes.replit.app
+Auto Page Maker: https://auto-page-maker-jamarrlmayes.replit.app
+Scholar Auth: https://scholar-auth-jamarrlmayes.replit.app
+
+Instructions: use only the relevant section per app
+
+Frontend Web App (public): Auto Page Maker, Scholarship Agent, Scholarship Sage, Provider Register
+Frontend Web App (authenticated): Student Pilot
+API/Backend Service: Scholarship API
+Auth Service: Scholar Auth
+Internal/Admin Dashboard: Auto Com Center
+
+Global read-only guardrails
+
+Allowed HTTP methods: GET, HEAD, OPTIONS only.
+Do not authenticate or submit any credentials unless explicit test-only credentials are provided.
+Do not submit any forms; intercept and prevent all form submissions.
+Treat 3xx responses as success if navigation completes.
+Capture screenshots and headers for evidence; collect console errors. Do not store PII.
+
+Core evidence to collect (every app)
+
+Availability: HTTP status (200–399), DNS/TLS reachable
+Performance: client-side TTFB and DOMContentLoaded timing (best effort)
+Console errors: count and examples
+Security headers: HSTS, CSP, X-Frame-Options, X-Content-Type-Options, Referrer-Policy, Permissions-Policy
+SEO (public pages): title, meta description, canonical, robots meta, robots.txt, sitemap.xml
+Accessibility spot-check: main landmarks, alt attributes for above-the-fold images
+
+Per-app relevant checks
+
+Public frontend: landing loads <~3s, no blocking console errors, basic SEO present, key GET-only nav works, no mixed-content
+Authenticated frontend: login UI visible, protected routes redirect to login, privacy/terms visible
+API service: GET /, /health, /status, /metrics (read-only), OpenAPI doc accessible, CORS headers reasonable, JSON types correct
+Auth service: login UI loads, reset/signup links visible, cookies flags (Secure, HttpOnly, SameSite) if set, CSRF token present (no submission)
+Internal/Admin: dashboard loads, read-only sections render, charts render without console errors
+
+Deliverables
+
+App-by-app report: Availability, Perf snapshot, Security headers, Console errors, SEO/accessibility as applicable
+Issues: categorized High/Medium/Low
+Readiness score (0–5): 0 Not reachable; 1 Major blockers; 2 Critical issues; 3 Usable non-critical issues; 4 Near-ready; 5 Production-ready
+
+How to execute
+
+Use the provided bundle:
+Frontend smoke via Playwright: frontend/tests/smoke.spec.js
+Backend read-only checks via pytest: backend/tests/test_readonly_endpoints.py
+Initial readiness probe: reporting/generate_readiness_report.py
+Run on a workstation with internet access.
+Export findings into reporting/report_template.md as report_<YYYYMMDD_HHMM>.md
+Do not attempt POST/PUT/PATCH/DELETE.
+
+Output format
+
+Single Markdown report with summary table, per-app evidence, and final readiness scores. No changes proposed—report only.

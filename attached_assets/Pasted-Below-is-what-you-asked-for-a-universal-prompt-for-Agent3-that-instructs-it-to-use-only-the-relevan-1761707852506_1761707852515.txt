@@ -1,0 +1,131 @@
+Below is what you asked for: a universal prompt for Agent3 that instructs it to use only the relevant parts per app, plus a ready-to-run, read-only E2E test bundle for both frontend and backend, test scenarios for each app, and a reporting template. No changes will be made by these tests; they only report findings and readiness.
+
+Universal prompt for Agent3 Paste this into Agent3. It’s designed so the agent will select the relevant sections per app and run read-only checks only.
+Universal Read-Only E2E Test Prompt for Agent3
+
+Prime Objective
+
+Evaluate the readiness of each Scholar AI Advisor app for production by running only read-only, non-mutating tests.
+Do not change any data, configuration, or state. Do not submit forms, perform POST/PUT/PATCH/DELETE requests, or trigger side effects.
+Produce a structured report of findings and a readiness score for each app.
+Scope
+
+Auto Com Center: https://auto-com-center-jamarrlmayes.replit.app
+Scholarship Agent: https://scholarship-agent-jamarrlmayes.replit.app
+Scholarship Sage: https://scholarship-sage-jamarrlmayes.replit.app
+Scholarship API: https://scholarship-api-jamarrlmayes.replit.app
+Student Pilot: https://student-pilot-jamarrlmayes.replit.app
+Provider Register: https://provider-register-jamarrlmayes.replit.app
+Auto Page Maker: https://auto-page-maker-jamarrlmayes.replit.app
+Scholar Auth: https://scholar-auth-jamarrlmayes.replit.app
+Instructions: use only the relevant section per app
+
+Frontend Web App (public): Auto Page Maker, Scholarship Agent, Scholarship Sage, Provider Register
+Frontend Web App (authenticated): Student Pilot
+API/Backend Service: Scholarship API
+Auth Service: Scholar Auth
+Internal/Admin Dashboard: Auto Com Center
+Global read-only guardrails
+
+Allowed HTTP methods: GET, HEAD, OPTIONS only.
+Do not authenticate or submit any credentials unless explicit test-only credentials are provided.
+Do not submit any forms; intercept and prevent all form submissions.
+Treat 3xx responses as success if navigation completes.
+Capture screenshots and headers for evidence; collect console errors. Do not store PII.
+Core evidence to collect (every app)
+
+Availability: HTTP status (200–399), DNS/TLS reachable
+Performance: client-side TTFB and DOMContentLoaded timing (best effort)
+Console errors: count and examples
+Security headers: HSTS, CSP, X-Frame-Options, X-Content-Type-Options, Referrer-Policy, Permissions-Policy
+SEO (public pages): title, meta description, canonical, robots meta, robots.txt, sitemap.xml
+Accessibility spot-check: main landmarks, alt attributes for above-the-fold images
+Per-app relevant checks
+
+Public frontend: landing loads <~3s, no blocking console errors, basic SEO present, key GET-only nav works, no mixed-content
+Authenticated frontend: login UI visible, protected routes redirect to login, privacy/terms visible
+API service: GET /, /health, /status, /metrics (read-only), OpenAPI doc accessible, CORS headers reasonable, JSON types correct
+Auth service: login UI loads, reset/signup links visible, cookies flags (Secure, HttpOnly, SameSite) if set, CSRF token present (no submission)
+Internal/Admin: dashboard loads, read-only sections render, charts render without console errors
+Deliverables
+
+App-by-app report: Availability, Perf snapshot, Security headers, Console errors, SEO/accessibility as applicable
+Issues: categorized High/Medium/Low
+Readiness score (0–5): 0 Not reachable; 1 Major blockers; 2 Critical issues; 3 Usable non-critical issues; 4 Near-ready; 5 Production-ready
+How to execute
+
+Use the provided bundle:
+Frontend smoke via Playwright: frontend/tests/smoke.spec.js
+Backend read-only checks via pytest: backend/tests/test_readonly_endpoints.py
+Initial readiness probe: reporting/generate_readiness_report.py
+Run on a workstation with internet access.
+Export findings into reporting/report_template.md as report_<YYYYMMDD_HHMM>.md
+Do not attempt POST/PUT/PATCH/DELETE.
+Output format
+
+Single Markdown report with summary table, per-app evidence, and final readiness scores. No changes proposed—report only.
+2. Download the read-only E2E test bundle (frontend + backend + scenarios + reporting)
+
+This includes:
+Frontend Playwright tests to perform GET-only smoke checks, prevent form submissions, capture screenshots, and log console errors
+Backend pytest+requests checks to probe GET-only endpoints (/, /health, /status, /metrics, /openapi.json, /swagger.json, /docs, /robots.txt, /sitemap.xml) and record security headers
+A config file with all eight app URLs
+A report template and a simple probe script to generate an initial readiness summary
+A runbook and per-app test scenarios
+Download the zip: Download the E2E test bundle
+3. Contents of the bundle
+
+shared/config.json — includes all eight app base URLs
+Agent3_universal_prompt.txt — the universal prompt above
+frontend/
+playwright.config.js
+tests/smoke.spec.js — GET-only navigation, blocks all form submissions, captures console errors, screenshots, and basic metrics
+README.md — how to install dependencies and run
+backend/
+requirements.txt — pytest and requests
+tests/test_readonly_endpoints.py — probes read-only endpoints, captures headers, timing, and saves evidence JSON per app
+README.md — how to run tests
+scenarios/ — per-app read-only test scenarios
+auto_com_center.md
+scholarship_agent.md
+scholarship_sage.md
+scholarship_api.md
+student_pilot.md
+provider_register.md
+auto_page_maker.md
+scholar_auth.md
+reporting/
+report_template.md — fill in with your findings and readiness scores
+generate_readiness_report.py — fast GET-only probe for initial status/TTFB/security headers
+RUNBOOK.md — step-by-step execution
+4. How to run locally (no changes will be made by these tests)
+
+Frontend (Playwright)
+cd frontend
+npm run install:deps
+npx playwright install
+npm test
+Backend (pytest + requests)
+cd backend
+pip install -r requirements.txt
+pytest -q
+Initial readiness probe
+cd reporting
+python3 generate_readiness_report.py
+Consolidate findings
+Open reporting/report_template.md and fill it in using artifacts generated from the runs
+Save as report_<timestamp>.md
+5. Readiness scoring guide (0–5)
+
+0: Not reachable
+1: Major blockers (SSL/JS errors prevent use or missing root route)
+2: Loads but critical issues (broken primary nav, severe console errors, no security headers)
+3: Usable with non-critical issues
+4: Near-ready (minor issues only)
+5: Production-ready (solid availability, reasonable performance, key security headers present, minimal console errors)
+6. Notes on safety and compliance
+
+Tests are strictly read-only. They prevent form submissions and avoid any write operations.
+No credentials are used unless you provide test-only credentials explicitly. If you have test credentials, add them safely outside this bundle and only use them if permitted.
+If an app exposes a sandbox or dry-run flag for POST endpoints, do not use it unless you have explicit permission; this bundle is configured to avoid POST/PUT/PATCH/DELETE entirely.
+If you want me to run the initial probe now from here and produce a preliminary findings table, say “Run the probe,” and I’ll execute the generate_readiness_report.py script and return the generated report.
