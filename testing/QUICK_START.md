@@ -1,25 +1,25 @@
 # Universal E2E Test Framework - Quick Start
 
-**One-Page Runbook for Operators**
+**Operator Guide for v2.1 Compact Prompt**
 
 ---
 
 ## 🚀 Test Any App in 5 Steps
 
-### **Step 1: Paste the Prompt**
+### **Step 1: Copy the Universal Prompt**
 
 Open: `testing/UNIVERSAL_TEST_PROMPT_CEO_APPROVED.txt`  
-Copy the entire file  
+Copy the entire "UNIVERSAL READ-ONLY E2E TEST PROMPT" section  
 Paste into **Agent3 as the system message**
 
-### **Step 2: Test a Single App by URL**
+### **Step 2: Run a Single App Test**
 
 **Example:**
 ```
 Test https://scholarship-api-jamarrlmayes.replit.app
 ```
 
-### **Step 3: Test by Rollout Gate**
+### **Step 3: Run Gate Tests**
 
 **Examples:**
 ```
@@ -28,21 +28,22 @@ T+48h gate: Test Student Pilot and Provider Register
 T+72h gate: Test all apps
 ```
 
-### **Step 4: Review Each YAML Report**
+### **Step 4: Review YAML Outputs**
 
-Check:
+Confirm:
 - `readiness_score_0_to_5`
 - `rollout_gate_status.meets_gate`
-- Top `recommended_actions`
+- Skim `evidence` and apply `recommended_actions`
 
-### **Step 5: Fix and Re-test**
+### **Step 5: Fix and Retest**
 
-Address critical issues (scores 0–2) first.  
-Re-run until gate criteria pass.
+- Address any app scoring 0–2 **immediately**
+- For **T+48h**: ensure Student Pilot and Provider Register each score **5**
+- For **T+72h**: ensure all apps ≥4, Auto Page Maker =5, Scholar Auth =5
 
 ---
 
-## ✅ Gate Criteria
+## ✅ Gate Pass Criteria
 
 | Gate | Apps | Requirement |
 |------|------|-------------|
@@ -52,22 +53,33 @@ Re-run until gate criteria pass.
 
 ---
 
-## 🎯 App URLs
+## 🎯 Ready-to-Use Commands for Agent3
 
 ```
-Auto Com Center:      https://auto-com-center-jamarrlmayes.replit.app
-Scholarship Agent:    https://scholarship-agent-jamarrlmayes.replit.app
-Scholarship Sage:     https://scholarship-sage-jamarrlmayes.replit.app
-Scholarship API:      https://scholarship-api-jamarrlmayes.replit.app
-Student Pilot:        https://student-pilot-jamarrlmayes.replit.app
-Provider Register:    https://provider-register-jamarrlmayes.replit.app
-Auto Page Maker:      https://auto-page-maker-jamarrlmayes.replit.app
-Scholar Auth:         https://scholar-auth-jamarrlmayes.replit.app
+Test https://scholarship-api-jamarrlmayes.replit.app
+T+24h gate: Test Scholarship API and Scholarship Agent
+T+48h gate: Test Student Pilot and Provider Register
+T+72h gate: Test all apps
 ```
 
 ---
 
-## 📊 Readiness Scores
+## 📊 App Keys and URLs
+
+| app_key | App Name | URL |
+|---------|----------|-----|
+| `scholarship_api` | Scholarship API | https://scholarship-api-jamarrlmayes.replit.app |
+| `scholarship_agent` | Scholarship Agent | https://scholarship-agent-jamarrlmayes.replit.app |
+| `student_pilot` | Student Pilot | https://student-pilot-jamarrlmayes.replit.app |
+| `provider_register` | Provider Register | https://provider-register-jamarrlmayes.replit.app |
+| `auto_page_maker` | Auto Page Maker | https://auto-page-maker-jamarrlmayes.replit.app |
+| `scholar_auth` | Scholar Auth | https://scholar-auth-jamarrlmayes.replit.app |
+| `auto_com_center` | Auto Com Center | https://auto-com-center-jamarrlmayes.replit.app |
+| `scholarship_sage` | Scholarship Sage | https://scholarship-sage-jamarrlmayes.replit.app |
+
+---
+
+## 📊 Scoring Rubric
 
 | Score | Meaning | Action |
 |-------|---------|--------|
@@ -80,19 +92,11 @@ Scholar Auth:         https://scholar-auth-jamarrlmayes.replit.app
 
 ---
 
-## 🛡️ Safety Guarantees
-
-✅ **Methods:** GET/HEAD/OPTIONS only  
-❌ **Prohibited:** POST/PUT/PATCH/DELETE, forms, auth, PII  
-⏱️ **Rate limit:** Max 20 requests/app, 1 per 10s per path  
-🏷️ **User-Agent:** `ScholarAI-ReadOnlyProbe/1.0`
-
----
-
-## 📝 Sample YAML Output
+## 📝 Sample YAML Output (v2.1)
 
 ```yaml
 app_name: Student Pilot
+app_key: student_pilot
 url_tested: https://student-pilot-jamarrlmayes.replit.app
 readiness_score_0_to_5: 5
 
@@ -102,7 +106,7 @@ rollout_gate_status:
   note: Revenue-ready for B2C credit purchases
 
 evidence:
-  dns_tls: Valid
+  dns_tls: resolved/valid
   http:
     status_chain: [200]
     ttfb_ms: 94
@@ -118,7 +122,7 @@ evidence:
     description_present: true
     canonical_present: true
     robots_txt_accessible: true
-    sitemap_xml_accessible: null
+    sitemap_xml_accessible: false
   notes:
     - Login page loads cleanly
     - Stripe CSP configured correctly
@@ -130,7 +134,16 @@ recommended_actions:
 
 ---
 
-## ⚠️ Special Note: Auto Com Center
+## 🛡️ Safety Guarantees
+
+✅ **Methods:** GET/HEAD/OPTIONS only  
+❌ **Prohibited:** POST/PUT/PATCH/DELETE, forms, auth, PII  
+⏱️ **Rate limit:** ≤1 request/path/10s, ≤20 total/app  
+🔒 **Respect:** robots.txt, security controls  
+
+---
+
+## ⚠️ Special Case: Auto Com Center
 
 **Auto Com Center is an admin dashboard.**
 
@@ -143,11 +156,8 @@ recommended_actions:
 - Security headers
 - No critical console errors
 
-❌ **Do NOT:**
-- Attempt authentication
-- Expect full dashboard without auth
-
-**Current issue:** Returns `404` (blocker - needs fixing)
+❌ **Blocker:**
+- `404` on root (current issue)
 
 ---
 
@@ -178,17 +188,16 @@ This gives basic checks but less depth than Agent3.
 
 ---
 
-## 💡 Quick Commands for Agent3
+## 🆕 What's New in v2.1
 
-```
-"Test https://auto-com-center-jamarrlmayes.replit.app"
-"T+24h gate: Test Scholarship API and Scholarship Agent"
-"T+48h gate: Test Student Pilot and Provider Register"
-"T+72h gate: Test all apps"
-```
+✅ **app_key standardization** - Each app has a consistent key  
+✅ **Explicit URL mapping** - Clear host-to-app routing  
+✅ **TTFB benchmarks** - Target ~120ms for fast apps  
+✅ **Clearer scoring** - Specific criteria per app module  
+✅ **Gate auto-routing** - Automatic expansion of gate phrases  
 
 ---
 
-**Version:** 1.0 (CEO-Approved Final)  
-**Output Format:** YAML  
+**Version:** 2.1 (CEO-Approved Production-Ready)  
+**Output Format:** YAML with app_key  
 **Alignment:** 72-hour rollout timeline
