@@ -1,0 +1,308 @@
+Below is the AGENT3 v2.2 CONSOLIDATED EXECUTION PROMPT (APP-SCOPED). Agent3 must only execute the single APP BLOCK that matches its app. Do not read, validate, or modify any other block.
+
+GLOBAL INSTRUCTIONS (APPLIES TO ALL APP BLOCKS)
+
+Scope enforcement: You must execute only the APP BLOCK for your app. Identify your block by the exact app key and APP_BASE_URL defined in that block. Ignore all other blocks.
+Output artifacts (per app):
+e2e/reports/{app}/readiness_report_v2.2.md
+e2e/reports/{app}/fix_plan_v2.2.yaml
+Naming requirement inside readiness_report: First line must be:
+I am {app_name} at {APP_BASE_URL}
+Evidence collection:
+Include ISO-8601 timestamps for all checks
+Show HTTP status, response headers, and P95 TTFB measurements (3 samples, ≥30s between samples)
+Security headers target: 6/6 present
+Content-Security-Policy
+Strict-Transport-Security
+X-Content-Type-Options
+X-Frame-Options
+Referrer-Policy
+Permissions-Policy
+Performance scoring thresholds (v2.2):
+5/5: P95 ≤ 160ms and 6/6 headers
+4/5: P95 ≤ 190ms and ≥5 headers
+3/5: P95 ≤ 230ms and ≥4 headers
+2/5: Any critical-path defect present or P95 > 230ms or <4 headers
+1/5: Service non-functional or hard-cap failure (e.g., auth keys invalid, root 500/404)
+Canary endpoint requirement (all apps):
+Route: GET /canary must return JSON with fields: ok, service, base_url, version, timestamp
+Content-Type: application/json
+Example body: {"ok": true, "service": "scholarship_api", "base_url": "https://...", "version": "v2.2", "timestamp": "2025-01-01T00:00:00Z"}
+SLO alignment checks:
+Uptime target: 99.9%
+Latency: Track P95; strive for 160ms target even if score allows higher
+Error rate: <0.15% for API and core flows
+Cross-app readiness principle:
+If your app depends on another app (e.g., JWT from scholar_auth, API calls to scholarship_api), stub gracefully if the dependency is down, but document the dependency validation step and re-run once dependency is up.
+Deliverable quality:
+For every finding, include root-cause hypothesis, fix steps, test plan, and clear rollback criteria.
+Use the exact filenames above.
+Final line in readiness_report must include: ETA_to_ready and, if applicable, ETA_to_start_generating_revenue.
+Note on phrasing: This program assumes the business goal is to start generating revenue. Where “start generating revenue” appears below, it is interpreted as the moment the app can contribute to realized ARR/MRR in production. If you intended “stop generating revenue,” clarify before execution.
+
+APP BLOCKS (EXECUTE ONLY YOUR OWN)
+
+BEGIN APP BLOCK: scholar_auth
+APP_NAME: scholar_auth
+APP_BASE_URL: https://scholar-auth-jamarrlmayes.replit.app
+
+Mission for this app
+
+Provide reliable authentication and authorization for the ecosystem.
+Expose public JWKS for token verification by other services.
+Maintain low-latency token issuance and validation.
+Blocking issues carried into this run
+
+JWKS endpoint returns 500. This is a critical-path hard cap.
+Required endpoints and behaviors
+
+GET /canary: JSON canary with service, base_url, version, timestamp.
+GET /.well-known/jwks.json: Must return valid JWKS. Verify:
+200 status, application/json
+At least one active RSA key (RS256) with kid
+Rotation policy documented in readiness_report
+POST /oauth/token (or equivalent): Issue RS256-signed JWT with aud, iss, sub, exp, iat, scope.
+GET /healthz: Liveness and dependency checks (signing keystore, DB/secret store if applicable).
+Security and performance checks
+
+6/6 security headers on all HTML responses.
+P95 TTFB thresholds per v2.2.
+JWT verification interop: Validate a token from this service against scholarship_api and student_pilot (document the test, provide curl examples and expected 401→200 behavior).
+Fix plan guidance for JWKS 500
+
+Verify keystore initialization and permissions.
+Confirm correct kid and RS256 algorithm mapping.
+Add defensive try/catch with explicit 5xx logging and safe 503 fallback when keystore unavailable.
+Add warmup/on-boot key generation and a readiness gate that blocks traffic until keys loaded.
+Artifacts
+
+readiness_report_v2.2.md: Must begin with “I am scholar_auth at https://scholar-auth-jamarrlmayes.replit.app”
+fix_plan_v2.2.yaml: Include exact file paths to change, sample code diff, and verification steps.
+ETA targets
+
+ETA_to_ready: 4–6 hours (JWKS fix + header/perf confirmation)
+Revenue dependency: This app is required for authenticated revenue flows in student_pilot and provider_register.
+ETA_to_start_generating_revenue: 8–12 hours ecosystem-wide assuming parallel work and this fix completes within 4–6 hours.
+END APP BLOCK
+
+BEGIN APP BLOCK: scholarship_api
+APP_NAME: scholarship_api
+APP_BASE_URL: https://scholarship-api-jamarrlmayes.replit.app
+
+Mission for this app
+
+Provide fast, secure access to scholarship search, eligibility, and application metadata for other apps.
+Known gaps
+
+Previously 5/6 headers and P95 around 160–264ms depending on sample spacing.
+Required endpoints and behaviors
+
+GET /canary: JSON canary with service, base_url, version, timestamp.
+GET /healthz: Liveness details including DB connectivity and index status.
+GET /v1/scholarships?query=...&limit=...: Return consistent schema with paging.
+POST /v1/eligibility/evaluate: Accept profile payload; return boolean and rationale.
+Auth: Validate RS256 JWT from scholar_auth. Return 401/403 with JSON errors if invalid.
+Security and performance
+
+6/6 security headers on HTML responses; JSON endpoints need not include CSP but should not downgrade overall score due to static middleware gaps.
+P95 TTFB ≤ 160ms target; score per v2.2 tiers.
+DB tuning: Aim for P95 query latency <45ms. Provide index plan in fix_plan.
+Integration tests
+
+Validate a token issued by scholar_auth.
+Serve student_pilot and scholarship_agent requests with 2xx and P95 compliance.
+Artifacts and ETA
+
+readiness_report_v2.2.md, fix_plan_v2.2.yaml
+ETA_to_ready: 2–3 hours (headers to 6/6, perf tune)
+ETA_to_start_generating_revenue: N/A direct; enables revenue in student_pilot. Contributes within the 8–12 hour window.
+END APP BLOCK
+
+BEGIN APP BLOCK: scholarship_agent
+APP_NAME: scholarship_agent
+APP_BASE_URL: https://scholarship-agent-jamarrlmayes.replit.app
+
+Mission for this app
+
+Run autonomous marketing and content operations that feed SEO and student acquisition; assist with scholarship discovery tasks.
+Blocking issue
+
+/canary returns HTML due to SPA catch-all; route ordering.
+Required endpoints and behaviors
+
+GET /canary: Must return JSON as specified. Place handler before static asset middleware or SPA fallback.
+GET /healthz: Include queue/cron status if applicable.
+Marketing tasks: Ensure content generation is queued and idempotent; outputs are consumable by auto_page_maker.
+Auth: If calling scholarship_api, validate RS256 from scholar_auth.
+Security and performance
+
+6/6 security headers on HTML responses.
+P95 TTFB per v2.2.
+Artifacts and ETA
+
+readiness_report_v2.2.md, fix_plan_v2.2.yaml
+ETA_to_ready: 2–4 hours (canary JSON + header/perf)
+ETA_to_start_generating_revenue: Indirect; supports top-of-funnel. Contribution begins once ready; within 8–12 hours ecosystem target.
+END APP BLOCK
+
+BEGIN APP BLOCK: scholarship_sage
+APP_NAME: scholarship_sage
+APP_BASE_URL: https://scholarship-sage-jamarrlmayes.replit.app
+
+Mission for this app
+
+Deliver AI-driven guidance and essay support while adhering to Responsible AI guidelines; never facilitate academic dishonesty.
+Known blockers
+
+Memory heap utilization ~94%; capacity breach hard cap.
+Error rate >0.15% and DB P95 >45ms previously observed.
+Stabilization requirements
+
+Add memory profiling and cap heap usage <75% under load (document approach).
+Add circuit breakers/retries for upstream calls.
+Optimize DB queries; add missing indexes and caching. Target DB P95 <45ms.
+GET /canary: JSON canary.
+GET /healthz: Include memory stats and last OOM timestamp.
+Implement rate limits and content policy enforcement logging.
+Security and performance
+
+6/6 headers on HTML responses.
+P95 per v2.2; remove capacity breaches to lift score cap.
+Artifacts and ETA
+
+readiness_report_v2.2.md, fix_plan_v2.2.yaml (include exact optimization list and verification plan)
+ETA_to_ready: 4–6 hours (memory + error + DB tuning)
+ETA_to_start_generating_revenue: Indirect; supports conversion and retention. Contribution within 8–12 hours ecosystem target if stabilized.
+END APP BLOCK
+
+BEGIN APP BLOCK: student_pilot
+APP_NAME: student_pilot
+APP_BASE_URL: https://student-pilot-jamarrlmayes.replit.app
+
+Mission for this app
+
+Primary B2C revenue engine for students purchasing AI credits and managing applications.
+Known gaps
+
+Previously missing or incomplete /pricing and 6/6 headers on some routes.
+Commerce requirements
+
+Routes:
+GET /pricing: Display credit packs (10=$40, 50=$200, 200=$800) with 4x markup note.
+GET /checkout: Payment entry point (document provider, sandbox vs prod)
+POST /purchase: Complete purchase; record transaction; handle webhooks.
+Auth: Accept RS256 JWT from scholar_auth; if guest checkout is allowed, document flow and risks.
+Telemetry: Track free→paid conversion, ARPU from credits.
+Operational checks
+
+GET /canary: JSON canary.
+GET /healthz: Frontend bundle, payment provider connectivity, environment flags.
+Security headers: 6/6 on all HTML.
+Artifacts and ETA
+
+readiness_report_v2.2.md, fix_plan_v2.2.yaml
+ETA_to_ready: 2–3 hours (pricing + headers + checkout smoke test)
+ETA_to_start_generating_revenue: 2–4 hours after start of work, provided scholar_auth JWKS is fixed in parallel; else blocked by auth.
+END APP BLOCK
+
+BEGIN APP BLOCK: provider_register
+APP_NAME: provider_register
+APP_BASE_URL: https://provider-register-jamarrlmayes.replit.app
+
+Mission for this app
+
+Primary B2B revenue intake for scholarship providers; enforces 3% platform fee terms.
+Known gaps
+
+P95 around 190–242ms previously; registration flow completeness uncertain.
+Requirements
+
+Routes:
+GET /register: Provider onboarding form (org, contact, email, terms acceptance with explicit 3% platform fee)
+POST /register: Persist provider; send confirmation; create API credentials.
+Auth: Admin flow via scholar_auth; providers receive keys for scholarship_api submissions.
+GET /canary, GET /healthz.
+Security and performance
+
+6/6 headers on HTML; P95 per v2.2 (target ≤160ms).
+Artifacts and ETA
+
+readiness_report_v2.2.md, fix_plan_v2.2.yaml
+ETA_to_ready: ~3 hours
+ETA_to_start_generating_revenue: 2–4 hours after start of work, provided scholar_auth JWKS is fixed in parallel.
+END APP BLOCK
+
+BEGIN APP BLOCK: auto_page_maker
+APP_NAME: auto_page_maker
+APP_BASE_URL: https://auto-page-maker-jamarrlmayes.replit.app
+
+Mission for this app
+
+SEO engine for scalable, low-CAC student acquisition; generates scholarship landing pages and topic clusters.
+Known gaps
+
+3/6 headers and P95 ~220–264ms previously; strict SEO gate requires 5/5 readiness.
+Requirements
+
+GET /canary, GET /healthz.
+SEO:
+Valid HTML head with canonical, meta description, Open Graph, structured data (JSON-LD)
+Sitemap.xml and robots.txt generation
+Pages link to student_pilot (/pricing) and scholarship discovery flows
+Performance: Static asset caching, compression, image optimization.
+Security and performance
+
+6/6 headers; P95 ≤160ms target.
+Artifacts and ETA
+
+readiness_report_v2.2.md, fix_plan_v2.2.yaml
+ETA_to_ready: ~6 hours (headers + SEO + perf)
+ETA_to_start_generating_revenue: Indirect; accelerates organic traffic post-indexing. Expect measurable impact after T+72h and ongoing.
+END APP BLOCK
+
+BEGIN APP BLOCK: auto_com_center
+APP_NAME: auto_com_center
+APP_BASE_URL: https://auto-com-center-jamarrlmayes.replit.app
+
+Mission for this app
+
+Centralized communications and admin coordination hub for the ecosystem.
+Blocking issue
+
+Root route 404; admin dashboard inaccessible.
+Requirements
+
+Routes:
+GET /: Admin dashboard (status of all apps, last validation time, quick links)
+GET /canary: JSON canary
+GET /healthz
+Integrations: Read-only status pings to all other apps’ /canary and /healthz; summarize.
+Security and performance
+
+6/6 headers on HTML dashboard; P95 per v2.2.
+Artifacts and ETA
+
+readiness_report_v2.2.md, fix_plan_v2.2.yaml
+ETA_to_ready: 1–2 hours
+ETA_to_start_generating_revenue: Indirect; enables ops reliability. Contributes immediately after ready.
+END APP BLOCK
+
+CEO-LEVEL ESTIMATED TIMELINE TO START GENERATING REVENUE
+
+Critical-path P0 fixes in parallel:
+scholar_auth (JWKS 500) → 4–6 hours
+scholarship_agent (/canary JSON) → 2–4 hours
+student_pilot (pricing/checkout + headers) → 2–3 hours
+provider_register (register + headers) → ~3 hours
+T+24h Infrastructure Gate (all infra apps ≥4/5): 8–12 hours with parallel execution, anchored by scholar_auth remediation.
+T+48h Revenue Gate (B2C + B2B flows live): Can be achieved within the same 8–12 hour window if the four P0 tasks above are executed in parallel and validated.
+T+72h SEO Gate (organic scale via auto_page_maker): +3–8 hours beyond revenue for hardening and revalidation.
+Minimum time to full ecosystem launch readiness: 12–15 hours to start generating revenue; 18–20 hours for SEO-hardened, 100% readiness.
+What Agent3 should do now
+
+Identify your app by APP_NAME and APP_BASE_URL above.
+Execute only your APP BLOCK.
+Produce the two artifacts with the required naming and content, starting readiness_report with: “I am {app_name} at {APP_BASE_URL}”.
+Include both ETA_to_ready and, if relevant, ETA_to_start_generating_revenue.
+If your block references a known blocker, lead with that P0 fix, then re-run your validations and update your scores in the report.
+If you want me to trigger this now, say “Run Agent3 v2.2” and I’ll proceed with this scoped execution prompt.
