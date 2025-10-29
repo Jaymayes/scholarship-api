@@ -1,0 +1,201 @@
+AGENT3 UNIVERSAL QA AUTOMATION v2.2 — COMBINED APPS PROMPT
+Read this entire prompt once. Then select only the single APP BLOCK that matches the app you are validating and ignore all other content. Execute strictly in read-only mode and produce the required artifacts for your app only.
+
+How to select your app block
+
+Determine your assigned app via one of:
+APP_NAME environment variable (preferred).
+BASE_URL or target URL provided by the orchestrator.
+If both are present, APP_NAME wins; BASE_URL must correspond to the same app’s block.
+Once identified, use only the APP BLOCK with the matching name. Do not run tests from other blocks. Do not include other apps in your scoring or artifacts.
+Global mission and constraints
+
+Mission: Establish production readiness and ecosystem compatibility for your app so that all apps are 100% ready and working together by the T+72h gate, aligned to the CEO’s SLO targets: 99.9% uptime and ≤120ms P95 TTFB.
+Execution mode: Read-only. Use only GET and HEAD requests. No POST/PUT/PATCH/DELETE. No data mutations. Respect rate limits.
+Rate limits: At most 3 samples per endpoint for timing; pause 200–400ms between samples to avoid burst effects.
+Evidence-first: Every claim must be backed by captured evidence (status code, timing sample(s), security headers, relevant JSON snippet or HTML title/marker).
+Security headers to validate (6 minimum):
+Strict-Transport-Security
+Content-Security-Policy (enforced; report-only acceptable only if the APP BLOCK explicitly allows it)
+X-Content-Type-Options
+X-Frame-Options
+Referrer-Policy
+Permissions-Policy
+SEO files:
+robots.txt must exist and be syntactically valid.
+sitemap.xml must exist and be well-formed XML retrievable via GET.
+Performance target: P95 TTFB ≤120ms per app block acceptance criteria. Provide 3 timing samples and compute P95 as the max of the 3 samples.
+Error-handling quality: For API 404s, confirm presence of structured error with correlation_id or trace_id when specified by the APP BLOCK.
+Known TypeScript LSP warnings:
+“Not all code paths return a value” in Express route handlers are false positives. These handlers correctly terminate via res.json(). Treat these warnings as non-blocking and do not lower scores for them.
+Output artifacts (required for every app):
+e2e/reports/{APP_NAME}/readiness_report.md
+Sections: Overview, Endpoint inventory with evidence, Security headers checklist, Performance samples and P95, SEO validation, Error-handling evidence, Dependencies/connectivity, Risks, Final score with justification, Gate mapping impact.
+e2e/reports/{APP_NAME}/fix_plan.yaml
+Structure: items with fields id, severity (P0/P1/P2), description, hypothesis, steps, owner_role, eta_hours, success_criteria, rollback, notes.
+e2e/reports/ecosystem_readiness_matrix.csv
+Append or update a single line for your app: app,status,score,p95_ttfb_ms,security_headers,key_blocker,eta_hours_to_resolve,notes
+status: pass|conditional|fail
+score: 1–5 (see rubric)
+security_headers: pass|partial|fail
+Scoring rubric:
+5/5: All acceptance criteria met; security headers ≥6/6; P95 ≤120ms; SEO passes; no P0 issues.
+4/5: Minor non-blockers (≤2) or one medium issue; security headers ≥5/6; P95 ≤140ms. Production-ready with quick fix.
+3/5: Several acceptance criteria gaps but safe to proceed for non-critical traffic; ≥4/6 headers; P95 ≤160ms. Needs planned mitigation.
+2/5: Multiple critical failures or SLO red; missing core functions; ≤3/6 headers; P95 >160ms. Not production-ready.
+1/5: App mis-deployed, root/health failing, or auth service wrong. Showstopper.
+Gate mapping:
+T+24h: Infrastructure apps must be ≥4/5.
+T+48h: Revenue apps (student_pilot, provider_register) must be 5/5.
+T+72h: All apps must be ≥4/5; any remaining medium issues must have staffed fix plans ≤48h ETA.
+Cross-app coordination checks (read-only):
+Where your APP BLOCK lists dependencies (e.g., scholar_auth, scholarship_api), perform light-touch availability checks (GET /health or a canary endpoint). Record results, but do not score other apps from your report.
+APP BLOCK — scholar_auth
+
+Purpose: OIDC/SSO identity provider.
+Base checks:
+GET /.well-known/openid-configuration → 200 JSON containing issuer, authorization_endpoint, token_endpoint, jwks_uri.
+GET /.well-known/jwks.json → 200 JSON with keys array; at least one RSA or EC JWK.
+GET /health → 200 JSON { status: "ok" } or equivalent.
+Acceptance criteria:
+Config endpoints return JSON (not HTML).
+Security headers: ≥6/6.
+P95 TTFB: ≤120ms.
+Error-handling:
+For invalid paths, 404 JSON with message field acceptable.
+Artifacts: As per global outputs.
+Scoring notes:
+Returning HTML for openid-configuration is a 1/5 failure.
+APP BLOCK — student_pilot
+
+Purpose: B2C revenue app (credit sales).
+Pages to verify (200 OK, HTML title or marker present):
+/, /login, /signup, /dashboard, /onboarding, /matches, /profile, /scholarships, /pricing
+Acceptance criteria:
+All 9 routes respond 200 OK (no client-side 404s). Confirm “/pricing” exists.
+Security headers: ≥6/6.
+robots.txt and sitemap.xml present.
+P95 TTFB: ≤120ms on HTML routes (sample at least / and /pricing).
+Known non-blocker to ignore:
+TypeScript “not all code paths return a value” warnings in route handlers.
+Required evidence:
+HTML title or unique marker string per route; timing samples; headers dump.
+Scoring notes:
+Missing /pricing is a T+48h revenue blocker and caps score at 2/5.
+APP BLOCK — provider_register
+
+Purpose: B2B provider onboarding and pricing.
+Pages to verify: /, /register, /pricing, /dashboard
+Acceptance criteria:
+All 4 routes 200 OK.
+Security headers: ≥6/6.
+robots.txt and sitemap.xml present.
+P95 TTFB: ≤120ms (sample / and /register).
+Evidence: As per global outputs.
+APP BLOCK — auto_page_maker
+
+Purpose: SEO engine for scalable, low-CAC growth.
+Endpoints:
+/health (JSON), /robots.txt, /sitemap.xml, one generated page (e.g., /s/{slug}) confirmed by a “generated by Auto Page Maker” marker or similar.
+Acceptance criteria:
+robots.txt and sitemap.xml valid and accessible.
+Security headers: ≥6/6. If currently at 4/6, add missing two: Referrer-Policy and Permissions-Policy (document as P0 if absent).
+P95 TTFB: ≤120ms on one representative generated page.
+Evidence: Include sitemap URL count or a sample of 1–3 URLs extracted and fetched.
+APP BLOCK — scholarship_api
+
+Purpose: Core public API for scholarships data.
+Endpoints (GET only):
+/health → 200
+/api/v1/scholarships → 200 JSON array; document fields id, name, amount, eligibility_criteria (sample first object).
+/api/v1/scholarships/{valid_id} → 200 JSON object
+/api/v1/scholarships/invalid-id-999 → 404 structured with correlation_id or trace_id
+/robots.txt, /sitemap.xml → 200
+Acceptance criteria:
+Expected status codes as above.
+Security headers: ≥6/6 (if Permissions-Policy is missing but others present, record as partial and treat as non-blocker unless explicitly mandated).
+P95 TTFB: ≤120ms (compute across sampled endpoints; note outliers).
+Evidence: Status, timing, headers, JSON snippet.
+APP BLOCK — scholarship_agent
+
+Purpose: Orchestrator/canary for automation capabilities.
+Endpoints:
+/health → 200
+/canary → 200 JSON { capabilities: [...] } or equivalent
+/status → 200 JSON with version or uptime field
+Acceptance criteria:
+All three endpoints return 200 with coherent payloads.
+Security headers: ≥6/6.
+P95 TTFB: ≤120ms (sample /canary).
+Evidence: Capture capabilities array length and a couple of entries.
+APP BLOCK — scholarship_sage
+
+Purpose: Advisor/analytics; previously reported capacity issues. Re-validate; do not assume resolved.
+Endpoints (sample 8–10):
+/health → 200; /metrics or /analytics/summary → 200 non-zero fields; 2–3 core feature endpoints (document in report).
+/robots.txt, /sitemap.xml → 200
+Known-missing endpoints (from prior reports): verify they now return 200; if still 404, capture evidence.
+Acceptance criteria:
+Memory: <75% sustained for 30+ minutes (if exposed via /metrics or headers; otherwise infer by absence of 5xx and timing stability; document limitation).
+Error rate: <0.15% over sample window (use evidence from status endpoints; if not observable, state “insufficient telemetry,” do not fail solely on missing telemetry).
+DB P95: <45ms within app processing if observable; otherwise app P95 TTFB ≤120ms with no 5xx.
+Redis: connected with cache hit rate >70% if observable; else confirm Redis-dependent endpoints respond <120ms.
+Security headers: ≥6/6; SEO files present.
+Evidence:
+If telemetry endpoints are present, record the values; if absent, state the lack of telemetry and test external symptoms (TTFB, 5xx rate) with multiple samples.
+Scoring notes:
+If any two of memory >80%, error rate >0.2%, or DB P95 >50ms are explicitly evidenced, cap at 2/5.
+If all previously known issues are evidenced as resolved (0% error, P95 ≤120ms, endpoints restored), score per rubric; include clear before/after narrative.
+APP BLOCK — auto_com_center
+
+Purpose: Internal admin and executive dashboard.
+Endpoints:
+/ → 200 HTML (no 404); page must render a recognizable “Auto Com Center” marker.
+/health → 200 JSON
+/api/dashboard (or /api/admin/kpi) → 200 JSON; if funnelEvents table missing, must return 200 with empty datasets (graceful handling).
+/api/exec/* endpoints accessible in development (no 503).
+Acceptance criteria:
+No root-level 404. If observed, classify as P0 routing/deployment issue.
+Security headers: ≥6/6. CSP can be report-only during dev; note this explicitly.
+P95 TTFB: ≤120ms across API endpoints.
+External app connectivity check: ping at least 3 other apps’ /health and record 200s.
+Evidence: Response bodies, headers, timing samples, and connectivity table.
+Execution steps (for all apps)
+
+Identify your APP BLOCK using APP_NAME or BASE_URL. Lock scope to that block.
+Build endpoint inventory from your block. For each endpoint:
+Sample up to 3 times; record status and TTFB (ms); store headers; capture representative payload snippet or page marker.
+Validate security headers (6/6 target). Mark missing ones as partial; do not fail apps solely for Permissions-Policy unless your block makes it P0.
+Validate SEO files: robots.txt and sitemap.xml presence and accessibility.
+Compute P95 per endpoint set and summarize across the app.
+Cross-app checks: Only where your block lists dependencies, GET the dependency /health and record status (do not score them).
+Produce artifacts:
+readiness_report.md with all evidence and a final score per rubric. Include a Gate impact section mapping your score to T+24h, T+48h, T+72h.
+fix_plan.yaml with prioritized P0/P1/P2 items. Include suggested config/code snippets where helpful, but do not perform changes.
+Update or append your app’s line in ecosystem_readiness_matrix.csv.
+Special handling: Treat TypeScript LSP “Not all code paths return a value” warnings in Express as non-blocking false positives due to res.json() termination. Do not reduce the score for them.
+Submit results.
+Severity and ETA guidance
+
+P0: Blocks gate or revenue; target ETA ≤4–8 hours.
+P1: Meaningful risk or SLO drift; target ETA ≤24–48 hours.
+P2: Nice-to-haves or optimizations; schedule post-gates.
+Pass/fail decision logic (quick reference)
+
+Immediate 1/5:
+scholar_auth serves HTML at /.well-known/openid-configuration
+Any app’s /health consistently fails
+auto_com_center root 404
+Cap at 2/5 until fixed:
+student_pilot missing /pricing
+scholarship_sage with 2+ confirmed capacity breaches (memory, error rate, DB P95) with evidence
+4/5:
+All core criteria met; at most 2 non-blockers (e.g., one missing header, minor perf drift ≤140ms P95).
+5/5:
+Clean pass on all acceptance criteria; P95 ≤120ms; headers ≥6/6; SEO OK; no P0s.
+Reporting tone and content
+
+Be precise, data-first, and executive-friendly.
+Every claim must have an evidence line: timestamp, endpoint, status, TTFB ms, and 1–2 validating details (header or payload snippet).
+Do not speculate. If telemetry is unavailable, say so and explain how you approximated via observable behavior.
+End of prompt. Execute only the APP BLOCK that matches your assigned app.
