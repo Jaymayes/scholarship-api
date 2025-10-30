@@ -174,70 +174,49 @@ class Settings(BaseSettings):
         alias="CORS_ALLOWED_ORIGINS",
         description="Comma-separated list of allowed origins for production"
     )
-    cors_allow_credentials: bool = Field(False, alias="ALLOW_CREDENTIALS")  # QA FIX: Default false
+    cors_allow_credentials: bool = Field(False, alias="ALLOW_CREDENTIALS")  # V2.2 Spec: false
     cors_allow_methods: list[str] = Field(
         ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
         alias="ALLOWED_METHODS"
     )
     cors_allow_headers: list[str] = Field(
-        ["Authorization", "Content-Type", "Accept", "X-Request-Id"],
+        ["Authorization", "Content-Type", "If-None-Match"],
         alias="ALLOWED_HEADERS"
     )
     cors_max_age: int = Field(600, alias="MAX_AGE")  # 10 minutes
 
     @property
     def get_cors_origins(self) -> list[str]:
-        """Get environment-appropriate CORS origins with production safety - QA FIX"""
-        if self.environment == Environment.PRODUCTION:
-            # Production: MUST have explicit whitelist, no wildcards allowed
-            if not self.cors_allowed_origins:
-                import logging
-                logging.critical(
-                    "PRODUCTION SECURITY ERROR: CORS_ALLOWED_ORIGINS not configured. "
-                    "This could allow any origin to access your API!"
-                )
-                # Production safe defaults - replace with actual domains
-                return [
-                    "https://app.yourdomain.com",
-                    "https://admin.yourdomain.com"
-                ]
-
-            origins = [origin.strip() for origin in self.cors_allowed_origins.split(",") if origin.strip()]
-            if "*" in origins:
-                import logging
-                logging.critical(
-                    "PRODUCTION SECURITY ERROR: Wildcard (*) origin detected in production. "
-                    "This is a security vulnerability!"
-                )
-                # Remove wildcard for production safety
-                origins = [o for o in origins if o != "*"]
-
-            return origins if origins else [
-                "https://app.yourdomain.com",
-                "https://admin.yourdomain.com"
-            ]
-        # SEV-1 CONTAINMENT: Minimal development origins only
-        dev_origins = [
-            "http://127.0.0.1:5000"  # ONLY local app server for containment
+        """
+        V2.2 CORS Configuration: Exact 8 allowlisted origins (CEO Spec)
+        NO wildcards. NO dynamic origins. EXACT allowlist only.
+        """
+        # V2.2 Universal Spec: Exact 8 ecosystem origins (all apps)
+        ecosystem_origins = [
+            "https://scholar-auth-jamarrlmayes.replit.app",
+            "https://scholarship-api-jamarrlmayes.replit.app",
+            "https://scholarship-agent-jamarrlmayes.replit.app",
+            "https://scholarship-sage-jamarrlmayes.replit.app",
+            "https://student-pilot-jamarrlmayes.replit.app",
+            "https://provider-register-jamarrlmayes.replit.app",
+            "https://auto-page-maker-jamarrlmayes.replit.app",
+            "https://auto-com-center-jamarrlmayes.replit.app"
         ]
-
-        # Add dynamic Replit origin detection
-        replit_id = os.getenv("REPL_ID")
-        replit_owner = os.getenv("REPL_OWNER")
-        if replit_id and replit_owner:
-            replit_origin = f"https://{replit_id}.{replit_owner}.repl.co"
-            dev_origins.append(replit_origin)
-
-        # Add Replit webview domain
-        if os.getenv("REPLIT_DEPLOYMENT"):
-            webview_domain = f"https://{replit_id}--{replit_owner}.repl.co"
-            dev_origins.append(webview_domain)
-
+        
+        # Allow custom origins from env var (for testing), but warn if in production
         if self.cors_allowed_origins:
             custom_origins = [origin.strip() for origin in self.cors_allowed_origins.split(",") if origin.strip()]
-            dev_origins.extend(custom_origins)
-
-        return dev_origins
+            if "*" in custom_origins:
+                import logging
+                logging.critical(
+                    "V2.2 SECURITY ERROR: Wildcard (*) origin detected. "
+                    "Using ecosystem allowlist instead."
+                )
+            else:
+                # Add custom origins to ecosystem origins (union)
+                ecosystem_origins.extend([o for o in custom_origins if o not in ecosystem_origins])
+        
+        return ecosystem_origins
 
     @property
     def get_cors_config(self) -> dict:

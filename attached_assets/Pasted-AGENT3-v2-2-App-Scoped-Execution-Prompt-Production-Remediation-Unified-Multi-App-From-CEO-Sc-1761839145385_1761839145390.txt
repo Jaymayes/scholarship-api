@@ -1,0 +1,178 @@
+AGENT3 v2.2 App-Scoped Execution Prompt (Production Remediation – Unified, Multi-App)
+From: CEO, Scholar AI Advisor
+Mission: Get every app 100% production-ready and working together. You must ONLY execute the section of this prompt that matches your assigned app. Ignore everything else.
+
+Execution Handshake (must respond before any work)
+Reply exactly with:
+ASSIGNED_APP: <one exact app name from the list below>
+APP_BASE_URL: <exact base URL from the list below>
+VERSION: v2.2
+I acknowledge I will only execute the section of this prompt that matches my app.
+
+App Directory and Base URLs (reference only; do not execute other apps’ sections)
+
+scholar_auth → https://scholar-auth-jamarrlmayes.replit.app
+scholarship_api → https://scholarship-api-jamarrlmayes.replit.app
+scholarship_agent → https://scholarship-agent-jamarrlmayes.replit.app
+scholarship_sage → https://scholarship-sage-jamarrlmayes.replit.app
+student_pilot → https://student-pilot-jamarrlmayes.replit.app
+provider_register → https://provider-register-jamarrlmayes.replit.app
+auto_page_maker → https://auto-page-maker-jamarrlmayes.replit.app
+auto_com_center → https://auto-com-center-jamarrlmayes.replit.app
+Universal Phase 0 (ALL apps must implement; then proceed to your app’s Phase 1)
+Do this exactly once for your assigned app. These are pass/fail requirements.
+
+Canary Endpoints
+Implement GET /canary and GET /_canary_no_cache
+Response JSON schema (all fields required; exact keys; p95_ms must be a number): { "app": "<app name exactly>", "app_base_url": "<APP_BASE_URL exactly>", "version": "v2.2", "status": "ok", "now_utc": "<ISO8601 UTC timestamp>", "commit_sha": "<git sha or 'unknown'>", "p95_ms": <number> }
+/_canary_no_cache must set Cache-Control: no-store
+2. Security Headers (6/6, exact)
+
+Strict-Transport-Security: max-age=63072000; includeSubDomains; preload
+X-Content-Type-Options: nosniff
+X-Frame-Options: DENY
+Referrer-Policy: no-referrer
+Content-Security-Policy: default-src 'none'
+Permissions-Policy: geolocation=(), microphone=(), camera=()
+3. CORS (allowlist only; no wildcards)
+
+Allowed origins (all eight): https://scholar-auth-jamarrlmayes.replit.app https://scholarship-api-jamarrlmayes.replit.app https://scholarship-agent-jamarrlmayes.replit.app https://scholarship-sage-jamarrlmayes.replit.app https://student-pilot-jamarrlmayes.replit.app https://provider-register-jamarrlmayes.replit.app https://auto-page-maker-jamarrlmayes.replit.app https://auto-com-center-jamarrlmayes.replit.app
+Methods: GET, POST, PUT, PATCH, DELETE, OPTIONS
+Credentials: false
+Max-Age: 600
+4. Performance and Reliability SLOs
+
+P95 latency target ≤120ms; hard ceiling ≤160ms
+0% 5xx during validation window (smoke tests)
+Log p95_ms in /canary as a number (update on each deploy)
+Uptime target: 99.9%
+5. Rate Limiting (baseline)
+
+Public endpoints: 120 req/min per IP (429 with JSON body { "error": "rate_limited" })
+Auth endpoints (if any): 60 req/min per IP
+6. Deliverables (paths must exist)
+
+e2e/reports/<app>/readiness_report_<app>_v2.2_unified.md
+e2e/reports/<app>/fix_plan_<app>_v2.2.yaml Include in the readiness report: the exact "app" and "app_base_url" values and a screenshot or curl output of both canary endpoints and security headers. The app must literally “name itself” and print the APP_BASE_URL in these reports.
+App-Specific Phase 1 Requirements
+Only execute the section for your assigned app. Do not modify other apps.
+
+scholar_auth (Critical Path; prerequisite for all revenue)
+APP_BASE_URL: https://scholar-auth-jamarrlmayes.replit.app
+OIDC Discovery: Implement /.well-known/openid-configuration (RFC 8414)
+JWKS: Implement /.well-known/jwks.json (RS256); include kid rotation support
+Token Service: Authorization Code + PKCE (S256); issue RS256 JWTs with roles claim [student|provider|admin]
+Sessions: httpOnly + Secure cookies; SameSite=Lax; short-lived access token + refresh rotation with reuse detection
+Security: Backoff and lockout after failed logins; 60 rpm per IP; audit login events
+SSO Stubs: Prepare optional social login provider config (disabled by default)
+Acceptance Tests:
+Validate JWKS and role-bearing JWTs across student_pilot and provider_register
+p95 ≤120ms; 0% 5xx in smoke; 6/6 headers; CORS allowlist
+2. student_pilot (B2C revenue: credits checkout)
+
+APP_BASE_URL: https://student-pilot-jamarrlmayes.replit.app
+Auth: Validate RS256 JWTs from scholar_auth JWKS; role must be student
+Payments: Stripe Checkout for credit bundles with 4x markup on AI costs; tax settings enabled; store price ids via env
+Webhooks: Handle checkout.session.completed; idempotency via eventId store; ledger credit increment
+Ledger: Credits balance; transactions history; minimal PII profile page
+Scholarship Search: Consume scholarship_api GET /scholarships with filters; paginate; SEO noindex
+UX: Purchase credits, see balance, spend credits on application support actions (no academic dishonesty)
+Acceptance Tests:
+End-to-end purchase to balance increment
+p95 ≤120ms; 0% 5xx; 6/6 headers; CORS allowlist
+3. provider_register (B2B revenue: provider onboarding + payouts)
+
+APP_BASE_URL: https://provider-register-jamarrlmayes.replit.app
+Auth: Validate RS256 JWTs; role must be provider
+Stripe Connect: Express onboarding; store accountId; show onboarding + payout status
+Dashboard: Onboarding progress, org profile CRUD, API key issuance, webhook secret display
+Audit: Log changes with actor, timestamp, diff; 60 rpm per IP
+Webhooks: Handle account.updated for payouts/KYC; idempotency
+Acceptance Tests:
+Provider can complete onboarding and obtain API key
+p95 ≤120ms; 0% 5xx; security headers; CORS allowlist
+4. scholarship_api (Scholarship catalog: read + provider writes)
+
+APP_BASE_URL: https://scholarship-api-jamarrlmayes.replit.app
+Read Endpoints:
+GET /scholarships?country=&degree=&deadline_before=&funder=&q=&page=&page_size=
+GET /scholarships/:id
+Caching: ETag + Cache-Control: public, max-age=300
+Write Endpoints (provider only via JWT role=provider):
+POST /scholarships (validate schema; sanitize; dedupe by external_id)
+PUT /scholarships/:id
+Rate Limits: 120 rpm public; 60 rpm provider writes
+Observability: Route-level p95; cache hit-rate metric
+Acceptance Tests:
+Faceted search fast (p95 ≤120ms); 0% 5xx; headers and CORS correct
+5. scholarship_agent (Autonomous campaign ops for lead gen and provider enablement)
+
+APP_BASE_URL: https://scholarship-agent-jamarrlmayes.replit.app
+Jobs: Schedules for content distribution, provider outreach, and SEO asset requests to auto_page_maker
+Integrations:
+Read scholarships from scholarship_api
+Post messages via auto_com_center webhook endpoints (transactional only; no spam)
+Controls: Rate caps; human-in-the-loop approval toggles; audit of actions
+Acceptance Tests: Jobs run on schedule; produce artifacts; p95 ≤120ms on control plane; headers/CORS ok
+6. scholarship_sage (Executive dashboards; read-only)
+
+APP_BASE_URL: https://scholarship-sage-jamarrlmayes.replit.app
+Dashboards: B2C (free→paid conversion, ARPU), B2B (active providers, 3% fee), CAC, SLOs (uptime, latency), 5xx errors
+Data: Read-only aggregation from sibling apps; no write endpoints
+Live: WebSocket updates for key metrics and SLOs
+Auth: JWT required; roles [admin|analyst] with least privilege
+Acceptance Tests: All dashboards load p95 ≤120ms; no writes; headers/CORS ok
+7. auto_page_maker (SEO engine for organic growth)
+
+APP_BASE_URL: https://auto-page-maker-jamarrlmayes.replit.app
+Page Generation: Build scholarship landing pages from scholarship_api data; canonical URLs; pagination; sitemap.xml
+Structured Data: JSON-LD for Scholarship rich results; valid per schema.org
+Publishing: Incremental builds; purge cache; noindex for staging paths
+Metrics: Track page build times, publish success, sitemap count
+Acceptance Tests: Pages render fast; sitemap valid; JSON-LD passes validation; headers/CORS ok
+8. auto_com_center (Transactional comms hub)
+
+APP_BASE_URL: https://auto-com-center-jamarrlmayes.replit.app
+Endpoints: Send transactional email/SMS (purchase receipts, onboarding, alerts) via provider SDKs or stubs; no marketing blasts
+Webhooks: Handle bounces/complaints/unsubscribes; enforce suppression lists
+Templates: Versioned templates; variables validation
+Compliance: DMARC/SPF/DKIM ready; rate cap; audit logs
+Acceptance Tests: Send/receive webhook flow; suppression respected; headers/CORS ok
+Acceptance Criteria (all apps)
+
+Phase 0: Pass (canary x2, p95_ms numeric, 6/6 headers exact, CORS allowlist exact, rate limits enforced)
+Phase 1: App-specific features complete; smoke tests pass with 0% 5xx during validation
+Readiness report and fix plan files exist with required evidence
+The app literally names itself and prints its APP_BASE_URL in both canary responses and in the readiness report
+Governance and Ethics (all apps)
+
+FERPA/COPPA-aware data handling; collect minimal PII
+No academic dishonesty features
+Responsible AI: transparent logs for automated actions; bias mitigation where applicable
+Estimated Time to Start Generating Revenue
+Note: “start generating revenue” assumed; if you intended “stop,” clarify. Estimates are for a single app’s Phase 0 + Phase 1 when the necessary dependencies are available.
+
+scholar_auth: 6–8 hours (critical prerequisite; unlocks revenue)
+student_pilot: 2–4 hours after scholar_auth; first B2C revenue in 8–12 hours total
+provider_register: 5–7 hours after scholar_auth; first B2B revenue in 11–15 hours total
+scholarship_api: 1–2 hours (supports both funnels; indirect revenue)
+scholarship_agent: 3–5 hours (supports growth; indirect revenue)
+scholarship_sage: 2–4 hours (monitoring/metrics; indirect revenue)
+auto_page_maker: 3–5 hours (organic SEO growth; reduces CAC; indirect revenue)
+auto_com_center: 4–6 hours (transactional comms; indirect revenue)
+Critical Path to First Revenue
+
+Fastest B2C path: scholar_auth (6–8h) → student_pilot (+2–4h) = 8–12h to first B2C revenue
+B2B path: scholar_auth (6–8h) → provider_register (+5–7h) = 11–15h to first B2B revenue
+Handoff Instructions
+
+Agent3 must reply with the Execution Handshake exactly as specified and immediately begin Universal Phase 0, then the App-Specific Phase 1 for only the assigned app.
+Every app’s readiness report must include the app’s self-identification and the exact APP_BASE_URL.
+On completion, post the two deliverables and the key metrics snapshot (p95_ms, 0% 5xx validation, headers audit) to the report directory.
+Assignment Request (for you to issue now)
+Please assign Agent3 to ONE app by replying with the exact app name from the list above. Recommended order for fastest time-to-revenue:
+
+scholar_auth
+student_pilot
+provider_register
+Once assigned, Agent3 will execute immediately per this prompt.
