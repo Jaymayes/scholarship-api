@@ -1,0 +1,245 @@
+Below is the complete, app-scoped execution prompt for Agent3. It contains sections for all eight apps. Agent3 must only execute the section that matches its assigned app. After the prompt, I provide CEO-level ETAs to first revenue per app and the combined path to first dollars.
+
+AGENT3 v2.2 UNIFIED EXECUTION PROMPT — APP-SCOPED ONLY
+
+Section 0 — Handshake and Operating Rules
+
+You are Agent3. Execute APP-SCOPED work only. Do not modify any other app’s code or deployment.
+At the top of your first reply, print exactly this handshake (replace placeholders with your values): ASSIGNED_APP: <one_of: scholar_auth | scholarship_api | scholarship_agent | scholarship_sage | student_pilot | provider_register | auto_page_maker | auto_com_center> APP_BASE_URL: <exact base URL from Section 1 for your app> VERSION: v2.2 I acknowledge I will only execute the section of this prompt that matches my app.
+Output a short status report with:
+app_name (must equal ASSIGNED_APP)
+app_base_url (must equal APP_BASE_URL)
+version (v2.2)
+status (one of: ok | warn | fail)
+p95_ms (from rolling 30-request window; compute true 95th percentile)
+commit_sha (use workspace commit or “workspace” if not available)
+server_time_utc (ISO8601)
+Produce two deliverables for your app:
+e2e/reports/<app>/readiness_report_<app>_v2.2_ceo_final.md
+e2e/reports/<app>/fix_plan_<app>_v2.2.yaml
+Adhere to SLOs: 99.9% uptime target, ≤120ms P95 latency (≤160ms ceiling), 0% auth bypasses, 0 critical security findings.
+Use the immutable 8-origin CORS allowlist below exactly. Do not add, remove, or make it environment-overridable: https://scholar-auth-jamarrlmayes.replit.app https://scholarship-api-jamarrlmayes.replit.app https://scholarship-agent-jamarrlmayes.replit.app https://scholarship-sage-jamarrlmayes.replit.app https://student-pilot-jamarrlmayes.replit.app https://provider-register-jamarrlmayes.replit.app https://auto-page-maker-jamarrlmayes.replit.app https://auto-com-center-jamarrlmayes.replit.app
+Section 1 — Base URLs (read-only reference)
+
+scholar_auth → https://scholar-auth-jamarrlmayes.replit.app
+scholarship_api → https://scholarship-api-jamarrlmayes.replit.app
+scholarship_agent → https://scholarship-agent-jamarrlmayes.replit.app
+scholarship_sage → https://scholarship-sage-jamarrlmayes.replit.app
+student_pilot → https://student-pilot-jamarrlmayes.replit.app
+provider_register → https://provider-register-jamarrlmayes.replit.app
+auto_page_maker → https://auto-page-maker-jamarrlmayes.replit.app
+auto_com_center → https://auto-com-center-jamarrlmayes.replit.app
+Section 2 — Universal Phase 0 Requirements (ALL apps must implement these within their own codebase)
+
+Canary endpoint: GET /canary returns JSON with 7 required fields: app_name, app_base_url, version, status, p95_ms, commit_sha, server_time_utc
+P95 tracking: rolling window of last 30 requests; compute true 95th percentile and return as integer milliseconds.
+Security headers (6/6, CEO-standard values):
+Strict-Transport-Security: max-age=63072000; includeSubDomains; preload
+Content-Security-Policy:
+UI apps (browser-rendered, e.g., student_pilot, provider_register, scholarship_sage, scholarship_agent, auto_page_maker, auto_com_center): default-src 'self'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https://js.stripe.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self' [the 8 origins above] https://api.stripe.com wss: ws:; frame-src https://js.stripe.com https://hooks.stripe.com; frame-ancestors 'none'; base-uri 'self'; form-action 'self' https://hooks.stripe.com; object-src 'none'
+API/headless apps (e.g., scholar_auth, scholarship_api): default-src 'none'; base-uri 'none'; object-src 'none'; frame-ancestors 'none'; form-action 'none'; connect-src 'self'
+Permissions-Policy: accelerometer=(), ambient-light-sensor=(), autoplay=(), bluetooth=(), camera=(), clipboard-read=(), clipboard-write=(), display-capture=(), encrypted-media=(), fullscreen=(self), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), midi=(), payment=(), usb=(), xr-spatial-tracking=()
+X-Frame-Options: DENY
+Referrer-Policy: strict-origin-when-cross-origin
+X-Content-Type-Options: nosniff
+CORS: allow only the 8 origins listed; include OPTIONS preflight and cache preflight 600s; expose ETag where relevant.
+Observability: Request-ID middleware on every request; log correlation with request_id included.
+Rate limits: implement app-appropriate defaults; where specified in app sections, use those values.
+Section 3 — App-Specific Phase 1 Requirements
+Agent3: Only execute the subsection for your ASSIGNED_APP.
+
+3.1 scholar_auth (APP_BASE_URL: https://scholar-auth-jamarrlmayes.replit.app)
+
+Goals: Production-ready OIDC with PKCE, RS256 JWKS, session management, rate limits.
+Features:
+OIDC Authorization Code with PKCE (S256); endpoints: /oidc/auth, /oidc/token
+JWKS: /.well-known/jwks.json with real RS256 keypair, stable kid, modulus > 300 bytes
+Session cookies: HttpOnly; Secure; SameSite=Lax
+Rate limiting: 60 rpm for /oidc/auth, /oidc/token, /api/auth/login
+Admin bootstrap route with separate aggressive rate limit
+Integration:
+CORS allowlist (8 origins)
+Provide /.well-known/openid-configuration (metadata)
+Acceptance tests:
+Validate PKCE flow end-to-end
+Validate JWT verification in scholarship_api and provider_register using your JWKS
+Deliverables:
+Readiness report and fix plan (paths in Section 0)
+Example curl scripts for end-to-end token exchange
+Success criteria:
+P95 ≤120ms, 0% 5xx during smoke tests, JWT verifiable by peers
+3.2 scholarship_api (APP_BASE_URL: https://scholarship-api-jamarrlmayes.replit.app)
+
+Goals: Headless API for scholarships and providers; caching and conditional requests; secure provider writes.
+Features:
+Read endpoints: GET /scholarships, GET /scholarships/:id
+ETag for list/detail; support If-None-Match; return 304 when unchanged
+Cache-Control: lists public, max-age=300; details public, max-age=1800
+Provider writes (secure):
+POST /providers/:id/scholarships
+PUT /providers/:id/scholarships/:scholarship_id
+Auth: Validate JWT via scholar_auth JWKS; require scope provider
+Rate limits: provider writes 60 rpm per provider_id; read endpoints 600 rpm per origin
+Integration:
+Consumed by student_pilot and auto_page_maker
+Write flows initiated by provider_register
+Acceptance tests:
+Conditional GET with ETag
+JWT scope enforcement
+CORS preflight success from student_pilot origin
+Deliverables: report + fix plan; verification curl scripts
+3.3 scholarship_agent (APP_BASE_URL: https://scholarship-agent-jamarrlmayes.replit.app)
+
+Goals: Autonomous marketing engine for campaigns; feeds Auto Page Maker and communications.
+Features:
+Campaign scheduler (daily/weekly); content briefs for SEO articles
+API to trigger auto_page_maker page generation jobs
+Lead scoring for inbound students and providers (lightweight heuristic OK)
+Integration:
+Read-only JWT from scholar_auth for agent access if needed
+Webhooks to auto_com_center for outbound comms (email/push)
+Acceptance tests:
+Trigger a page-gen job and confirm page published by auto_page_maker
+Generate 3 sample campaign briefs and enqueue outbound messages
+Deliverables: report + fix plan; sample payloads and job logs
+3.4 scholarship_sage (APP_BASE_URL: https://scholarship-sage-jamarrlmayes.replit.app)
+
+Goals: Observability and executive analytics; SLO monitoring.
+Features:
+Live dashboard: P95 latency, 5xx rate, B2C conversion, ARPU, CAC, B2B provider activations, revenue
+WebSocket updates; breach alerting thresholds (P95 >120ms, 5xx >1% per 5m)
+Integration:
+Pull /canary from all 8 apps
+Read-only queries from scholarship_api for funnel metrics
+Acceptance tests:
+Dashboard loads, shows all 8 apps’ status; alert triggers on synthetic breach
+Deliverables: report + fix plan; dashboard screenshots; instructions to wire alerts
+3.5 student_pilot (APP_BASE_URL: https://student-pilot-jamarrlmayes.replit.app)
+
+Goals: B2C path to first dollar via Stripe credits and scholarship search/apply UX.
+Features:
+Auth via scholar_auth (OIDC PKCE)
+Stripe integration (test then live); purchase credits; display current balance
+Search UI backed by scholarship_api; acceptable to fall back to mock data if scholarship_api write path pending
+Client CSP: include Stripe domains; expose ETag header
+Integration:
+Consume scholarship_api read endpoints
+Emit analytics events to scholarship_sage
+Acceptance tests:
+Full purchase flow completes; webhook or client confirmation persists credit
+CORS OK to scholarship_api; P95 ≤120ms
+Deliverables: report + fix plan; test cards and webhook instructions
+3.6 provider_register (APP_BASE_URL: https://provider-register-jamarrlmayes.replit.app)
+
+Goals: B2B provider onboarding and publishing listings; enforces provider scope.
+Features:
+Auth via scholar_auth; obtain JWT with provider scope
+Onboard form (organization profile, contact, KYC placeholder), terms acceptance
+Create/Update scholarships via scholarship_api write endpoints
+Rate limits: 60 rpm writes per provider
+Integration:
+JWT verification path tested against scholar_auth JWKS
+Provide provider_id mapping that scholarship_api enforces
+Acceptance tests:
+End-to-end: onboard → token → create scholarship → visible in student_pilot search
+Deliverables: report + fix plan; curl scripts for provider POST/PUT
+3.7 auto_page_maker (APP_BASE_URL: https://auto-page-maker-jamarrlmayes.replit.app)
+
+Goals: SEO engine to drive organic, low-CAC growth.
+Features:
+Generate dynamic scholarship pages from scholarship_api data
+Output sitemaps (daily refresh), robots.txt, canonical URLs
+Schema.org (Scholarship) JSON-LD; OpenGraph/Twitter meta
+Caching headers: public, max-age=1800; ETag for pages
+Integration:
+Accept jobs from scholarship_agent; confirm publish status via callback
+Ensure CORS and CSP for UI profile
+Acceptance tests:
+Publish 50 pages; sitemap index updated; structured data validator sample output
+Deliverables: report + fix plan; list of published URLs; sitemap locations
+3.8 auto_com_center (APP_BASE_URL: https://auto-com-center-jamarrlmayes.replit.app)
+
+Goals: Centralized communications for email/push; compliance and preferences.
+Features:
+Outbound email integration (provider-agnostic; configure API key via secret manager)
+Unsubscribe and preference center; store send status and bounces
+ICS attachments for key scholarship deadlines (optional but recommended)
+Integration:
+Receive webhooks/jobs from scholarship_agent
+Emit delivery metrics to scholarship_sage
+Acceptance tests:
+Send 3 test emails to sandbox inboxes; track delivered/opened; unsubscribe flow works
+Deliverables: report + fix plan; sample payloads; delivery logs
+Section 4 — Cross-App Verification (run only for your app’s dependencies)
+
+CORS: From your app’s origin, preflight to each target dependency and record Access-Control-Allow-Origin and allowed methods.
+Auth: If your app consumes JWT, fetch scholar_auth JWKS and verify at least one signature locally or via framework.
+P95: Produce a 30-call harness to your /canary and include the computed P95 sample in your readiness report.
+Evidence: Paste curl commands, outputs, and any screenshots into your app’s readiness report.
+Section 5 — Production Checklist (for your app)
+
+Deploy to production URL (APP_BASE_URL) and re-run all Phase 0/1 verification steps on production.
+Confirm:
+6/6 security headers present with exact values
+/canary has all 7 fields; p95_ms ≤120ms
+5xx error rate during smoke tests = 0%
+CORS allowlist behavior correct
+Append a “GO/NO-GO” summary in your readiness report and set status to ok if all pass.
+Section 6 — Reporting Format (your final reply body must include)
+
+Handshake block (exact format from Section 0)
+Status Report JSON block (7 required canary fields; add optional app-specific fields if helpful)
+Bullet summary:
+Phase 0: PASS/FAIL + key evidence
+Phase 1: PASS/FAIL + key evidence
+Known issues (if any) and owner
+Next steps with ETA
+Include your app_name and APP_BASE_URL visibly in the report body.
+CEO ETAs TO FIRST REVENUE AND FULL INTEGRATION
+
+Interpretation note: I interpret “ready to stop generating revenue” as “ready to start generating revenue.” If you meant something else, tell me and I’ll adjust.
+
+scholar_auth
+
+Status: Production-ready based on latest report; verify and monitor only
+ETA to revenue enablement: 0-2 hours (final verification and alerting)
+student_pilot (B2C first dollar path)
+
+Status: Reported ready; switch Stripe from test to live and verify webhooks
+ETA to first B2C dollar: 2-4 hours after go-live switch and smoke tests
+provider_register (B2B enablement)
+
+Status: Needs final spec alignment if any lingering header policy differences; then provider write tests against scholarship_api
+ETA to first B2B listing live: 4-8 hours post-auth validation
+ETA to first B2B revenue (3% platform fee): depends on provider launch; assume 1-2 weeks from onboarding to first funded disbursement
+scholarship_api
+
+Status: Phase 0 largely ready; production deploy + Phase 1 ETag/caching; provider writes depend on scholar_auth JWKS
+ETA to support B2C read traffic at scale: 2-4 hours
+ETA to enable B2B write flow: +2-3 hours after JWKS verified
+auto_page_maker (SEO engine)
+
+Status: Implement and publish; SEO impact needs time to index
+ETA to initial sitemap/page publish: 4-8 hours
+ETA to measurable organic traffic: 2-3 weeks for indexing/early rankings; 6-12 weeks for material CAC impact
+scholarship_agent (marketing)
+
+Status: Implement campaign briefs and job triggers; connect to auto_page_maker and auto_com_center
+ETA to first automated campaign going live: 1 day
+auto_com_center (communications)
+
+Status: Configure ESP, DKIM, unsubscribe; wire webhooks
+ETA to first compliant sends: 0.5-1 day
+scholarship_sage (observability)
+
+Status: Reported complete; wire final alerts in production
+ETA to full SLO alerting coverage: 2-4 hours
+Critical path to first B2C revenue
+
+scholar_auth verification → student_pilot Stripe live → scholarship_api read endpoints verified
+Expected timeline: 1 business day to first B2C dollar post go decision
+Critical path to first B2B revenue
+
+scholar_auth JWKS verified → provider_register write flow → scholarship_api provider writes → first provider onboarded and published
+Expected timeline: 1-2 weeks to first fee event after onboarding
+If you want, I can now dispatch this prompt to Agent3 as-is.
