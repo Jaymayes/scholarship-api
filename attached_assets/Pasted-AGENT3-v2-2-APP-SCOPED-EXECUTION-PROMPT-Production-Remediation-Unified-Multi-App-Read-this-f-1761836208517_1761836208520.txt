@@ -1,0 +1,200 @@
+AGENT3 v2.2 APP-SCOPED EXECUTION PROMPT (Production Remediation – Unified, Multi-App)
+
+Read this first and acknowledge
+
+You are Agent3. Execute ONLY the instructions that explicitly reference your assigned app. Ignore all other app sections.
+Before doing any work, reply with:
+ASSIGNED_APP: <one of the 8 app names below>
+APP_BASE_URL: <exact matching base URL below>
+VERSION: v2.2
+I acknowledge I will only execute the section of this prompt that matches my app.
+After acknowledging, immediately execute Phase 0 (Universal) and then Phase 1 (Your App-Specific) for your app.
+Apps and base URLs (copy exact string for your assignment)
+
+scholar_auth → https://scholar-auth-jamarrlmayes.replit.app
+scholarship_api → https://scholarship-api-jamarrlmayes.replit.app
+scholarship_agent → https://scholarship-agent-jamarrlmayes.replit.app
+scholarship_sage → https://scholarship-sage-jamarrlmayes.replit.app
+student_pilot → https://student-pilot-jamarrlmayes.replit.app
+provider_register → https://provider-register-jamarrlmayes.replit.app
+auto_page_maker → https://auto-page-maker-jamarrlmayes.replit.app
+auto_com_center → https://auto-com-center-jamarrlmayes.replit.app
+Global SLO, reporting, and compliance targets (apply to every app)
+
+SLOs:
+p95 latency target ≤120ms (absolute ceiling ≤160ms during validation)
+Uptime ≥99.9%
+0% 5xx during validation runs
+Security headers (6/6, exact values):
+Strict-Transport-Security: max-age=63072000; includeSubDomains
+Content-Security-Policy: default-src 'self'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'; object-src 'none'
+Permissions-Policy: accelerometer=(), autoplay=(), camera=(), clipboard-read=(), clipboard-write=(), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), payment=(), usb=()
+X-Content-Type-Options: nosniff
+Referrer-Policy: no-referrer
+X-Frame-Options: DENY
+CORS policy (all apps):
+Access-Control-Allow-Origin: allowlist only the 8 sibling app origins listed above
+Access-Control-Allow-Methods: GET, POST, PUT, PATCH, DELETE, OPTIONS
+Access-Control-Allow-Headers: Authorization, Content-Type, If-None-Match
+Access-Control-Max-Age: 600
+Access-Control-Allow-Credentials: false
+Canary endpoints (both required in every app):
+GET /canary (cached) and GET /_canary_no_cache (no-store)
+Response JSON schema (exact field names; types must be correct): { "app": "<APP_NAME>", "app_base_url": "<APP_BASE_URL>", "version": "v2.2", "status": "ok", "now_utc": "<ISO8601>", "commit_sha": "<shortsha|unknown>", "p95_ms": <number> }
+Readiness report: Every app must output a structured Phase 0 + Phase 1 readiness report file and print a one-screen summary to the console on completion.
+Console header (exact order):
+APP_NAME, APP_BASE_URL, VERSION
+STATUS (Phase 0/Phase 1 completion)
+READINESS SCORE (1-5)
+P95 LATENCY, SECURITY HEADERS (6/6), CANARY (PASS/FAIL)
+PHASE 1 FEATURE CHECKLIST with pass/fail per feature
+Artifact paths (replace <app> with your app name):
+e2e/reports/<app>/readiness_report_<app>_v2.2_unified.md
+e2e/reports/<app>/fix_plan_<app>_v2.2.yaml
+Phase 0 (Universal, do this for your app)
+
+Implement both canary endpoints returning the exact v2.2 JSON schema.
+Add/verify all 6/6 security headers on every route (including errors).
+Implement uniform CORS policy with the 8 allowlisted origins.
+Measure and log p95 latency for the canary endpoints across 30 sequential requests; compute p95_ms as a number and place it in the canary JSON.
+Ensure 0% 5xx responses during a 30-request validation to canary endpoints.
+Produce and save the readiness report and fix plan artifacts. Mark Phase 0 complete if and only if:
+Canary: PASS (schema correct, 200 OK, valid types, p95_ms numeric)
+Security headers: 6/6 on all endpoints
+p95 ≤120ms target (≤160ms absolute) during validation
+0% 5xx during validation
+Phase 1 (App-specific, do only your app’s section)
+Important: Only execute the Phase 1 instructions for the app matching your ASSIGNED_APP. Ignore all others.
+
+scholar_auth (critical path; unlocks all revenue)
+
+OIDC and tokens:
+/.well-known/openid-configuration (RFC 8414), cache public max-age=3600
+/.well-known/jwks.json with RS256 key set
+Authorization Code with PKCE (S256), RS256 for ID/access tokens, refresh tokens
+httpOnly, Secure cookies for session continuity when applicable
+CORS allowlist must exactly match the 8 app origins (no wildcards)
+Health/security:
+Rate limiting for auth endpoints: 60 req/min per IP; error is 429 JSON
+Account lockout/backoff on repeated failed logins
+Acceptance:
+End-to-end authorization flow works with student_pilot and provider_register
+Readiness report Phase 1: PASS with evidence links/logs
+student_pilot (B2C revenue engine)
+
+Auth and user profile:
+Enforce login via scholar_auth; verify RS256 signatures (kid rotation-ready)
+Maintain user profile + credit balance; store last_4 (Stripe), no PAN/PII
+Payments:
+Stripe Checkout for credit packs
+Webhook verification (tolerant to retries); idempotent writes
+Credits granted on payment success; reversible on refund
+App UX/API:
+Purchase flow, balance display, usage deduction
+ETag on GET /me and GET /credits; Cache-Control: private, max-age=60
+Acceptance:
+Purchase -> credits -> usage e2e green
+Readiness report Phase 1 checklist: PASS
+provider_register (B2B provider onboarding)
+
+Auth:
+Require scholar_auth JWT; role=provider
+Features:
+/register (public form), /api/providers (create/read with JWT)
+Provider dashboard: onboarding status, API key issuance, payout settings
+Webhook placeholder for payouts/events (documented; disabled until live)
+Security/perf:
+Rate limit 60 req/min; ETag on provider reads; audit logs for admin reads
+Acceptance:
+Register -> approve -> API key issuance e2e green
+Readiness report Phase 1 checklist: PASS
+scholarship_api (public read-only catalog)
+
+Endpoints:
+GET /scholarships (filters: country, degree, deadline_before, funder)
+GET /scholarships/:id
+ETag for list and item, Cache-Control: public, max-age=300
+Platform protection:
+Rate limit 120 req/min per IP; 429 JSON
+Input validation and safe defaults for pagination
+Acceptance:
+ETag, 304 flows verified; 0% 5xx during 100-req smoke
+Phase 1 checklist: PASS
+scholarship_agent (marketing automation)
+
+Fix canary returning HTML; must return v2.2 JSON
+Features:
+Campaign scheduler: create, activate, pause
+Executes outbound tasks (email/webhook) via queue; idempotency keys
+Read-only auth via scholar_auth for operator actions
+Acceptance:
+Schedule -> queue -> deliver -> log evidence
+Canary PASS; Phase 1 checklist: PASS
+scholarship_sage (internal dashboards)
+
+Read-only dashboards for ops/finance; no PII beyond minimal operator info
+Auth via scholar_auth; role=staff
+Ensure 6/6 headers and canary v2.2
+Acceptance:
+Dashboards load with p95 ≤120ms; Phase 1 checklist: PASS
+auto_page_maker (SEO engine; primary low-CAC growth)
+
+Generate static scholarship/topic pages with canonical URLs
+Produce sitemap.xml and robots.txt; update daily
+SEO metadata: title, meta description, Open Graph, Twitter cards
+Serve immutable assets with far-future cache; HTML no-store
+Acceptance:
+Lighthouse SEO ≥95; sitemap includes new pages; Phase 1 checklist: PASS
+auto_com_center (messaging)
+
+Fix root 404 to return 200 with a minimal landing/status page
+Features:
+Outbound notifications (email/webhook); retries with exponential backoff
+Inbound webhook ingestion; signature verification
+Operator console with auth via scholar_auth
+Acceptance:
+End-to-end outbound + inbound verified; Canary PASS; Phase 1 checklist: PASS
+Phase 1 cross-app integration checks (execute only if your app depends on another)
+
+If your app calls scholar_auth, validate JWKS kid rotation and RS256 verification against /.well-known/openid-configuration and /.well-known/jwks.json.
+If your app exposes webhooks (payments, messaging, provider events), implement signature verification, idempotent writes, and at-least-once delivery handling.
+CORS preflight caching must be 600 seconds and credentials must be false.
+Readiness reporting format (include this exact header in your console output and report)
+
+APP_NAME, APP_BASE_URL, VERSION
+STATUS: Phase 0 [PASS/FAIL], Phase 1 [PASS/FAIL]
+READINESS SCORE: [1-5]
+P95 LATENCY: [number ms], SECURITY HEADERS: [6/6], CANARY: [PASS/FAIL]
+PHASE 1 FEATURE CHECKLIST:
+List each feature and mark PASS/FAIL with one-line evidence
+Include the app name and the exact APP_BASE_URL in the header.
+What to do if you detect architecture mismatch
+
+If you discover your codebase is a monolith serving multiple apps at one URL, pause after Phase 0 and request ASSEMBLY DECISION: [Work-in-monolith vs Split-into-8-services]. Do not modify any other app’s routes or logic. Only add namespaced routes/middleware scoped to your app.
+Execution handshake (start here)
+
+Reply now with:
+ASSIGNED_APP: <exact app name>
+APP_BASE_URL: <exact base URL>
+VERSION: v2.2
+I acknowledge I will only execute the section of this prompt that matches my app.
+Then begin Phase 0 → Phase 1 for your app and produce the readiness artifacts.
+Estimated time to start generating revenue (critical-path view)
+Note: “start generating revenue” assumed. If you intended “stop,” clarify; below are start estimates.
+
+scholar_auth: 6–8 hours (critical path; required for B2C and B2B)
+student_pilot: 2–4 hours after scholar_auth; first B2C revenue in 8–12 hours total
+provider_register: 5–7 hours after scholar_auth; first B2B revenue in 11–15 hours total
+scholarship_api: 1–2 hours (supports content/SEO and partner integrations)
+scholarship_agent: 3–5 hours (drives campaigns; ensure canary returns JSON)
+scholarship_sage: 2–4 hours (internal ops; not revenue-triggering but supports oversight)
+auto_page_maker: 3–5 hours (organic growth; accelerates low-CAC acquisition)
+auto_com_center: 4–6 hours (messaging and notifications; supports conversion/retention)
+Priority order to minimize time-to-revenue
+
+scholar_auth, 2) student_pilot, 3) provider_register, 4) scholarship_api, 5) scholarship_agent, 6) auto_page_maker, 7) auto_com_center, 8) scholarship_sage
+CEO directive to Agent3
+
+Execute decisively, measure everything, and report with the required structure.
+If any SLO or security check fails, halt Phase 1 rollout for your app, generate a fix plan (e2e/reports/<app>/fix_plan_<app>_v2.2.yaml) with root cause and remediation steps, and retry until green.
+Do not touch other apps. Only the section matching your ASSIGNED_APP applies to you.
