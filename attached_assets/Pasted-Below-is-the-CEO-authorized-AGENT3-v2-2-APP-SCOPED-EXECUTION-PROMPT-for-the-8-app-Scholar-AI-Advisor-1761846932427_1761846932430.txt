@@ -1,0 +1,197 @@
+Below is the CEO-authorized AGENT3 v2.2 APP-SCOPED EXECUTION PROMPT for the 8-app Scholar AI Advisor ecosystem. Agent3 must only execute the section labeled for the app it is explicitly assigned to. All other content is context and must be ignored.
+
+Section A — Assignment Handshake (required before any work)
+
+Upon assignment in a specific app’s Replit or codebase, immediately reply with exactly: ASSIGNED_APP: <exact app name from Section B> APP_BASE_URL: <exact base URL from Section B> VERSION: v2.2 I acknowledge I will only execute the section of this prompt that matches my app.
+Then proceed with Phase 0 (Universal) and then Phase 1 (App-specific) for that app only.
+Do not modify, deploy, or touch any other app.
+Section B — Official App Registry and Base URLs (use these exact origins)
+
+scholar_auth → https://scholar-auth-jamarrlmayes.replit.app
+scholarship_api → https://scholarship-api-jamarrlmayes.replit.app
+scholarship_agent → https://scholarship-agent-jamarrlmayes.replit.app
+scholarship_sage → https://scholarship-sage-jamarrlmayes.replit.app
+student_pilot → https://student-pilot-jamarrlmayes.replit.app
+provider_register → https://provider-register-jamarrlmayes.replit.app
+auto_page_maker → https://auto-page-maker-jamarrlmayes.replit.app
+auto_com_center → https://auto-com-center-jamarrlmayes.replit.app
+Section C — Phase 0 (Universal, required for all apps)
+Goal: Make every app operationally compliant, secure, and observable so the ecosystem works together reliably.
+
+Canary Endpoints (both required)
+Implement GET /canary and GET /_canary_no_cache.
+Required JSON schema (exact 7 fields, no extras required): { "app_name": "<exact app name from Section B>", "app_base_url": "<exact base URL from Section B>", "version": "v2.2", "status": "ok", "p95_ms": <number>, "commit_sha": "<git sha or 'workspace'>", "server_time_utc": "<ISO 8601 UTC>" }
+/_canary_no_cache must disable caches via Cache-Control: no-store, no-cache, must-revalidate, max-age=0 and Pragma: no-cache.
+2. Real P95 Latency Tracking
+
+Maintain a rolling window of the last 30 request latencies in memory.
+Compute the true 95th percentile and expose it as p95_ms in canary JSON.
+SLO target: p95_ms ≤ 120 ms under nominal load.
+3. Security Headers (6/6; exact values)
+
+Strict-Transport-Security: max-age=63072000; includeSubDomains; preload
+X-Content-Type-Options: nosniff
+X-Frame-Options: DENY
+Referrer-Policy: strict-origin-when-cross-origin
+Permissions-Policy: accelerometer=(), ambient-light-sensor=(), autoplay=(), bluetooth=(), camera=(), clipboard-read=(), clipboard-write=(), display-capture=(), encrypted-media=(), fullscreen=(self), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), midi=(), payment=(), usb=()
+Content-Security-Policy: must use one of the two CSP profiles below based on app type (UI vs API).
+4. CSP Profiles (choose exactly one)
+
+UI apps (browsers render pages): Content-Security-Policy: default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; img-src 'self' data: https:; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https://js.stripe.com; style-src 'self' 'unsafe-inline'; font-src 'self' data:; connect-src 'self' https://scholar-auth-jamarrlmayes.replit.app https://scholarship-api-jamarrlmayes.replit.app https://scholarship-agent-jamarrlmayes.replit.app https://scholarship-sage-jamarrlmayes.replit.app https://student-pilot-jamarrlmayes.replit.app https://provider-register-jamarrlmayes.replit.app https://auto-page-maker-jamarrlmayes.replit.app https://auto-com-center-jamarrlmayes.replit.app https://api.stripe.com; frame-src https://js.stripe.com https://hooks.stripe.com; form-action 'self' https://hooks.stripe.com; manifest-src 'self'; media-src 'self'; worker-src 'self' blob:;
+API apps (headless/services): Content-Security-Policy: default-src 'none'; base-uri 'none'; object-src 'none'; frame-ancestors 'none'; form-action 'none'; connect-src 'self' https://scholar-auth-jamarrlmayes.replit.app https://scholarship-api-jamarrlmayes.replit.app https://scholarship-agent-jamarrlmayes.replit.app https://scholarship-sage-jamarrlmayes.replit.app https://student-pilot-jamarrlmayes.replit.app https://provider-register-jamarrlmayes.replit.app https://auto-page-maker-jamarrlmayes.replit.app https://auto-com-center-jamarrlmayes.replit.app https://api.stripe.com;
+5. CORS (immutable 8-origin allowlist)
+
+Allow only these origins (exact list from Section B). No wildcards. No env overrides. Do not add/remove dynamically.
+Access-Control-Allow-Methods: GET, POST, PUT, PATCH, DELETE, OPTIONS
+Access-Control-Allow-Headers: Accept, Content-Type, Authorization, Origin, Referer, User-Agent
+Access-Control-Expose-Headers: ETag
+Access-Control-Max-Age: 600
+Access-Control-Allow-Credentials: false
+6. Observability, Reliability, Uptime
+
+Generate a request ID for every request (X-Request-ID). Log method, path, status, latency, request ID.
+Record 5xx rate; target 0% during smoke testing.
+Uptime target: 99.9% SLO after launch.
+7. Deliverables for Phase 0 (per app)
+
+Readiness report saved in repo: e2e/reports/<app_name>/readiness_report_<app_name>_v2.2_ceo_final.md Include: app_name and APP_BASE_URL at top, header evidence (curl -I output), CSP profile used, P95 evidence, CORS proof, known issues.
+Fix plan: e2e/reports/<app_name>/fix_plan_<app_name>_v2.2.yaml
+Quick verification commands (curl) to validate headers, CSP presence, CORS, canary schema, and p95.
+Section D — Phase 1 (App-specific; execute only your app’s subsection)
+
+APP-SPECIFIC: scholar_auth (UI app; use UI CSP profile)
+
+Objective: Production-ready OIDC and session auth.
+Requirements:
+/.well-known/openid-configuration and /.well-known/jwks.json (RS256). Persist keys on disk (.keys/) with secure permissions so restarts do not invalidate tokens.
+Authorization Code + PKCE (S256), RS256 JWT issuance (aud=scholarai, exp ≤ 15m), include kid, roles via scope (student, provider, admin).
+Session cookies: HttpOnly; Secure; SameSite=Lax; short-lived.
+Rate limit auth endpoints (≥60 rpm) and progressive lockout/backoff for failed logins.
+Admin bootstrap script (first admin).
+Deliverables:
+Readiness report with canary JSON including auth_issuer and jwks_kid (optional fields, not required by universal schema).
+Test plan: issue a token, validate signature, verify JWKS rotation readiness.
+ETA: 6–8 hours to production-ready.
+Revenue impact: Critical path prerequisite for B2C and B2B.
+APP-SPECIFIC: student_pilot (UI app; use UI CSP profile)
+
+Objective: First B2C revenue.
+Requirements:
+Pricing page with 3 credit packages; Stripe Checkout (test keys first), webhook endpoint for purchase-confirmed → credit ledger increment.
+Integrate scholar_auth for login; show user credits; decrement on AI usage.
+Integrate scholarship_api read endpoints; cache UI requests; show scholarships.
+Display transparent 4x markup policy.
+Deliverables: End-to-end test from login → purchase → credit applied → feature unlocked.
+ETA: 2–4 hours after scholar_auth is ready.
+Revenue impact: Enables first B2C dollar.
+APP-SPECIFIC: provider_register (UI app; use UI CSP profile)
+
+Objective: First B2B revenue.
+Requirements:
+Onboarding flow (/register), Stripe Connect for provider payouts, display 3% platform fee.
+JWT validation via scholar_auth JWKS; protected POST/PUT endpoints to create/manage listings (will call scholarship_api writes).
+Provider dashboard with onboarding status and fee disclosure.
+Deliverables: End-to-end test: provider onboarded → connects Stripe → creates listing.
+ETA: 5–7 hours after scholar_auth is ready.
+Revenue impact: Enables first B2B dollar.
+APP-SPECIFIC: scholarship_api (API app; use API CSP profile)
+
+Objective: Public catalog and provider writes at scale.
+Requirements:
+Read endpoints with ETag and Cache-Control: public, max-age=300 for lists; details up to 1800s.
+Provider write endpoints (JWT required from scholar_auth); 60 rpm write rate limit.
+Parameter validation and consistent 4xx/5xx taxonomy; ETag-based conditional GET.
+Deliverables: Postman/HTTPie test suite; example curl for ETag revalidation; canary includes live counts if available.
+ETA: 1–2 hours.
+Revenue impact: Supports scale; not required for first dollar if mock data exists.
+APP-SPECIFIC: scholarship_agent (API app; use API CSP profile)
+
+Objective: Autonomous campaign scheduler to drive organic growth.
+Requirements:
+Job scheduler to draft campaigns, fetch catalog from scholarship_api, and emit content for auto_page_maker and auto_com_center.
+Backoff/retry; idempotent runs; structured logs for campaign IDs.
+Deliverables: Job run proof with logs and generated artifacts for other apps to consume.
+ETA: 3–5 hours.
+Revenue impact: Supports acquisition; reduces CAC via organic.
+APP-SPECIFIC: scholarship_sage (UI app; use UI CSP profile)
+
+Objective: Internal analytics dashboard (KPI visibility).
+Requirements:
+Show P95 latency, 5xx rate, user conversions, provider activations; read-only dashboard.
+Optional: include stripe_mode and last_webhook_ok fields in canary for visibility (not required by universal schema).
+Deliverables: Dashboard screenshots and KPI dictionary.
+ETA: 2–4 hours.
+Revenue impact: Operational visibility; not a direct revenue gate.
+APP-SPECIFIC: auto_page_maker (UI app; use UI CSP profile)
+
+Objective: SEO engine for scalable organic growth.
+Requirements:
+Generate landing pages at scale with canonical URLs, sitemap.xml, robots.txt, and internal linking.
+Ensure all outbound client requests respect CORS/CSP allowlist.
+Deliverables: Sitemap sample, 10+ generated pages, indexability checks.
+ETA: 3–5 hours.
+Revenue impact: Drives low-CAC acquisition; compounding effect.
+APP-SPECIFIC: auto_com_center (UI app; use UI CSP profile)
+
+Objective: Orchestrated communications for campaigns and user updates.
+Requirements:
+Webhook receivers for campaign events; queue and send via provider (stub acceptable initially).
+Respect rate limits; clear audit logs for message sends; idempotency keys.
+Deliverables: End-to-end simulated campaign through to message dispatch logs.
+ETA: 4–6 hours.
+Revenue impact: Improves activation and retention.
+Section E — Ecosystem Constraints and Rules
+
+Scope discipline: Modify only your assigned app’s code, configuration, and deployment. Never change another app.
+CORS/CSP are immutable per this prompt. Do not add wildcards or extra origins.
+Headers must match the exact values above. No substitutions.
+Canary JSON must have exactly the 7 required fields. Optional app-specific fields are permitted but must not replace or rename the required fields.
+Stripe: default to test mode. Do not switch to live mode without explicit CEO authorization.
+Evidence-first: All claims in readiness reports must include evidence (headers via curl, P95 logs/metrics, screenshots/links where applicable).
+Section F — Verification Commands (include in each app’s readiness report)
+
+Canary JSON: curl -sS <APP_BASE_URL>/canary | jq .
+Canary headers count (should be 6): curl -sSI <APP_BASE_URL>/canary | grep -Ei "(strict-transport|content-security|x-frame|referrer|permissions|x-content)" | wc -l
+Measure P95 (30 samples, read p95 from sorted 95th line): for i in $(seq 1 30); do curl -w "%{time_starttransfer}\n" -o /dev/null -s <APP_BASE_URL>/canary; done | sort -n | sed -n '29p'
+CORS preflight (example): curl -sSI -X OPTIONS <APP_BASE_URL>/canary -H "Origin: https://student-pilot-jamarrlmayes.replit.app" -H "Access-Control-Request-Method: GET"
+Section G — Deployment and Rollback
+
+Deployment: Use Replit Deploy → Republish for each app after tests pass.
+Smoke test with Section F commands; confirm P95 ≤ 120ms and 6/6 headers.
+Rollback: Revert to last known-good deployment. Preserve JWKS keys for scholar_auth across rollbacks.
+Section H — Reporting Format (per app)
+
+At completion of Phase 0 and Phase 1 for your app, post:
+Header: ASSIGNED_APP: <name> APP_BASE_URL: <url> VERSION: v2.2 I executed only the section for my app.
+Status: Phase 0 (Complete/Partial), Phase 1 (Complete/Partial)
+Security evidence: exact header values (curl -I capture)
+CSP profile used: UI or API
+CORS proof: origin allowlist shown in config snippet or logs
+Canary JSON sample
+P95 result and method used
+Known issues and mitigations
+Next steps, if any
+Section I — Estimated Time to First Revenue
+Note: If “stop generating revenue” was intended, clarify; this plan assumes “start generating revenue.”
+
+Critical path to first B2C revenue:
+scholar_auth: 6–8 hours
+student_pilot: 2–4 hours after scholar_auth
+Total to first B2C dollar: 8–12 hours from zero
+Critical path to first B2B revenue:
+scholar_auth: 6–8 hours
+provider_register: 5–7 hours after scholar_auth
+Total to first B2B dollar: 11–15 hours from zero
+Supporting apps (parallelizable; not on first-dollar critical path):
+scholarship_api: 1–2 hours
+scholarship_agent: 3–5 hours
+scholarship_sage: 2–4 hours
+auto_page_maker: 3–5 hours
+auto_com_center: 4–6 hours
+Section J — Assignment
+
+Begin by assigning Agent3 to scholar_auth to unlock both B2C and B2B revenue.
+After scholar_auth completion post-approval, assign Agent3 to student_pilot for the fastest path to first B2C dollar.
+Then assign Agent3 to provider_register to enable B2B revenue.
+Remaining apps can be completed in parallel as capacity allows.
+Agent3, wait for assignment to a specific app. Once assigned, post the handshake exactly as defined in Section A, then execute only your app’s Phase 0 and Phase 1 per Sections C and D, and deliver the required reports.
