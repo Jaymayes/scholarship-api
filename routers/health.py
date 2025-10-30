@@ -276,10 +276,10 @@ async def deep_health_check() -> DeepHealthResponse:
     )
 
 @router.get("/canary")
-async def canary_check(response: Response):
+async def canary_check(response: Response, db: Session = Depends(get_db)):
     """
-    V2.2 Universal Ecosystem Canary Endpoint
-    Exact schema per CEO v2.2 spec (numeric p95_ms)
+    V2.2 APP-SCOPED Universal Ecosystem Canary Endpoint
+    Exact schema per CEO v2.2 spec: app_name, server_time_utc, business metrics
     CRITICAL: This MUST be accessible without authentication
     """
     from datetime import datetime
@@ -301,20 +301,33 @@ async def canary_check(response: Response):
     # For now, use a reasonable estimate based on lightweight endpoint
     p95_ms = float(os.getenv("CANARY_P95_MS", "85"))
     
+    # Business metrics: total_scholarships, total_providers (CEO v2.2 requirement)
+    try:
+        # Query scholarships table directly via raw SQL (Pydantic model, not SQLAlchemy)
+        total_scholarships = db.execute(text("SELECT COUNT(*) FROM scholarships")).scalar() or 0
+        # Providers count - distinct organizations
+        total_providers = db.execute(text("SELECT COUNT(DISTINCT organization) FROM scholarships WHERE organization IS NOT NULL")).scalar() or 0
+    except Exception as e:
+        logger.warning(f"Failed to fetch business metrics for canary: {e}")
+        total_scholarships = 0
+        total_providers = 0
+    
     return {
-        "app": "scholarship_api",
+        "app_name": "scholarship_api",
         "app_base_url": "https://scholarship-api-jamarrlmayes.replit.app",
         "version": "v2.2",
         "status": "ok",
-        "now_utc": datetime.utcnow().isoformat() + "Z",
+        "server_time_utc": datetime.utcnow().isoformat() + "Z",
         "commit_sha": commit_sha[:8] if len(commit_sha) > 8 else commit_sha,
-        "p95_ms": p95_ms
+        "p95_ms": p95_ms,
+        "total_scholarships": total_scholarships,
+        "total_providers": total_providers
     }
 
 @router.get("/_canary_no_cache")
-async def canary_check_no_cache(response: Response):
+async def canary_check_no_cache(response: Response, db: Session = Depends(get_db)):
     """
-    V2.2 Fallback canary endpoint with explicit cache bypass
+    V2.2 APP-SCOPED Fallback canary endpoint with explicit cache bypass
     Identical to /canary but provides alternative path if CDN caches /canary
     """
     from datetime import datetime
@@ -335,14 +348,27 @@ async def canary_check_no_cache(response: Response):
     # P95 latency estimate
     p95_ms = float(os.getenv("CANARY_P95_MS", "85"))
     
+    # Business metrics: total_scholarships, total_providers (CEO v2.2 requirement)
+    try:
+        # Query scholarships table directly via raw SQL (Pydantic model, not SQLAlchemy)
+        total_scholarships = db.execute(text("SELECT COUNT(*) FROM scholarships")).scalar() or 0
+        # Providers count - distinct organizations
+        total_providers = db.execute(text("SELECT COUNT(DISTINCT organization) FROM scholarships WHERE organization IS NOT NULL")).scalar() or 0
+    except Exception as e:
+        logger.warning(f"Failed to fetch business metrics for canary: {e}")
+        total_scholarships = 0
+        total_providers = 0
+    
     return {
-        "app": "scholarship_api",
+        "app_name": "scholarship_api",
         "app_base_url": "https://scholarship-api-jamarrlmayes.replit.app",
         "version": "v2.2",
         "status": "ok",
-        "now_utc": datetime.utcnow().isoformat() + "Z",
+        "server_time_utc": datetime.utcnow().isoformat() + "Z",
         "commit_sha": commit_sha[:8] if len(commit_sha) > 8 else commit_sha,
-        "p95_ms": p95_ms
+        "p95_ms": p95_ms,
+        "total_scholarships": total_scholarships,
+        "total_providers": total_providers
     }
 
 @router.get("/healthz")
