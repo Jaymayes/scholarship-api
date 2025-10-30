@@ -1,0 +1,322 @@
+metadata:
+  app: scholarship_api
+  base_url: https://scholarship-api-jamarrlmayes.replit.app
+  version: v2.2
+  owner: API Engineering Team
+  target_score: 5
+  current_score: 1
+  gate_deadline: T+24h Infrastructure Gate
+  last_updated: 2025-10-30T04:10:00Z
+  critical_blocker:
+    - /canary endpoint missing (404) - HARD CAP TO 1/5
+
+tasks:
+  - id: FP-API-CANARY-JSON
+    title: Implement universal /canary endpoint
+    severity: P0
+    estimate_hours: 1
+    priority: CRITICAL_PATH
+    summary: Add GET /canary endpoint returning JSON per v2.2 universal spec
+    acceptance_criteria:
+      - GET /canary returns 200 OK
+      - Content-Type is application/json; charset=utf-8
+      - Response body matches exact spec
+          - ok: true (boolean)
+          - service: "scholarship_api" (string)
+          - base_url: "https://scholarship-api-jamarrlmayes.replit.app" (string)
+          - version: "v2.2" (string)
+          - timestamp: ISO-8601 UTC (string)
+      - P95 TTFB ≤ 120ms across 3 samples
+      - Endpoint accessible without authentication
+      - Route registered BEFORE any catch-all routes
+    implementation_notes: |
+      Location: Likely main.py or routers/health.py (FastAPI app)
+      
+      Implementation (FastAPI):
+      ```python
+      from datetime import datetime
+      from fastapi import APIRouter, Response
+      
+      router = APIRouter()
+      
+      @router.get("/canary")
+      async def canary(response: Response):
+          """Universal ecosystem canary endpoint (v2.2 spec)"""
+          response.headers["Content-Type"] = "application/json; charset=utf-8"
+          response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+          
+          return {
+              "ok": True,
+              "service": "scholarship_api",
+              "base_url": "https://scholarship-api-jamarrlmayes.replit.app",
+              "version": "v2.2",
+              "timestamp": datetime.utcnow().isoformat() + "Z"
+          }
+      ```
+      
+      **CRITICAL:** Register this route BEFORE any catch-all or 404 handlers:
+      ```python
+      # In main.py
+      from routers import health  # or wherever /canary is defined
+      
+      app = FastAPI()
+      
+      # Register /canary FIRST
+      app.include_router(health.router, tags=["health"])
+      
+      # Then other routers
+      app.include_router(scholarships.router, prefix="/api/v1")
+      
+      # Catch-all/404 handler LAST
+      @app.exception_handler(404)
+      async def not_found_handler(request, exc):
+          return JSONResponse(...)
+      ```
+      
+      Verification steps:
+      1. Restart FastAPI server
+      2. Test: `curl -i https://scholarship-api-jamarrlmayes.replit.app/canary`
+      3. Verify HTTP 200, Content-Type: application/json
+      4. Verify JSON body matches spec (use jq to validate)
+      5. Test 3 times, ensure P95 TTFB <120ms
+    changes:
+      - file: main.py (or routers/health.py)
+        action: add
+        notes: Add /canary route handler with exact JSON response; ensure route registration order is correct
+    verification:
+      - step: curl -sS -D - https://scholarship-api-jamarrlmayes.replit.app/canary
+        expect: HTTP/2 200, Content-Type application/json, body with ok:true
+      - step: curl -sS https://scholarship-api-jamarrlmayes.replit.app/canary | jq '.ok, .service, .version'
+        expect: true, "scholarship_api", "v2.2"
+      - step: curl -w "TTFB=%{time_starttransfer}s\n" -o /dev/null -sS https://scholarship-api-jamarrlmayes.replit.app/canary
+        expect: TTFB ≤0.12s (120ms)
+    success_criteria:
+      - /canary returns 200 JSON with correct structure
+      - All fields present and correctly typed
+      - P95 TTFB ≤ 120ms (target; 160ms acceptable for 5/5)
+      - Score increases from 1/5 to 4/5 immediately
+    rollback_plan: |
+      If /canary causes issues:
+      1. Comment out @router.get("/canary") handler
+      2. Restart server
+      3. App returns to previous state (404 on /canary, score 1/5)
+      
+      If deployment fails:
+      1. Revert git commit
+      2. Redeploy previous version
+    risk: low
+    dependencies: []
+    notes: |
+      **QUICK WIN:** This is a 1-hour P0 fix that unlocks:
+      - Score 1/5 → 4/5 (or 5/5 with Permissions-Policy)
+      - T+24h Infrastructure Gate unblocked
+      - Ecosystem orchestration health checks enabled
+      
+      The /canary endpoint is lightweight (no DB queries, just JSON response).
+      Performance should be excellent (<50ms typical).
+
+  - id: FP-API-PERMISSIONS-POLICY
+    title: Add Permissions-Policy header for 6/6 security headers
+    severity: P2
+    estimate_hours: 0.5
+    priority: MEDIUM
+    summary: Add Permissions-Policy to achieve 6/6 security headers (unlocks 5/5 score)
+    acceptance_criteria:
+      - Permissions-Policy header present on all responses
+      - Header value: camera=(), microphone=(), geolocation=()
+      - curl -I shows all 6/6 headers present
+      - Score increases from 4/5 to 5/5 (after /canary is fixed)
+    implementation_notes: |
+      Location: Middleware configuration in main.py
+      
+      FastAPI implementation:
+      ```python
+      from fastapi.middleware.trustedhost import TrustedHostMiddleware
+      from starlette.middleware.base import BaseHTTPMiddleware
+      
+      class SecurityHeadersMiddleware(BaseHTTPMiddleware):
+          async def dispatch(self, request, call_next):
+              response = await call_next(request)
+              response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
+              return response
+      
+      # In main.py
+      app.add_middleware(SecurityHeadersMiddleware)
+      ```
+      
+      Or using existing helmet/security package if configured.
+    changes:
+      - file: main.py
+        action: modify
+        notes: Add Permissions-Policy header via middleware
+    verification:
+      - step: curl -I https://scholarship-api-jamarrlmayes.replit.app/health | grep -i permissions-policy
+        expect: "Permissions-Policy: camera=(), microphone=(), geolocation=()"
+      - step: Count security headers
+        expect: 6/6 present
+    success_criteria:
+      - 6/6 security headers present
+      - No functionality regression
+      - Score 4/5 → 5/5 (assuming /canary is fixed)
+    rollback_plan: |
+      Remove middleware if it causes issues:
+      1. Comment out app.add_middleware(SecurityHeadersMiddleware)
+      2. Restart server
+    risk: low
+    dependencies:
+      - FP-API-CANARY-JSON (must be completed first)
+
+  - id: FP-API-RATE-LIMIT
+    title: Add basic rate limiting for production safety
+    severity: P1
+    estimate_hours: 2
+    priority: MEDIUM
+    summary: Protect API from abuse with rate limiting (nice-to-have for 5/5)
+    acceptance_criteria:
+      - Rate limit: 100 requests per minute per IP for public endpoints
+      - Rate limit: 1000 requests per minute per API key for authenticated endpoints
+      - HTTP 429 with JSON error response when limit exceeded
+      - Rate limit headers present (X-RateLimit-Limit, X-RateLimit-Remaining, X-RateLimit-Reset)
+    implementation_notes: |
+      FastAPI with slowapi library:
+      ```python
+      from slowapi import Limiter, _rate_limit_exceeded_handler
+      from slowapi.util import get_remote_address
+      from slowapi.errors import RateLimitExceeded
+      
+      limiter = Limiter(key_func=get_remote_address)
+      app.state.limiter = limiter
+      app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+      
+      @app.get("/api/v1/scholarships")
+      @limiter.limit("100/minute")
+      async def list_scholarships():
+          ...
+      ```
+      
+      For authenticated endpoints, use API key extraction:
+      ```python
+      def get_api_key(request: Request):
+          return request.headers.get("Authorization", "").split()[-1]
+      
+      @app.get("/api/v1/applications")
+      @limiter.limit("1000/minute", key_func=get_api_key)
+      async def create_application():
+          ...
+      ```
+    changes:
+      - file: main.py
+        action: modify
+        notes: Add slowapi limiter configuration
+      - file: requirements.txt
+        action: add
+        notes: Add slowapi dependency
+      - file: routers/scholarships.py
+        action: modify
+        notes: Add @limiter.limit decorators to endpoints
+    verification:
+      - step: Make 101 requests to /api/v1/scholarships within 1 minute
+        expect: 101st request returns HTTP 429 with JSON error
+      - step: curl -I https://scholarship-api-jamarrlmayes.replit.app/api/v1/scholarships
+        expect: Headers include X-RateLimit-Limit, X-RateLimit-Remaining
+    success_criteria:
+      - Rate limits enforced correctly
+      - 429 errors are JSON (not HTML)
+      - No performance degradation (<5ms overhead per request)
+    rollback_plan: |
+      If rate limiting causes false positives:
+      1. Increase limits temporarily (e.g., 100 → 500/minute)
+      2. If still problematic, remove @limiter.limit decorators
+      3. Restart server
+    risk: medium
+    dependencies: []
+    notes: |
+      Optional for 5/5 score but recommended for production safety.
+      Can be implemented post-T+24h gate if time is tight.
+
+verification_steps:
+  - step: 1
+    action: Implement /canary endpoint (FP-API-CANARY-JSON)
+    expected: |
+      curl https://scholarship-api-jamarrlmayes.replit.app/canary
+      → 200 OK
+      → Content-Type: application/json
+      → Body: {"ok":true,"service":"scholarship_api","base_url":"...","version":"v2.2","timestamp":"..."}
+  
+  - step: 2
+    action: Add Permissions-Policy header (FP-API-PERMISSIONS-POLICY)
+    expected: |
+      curl -I https://scholarship-api-jamarrlmayes.replit.app/health | grep -i permissions-policy
+      → Permissions-Policy: camera=(), microphone=(), geolocation=()
+  
+  - step: 3
+    action: Re-run full validation (3 samples per endpoint)
+    expected: |
+      /canary: 200 JSON, P95 ≤120ms
+      /health: 200 JSON, P95 ≤145ms
+      /api/v1/scholarships: 200 JSON, P95 ≤93ms
+      Security headers: 6/6
+      Final score: 5/5
+  
+  - step: 4
+    action: Verify ecosystem integration
+    expected: |
+      student_pilot can call /api/v1/scholarships → 200
+      scholarship_agent can call /canary → 200
+      scholar_auth tokens accepted (if auth enabled)
+
+quick_wins:
+  - id: QW-001
+    title: Copy /health logic to /canary (5-minute fix)
+    eta_minutes: 5
+    steps:
+      - Locate /health route handler in codebase
+      - Duplicate as /canary with modified response body
+      - Update response to match v2.2 canary spec
+      - Restart server
+      - Test with curl
+    impact: Score 1/5 → 4/5 immediately; unblocks T+24h gate
+  
+  - id: QW-002
+    title: Test /canary locally before deployment
+    eta_minutes: 10
+    steps:
+      - Run server locally: uvicorn main:app --reload
+      - curl http://localhost:8000/canary
+      - Verify JSON structure with jq
+      - Verify Content-Type header
+      - Deploy to production with confidence
+    impact: De-risks production deployment
+  
+  - id: QW-003
+    title: Add Permissions-Policy via one-line middleware
+    eta_minutes: 15
+    steps:
+      - Add SecurityHeadersMiddleware class (5 lines of code)
+      - Register middleware in main.py
+      - Restart server
+      - Test with curl -I
+    impact: Score 4/5 → 5/5; achieves perfect security posture
+
+notes: |
+  Post-fix validation checklist:
+  - /canary returns 200 JSON with correct structure ✅
+  - Content-Type: application/json; charset=utf-8 ✅
+  - P95 TTFB ≤120ms (or ≤160ms for 5/5) ✅
+  - Security headers 6/6 (add Permissions-Policy) ✅
+  - /health, /api/v1/scholarships still work (no regression) ✅
+  
+  If score reaches 4/5: T+24h Infrastructure Gate UNBLOCKED
+  If score reaches 5/5: Excellent; API production-ready
+  
+  CRITICAL PATH: FP-API-CANARY-JSON (P0) must be completed for T+24h gate.
+  FP-API-PERMISSIONS-POLICY (P2) is nice-to-have for 5/5.
+  FP-API-RATE-LIMIT (P1) can be deferred post-gate if needed.
+  
+  ETA to 4/5: 1 hour (FP-API-CANARY-JSON only)
+  ETA to 5/5: 1.5 hours (FP-API-CANARY-JSON + FP-API-PERMISSIONS-POLICY)
+  
+  **Revenue Impact:** This API is on the critical path to revenue. Without /canary:
+  - Ecosystem health monitoring impaired
+  - Cannot confidently scale to production load
+  - Revenue start delayed

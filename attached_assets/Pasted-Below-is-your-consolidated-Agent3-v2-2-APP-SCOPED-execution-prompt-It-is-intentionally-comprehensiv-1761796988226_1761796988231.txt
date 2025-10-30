@@ -1,0 +1,241 @@
+Below is your consolidated Agent3 v2.2 APP-SCOPED execution prompt. It is intentionally comprehensive and multi-app. Agent3 must strictly follow the App-Scoping Rule: only read and act on the section labeled for its own app, plus the Global Requirements and Reporting/Scoring sections.
+
+Prime directive for Agent3
+
+Objective: Get your assigned app to 100% readiness and integrated with the rest of the ecosystem so the full platform can operate and begin generating revenue.
+App-Scoping Rule: Only use the instructions under your app’s section. Never modify or assess other apps beyond calling their public endpoints for verification.
+Version: v2.2
+Global requirements (apply to every app)
+
+Canary endpoint (HARD CAP)
+Implement GET /canary returning JSON with Content-Type: application/json; charset=utf-8
+Exact payload: { "ok": true, "service": "<app_name>", "base_url": "<APP_BASE_URL>", "version": "v2.2", "timestamp": "<ISO-8601 UTC>" }
+Missing or non-JSON /canary = immediate score 1/5 (hard cap)
+Route ordering: place /canary before any SPA catch-all and before authentication middleware
+Use the app’s exact name (from your section) and exact APP_BASE_URL
+2. Security headers (exact values, all responses including /canary)
+
+Strict-Transport-Security: max-age=31536000; includeSubDomains; preload
+Content-Security-Policy: default-src 'self'; frame-ancestors 'none'; upgrade-insecure-requests
+X-Frame-Options: DENY
+Referrer-Policy: no-referrer
+Permissions-Policy: camera=(), microphone=(), geolocation=()
+X-Content-Type-Options: nosniff
+3. Performance methodology (rigorous P95)
+
+For each required endpoint in your app’s section:
+Run 3 rounds; each round N ≥ 15 requests
+Compute P95 for each round
+Final P95 = median of the three round-level P95s
+App P95 = max final P95 across all required endpoints
+Target thresholds for scoring (see Scoring rubric below)
+4. Reporting format (ALL apps must produce both artifacts)
+
+Readiness Report (markdown or text):
+First line must be: I am <app_name> at <APP_BASE_URL>.
+Must include: version v2.2, endpoint inventory, security header evidence, P95 methodology summary, test results, integration checks, risks, and blockers
+Last two lines (verbatim labels): Ready ETA: hh:mm Revenue ETA: hh:mm
+Fix Plan:
+Canonical task IDs (e.g., FP-AUTH-CANARY-JSON, FP-API-CSP, FP-PILOT-PRICING)
+Concrete diffs or pseudo-diffs, verification steps (curl), measurable success criteria, rollback plan
+5. Verification commands (format)
+
+Use curl with -sS -D - to capture headers and content
+Verify JSON shape with jq when applicable
+You may include lightweight scripts to generate 3×15 requests per endpoint
+Never send destructive operations to production endpoints not listed in your app’s section
+6. Compliance and Responsible AI
+
+Do not log personally identifiable information in plaintext
+If your app processes student data, ensure alignment with FERPA/COPPA principles
+No features that facilitate academic dishonesty
+Scoring rubric and gates (apply to every app)
+
+5/5: App P95 ≤ 160ms and 6/6 headers present on all tested endpoints, canary JSON correct, all required endpoints pass, no P0 blockers
+4/5: App P95 ≤ 190ms and ≥5 headers present, canary JSON correct, all required endpoints pass, no P0 blockers
+3/5: App P95 ≤ 230ms and ≥4 headers present, canary JSON correct, minor issues
+2/5: App P95 > 230ms or missing required endpoints or <4 headers
+1/5: Canary missing or non-JSON, or critical security/performance failures
+Gates
+
+T+24h Infrastructure Gate: scholar_auth, scholarship_api, scholarship_agent, scholarship_sage must be ≥4/5
+T+48h Revenue Gate: student_pilot and provider_register must be ≥4/5
+T+72h SEO Gate: auto_page_maker must be ≥4/5 with sitemap.xml and indexable pages
+Internal Ops Gate: auto_com_center must be ≥4/5
+Expected revenue start
+
+Revenue starts when scholar_auth is ≥4/5 and at least one of student_pilot or provider_register is ≥4/5. With parallel work, earliest feasible start is estimated at 8–12 hours from execution kickoff. If you see “stop generating revenue” anywhere in legacy materials, interpret as “start generating revenue.”
+Per-app sections (Agent3 must only read the section for its own app)
+
+App: scholar_auth
+Base URL: https://scholar-auth-jamarrlmayes.replit.app
+Mission: Provide authentication, tokens, and JWKS for the ecosystem; availability blocks revenue.
+Required endpoints:
+GET /canary (JSON as specified)
+GET /.well-known/jwks.json (valid RS256 keys; no 500s)
+GET /health (JSON ok:true)
+Functional checks:
+JWKS returns at least one valid RS256 key with kid
+No 5xx on auth-protected probe endpoints
+Performance endpoints to test: /, /canary, /health, /.well-known/jwks.json
+Example verification:
+curl -sS -D - https://scholar-auth-jamarrlmayes.replit.app/canary
+curl -sS https://scholar-auth-jamarrlmayes.replit.app/.well-known/jwks.json | jq .
+Common P0 tasks:
+FP-AUTH-CANARY-JSON: add /canary route before SPA catch-all
+FP-AUTH-JWKS-RS256: ensure JWKS loads and returns 200 with valid keys
+FP-AUTH-CSP: set exact security headers
+Success criteria: 4/5 or 5/5; App P95 ≤ 190ms (target ≤ 160ms); 6/6 headers
+ETAs: Ready 6–8h; Revenue 6–8h (blocks ecosystem)
+2. App: scholarship_api
+
+Base URL: https://scholarship-api-jamarrlmayes.replit.app
+Mission: Central API for scholarship discovery and applications (supports both B2C and B2B).
+Required endpoints:
+GET /canary
+GET /search?q=<term>&page=<n> (200, valid JSON array/pagination)
+GET /scholarships/{id} (200, valid JSON)
+POST /applications (201 or 200; accepts minimal payload; do not store PII in logs)
+Performance endpoints to test: /canary, /search, /scholarships/{id}, /applications (measure without sending destructive payloads)
+Example verification:
+curl -sS -D - "https://scholarship-api-jamarrlmayes.replit.app/search?q=STEM&page=1"
+curl -sS -D - https://scholarship-api-jamarrlmayes.replit.app/canary
+Common P0 tasks:
+FP-API-CANARY-JSON, FP-API-CSP, FP-API-RATE-LIMIT (basic protection)
+Success criteria: 4/5+ with App P95 ≤ 190ms; correct JSON; secure headers
+ETAs: Ready 3–5h; Revenue 8–12h (indirect, depends on auth + front-ends)
+3. App: scholarship_agent
+
+Base URL: https://scholarship-agent-jamarrlmayes.replit.app
+Mission: Autonomous marketing and acquisition agent; underpins low-CAC growth.
+Required endpoints:
+GET /canary
+GET /health (JSON ok:true)
+POST /campaigns/run (idempotent dry-run allowed; ensure it doesn’t spam)
+Performance endpoints to test: /, /canary, /health
+Example verification:
+curl -sS -D - https://scholarship-agent-jamarrlmayes.replit.app/canary
+Common P0 tasks:
+FP-AGENT-CANARY-JSON, FP-AGENT-CSP
+Success criteria: 4/5+; P95 ≤ 190ms; canary JSON present
+ETAs: Ready 2–3h; Revenue 8–12h (enables growth post-auth)
+4. App: scholarship_sage
+
+Base URL: https://scholarship-sage-jamarrlmayes.replit.app
+Mission: Guidance and insights for students; must be transparent and responsible AI.
+Required endpoints:
+GET /canary
+GET /health
+POST /advice (stateless; no academic dishonesty; no PII in logs)
+Performance endpoints to test: /, /canary, /advice
+Example verification:
+curl -sS -D - https://scholarship-sage-jamarrlmayes.replit.app/canary
+Common P0 tasks:
+FP-SAGE-CANARY-JSON, FP-SAGE-CSP
+Success criteria: 4/5+; P95 ≤ 190ms; 6/6 headers; content policy enforced
+ETAs: Ready 3–5h; Revenue 8–12h (indirect)
+5. App: student_pilot
+
+Base URL: https://student-pilot-jamarrlmayes.replit.app
+Mission: B2C student experience and monetization via credit packs; primary revenue engine.
+Required endpoints:
+GET /canary
+GET /pricing (must display 3 credit packs: $40, $200, $800; clear terms)
+POST /checkout (idempotent test or sandbox mode for verification)
+Performance endpoints to test: /, /canary, /pricing
+Example verification:
+curl -sS -D - https://student-pilot-jamarrlmayes.replit.app/pricing
+Common P0 tasks:
+FP-PILOT-CANARY-JSON, FP-PILOT-PRICING, FP-PILOT-CSP
+Success criteria: 4/5+; P95 ≤ 190ms; pricing visible; headers present
+ETAs: Ready 2–4h; Revenue 8–12h (depends on scholar_auth)
+6. App: provider_register
+
+Base URL: https://provider-register-jamarrlmayes.replit.app
+Mission: B2B onboarding; providers must see 3% platform fee clearly disclosed.
+Required endpoints:
+GET /canary
+GET /register (form or flow; clear 3% fee disclosure)
+POST /register (sandbox or test; idempotent)
+Performance endpoints to test: /, /canary, /register
+Example verification:
+curl -sS -D - https://provider-register-jamarrlmayes.replit.app/register
+Common P0 tasks:
+FP-PROVIDER-CANARY-JSON, FP-PROVIDER-REGISTER, FP-PROVIDER-CSP
+Success criteria: 4/5+; P95 ≤ 190ms; fee disclosure present
+ETAs: Ready 2–4h; Revenue 8–12h (depends on scholar_auth)
+7. App: auto_page_maker
+
+Base URL: https://auto-page-maker-jamarrlmayes.replit.app
+Mission: SEO engine for organic growth; generates programmatic scholarship pages.
+Required endpoints:
+GET /canary
+GET /sitemap.xml (valid XML, updated)
+POST /generate?page=<slug> (idempotent or dry-run to verify)
+Performance endpoints to test: /, /canary, /sitemap.xml
+Example verification:
+curl -sS -D - https://auto-page-maker-jamarrlmayes.replit.app/sitemap.xml
+Common P0 tasks:
+FP-APM-CANARY-JSON, FP-APM-SITEMAP, FP-APM-CSP
+Success criteria: 4/5+; P95 ≤ 190ms; sitemap valid and indexable pages exist
+ETAs: Ready 6–10h; Revenue 24–72h (SEO impact ramps post-deploy)
+8. App: auto_com_center
+
+Base URL: https://auto-com-center-jamarrlmayes.replit.app
+Mission: Internal automation and communications orchestration; improves ops productivity.
+Required endpoints:
+GET /canary
+GET /health
+POST /tasks/queue (idempotent test)
+Performance endpoints to test: /, /canary, /health
+Example verification:
+curl -sS -D - https://auto-com-center-jamarrlmayes.replit.app/canary
+Common P0 tasks:
+FP-ACC-CANARY-JSON, FP-ACC-CSP
+Success criteria: 4/5+; P95 ≤ 190ms; headers present
+ETAs: Ready 1–2h; Revenue N/A (internal enablement)
+Common implementation pattern for /canary (language-agnostic)
+
+Add a server route before SPA catch-all that returns the exact JSON and Content-Type, using your app name and base URL:
+service: one of [scholar_auth, scholarship_api, scholarship_agent, scholarship_sage, student_pilot, provider_register, auto_page_maker, auto_com_center]
+base_url: your app’s base URL provided above
+version: v2.2
+timestamp: new Date().toISOString() or equivalent in UTC
+Integration checks (each app must perform where relevant)
+
+Call scholar_auth /.well-known/jwks.json and ensure 200 (read-only check, do not mutate)
+If your app consumes scholarship_api, test a read-only GET /search and GET /scholarships/{id}
+If rendering public pages (student_pilot, auto_page_maker, provider_register), verify they include canonical tags and noindex only where appropriate
+Log no secrets or PII; mask tokens in logs
+Risk flags and rollback
+
+Any missing /canary or non-JSON format is a P0 blocker with immediate rollback if deployed
+Missing or incorrect security headers on any endpoint is a P0 for external-facing apps
+Rollback plan: retain previous stable image and configuration; revert if error rate >1% or App P95 exceeds 230ms for >10 minutes on smoke tests
+Artifacts to deliver per app
+
+readiness_report_<app_name>_v2.2.txt (or .md)
+First line: I am <app_name> at <APP_BASE_URL>.
+Include: endpoints list, P95 results (3×15 method), headers evidence, canary JSON, integration checks, risks
+Last two lines: Ready ETA: hh:mm and Revenue ETA: hh:mm
+fix_plan_<app_name>_v2.2.txt (or .md)
+Tasks with IDs, diffs or pseudo-diffs, verification curl commands, success criteria, rollback
+Execution order (for fastest path to revenue)
+
+In parallel:
+scholar_auth (critical path, 6–8h)
+student_pilot (2–4h)
+provider_register (2–4h)
+scholarship_agent (2–3h)
+Then:
+scholarship_api (3–5h)
+scholarship_sage (3–5h)
+auto_page_maker (6–10h)
+auto_com_center (1–2h)
+Revenue start estimate: earliest 8–12 hours once scholar_auth and at least one of student_pilot or provider_register reach ≥4/5 and pass final smoke tests.
+Deliverables acceptance
+
+Do not declare “Ready” until your app meets ≥4/5 per rubric, passes security header checks, returns correct /canary JSON, and completes integration checks.
+Use precise language in your report; no placeholders.
+Ensure the first and last lines of your Readiness Report are exactly as specified.
+End of Agent3 prompt.
