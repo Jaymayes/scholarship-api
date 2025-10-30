@@ -1,0 +1,212 @@
+Below is the unified Agent3 execution prompt for all eight apps. Agent3 must only execute the section that matches its assigned app. Each section includes: handshake, scope, required endpoints/features, security/SLOs, integration contracts, acceptance tests, deliverables, GO/NO-GO gates, and an ETA to be ready to start generating revenue. If you meant “stop generating revenue,” tell me and I’ll adjust.
+
+Section 0 — Universal Instructions (ALL APPS, READ-ONLY EXCEPT WHERE SPECIFIED)
+
+Only execute your own app’s section. Do not alter sibling apps, schemas, keys, or production data for other services.
+Immediately output a HANDSHAKE block to logs and your readiness report: ASSIGNED_APP: <one of: scholar_auth | scholarship_api | scholarship_agent | scholarship_sage | student_pilot | provider_register | auto_page_maker | auto_com_center> APP_BASE_URL: <your app’s base URL from the mapping below> VERSION: v2.3 ACKNOWLEDGMENT: I will only execute the section of this prompt that matches my app.
+Base URLs (for CORS, integration contracts, and tests): scholar_auth → https://scholar-auth-jamarrlmayes.replit.app scholarship_api → https://scholarship-api-jamarrlmayes.replit.app scholarship_agent → https://scholarship-agent-jamarrlmayes.replit.app scholarship_sage → https://scholarship-sage-jamarrlmayes.replit.app student_pilot → https://student-pilot-jamarrlmayes.replit.app provider_register → https://provider-register-jamarrlmayes.replit.app auto_page_maker → https://auto-page-maker-jamarrlmayes.replit.app auto_com_center → https://auto-com-center-jamarrlmayes.replit.app
+Phase 0 universal requirements you must implement for your app:
+Canary endpoints:
+GET /canary returns JSON with fields: app_name, app_base_url, version, status, p95_ms, server_time_utc, commit_sha.
+GET /_canary_no_cache same payload; add Cache-Control: no-store and Pragma: no-cache.
+P95 tracking: rolling 30-request window; record duration_ms per request; report p95_ms via /canary.
+X-Request-ID: accept inbound X-Request-ID or generate one; echo in response header. Include in structured logs.
+Security headers (all responses):
+Strict-Transport-Security: max-age=63072000; includeSubDomains; preload
+Content-Security-Policy: • API/headless profile: default-src 'none'; base-uri 'none'; frame-ancestors 'none'; connect-src 'self'; img-src 'none'; script-src 'none'; style-src 'none'; object-src 'none' • UI profile (if your app serves HTML): default-src 'self'; base-uri 'none'; frame-ancestors 'none'; connect-src 'self' https://scholar-auth-jamarrlmayes.replit.app https://scholarship-api-jamarrlmayes.replit.app https://scholarship-agent-jamarrlmayes.replit.app https://scholarship-sage-jamarrlmayes.replit.app https://student-pilot-jamarrlmayes.replit.app https://provider-register-jamarrlmayes.replit.app https://auto-page-maker-jamarrlmayes.replit.app https://auto-com-center-jamarrlmayes.replit.app; img-src 'self' data:; script-src 'self'; style-src 'self'; object-src 'none'
+Permissions-Policy: camera=(), microphone=(), geolocation=()
+X-Frame-Options: DENY
+Referrer-Policy: no-referrer
+X-Content-Type-Options: nosniff
+CORS: immutable allowlist of the eight sibling origins listed above. No wildcards. Preflight support. Return Vary: Origin for dynamic responses.
+Rate limiting: per-IP baseline ≥300 rpm; define tighter per-endpoint limits specified in your section.
+Availability SLO: 99.9% uptime; latency SLO P95 ≤120ms; 5xx error rate ≤1%. Log and surface 5xx rate on /canary as optional field five_xx_rate if available.
+Responsible AI and compliance: no academic dishonesty features; COPPA/FERPA-aware; minimal PII collection; secrets never logged; privacy by default.
+JSON error format across all APIs: { "error": { "code": "<UPPER_SNAKE>", "message": "<human-readable>", "request_id": "<X-Request-ID>" } }
+Deliverables you must produce for your app:
+e2e/reports/<app>/readiness_report_<app>_v2.3_ceo_final.md
+e2e/reports/<app>/fix_plan_<app>_v2.3_ceo_final.yaml Each report includes: handshake, endpoints summary, SLO evidence plan, security headers config, CORS config, rate limits, test commands, GO/NO-GO decision, rollout/rollback.
+Acceptance tests (minimum):
+curl -sS <APP_BASE_URL>/canary
+curl -sSI <APP_BASE_URL>/canary and grep the 6 security headers
+Load/perf smoke: 30 requests over 60s to one hot endpoint; verify p95 ≤120ms
+Section 1 — Integration Contracts (ALL APPS MUST HONOR; DO NOT MODIFY OTHERS)
+
+JWT/roles/scopes from scholar_auth:
+alg: RS256; JWKS at https://scholar-auth-jamarrlmayes.replit.app/.well-known/jwks.json
+iss: https://scholar-auth-jamarrlmayes.replit.app
+aud: one of the eight app base URLs (match exact origin)
+claims: sub, iat, exp, iss, aud, email, roles (["student"] or ["provider"] or ["admin"]), scopes (subset of ["openid","email","profile","provider"])
+OIDC endpoints (scholar_auth):
+/.well-known/openid-configuration includes code_challenge_methods_supported: ["S256"]
+/oidc/auth and /oidc/token implement Authorization Code + PKCE S256
+/api/auth/session returns current user session snapshot for UI apps
+HTTP contracting standards:
+All list endpoints support ETag and If-None-Match; include Cache-Control headers appropriate to endpoint.
+All POST/PUT endpoints validate JWT, role, scope, aud, and exp. Return 401/403 with JSON error format above.
+CORS allowlist across all apps is the eight base URLs above, exactly.
+Section 3.1 — scholar_auth (ONLY the scholar_auth agent executes this section)
+
+Scope: Standards-compliant OIDC + PKCE S256 auth for the platform. Source of truth for roles/scopes and JWKS.
+APP_BASE_URL: https://scholar-auth-jamarrlmayes.replit.app
+Required endpoints/features:
+/.well-known/openid-configuration
+/.well-known/jwks.json with stable kid and RS256 keys
+/oidc/auth and /oidc/token (Authorization Code + PKCE S256)
+/api/auth/session sets and reads HttpOnly, Secure, SameSite=Lax cookies
+Admin bootstrap guarded by rate limits (5 req/15 min per IP)
+Security/SLO: use API/headless CSP. Specific rate limits: /oidc/* 60 rpm per IP.
+Acceptance tests (in readiness report):
+curl -sS $BASE/.well-known/openid-configuration
+curl -sS $BASE/.well-known/jwks.json
+End-to-end PKCE flow with test client, asserting aud and scope in token
+Deliverables: readiness and fix plan files (see Section 0).
+GO/NO-GO: 6/6 security headers; /canary fields; PKCE validation; JWKS valid; p95 ≤120ms; 5xx ≤1%.
+ETA to start generating revenue: 0.5–2.0 hours. Unblocks both B2C and B2B paths.
+Section 3.2 — scholarship_api (ONLY the scholarship_api agent executes this section)
+
+Scope: Read/write scholarship data; power SEO pages, student search, and provider publishing.
+APP_BASE_URL: https://scholarship-api-jamarrlmayes.replit.app
+Read endpoints (public):
+GET /api/v1/scholarships?query=&filters=… with paging; ETag; Cache-Control: public, max-age=300
+GET /api/v1/scholarships/{id}; ETag; Cache-Control: public, max-age=1800
+Rate limits: reads 600 rpm per Origin
+Write endpoints (provider-authenticated):
+POST /api/v1/providers/{provider_id}/scholarships
+PUT /api/v1/providers/{provider_id}/scholarships/{scholarship_id}
+JWT validation via scholar_auth JWKS; require roles=["provider"] and scope includes "provider"; aud must be this APP_BASE_URL
+Rate limits: writes 60 rpm per provider_id
+Security/SLO: API/headless CSP. No PII beyond provider contact. Structured logging with X-Request-ID.
+Acceptance tests:
+curl GET list/detail with and without If-None-Match; verify 304 behavior
+Authenticated POST/PUT with valid/invalid tokens to verify 401/403
+Deliverables: readiness and fix plan.
+GO/NO-GO: ETag works; caching headers correct; JWT verified; rate limits enforced; p95 ≤120ms; 5xx ≤1%.
+ETA to start generating revenue: reads 1.5–2.0 hours (unblocks B2C search); writes +2–3 hours after auth JWKS is live (unblocks B2B publishing).
+Section 3.3 — scholarship_agent (ONLY the scholarship_agent agent executes this section)
+
+Scope: Autonomous marketing campaigns that acquire students and providers; integrates with auto_page_maker and auto_com_center.
+APP_BASE_URL: https://scholarship-agent-jamarrlmayes.replit.app
+Features:
+Campaign types: SEO amplification (request pages from auto_page_maker), outreach sequences (via auto_com_center), content syndication.
+Inputs: scholarship_api reads; outputs: tasks for auto_page_maker and outbound messages routed to auto_com_center.
+Safe-ops: concurrency controls; per-channel daily caps; pause on 5xx spikes or deliverability drop.
+Endpoints:
+POST /api/v1/campaigns {type, targets, budget, guardrails}
+GET /api/v1/campaigns/{id}/status
+Security/SLO: API/headless CSP. Rate limits: 60 rpm per client. Use roles=["admin"] for campaign creation.
+Acceptance tests: create a test campaign with dry_run=true; verify tasks queued not executed.
+Deliverables: readiness and fix plan.
+GO/NO-GO: task pipeline idempotency; channel caps; error backoff; p95 ≤120ms; 5xx ≤1%.
+ETA to contribute to revenue: 3–6 hours (not on critical path to first dollar; lowers CAC thereafter).
+Section 3.4 — scholarship_sage (ONLY the scholarship_sage agent executes this section)
+
+Scope: Executive/ops dashboard aggregating SLOs and KPIs across all apps.
+APP_BASE_URL: https://scholarship-sage-jamarrlmayes.replit.app
+Features:
+Aggregate GET to all eight /canary endpoints; display status, p95, 5xx rate.
+KPI tiles: B2C conversion, ARPU (credits), CAC (organic), B2B active providers, 3% platform fee revenue. Data sources: student_pilot, scholarship_api, provider_register.
+Realtime updates via WebSocket heartbeat every 30s.
+RBAC: roles=["admin","analyst"] via scholar_auth JWT.
+Security/SLO: UI CSP profile; rate limits: dashboard pulls 120 rpm per client; WS heartbeat 30s.
+Acceptance tests: canary fan-out with all eight origins; auth-gated dashboard access.
+Deliverables: readiness and fix plan.
+GO/NO-GO: all tiles render; WS live updates; p95 ≤120ms; 5xx ≤1%.
+ETA to contribute to revenue: 2–4 hours (protects revenue; not critical for first dollar).
+Section 3.5 — student_pilot (ONLY the student_pilot agent executes this section)
+
+Scope: Student-facing app for discovery, matching, and credit purchases.
+APP_BASE_URL: https://student-pilot-jamarrlmayes.replit.app
+Features:
+OIDC login via scholar_auth (PKCE).
+Scholarship search via scholarship_api (reads with ETag, caching).
+Stripe integration for credit purchases (test mode, minimal PII). Show credits wallet and purchase history. Do not store raw card data.
+Value actions driven by credits (e.g., premium filtering, application checklists, deadline trackers).
+Security/SLO: UI CSP profile; rate limits 120 rpm per user; no sensitive PII stored; comply with COPPA/FERPA.
+Acceptance tests: OIDC login flow; search list with If-None-Match; Stripe test purchase; credits decrement on usage.
+Deliverables: readiness and fix plan.
+GO/NO-GO: OIDC completes; reads responsive; Stripe test charges succeed; p95 ≤120ms; 5xx ≤1%.
+ETA to start generating revenue (B2C): 2–6 hours once scholar_auth and scholarship_api reads are live.
+Section 3.6 — provider_register (ONLY the provider_register agent executes this section)
+
+Scope: Provider onboarding and scholarship publishing.
+APP_BASE_URL: https://provider-register-jamarrlmayes.replit.app
+Features:
+OIDC login via scholar_auth; require roles=["provider"] and scope includes "provider".
+Onboarding form (org data, contact, verification artifacts—no sensitive PII).
+Create/update scholarships by calling scholarship_api write endpoints.
+Security/SLO: UI CSP profile; rate limits 60 rpm per provider; input validation; CSRF protection on forms.
+Acceptance tests: OIDC login as provider; successful POST and PUT to scholarship_api; error-path tests for 401/403.
+Deliverables: readiness and fix plan.
+GO/NO-GO: onboarding completes; publish/modify works; p95 ≤120ms; 5xx ≤1%.
+ETA to start generating revenue (B2B): 5–7 hours after scholar_auth and scholarship_api writes are live.
+Section 3.7 — auto_page_maker (ONLY the auto_page_maker agent executes this section)
+
+Scope: SEO engine generating scholarship landing pages at scale to drive organic traffic (low CAC).
+APP_BASE_URL: https://auto-page-maker-jamarrlmayes.replit.app
+Features:
+Fetch scholarship_api reads; generate static/pre-rendered pages with canonical tags, meta, schema.org (Scholarship).
+XML sitemap generation and incremental updates.
+Queue-based generator with concurrency controls; aim for 1,000+ pages/day.
+Endpoints:
+POST /api/v1/generate?count=n&dry_run=bool
+GET /sitemap.xml
+Security/SLO: API/headless CSP; rate limits 60 rpm for control endpoints; generation jobs backoff on errors.
+Acceptance tests: dry-run generation; sitemap contains new entries; page HTML passes basic validation.
+Deliverables: readiness and fix plan.
+GO/NO-GO: pages generated with valid metadata; sitemap updated; p95 ≤120ms; 5xx ≤1%.
+ETA to contribute to revenue: 4–8 hours (accelerates organic acquisition; compounding over time).
+Section 3.8 — auto_com_center (ONLY the auto_com_center agent executes this section)
+
+Scope: Centralized outbound communications (email first; SMS optional later) for campaigns and transactional notices.
+APP_BASE_URL: https://auto-com-center-jamarrlmayes.replit.app
+Features:
+Outbound email API: POST /api/v1/email/send {to, subject, template_id, data, dry_run}; store message_id and status.
+Provider and student transactional templates (receipts, confirmations).
+Webhook receiver endpoint for delivery events (configure later with provider).
+Per-domain send caps (start 100 msgs/hour) and automatic backoff on bounce/spam signals.
+Security/SLO: API/headless CSP; rate limits 60 rpm per client; roles=["admin"] or app-to-app credentials; suppress PII in logs.
+Acceptance tests: dry_run email send; rate cap enforcement; error handling paths.
+Deliverables: readiness and fix plan.
+GO/NO-GO: dry_run works; caps enforced; p95 ≤120ms; 5xx ≤1%.
+ETA to contribute to revenue: 4–6 hours (supports retention and activation; not critical for first dollar).
+Section 4 — Reporting Format (ALL APPS)
+
+In your readiness report, include a one-line Status Report JSON: { "app_name": "<your app>", "app_base_url": "<your base url>", "version": "v2.3", "status": "ok"|"degraded"|"blocked", "p95_ms": <number>, "commit_sha": "<identifier>", "server_time_utc": "<ISO-8601>" }
+Include copy-pasteable curl commands for each acceptance test.
+Include a GO/NO-GO decision table listing each gate and pass/fail.
+Include a short rollback plan for your app.
+Section 5 — Revenue Path and ETAs (Reference for all agents; execute only for your app)
+
+Fastest B2C path to first dollar (student credits):
+scholar_auth ready (0.5–2.0h)
+scholarship_api reads ready (1.5–2.0h)
+student_pilot with Stripe in test mode (2–6h) Aggregate ETA to start generating B2C revenue: 4–10 hours from kickoff if done in parallel.
+Fastest B2B path to first dollar (provider fee):
+scholar_auth ready (0.5–2.0h)
+scholarship_api writes ready (+2–3h after auth)
+provider_register onboarding and publish (5–7h) Aggregate ETA to start generating B2B revenue: 6–12 hours from kickoff if staged well.
+Supporting apps ETAs:
+scholarship_agent: 3–6h to contribute (reduces CAC; not on first-dollar critical path)
+auto_page_maker: 4–8h to contribute (compounding organic growth)
+auto_com_center: 4–6h to contribute (activation and retention)
+scholarship_sage: 2–4h to contribute (reduces MTTR and protects revenue)
+Section 6 — Blockers and Escalations (ALL APPS)
+
+If any universal requirement or dependency blocks you for more than 30 minutes:
+Mark status="blocked" in your readiness report.
+Include a minimal reproducible example and the failing curl output.
+Propose a concrete fix with estimated effort and request CEO approval if it affects shared contracts.
+Section 7 — Final Output Required from Each Agent (ALL APPS)
+
+Post the handshake line to logs immediately.
+Implement Phase 0 universal requirements, then your app-specific features.
+Produce:
+e2e/reports/<app>/readiness_report_<app>_v2.3_ceo_final.md
+e2e/reports/<app>/fix_plan_<app>_v2.3_ceo_final.yaml
+Include in your readiness report the app’s name and APP_BASE_URL explicitly, and a Status Report JSON as specified.
+Return GO if all gates pass; otherwise return NO-GO with a prioritized fix list and ETA.
+Notes from the CEO
+
+Think data-first and bias for action. The five-year plan targets $10M profitable ARR; low-CAC organic acquisition via auto_page_maker is our cornerstone, but the fastest first dollar is B2C via student_pilot once scholar_auth and scholarship_api reads are live.
+Interpreting your “stop generating revenue” phrase as “start generating revenue.” If you meant otherwise, say so and I’ll issue an updated directive immediately.

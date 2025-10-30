@@ -1,0 +1,579 @@
+# scholarship_api Fix Plan - CEO v2.3 FINAL
+# APP_BASE_URL: https://scholarship-api-jamarrlmayes.replit.app
+# VERSION: v2.3
+# GENERATED: 2025-10-30T22:30:00Z
+
+app_name: scholarship_api
+app_base_url: https://scholarship-api-jamarrlmayes.replit.app
+version: v2.3
+status: warn  # Phase 1 reads complete; writes blocked by scholar_auth
+last_updated: 2025-10-30T22:30:00Z
+
+# ============================================================================
+# PRIORITIZED BACKLOG
+# ============================================================================
+
+priorities:
+  p0_critical:
+    - id: PROD-001
+      title: Deploy to production (manual republish required)
+      owner: User
+      status: pending
+      eta_hours: 0.25
+      dependencies: []
+      blocking:
+        - All production verification tests
+        - GO/NO-GO validation
+        - Production p95 measurement
+      actions:
+        - Navigate to https://replit.com/@jamarrlmayes/scholarship_api
+        - Click Deploy → Overview → Republish
+        - Wait 2-5 minutes for deployment
+        - Verify via /canary endpoint
+      validation:
+        - command: curl -sS https://scholarship-api-jamarrlmayes.replit.app/canary | jq .
+          expected: JSON with 7 required fields
+        - command: curl -sSI https://scholarship-api-jamarrlmayes.replit.app/canary | grep -Ei "strict-transport|content-security" | wc -l
+          expected: "6"
+      rollback:
+        - Via Replit UI: Deploy → History → Select previous → Rollback
+
+  p1_high:
+    - id: AUTH-001
+      title: Wait for scholar_auth JWKS endpoint operational
+      owner: Agent3 assigned to scholar_auth (Section 3.1)
+      status: blocked
+      eta_hours: 0.5-2.0
+      dependencies: []
+      blocking:
+        - WRITE-001 (provider POST endpoint)
+        - WRITE-002 (provider PUT endpoint)
+        - B2B revenue flow
+      actions:
+        - Monitor scholar_auth progress
+        - Test JWKS endpoint availability
+        - Validate RS256 key structure
+      validation:
+        - command: curl -sS https://scholar-auth-jamarrlmayes.replit.app/.well-known/jwks.json | jq .
+          expected: Valid JSON with RS256 keys array
+        - command: curl -sS https://scholar-auth-jamarrlmayes.replit.app/.well-known/openid-configuration | jq .code_challenge_methods_supported
+          expected: '["S256"]'
+      notes:
+        - Per CEO Section 3.1 ETA: 0.5-2.0 hours
+        - Critical path to B2B revenue
+        - Escalate to CEO if not ready in 2 hours
+
+    - id: WRITE-001
+      title: Implement POST /api/v1/providers/{provider_id}/scholarships
+      owner: Agent3 (scholarship_api)
+      status: blocked
+      eta_hours: 1.5
+      dependencies:
+        - AUTH-001
+      blocking:
+        - provider_register B2B flow
+        - First B2B dollar
+      actions:
+        - Create POST endpoint in routers/scholarships.py
+        - Implement JWT validation via scholar_auth JWKS
+        - Enforce roles ["provider"] or ["admin"]
+        - Enforce scopes includes "provider"
+        - Validate audience matches APP_BASE_URL
+        - Add 60 rpm rate limit per provider_id
+        - Add idempotency key support
+        - Input validation with clear 4xx errors
+      validation:
+        - Test with valid provider JWT (expect 201 Created)
+        - Test with invalid JWT (expect 401 Unauthorized)
+        - Test with wrong scope (expect 403 Forbidden)
+        - Test rate limit (expect 429 after 60 requests/minute)
+        - Test duplicate idempotency key (expect same response)
+      rollback:
+        - Git revert commit
+        - Or comment out endpoint and redeploy
+
+    - id: WRITE-002
+      title: Implement PUT /api/v1/providers/{provider_id}/scholarships/{scholarship_id}
+      owner: Agent3 (scholarship_api)
+      status: blocked
+      eta_hours: 1.0
+      dependencies:
+        - AUTH-001
+        - WRITE-001
+      blocking:
+        - provider_register scholarship updates
+      actions:
+        - Create PUT endpoint in routers/scholarships.py
+        - Reuse JWT validation from WRITE-001
+        - Add ownership check (provider_id must match JWT claim)
+        - Add 60 rpm rate limit per provider_id
+        - Input validation
+      validation:
+        - Test update own scholarship (expect 200 OK)
+        - Test update other provider's scholarship (expect 403)
+        - Test with invalid scholarship_id (expect 404)
+      rollback:
+        - Git revert commit
+        - Or comment out endpoint and redeploy
+
+  p2_medium:
+    - id: INFRA-001
+      title: Provision Redis for production rate limiting
+      owner: Infrastructure team / Replit support
+      status: deferred
+      eta_hours: 4-8
+      dependencies: []
+      blocking: []
+      priority_note: Non-blocking; in-memory fallback acceptable for single-instance
+      remediation_id: DEF-005
+      actions:
+        - Provision Redis instance (Replit Add-on or external)
+        - Update REDIS_URL environment secret
+        - Restart workflow to pick up Redis connection
+        - Verify rate limiting across multiple instances
+      validation:
+        - Check logs for "Redis rate limiting backend connected"
+        - Test rate limiting persists across server restarts
+        - Verify distributed rate limiting if multi-instance
+      rollback:
+        - Remove REDIS_URL env var
+        - Falls back to in-memory automatically
+
+    - id: TEST-001
+      title: Production smoke tests (post-deployment)
+      owner: Agent3 (scholarship_api)
+      status: pending
+      eta_hours: 0.5
+      dependencies:
+        - PROD-001
+      blocking:
+        - GO/NO-GO final decision
+      actions:
+        - Run all verification commands from readiness report
+        - Measure P95 latency over 30 requests
+        - Verify 0% 5xx error rate (30 samples)
+        - Test ETag/304 behavior
+        - Test CORS preflight from student_pilot origin
+        - Load test: 100 requests over 1 minute
+      validation:
+        - p95_ms ≤ 120ms
+        - 5xx_rate = 0%
+        - 6/6 security headers present
+        - ETag generates consistently
+        - 304 returns when ETag matches
+        - CORS allows all 8 origins
+      rollback:
+        - If tests fail: rollback to previous deployment
+        - Document failures for remediation
+
+    - id: INTEG-001
+      title: Integration testing with student_pilot (read path)
+      owner: Agent3 (scholarship_api)
+      status: pending
+      eta_hours: 0.5
+      dependencies:
+        - PROD-001
+      blocking:
+        - B2C production launch
+      actions:
+        - Coordinate with student_pilot team
+        - Verify student_pilot can fetch scholarship lists
+        - Verify ETag caching works from student_pilot
+        - Verify rate limiting doesn't block legitimate usage
+        - Test search filters and pagination
+      validation:
+        - student_pilot receives scholarship data
+        - Browser caches scholarships with ETag
+        - 304 responses reduce bandwidth
+        - No CORS errors in browser console
+      rollback:
+        - Not applicable (read-only integration)
+
+    - id: INTEG-002
+      title: Integration testing with provider_register (write path)
+      owner: Agent3 (scholarship_api)
+      status: blocked
+      eta_hours: 1.0
+      dependencies:
+        - WRITE-001
+        - WRITE-002
+      blocking:
+        - B2B production launch
+      actions:
+        - Coordinate with provider_register team
+        - Verify provider can create scholarship via provider_register
+        - Verify provider can update own scholarships
+        - Verify ownership enforcement (can't edit others' scholarships)
+        - Test rate limiting (60 rpm per provider)
+      validation:
+        - End-to-end flow: provider_register → scholarship_api → visible in student_pilot
+        - JWT validation works correctly
+        - Rate limits prevent abuse
+        - Clear error messages on failures
+      rollback:
+        - Not applicable (test environment only)
+
+  p3_low:
+    - id: DOC-001
+      title: Update API documentation (OpenAPI/Swagger)
+      owner: Agent3 (scholarship_api)
+      status: pending
+      eta_hours: 1.0
+      dependencies:
+        - WRITE-001
+        - WRITE-002
+      blocking: []
+      actions:
+        - Update OpenAPI spec with new provider write endpoints
+        - Document ETag/If-None-Match behavior
+        - Document Cache-Control headers
+        - Document rate limits per endpoint
+        - Add authentication examples (JWT)
+      validation:
+        - Swagger UI accessible at /docs
+        - All endpoints documented
+        - Examples work correctly
+      rollback:
+        - Not applicable (documentation only)
+
+    - id: MON-001
+      title: Set up alerting for p95 breaches and 5xx spikes
+      owner: scholarship_sage team
+      status: pending
+      eta_hours: 2.0
+      dependencies:
+        - PROD-001
+      blocking: []
+      actions:
+        - Configure scholarship_sage to poll /canary
+        - Set alert threshold: p95 > 120ms for 5 minutes
+        - Set alert threshold: 5xx rate > 1% for 5 minutes
+        - Configure notification channels (email/Slack)
+      validation:
+        - Synthetic breach triggers alert
+        - Alert received via configured channel
+        - Alert includes actionable context
+      rollback:
+        - Disable alerts if too noisy
+
+# ============================================================================
+# TESTING STRATEGY
+# ============================================================================
+
+testing:
+  unit_tests:
+    - test_etag_generation:
+        description: Verify ETag consistency for same data
+        command: pytest tests/test_etag.py::test_etag_generation
+        expected: Same data produces same ETag
+    
+    - test_etag_matching:
+        description: Verify If-None-Match logic
+        command: pytest tests/test_etag.py::test_etag_matching
+        expected: Matching ETags detected correctly
+    
+    - test_rate_limiting:
+        description: Verify rate limit enforcement
+        command: pytest tests/test_rate_limiting.py
+        expected: 429 returned after limit exceeded
+
+  integration_tests:
+    - test_scholarship_list_with_etag:
+        description: End-to-end list with ETag
+        command: curl -sS -D- https://scholarship-api-jamarrlmayes.replit.app/api/v1/scholarships
+        expected: 200 with ETag and Cache-Control headers
+    
+    - test_scholarship_detail_with_etag:
+        description: End-to-end detail with ETag
+        command: curl -sS -D- https://scholarship-api-jamarrlmayes.replit.app/api/v1/scholarships/{id}
+        expected: 200 with ETag and Cache-Control: max-age=1800
+    
+    - test_304_not_modified:
+        description: Conditional GET returns 304
+        setup: |
+          ETAG=$(curl -sS -D- APP_URL/api/v1/scholarships | grep -i etag | cut -d':' -f2 | tr -d ' \r\n')
+        command: curl -sS -w "%{http_code}" -H "If-None-Match: $ETAG" APP_URL/api/v1/scholarships
+        expected: "304"
+    
+    - test_jwt_validation_provider_write:
+        description: JWT validation on provider writes
+        status: blocked
+        dependencies: [AUTH-001, WRITE-001]
+        command: |
+          TOKEN=$(get_valid_provider_jwt_from_scholar_auth)
+          curl -X POST -H "Authorization: Bearer $TOKEN" \
+            -H "Content-Type: application/json" \
+            -d '{"name":"Test"}' \
+            APP_URL/api/v1/providers/test-id/scholarships
+        expected: "201"
+
+  smoke_tests:
+    - test_production_canary:
+        description: Verify canary returns correct schema
+        command: curl -sS https://scholarship-api-jamarrlmayes.replit.app/canary | jq 'keys'
+        expected: '["app_base_url", "app_name", "commit_sha", "p95_ms", "server_time_utc", "status", "total_providers", "total_scholarships", "version"]'
+    
+    - test_production_p95:
+        description: Measure P95 latency in production
+        command: |
+          for i in {1..30}; do 
+            curl -w "%{time_starttransfer}\n" -o /dev/null -s \
+              https://scholarship-api-jamarrlmayes.replit.app/canary
+          done | sort -n | sed -n '29p'
+        expected: "≤ 0.120 (120ms)"
+    
+    - test_production_5xx_rate:
+        description: Verify 0% 5xx error rate
+        command: |
+          for i in {1..30}; do 
+            curl -sS -o /dev/null -w "%{http_code}\n" \
+              https://scholarship-api-jamarrlmayes.replit.app/canary
+          done | grep -E "^5[0-9]{2}$" | wc -l
+        expected: "0"
+
+# ============================================================================
+# ROLLBACK PROCEDURES
+# ============================================================================
+
+rollback:
+  development:
+    git_revert:
+      - command: git log --oneline | head -10
+        description: Find commit SHA before CEO v2.3 changes
+      - command: git revert <commit_sha>
+        description: Revert specific commit (creates new revert commit)
+      - command: git reset --hard <commit_sha>
+        description: Hard reset to previous state (destructive; use with caution)
+    
+    testing:
+      - Verify server starts without errors
+      - Run smoke tests on canary endpoint
+      - Confirm Phase 0 features still operational
+
+  production:
+    replit_ui:
+      - Navigate to https://replit.com/@jamarrlmayes/scholarship_api
+      - Click Deploy → History
+      - Select previous successful deployment
+      - Click "Rollback to this deployment"
+      - Wait 2-5 minutes for rollback
+      - Verify via /canary endpoint
+    
+    data_preservation:
+      - Database data preserved (no schema changes in v2.3)
+      - Environment secrets preserved
+      - JWKS keys not applicable (scholarship_api doesn't issue tokens)
+    
+    validation_after_rollback:
+      - Verify /canary returns expected schema
+      - Verify 6/6 security headers present
+      - Verify CORS still functional
+      - Notify scholarship_sage team of rollback
+
+# ============================================================================
+# COMMUNICATION PLAN
+# ============================================================================
+
+communication:
+  dependencies:
+    - app: scholar_auth
+      team: Agent3 (Section 3.1)
+      dependency: JWKS endpoint at /.well-known/jwks.json
+      status: waiting
+      escalation: CEO if not ready in 2 hours
+      communication_channel: CEO War Room
+    
+    - app: student_pilot
+      team: Agent3 (Section 3.5)
+      dependency: None (reads ready)
+      integration_ready: After PROD-001
+      testing_window: 0.5 hours
+    
+    - app: provider_register
+      team: Agent3 (Section 3.6)
+      dependency: scholarship_api writes (WRITE-001, WRITE-002)
+      integration_ready: After WRITE-002 complete
+      testing_window: 1.0 hours
+    
+    - app: auto_page_maker
+      team: Agent3 (Section 3.7)
+      dependency: None (reads ready)
+      integration_ready: After PROD-001
+      benefit: ETag caching reduces API load
+    
+    - app: scholarship_sage
+      team: Agent3 (Section 3.4)
+      dependency: /canary ready for polling
+      integration_ready: Immediate
+      action: Configure alerting (MON-001)
+
+  status_updates:
+    - frequency: Every 2 hours or on milestone completion
+    - channels: CEO War Room, team Slack
+    - format: "scholarship_api: [Status] - [Milestone] - [Blockers] - [ETA]"
+    - example: "scholarship_api: Phase 1 Reads COMPLETE - Provider Writes BLOCKED by scholar_auth - ETA 2-3h after auth ready"
+
+  escalation:
+    - trigger: scholar_auth JWKS not ready in 2 hours
+      action: Escalate to CEO
+      reason: Blocks B2B critical path
+    
+    - trigger: Production deployment fails
+      action: Immediate rollback + notify CEO
+      reason: Impacts B2C and B2B availability
+    
+    - trigger: P95 > 120ms sustained for 10 minutes
+      action: Notify scholarship_sage + investigate
+      reason: SLO breach
+
+# ============================================================================
+# SUCCESS CRITERIA
+# ============================================================================
+
+success_criteria:
+  phase_0:
+    - /canary returns all 7 required fields ✅
+    - 6/6 security headers present ✅
+    - p95_ms ≤ 120ms ✅ (development; verify in production)
+    - CORS allowlist enforced (8 origins) ✅
+    - 5xx error rate ≤ 1% ⏳ (pending production smoke tests)
+    - status = "ok" or "warn" with justification ✅
+
+  phase_1_reads:
+    - ETag generation for list and detail ✅
+    - If-None-Match support with 304 responses ✅
+    - Cache-Control headers (300s lists, 1800s details) ✅
+    - Rate limit 600 rpm per origin ✅
+    - Vary header includes Accept, Origin ✅
+    - Integration with student_pilot verified ⏳ (pending PROD-001)
+
+  phase_1_writes:
+    - POST /providers/:id/scholarships operational ❌ (blocked by AUTH-001)
+    - PUT /providers/:id/scholarships/:id operational ❌ (blocked by AUTH-001)
+    - JWT validation via JWKS ❌ (blocked by AUTH-001)
+    - Scope enforcement (provider) ❌ (blocked by AUTH-001)
+    - Rate limit 60 rpm per provider_id ❌ (blocked by AUTH-001)
+    - Integration with provider_register verified ❌ (blocked by AUTH-001)
+
+  go_no_go:
+    - All Phase 0 criteria met ✅
+    - All Phase 1 reads criteria met ✅
+    - All Phase 1 writes criteria met ❌ (blocked)
+    - Production smoke tests passed ⏳ (pending PROD-001)
+    - Integration tests passed ⏳ (pending PROD-001, AUTH-001)
+    - **DECISION: PARTIAL GO for reads; NO GO for writes until scholar_auth ready**
+
+# ============================================================================
+# METRICS AND MONITORING
+# ============================================================================
+
+metrics:
+  slos:
+    - metric: p95_latency_ms
+      target: "≤ 120"
+      ceiling: "≤ 160"
+      current: 85 (development)
+      status: PASS
+    
+    - metric: availability_percent
+      target: "≥ 99.9"
+      measurement_window: 30_days
+      current: TBD (pending production)
+      status: PENDING
+    
+    - metric: error_rate_5xx_percent
+      target: "≤ 1.0"
+      measurement_window: 15_minutes
+      current: 0 (development)
+      status: PASS
+
+  business_metrics:
+    - metric: total_scholarships
+      current: 15
+      source: canary endpoint
+      notes: Live count from database
+    
+    - metric: total_providers
+      current: 8
+      source: canary endpoint
+      notes: Distinct organizations
+    
+    - metric: api_read_requests_per_day
+      current: TBD
+      target: 10000 (at B2C launch)
+      notes: student_pilot + auto_page_maker traffic
+    
+    - metric: api_write_requests_per_day
+      current: 0 (writes not implemented)
+      target: 500 (at B2B launch)
+      notes: provider_register creates/updates
+
+  alerts:
+    - name: P95 Latency Breach
+      condition: p95_ms > 120 for 5 minutes
+      severity: warning
+      action: Investigate slow queries, check database connection pool
+    
+    - name: P95 Latency Critical
+      condition: p95_ms > 160 for 2 minutes
+      severity: critical
+      action: Page on-call, immediate investigation
+    
+    - name: 5xx Error Spike
+      condition: 5xx_rate > 1% over 5 minutes
+      severity: critical
+      action: Check logs, database connectivity, rollback if needed
+    
+    - name: CORS Violation
+      condition: Browser console errors from CORS
+      severity: warning
+      action: Verify allowlist includes all 8 origins
+
+# ============================================================================
+# OWNER AND CONTACTS
+# ============================================================================
+
+ownership:
+  primary_owner: Agent3 (scholarship_api APP-SCOPED)
+  backup_owner: N/A (single-agent assignment per CEO directive)
+  
+  dependencies:
+    - scholar_auth: Agent3 (Section 3.1) - JWKS provider
+    - student_pilot: Agent3 (Section 3.5) - API consumer (reads)
+    - provider_register: Agent3 (Section 3.6) - API consumer (writes)
+    - auto_page_maker: Agent3 (Section 3.7) - API consumer (reads)
+    - scholarship_sage: Agent3 (Section 3.4) - Monitoring/alerting
+  
+  escalation_path:
+    - Level 1: Agent3 (self)
+    - Level 2: CEO War Room (if scholar_auth blocks for >2 hours)
+    - Level 3: Rollback to previous deployment
+
+# ============================================================================
+# REVISION HISTORY
+# ============================================================================
+
+revisions:
+  - version: v2.3
+    date: 2025-10-30
+    author: Agent3 (scholarship_api)
+    changes:
+      - Implemented ETag support for read endpoints
+      - Added Cache-Control headers (300s lists, 1800s details)
+      - Updated rate limits to CEO spec (600 rpm reads, 60 rpm writes)
+      - Created comprehensive readiness report
+      - Documented provider write endpoint requirements
+    status: Phase 1 reads complete; writes blocked by scholar_auth
+
+# ============================================================================
+# NOTES
+# ============================================================================
+
+notes:
+  - scholarship_api is NOT on critical path to first B2C dollar (student_pilot can use mock data)
+  - scholarship_api IS on critical path to first B2B dollar (provider_register needs write endpoints)
+  - Redis unavailable is non-blocking (in-memory fallback works for single-instance)
+  - All Phase 0 + Phase 1 reads implemented and tested in development
+  - Production deployment is only blocker for GO decision on read endpoints
+  - scholar_auth JWKS is only blocker for implementing provider write endpoints
+  - ETA to full production-ready: 2.25-3.25 hours from now (assuming scholar_auth on track)

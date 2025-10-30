@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 
 from middleware.auth import User, require_auth
 from middleware.enhanced_rate_limiting import general_rate_limit, search_rate_limit
@@ -26,6 +26,7 @@ from utils.logger import get_logger
 from utils.session import extract_session_id, extract_actor_id
 from models.business_events import create_scholarship_saved_event
 from services.event_emission import EventEmissionService
+from utils.etag import generate_etag, etag_matches
 
 logger = get_logger(__name__)
 router = APIRouter()
@@ -33,9 +34,10 @@ router = APIRouter()
 event_emitter = EventEmissionService()
 
 @router.get("/scholarships", response_model=SearchResponse)
-@search_rate_limit()  # QA FIX: Apply rate limiting to scholarships endpoint
+@search_rate_limit()  # CEO v2.3: 600 rpm per origin for reads
 async def search_scholarships(
-    request: Request,  # QA FIX: Add request parameter for rate limiting
+    request: Request,
+    response: Response,  # CEO v2.3: Required for ETag and Cache-Control headers
     keyword: str | None = Query(None, description="Search keyword"),
     fields_of_study: list[FieldOfStudy] = Query(default=[], description="Filter by fields of study"),
     min_amount: float | None = Query(None, ge=0, description="Minimum scholarship amount"),
@@ -49,17 +51,16 @@ async def search_scholarships(
     limit: int = Query(20, ge=1, le=100, description="Number of results to return"),
     offset: int = Query(0, ge=0, description="Number of results to skip"),
     user_id: str | None = Query(None, description="User ID for analytics"),
-    # CEO WAR ROOM FIX: Optional authentication for public scholarship browsing
     current_user: User | None = None
 ):
     """
-    Search scholarships with various filters and pagination support - QA-004 fix: Authentication enforced.
-    Requires authentication unless PUBLIC_READ_ENDPOINTS feature flag is enabled.
-
-    This endpoint allows users to search through available scholarships using
-    multiple criteria including keywords, fields of study, amount ranges, and more.
+    CEO v2.3 Section 3.2: Search scholarships with ETag/Cache-Control support.
+    
+    Read endpoint with:
+    - ETag generation and If-None-Match support (304 responses)
+    - Cache-Control: public, max-age=300 (5 minutes)
+    - Rate limit: 600 rpm per origin
     """
-    # Authentication enforced by dependency injection - no additional check needed
     try:
         filters = SearchFilters(
             keyword=keyword,
@@ -80,15 +81,31 @@ async def search_scholarships(
         analytics_service.log_search(
             user_id=user_id,
             query=keyword or "",
-            result_count=0,  # Will be updated after search
+            result_count=0,
             filters=filters.model_dump()
         )
 
         result = scholarship_service.search_scholarships(filters)
 
-        # Update analytics with actual result count
+        # Update analytics
         if analytics_service.interactions:
             analytics_service.interactions[-1].metadata["result_count"] = result.total_count
+
+        # CEO v2.3: Generate ETag and check If-None-Match
+        etag = generate_etag(result)
+        if_none_match = request.headers.get("If-None-Match")
+        
+        if etag_matches(etag, if_none_match):
+            # Return 304 Not Modified
+            response.status_code = 304
+            response.headers["ETag"] = etag
+            response.headers["Cache-Control"] = "public, max-age=300"
+            return Response(status_code=304, headers=response.headers)
+        
+        # CEO v2.3 Section 3.2: Cache-Control for lists (300s = 5 minutes)
+        response.headers["ETag"] = etag
+        response.headers["Cache-Control"] = "public, max-age=300"
+        response.headers["Vary"] = "Accept, Origin"
 
         return result
 
@@ -157,17 +174,20 @@ async def smart_search_scholarships(
         raise HTTPException(status_code=500, detail="Internal server error during smart search")
 
 @router.get("/scholarships/{scholarship_id}", response_model=Scholarship)
-@general_rate_limit()  # QA FIX: Apply rate limiting to scholarship detail endpoint
+@search_rate_limit()  # CEO v2.3: 600 rpm per origin for reads
 async def get_scholarship(
-    request: Request,  # QA FIX: Add request parameter for rate limiting
+    request: Request,
+    response: Response,  # CEO v2.3: Required for ETag and Cache-Control headers
     scholarship_id: str,
     user_id: str | None = Query(None, description="User ID for analytics")
 ):
     """
-    Get detailed information about a specific scholarship.
-
-    Returns comprehensive scholarship details including eligibility criteria,
-    application requirements, and deadlines.
+    CEO v2.3 Section 3.2: Get scholarship details with ETag/Cache-Control support.
+    
+    Detail endpoint with:
+    - ETag generation and If-None-Match support (304 responses)
+    - Cache-Control: public, max-age=1800 (30 minutes)
+    - Rate limit: 600 rpm per origin
     """
     try:
         scholarship = scholarship_service.get_scholarship_by_id(scholarship_id)
@@ -178,10 +198,10 @@ async def get_scholarship(
                 detail=f"Scholarship with ID {scholarship_id} not found"
             )
 
-        # Log scholarship view (existing analytics)
+        # Log scholarship view
         analytics_service.log_scholarship_view(user_id, scholarship_id)
         
-        # Emit business event for KPI tracking (NEW: CEO directive)
+        # Emit business event for KPI tracking
         session_id = extract_session_id(request)
         actor_id = extract_actor_id(request) or user_id
         
@@ -194,6 +214,22 @@ async def get_scholarship(
             session_id=session_id
         )
         await event_emitter.emit(event)
+
+        # CEO v2.3: Generate ETag and check If-None-Match
+        etag = generate_etag(scholarship)
+        if_none_match = request.headers.get("If-None-Match")
+        
+        if etag_matches(etag, if_none_match):
+            # Return 304 Not Modified
+            response.status_code = 304
+            response.headers["ETag"] = etag
+            response.headers["Cache-Control"] = "public, max-age=1800"
+            return Response(status_code=304, headers=response.headers)
+        
+        # CEO v2.3 Section 3.2: Cache-Control for details (1800s = 30 minutes)
+        response.headers["ETag"] = etag
+        response.headers["Cache-Control"] = "public, max-age=1800"
+        response.headers["Vary"] = "Accept, Origin"
 
         return scholarship
 
