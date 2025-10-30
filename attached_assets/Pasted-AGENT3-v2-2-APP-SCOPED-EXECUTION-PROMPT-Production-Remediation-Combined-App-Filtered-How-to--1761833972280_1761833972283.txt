@@ -1,0 +1,215 @@
+AGENT3 v2.2 APP-SCOPED EXECUTION PROMPT (Production Remediation) — Combined, App-Filtered
+
+How to use this prompt
+
+You are assigned to exactly one app. Only read and execute the section labeled for your app. Ignore all other app sections.
+Inputs you must receive before starting:
+ASSIGNED_APP: one of [scholar_auth, scholarship_api, scholarship_agent, scholarship_sage, student_pilot, provider_register, auto_page_maker, auto_com_center]
+APP_BASE_URL: base URL for your assigned app (see mapping below)
+VERSION: v2.2
+App-to-URL mapping:
+scholar_auth → https://scholar-auth-jamarrlmayes.replit.app
+scholarship_api → https://scholarship-api-jamarrlmayes.replit.app
+scholarship_agent → https://scholarship-agent-jamarrlmayes.replit.app
+scholarship_sage → https://scholarship-sage-jamarrlmayes.replit.app
+student_pilot → https://student-pilot-jamarrlmayes.replit.app
+provider_register → https://provider-register-jamarrlmayes.replit.app
+auto_page_maker → https://auto-page-maker-jamarrlmayes.replit.app
+auto_com_center → https://auto-com-center-jamarrlmayes.replit.app
+If ASSIGNED_APP or APP_BASE_URL is missing, stop and request assignment: “STATUS: NEED_ASSIGNMENT for AGENT3 v2.2”.
+Revenue objective and critical path
+
+Our earliest revenue happens when both scholar_auth and exactly one revenue app are ready:
+B2C revenue path: scholar_auth + student_pilot
+B2B revenue path: scholar_auth + provider_register
+Target end-to-end ETA to start generating revenue: 8–12 hours from assignment start if work proceeds without external blockers (auth 6–8h + revenue app 2–4h, parallelized when possible).
+Universal Phase 0 requirements (apply to all apps; do this first)
+
+Implement two health endpoints registered before any SPA catch-all or middleware that could return HTML:
+GET /canary returns strict JSON: { "ok": true, "service": "<ASSIGNED_APP>", "base_url": "<APP_BASE_URL>", "version": "v2.2", "timestamp": "<ISO8601>" }
+GET /_canary_no_cache returns the exact same JSON payload.
+Response headers required for both endpoints (exact values):
+Content-Type: application/json; charset=utf-8
+Cache-Control: no-store, no-cache, must-revalidate
+Pragma: no-cache
+Expires: 0
+Strict-Transport-Security: max-age=31536000; includeSubDomains; preload
+Content-Security-Policy: default-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'
+X-Frame-Options: DENY
+Referrer-Policy: no-referrer
+Permissions-Policy: camera=(), microphone=(), geolocation=()
+X-Content-Type-Options: nosniff
+SLOs to verify:
+P95 latency ≤ 160ms for /canary and /_canary_no_cache
+No 5xx responses during canary test loop (3 rounds × 15 requests)
+Artifact outputs (write all):
+e2e/reports/<ASSIGNED_APP>/readiness_report_<ASSIGNED_APP>_v2.2.md
+e2e/reports/<ASSIGNED_APP>/fix_plan_<ASSIGNED_APP>_v2.2.yaml
+The readiness report must include:
+“APP_NAME: <ASSIGNED_APP>”
+“APP_BASE_URL: <APP_BASE_URL>”
+“VERSION: v2.2”
+Canary evidence (raw responses and headers), P95 measurements, and confirmation of 6/6 security headers.
+Phase 1 requirements by app (execute only your app’s section)
+
+scholar_auth (APP_BASE_URL: https://scholar-auth-jamarrlmayes.replit.app)
+
+Fix/implement OIDC:
+GET /.well-known/openid-configuration with RFC 8414 compliant JSON, add 6/6 headers, Cache-Control: public, max-age=3600.
+GET /.well-known/jwks.json returns valid RS256 JWK set. Fields: kty, kid, use, alg=RS256, n, e. JSON only (no HTML). Add 6/6 headers.
+Token issuance and verification:
+Ensure RS256 signing keys are rotated safely; publish kid; support key rollover.
+Validate access and ID token claims (aud, iss, sub, exp, iat) and clock skew handling.
+CORS:
+Allow only trusted origins from other 7 app base URLs; deny all others; include preflight caching max-age=600.
+Rate limiting and anomaly detection (baseline):
+60 req/min per IP for auth endpoints; burst control; structured logging of 401/403 spikes.
+Deliverables:
+Update readiness_report with validated discovery and JWKS examples.
+Provide curl tests for /.well-known/openid-configuration and /.well-known/jwks.json.
+ETA to ready: 6–8 hours.
+student_pilot (APP_BASE_URL: https://student-pilot-jamarrlmayes.replit.app)
+
+Routes:
+GET /pricing with live Stripe pricing table or equivalent, clear plan/credit disclosures.
+Auth guard on post-purchase pages using scholar_auth RS256 tokens.
+Payments:
+Stripe Checkout or Payment Element integration; handle webhooks idempotently; store payment status; enforce credit/grant usage caps.
+SEO:
+page-level title, meta description, canonical, noindex on auth-only routes.
+Router order:
+Canary routes registered before SPA/SSR catch-all.
+Telemetry:
+Events for view_pricing, checkout_started, checkout_succeeded, conversion_rate KPI.
+Deliverables:
+Readiness and fix_plan docs with screenshots or curl outputs.
+ETA to ready: 2–4 hours (after scholar_auth keys live).
+provider_register (APP_BASE_URL: https://provider-register-jamarrlmayes.replit.app)
+
+Onboarding:
+GET /register with 3% platform fee disclosure.
+POST /api/providers/register with auth (scholar_auth) and basic provider profile.
+Dashboard:
+Authenticated GET /dashboard, list onboarding steps, fee, payout status.
+Webhooks:
+Create endpoint to receive future payouts/verification events; log, idempotency keys.
+SEO:
+Canonical tags; block index on dashboard and POST endpoints.
+Deliverables:
+Readiness and fix_plan; include fees disclosure screenshot or HTML snippet.
+ETA to ready: 5–7 hours (after scholar_auth keys live).
+scholarship_api (APP_BASE_URL: https://scholarship-api-jamarrlmayes.replit.app)
+
+Public read endpoints (example):
+GET /v1/scholarships?query=&page=&page_size= with pagination, 200 only JSON.
+GET /v1/scholarships/{id}
+Headers:
+Include ETag and Cache-Control: public, max-age=60 on list and item reads.
+CORS:
+Allow read from the 7 app origins; block others; preflight caching 600s.
+Rate limiting:
+120 req/min per IP on reads; 429 with JSON body on exceed.
+Deliverables:
+Readiness and fix_plan with example responses and header dumps.
+ETA to ready: 1–2 hours.
+scholarship_agent (APP_BASE_URL: https://scholarship-agent-jamarrlmayes.replit.app)
+
+Purpose:
+Autonomous marketing campaign executor producing SEO-friendly scholarship content briefs for auto_page_maker and monitoring their performance.
+Endpoints:
+POST /v1/campaigns {goal, inputs} creates a draft campaign.
+GET /v1/campaigns/{id} status and metrics.
+Safety:
+Content policy checks; no academic dishonesty; transparent sources.
+Deliverables:
+Readiness and fix_plan; sample campaign JSON and policy checks.
+ETA to ready: 3–5 hours.
+scholarship_sage (APP_BASE_URL: https://scholarship-sage-jamarrlmayes.replit.app)
+
+Sales/ops dashboard:
+Auth-only GET /dashboard with SLOs (uptime, P95), funnel KPIs (B2C, B2B), and capacity indicators.
+Optional assist API (if in scope):
+POST /v1/assist/ask {question, context?}, with guardrails to avoid academic dishonesty; return cites and explanations.
+Deliverables:
+Readiness and fix_plan; document either dashboard-only or dashboard+Q&A mode.
+ETA to ready: 2–4 hours.
+auto_page_maker (APP_BASE_URL: https://auto-page-maker-jamarrlmayes.replit.app)
+
+SEO engine:
+GET /sitemap.xml includes student_pilot/provider_register canonical pages and generated scholarship landing pages.
+GET /robots.txt referencing sitemap; disallow non-public routes.
+Page generator:
+POST /v1/pages {slug, title, meta, body, canonical} with auth; draft/publish states; dedupe slugs; avoid near-duplicate content.
+Telemetry:
+Page impressions, CTR, indexation status; provide export.
+Deliverables:
+Readiness and fix_plan; include example generated page HTML and canonical tags.
+ETA to ready: 3–5 hours.
+auto_com_center (APP_BASE_URL: https://auto-com-center-jamarrlmayes.replit.app)
+
+Messaging:
+POST /v1/notifications/send {to, channel[email|sms], template_id, data} with auth.
+Enforce opt-out/unsubscribe for email; TCPA compliance for SMS.
+Idempotency:
+Idempotency-Key header respected; 201 on first, 200 on replay.
+Templates:
+GET /v1/templates list approved templates; template variables validated at send time.
+Deliverables:
+Readiness and fix_plan; include example idempotent send traces and logs.
+ETA to ready: 4–6 hours.
+Cross-app integration requirements (execute only if your app depends on another)
+
+If your app consumes scholar_auth:
+Verify RS256 JWT validation with kid lookup against JWKS.
+Handle token expiration and 401/403 paths with JSON error bodies: {ok:false, error_code, message}.
+If your app serves public pages (student_pilot, provider_register, auto_page_maker):
+Ensure canonical tags, noindex on auth-only pages, and that /canary routes are before any SPA catch-all.
+If your app calls scholarship_api:
+Respect pagination; back off on 429; propagate X-Request-Id in logs for traceability.
+Verification checklist (your app must include these in readiness_report)
+
+Canary verification:
+Paste exact JSON payload from GET /canary and GET /_canary_no_cache.
+Paste all response headers for both endpoints.
+Show P95 latency for 45 total requests (3×15) and the calculation method.
+Security:
+Confirm all 6 headers present with exact values.
+Functional:
+List all Phase 1 endpoints implemented for your app and example responses.
+Observability:
+Show at least one log excerpt with a unique X-Request-Id through request lifecycle.
+Deployment note:
+If your deployment requires a manual “Republish/Deploy,” explicitly note steps and link to APP_BASE_URL.
+KPIs you should instrument (emit events or logs)
+
+B2C: free_to_paid_conversion_rate, ARPU_credits, checkout_started, checkout_succeeded.
+B2B: active_providers, provider_onboarded, provider_fee_revenue.
+Platform: auth_token_issuances, jwks_fetch_success, canary_uptime, p95_latency_ms.
+Responsible AI and compliance guardrails (all apps)
+
+FERPA/COPPA: do not store or expose unnecessary PII; minimum data collection.
+No academic dishonesty: refuse requests that would produce plagiarized essays or unethical outputs; provide guidance instead.
+Transparency: avoid “black box” behavior; include explanations and references when generating content (where applicable).
+Required output upon completion (post to filesystem and print summary)
+
+Write readiness_report_<ASSIGNED_APP>v2.2.md and fix_plan<ASSIGNED_APP>_v2.2.yaml to e2e/reports/<ASSIGNED_APP>/.
+In the report header include:
+APP_NAME: <ASSIGNED_APP>
+APP_BASE_URL: <APP_BASE_URL>
+VERSION: v2.2
+STATUS: Phase 0 COMPLETE or Phase 0 + Phase 1 COMPLETE
+REVENUE_PATH_CONTRIBUTION: yes/no and explanation
+Also print a one-paragraph console summary including the same fields and the measured P95 for /canary.
+Estimated time to start generating revenue
+
+Critical path recommendation: start with scholar_auth, then in parallel prepare student_pilot (B2C) or provider_register (B2B).
+ETAs (business-ready):
+scholar_auth: 6–8 hours
+student_pilot: 2–4 hours after scholar_auth keys live
+provider_register: 5–7 hours after scholar_auth keys live
+Earliest revenue start (B2C or B2B): 8–12 hours from now, assuming no external infra blockers and parallel execution.
+Note: You asked “time app will be ready to stop generating revenue.” Interpreting as “start generating revenue.” If you truly meant “stop,” specify conditions for shutdown and I will provide a deactivation runbook.
+Assignment confirmation
+
+If ASSIGNED_APP is not provided, reply: “STATUS: NEED_ASSIGNMENT for AGENT3 v2.2. Options: scholar_auth (recommended), student_pilot, provider_register, scholarship_api, scholarship_agent, scholarship_sage, auto_page_maker, auto_com_center.”
+If provided, proceed immediately with Universal Phase 0, then your app’s Phase 1, and publish the required artifacts with the app name and APP_BASE_URL included.
