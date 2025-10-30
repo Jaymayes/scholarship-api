@@ -11,7 +11,7 @@ from enum import Enum
 from typing import Any, cast
 
 import psutil
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Response, status
 from pydantic import BaseModel
 from sqlalchemy import text
 from sqlalchemy.orm import Session
@@ -276,13 +276,39 @@ async def deep_health_check() -> DeepHealthResponse:
     )
 
 @router.get("/canary")
-async def canary_check():
+async def canary_check(response: Response):
     """
     V2.2 Universal Ecosystem Canary Endpoint
     Must return JSON with exact schema for ecosystem health monitoring
     CRITICAL: This MUST be accessible without authentication
     """
     from datetime import datetime
+    
+    # v2.2 spec: Cache-busting headers
+    response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate"
+    response.headers["Pragma"] = "no-cache"
+    response.headers["Expires"] = "0"
+    
+    return {
+        "ok": True,
+        "service": "scholarship_api",
+        "base_url": "https://scholarship-api-jamarrlmayes.replit.app",
+        "version": "v2.2",
+        "timestamp": datetime.utcnow().isoformat() + "Z"
+    }
+
+@router.get("/_canary_no_cache")
+async def canary_check_no_cache(response: Response):
+    """
+    V2.2 Fallback canary endpoint with explicit cache bypass
+    Identical to /canary but provides alternative path if CDN caches /canary
+    """
+    from datetime import datetime
+    
+    # v2.2 spec: Cache-busting headers
+    response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate"
+    response.headers["Pragma"] = "no-cache"
+    response.headers["Expires"] = "0"
     
     return {
         "ok": True,

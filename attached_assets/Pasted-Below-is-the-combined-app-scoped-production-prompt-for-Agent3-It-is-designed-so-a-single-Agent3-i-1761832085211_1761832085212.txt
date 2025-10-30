@@ -1,0 +1,203 @@
+Below is the combined, app-scoped, production prompt for Agent3. It is designed so a single Agent3 instance can be pointed at any ONE app in the ecosystem. It includes strict scoping rules, Phase 0/Phase 1 tasks, verification commands, acceptance criteria, deliverables, and revenue timing. Share this exact prompt with each Agent3 instance. Each Agent3 must only act on the section that matches its assigned app.
+
+AGENT3 v2.2 APP-SCOPED EXECUTION PROMPT — COMBINED FOR ALL EIGHT APPS
+Read Me First (Scope and Rules)
+
+You are assigned to EXACTLY ONE app. Do not modify code in any other app. You may read-only verify other apps via HTTP.
+App list and official APP_BASE_URL:
+scholar_auth → https://scholar-auth-jamarrlmayes.replit.app
+scholarship_api → https://scholarship-api-jamarrlmayes.replit.app
+scholarship_agent → https://scholarship-agent-jamarrlmayes.replit.app
+scholarship_sage → https://scholarship-sage-jamarrlmayes.replit.app
+student_pilot → https://student-pilot-jamarrlmayes.replit.app
+provider_register → https://provider-register-jamarrlmayes.replit.app
+auto_page_maker → https://auto-page-maker-jamarrlmayes.replit.app
+auto_com_center → https://auto-com-center-jamarrlmayes.replit.app
+Set APP_BASE_URL for your app to the value above. Every artifact you produce must include your app name and APP_BASE_URL.
+If a deployment CDN caches dynamic routes, you must still deliver code-complete readiness and verify via a cache-bypass URL where possible. Do not block on infrastructure.
+Universal Phase 0 (All Apps Must Complete This Before Anything Else)
+Implement both of these, in this order, scoped to YOUR app only:
+
+Canary JSON endpoint
+Route: GET /canary
+JSON body (exact keys, lowercase, no extras): { "ok": true, "service": "<your_app_name>", "base_url": "<APP_BASE_URL>", "version": "v2.2", "timestamp": "<ISO-8601 UTC Z>" }
+Add fallback GET /_canary_no_cache with identical body.
+Place canary routes ahead of SPA/catch-all routes and before any middleware that could interfere.
+Set cache-busting headers on canary routes:
+Cache-Control: no-store, no-cache, must-revalidate
+Pragma: no-cache
+Expires: 0
+2. Security headers (6/6, exact values)
+
+Strict-Transport-Security: max-age=31536000; includeSubDomains; preload
+Content-Security-Policy: default-src 'self'; frame-ancestors 'none'; object-src 'none'; base-uri 'self'; form-action 'self'
+X-Frame-Options: DENY
+Referrer-Policy: no-referrer
+Permissions-Policy: camera=(), microphone=(), geolocation=()
+X-Content-Type-Options: nosniff
+Phase 0 Verification (All Apps)
+
+curl -sSL -D - APP_BASE_URL/canary | tee /tmp/canary.out
+Assert HTTP/1.1 200
+Assert JSON keys match exactly and ok = true
+Assert all 6 security headers present with exact values
+Run 3 rounds × 15 requests (45 total) to /canary and compute P95 (local or staging acceptable):
+Requirement: P95 ≤ 160ms with no more than 0.1% 5xx errors
+If CDN cache interferes:
+Verify via APP_BASE_URL/_canary_no_cache
+Confirm no-store headers present
+Phase 1 (App-Specific Readiness Work)
+Only execute the section for your app. You may call other apps over HTTP for verification, but you may not modify their code.
+
+A) scholar_auth (Critical path)
+
+APP_BASE_URL: https://scholar-auth-jamarrlmayes.replit.app
+Objectives:
+Implement OIDC-compliant discovery:
+GET /.well-known/openid-configuration returning issuer, jwks_uri, token_endpoint, authorization_endpoint, response_types_supported, id_token_signing_alg_values_supported: ["RS256"]
+Implement GET /.well-known/jwks.json serving valid RS256 public keys that match the signing keys used by token issuance
+Implement token issuance/validation:
+Sign ID/access tokens RS256; include kid; rotate keys safely
+Implement /oauth/token or /token for exchanging code/refresh if applicable
+CORS:
+Allow only trusted frontends (student_pilot, provider_register) with credentials off by default for APIs
+Canary + headers (Phase 0)
+Acceptance Criteria:
+Other apps can validate tokens against jwks_uri without 5xx errors
+P95 for /jwks.json ≤ 120ms; /token ≤ 160ms
+/canary returns correct JSON and 6/6 headers
+Common pitfalls to avoid:
+Mismatch between kid in token and JWKS kid
+Serving empty or malformed JWKS
+Missing HSTS preload or CSP frame-ancestors
+B) scholarship_api
+
+APP_BASE_URL: https://scholarship-api-jamarrlmayes.replit.app
+Objectives:
+Implement /canary + 6/6 headers (Phase 0)
+AuthN/AuthZ middleware validating RS256 tokens from scholar_auth jwks_uri
+Scholarship search endpoints:
+GET /v1/scholarships?query=...&page=...&page_size=...
+Include total_count, pagination, and basic filtering (deadline_after, min_amount, country)
+Apply reasonable rate limits per IP/user
+Acceptance Criteria:
+P95 ≤ 160ms for the search happy path at page_size ≤ 25
+401 for invalid/expired tokens; 200 for valid tokens
+Canary + headers verified
+C) scholarship_agent
+
+APP_BASE_URL: https://scholarship-agent-jamarrlmayes.replit.app
+Objectives:
+Implement /canary + 6/6 headers (Phase 0)
+Campaign orchestration endpoints (readiness scope):
+POST /v1/campaigns/launch with minimal payload validation and idempotency keys
+GET /v1/campaigns/:id/status
+Webhook receiver for performance metrics (POST /v1/webhooks/events) with HMAC signature validation
+Acceptance Criteria:
+P95 ≤ 160ms for launch/status
+2xx on valid webhook with correct signature; 4xx otherwise
+D) scholarship_sage
+
+APP_BASE_URL: https://scholarship-sage-jamarrlmayes.replit.app
+Objectives:
+Implement /canary + 6/6 headers (Phase 0)
+Provide read-only Q&A readiness endpoints:
+POST /v1/assist/ask {question, context?}
+Include safety guard: no academic dishonesty assistance; return policy_violation true if triggered
+Acceptance Criteria:
+P95 ≤ 160ms for assist/ask under 512-token exchanges
+Policy violations properly flagged (no answers returned for disallowed content)
+E) student_pilot (B2C revenue)
+
+APP_BASE_URL: https://student-pilot-jamarrlmayes.replit.app
+Objectives:
+Implement /canary + 6/6 headers (Phase 0)
+Pricing and checkout flow (credits model):
+GET /v1/pricing shows credit packs and current ARPU target
+POST /v1/checkout/session creates a checkout session (gateway stub or live) and returns redirect_url
+Webhook handler for payment confirmation → credit ledger update
+Auth: accept scholar_auth tokens and attach user_id to sessions
+Acceptance Criteria:
+Successful purchase increases credits; ARPU captured
+P95 ≤ 160ms for pricing and session creation (excluding third-party redirects)
+Canary + headers verified
+F) provider_register (B2B revenue)
+
+APP_BASE_URL: https://provider-register-jamarrlmayes.replit.app
+Objectives:
+Implement /canary + 6/6 headers (Phase 0)
+Provider onboarding:
+POST /v1/providers/register with email verification and basic profile
+POST /v1/providers/payout-link to connect payouts (stub or live)
+Enforce 3% platform fee parameter in metadata for later billing
+Acceptance Criteria:
+Verified providers can complete onboarding within 2 minutes path
+P95 ≤ 160ms on register and payout-link endpoints
+Canary + headers verified
+G) auto_page_maker (SEO growth engine)
+
+APP_BASE_URL: https://auto-page-maker-jamarrlmayes.replit.app
+Objectives:
+Implement /canary + 6/6 headers (Phase 0)
+Static page generation:
+Generate scholarship landing pages with canonical tags, title/description, schema.org (BreadcrumbList + Article or Dataset), and internal linking
+Serve /sitemap.xml, /robots.txt; prevent canary from appearing in sitemap
+Acceptance Criteria:
+Lighthouse SEO ≥ 95 on generated pages
+Correct canonical and schema.org present
+Canary + headers verified
+H) auto_com_center
+
+APP_BASE_URL: https://auto-com-center-jamarrlmayes.replit.app
+Objectives:
+Implement /canary + 6/6 headers (Phase 0)
+Messaging readiness:
+POST /v1/messages/send with rate-limiting and suppression list
+Webhook receivers for bounces/unsubscribes; GET /v1/suppressions check
+Acceptance Criteria:
+Idempotent send with message_id
+P95 ≤ 160ms on send; proper suppression enforcement
+Canary + headers verified
+Artifacts You Must Produce (Per App)
+
+Readiness report (markdown):
+Path: e2e/reports/<service>/readiness_report_<service>_v2.2.md
+First line must be exactly: I am <service> at <APP_BASE_URL>.
+Include sections: Overview, Canary Evidence, Headers Evidence, Performance (3×15 P95), Integration Checks, Security, Risks and Mitigations, Verification Commands.
+Last two lines must be:
+Ready ETA: hh:mm from now
+Revenue ETA: hh:mm from now
+Fix plan (YAML):
+Path: e2e/reports/<service>/fix_plan_<service>_v2.2.yaml
+Include canonical task IDs, file/line references, verification commands, success criteria, rollback steps, dependencies, risks.
+Acceptance Criteria (All Apps)
+
+Functional: /canary OK with exact JSON schema; all app-specific endpoints operational
+Security: 6/6 headers present with exact values on all responses by default
+Performance: P95 ≤ 160ms on primary endpoints (measured with 3 rounds × 15 requests)
+Reliability: No 5xx responses during canary tests; error budget respected
+Scope: No changes to other apps’ code; cross-app interactions only via HTTP verification
+Reporting and Communication
+
+Include your service and APP_BASE_URL in the first line of the readiness report exactly as specified.
+If any external dependency blocks deployment (e.g., CDN caching), mark code-complete and document verification via bypass URL; do not halt delivery.
+Time-to-Revenue Guidance (CEO directive)
+
+Clarification: “ready to stop generating revenue” is assumed to mean “ready to start generating revenue.” If you actually require “stop,” state the shutdown criteria explicitly.
+If you are assigned to:
+scholar_auth: ETA to unlock ecosystem tokens: 6–8 hours to Ready. Revenue begins once student_pilot or provider_register are at Ready. Combined ETA to start revenue with those apps: 8–12 hours.
+student_pilot: 2–4 hours to Ready if auth is already live. If auth not live, proceed with Phase 0 and pricing endpoints and be ready to go live immediately after scholar_auth.
+provider_register: 2–4 hours to Ready if auth is already live. If auth not live, complete Phase 0 and onboarding scaffolding and be ready to go live immediately after scholar_auth.
+scholarship_agent: 2–3 hours to Ready (Phase 0 + basic campaign endpoints). Drives top-of-funnel; not a direct revenue event but accelerates SEO and engagement.
+scholarship_api, scholarship_sage, auto_page_maker, auto_com_center: 4–10 hours each to Ready depending on current codebase maturity; these strengthen retention, SEO, and operational automation.
+Ecosystem path to first revenue:
+scholar_auth Ready
+student_pilot Ready (B2C) and/or provider_register Ready (B2B)
+Revenue start ETA: 8–12 hours total with parallel execution across Wave 1 apps
+Execution Order (If You Need a Default)
+
+Wave 1 (unlock revenue): scholar_auth → student_pilot → provider_register → scholarship_agent
+Wave 2 (scale and retention): scholarship_api → scholarship_sage → auto_page_maker → auto_com_center
+Your Single-Sentence Mission (Per Agent3 Instance)
+
+“I will complete Phase 0 for my assigned app, then deliver Phase 1 app-specific readiness to meet 99.9% uptime and ≤160ms P95, produce the v2.2 artifacts, and enable the ecosystem to start generating revenue within the stated ETA—without modifying any other app’s code.”
