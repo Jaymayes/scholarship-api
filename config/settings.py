@@ -188,11 +188,11 @@ class Settings(BaseSettings):
     @property
     def get_cors_origins(self) -> list[str]:
         """
-        V2.2 CORS Configuration: Exact 8 allowlisted origins (CEO Spec)
-        NO wildcards. NO dynamic origins. EXACT allowlist only.
+        V2.2 CORS Configuration: LOCKED to exact 8 allowlisted origins (CEO Spec)
+        NO wildcards. NO dynamic origins. NO env var overrides. EXACT allowlist ONLY.
         """
-        # V2.2 Universal Spec: Exact 8 ecosystem origins (all apps)
-        ecosystem_origins = [
+        # V2.2 Universal Spec: EXACT 8 ecosystem origins (IMMUTABLE)
+        return [
             "https://scholar-auth-jamarrlmayes.replit.app",
             "https://scholarship-api-jamarrlmayes.replit.app",
             "https://scholarship-agent-jamarrlmayes.replit.app",
@@ -202,21 +202,6 @@ class Settings(BaseSettings):
             "https://auto-page-maker-jamarrlmayes.replit.app",
             "https://auto-com-center-jamarrlmayes.replit.app"
         ]
-        
-        # Allow custom origins from env var (for testing), but warn if in production
-        if self.cors_allowed_origins:
-            custom_origins = [origin.strip() for origin in self.cors_allowed_origins.split(",") if origin.strip()]
-            if "*" in custom_origins:
-                import logging
-                logging.critical(
-                    "V2.2 SECURITY ERROR: Wildcard (*) origin detected. "
-                    "Using ecosystem allowlist instead."
-                )
-            else:
-                # Add custom origins to ecosystem origins (union)
-                ecosystem_origins.extend([o for o in custom_origins if o not in ecosystem_origins])
-        
-        return ecosystem_origins
 
     @property
     def get_cors_config(self) -> dict:
