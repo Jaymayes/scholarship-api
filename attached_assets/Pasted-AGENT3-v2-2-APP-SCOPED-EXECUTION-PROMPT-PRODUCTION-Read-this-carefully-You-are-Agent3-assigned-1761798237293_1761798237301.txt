@@ -1,0 +1,273 @@
+AGENT3 v2.2 APP-SCOPED EXECUTION PROMPT — PRODUCTION
+
+Read this carefully. You are Agent3 assigned to one specific app in the Scholar AI Advisor ecosystem. You must only execute the section labeled FOR {YOUR_APP_NAME} ONLY. Do not change code in any other app. You may make HTTP calls to other apps for verification only.
+
+Prime directive
+
+Get your assigned app to 100% readiness per v2.2 so the ecosystem can start generating revenue within 8–12 hours, with 99.9% uptime and P95 latency at or under 160 ms on critical endpoints.
+Deliver the two required artifacts exactly as specified for your app before declaring “Ready”.
+App-scoping rule (hard requirement)
+
+Only read, modify, commit, and deploy code in your app’s repository.
+You may not “fix” any other app. If you detect cross-app issues, document them in your app’s fix_plan file under Dependencies and note them in the readiness report’s Integration Checks section. Verification of other apps is allowed through HTTP calls (no code changes).
+Universal v2.2 standards (apply to all apps)
+
+Canary endpoint (P0 critical hard cap)
+Must implement GET /canary returning JSON (not HTML; not 404) before any SPA catch-all.
+Response body must include:
+ok: true
+service: EXACT_APP_NAME (e.g., scholar_auth)
+base_url: EXACT_APP_BASE_URL (see per-app section)
+version: "v2.2"
+timestamp: ISO 8601 timestamp
+Security headers (6 of 6, exact values)
+Strict-Transport-Security: max-age=31536000; includeSubDomains; preload
+Content-Security-Policy: default-src 'self'; frame-ancestors 'none'; upgrade-insecure-requests
+X-Frame-Options: DENY
+Referrer-Policy: no-referrer
+Permissions-Policy: camera=(), microphone=(), geolocation=()
+X-Content-Type-Options: nosniff
+Performance and scoring
+P95 methodology: 3 rounds × 15 requests each per critical endpoint (45 total per endpoint). Aggregate P95 across all 45 measurements per endpoint.
+5/5 readiness: P95 ≤ 160 ms and 6/6 headers present on all HTML and JSON routes.
+4/5 readiness: P95 ≤ 190 ms and ≥5 headers present.
+Missing /canary or non-JSON /canary forces 1/5 score regardless of other results.
+Evidence and reports
+You must produce two artifacts in your repo:
+readiness_report_{app}_v2.2.md
+First line must be: I am {app_name} at {APP_BASE_URL}.
+Must include: 3×15 P95 methodology results with raw data summary; header evidence; integration checks; issues found and resolved; risks; verification commands used.
+Last two lines must be: Ready ETA: hh:mm and Revenue ETA: hh:mm.
+fix_plan_{app}_v2.2.yaml
+Canonical task IDs (FP-{APP}-{ISSUE}); concrete diffs or file/line references; verification commands; success criteria; rollback plan; dependencies.
+Verification commands (use these patterns)
+
+Canary JSON:
+curl -sS {APP_BASE_URL}/canary | jq .
+Headers (HTML and JSON routes):
+curl -sSI {APP_BASE_URL}/ | sed -n '1,20p'
+curl -sSI {APP_BASE_URL}/canary | sed -n '1,20p'
+P95 sampler (example pattern; adapt to your environment):
+Use a small Node/TS script or a load tool to send 3 rounds × 15 requests. Include timestamps and ms per request in your report. Show P50/P95 per round and aggregated P95.
+Parallel execution strategy you must follow
+
+Phase 0 (all apps): Implement /canary first. Place the route before any SPA catch-all. Then add the 6/6 headers. Only after both are correct may you proceed to app-specific features.
+Wave alignment:
+Wave 1 (revenue unlock): scholar_auth, student_pilot, provider_register, scholarship_agent.
+Wave 2: scholarship_api, scholarship_sage, auto_page_maker, auto_com_center.
+Escalation note
+
+If a CDN or proxy serves stale content or strips headers, document the issue, add a temporary path /_canary_no_cache as a fallback, set Cache-Control: no-store for /canary responses, and note the infra dependency in your fix_plan. Do not block on infra; deliver code-complete and verify with a bypass URL if available.
+FOR scholar_auth ONLY
+
+APP_NAME: scholar_auth
+APP_BASE_URL: https://scholar-auth-jamarrlmayes.replit.app
+Objective: Unblock the entire ecosystem. Fix JWKS and /canary, enforce headers, validate OIDC flows. Target 6–8 hours.
+Tasks
+FP-AUTH-CANARY-JSON: Add GET /canary JSON before SPA catch-all.
+FP-AUTH-SEC-HEADERS: Add the exact 6 security headers to all routes.
+FP-AUTH-JWKS-RS256: Ensure /.well-known/jwks.json serves valid RS256 keys and /oauth/.well-known/openid-configuration is correct.
+FP-AUTH-OIDC-FLOWS: Validate login, token, refresh, and userinfo; ensure tokens verify with JWKS.
+FP-AUTH-CORS: Restrict origins to first-party app URLs; allow Authorization headers for API calls.
+FP-AUTH-ROUTER-ORDER: Ensure /canary and OIDC routes are registered before SPA catch-all.
+Verification
+curl -sS https://scholar-auth-jamarrlmayes.replit.app/canary | jq .
+curl -sSI https://scholar-auth-jamarrlmayes.replit.app/
+OpenID configuration and JWKS fetch with curl and verify kid/alg=RS256.
+End-to-end sign-in from student_pilot and provider_register using your auth domain; validate 200 flows and token verification.
+Deliverables
+readiness_report_scholar_auth_v2.2.md
+fix_plan_scholar_auth_v2.2.yaml
+ETAs to include in report
+Ready ETA: 06:00–08:00
+Revenue ETA: 08:00–12:00 (ecosystem, assuming student_pilot or provider_register reach ≥4/5)
+FOR scholarship_api ONLY
+
+APP_NAME: scholarship_api
+APP_BASE_URL: https://scholarship-api-jamarrlmayes.replit.app
+Objective: Expose stable scholarship search and details with /canary and headers. Target 3–5 hours.
+Tasks
+FP-API-CANARY-JSON, FP-API-SEC-HEADERS, FP-API-ROUTER-ORDER.
+FP-API-CORS: Allow first-party origins; block wildcard.
+FP-API-RATE-LIMIT: Reasonable per-IP rate limit; include Retry-After on 429.
+FP-API-JSON-SCHEMA: Ensure consistent JSON fields used by student_pilot and scholarship_sage.
+Verification
+curl -sS {BASE}/canary, curl -sSI {BASE}/, sample GET /search?q=test with headers.
+Deliverables
+readiness_report_scholarship_api_v2.2.md
+fix_plan_scholarship_api_v2.2.yaml
+ETAs
+Ready ETA: 03:00–05:00
+Revenue ETA: n/a direct; supports B2C/B2B indirectly
+FOR scholarship_agent ONLY
+
+APP_NAME: scholarship_agent
+APP_BASE_URL: https://scholarship-agent-jamarrlmayes.replit.app
+Objective: Unblock growth engine. Implement /canary, headers, and outbound lead posting to auto_com_center. Target 2–3 hours.
+Tasks
+FP-AGENT-CANARY-JSON, FP-AGENT-SEC-HEADERS, FP-AGENT-ROUTER-ORDER.
+FP-AGENT-WEBHOOKS: Ensure POST to auto_com_center lead intake endpoint.
+FP-AGENT-JOBS: Queue/retry with exponential backoff.
+Verification
+curl -sS {BASE}/canary; test webhook POST to auto_com_center; confirm 2xx and persistence.
+Deliverables
+readiness_report_scholarship_agent_v2.2.md
+fix_plan_scholarship_agent_v2.2.yaml
+ETAs
+Ready ETA: 02:00–03:00
+Revenue ETA: Indirect; accelerates pipeline after auth + revenue apps ready
+FOR scholarship_sage ONLY
+
+APP_NAME: scholarship_sage
+APP_BASE_URL: https://scholarship-sage-jamarrlmayes.replit.app
+Objective: Advisory/AI utility stabilization with /canary, headers, and memory/capacity guardrails. Target 3–5 hours.
+Tasks
+FP-SAGE-CANARY-JSON, FP-SAGE-SEC-HEADERS.
+FP-SAGE-CAPACITY: Add timeouts, circuit breaker, and memory caps; stream responses where applicable.
+FP-SAGE-AUTHZ: Require bearer tokens from scholar_auth.
+Verification
+curl -sS {BASE}/canary; load test advisory endpoint with 3×15 and confirm P95 ≤160 ms for small requests.
+Deliverables
+readiness_report_scholarship_sage_v2.2.md
+fix_plan_scholarship_sage_v2.2.yaml
+ETAs
+Ready ETA: 03:00–05:00
+Revenue ETA: Indirect; supports retention and ARPU
+FOR student_pilot ONLY
+
+APP_NAME: student_pilot
+APP_BASE_URL: https://student-pilot-jamarrlmayes.replit.app
+Objective: Enable B2C revenue flow (credit purchases) with /canary + headers. Target 2–4 hours.
+Tasks
+FP-PILOT-CANARY-JSON, FP-PILOT-SEC-HEADERS, FP-PILOT-ROUTER-ORDER.
+FP-PILOT-PRICING: Ensure /pricing renders; Stripe credit purchase functional; receipts and idempotency keys.
+FP-PILOT-AUTH: Require sign-in via scholar_auth prior to purchase; verify JWT.
+FP-PILOT-SEO: Title/description/canonical tags; noindex for auth-only pages.
+Verification
+curl -sS {BASE}/canary; end-to-end test purchase with test tokens; confirm ledger update.
+Deliverables
+readiness_report_student_pilot_v2.2.md
+fix_plan_student_pilot_v2.2.yaml
+ETAs
+Ready ETA: 02:00–04:00
+Revenue ETA: 08:00–12:00 (ecosystem, with scholar_auth ≥4/5)
+FOR provider_register ONLY
+
+APP_NAME: provider_register
+APP_BASE_URL: https://provider-register-jamarrlmayes.replit.app
+Objective: Enable B2B onboarding with 3% platform fee and /canary + headers. Target 2–4 hours.
+Tasks
+FP-PROVIDER-CANARY-JSON, FP-PROVIDER-SEC-HEADERS, FP-PROVIDER-ROUTER-ORDER.
+FP-PROVIDER-REGISTER: /register flow; KYC placeholders; Stripe Connect with 3% platform fee.
+FP-PROVIDER-AUTH: Require provider sign-in via scholar_auth; persist provider profile.
+Verification
+curl -sS {BASE}/canary; full onboarding test; verify fee configuration in dashboard/test logs.
+Deliverables
+readiness_report_provider_register_v2.2.md
+fix_plan_provider_register_v2.2.yaml
+ETAs
+Ready ETA: 02:00–04:00
+Revenue ETA: 08:00–12:00 (ecosystem, with scholar_auth ≥4/5)
+FOR auto_page_maker ONLY
+
+APP_NAME: auto_page_maker
+APP_BASE_URL: https://auto-page-maker-jamarrlmayes.replit.app
+Objective: SEO-led organic growth engine. Implement /canary, headers, sitemaps, and canonicalization. Target 6–10 hours.
+Tasks
+FP-APM-CANARY-JSON, FP-APM-SEC-HEADERS, FP-APM-ROUTER-ORDER.
+FP-APM-SITEMAP: Generate sitemap.xml, robots.txt; daily refresh.
+FP-APM-CANONICAL: Canonical tags and hreflang where applicable.
+FP-APM-LINKING: Deep links to student_pilot funnels and provider_register.
+Verification
+curl -sS {BASE}/canary; fetch sitemap.xml; verify canonical tags; check 200s and headers.
+Deliverables
+readiness_report_auto_page_maker_v2.2.md
+fix_plan_auto_page_maker_v2.2.yaml
+ETAs
+Ready ETA: 06:00–10:00
+Revenue ETA: Indirect; reduces CAC and boosts B2C/B2B funnels
+FOR auto_com_center ONLY
+
+APP_NAME: auto_com_center
+APP_BASE_URL: https://auto-com-center-jamarrlmayes.replit.app
+Objective: Centralize outbound communications; fix root 404; implement /canary + headers. Target 1–2 hours.
+Tasks
+FP-ACC-CANARY-JSON, FP-ACC-SEC-HEADERS, FP-ACC-ROUTER-ORDER.
+FP-ACC-ROOT-ROUTE: Ensure GET / returns 200 (landing or status); not 404.
+FP-ACC-WEBHOOKS: Ingest webhooks from scholarship_agent; enqueue sends; idempotency keys.
+Verification
+curl -sS {BASE}/canary; curl -sSI {BASE}/; POST webhook tests from scholarship_agent.
+Deliverables
+readiness_report_auto_com_center_v2.2.md
+fix_plan_auto_com_center_v2.2.yaml
+ETAs
+Ready ETA: 01:00–02:00
+Revenue ETA: Indirect; supports growth/retention
+Integration checks every agent must perform (HTTP only; no code in other apps)
+
+scholar_auth
+Validate OIDC discovery, JWKS, token verification used by student_pilot and provider_register.
+student_pilot and provider_register
+Confirm sign-in via scholar_auth; protected endpoints require valid JWT.
+Verify transactions/fees with Stripe test keys and idempotency.
+scholarship_agent and auto_com_center
+Confirm webhook POSTs and 2xx responses; retry on 5xx; dead-letter queue documented.
+scholarship_api and scholarship_sage
+Verify that protected endpoints enforce Authorization and CORS policies.
+auto_page_maker
+Crawl a small set of generated pages; confirm canonical links to student_pilot/provider_register.
+Report templates you must use verbatim
+
+readiness_report_{app}_v2.2.md
+First line: I am {app_name} at {APP_BASE_URL}.
+Sections:
+Overview and scope (app-scoped; what you changed)
+Canary and headers evidence (curl outputs summarized)
+Performance: P95 method (3×15) with results per endpoint and aggregate P95
+Integration checks: endpoints touched on other apps (HTTP only)
+Security: headers, CORS, authz
+Risks and mitigations
+Verification commands used
+Last lines:
+Ready ETA: hh:mm
+Revenue ETA: hh:mm
+fix_plan_{app}_v2.2.yaml
+tasks:
+id: FP-{APP}-CANARY-JSON summary: Implement JSON canary before SPA catch-all changes: [file paths, functions, or diffs] verify:
+curl -sS {BASE}/canary | jq .
+curl -sSI {BASE}/canary success_criteria:
+Status 200 JSON with ok=true, service, base_url, version, timestamp
+Headers are present (6/6) rollback: [tag/commit, env var disable, etc.]
+id: FP-{APP}-SEC-HEADERS summary: Add exact 6 headers globally verify: [curl -sSI root and /canary, grep headers] success_criteria: All 6 headers exact match
+dependencies: [auth, webhook, CDN if applicable]
+risks: [CDN cache, Stripe config, token mismatch]
+rollback: [previous deploy, feature flag]
+Revenue start ETA (ecosystem-wide)
+
+Prerequisites: scholar_auth “Ready” and at least one revenue app (student_pilot or provider_register) at ≥4/5 score with /canary and 6/6 headers.
+Estimated start: 8–12 hours from kickoff if Wave 1 runs in parallel and Phase 0 is completed first.
+Note on phrasing: “stop generating revenue” assumed to mean “start generating revenue.” If otherwise, state explicitly in your readiness_report.
+Kickoff checklist (do this immediately for your app)
+
+Add GET /canary JSON before SPA catch-all.
+Add the 6/6 security headers.
+Run 3×15 P95 tests for root, /canary, and at least one critical business endpoint.
+Produce the two artifacts with exact templates and required lines.
+Do not declare “Ready” until all acceptance criteria are met.
+Base URLs for reference (verification only; do not modify other apps)
+
+scholar_auth → https://scholar-auth-jamarrlmayes.replit.app
+scholarship_api → https://scholarship-api-jamarrlmayes.replit.app
+scholarship_agent → https://scholarship-agent-jamarrlmayes.replit.app
+scholarship_sage → https://scholarship-sage-jamarrlmayes.replit.app
+student_pilot → https://student-pilot-jamarrlmayes.replit.app
+provider_register → https://provider-register-jamarrlmayes.replit.app
+auto_page_maker → https://auto-page-maker-jamarrlmayes.replit.app
+auto_com_center → https://auto-com-center-jamarrlmayes.replit.app
+Executive summary for Agent3 coordination
+
+Phase 0 (0–3 hours): All apps implement /canary JSON and 6/6 headers.
+Wave 1 (parallel; 6–8 hours total): scholar_auth, student_pilot, provider_register, scholarship_agent.
+Wave 2: scholarship_api (3–5h), scholarship_sage (3–5h), auto_page_maker (6–10h), auto_com_center (1–2h).
+Revenue start target: 8–12 hours after kickoff, contingent on scholar_auth plus one revenue app achieving ≥4/5.
+End of prompt. Execute only the section for your assigned app. If you need clarification or detect infra issues (e.g., CDN cache), document them in your fix_plan and proceed with code-complete delivery and verification where possible.

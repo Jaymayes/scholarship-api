@@ -23,20 +23,18 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next: Callable) -> Response:
         response = await call_next(request)
 
-        # Always add basic security headers
+        # v2.2 Universal Spec: 6/6 security headers (exact values required)
         response.headers["X-Content-Type-Options"] = "nosniff"
-        response.headers["X-Frame-Options"] = "SAMEORIGIN"
-        response.headers["X-XSS-Protection"] = "1; mode=block"
+        response.headers["X-Frame-Options"] = "DENY"
         response.headers["Referrer-Policy"] = "no-referrer"
-        response.headers["Content-Security-Policy"] = "default-src 'self' 'unsafe-inline'; frame-ancestors 'self'"
-
-        # Add HSTS header only in production with HTTPS
+        response.headers["Content-Security-Policy"] = "default-src 'self'; frame-ancestors 'none'; upgrade-insecure-requests"
+        response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
+        
+        # HSTS header (v2.2 spec: max-age=31536000; includeSubDomains; preload)
         if self.settings.should_enable_hsts:
-            hsts_value = f"max-age={self.settings.hsts_max_age}"
-            if self.settings.hsts_include_subdomains:
-                hsts_value += "; includeSubDomains"
-            if self.settings.hsts_preload:
-                hsts_value += "; preload"
-            response.headers["Strict-Transport-Security"] = hsts_value
+            response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains; preload"
+        else:
+            # Always set HSTS in v2.2 (development uses lower max-age)
+            response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains; preload"
 
         return response

@@ -275,6 +275,23 @@ async def deep_health_check() -> DeepHealthResponse:
         ai=ai_status
     )
 
+@router.get("/canary")
+async def canary_check():
+    """
+    V2.2 Universal Ecosystem Canary Endpoint
+    Must return JSON with exact schema for ecosystem health monitoring
+    CRITICAL: This MUST be accessible without authentication
+    """
+    from datetime import datetime
+    
+    return {
+        "ok": True,
+        "service": "scholarship_api",
+        "base_url": "https://scholarship-api-jamarrlmayes.replit.app",
+        "version": "v2.2",
+        "timestamp": datetime.utcnow().isoformat() + "Z"
+    }
+
 @router.get("/healthz")
 async def liveness_probe() -> dict[str, str]:
     """

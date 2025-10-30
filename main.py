@@ -325,6 +325,7 @@ async def handle_method_not_allowed(request: Request, exc: HTTPException):
     return await method_not_allowed_handler(request, exc)
 
 # Include routers
+# V2.2 Note: /canary endpoint moved to health router for proper organization
 app.include_router(auth_router)
 app.include_router(scholarships_router, prefix="/api/v1", tags=["scholarships"])
 app.include_router(applications_router, prefix="/api/v1", tags=["applications"])
