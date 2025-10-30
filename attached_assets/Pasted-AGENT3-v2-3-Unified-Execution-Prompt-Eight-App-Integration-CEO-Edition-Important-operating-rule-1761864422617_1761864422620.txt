@@ -1,0 +1,248 @@
+AGENT3 v2.3 Unified Execution Prompt — Eight-App Integration (CEO Edition)
+Important operating rule for every app
+
+Only execute the section(s) of this prompt that match your app name.
+Do not modify or run steps for other apps. You may read cross-app requirements to satisfy dependencies, but you must not change other apps.
+When you complete your section, output the Status Report JSON and write the required deliverables to disk as specified below.
+Section 0 — Handshake (every app must populate this)
+Paste this at the top of your run, then proceed only with your app’s section:
+
+ASSIGNED_APP: <one of: scholar_auth | scholarship_api | scholarship_agent | scholarship_sage | student_pilot | provider_register | auto_page_maker | auto_com_center>
+APP_BASE_URL: <your exact base URL from the list below>
+VERSION: v2.3
+ACKNOWLEDGMENT: I will only execute the section of this prompt that matches my app.
+
+Base URLs
+
+scholar_auth → https://scholar-auth-jamarrlmayes.replit.app
+scholarship_api → https://scholarship-api-jamarrlmayes.replit.app
+scholarship_agent → https://scholarship-agent-jamarrlmayes.replit.app
+scholarship_sage → https://scholarship-sage-jamarrlmayes.replit.app
+student_pilot → https://student-pilot-jamarrlmayes.replit.app
+provider_register → https://provider-register-jamarrlmayes.replit.app
+auto_page_maker → https://auto-page-maker-jamarrlmayes.replit.app
+auto_com_center → https://auto-com-center-jamarrlmayes.replit.app
+Sibling-origin CORS allowlist (identical across all apps; no wildcards)
+[
+"https://scholar-auth-jamarrlmayes.replit.app",
+"https://scholarship-api-jamarrlmayes.replit.app",
+"https://scholarship-agent-jamarrlmayes.replit.app",
+"https://scholarship-sage-jamarrlmayes.replit.app",
+"https://student-pilot-jamarrlmayes.replit.app",
+"https://provider-register-jamarrlmayes.replit.app",
+"https://auto-page-maker-jamarrlmayes.replit.app",
+"https://auto-com-center-jamarrlmayes.replit.app"
+]
+
+Phase 0 — Universal Requirements (all apps must implement exactly)
+Security/SLO/canary
+
+Endpoints: implement GET /canary and GET /_canary_no_cache
+Response JSON fields (7 required): app_name, app_base_url, version, status ∈ {ok,warn,fail}, server_time_utc (ISO 8601), p95_ms (rolling last 30 requests), commit_sha
+/_canary_no_cache must include headers: Cache-Control: no-store and Pragma: no-cache
+Request correlation: accept optional X-Request-ID, generate one if missing, echo in response and logs
+Security headers (exact values on every 200/4xx/5xx):
+Strict-Transport-Security: max-age=63072000; includeSubDomains; preload
+Content-Security-Policy: app-specific (see each section)
+Permissions-Policy: camera=(), microphone=(), geolocation=()
+X-Frame-Options: DENY
+Referrer-Policy: no-referrer
+X-Content-Type-Options: nosniff
+CORS: immutable 8-origin allowlist (above); no *
+Baseline rate limiting: ≥300 rpm per origin (plus endpoint-specific rules in app sections)
+SLO targets: uptime 99.9%, p95 ≤ 120ms, 5xx ≤ 1% rolling
+Error format: JSON with fields error, message, request_id
+Responsible AI: never facilitate academic dishonesty; COPPA/FERPA-aware; minimum necessary PII; opt-in analytics
+Artifacts to write (every app)
+
+e2e/reports/<app>/readiness_report_<app>_v2.3_ceo_final.md
+e2e/reports/<app>/fix_plan_<app>_v2.3_ceo_final.yaml Include: handshake, endpoints, SLO evidence, security header proofs, CORS config, rate limits, verification commands, GO/NO-GO matrix, rollout/rollback plan.
+Standard verification commands (every app; adapt host)
+
+Canary JSON: curl -sS <APP_BASE_URL>/canary | jq .
+Security headers count (expect 6): curl -sSI <APP_BASE_URL>/canary | grep -Ei "(strict-transport|content-security|x-frame|referrer|permissions|x-content)" | wc -l
+Output required at end (every app)
+Print Status Report JSON:
+{
+"app_name": "<your app>",
+"app_base_url": "<your base url>",
+"version": "v2.3",
+"status": "<ok|warn|fail>",
+"p95_ms": <number>,
+"server_time_utc": "<ISO timestamp>",
+"commit_sha": "<sha or 'workspace'>"
+}
+
+Section 3.1 — scholar_auth (only scholar_auth executes this)
+Goal: Provide secure OIDC for platform (Authorization Code + PKCE S256) and JWT signing for all apps.
+Endpoints and specs
+
+/.well-known/openid-configuration (RFC 8414): include issuer, authorization_endpoint, token_endpoint, jwks_uri, response_types_supported, grant_types_supported, code_challenge_methods_supported: ["S256"]
+/.well-known/jwks.json: RS256 keys with stable kid; rotate-ready. n length ≥ 2048-bit modulus.
+/oidc/auth: supports code_challenge (S256), code_challenge_method.
+/oidc/token: validates PKCE; returns access_token (RS256 JWT), id_token optional.
+/api/auth/session: sets session cookie; HttpOnly; Secure; SameSite=Lax; no PII beyond email/sub. JWT contract and roles
+Claims: sub, iat, exp, iss, aud, email, roles[], scopes[]
+Roles: ["student","provider","admin","analyst"]
+Scopes examples: ["read:scholarships","write:scholarships","payments:create","org:manage"] Security and limits
+CSP (API/headless): default-src 'none'; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'; object-src 'none'
+Rate limits: 60 rpm per IP on /oidc/auth and /oidc/token; 5 req/15 min on admin bootstrap Verification (additionally)
+JWKS reachable: curl -sS <AUTH>/.well-known/jwks.json | jq .
+End-to-end PKCE: exercise code flow and verify aud/iss/exp/roles/scopes Revenue unblock
+Unblocks student_pilot payments and provider_register publishing ETA to revenue contribution
+0.5–2.0 hours to GO
+Section 3.2 — scholarship_api (only scholarship_api executes this)
+Role: Authoritative scholarship data plane (search, read, provider writes).
+Read endpoints (Phase 1)
+
+GET /api/v1/scholarships (list, filters, pagination)
+GET /api/v1/scholarships/{id} (detail)
+ETag: strong SHA-256; support If-None-Match → 304
+Cache-Control: lists public, max-age=300; details public, max-age=1800
+Vary: Accept, Origin Write endpoints (Phase 2; require scholar_auth)
+POST /api/v1/providers/{provider_id}/scholarships
+PUT /api/v1/providers/{provider_id}/scholarships/{scholarship_id}
+Validate JWT via scholar_auth JWKS; enforce scopes write:scholarships and ownership provider_id Search and scoring
+Basic text + filterable fields (amount, deadline, location, major); safe defaults
+Anti-gaming checks: server-side validation for provider writes Security/CSP/limits
+CSP (API/headless)
+Rate limits: reads 600 rpm per origin; writes 60 rpm per provider_id; baseline ≥300 rpm Verification (additionally)
+ETag test: curl -D- <API>/api/v1/scholarships | grep -i "etag|cache-control"
+Writes 401/403 until auth wired; then 201/200 with scope checks Revenue unblock
+B2C search (reads) and B2B publishing (writes) ETA to revenue contribution
+Reads: 1.5–2.0 hours; Writes: +2–3 hours after scholar_auth is live
+Section 3.3 — scholarship_agent (only scholarship_agent executes this)
+Role: Autonomous marketing/growth engine controlling campaigns, budgets, and SEO content requests.
+Functions
+
+Campaign registry: define personas, channels (email, SMS, social), cadences, budget ceilings
+UTM management and goal tracking (signups, credit purchases, provider onboardings)
+API contracts to:
+auto_page_maker: request page topics and publish triggers
+auto_com_center: queue outbound messages with templates and suppression lists
+Safety: budget guardrails and pause-on-spike thresholds; no black-box content—store prompts, versions, and outputs Endpoints
+POST /agent/campaigns (create/update)
+POST /agent/actions/publish-page (calls auto_page_maker)
+POST /agent/actions/send (calls auto_com_center) Security/CSP/limits
+CSP (API/headless)
+Rate limits: 300 rpm; action endpoints 60 rpm Verification
+Dry-run mode flag; write activity ledger Revenue contribution
+Scales low-CAC organic growth and reactivation loops ETA to revenue contribution
+3–6 hours to useful autonomy after wiring
+Section 3.4 — scholarship_sage (only scholarship_sage executes this)
+Role: Real-time ops/KPI dashboard aggregating canaries and funnel metrics.
+Functions
+
+Fan-out /canary aggregation across all 8 apps; show status, p95, 5xx rate
+KPI tiles:
+B2C: free→paid conversion, ARPU (credits), CAC (organic)
+B2B: active providers, 3% fee revenue
+WebSocket live updates: 30s heartbeat
+RBAC: roles admin, analyst (JWT via scholar_auth) Security/CSP/limits
+CSP (UI profile): default-src 'self'; connect-src 'self' <all 8 origins>; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self'
+Rate limit: 120 rpm per client on pulls Verification
+Canary fan-out, RBAC gating, WS heartbeat ETA to revenue contribution
+2–4 hours; protects revenue via fast incident detection
+Section 3.5 — student_pilot (only student_pilot executes this)
+Role: B2C student app for discovery, credits, and checkout.
+Auth/payments
+
+OIDC PKCE with scholar_auth; store tokens securely; honor roles/scopes
+Stripe integration:
+Use test keys in dev; live keys only after GO
+Webhooks with signature verification; idempotency keys for charges
+Credits wallet and pricing with 4x AI markup target UX/compliance
+No academic dishonesty features; guidance only
+Anonymous browsing allowed; write actions require login Security/CSP/limits
+CSP (UI profile; plus Stripe domains for scripts/connect/img)
+Rate limits: baseline ≥300 rpm; payment endpoints 60 rpm Verification
+Full OIDC login, purchase flow (charge→webhook→wallet credit), refund test Revenue unblock
+First B2C dollar once login+checkout+search are live ETA to revenue contribution
+2–6 hours after scholar_auth is ready
+Section 3.6 — provider_register (only provider_register executes this)
+Role: B2B onboarding and provider console; enforces 3% platform fee policy.
+Functions
+
+Onboard provider orgs; persist provider_id; display fee policy
+Auth: OIDC via scholar_auth; toggle MOCK_AUTH=false when live
+Publishing: call scholarship_api writes with validated JWT scopes Security/CSP/limits
+CSP (UI profile)
+Rate limits: 60 rpm per provider_id on publishing Verification
+Onboarding → JWT → create draft scholarship → update draft → publish Revenue unblock
+Enables B2B 3% fee revenue and fresh inventory ETA to revenue contribution
+5–7 hours after scholar_auth and scholarship_api writes are live
+Section 3.7 — auto_page_maker (only auto_page_maker executes this)
+Role: SEO growth engine generating scholarship pages with structured data.
+Functions
+
+Deterministic page generator: per scholarship and per taxonomy (major, state, deadlines)
+HTML output with:
+<title>, meta description, OpenGraph/Twitter cards
+JSON-LD schema.org/Scholarship
+Internal linking graph and breadcrumbs
+Sitemaps:
+/sitemap.xml (index) + segmented sitemaps
+/robots.txt allowing bots; Crawl-delay omitted
+Pre-render and cache; daily recrawl pings to search engines when updated (queued, no external calls in dev) Security/CSP/limits
+CSP (UI profile)
+Rate limits: 300 rpm; page build jobs 30 rpm Verification
+Validate HTML, links, and JSON-LD; check sitemaps and canonical URLs Revenue contribution
+Drives low-CAC organic traffic; not on first-dollar critical path ETA to revenue contribution
+4–8 hours to initial publish; SEO results ramp over weeks
+Section 3.8 — auto_com_center (only auto_com_center executes this)
+Role: Transactional/comms hub for email/SMS/in-app notifications.
+Functions
+
+Provider: send via Postmark/SendGrid (abstracted); sandbox mode in dev
+Templates: versioned, localized; merge variables; preview endpoint
+Compliance: unsubscribe, bounce/complaint handling, per-user frequency caps
+Webhooks: inbound event processing; signed secrets; idempotent storage
+API used by scholarship_agent and student_pilot for notifications/receipts Security/CSP/limits
+CSP (API/headless)
+Rate limits: global 300 rpm; per-recipient 10/min; hard daily caps per campaign Verification
+Dry-run sends, suppression tests, webhook signature verification, idempotency Revenue contribution
+Improves conversion/retention; supports receipts and onboarding nudges ETA to revenue contribution
+2–4 hours to transactional readiness
+GO/NO-GO Decision Matrix (every app must populate in its report)
+
+Gate 1: /canary returns 7 required fields
+Gate 2: 6/6 security headers exact
+Gate 3: p95 ≤ 120ms over 30-req rolling window
+Gate 4: CORS allowlist = 8 sibling origins; no wildcards
+Gate 5: 5xx ≤ 1% rolling
+Gate 6: status = "ok"
+App-specific gates (see your section) Decision values: GO, PARTIAL GO (specify scope), NO GO (with blocking issues)
+Cross-app integration contract summary
+
+Auth: All JWTs must validate iss = https://scholar-auth-jamarrlmayes.replit.app and aud per client. JWKS from /.well-known/jwks.json.
+Roles/scopes: Enforced by scholarship_api and UIs; provider writes require write:scholarships and provider ownership.
+CORS: Identical 8-origin allowlist across all apps.
+CSP: API/headless for backends; UI profile for web apps; Stripe domains only where needed.
+Rate limits: Baseline ≥300 rpm; stricter on sensitive endpoints as defined.
+Observability: Each app logs X-Request-ID, status code, latency, and user_id/sub when available (never log tokens/PII).
+Canary aggregation: scholarship_sage polls all /canary endpoints and surfaces KPIs.
+Revenue-readiness plan and ETAs
+Assumption: “stop generating revenue” in the request means “start generating revenue.” If not, clarify before proceeding.
+
+Critical path to first B2C dollar (estimate 3–8 hours total):
+scholar_auth GO (0.5–2.0h)
+student_pilot OIDC + Stripe live (2–6h)
+scholarship_api reads deployed (0.25h deploy; 1.5–2.0h if work remains)
+Critical path to first B2B dollar (estimate 7.5–12 hours total):
+scholar_auth GO (0.5–2.0h)
+scholarship_api writes (2–3h)
+provider_register live with OIDC (5–7h)
+Supporting engines (in parallel; not on first-dollar critical path):
+scholarship_agent 3–6h
+scholarship_sage 2–4h
+auto_page_maker 4–8h to initial publish
+auto_com_center 2–4h transactional readiness
+What to print when you finish (mandatory)
+
+Your Status Report JSON (see Phase 0)
+A one-line GO/NO-GO result for your app
+The path to both deliverable files you created
+Reminder
+
+Do not operate or modify other apps. If you need a dependency that is not ready, mark your status = "warn", list the blocker, and proceed with mock adapters guarded by a single environment flag so we can flip to live with zero code changes.
+End of AGENT3 v2.3 Unified Execution Prompt.
