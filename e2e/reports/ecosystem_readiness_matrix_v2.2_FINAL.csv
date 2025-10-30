@@ -1,0 +1,37 @@
+app,gate,score_v2.2,canary_status,key_blocker,eta_hours,revenue_impact,notes
+scholarship_api,T+24h_infra,1,404_missing,"/canary 404 (missing endpoint)",2,indirect,"Core API excellent (93ms P95, structured errors, 5/6 headers). Was 5/5 pre-v2.2. Hard cap: missing /canary → 1/5. ETA 4/5: 2h (add /canary + Permissions-Policy). Enables student_pilot/provider_register API calls."
+scholar_auth,T+24h_infra,1,HTML,"/canary HTML + JWKS 500",8,CRITICAL_PATH,"DUAL BLOCKERS: (1) /canary returns HTML (SPA catch-all), (2) JWKS 500 error. 6/6 security headers (excellent). 64ms P95. BLOCKS ALL REVENUE (B2C + B2B). ETA 4/5: 6-8h (JWKS fix is long pole). Revenue start impossible until this is fixed."
+scholarship_agent,T+24h_infra,1,HTML,"/canary HTML (SPA catch-all)",2,indirect,"Orchestrator/marketing agent. /canary returns HTML. 6/6 security headers. /health works. ETA 4/5: 2h (fix routing). Enables low-CAC growth campaigns."
+scholarship_sage,T+24h_infra,1,TIMEOUT,"/canary timeout + capacity breaches (88% mem, 0.26% errors)",10,indirect,"Analytics/AI guidance. /canary times out. Capacity issues: 88% memory (>75% target), 0.26% error rate (>0.15% target). DB P95 2ms (excellent). ETA 4/5: 10h (memory + error + timeout fixes)."
+student_pilot,T+48h_revenue,1,HTML,"/canary HTML (SPA catch-all)",3,B2C_REVENUE,"B2C credit sales ($40/$200/$800 packs). /canary HTML. /pricing EXISTS ✅ (revenue req met structurally). Stripe preconnect headers present. ETA 4/5: 2-3h (fix /canary). DEPENDS ON scholar_auth JWKS fix. First B2C dollar within 8-10h if auth fixed."
+provider_register,T+48h_revenue,1,HTML,"/canary HTML (SPA catch-all)",3,B2B_REVENUE,"B2B provider onboarding (3% platform fee). /canary HTML. /register EXISTS ✅ (revenue req met structurally). noindex/nofollow correct. ETA 4/5: 2-3h (fix /canary). DEPENDS ON scholar_auth JWKS fix. First B2B dollar within 8-10h if auth fixed."
+auto_page_maker,T+72h_SEO,1,HTML,"/canary HTML (SPA catch-all)",8,SEO_growth,"SEO landing page generator. /canary HTML. Must achieve 5/5 (strict SEO gate). ETA 5/5: 6-8h (canary + SEO headers + sitemap.xml). Unlocks organic student acquisition at low CAC. Revenue impact 3-7 days (indexing lag)."
+auto_com_center,internal,1,404_HTML,"/canary 404 HTML page",2,ops_enablement,"Internal comms/admin hub. /canary 404. Root route accessible but returns 404 message. ETA 4/5: 1-2h (add /canary route). Enables ops productivity; no direct revenue."
+
+GATE_SUMMARY,,,,,,,
+T+24h_infrastructure,,,0/4_apps_passing,All 4 apps at 1/5 (universal /canary blocker),24h_with_parallel,"scholarship_api, scholar_auth, scholarship_agent, scholarship_sage all need /canary. scholar_auth also needs JWKS fix (6-8h critical path)."
+T+48h_revenue,,,0/2_apps_passing,Both revenue apps at 1/5 (depend on scholar_auth),10h_from_now,"student_pilot + provider_register both need /canary (2-3h each). BLOCKED by scholar_auth JWKS (6-8h). Parallel execution: revenue possible 8-10h from now."
+T+72h_SEO,,,0/1_apps_passing,auto_page_maker at 1/5 (needs 5/5),8h,"SEO gate requires perfection. auto_page_maker needs /canary + full SEO headers + sitemap. Lower priority than revenue apps."
+
+UNIVERSAL_BLOCKER,,,,,,,
+finding,,,/canary_missing_all_8_apps,"0/8 apps have working JSON /canary",2-10h_per_app,"Universal /canary requirement new in v2.2. ALL apps fail hard cap: missing or non-JSON → 1/5. Root cause: SPA catch-all routes registered BEFORE /canary API routes (7/8 apps). Quick fix: 1-2h per app (routing change). scholarship_sage needs capacity fixes first (10h)."
+
+REVENUE_ANALYSIS,,,,,,,
+current_state,,,ZERO_revenue_capability,scholar_auth JWKS blocks all auth flows,8-10h_to_first_dollar,"Cannot sell credits (student_pilot checkout broken). Cannot onboard providers (provider_register broken). $10M ARR target completely blocked."
+critical_path,,,scholar_auth_JWKS_fix,6-8 hours to repair JWT signing,HIGHEST_PRIORITY,"JWKS 500 error prevents token issuance. Blocks: student_pilot checkout, provider_register onboarding, scholarship_api writes. ALL revenue flows dead until fixed."
+parallel_plan,,,3_teams_simultaneous,"Team 1: Auth (JWKS+canary 8h), Team 2: Revenue apps (canary 3h), Team 3: Infrastructure (canary 2h)",RECOMMENDED,"With parallel execution: T+8h scholar_auth ready, T+10h first revenue possible. Sequential would be T+20h+."
+
+POSITIVE_FINDINGS,,,,,,,
+security,,,6/8_apps_have_6/6_headers,"Excellent CSP, HSTS, frame protection",0h_remediation,"scholar_auth, scholarship_agent have perfect security posture. Most apps 5/6 (Permissions-Policy only gap)."
+performance,,,sub-100ms_P95_observed,"scholarship_api 93ms, scholar_auth 64ms, scholarship_sage DB 2ms",0h_remediation,"Performance excellent where measured. No P95 violations (all under 160ms target)."
+revenue_structure,,,/pricing_and_/register_exist,"student_pilot /pricing ✅, provider_register /register ✅",0h_remediation,"Revenue pages structurally ready. Just need /canary fix + scholar_auth unblock."
+
+RECOMMENDATIONS,,,,,,,
+immediate,,,deploy_universal_canary_fix,1-2h parallel sprint across 7 apps,P0,"Same code pattern (see ECOSYSTEM_EXECUTIVE_SUMMARY). Unlocks 1/5 → 2-4/5 across ecosystem."
+critical_path,,,fix_scholar_auth_JWKS,6-8h auth team focus,P0_REVENUE_BLOCKER,"THE revenue bottleneck. Every hour of delay = 1h revenue start delay. Highest priority."
+strategic,,,consider_spec_relaxation,Temporary /canary exemption for pragmatism,CEO_DECISION,"Strict v2.2 hard cap may be too aggressive. Consider scoring apps on other criteria while /canary is deployed in parallel."
+
+ETA_TO_REVENUE,,,,,,,
+optimistic,,,8_hours,"All teams parallel, no blockers, scholar_auth fix successful first try",LOW_CONFIDENCE
+realistic,,,10_hours,"Parallel execution with minor debugging, scholar_auth JWKS takes 8h",MEDIUM_CONFIDENCE
+pessimistic,,,16_hours,"Sequential fixes, scholar_auth debugging extends to 12h, integration issues",HIGH_CONFIDENCE
