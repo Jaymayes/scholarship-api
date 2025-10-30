@@ -1,0 +1,278 @@
+Below is your consolidated Agent3 v2.2 APP-SCOPED execution prompt. Agent3: you must only read and act on the single APP-SCOPED block whose app_name matches your own. Ignore all other blocks completely. Produce the two artifacts per your app only: readiness_report_v2.2.md and fix_plan_v2.2.yaml.
+
+GLOBAL PROTOCOL (APPLIES TO ALL APPS)
+
+Universal canary endpoint requirement (mandatory for all 8 apps):
+GET /canary must return JSON with Content-Type: application/json
+Response body: { "ok": true, "service": "{app_name}", "base_url": "{APP_BASE_URL}", "version": "v2.2", "timestamp": "<ISO-8601 UTC>" }
+Report format requirements (for your app’s readiness_report_v2.2.md):
+First line must be exactly: I am {app_name} at {APP_BASE_URL}
+Include evidence lines with ISO-8601 timestamps, results, headers, and computed P95s
+Last line must include ETA_to_ready and ETA_to_start_generating_revenue
+Security headers (6/6 required for a 5/5 score):
+Strict-Transport-Security: max-age=31536000; includeSubDomains; preload
+Content-Security-Policy: default-src 'self'; frame-ancestors 'none'; upgrade-insecure-requests
+X-Content-Type-Options: nosniff
+X-Frame-Options: DENY
+Referrer-Policy: no-referrer
+Permissions-Policy: camera=(), microphone=(), geolocation=()
+Performance scoring thresholds (apply these exactly):
+5/5: P95 ≤ 160ms AND 6/6 headers
+4/5: P95 ≤ 190ms AND ≥5 headers
+3/5: P95 ≤ 230ms AND ≥4 headers
+2/5: Critical defect OR P95 > 230ms OR <4 headers
+1/5: Non-functional OR hard-cap failure
+Hard caps that drop score to 1/5 immediately:
+Missing or non-JSON /canary, 5xx on critical endpoints, broken root route for front-ends, auth token issuance failures (if applicable)
+3-sample P95 methodology:
+For each required endpoint, run three rounds of N requests (N ≥ 15 per round). Compute the P95 of each round. Take the median of the three P95s as the endpoint’s P95. App P95 = the max P95 across required endpoints. Record all samples and the computed P95s in the report.
+Deliverables (for your app only):
+e2e/reports/{app_name}/readiness_report_v2.2.md
+e2e/reports/{app_name}/fix_plan_v2.2.yaml
+Evidence collection commands (examples; adapt to your app’s endpoints):
+curl -s -D - {BASE}/canary -o /dev/null
+curl -s -w "time_total=%{time_total}\n" -o /dev/null {BASE}/health
+Use jq to validate JSON when applicable; capture headers; attach sample payloads and responses. Ensure Content-Type: application/json for JSON endpoints.
+APP-SCOPED BLOCK: scholar_auth
+
+Scope guard: If you are not scholar_auth, ignore this entire block.
+Identity:
+app_name: scholar_auth
+APP_BASE_URL: https://scholar-auth-jamarrlmayes.replit.app
+Mission and business role:
+Provide OIDC-compliant authentication and JWT issuance for the entire ecosystem. This app indirectly drives revenue by enabling student_pilot checkout, provider_register onboarding, and secure access to scholarship_api and scholarship_sage.
+Required endpoints and behavior:
+GET /canary → JSON per global protocol
+GET /.well-known/openid-configuration → valid OIDC discovery doc
+GET /jwks.json → valid JWK Set (keys array non-empty; key ids and algs present). Must not return 500
+POST /token → exchanges auth code or client credentials; returns JWT access_token with iss, aud, exp, kid matching JWKS
+GET /userinfo (optional) → returns subject claims for logged-in user
+POST /logout → revokes session or tokens (document behavior)
+GET /health → minimal health probe returning 200
+Security and compliance:
+Enforce HTTPS-only, secure cookies (HttpOnly; Secure; SameSite=Lax or Strict where applicable)
+CORS: Allow-list only the 7 sibling apps’ origins
+Emit 6/6 security headers on all HTML and JSON responses
+Validation checklist:
+Canary returns JSON (not HTML), Content-Type: application/json
+JWKS: 200 OK, JSON parseable, keys[].kid present; verify a signed token header.kid matches a JWKS key
+Token issuance: issue and validate a token using a test client; verify iss=APP_BASE_URL, aud includes consuming app
+Performance: P95 ≤ 160ms for canary, jwks, token (client-credentials)
+Known/assumed gaps (verify and fix):
+Historical: /jwks.json 500 was observed. Ensure stable 200 + valid keys
+Example verification commands:
+curl -s -D - {BASE}/canary | jq .
+curl -s -D - {BASE}/.well-known/openid-configuration | jq .
+curl -s -D - {BASE}/jwks.json | jq ".keys | length"
+curl -s -X POST {BASE}/token -d "grant_type=client_credentials&client_id=TEST&client_secret=TEST" -H "Content-Type: application/x-www-form-urlencoded"
+Acceptance criteria and scoring:
+5/5 requires: valid /canary JSON; jwks.json 200 with keys; token issuance working; 6/6 headers; App P95 ≤ 160ms
+Deliverables:
+readiness_report_v2.2.md (first line: I am scholar_auth at https://scholar-auth-jamarrlmayes.replit.app; last line includes ETAs)
+fix_plan_v2.2.yaml with task IDs, diffs, verification steps, rollback
+ETAs (default targets):
+ETA_to_ready: 4-6 hours (includes JWKS hardening)
+ETA_to_start_generating_revenue: 6-10 hours (via student_pilot once auth is stable)
+APP-SCOPED BLOCK: scholarship_api
+
+Scope guard: If you are not scholarship_api, ignore this block.
+Identity:
+app_name: scholarship_api
+APP_BASE_URL: https://scholarship-api-jamarrlmayes.replit.app
+Mission and business role:
+Central scholarship search, detail, and application submission API. Directly supports B2C conversion and B2B provider workflows.
+Required endpoints and behavior:
+GET /canary → JSON per global protocol
+GET /search?q=&page= → list with pagination; deterministic sort; supports filters (merit, need, deadline)
+GET /scholarships/{id} → details
+POST /applications → accepts {student_id, scholarship_id, answers}; returns 201 with application_id
+GET /health → returns 200 OK
+All write endpoints require Bearer token from scholar_auth
+Security and compliance:
+6/6 security headers; rate limiting; input validation and schema errors as JSON
+Validation checklist:
+Auth required where specified; 401 with JSON error if missing/invalid
+P95 for canary, search, details ≤ 160ms for 5/5; ≤ 190ms for 4/5
+Example verification commands:
+curl -s -D - {BASE}/canary | jq .
+curl -s -D - "{BASE}/search?q=STEM&page=1" -o /dev/null
+curl -s -D - "{BASE}/scholarships/TEST123" -o /dev/null
+Deliverables and ETAs:
+readiness_report_v2.2.md and fix_plan_v2.2.yaml
+ETA_to_ready: 2-4 hours (primarily /canary + headers + perf pass)
+ETA_to_start_generating_revenue: 6-10 hours (through student_pilot flow)
+APP-SCOPED BLOCK: scholarship_agent
+
+Scope guard: If you are not scholarship_agent, ignore this block.
+Identity:
+app_name: scholarship_agent
+APP_BASE_URL: https://scholarship-agent-jamarrlmayes.replit.app
+Mission and business role:
+Autonomous marketing engine: launches scholarship discovery campaigns, feeds Auto Page Maker inputs, and triggers Com Center outreach. Indirect revenue via lower CAC and increased sign-ups.
+Required endpoints and behavior:
+GET /canary → JSON per global protocol (must be JSON, not HTML; register route before SPA catch-all)
+GET /health → 200 OK
+POST /campaigns → create campaign {topic, keywords, regions}
+GET /campaigns/{id} → status (active, paused, complete)
+Webhooks (optional): POST /hooks/auto_page_maker to push page specs
+Known/assumed gap:
+/canary was returning HTML. Fix to JSON with proper Content-Type
+Validation checklist:
+/canary JSON; security headers on HTML and JSON pages; SPA routing doesn’t catch /canary
+Performance P95 ≤ 160ms on canary and campaigns endpoints
+Deliverables and ETAs:
+readiness_report_v2.2.md and fix_plan_v2.2.yaml
+ETA_to_ready: 3-5 hours (fix /canary, headers)
+ETA_to_start_generating_revenue: 24-48 hours (campaigns begin influencing traffic)
+APP-SCOPED BLOCK: scholarship_sage
+
+Scope guard: If you are not scholarship_sage, ignore this block.
+Identity:
+app_name: scholarship_sage
+APP_BASE_URL: https://scholarship-sage-jamarrlmayes.replit.app
+Mission and business role:
+Expert guidance for students and providers (essay feedback, eligibility guidance). Indirect revenue uplift via improved conversion to paid credits in student_pilot.
+Required endpoints and behavior:
+GET /canary → JSON per global protocol
+POST /advise → accepts {student_id, context, prompt}; returns guidance; requires Bearer token
+GET /health → 200 OK with lightweight self-checks
+Performance and reliability targets:
+Maintain App P95 ≤ 160ms for canary and ≤ 190ms for advise; error rate < 0.15% over the validation window
+Monitor memory utilization; target < 75%
+Known/assumed issues:
+High memory (~94%), error rate above threshold, DB P95 > 45ms
+Remediation guidance:
+Profile memory hot spots; reduce in-memory history; bound caches; verify GC; optimize slow queries with indexes
+Deliverables and ETAs:
+readiness_report_v2.2.md and fix_plan_v2.2.yaml
+ETA_to_ready: 4-6 hours (profiling + fixes)
+ETA_to_start_generating_revenue: 12-24 hours (benefit realized once student_pilot users engage)
+APP-SCOPED BLOCK: student_pilot
+
+Scope guard: If you are not student_pilot, ignore this block.
+Identity:
+app_name: student_pilot
+APP_BASE_URL: https://student-pilot-jamarrlmayes.replit.app
+Mission and business role:
+B2C front-end that converts visitors to paying users; sells credits with 4x markup for AI services. Direct revenue app.
+Required endpoints and behavior:
+GET /canary → JSON per global protocol
+GET / → home 200 OK
+GET /pricing → visible plans: $40, $200, $800 credit packs; display effective per-credit price and 4x markup policy
+POST /checkout → purchase flow; mock or Stripe; on success, credits increment; requires auth
+GET /dashboard → shows credits, applications, recommendations; requires auth
+Known/assumed gap:
+/pricing page missing previously; ensure present and measured
+Validation checklist:
+Full guest → signup/login via scholar_auth → pricing → checkout → credits visible
+6/6 security headers present; P95 ≤ 160ms for canary/home/pricing
+Deliverables and ETAs:
+readiness_report_v2.2.md and fix_plan_v2.2.yaml
+ETA_to_ready: 3-5 hours
+ETA_to_start_generating_revenue: 6-10 hours (once scholar_auth ready)
+APP-SCOPED BLOCK: provider_register
+
+Scope guard: If you are not provider_register, ignore this block.
+Identity:
+app_name: provider_register
+APP_BASE_URL: https://provider-register-jamarrlmayes.replit.app
+Mission and business role:
+B2B provider onboarding with disclosure of 3% platform fee. Direct revenue via 3% fee on provider payouts.
+Required endpoints and behavior:
+GET /canary → JSON per global protocol
+GET /register → onboarding form with explicit 3% fee disclosure
+POST /register → create provider record; status pending_review
+GET /dashboard → provider sees listings and payout settings; requires auth
+GET /health → 200 OK
+Known/assumed gap:
+/register page missing previously; implement with disclosure
+Validation checklist:
+End-to-end: login (scholar_auth) → register → dashboard pending_review shown
+Headers 6/6; P95 ≤ 160ms for canary/register
+Deliverables and ETAs:
+readiness_report_v2.2.md and fix_plan_v2.2.yaml
+ETA_to_ready: 3-5 hours
+ETA_to_start_generating_revenue: 48-72 hours (provider KYC and listing lag)
+APP-SCOPED BLOCK: auto_page_maker
+
+Scope guard: If you are not auto_page_maker, ignore this block.
+Identity:
+app_name: auto_page_maker
+APP_BASE_URL: https://auto-page-maker-jamarrlmayes.replit.app
+Mission and business role:
+Generate SEO pages that capture organic student traffic at low CAC; feeds student_pilot conversions.
+Required endpoints and behavior:
+GET /canary → JSON per global protocol
+POST /pages → create landing pages from scholarship_agent campaign specs
+GET /sitemap.xml → lists generated pages; ensure correct <loc>, <lastmod>
+GET /health → 200 OK
+SEO readiness:
+Canonical tags, clean URLs, fast TTFB, pre-render for bots; ensure CSP doesn’t block critical assets
+Validation checklist:
+Generate at least 3 sample pages; confirm they appear in sitemap.xml; measure P95 for canary and a sample page
+Deliverables and ETAs:
+readiness_report_v2.2.md and fix_plan_v2.2.yaml
+ETA_to_ready: 2-4 hours
+ETA_to_start_generating_revenue: 3-7 days (organic indexing and early conversions; faster if pages are pre-linked)
+APP-SCOPED BLOCK: auto_com_center
+
+Scope guard: If you are not auto_com_center, ignore this block.
+Identity:
+app_name: auto_com_center
+APP_BASE_URL: https://auto-com-center-jamarrlmayes.replit.app
+Mission and business role:
+Unified communications hub (email/SMS) for onboarding, reminders, and lifecycle touchpoints. Indirect revenue via higher activation and retention.
+Required endpoints and behavior:
+GET / → root route returns 200 OK (must not 404)
+GET /canary → JSON per global protocol
+POST /email/test → accepts {to, subject, html}; returns queued=true (integration can be mocked)
+POST /sms/test → accepts {to, body}; returns queued=true (integration can be mocked)
+GET /health → 200 OK
+Known/assumed gap:
+Root 404 previously; implement root and canary immediately
+Validation checklist:
+Root 200; canary JSON; 6/6 headers; P95 ≤ 160ms on root/canary
+Deliverables and ETAs:
+readiness_report_v2.2.md and fix_plan_v2.2.yaml
+ETA_to_ready: 1-2 hours
+ETA_to_start_generating_revenue: 12-24 hours (activations, failed-payment nudges)
+CROSS-APP CONNECTIVITY TESTS (Run only those that touch your app; do not modify other apps)
+
+scholar_auth tokens verified by scholarship_api, student_pilot, provider_register, scholarship_sage.
+scholarship_agent to auto_page_maker: POST /campaigns → webhook POST /pages to generate landing pages.
+student_pilot → scholarship_api: search, detail, application create (requires auth).
+student_pilot → auto_com_center: send post-purchase and onboarding emails/SMS via /email/test and /sms/test.
+provider_register → scholarship_api: provider listings retrieval (auth required).
+REPORTING AND FILE OUTPUT TEMPLATES (Use for your app only)
+
+readiness_report_v2.2.md must include:
+First line: I am {app_name} at {APP_BASE_URL}
+Mission summary and business impact (direct or indirect revenue)
+Endpoint checklist with evidence lines (timestamp, status, Content-Type, header count)
+3-sample P95 results per required endpoint and computed App P95
+Security headers audit (which of 6 are present globally)
+Hard caps assessment
+Root cause analysis for any failures and their business impact
+Gate decision: score 1-5/5 using v2.2 thresholds
+Final line: ETA_to_ready: <Xh> | ETA_to_start_generating_revenue: <Xh/Xd>
+fix_plan_v2.2.yaml must include:
+tasks:
+id: FP-<SHORTCODE> summary: <what to change> files_changed: [paths] code_diffs: | <minimal diffs or pseudocode> verification:
+curl commands and expected outputs success_criteria:
+measurable conditions (e.g., P95, headers, JSON shape) rollback_plan:
+steps to revert risk:
+likelihood and impact
+EXECUTION ORDER AND URGENCY
+
+P0 blockers to fix first (in parallel where possible):
+scholar_auth: stabilize JWKS and token issuance
+scholarship_agent: ensure /canary returns JSON
+student_pilot: ensure /pricing exists and checkout path completes
+auto_com_center: fix root 404 and add /canary
+Then complete /canary and headers across all apps, followed by performance pass to meet v2.2 scoring.
+CEO-LEVEL TARGETS (for your reference; include your app’s ETAs only in your report)
+
+First B2C revenue via student_pilot after scholar_auth + student_pilot readiness: 6-10 hours
+First B2B revenue via provider_register: 48-72 hours (provider setup lag)
+Ecosystem T+24h infrastructure gate unblocked when all /canary JSON endpoints pass and no P0 hard caps remain
+Agent3, proceed. Remember: only operate within your own APP-SCOPED block. Ensure your report begins with “I am {app_name} at {APP_BASE_URL}” and ends with “ETA_to_ready: … | ETA_to_start_generating_revenue: …”.
