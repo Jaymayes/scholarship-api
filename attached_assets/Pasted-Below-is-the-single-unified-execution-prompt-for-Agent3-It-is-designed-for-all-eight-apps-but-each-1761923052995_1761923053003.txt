@@ -1,0 +1,222 @@
+Below is the single unified execution prompt for Agent3. It is designed for all eight apps, but each Agent3 instance must only execute the section explicitly assigned to its app. To enforce this, every Agent3 instance must perform the Scope Guard and Handshake in U0 and then execute only the one app-specific section (A1–A8) matching ASSIGNED_APP.
+
+AGENT3 UNIFIED EXECUTION PROMPT v2.5 (CEO Edition — FINAL)
+
+U0 — Scope Guard and Handshake (MANDATORY FOR ALL)
+
+On startup, log and print exactly this one-line handshake: AGENT3_HANDSHAKE ASSIGNED_APP=<one of: scholar_auth|scholarship_api|scholarship_agent|scholarship_sage|student_pilot|provider_register|auto_page_maker|auto_com_center> APP_BASE_URL=<exact base URL below> VERSION=v2.5 ACK=I will only execute my app section.
+If ASSIGNED_APP is not one of the listed apps, exit without making changes.
+After printing the handshake, execute only your assigned A# section. Do not modify any other app.
+U1 — Global Constants (ALL APPS)
+
+Version: v2.5
+Base URLs (APP_BASE_URL per app):
+scholar_auth → https://scholar-auth-jamarrlmayes.replit.app
+scholarship_api → https://scholarship-api-jamarrlmayes.replit.app
+scholarship_agent → https://scholarship-agent-jamarrlmayes.replit.app
+scholarship_sage → https://scholarship-sage-jamarrlmayes.replit.app
+student_pilot → https://student-pilot-jamarrlmayes.replit.app
+provider_register → https://provider-register-jamarrlmayes.replit.app
+auto_page_maker → https://auto-page-maker-jamarrlmayes.replit.app
+auto_com_center → https://auto-com-center-jamarrlmayes.replit.app
+CORS allowlist (exactly these 8 origins, no wildcards):
+The 8 APP_BASE_URL values above
+Required security headers on 100% of responses:
+Strict-Transport-Security: max-age=31536000; includeSubDomains
+Content-Security-Policy: default-src 'self'; frame-ancestors 'none' (extend only where noted)
+X-Frame-Options: DENY
+X-Content-Type-Options: nosniff
+Referrer-Policy: strict-origin-when-cross-origin
+Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=()
+Standard error JSON: { "error": { "code": "<UPPER_SNAKE_CASE>", "message": "<human readable>", "details": null|object }, "request_id": "<uuid>" }
+Request correlation:
+Accept and echo X-Request-ID; if missing, generate a UUID.
+SLO targets:
+Universal P95 latency ≤120ms; 5xx ≤1%
+App-specific stricter SLOs are noted in each A# section if applicable.
+Canary endpoint (must return exactly 9 fields): { "app_name": "<must match ASSIGNED_APP>", "app_base_url": "<must match APP_BASE_URL>", "version": "v2.5", "status": "ok|degraded", "p95_ms": <number>, "commit_sha": "<short sha|workspace>", "server_time_utc": "<ISO8601>", "revenue_role": "<direct|enables|acquires|protects>", "revenue_eta_hours": "<range, e.g., 2-6>" }
+Idempotency (writes only):
+Require Idempotency-Key on POST/PUT/PATCH/award flows; 24h memory; return HTTP 409 on replay with original request_id in details.
+RBAC and Auth:
+OIDC via scholar_auth; JWKS: https://scholar-auth-jamarrlmayes.replit.app/.well-known/jwks.json
+Roles: student, provider, admin
+Scopes (examples): read:scholarships, write:scholarships, provider.manage, purchase.credits, admin, analytics.export
+Events and telemetry:
+Emit events via POST to auto_com_center: https://auto-com-center-jamarrlmayes.replit.app/events
+Example events: student_pilot.purchase_succeeded|failed, provider_register.scholarship_submitted|published, scholarship_agent.campaign_launched|click, auto_page_maker.page_published, scholarship_sage.alert, scholarship_api.write_blocked
+Stop conditions (abort current operation and log):
+bad_scope, cors_violation, missing_auth, slo_breach, ethics_guard
+U8 — Deliverables (ALL APPS)
+
+Write two files per app with these exact names and include:
+e2e/reports/<ASSIGNED_APP>/readiness_report_<ASSIGNED_APP>v2_5_ceo_final.md
+e2e/reports/<ASSIGNED_APP>/fix_plan<ASSIGNED_APP>_v2_5_ceo_final.yaml
+Both files must contain:
+The exact AGENT3_HANDSHAKE line
+APP_BASE_URL
+The current /canary JSON payload
+Evidence that all validation gates (U1–U4) for that app are passing
+Any blockers and their resolution steps
+The readiness report must show app_name and app_base_url exactly matching /canary. This fulfills “have the app name itself with the base APP_BASE_URL and include it in the report.”
+U4 — Validation Gates (ALL APPS)
+
+Gate 1: /canary returns 9 exact fields; version=v2.5; app_name and app_base_url correct
+Gate 2: Security headers present on 100% responses
+Gate 3: CORS equals the 8-origin allowlist; no wildcards
+Gate 4: X-Request-ID correlation functional
+Gate 5: SLOs satisfied; report current p95_ms; 5xx ≤1%
+Gate 6: Standard error JSON format on errors
+Gate 7: RBAC enforced (401/403 on violations)
+Gate 8: Idempotency on writes (N/A apps must note it as N/A)
+Gate 9: Deliverables written as specified
+A1 — scholar_auth (execute only if ASSIGNED_APP=scholar_auth)
+
+APP_BASE_URL: https://scholar-auth-jamarrlmayes.replit.app
+Mission: Central OIDC, JWKS, tokens, roles, scopes
+Requirements:
+OIDC endpoints operational: authorize, token, userinfo, jwks.json
+Serve JWKS; rotate keys safely; cache headers
+Roles and scopes issuance; audience/issuer claims correct
+SLO: P95 ≤20ms; 5xx ≤1%
+Revenue role and ETA: enables; 0.5-2 hours
+Status goal: status="ok"
+Emit events: scholar_auth.token_issued
+Deliver all U8 artifacts and pass U4 gates
+A2 — scholarship_api (ASSIGNED_APP=scholarship_api)
+
+APP_BASE_URL: https://scholarship-api-jamarrlmayes.replit.app
+Mission: Canonical scholarship data service
+Read policy: Public reads unless stricter flag enabled; JWT optional for reads
+Degraded mode: If JWKS unreachable/invalid → status="degraded"; disable writes; reads continue
+Requirements:
+GET /scholarships: filters, sort, pagination, ETag, 304 support; cache headers
+POST/PUT/PATCH /scholarships: require provider role + write:scholarships; Idempotency-Key
+Ownership enforcement: providers can only mutate their org’s records
+Rate limits: reads 300 rpm; writes 120 rpm
+SLO: P95 ≤85ms; 5xx ≤1%
+Revenue role and ETA: enables; 2-5 hours
+Events: scholarship_api.write_blocked (when degraded), scholarship_api.entity_written
+Status goal: status="ok" when JWKS available; otherwise "degraded" with writes disabled
+Deliver U8 artifacts and pass U4 gates
+A3 — scholarship_agent (ASSIGNED_APP=scholarship_agent)
+
+APP_BASE_URL: https://scholarship-agent-jamarrlmayes.replit.app
+Mission: Autonomous campaigns that drive low-CAC traffic and activations
+Inputs: Campaign brief (segment, goals, landing URLs, budget=0 for organic), guardrails
+Orchestrations:
+SEO: Call auto_page_maker to generate landing pages, topic clusters, and internal linking to student_pilot and provider_register flows
+Email: Use auto_com_center to schedule compliant outreach; include unsubscribe links; never email minors without consent (COPPA)
+Tracking: UTM tags in all links pointing to student_pilot and provider_register
+Requirements:
+RBAC: admin to configure; read-only to fetch KPI summaries from scholarship_sage
+Hard guardrails: no academic dishonesty; adhere to Responsible AI policies; ethics_guard stop condition if violated
+SLO: P95 ≤90ms; 5xx ≤1%
+Revenue role and ETA: acquires; 6-12 hours
+Events: scholarship_agent.campaign_launched, scholarship_agent.click
+Deliver U8 artifacts and pass U4 gates
+A4 — scholarship_sage (ASSIGNED_APP=scholarship_sage)
+
+APP_BASE_URL: https://scholarship-sage-jamarrlmayes.replit.app
+Mission: Revenue protection via KPIs and circuit breakers
+Poll all 8 /canary endpoints every 60s ± jitter; aggregate KPIs; compute SLA/SLO drift
+Endpoints:
+GET /kpi/summary (requires admin + analytics.export)
+Circuit breakers:
+If any app status="degraded" or slo_breach detected → emit scholarship_sage.alert and annotate the offending app
+SLO: P95 ≤30ms target (universal ≤120ms), 5xx ≤1%
+Revenue role and ETA: protects; 2-4 hours
+Deliver U8 artifacts and pass U4 gates
+A5 — student_pilot (ASSIGNED_APP=student_pilot)
+
+APP_BASE_URL: https://student-pilot-jamarrlmayes.replit.app
+Mission: B2C experience to browse scholarships, purchase credits, and receive AI coaching
+Requirements:
+Login via scholar_auth (student role; scopes: read:scholarships, purchase.credits)
+Browse via scholarship_api with ETag caching
+Stripe Checkout for credit packs (extend CSP minimally for Stripe)
+Ethics: coaching only; never write or submit student content on their behalf
+Rate limits: browse 300 rpm; checkout 60 rpm
+SLO: P95 ≤60ms; 5xx ≤1%
+Revenue role and ETA: direct; 2-6 hours (after A1 + A2 ok and Stripe live)
+Events: student_pilot.purchase_succeeded | purchase_failed
+Deliver U8 artifacts and pass U4 gates
+A6 — provider_register (ASSIGNED_APP=provider_register)
+
+APP_BASE_URL: https://provider-register-jamarrlmayes.replit.app
+Mission: B2B provider onboarding; scholarship submission and publishing
+Requirements:
+OIDC via scholar_auth (provider role; scopes: provider.manage, write:scholarships)
+Write to scholarship_api with Idempotency-Key and org ownership enforcement
+Workflow: draft → review → publish with immutable audit log
+Events: provider_register.scholarship_submitted | provider_register.scholarship_published
+Rate limits: writes 120 rpm; reads 300 rpm
+SLO: P95 ≤90ms; 5xx ≤1%
+Revenue role and ETA: direct (3% platform fee on awards); 3-6 hours after A1 + A2 writes ok
+Deliver U8 artifacts and pass U4 gates
+A7 — auto_page_maker (ASSIGNED_APP=auto_page_maker)
+
+APP_BASE_URL: https://auto-page-maker-jamarrlmayes.replit.app
+Mission: Organic SEO engine for scalable, low-CAC student acquisition
+Requirements:
+Generate static, indexable pages for scholarships and topic clusters
+Canonical URLs; meta tags; JSON-LD; sitemap.xml and robots.txt
+Internal links to student_pilot and provider_register; include UTM tracking
+Pull data from scholarship_api; cache with ETag; 304 support
+Publish pages atomically; emit auto_page_maker.page_published
+SLO: P95 ≤80ms; 5xx ≤1%
+Revenue role and ETA: acquires; 4-8 hours to first indexed pages (traffic ramps over days; still required now to minimize CAC)
+Deliver U8 artifacts and pass U4 gates
+A8 — auto_com_center (ASSIGNED_APP=auto_com_center) — VERIFIED PRODUCTION READY
+
+APP_BASE_URL: https://auto-com-center-jamarrlmayes.replit.app
+Mission: Centralized event intake and outbound communications orchestration
+Requirements:
+Accept POST /events from sibling apps; durable queueing; at-least-once delivery to configured channels
+Enforce CORS (8 origins), headers, RBAC for admin endpoints
+SLO: P95 ≤60ms; 5xx ≤1%
+Revenue role and ETA: enables; already production-ready (0 hours)
+Deliver U8 artifacts if not already present; maintain passing U4 gates
+Revenue Readiness and Timeline
+
+Interpretation note: You wrote “estimated time app will be ready to stop generating revenue.” Assuming this is “start generating revenue.” If you did mean “stop,” please clarify and I’ll adjust.
+Per app revenue_role and ETA to revenue activation:
+scholar_auth: enables; 0.5-2 hours
+scholarship_api: enables; 2-5 hours (reads public; writes enabled once JWKS reachable)
+student_pilot: direct; 2-6 hours (requires A1 + A2 ok and Stripe live)
+provider_register: direct; 3-6 hours post A1 + A2 writes ok
+auto_page_maker: acquires; 4-8 hours for initial pages (SEO ramps over days)
+scholarship_agent: acquires; 6-12 hours to launch organic campaigns
+scholarship_sage: protects; 2-4 hours
+auto_com_center: enables; 0 hours (verified production-ready)
+First-Dollar Critical Path (fastest B2C revenue):
+A1 (scholar_auth) → A2 (scholarship_api) → A5 (student_pilot)
+Expected first-dollar ETA: 6-12 hours from kickoff
+First B2B Revenue (3% fee):
+A1 + A2 writes → A6 (provider_register) publish → awards processed
+Expected ETA: 3-6 hours after A1 + A2 are fully ok
+Execution Order and Coordination
+
+Phase 1: Confirm A1=ok and lift A2 out of degraded (writes enabled via JWKS). Validate U4 gates.
+Phase 2: Go live with A5 (Stripe live), then A6. Validate revenue events flowing into auto_com_center.
+Phase 3: Deploy A7 to begin SEO page generation in parallel. Hand links to A3 for campaign orchestration.
+Phase 4: Enable A3 to run organic campaigns that target A5 and A6 funnels with UTM tracking.
+Phase 5: Ensure A4 is polling all eight apps and enforcing circuit breakers, with alerts routed via auto_com_center.
+What Agent3 must output when done (per app)
+
+200-OK /canary response with the exact 9 fields, including:
+app_name: <ASSIGNED_APP>
+app_base_url: <APP_BASE_URL>
+version: v2.5
+status: ok (or degraded with documented reason)
+p95_ms, commit_sha, server_time_utc
+revenue_role: as specified in your A# section
+revenue_eta_hours: as specified in your A# section
+Two deliverable files under e2e/reports/<ASSIGNED_APP>/ with the required contents (including the handshake line and canary payload).
+A log line confirming all U4 validation gates passed and all stop conditions are clear.
+CEO Notes to Agent3
+
+Think data-first: surface measured P95 and 5xx in /canary; attach evidence in readiness_report.
+Student value drives revenue: ensure frictionless flows in student_pilot; no academic dishonesty.
+Prioritize organic growth: auto_page_maker and scholarship_agent must be configured early to reduce CAC.
+Maintain lean autonomy: each app must be operable end-to-end without manual babysitting; use events and clear error formats.
+If you need any changes to naming or file structure, reply with the minimal diff and rationale before executing.

@@ -128,13 +128,13 @@ def general_rate_limit():
     return limiter.limit(limit) if limiter else lambda f: f
 
 def search_rate_limit():
-    """CEO v2.3: Read endpoints 600 rpm per origin"""
-    limit = "600/minute"  # CEO spec Section 3.2: reads 600 rpm per origin
+    """CEO v2.5 A2: Read endpoints 300 rpm per origin"""
+    limit = "300/minute"  # CEO spec A2: reads 300 rpm
     return limiter.limit(limit) if limiter else lambda f: f
 
 def write_rate_limit():
-    """CEO v2.3: Provider writes 60 rpm per provider_id"""
-    limit = "60/minute"  # CEO spec Section 3.2: writes 60 rpm per provider_id
+    """CEO v2.5 A2: Provider writes 120 rpm per provider_id"""
+    limit = "120/minute"  # CEO spec A2: writes 120 rpm
     return limiter.limit(limit) if limiter else lambda f: f
 
 def eligibility_rate_limit():
@@ -143,8 +143,8 @@ def eligibility_rate_limit():
     return limiter.limit(limit) if limiter else lambda f: f
 
 def provider_write_rate_limit():
-    """CEO v2.3 Section 3.2: Strict 60 rpm for provider write operations"""
-    limit = "60/minute"  # CEO spec: 60 rpm per provider_id
+    """CEO v2.5 A2: Strict 120 rpm for provider write operations"""
+    limit = "120/minute"  # CEO spec A2: 120 rpm
     return limiter.limit(limit) if limiter else lambda f: f
 
 # QA FIX: Enhanced exception handler
