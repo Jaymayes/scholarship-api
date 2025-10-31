@@ -306,7 +306,7 @@ async def canary_check(db: Session = Depends(get_db)):
         "server_time_utc": datetime.utcnow().isoformat() + "Z",
         "p95_ms": p95_ms,
         "revenue_role": "enables",
-        "revenue_eta_hours": "1.5-3"
+        "revenue_eta_hours": "2-5"
     }
 
 @router.get("/_canary_no_cache")
@@ -342,7 +342,7 @@ async def canary_check_no_cache(response: Response, db: Session = Depends(get_db
         "server_time_utc": datetime.utcnow().isoformat() + "Z",
         "p95_ms": p95_ms,
         "revenue_role": "enables",
-        "revenue_eta_hours": "1.5-3"
+        "revenue_eta_hours": "2-5"
     }
 
 @router.get("/healthz")

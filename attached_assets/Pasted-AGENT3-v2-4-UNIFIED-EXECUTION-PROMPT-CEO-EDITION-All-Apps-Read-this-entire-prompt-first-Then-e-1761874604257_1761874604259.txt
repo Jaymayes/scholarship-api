@@ -1,0 +1,246 @@
+AGENT3 v2.4 UNIFIED EXECUTION PROMPT (CEO EDITION) — All Apps
+Read this entire prompt first. Then execute only the section that matches your ASSIGNED_APP. Do not modify or touch other apps.
+
+Section 0 — Handshake (Required for every app)
+
+ASSIGNED_APP: one of [scholar_auth, scholarship_api, scholarship_agent, scholarship_sage, student_pilot, provider_register, auto_page_maker, auto_com_center]
+APP_BASE_URL: set exactly from the list below for your app.
+scholar_auth → https://scholar-auth-jamarrlmayes.replit.app
+scholarship_api → https://scholarship-api-jamarrlmayes.replit.app
+scholarship_agent → https://scholarship-agent-jamarrlmayes.replit.app
+scholarship_sage → https://scholarship-sage-jamarrlmayes.replit.app
+student_pilot → https://student-pilot-jamarrlmayes.replit.app
+provider_register → https://provider-register-jamarrlmayes.replit.app
+auto_page_maker → https://auto-page-maker-jamarrlmayes.replit.app
+auto_com_center → https://auto-com-center-jamarrlmayes.replit.app
+VERSION: v2.4
+ACKNOWLEDGMENT: “I will only execute the section for ASSIGNED_APP. I will not modify other apps.”
+Required canary status JSON for every app (exact 9 fields)
+
+Implement GET /canary returning: { "app_name": "<your app>", "app_base_url": "<your base url>", "version": "v2.4", "status": "ok" | "degraded" | "down", "p95_ms": <integer>, "commit_sha": "<short sha or build id>", "server_time_utc": "<ISO-8601>", "revenue_role": "<see your section>", "revenue_eta_hours": "<see your section>" }
+Implement GET /_canary_no_cache with Cache-Control: no-store
+Section 1 — Universal Platform Requirements (All apps must implement)
+
+CORS allowlist (exact; no wildcards)
+Allowed origins (must match exactly; no extras):
+https://scholar-auth-jamarrlmayes.replit.app
+https://scholarship-api-jamarrlmayes.replit.app
+https://scholarship-agent-jamarrlmayes.replit.app
+https://scholarship-sage-jamarrlmayes.replit.app
+https://student-pilot-jamarrlmayes.replit.app
+https://provider-register-jamarrlmayes.replit.app
+https://auto-page-maker-jamarrlmayes.replit.app
+https://auto-com-center-jamarrlmayes.replit.app
+2. Security headers (set on all 2xx/4xx; match exactly)
+
+Strict-Transport-Security: max-age=15552000; includeSubDomains
+Content-Security-Policy: default-src 'none'; connect-src 'self'; base-uri 'none'; object-src 'none'; frame-ancestors 'none'
+Permissions-Policy: camera=(); microphone=(); geolocation=(); payment=()
+X-Frame-Options: DENY
+Referrer-Policy: no-referrer
+X-Content-Type-Options: nosniff
+3. Observability and SLOs
+
+Accept, generate if absent, echo, and log X-Request-ID for every request.
+Maintain rolling P95 latency and 5xx rate; target P95 ≤ 120ms, 5xx ≤ 1%.
+Log minimal PII; redact emails to local-part+domain hash when logging.
+4. Rate limits (unless overridden in app section)
+
+Baseline: 300 rpm per IP.
+Auth endpoints (login/token/etc.): 60 rpm per IP.
+5. Responsible AI and compliance
+
+No academic dishonesty features; assistance only, with user-in-the-loop.
+Respect FERPA/COPPA; collect minimum data; provide data export/delete on request.
+6. Deliverables (write both on successful run)
+
+e2e/reports/<app>/readiness_report_<app>_v2_4_ceo_final.md
+e2e/reports/<app>/fix_plan_<app>_v2_4_ceo_final.yaml
+7. GO/NO-GO gates (must pass before reporting GO)
+
+Gate 1: /canary returns the exact 9 fields with status
+Gate 2: 6/6 security headers present on /canary
+Gate 3: CORS allowlist equals the exact 8 origins
+Gate 4: X-Request-ID accepted/generated/echoed/logged
+Gate 5: Rolling P95 ≤ 120ms; 5xx ≤ 1%
+Gate 6: Deliverables written (report + fix plan)
+Gates 7–9: App-specific in your section
+Section 2 — Cross-App Contracts (Know your dependencies, but do not modify other apps)
+
+Identity: All apps trust scholar_auth OIDC (RS256, stable kid). Tokens carry roles [student, provider, admin, analyst] and scopes as declared in Section 3.1.
+Data API: scholarship_api is the single source of truth for scholarships.
+UX funnel: auto_page_maker → student_pilot → scholar_auth (sign-in) → scholarship_api (read) → Stripe → auto_com_center (receipts/nudges).
+B2B funnel: provider_register → scholar_auth (provider role) → scholarship_api (writes) → auto_page_maker (publish pages).
+Monitoring: scholarship_sage fans out to all /canary endpoints and aggregates KPIs.
+Section 3 — App-Specific Execution Blocks (execute only your app’s block)
+
+3.1 scholar_auth (OIDC identity provider)
+
+Revenue role: enables
+revenue_eta_hours: 0.5-2
+Implement OIDC:
+/.well-known/openid-configuration including code_challenge_methods_supported: ["S256"]
+/.well-known/jwks.json (RS256 ≥ 2048-bit; stable kid)
+/oidc/authorize (PKCE S256), /oidc/token, /oidc/userinfo
+Session endpoint: /api/auth/session with HttpOnly, Secure, SameSite=Lax cookies
+JWT claims: sub, iat, exp, iss, aud, email; roles and scopes present
+Scopes: ["read:scholarships","write:scholarships","payments:create","org:manage"]
+Rate limits: /oidc/* at 60 rpm per IP
+GO/NO-GO app gates:
+Gate 7: JWKS validates; discovery doc correct
+Gate 8: PKCE S256 enforced; roles/scopes in tokens
+Gate 9: Session cookie flags correct and secure
+3.2 scholarship_api (Scholarships Read/Write API)
+
+Revenue role: enables
+revenue_eta_hours: 2-5
+Reads (required now):
+GET /api/v1/scholarships?query=&facet=… → ETag + Cache-Control: public, max-age=120
+GET /api/v1/scholarships/{id} → ETag + Cache-Control: public, max-age=1800
+Writes (required for B2B):
+POST /api/v1/scholarships (Idempotency-Key supported)
+PATCH /api/v1/scholarships/{id} (ownership via provider role)
+422 validation with machine-readable error schema
+AuthZ:
+Read requires scope read:scholarships
+Write requires scope write:scholarships and provider role
+Search facets: category, amount_min/max, deadline_before/after, location, eligibility tags
+GO/NO-GO app gates:
+Gate 7: 422 schema returned on invalid payloads
+Gate 8: Idempotency-Key guarantees safe retries on POST/PATCH
+Gate 9: RBAC + provider ownership enforced on writes
+3.3 scholarship_agent (Autonomous marketing/origin demand engine)
+
+Revenue role: acquires
+revenue_eta_hours: 4-8 (technical readiness), note: learning period 3-7 days
+Responsibilities:
+Pull scholarship inventory from scholarship_api; generate campaign briefs with strong UTM strategy
+Publish content tasks to auto_com_center for email/SMS drip and to auto_page_maker for landing variants
+Respect sending limits; monitor conversions via student_pilot webhooks and Stripe events
+Endpoints:
+POST /campaigns (create), GET /campaigns/{id}, POST /campaigns/{id}/pause, POST /campaigns/{id}/resume
+Webhook /events/attribution for student_pilot conversion pings (includes UTM fields)
+Guardrails:
+No unsolicited messaging; use only opted-in lists from auto_com_center
+Daily global contact limit; per-user cool-down windows
+GO/NO-GO app gates:
+Gate 7: UTM consistency validated end-to-end to student_pilot
+Gate 8: Rate limiting and suppression lists enforced
+Gate 9: Attribution webhook updates conversion dashboard correctly
+3.4 scholarship_sage (KPI and SLO dashboard)
+
+Revenue role: protects
+revenue_eta_hours: 2-4
+Implement GET /kpi/summary returning:
+B2C: free_to_paid_conversion, arpu_credits, cac_organic
+B2B: active_providers, platform_fee_revenue
+SLO: status, uptime_percent, p95_latency_ms, error_rate
+Fleet: apps_healthy, apps_total
+Poll all eight /canary endpoints every 60s with jitter; aggregate health
+RBAC: read-only to roles [analyst, admin]
+GO/NO-GO app gates:
+Gate 7: Fan-out error budget < 1%; exponential backoff with jitter
+Gate 8: RBAC enforced; no writes exposed
+Gate 9: Live KPI refresh latency ≤ 60s
+3.5 student_pilot (B2C storefront: discovery, apply, buy credits)
+
+Revenue role: direct
+revenue_eta_hours: 2-6
+Integrations:
+OIDC with scholar_auth
+Read scholarships from scholarship_api
+Stripe checkout (test and live modes)
+Emit purchase/receipt events to auto_com_center
+CSP additions:
+Allow Stripe endpoints in connect-src, frame-src as required; keep minimal
+UX guardrails:
+Provide suggestions and structure; never write essays for users
+GO/NO-GO app gates:
+Gate 7: OIDC login flow works; tokens cached securely; logout clears session
+Gate 8: Stripe test-mode purchase succeeds; receipt event posted to auto_com_center
+Gate 9: Scholarship detail pages render from scholarship_api with ETag caching
+3.6 provider_register (B2B provider onboarding and publishing)
+
+Revenue role: direct
+revenue_eta_hours: 3-6 (technical); first-dollar typically 24–72h post-onboarding
+Flows:
+Provider onboarding with TOS/IP/user-agent capture; OIDC with provider role assignment
+Scholarship draft → review → publish; writes to scholarship_api
+Ownership checks; immutable audit trail (who/when/what)
+Idempotency-Key on create/update
+GO/NO-GO app gates:
+Gate 7: Provider role required to access publish endpoints
+Gate 8: Idempotent create/update; 409 on duplicate keys without Idempotency-Key
+Gate 9: Published items visible via scholarship_api reads and rendered by auto_page_maker
+3.7 auto_page_maker (SEO engine for organic growth)
+
+Revenue role: acquires (low-CAC traffic)
+revenue_eta_hours: 4-8 (technical); organic revenue impact 2–14 days
+Responsibilities:
+Generate static pages for scholarships and category hubs from scholarship_api
+Build and serve /sitemap.xml and /robots.txt; canonical URLs; hreflang if applicable
+Include “Apply” CTAs deep-linking to student_pilot; embed UTM params from scholarship_agent when present
+Pre-render HTML; minimal JS; Core Web Vitals-friendly
+GO/NO-GO app gates:
+Gate 7: Sitemap valid; pages pass basic Lighthouse perf ≥ 90
+Gate 8: Canonical/metadata correct; no duplicate/thin content generations
+Gate 9: Scholarship updates propagate to page rebuilds within 10 minutes
+3.8 auto_com_center (Messaging: receipts, nudges, lifecycle)
+
+Revenue role: retains (and supports direct via transactional comms)
+revenue_eta_hours: 2-4
+Capabilities:
+Webhooks: Stripe (purchase/receipt), student_pilot (events), scholarship_agent (campaign sends)
+Transactional emails/SMS: receipts, deadline reminders, onboarding nudges
+Respect unsubscribe and frequency caps; maintain suppression lists; CAN-SPAM compliant
+Endpoints:
+POST /webhooks/stripe
+POST /messages/send (idempotent via Message-Id)
+GET /health/subsystems (ESP/SMS provider status)
+GO/NO-GO app gates:
+Gate 7: Idempotent webhook processing; safe retries
+Gate 8: Unsubscribe honored within 60 seconds across all channels
+Gate 9: Delivery/engagement metrics exported for scholarship_sage
+Section 4 — Cross-App Readiness Tests (each app runs only the tests relevant to its dependencies)
+
+scholar_auth: Validate JWKS consumption by scholarship_api, student_pilot, provider_register (synthetic token rounds).
+scholarship_api: Validate reads from student_pilot and auto_page_maker; validate writes from provider_register (provider role).
+scholarship_agent: Validate UTM attribution loop with student_pilot and delivery via auto_com_center.
+scholarship_sage: Validate canary fetch for all eight apps; compute apps_healthy.
+student_pilot: Validate OAuth flow with scholar_auth; reads from scholarship_api; Stripe test purchase; webhook to auto_com_center.
+provider_register: Validate publish write to scholarship_api and visibility on auto_page_maker.
+auto_page_maker: Validate sitemap entries for newly published scholarships; links to student_pilot with UTM if present.
+auto_com_center: Validate Stripe webhook and send of receipt; suppression/unsubscribe working.
+Section 5 — Final Output Required from each app (post-GO only)
+
+Print a STATUS REPORT JSON (same shape as /canary) to logs and include:
+app_name and app_base_url populated
+version=v2.4
+status=ok if all gates pass; otherwise degraded with reason in your readiness report
+p95_ms current value
+commit_sha of your deployment
+server_time_utc now
+revenue_role and revenue_eta_hours per your section
+Confirm file writes for:
+e2e/reports/<app>/readiness_report_<app>_v2_4_ceo_final.md
+e2e/reports/<app>/fix_plan_<app>_v2_4_ceo_final.yaml
+CEO Rollup: Revenue ETA guidance (for planning)
+
+scholar_auth: enables, 0.5–2 hours
+scholarship_api: enables, 2–5 hours
+scholarship_agent: acquires, 4–8 hours technical; campaign learning 3–7 days
+scholarship_sage: protects, 2–4 hours
+student_pilot: direct, 2–6 hours
+provider_register: direct, 3–6 hours technical; first B2B dollar typically 24–72 hours
+auto_page_maker: acquires, 4–8 hours technical; SEO revenue impact 2–14 days
+auto_com_center: retains, 2–4 hours
+Important clarifications
+
+“Revenue ETA” means time to technical readiness to start generating revenue. Where applicable, also note realistic realization windows (e.g., SEO or B2B ramp).
+If any dependency is missing, set status to degraded, note the dependency in the readiness_report, and expose a /blocking_dependencies endpoint listing unmet items.
+Execution reminder
+
+Only execute the block for your ASSIGNED_APP.
+Do not modify, patch, or change any other app or section.
+If you need a dependency change in another app, document it in your fix_plan and surface it via /blocking_dependencies without taking action outside your app.
+End of unified prompt.
