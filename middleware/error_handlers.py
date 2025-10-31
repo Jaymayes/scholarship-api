@@ -124,15 +124,16 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
             "value": error.get("input", None)
         })
 
+    # CEO v2.5 U4: Build error response (no details field per spec)
+    error_message = f"Request validation failed: {len(validation_details)} field(s)"
     error_response = create_error_response(
-        request, 422, "VALIDATION_ERROR", "Request validation failed",
-        {"fields": validation_details}
+        request, 422, "VALIDATION_ERROR", error_message
     )
 
     logger.warning(
         f"Validation error on {request.method} {request.url.path}",
         extra={
-            "trace_id": error_response["trace_id"],
+            "request_id": error_response["error"]["request_id"],
             "validation_errors": validation_details
         }
     )
@@ -156,7 +157,7 @@ async def rate_limit_exception_handler(request: Request, exc: RateLimitExceeded)
 
     logger.warning(
         f"Rate limit exceeded for {request.method} {request.url.path}",
-        extra={"trace_id": error_response["trace_id"]}
+        extra={"request_id": error_response["error"]["request_id"]}
     )
 
     return JSONResponse(
@@ -227,7 +228,7 @@ async def method_not_allowed_handler(request: Request, exc: HTTPException) -> JS
 
     logger.warning(
         f"Method not allowed: {request.method} {request.url.path}",
-        extra={"trace_id": error_response["trace_id"]}
+        extra={"request_id": error_response["error"]["request_id"]}
     )
 
     return JSONResponse(status_code=405, content=error_response)

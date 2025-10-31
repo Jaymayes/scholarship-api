@@ -29,31 +29,23 @@ def build_error(
     """
     Build standardized error response dict
 
-    Priority 2 Day 2: Enhanced unified error envelope
-    Schema: {code, message, correlation_id, details?, status, timestamp, trace_id}
-
+    CEO v2.5 U4 Final: Simplified error format
+    Schema: { "error": { "code": "...", "message": "...", "request_id": "..." } }
+    
+    NO top-level request_id; NO details field per U4 spec.
     Returns plain dict - never JSON string to prevent double encoding
     All error handlers must use this and pass result directly to JSONResponse
     """
-    correlation_id = trace_id or str(uuid.uuid4())
+    request_id = trace_id or str(uuid.uuid4())
 
-    # Primary error schema - Priority 2 Day 2 compliant
-    error_dict = {
-        "code": code,
-        "message": message,
-        "correlation_id": correlation_id,  # Primary field for API consumers
-        "status": status,
-        "timestamp": int(time.time())
+    # CEO v2.5 U4: Error nested under "error" key
+    return {
+        "error": {
+            "code": code,
+            "message": message,
+            "request_id": request_id
+        }
     }
-
-    # Include details if provided
-    if details:
-        error_dict["details"] = details
-
-    # Keep trace_id for internal logging and backward compatibility
-    error_dict["trace_id"] = correlation_id
-
-    return error_dict
 
 
 def build_rate_limit_error(
@@ -63,9 +55,8 @@ def build_rate_limit_error(
     """Build rate limit specific error with retry information"""
     return build_error(
         code="RATE_LIMITED",
-        message="Rate limit exceeded: 5 requests per minute",
+        message=f"Rate limit exceeded. Retry after {retry_after_seconds} seconds.",
         status=429,
-        details={"retry_after_seconds": retry_after_seconds},
         trace_id=trace_id
     )
 
