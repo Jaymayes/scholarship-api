@@ -102,9 +102,9 @@ async def search_scholarships(
             response.headers["Cache-Control"] = "public, max-age=300"
             return Response(status_code=304, headers=response.headers)
         
-        # CEO v2.3 Section 3.2: Cache-Control for lists (300s = 5 minutes)
+        # CEO v2.4 Section 3.2: Cache-Control for lists (120s = 2 minutes)
         response.headers["ETag"] = etag
-        response.headers["Cache-Control"] = "public, max-age=300"
+        response.headers["Cache-Control"] = "public, max-age=120"
         response.headers["Vary"] = "Accept, Origin"
 
         return result

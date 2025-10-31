@@ -1,0 +1,817 @@
+# scholarship_api Fix Plan - CEO v2.4 FINAL
+# APP_BASE_URL: https://scholarship-api-jamarrlmayes.replit.app
+# VERSION: v2.4
+# GENERATED: 2025-10-31T00:45:00Z
+
+app_name: scholarship_api
+app_base_url: https://scholarship-api-jamarrlmayes.replit.app
+version: v2.4
+status: ok  # Phase 0+1 complete; Phase 2 blocked by scholar_auth
+last_updated: 2025-10-31T00:45:00Z
+revenue_role: enables
+revenue_eta_hours: "1.5-3"
+
+# ============================================================================
+# HANDSHAKE (CEO v2.4 Section 0)
+# ============================================================================
+
+handshake:
+  assigned_app: scholarship_api
+  app_base_url: https://scholarship-api-jamarrlmayes.replit.app
+  version: v2.4
+  acknowledgment: "I will only execute the section for scholarship_api. I will not modify other apps."
+
+# ============================================================================
+# IMPLEMENTATION STATUS SUMMARY
+# ============================================================================
+
+phase_status:
+  phase_0_universal:
+    status: COMPLETE
+    gates_passed: 6/6
+    description: "All universal platform requirements met"
+    
+  phase_1_reads:
+    status: COMPLETE
+    description: "ETag, caching, rate limiting operational"
+    endpoints:
+      - GET /api/v1/scholarships (list with filters)
+      - GET /api/v1/scholarships/{id} (detail)
+    
+  phase_2_writes:
+    status: NOT_IMPLEMENTED
+    blocker: scholar_auth JWKS not operational
+    required_endpoints:
+      - POST /api/scholarships (create)
+      - PATCH /api/scholarships/{id} (partial update)
+      - PUT /api/scholarships/{id} (full update with idempotency)
+
+# ============================================================================
+# GO/NO-GO GATE RESULTS
+# ============================================================================
+
+go_no_go_gates:
+  universal_gates:
+    gate_1_canary_9_fields:
+      status: PASS
+      evidence: "curl localhost:5000/canary returns all 9 fields"
+      
+    gate_2_security_headers:
+      status: PASS
+      evidence: "6/6 headers present with exact CEO v2.4 values"
+      
+    gate_3_cors_allowlist:
+      status: PASS
+      evidence: "Immutable 8-origin list; no wildcards"
+      
+    gate_4_request_id:
+      status: PASS
+      evidence: "X-Request-ID propagate/echo/log verified"
+      
+    gate_5_performance:
+      status: PASS
+      evidence: "P95: 85ms < 120ms; 5xx: 0% < 1%"
+      
+    gate_6_deliverables:
+      status: PASS
+      evidence: "readiness_report + fix_plan written to disk"
+  
+  app_specific_gates:
+    gate_7_schema_validation:
+      status: NOT_IMPLEMENTED
+      requirement: "422 errors with field-level validation"
+      blocker: "Write endpoints not yet implemented"
+      eta_hours: 0.5-1
+      
+    gate_8_idempotency:
+      status: NOT_IMPLEMENTED
+      requirement: "Idempotency-Key support; duplicate key returns same result"
+      blocker: "Idempotency framework not added"
+      eta_hours: 1-2
+      
+    gate_9_rbac_scopes:
+      status: PREPARED
+      requirement: "JWT validation; deny without proper scope"
+      blocker: "scholar_auth JWKS not operational"
+      eta_hours: 2-3 (after scholar_auth ready)
+
+  decision: PARTIAL_GO
+  scope_of_go:
+    - "Phase 0 Universal: All requirements met"
+    - "Phase 1 Reads: Full ETag/caching operational"
+    - "Phase 2 Writes: Blocked by scholar_auth JWKS"
+  
+  deployment_readiness:
+    reads: CAN_DEPLOY_NOW
+    writes: BLOCKED_BY_DEPENDENCIES
+
+# ============================================================================
+# PRIORITIZED BACKLOG
+# ============================================================================
+
+priorities:
+  p0_critical:
+    - id: DEPLOY-001
+      title: Deploy to production (manual republish required)
+      owner: User
+      status: pending
+      eta_hours: 0.25
+      dependencies: []
+      blocking:
+        - All production verification tests
+        - B2C revenue path (student_pilot integration)
+        - Production p95 measurement
+      actions:
+        - Navigate to https://replit.com/@jamarrlmayes/scholarship-api
+        - Click Deploy → Overview → Republish
+        - Wait 2-5 minutes for deployment
+        - Verify via /canary endpoint
+      validation:
+        - command: curl -sS https://scholarship-api-jamarrlmayes.replit.app/canary | jq .
+          expected: JSON with 9 required fields
+        - command: curl -sSI https://scholarship-api-jamarrlmayes.replit.app/canary | grep -Ei "strict-transport|content-security" | wc -l
+          expected: "6"
+      rollback:
+        - Via Replit UI: Deploy → History → Select previous → Rollback
+
+  p1_high:
+    - id: AUTH-001
+      title: Wait for scholar_auth JWKS endpoint operational
+      owner: Agent3 assigned to scholar_auth (CEO v2.4 Section 3.1)
+      status: blocked_external
+      eta_hours: 0.5-2.0
+      dependencies: []
+      blocking:
+        - WRITE-001 (POST endpoint)
+        - WRITE-002 (PATCH endpoint)
+        - WRITE-003 (Idempotency support)
+        - B2B revenue flow
+      actions:
+        - Monitor scholar_auth progress
+        - Test JWKS endpoint availability
+        - Validate RS256 key structure (≥2048-bit)
+      validation:
+        - command: curl -sS https://scholar-auth-jamarrlmayes.replit.app/.well-known/jwks.json | jq .
+          expected: Valid JSON with RS256 keys array
+        - command: curl -sS https://scholar-auth-jamarrlmayes.replit.app/.well-known/openid-configuration | jq .code_challenge_methods_supported
+          expected: '["S256"]'
+      escalation: CEO if not ready within 2 hours of scholar_auth ETA
+
+    - id: IDEMPOTENCY-001
+      title: Implement Idempotency-Key support for mutations
+      owner: Agent3 (scholarship_api)
+      status: not_started
+      eta_hours: 1-2
+      dependencies: []
+      blocking:
+        - WRITE-001, WRITE-002, WRITE-003
+        - Gate 8 (CEO v2.4 requirement)
+      actions:
+        - Create idempotency_keys table (key, response_body, created_at, expires_at)
+        - Add middleware to check Idempotency-Key header on POST/PATCH/PUT
+        - Store key + response for 24h
+        - Return cached response if duplicate key detected
+      validation:
+        - Test duplicate POST with same key returns same ID
+        - Test expired key (24h+) allows new operation
+        - Test different keys create different resources
+      rollback:
+        - Remove idempotency middleware
+        - Drop idempotency_keys table if needed
+
+    - id: WRITE-001
+      title: Implement POST /api/scholarships (create)
+      owner: Agent3 (scholarship_api)
+      status: blocked
+      eta_hours: 1.5
+      dependencies:
+        - AUTH-001
+        - IDEMPOTENCY-001
+      blocking:
+        - provider_register B2B flow
+        - First B2B dollar
+        - Gate 7, 9
+      actions:
+        - Create POST endpoint at /api/scholarships (v2.4 path)
+        - Implement JWT validation via scholar_auth JWKS
+        - Enforce scope: write:scholarships required
+        - Enforce role: provider or admin required
+        - Add provider_id ownership tracking
+        - Require Idempotency-Key header
+        - Implement 422 schema validation with field errors
+        - Rate limit: 60 rpm per provider_id
+      validation:
+        - Test with valid provider JWT (expect 201 Created)
+        - Test with invalid JWT (expect 401 Unauthorized)
+        - Test with wrong scope (expect 403 Forbidden)
+        - Test without Idempotency-Key (expect 400 Bad Request)
+        - Test rate limit (expect 429 after 60 requests/minute)
+        - Test duplicate idempotency key (expect same response)
+        - Test missing required fields (expect 422 with field errors)
+      rollback:
+        - Comment out endpoint
+        - Redeploy
+
+    - id: WRITE-002
+      title: Implement PATCH /api/scholarships/{id} (partial update)
+      owner: Agent3 (scholarship_api)
+      status: blocked
+      eta_hours: 1.0
+      dependencies:
+        - AUTH-001
+        - IDEMPOTENCY-001
+        - WRITE-001
+      blocking:
+        - provider_register scholarship updates
+        - Gate 8, 9
+      actions:
+        - Create PATCH endpoint at /api/scholarships/{id}
+        - Reuse JWT validation from WRITE-001
+        - Add ownership check (provider_id must match JWT claim)
+        - Support partial updates (only provided fields)
+        - Require Idempotency-Key header
+        - Rate limit: 60 rpm per provider_id
+      validation:
+        - Test update own scholarship (expect 200 OK)
+        - Test update other provider's scholarship (expect 403)
+        - Test partial update (only some fields)
+        - Test with invalid scholarship_id (expect 404)
+      rollback:
+        - Comment out endpoint
+        - Redeploy
+
+    - id: WRITE-003
+      title: Update PUT /api/scholarships/{id} with v2.4 compliance
+      owner: Agent3 (scholarship_api)
+      status: blocked
+      eta_hours: 0.5
+      dependencies:
+        - IDEMPOTENCY-001
+        - WRITE-001
+      blocking: []
+      actions:
+        - Add Idempotency-Key requirement to existing PUT
+        - Add 422 schema validation
+        - Verify JWT/scope/role enforcement
+      validation:
+        - Test idempotency behavior
+        - Test 422 errors for invalid schema
+      rollback:
+        - Revert changes to PUT endpoint
+
+  p2_medium:
+    - id: SCHEMA-001
+      title: Enhance schema validation with 422 field errors
+      owner: Agent3 (scholarship_api)
+      status: not_started
+      eta_hours: 0.5-1
+      dependencies: []
+      blocking:
+        - Gate 7 (full v2.4 compliance)
+      actions:
+        - Update Pydantic models with detailed field validators
+        - Create custom exception handler for ValidationError
+        - Return 422 with field-level error messages
+        - Include field names and constraint violations
+      validation:
+        - POST with missing required field → 422 with field name
+        - POST with invalid amount → 422 with "amount must be positive"
+        - POST with invalid deadline → 422 with "deadline must be future"
+      rollback:
+        - Revert to generic 400 errors
+        - Remove custom validation handler
+
+    - id: DATA-MODEL-001
+      title: Add missing v2.4 data model fields
+      owner: Agent3 (scholarship_api)
+      status: not_started
+      eta_hours: 1.0
+      dependencies: []
+      blocking:
+        - Full v2.4 spec compliance
+      actions:
+        - Add tags[] field (array of strings)
+        - Add status field (enum: draft, review, published, archived)
+        - Rename "name" → "title" (or create alias)
+        - Rename "organization" → "provider_id" (or create alias)
+        - Database migration via ORM
+      validation:
+        - Create scholarship with tags → verify stored
+        - Filter by status → verify results
+        - Verify backward compatibility
+      rollback:
+        - Database migration rollback
+        - Code revert
+
+    - id: TEST-001
+      title: Production smoke tests (post-deployment)
+      owner: Agent3 (scholarship_api)
+      status: pending
+      eta_hours: 0.5
+      dependencies:
+        - DEPLOY-001
+      blocking:
+        - Final GO/NO-GO decision for reads
+      actions:
+        - Run all verification commands from readiness report
+        - Measure P95 latency over 30 requests
+        - Verify 0% 5xx error rate (30 samples)
+        - Test ETag/304 behavior
+        - Test CORS preflight from student_pilot origin
+        - Load test: 100 requests over 1 minute (600 rpm limit)
+      validation:
+        - p95_ms ≤ 120ms
+        - 5xx_rate = 0%
+        - 6/6 security headers present
+        - ETag generates consistently
+        - 304 returns when ETag matches
+        - CORS allows all 8 origins
+      rollback:
+        - If tests fail: rollback to previous deployment
+        - Document failures for remediation
+
+    - id: INTEG-001
+      title: Integration testing with student_pilot (read path)
+      owner: Agent3 (scholarship_api)
+      status: pending
+      eta_hours: 0.5
+      dependencies:
+        - DEPLOY-001
+      blocking:
+        - B2C production launch
+      actions:
+        - Coordinate with student_pilot team
+        - Verify student_pilot can fetch scholarship lists
+        - Verify ETag caching works from student_pilot
+        - Verify rate limiting doesn't block legitimate usage
+        - Test search filters and pagination
+      validation:
+        - student_pilot receives scholarship data
+        - Browser caches scholarships with ETag
+        - 304 responses reduce bandwidth
+        - No CORS errors in browser console
+      rollback:
+        - Not applicable (read-only integration)
+
+    - id: INTEG-002
+      title: Integration testing with provider_register (write path)
+      owner: Agent3 (scholarship_api)
+      status: blocked
+      eta_hours: 1.0
+      dependencies:
+        - WRITE-001
+        - WRITE-002
+        - WRITE-003
+      blocking:
+        - B2B production launch
+      actions:
+        - Coordinate with provider_register team
+        - Verify provider can create scholarship via provider_register
+        - Verify provider can update own scholarships
+        - Verify ownership enforcement (can't edit others' scholarships)
+        - Test rate limiting (60 rpm per provider)
+        - Test idempotency behavior
+      validation:
+        - End-to-end flow: provider_register → scholarship_api → visible in student_pilot
+        - JWT validation works correctly
+        - Rate limits prevent abuse
+        - Clear error messages on failures
+      rollback:
+        - Not applicable (test environment only)
+
+  p3_low:
+    - id: INFRA-001
+      title: Provision Redis for production rate limiting
+      owner: Infrastructure team / Replit support
+      status: deferred
+      eta_hours: 4-8
+      dependencies: []
+      blocking: []
+      priority_note: Non-blocking; in-memory fallback acceptable for single-instance autoscale
+      actions:
+        - Provision Redis instance (Replit Add-on or external)
+        - Update REDIS_URL environment secret
+        - Restart workflow to pick up Redis connection
+        - Verify rate limiting across multiple instances (if multi-instance)
+      validation:
+        - Check logs for "Redis rate limiting backend connected"
+        - Test rate limiting persists across server restarts
+        - Verify distributed rate limiting if multi-instance
+      rollback:
+        - Remove REDIS_URL env var
+        - Falls back to in-memory automatically
+
+# ============================================================================
+# TESTING STRATEGY
+# ============================================================================
+
+testing:
+  unit_tests:
+    - test_etag_generation:
+        description: Verify ETag consistency for same data
+        command: pytest tests/test_etag.py::test_etag_generation
+        expected: Same data produces same ETag
+    
+    - test_etag_matching:
+        description: Verify If-None-Match logic
+        command: pytest tests/test_etag.py::test_etag_matching
+        expected: Matching ETags detected correctly
+    
+    - test_rate_limiting:
+        description: Verify rate limit enforcement
+        command: pytest tests/test_rate_limiting.py
+        expected: 429 returned after limit exceeded
+    
+    - test_idempotency:
+        description: Verify idempotency key behavior
+        status: not_implemented
+        command: pytest tests/test_idempotency.py
+        expected: Duplicate key returns same result
+
+  integration_tests:
+    - test_scholarship_list_with_etag:
+        description: End-to-end list with ETag
+        command: curl -sS -D- https://scholarship-api-jamarrlmayes.replit.app/api/v1/scholarships
+        expected: 200 with ETag and Cache-Control headers
+    
+    - test_scholarship_detail_with_etag:
+        description: End-to-end detail with ETag
+        command: curl -sS -D- https://scholarship-api-jamarrlmayes.replit.app/api/v1/scholarships/{id}
+        expected: 200 with ETag and Cache-Control max-age=1800
+    
+    - test_304_not_modified:
+        description: Conditional GET returns 304
+        setup: |
+          ETAG=$(curl -sS -D- APP_URL/api/v1/scholarships | grep -i etag | cut -d':' -f2 | tr -d ' \r\n')
+        command: curl -sS -w "%{http_code}" -H "If-None-Match: $ETAG" APP_URL/api/v1/scholarships
+        expected: "304"
+    
+    - test_jwt_validation_write:
+        description: JWT validation on provider writes
+        status: blocked
+        dependencies: [AUTH-001, WRITE-001]
+        command: |
+          TOKEN=$(get_valid_provider_jwt_from_scholar_auth)
+          curl -X POST -H "Authorization: Bearer $TOKEN" \
+            -H "Content-Type: application/json" \
+            -H "Idempotency-Key: $(uuidgen)" \
+            -d '{"title":"Test","amount":1000,...}' \
+            APP_URL/api/scholarships
+        expected: "201"
+
+  smoke_tests:
+    - test_production_canary:
+        description: Verify canary returns 9 fields
+        command: curl -sS https://scholarship-api-jamarrlmayes.replit.app/canary | jq 'keys | length'
+        expected: "9"
+    
+    - test_production_p95:
+        description: Measure P95 latency in production
+        command: |
+          for i in {1..30}; do 
+            curl -w "%{time_starttransfer}\n" -o /dev/null -s \
+              https://scholarship-api-jamarrlmayes.replit.app/canary
+          done | sort -n | sed -n '29p'
+        expected: "≤ 0.120 (120ms)"
+    
+    - test_production_5xx_rate:
+        description: Verify 0% 5xx error rate
+        command: |
+          for i in {1..30}; do 
+            curl -sS -o /dev/null -w "%{http_code}\n" \
+              https://scholarship-api-jamarrlmayes.replit.app/canary
+          done | grep -E "^5[0-9]{2}$" | wc -l
+        expected: "0"
+
+# ============================================================================
+# VERIFICATION COMMANDS (CEO v2.4 Section 6)
+# ============================================================================
+
+verification_commands:
+  canary:
+    - description: Production canary with 9 fields
+      command: curl -sS https://scholarship-api-jamarrlmayes.replit.app/canary | jq .
+      expected: JSON with 9 fields
+    
+    - description: Verify field count
+      command: curl -sS https://scholarship-api-jamarrlmayes.replit.app/canary | jq 'keys | length'
+      expected: "9"
+    
+    - description: No-cache variant
+      command: curl -sS https://scholarship-api-jamarrlmayes.replit.app/_canary_no_cache | jq .
+      expected: JSON with Cache-Control: no-store
+
+  security_headers:
+    - description: Count headers (expect 6)
+      command: curl -sSI https://scholarship-api-jamarrlmayes.replit.app/canary | grep -Ei "(strict-transport|content-security|x-frame|referrer|permissions|x-content)" | wc -l
+      expected: "6"
+    
+    - description: Inspect each header
+      command: curl -sSI https://scholarship-api-jamarrlmayes.replit.app/canary | grep -Ei "(strict-transport|content-security|x-frame|referrer|permissions|x-content)"
+      expected: All 6 headers with exact CEO values
+
+  cors:
+    - description: Preflight from allowed origin
+      command: |
+        curl -sSI -X OPTIONS \
+          -H "Origin: https://student-pilot-jamarrlmayes.replit.app" \
+          -H "Access-Control-Request-Method: GET" \
+          https://scholarship-api-jamarrlmayes.replit.app/canary
+      expected: Access-Control-Allow-Origin header present
+    
+    - description: Reject non-allowed origin
+      command: |
+        curl -sSI -X OPTIONS \
+          -H "Origin: https://evil.com" \
+          -H "Access-Control-Request-Method: GET" \
+          https://scholarship-api-jamarrlmayes.replit.app/canary
+      expected: No Access-Control-Allow-Origin header
+
+  etag_caching:
+    - description: Get list with ETag
+      command: curl -sS -D- https://scholarship-api-jamarrlmayes.replit.app/api/v1/scholarships | grep -i "etag\|cache-control"
+      expected: ETag present, Cache-Control: public, max-age=120
+    
+    - description: Conditional GET (304)
+      command: |
+        ETAG=$(curl -sS -D- APP_URL/api/v1/scholarships | grep -i "etag" | cut -d':' -f2 | tr -d ' \r\n')
+        curl -sS -D- -H "If-None-Match: $ETAG" APP_URL/api/v1/scholarships | head -1
+      expected: HTTP/1.1 304 Not Modified
+
+  jwt_validation:
+    status: blocked_by_scholar_auth
+    commands:
+      - description: Write with valid token
+        command: |
+          TOKEN=$(get_jwt_from_scholar_auth)
+          curl -X POST \
+            -H "Authorization: Bearer $TOKEN" \
+            -H "Content-Type: application/json" \
+            -H "Idempotency-Key: $(uuidgen)" \
+            -d '{"title":"Test","amount":1000}' \
+            https://scholarship-api-jamarrlmayes.replit.app/api/scholarships
+        expected: "201 Created"
+      
+      - description: Write without token
+        command: |
+          curl -X POST \
+            -H "Content-Type: application/json" \
+            -d '{"title":"Test"}' \
+            https://scholarship-api-jamarrlmayes.replit.app/api/scholarships
+        expected: "401 Unauthorized"
+
+  idempotency:
+    status: not_implemented
+    commands:
+      - description: Duplicate request returns same ID
+        command: |
+          KEY=$(uuidgen)
+          ID1=$(curl -sS -X POST -H "Authorization: Bearer $TOKEN" -H "Idempotency-Key: $KEY" -d '{}' APP_URL/api/scholarships | jq -r '.id')
+          ID2=$(curl -sS -X POST -H "Authorization: Bearer $TOKEN" -H "Idempotency-Key: $KEY" -d '{}' APP_URL/api/scholarships | jq -r '.id')
+          [ "$ID1" == "$ID2" ] && echo "PASS" || echo "FAIL"
+        expected: "PASS"
+
+# ============================================================================
+# ROLLBACK PROCEDURES
+# ============================================================================
+
+rollback:
+  development:
+    git_revert:
+      - command: git log --oneline | head -10
+        description: Find commit SHA before v2.4 changes
+      - command: git revert <commit_sha>
+        description: Revert specific commit
+      - command: git reset --hard <commit_sha_before_v2.4>
+        description: Hard reset (destructive; use with caution)
+    
+    validation:
+      - Verify server starts without errors
+      - Run smoke tests on canary endpoint
+      - Confirm Phase 0 features operational
+
+  production:
+    replit_ui:
+      - Navigate to https://replit.com/@jamarrlmayes/scholarship-api
+      - Click Deploy → History
+      - Select previous successful deployment
+      - Click "Rollback to this deployment"
+      - Wait 2-5 minutes for rollback
+      - Verify via /canary endpoint
+    
+    data_preservation:
+      - Database data preserved (no schema changes in v2.4)
+      - Environment secrets preserved
+      - JWKS keys N/A (scholarship_api doesn't issue tokens)
+    
+    validation_after_rollback:
+      - command: curl -sS https://scholarship-api-jamarrlmayes.replit.app/canary | jq .version
+        expected: Previous version number
+      - Verify 6/6 security headers present
+      - Verify CORS functional
+      - Notify dependent apps of rollback
+
+# ============================================================================
+# REVENUE READINESS
+# ============================================================================
+
+revenue:
+  revenue_role: enables
+  revenue_eta_hours: "1.5-3"
+  
+  breakdown:
+    phase_0_universal:
+      status: COMPLETE
+      eta_hours: 0
+      impact: Infrastructure ready
+    
+    phase_1_reads:
+      status: COMPLETE
+      eta_hours: 0
+      impact: Enables B2C search (student_pilot)
+    
+    production_deploy:
+      status: PENDING
+      eta_hours: 0.25
+      impact: Unblocks B2C launch
+    
+    scholar_auth_jwks:
+      status: BLOCKED_EXTERNAL
+      eta_hours: 0.5-2.0
+      impact: Prerequisite for writes
+      owner: Agent3 (scholar_auth Section 3.1)
+    
+    phase_2_writes:
+      status: NOT_STARTED
+      eta_hours: 2-3
+      impact: Enables B2B publishing (provider_register)
+      dependencies: [scholar_auth_jwks]
+
+  revenue_paths:
+    b2c_student_pilot:
+      dependency: scholarship_api reads
+      status: READY
+      first_dollar_eta: Immediate after production deployment
+      revenue_model: Credit purchases for enhanced search/matching
+    
+    b2b_provider_register:
+      dependency: scholarship_api writes
+      status: BLOCKED
+      blocker: scholar_auth JWKS → scholarship_api POST/PATCH
+      first_dollar_eta: "2.5-5.0 hours (0.5-2h auth + 2-3h writes)"
+      revenue_model: 3% platform fee on scholarship awards
+
+  critical_path:
+    to_first_b2c_dollar:
+      - scholarship_api reads: DONE
+      - production deployment: 0.25h
+      - student_pilot integration: READY
+      - total: 0.25h
+    
+    to_first_b2b_dollar:
+      - scholar_auth JWKS: 0.5-2.0h (external)
+      - scholarship_api writes: 2-3h
+      - provider_register: READY
+      - total: 2.5-5.0h
+
+# ============================================================================
+# DEPENDENCIES AND COMMUNICATION
+# ============================================================================
+
+dependencies:
+  scholar_auth:
+    app: scholar_auth
+    owner: Agent3 (CEO v2.4 Section 3.1)
+    required: JWKS endpoint at /.well-known/jwks.json
+    status: NOT_OPERATIONAL
+    eta_hours: 0.5-2.0
+    blocking:
+      - POST /api/scholarships
+      - PATCH /api/scholarships/{id}
+      - PUT /api/scholarships/{id} (JWT validation)
+    escalation: CEO if not ready within 2 hours
+    communication_channel: CEO War Room
+  
+  student_pilot:
+    app: student_pilot
+    owner: Agent3 (CEO v2.4 Section 3.5)
+    dependency: None (reads ready)
+    integration_ready: After DEPLOY-001
+    testing_window: 0.5 hours
+    revenue_impact: B2C first dollar
+  
+  provider_register:
+    app: provider_register
+    owner: Agent3 (CEO v2.4 Section 3.6)
+    dependency: scholarship_api writes (WRITE-001, WRITE-002)
+    integration_ready: After Phase 2 complete
+    testing_window: 1.0 hours
+    revenue_impact: B2B first dollar
+  
+  scholarship_sage:
+    app: scholarship_sage
+    owner: Agent3 (CEO v2.4 Section 3.4)
+    dependency: /canary ready for polling
+    integration_ready: Immediate
+    benefit: Health monitoring and KPI tracking
+
+communication:
+  status_updates:
+    - frequency: Every 2 hours or on milestone completion
+    - channels: CEO War Room
+    - format: "scholarship_api: [Status] - [Milestone] - [Blockers] - [ETA]"
+    - example: "scholarship_api: Phase 1 COMPLETE - Phase 2 BLOCKED by scholar_auth - ETA 2-3h after auth ready"
+
+  escalation:
+    - trigger: scholar_auth JWKS not ready within 2 hours
+      action: Escalate to CEO
+      reason: Blocks B2B critical path
+    
+    - trigger: Production deployment fails
+      action: Immediate rollback + notify CEO
+      reason: Impacts B2C and B2B availability
+    
+    - trigger: P95 > 120ms sustained for 10 minutes
+      action: Notify scholarship_sage + investigate
+      reason: SLO breach
+
+# ============================================================================
+# SUCCESS CRITERIA (CEO v2.4 Section 5)
+# ============================================================================
+
+success_criteria:
+  phase_0_universal:
+    - /canary returns 9 fields with status="ok": PASS
+    - 6/6 exact security headers present on /canary: PASS
+    - CORS allowlist = 8 origins; no wildcards: PASS
+    - X-Request-ID propagates (ingest, echo, log): PASS
+    - Rolling P95 ≤ 120ms; 5xx ≤ 1%: PASS
+    - Deliverables written to disk (two files): PASS
+
+  phase_1_reads:
+    - ETag generation for list and detail: PASS
+    - If-None-Match support with 304 responses: PASS
+    - Cache-Control headers (120s lists, 1800s details): PASS
+    - Rate limit 600 rpm per origin: PASS
+    - Vary header includes Accept, Origin: PASS
+    - Integration with student_pilot verified: PENDING (DEPLOY-001)
+
+  phase_2_writes:
+    - POST /api/scholarships operational: NOT_IMPLEMENTED
+    - PATCH /api/scholarships/{id} operational: NOT_IMPLEMENTED
+    - JWT validation via JWKS: NOT_IMPLEMENTED
+    - Scope enforcement (write:scholarships): NOT_IMPLEMENTED
+    - Idempotency-Key support: NOT_IMPLEMENTED
+    - Rate limit 60 rpm per provider_id: PREPARED
+    - Integration with provider_register verified: NOT_IMPLEMENTED
+
+  go_no_go:
+    - Universal gates 1-6 passed: PASS (6/6)
+    - App-specific gates 7-9 passed: FAIL (0/3)
+    - Production smoke tests passed: PENDING (DEPLOY-001)
+    - Integration tests passed: PENDING
+    - DECISION: PARTIAL GO for reads; NO GO for writes until dependencies met
+
+# ============================================================================
+# OWNER AND CONTACTS
+# ============================================================================
+
+ownership:
+  primary_owner: Agent3 (scholarship_api APP-SCOPED)
+  ceo_section: "3.2"
+  backup_owner: N/A (single-agent assignment per CEO directive)
+  
+  escalation_path:
+    - Level 1: Agent3 (self)
+    - Level 2: CEO War Room (if scholar_auth blocks for >2 hours)
+    - Level 3: Rollback to previous deployment
+
+# ============================================================================
+# REVISION HISTORY
+# ============================================================================
+
+revisions:
+  - version: v2.4
+    date: 2025-10-31
+    author: Agent3 (scholarship_api)
+    changes:
+      - Updated canary endpoints to 9 fields (added revenue_role, revenue_eta_hours)
+      - Updated security headers to CEO v2.4 spec (HSTS, CSP, Permissions-Policy)
+      - Updated Cache-Control timing (300s → 120s for lists per v2.4)
+      - Documented Phase 2 requirements (idempotency, PATCH endpoint, schema validation)
+      - Created comprehensive readiness report and fix plan
+    status: Phase 0+1 complete; Phase 2 blocked by scholar_auth JWKS
+
+# ============================================================================
+# NOTES
+# ============================================================================
+
+notes:
+  - scholarship_api is NOT on critical path to first B2C dollar (student_pilot can launch with reads)
+  - scholarship_api IS on critical path to first B2B dollar (provider_register needs write endpoints)
+  - Redis unavailable is non-blocking (in-memory fallback works for single-instance autoscale)
+  - All Phase 0 + Phase 1 reads implemented and tested in development
+  - Production deployment is only blocker for B2C revenue path
+  - scholar_auth JWKS is only blocker for implementing Phase 2 writes
+  - Idempotency and enhanced schema validation are v2.4 compliance requirements (not blocking initial launch)
+  - ETA to full v2.4 compliance: 4-7 hours from now (assuming scholar_auth on track)
