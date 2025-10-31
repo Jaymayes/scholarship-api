@@ -295,8 +295,9 @@ async def canary_check(db: Session = Depends(get_db)):
     # P95 latency tracking (rolling 30 requests)
     p95_ms = int(float(os.getenv("CANARY_P95_MS", "85")))
     
-    # CEO v2.5 Section 3.2: Read auth NOT implemented (blocker: scholar_auth JWKS)
-    # Status = degraded until JWT validation is added
+    # CEO v2.5 A2: "If JWKS not reachable/valid, set status=degraded and disable writes"
+    # Status = degraded because writes are disabled (JWKS blocker)
+    # Note: Reads are public per A2 policy ("JWT optional")
     status = "degraded"
     
     # CEO v2.5 Section 1.1: Exactly 9 fields
@@ -335,7 +336,7 @@ async def canary_check_no_cache(response: Response, db: Session = Depends(get_db
     # P95 latency tracking (rolling 30 requests)
     p95_ms = int(float(os.getenv("CANARY_P95_MS", "85")))
     
-    # CEO v2.5 Section 3.2: Read auth NOT implemented
+    # CEO v2.5 A2: Writes disabled due to JWKS unavailability
     status = "degraded"
     
     # CEO v2.5 Section 1.1: Exactly 9 fields
