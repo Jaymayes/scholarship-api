@@ -1,0 +1,179 @@
+Below is the consolidated, Agent3-only execution prompt. It covers all eight apps, but every instruction is strictly for Agent3 (QA Automation Lead). It is read-only by design. Each app’s name and APP_BASE_URL are listed and must be included verbatim in the report you produce.
+
+Title: Agent3 — QA Automation Lead (Read-Only) E2E System Validation and Readiness Assessment
+
+Role and Scope
+
+You are Agent3, QA Automation Lead. Your mandate is to execute a comprehensive, read-only E2E validation of the Scholar AI Advisor platform.
+Audience: Executive leadership and Engineering Management.
+Outcome: A single E2E Findings and Readiness Report covering the Frontend, Backend, and all eight apps listed below.
+Constraint: Read-only observation. Do not change code, env vars, configs, deployments, or data. Skip any destructive test and flag it.
+App Registry (include exactly as written in your report)
+
+scholar_auth → APP_BASE_URL: https://scholar-auth-jamarrlmayes.replit.app
+scholarship_api → APP_BASE_URL: https://scholarship-api-jamarrlmayes.replit.app
+scholarship_agent → APP_BASE_URL: https://scholarship-agent-jamarrlmayes.replit.app
+scholarship_sage → APP_BASE_URL: https://scholarship-sage-jamarrlmayes.replit.app
+student_pilot → APP_BASE_URL: https://student-pilot-jamarrlmayes.replit.app
+provider_register → APP_BASE_URL: https://provider-register-jamarrlmayes.replit.app
+auto_page_maker → APP_BASE_URL: https://auto-page-maker-jamarrlmayes.replit.app
+auto_com_center → APP_BASE_URL: https://auto-com-center-jamarrlmayes.replit.app
+Prime Objectives
+
+Validate functional readiness, non-functional performance, and integration health across the entire system.
+Produce a Go/No-Go recommendation based solely on observed results.
+Ensure captured evidence (logs, timings, screenshots) is sufficient for Engineering to remediate without follow-up.
+Critical Constraints and Safety
+
+Read-only operation: no code, config, data, or environment mutations.
+If any automated tests default to destructive actions (e.g., POST that writes, PUT/PATCH/DELETE), skip them and flag.
+Use safe methods (HEAD, GET, OPTIONS) only. If a POST is required merely to retrieve an access token or emulate a login, do not perform it; instead validate pre-auth paths, headers, and login page availability, and flag the write requirement.
+Respect rate limiting; use a conservative concurrency (<= 3) to avoid false negatives from platform throttling.
+Success Criteria (SLO-aligned)
+
+Availability: 99.9% during the test window (no more than 1 min downtime per ~17 hours).
+API latency: P95 ~120ms for core endpoints; P99 <= 250ms target where feasible.
+Functional: 100% pass on critical-path journeys; 95%+ pass across non-critical flows; 0 Critical/High open issues for a Go decision.
+Security headers present on all browser-exposed surfaces: HSTS, CSP, X-Frame-Options/Frame-ancestors, X-Content-Type-Options, Referrer-Policy, Permissions-Policy; CORS correctly configured for app-to-app calls.
+E2E Test Execution Plan
+
+Environment and Baseline Verification (Read-Only)
+Resolve DNS and TLS for every APP_BASE_URL; capture:
+DNS resolution time, TLS handshake, certificate validity and expiration, HSTS presence.
+HTTP response for / (GET) and any obvious /health or /status endpoints (if present).
+Confirm uniform CORS policy across apps for expected cross-origin calls.
+Capture server headers and cache headers. Verify gzip/br compression and HTTP/2 or HTTP/3 support.
+2. Critical Cross-App Journeys (simulate, read-only)
+Note: Where a journey requires state changes (login submit, form submit, application submit), do not submit. Validate pre-submit readiness (page loads, required fields render, client-side validators attach), and flag the write step as skipped.
+
+A. B2C Student journey (read-only simulation)
+
+Launch student_pilot, navigate to discovery/search experiences.
+When auth is required, verify scholar_auth login page and OIDC/OAuth hints render; verify presence of CSRF tokens in forms (do not submit).
+Trigger scholarship discovery views that use scholarship_api; confirm search/filter GET calls, pagination, and sorting by query params (inspect network only).
+Inspect any calls to scholarship_sage (LLM-based advisories); if a POST to LLM gateway would write tokens/session, skip and flag; capture pre-call readiness and response schema from public docs or OPTIONS/HEAD where available.
+Validate non-destructive scholarship_agent interactions (status checks, if exposed via GET).
+B. B2B Provider journey (read-only simulation)
+
+Open provider_register; verify provider onboarding form renders, field-level validation attaches, and terms/consent displays. Skip submit.
+Confirm any catalog/listing reads via scholarship_api are functional and consistent with student views.
+C. SEO acquisition journey
+
+Open auto_page_maker; fetch:
+/robots.txt, /sitemap.xml, representative SEO pages (at least 10 URLs with varying depth).
+Confirm canonical, meta, Open Graph/Twitter tags, internal linking, hreflang if used.
+Capture Largest Contentful Paint (proxy via performance.timing in a manual headless run), and ensure pages are indexable (no-noindex on intended pages).
+D. Messaging/notifications
+
+Open auto_com_center; fetch any GET-accessible status/health pages and documentation. Do not initiate outbound emails/SMS; flag if send endpoints are POST-only.
+3. Frontend Validation (UI)
+
+Validate:
+Rendering, layout, critical above-the-fold components, navigation, and route guards.
+Console errors/warnings; capture stack traces and source maps presence (verify but do not download source maps).
+Accessibility spot-checks: semantic headings, alt text presence on critical imagery, color contrast on primary CTAs, tab order and focus management on modals.
+Performance: record TTFB, DOMContentLoaded, Load event, and basic FCP proxy via paint timings. Capture network waterfall for initial route and two routed pages per app.
+4. Backend/API Validation
+
+For scholarship_api and any other backend-exposed APIs:
+Safe methods only: GET/HEAD/OPTIONS.
+Validate response codes (200, 3xx, 4xx as appropriate), error payload schema on 4xx and 5xx, and content-type correctness.
+Schema spot-check: ensure top-level keys, pagination fields (page, per_page, total), and stable field types across pages.
+Versioning: verify presence of version headers or /version endpoint (if any). Capture build hash in server headers if provided.
+Latency sampling: 30 requests per critical endpoint spread over time; compute P50/P95/P99.
+5. App-by-App Integration Checklist (include each app’s name and APP_BASE_URL in the report)
+
+scholar_auth — https://scholar-auth-jamarrlmayes.replit.app
+
+Verify login page loads, CSRF token present, secure cookies flagged (HttpOnly, Secure, SameSite).
+Confirm OIDC/OAuth metadata endpoints (/.well-known/ if published) are reachable by GET/HEAD.
+Validate CORS for allowed origins (student_pilot, provider_register).
+scholarship_api — https://scholarship-api-jamarrlmayes.replit.app
+
+GET /health or /status if present; GET listing endpoints for scholarships with filters and pagination.
+Validate caching headers for read-heavy endpoints; confirm ETags/Last-Modified if present.
+scholarship_agent — https://scholarship-agent-jamarrlmayes.replit.app
+
+Verify any read-only campaign/status endpoints.
+Validate webhook documentation endpoints (GET) if available; do not register webhooks.
+scholarship_sage — https://scholarship-sage-jamarrlmayes.replit.app
+
+Confirm GET-accessible health/status. Do not POST prompts or mutate sessions; flag skipped LLM-invoke steps.
+Verify response streaming capability via headers (e.g., text/event-stream) using HEAD if available.
+student_pilot — https://student-pilot-jamarrlmayes.replit.app
+
+Validate core pages, navigation, and scholarship browsing views (read-only).
+Confirm integration calls to scholarship_api are successful and CORS-compliant.
+provider_register — https://provider-register-jamarrlmayes.replit.app
+
+Validate onboarding UI, read-only validation hooks, and terms/consent visibility.
+Check that help/FAQ/read-only endpoints load correctly.
+auto_page_maker — https://auto-page-maker-jamarrlmayes.replit.app
+
+GET /robots.txt, /sitemap.xml, representative SEO pages, canonical tags; confirm pages return 200 and not soft 404s.
+Validate internal links are crawlable (no blocked JS rendering for critical content).
+auto_com_center — https://auto-com-center-jamarrlmayes.replit.app
+
+Verify status/health/documentation endpoints via GET/HEAD.
+Confirm no open directory listings; validate security headers on any operator console UI.
+6. Observability and Evidence Capture
+
+Capture for each app:
+URL, timestamp, request/response headers, status codes, timing metrics.
+Console error logs (screenshots or text), network waterfalls, and any CSP violations.
+Produce a performance sample: P50/P95/P99 lat for three most-called GET endpoints per app.
+Note all skipped tests and why they were skipped (destructive, POST-only, requires credentials not available in read-only mode).
+Reporting Template (deliver exactly this structure)
+
+A. Executive Summary
+
+Overall Health: Green | Yellow | Red
+Go/No-Go Recommendation: Go | No-Go
+Critical blockers summary (IDs list)
+B. Test Execution Summary
+
+Total tests executed:
+Pass rate:
+Tests skipped (count and reason categories: destructive, write-required, credentials unavailable)
+C. Detailed Findings: Frontend
+
+Per app: status of critical journeys, screenshots/console logs, test case IDs, and affected components.
+D. Detailed Findings: Backend
+
+API health, endpoint list tested (GET/HEAD/OPTIONS), schema notes, error handling, P50/P95/P99 latencies, and any rate-limit observations.
+E. Integration Status Matrix (include APP_BASE_URL in the table)
+
+Application | APP_BASE_URL | Connectivity/Auth | Inbound Data Flow | Outbound Data Flow | Notes
+Use Pass/Fail per column and concise notes.
+F. Prioritized List of Issues
+
+Severity: Critical, High, Medium, Low
+For each: ID, Title, Affected App(s), Evidence link (log/screenshot), Repro steps, Suspected root cause (observed), Workaround (if any).
+Severity Guidance
+
+Critical: Cross-app outage, authentication failure, data leakage, or P95 latency > 2x SLO on core paths.
+High: Major feature unusable (read-only view fails), consistent 5xx bursts, CSP misconfig exposing XSS risk.
+Medium: Intermittent 4xx/5xx, incorrect caching, missing canonical tags on SEO pages.
+Low: Cosmetic UI glitches, minor console warnings not impacting function.
+Go/No-Go Criteria
+
+Go requires: 0 Critical, 0 High, all critical paths pass, P95 near SLO targets, Integration Matrix: all apps Pass in Connectivity and at least one direction of data flow verified read-only.
+No-Go if any Critical/High persists or core journeys fail.
+Execution Timing and Revenue Readiness ETA
+Note: The request says “estimated time app will be ready to stop generating revenue.” Interpreting this as “start generating revenue.” If “stop” was intentional, provide clarification instructions in your report.
+
+QA E2E Execution (this assignment): 5–7 business days from test environment access, given eight apps and non-functional sampling.
+Remediation window (if issues found): 3–10 business days depending on severity count, owned by Engineering; Agent3 will not remediate.
+Revenue-start readiness (assuming Go at the end of this E2E): T + 1 business day after report sign-off.
+If Yellow with only Medium/Low issues and acceptable workarounds: limited B2C production ramp could begin within T + 2–3 business days.
+If Red: expect 2–4 weeks before safe revenue ramp, contingent on Engineering fixes and a follow-up verification pass.
+What to Include Up Front in Your Report
+
+“App Registry” section listing all eight apps and APP_BASE_URL exactly as provided.
+“Assumptions and Constraints” noting read-only limits and any credentials not supplied.
+“SLO Baseline” capturing observed availability and latency figures for each app.
+Begin Execution
+
+Acknowledge read-only constraints in your report’s preface.
+Start with Environment and Baseline Verification, then proceed through journeys, frontend, backend, and app-by-app integration checks.
+Produce the E2E Findings and Readiness Report using the template above and submit it for Go/No-Go.
