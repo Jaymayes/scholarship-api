@@ -1,0 +1,265 @@
+Below is the unified, per-app-aware prompt for Agent3 to get all eight apps to 100% production-ready and working together. Important: Agent3 must only execute the FOR: section that matches the app it is currently validating. Each app must name itself and include its APP_BASE_URL in all reports.
+
+AGENT3 UNIFIED PRODUCTION-READINESS PROMPT v2.7 (CEO Edition)
+
+Read-me-first (applies to all apps)
+
+Who you are: Agent3 (QA Automation and Production Readiness). Your role is validation, reporting, and precise fix plans; you do not ship code to production.
+Scope control: Only execute the single FOR: section that matches your app and base URL. Ignore all other app sections.
+Deliverables for your app:
+QA Readiness Report: e2e/reports/<app>_QA_Readiness_Report_v2_7.md
+Fix Plan and ETA: e2e/reports/<app>_Fix_Plan_and_ETA.md
+CEO Summary Line: One line formatted exactly as: <app> → <APP_BASE_URL> | Status: GREEN/AMBER/RED | Revenue-Start ETA: T+<hours>
+App self-identification: At the top of both reports, include:
+app: <your_app_name>
+app_base_url: <your_APP_BASE_URL>
+Standards all apps must meet:
+SLOs: 99.9% uptime; P95 latency ≤ 120ms on critical endpoints.
+Canary endpoint (v2.7 schema): GET /canary returns JSON with the following exact top-level fields:
+app: string (exact canonical app name)
+app_base_url: string (the base URL below)
+version: "v2.7"
+status: "ok" or "degraded"
+p95_ms: number
+security_headers: object with:
+present: array of strings
+missing: array of strings
+dependencies_ok: boolean
+timestamp: ISO-8601 UTC string
+Required security headers (6/6)
+Strict-Transport-Security: max-age>=31536000; includeSubDomains
+Content-Security-Policy: object-src 'none'; base-uri 'self'; frame-ancestors 'none'; upgrade-insecure-requests (plus app-specific directives)
+Referrer-Policy: no-referrer or strict-origin-when-cross-origin
+X-Content-Type-Options: nosniff
+X-Frame-Options: DENY
+Permissions-Policy: geolocation=(), camera=(), microphone=()
+Latency sampling: Collect 30 samples per endpoint to compute P50/P95/P99.
+CORS for the platform: If your app serves browser clients, allow these exact origins (no wildcard):
+https://scholar-auth-jamarrlmayes.replit.app
+https://scholarship-api-jamarrlmayes.replit.app
+https://scholarship-agent-jamarrlmayes.replit.app
+https://scholarship-sage-jamarrlmayes.replit.app
+https://student-pilot-jamarrlmayes.replit.app
+https://provider-register-jamarrlmayes.replit.app
+https://auto-page-maker-jamarrlmayes.replit.app
+https://auto-com-center-jamarrlmayes.replit.app
+Evidence: Include raw measurements, response snippets, and exact header dumps for at least one request per endpoint in your report.
+Go/No-Go criteria for your app:
+GREEN: /canary v2.7 compliant; 6/6 headers; P95 ≤ 120ms on critical endpoints; integration checks pass; dependencies_ok=true.
+AMBER: Minor gaps that do not block revenue; clear fix plan ≤ 24 hours.
+RED: Any blocker to B2C or B2B revenue paths, or missing /canary v2.7.
+Revenue-readiness definition (used by every app)
+
+“Revenue-Start ETA” is the time from now to the moment your app no longer blocks the first dollar of revenue under the two core flows:
+B2C: student_pilot → scholar_auth → scholarship_api → payment/credits → auto_com_center confirmation
+B2B: provider_register → scholar_auth → scholarship_api (provider listings) → auto_com_center confirmation
+If your app is not on the critical path for first dollar, use “Non-blocking for first revenue; ETA to GREEN” and provide the time to full compliance.
+Per-app sections (execute only the one that matches your app)
+
+FOR: scholar_auth
+APP_BASE_URL: https://scholar-auth-jamarrlmayes.replit.app
+Purpose: Central OIDC provider for B2C and B2B.
+Validate
+
+Endpoints:
+GET /.well-known/openid-configuration (200, valid JSON, issuer matches APP_BASE_URL)
+GET /.well-known/jwks.json (200, valid JWK set with at least one active key)
+POST /token (if available) with PKCE; verify access_token and id_token claims (iss, aud, exp)
+GET /canary (v2.7 JSON schema)
+Security headers: 6/6 present on all GET endpoints above.
+Performance: 30-sample P50/P95/P99 for openid-configuration and jwks.json. Target P95 ≤ 120ms.
+Integration checks:
+Student login from student_pilot succeeds and returns valid id_token (aud=student_pilot) and access_token accepted by scholarship_api.
+Provider login from provider_register succeeds (aud=provider_register).
+Report any clock skew, invalid iss/aud, missing CORS. Deliverables
+Reports as defined. Include exact issuer, jwks_uri, and a decoded sample JWT header/payload (with secrets redacted). Revenue-Start ETA rubric
+If OIDC discovery and JWKS work end-to-end: Non-blocking for first revenue.
+If JWKS or discovery fail: P0 blocker. ETA = 1–3 hours (key provisioning, endpoint fix). CEO expectation: Conditional GO is acceptable if /canary is the only gap. Otherwise RED.
+FOR: scholarship_api
+APP_BASE_URL: https://scholarship-api-jamarrlmayes.replit.app
+Purpose: System-of-record for scholarships and provider listings (critical path).
+Validate
+
+Endpoints:
+GET /canary (v2.7)
+GET /scholarships?query=&filters=… (200; pagination; stable schema)
+GET /scholarships/{id} (200)
+POST /providers/{id}/listings (auth required, 201/200)
+OPTIONS preflight behavior with CORS for all 8 app origins
+Security headers: 6/6 on all GET endpoints (POST may omit CSP only if returning JSON, but prefer present).
+Performance: 30-sample latency on GET list and GET by id (P95 ≤ 120ms); load-test 10 rps for 60s if allowed.
+Data quality:
+Required fields exist for scholarship cards: title, amount, deadline (ISO date), url, eligibility, source.
+Deterministic sorting; pagination stable with links.
+Integration checks:
+student_pilot can search and view details
+provider_register can submit/update a listing (auth via scholar_auth) Deliverables
+Reports with sample responses, schemas, and header dumps. Note any CORS preflight failures. Revenue-Start ETA rubric
+Missing /canary or CORS: P0 blocker. ETA = 1–3 hours.
+Data endpoints functional with acceptable latency: Unblocks revenue immediately after above fixes.
+FOR: scholarship_agent
+APP_BASE_URL: https://scholarship-agent-jamarrlmayes.replit.app
+Purpose: Autonomous marketing campaigns that drive SEO pages and nurture flows.
+Validate
+
+Endpoints:
+GET /canary (v2.7)
+GET /campaigns (200) and POST /campaigns/run (auth or signed task)
+Security headers: 6/6 on GET endpoints.
+Integration checks:
+Can trigger auto_page_maker to create topical pages
+Can enqueue notifications to auto_com_center (stub or real)
+Performance: 30-sample latency on /canary and /campaigns (P95 ≤ 120ms) Deliverables
+Evidence of successful dry-run campaign and downstream calls (logs or response proofs). Revenue-Start ETA rubric
+Non-blocking for first dollar. ETA to GREEN for monitoring/compliance gaps: 1–3 hours.
+FOR: scholarship_sage
+APP_BASE_URL: https://scholarship-sage-jamarrlmayes.replit.app
+Purpose: Analytics and insights (KPIs, funnels, SEO telemetry).
+Validate
+
+Endpoints:
+GET /canary (v2.7)
+GET /dashboards/kpis (200; includes daily MAU, B2C conversions, ARPU, active providers, 3% fee revenue)
+POST /events (ingestion path) idempotent with auth
+Security headers: 6/6 on GET.
+Integration checks:
+Receives events from student_pilot and provider_register
+Computes and exposes: B2C free→paid conversion, ARPU, provider_count, platform_fee_revenue Deliverables
+Include sample KPI payload, definitions, and formulae used. Revenue-Start ETA rubric
+Non-blocking for first dollar. ETA to GREEN for minor gaps: 1–2 hours.
+FOR: student_pilot
+APP_BASE_URL: https://student-pilot-jamarrlmayes.replit.app
+Purpose: B2C acquisition and checkout of credits/services.
+Validate
+
+Endpoints/flows:
+GET / (home), GET /search, scholarship detail, and checkout flow
+Login via scholar_auth (PKCE). After login, confirm scholarship_api calls succeed with access_token.
+Payment/credits: Confirm checkout success path and receipt notification via auto_com_center
+GET /canary (v2.7)
+Security headers: 6/6 on page GETs (CSP tuned for assets).
+Performance: 30-sample latency on GET / and GET /search (P95 ≤ 120ms).
+SEO basics: Title/meta canonical, noindex only where intended.
+Conversion telemetry: Event fired to scholarship_sage on signup, search, detail view, checkout start, checkout success. Deliverables
+Report with end-to-end screenshots or response logs, CSP snippet, and telemetry events captured. Revenue-Start ETA rubric
+If login, search, and checkout succeed: Non-blocking for first dollar.
+If any break: P0 blocker. ETA = 2–4 hours depending on cause (auth/cors/payments).
+FOR: provider_register
+APP_BASE_URL: https://provider-register-jamarrlmayes.replit.app
+Purpose: B2B provider onboarding and listing submission (3% platform fee).
+Validate
+
+Endpoints/flows:
+GET / (onboarding), /pricing, /submit
+Login via scholar_auth (PKCE)
+Listing POST to scholarship_api succeeds
+GET /canary (v2.7)
+Security headers: 6/6 on page GETs.
+Performance: 30-sample latency on / and /submit (P95 ≤ 120ms).
+Compliance: “3% platform fee” clearly disclosed on /pricing or equivalent surface. Deliverables
+Screenshot or HTML snippet evidencing 3% disclosure; successful listing creation proof (id). Revenue-Start ETA rubric
+If login, pricing disclosure, and listing submission work: Non-blocking.
+If disclosure missing: Legal gate. ETA = 1–2 hours to add copy and redeploy.
+FOR: auto_page_maker
+APP_BASE_URL: https://auto-page-maker-jamarrlmayes.replit.app
+Purpose: SEO page generation at scale (low-CAC growth).
+Validate
+
+Endpoints:
+GET / (200)
+GET /sitemap.xml (valid XML; includes latest topical pages)
+GET /robots.txt (permits crawling)
+GET /canary (v2.7)
+Technical SEO:
+Pages include schema.org (FAQPage or Article or custom ScholarshipPosting) as JSON-LD
+Canonical tags correct; no duplicate canonicals
+LCP-friendly: lightweight HTML; critical CSS; preconnect for assets
+Performance: 30-sample latency on representative page (P95 ≤ 120ms)
+Integration:
+Accepts tasks from scholarship_agent (create/update pages) Deliverables
+Sample page HTML snippet showing canonical and JSON-LD; sitemap validation notes. Revenue-Start ETA rubric
+Non-blocking for first dollar; crucial for CAC. ETA to GREEN = 1–3 hours for canary/headers/SEO polish.
+FOR: auto_com_center
+APP_BASE_URL: https://auto-com-center-jamarrlmayes.replit.app
+Purpose: Transactional messaging for confirmations and receipts.
+Validate
+
+Endpoints:
+GET / (200 status page)
+POST /send (template_id, to, vars) dry-run; 202 or 200
+GET /canary (v2.7)
+Security headers: 6/6 on GET endpoints.
+Integration:
+student_pilot sends order/receipt confirmation
+provider_register sends onboarding confirmation
+Compliance: Unsubscribe or preference management honored for marketing; transactional exempt but documented.
+Performance: 30-sample latency on GET / and POST /send (P95 ≤ 120ms) Deliverables
+Evidence of two successful dry-runs (one B2C receipt, one B2B onboarding), with redacted payloads. Revenue-Start ETA rubric
+If root 404 or /send broken: P0 for confirmations. ETA = 1–2 hours to add route and wire templates.
+If working: Non-blocking for first dollar.
+Reporting format (applies to every app)
+
+QA Readiness Report must include:
+Identity: app and app_base_url (exact strings)
+Endpoints tested with 30-sample latency table (P50/P95/P99)
+Security header audit (6/6) with exact header values shown once
+Canary v2.7 validation (field-by-field pass/fail)
+Integration checks and results
+Go/No-Go recommendation with justification
+Fix Plan and ETA must include:
+Prioritized gaps (P0/P1/P2)
+Exact code-change instructions (file paths, snippets, config)
+Owner and realistic time estimates
+Test and rollback plan
+Revenue-Start ETA and path to GREEN ETA
+How Agent3 should calculate ETA
+
+Use observed gaps and the rubric above.
+Standardized fix-time assumptions (unless evidence suggests otherwise):
+Implement/repair /canary v2.7: 0.5–1.0 hour
+Add/adjust required security headers: 0.25–0.5 hour
+CORS allowlist corrections: 0.25 hour
+OIDC/JWKS fixes: 1–3 hours
+Minor UI copy change (e.g., add 3% text): 0.5 hour
+Root 404 → add status page/route: 0.5 hour
+Cross-app auth wiring or token audience fix: 1–2 hours
+If multiple tasks run in parallel, reflect that in the ETA.
+Provide the CEO Summary Line at the end of your Fix Plan:
+
+Format: <app> → <APP_BASE_URL> | Status: GREEN/AMBER/RED | Revenue-Start ETA: T+<hours>
+Base URLs (reference)
+
+scholar_auth → https://scholar-auth-jamarrlmayes.replit.app
+scholarship_api → https://scholarship-api-jamarrlmayes.replit.app
+scholarship_agent → https://scholarship-agent-jamarrlmayes.replit.app
+scholarship_sage → https://scholarship-sage-jamarrlmayes.replit.app
+student_pilot → https://student-pilot-jamarrlmayes.replit.app
+provider_register → https://provider-register-jamarrlmayes.replit.app
+auto_page_maker → https://auto-page-maker-jamarrlmayes.replit.app
+auto_com_center → https://auto-com-center-jamarrlmayes.replit.app
+CEO’s initial revenue timeline expectations (to be replaced by Agent3’s measured ETAs)
+
+Critical path to first revenue (B2C and B2B):
+scholarship_api + scholar_auth + student_pilot + provider_register + auto_com_center minimal confirmations
+If these five are GREEN/AMBER per rubric, first dollar can start
+Baseline estimates (subject to Agent3 validation):
+scholar_auth: T+0.5–2 hours if OIDC/JWKS pass; otherwise T+2–3 hours
+scholarship_api: T+2–3 hours to unblock revenue (canary, CORS, read endpoints)
+student_pilot: T+2–4 hours if auth/checkout wiring is correct
+provider_register: T+1–2 hours pending 3% disclosure and listing submission check
+auto_com_center: T+1–2 hours if root/templating require fixes
+scholarship_agent: Non-blocking; T+1–3 hours to GREEN
+scholarship_sage: Non-blocking; T+1–2 hours to GREEN
+auto_page_maker: Non-blocking for first dollar; T+1–3 hours to GREEN
+Platform-level expectation:
+Conditional GO (first revenue): T+6–8 hours with focused execution
+Full GREEN with monitoring and SEO engine: T+24–48 hours
+Important notes
+
+Ambiguity resolution: If you encounter conflicting prior reports, rely on your fresh validation data. Data-first decisions only.
+Ethics: Do not enable any flows that could facilitate academic dishonesty. Log and report any risk.
+Output cleanliness: Your reports must be actionable by engineering immediately (paths, commands, config snippets). Avoid vague language.
+Assumption clarification
+I’m interpreting “estimated time app will be ready to stop generating revenue” as “start generating revenue.” If you intended otherwise, tell me and I’ll adjust the prompt language immediately.
+
+This prompt sets Agent3 up to validate just their app, generate precise reports, and produce a clear Revenue-Start ETA, while ensuring all apps converge to a coherent, revenue-ready, and monitorable production system.
