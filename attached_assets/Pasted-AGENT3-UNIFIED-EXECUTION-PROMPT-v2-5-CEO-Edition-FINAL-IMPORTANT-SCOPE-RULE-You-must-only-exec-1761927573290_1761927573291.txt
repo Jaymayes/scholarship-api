@@ -1,0 +1,201 @@
+AGENT3 UNIFIED EXECUTION PROMPT v2.5 (CEO Edition — FINAL)
+IMPORTANT SCOPE RULE: You must only execute the instructions that belong to your assigned app section (A1–A8). Ignore everything else. Do not modify other apps. If you cannot positively confirm your app identity and base URL, stop and write a fix plan.
+
+U0 — Scope Guard and Handshake (mandatory for all apps)
+
+On start, identify your app by name and base URL.
+Output the handshake line as the first line of your deliverables and logs: AGENT3_HANDSHAKE ASSIGNED_APP={your_app_name} APP_BASE_URL={your_base_url} VERSION=v2.5 ACK=I will only execute my app section.
+Name yourself exactly using the app_name string from your section (A1–A8) and the provided APP_BASE_URL. Include both in your readiness report.
+Refuse to run any step if ASSIGNED_APP and APP_BASE_URL do not match your section.
+U1 — Canary endpoint (all apps)
+
+Implement GET /canary returning exactly 9 JSON fields (no more, no less): { "app_name": "<one of A1–A8 names>", "app_base_url": "<exact base URL from this prompt>", "version": "v2.5", "status": "ok|degraded|fail", "p95_ms": <integer>, "commit_sha": "<string or 'workspace'>", "server_time_utc": "<RFC3339 UTC timestamp>", "revenue_role": "direct|enables|protects", "revenue_eta_hours": "<short range string, e.g., '2-6'>" }
+Do not add or rename fields. status=ok only when all section requirements are met.
+U2 — Security headers (all apps, 100% of responses)
+
+Strict-Transport-Security: max-age=31536000; includeSubDomains
+Content-Security-Policy: default-src 'self'; frame-ancestors 'none' (extend as required for payments/embeds)
+X-Frame-Options: DENY
+X-Content-Type-Options: nosniff
+Referrer-Policy: strict-origin-when-cross-origin
+Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=()
+U3 — CORS allowlist (all apps; no wildcards)
+Exactly these 8 origins are allowed (and only these):
+
+https://scholar-auth-jamarrlmayes.replit.app
+https://scholarship-api-jamarrlmayes.replit.app
+https://scholarship-agent-jamarrlmayes.replit.app
+https://scholarship-sage-jamarrlmayes.replit.app
+https://student-pilot-jamarrlmayes.replit.app
+https://provider-register-jamarrlmayes.replit.app
+https://auto-page-maker-jamarrlmayes.replit.app
+https://auto-com-center-jamarrlmayes.replit.app
+U4 — Validation gates (all apps must enforce and document)
+
+/canary returns exactly 9 fields; version=v2.5; correct app_name and app_base_url
+Security headers present on 100% of responses
+CORS equals the exact 8-origin allowlist; no wildcards
+Request correlation: generate X-Request-ID per request and log it
+SLOs: P95 latency and 5xx error rate per app section; universal ≤120ms P95, ≤1% 5xx
+Standard error JSON on non-2xx: {"error":{"code":"STRING","message":"HUMAN_READABLE","request_id":"..."}}
+RBAC enforcement with proper 401/403 where applicable
+Idempotency on all writes (Idempotency-Key header) where applicable
+Deliverables written (see U8)
+U5 — Rate limits (defaults unless overridden in your section)
+
+Reads: 300 rpm per IP + token
+Writes: 120 rpm per IP + token
+Checkout/payment: 60 rpm
+Return 429 with Retry-After and standard error JSON
+U6 — Telemetry and events
+
+Emit app-specific events noted in your section
+Include request_id, subject, org_id where applicable
+Record p95_ms and 5xx counters for SLO auditing
+U7 — Responsible AI and compliance
+
+No academic dishonesty; coaching-only for writing-related features
+Respect FERPA/COPPA; store only minimum necessary PII; redact logs
+U8 — Deliverables (two files, exact naming; include AGENT3_HANDSHAKE line)
+
+e2e/reports/{app_name}/readiness_report_{app_name}_v2_5_ceo_final.md
+e2e/reports/{app_name}/fix_plan_{app_name}_v2_5_ceo_final.yaml
+Include: your handshake; current /canary payload; proof for all 9 validation gates; revenue readiness summary; dependencies; risk and rollback plan.
+Fleet-wide constants and conventions
+
+Version: v2.5 (CEO Edition — FINAL)
+JWT/OIDC via scholar_auth; scopes are enforced in each section
+Idempotency-Key for POST/PUT/PATCH/DELETE that mutate state
+All timestamps in UTC, RFC3339
+Status transitions: ok → degraded → fail; open and close circuits as defined (A4)
+Default pagination: limit ≤ 50; cursor-based if supported
+A1 — scholar_auth (APP_BASE_URL=https://scholar-auth-jamarrlmayes.replit.app)
+Mission: Identity provider (OIDC), JWKS, roles/scopes
+Requirements:
+
+OIDC discovery, token, userinfo; JWKS serving
+Roles: student, provider, admin; Scopes include openid, profile, provider.manage, write:scholarships, analytics.export
+Enforce audience, issuer, exp, nbf, kid; key rotation support
+P95 target: ≤20ms; 5xx ≤1%
+Events: auth.login_succeeded|failed, auth.token_issued
+Revenue: enables; revenue_eta_hours: "0.5-2" Canary example: { "app_name": "scholar_auth", "app_base_url": "https://scholar-auth-jamarrlmayes.replit.app", "version": "v2.5", "status": "ok", "p95_ms": 4, "commit_sha": "workspace", "server_time_utc": "2025-10-31T00:00:00Z", "revenue_role": "enables", "revenue_eta_hours": "0.5-2" }
+A2 — scholarship_api (APP_BASE_URL=https://scholarship-api-jamarrlmayes.replit.app)
+Mission: Authoritative scholarship data store and search
+Requirements:
+
+CRUD with RBAC: providers can write only within their org; students read-only
+Idempotent writes with ownership enforcement
+ETag/If-None-Match for reads; pagination and filtering
+Webhook/event emit: scholarship.created|updated|published
+P95 target: ≤85ms; 5xx ≤1%
+Revenue: enables; revenue_eta_hours: "2-5"
+Accept Stripe webhook-forwarded metadata when applicable (provider fees reconciliation downflow) Canary example: { "app_name": "scholarship_api", "app_base_url": "https://scholarship-api-jamarrlmayes.replit.app", "version": "v2.5", "status": "ok", "p95_ms": 85, "commit_sha": "workspace", "server_time_utc": "2025-10-31T00:00:00Z", "revenue_role": "enables", "revenue_eta_hours": "2-5" } Notes:
+If your public deployment lags behind local, publish/deploy, then verify: GET /canary returns the 9-field v2.5 JSON.
+A3 — scholarship_agent (APP_BASE_URL=https://scholarship-agent-jamarrlmayes.replit.app)
+Mission: Autonomous campaigns to acquire students and providers (SEO off-page, email drip, partner outreach), strictly ethical and compliant.
+Requirements:
+
+Inputs: sitemap and RSS from auto_page_maker; KPIs from scholarship_sage /kpi/summary (admin + analytics.export)
+Outputs: campaign.run_started|completed, campaign.lead_generated; never sends content from black-box models without human review where required
+Respect opt-in and unsubscribe; DKIM/SPF alignment if sending email
+Rate limits: reads 300 rpm; writes 120 rpm; outbound send throttles configurable
+P95 target: ≤90ms; 5xx ≤1%
+Revenue: enables; revenue_eta_hours: "4-8" Canary example: { "app_name": "scholarship_agent", "app_base_url": "https://scholarship-agent-jamarrlmayes.replit.app", "version": "v2.5", "status": "ok", "p95_ms": 12, "commit_sha": "workspace", "server_time_utc": "2025-10-31T00:00:00Z", "revenue_role": "enables", "revenue_eta_hours": "4-8" }
+A4 — scholarship_sage (APP_BASE_URL=https://scholarship-sage-jamarrlmayes.replit.app)
+Mission: Fleet KPIs, SLO drift detection, circuit breakers
+Requirements:
+
+Poll all 8 /canary endpoints every 60s ± jitter; store 24h rolling window
+GET /kpi/summary (requires admin + analytics.export)
+Circuits: open when status=degraded|fail or SLO breach; close on recovery hysteresis
+Events: scholarship_sage.alert, scholarship_sage.circuit_open|circuit_close
+P95 target: ≤30ms; 5xx ≤1%
+Revenue: protects; revenue_eta_hours: "2-4" Canary example: { "app_name": "scholarship_sage", "app_base_url": "https://scholarship-sage-jamarrlmayes.replit.app", "version": "v2.5", "status": "ok", "p95_ms": 5, "commit_sha": "workspace", "server_time_utc": "2025-10-31T00:00:00Z", "revenue_role": "protects", "revenue_eta_hours": "2-4" }
+A5 — student_pilot (APP_BASE_URL=https://student-pilot-jamarrlmayes.replit.app)
+Mission: B2C student experience—discover scholarships, purchase credits
+Requirements:
+
+OIDC via scholar_auth; scopes: openid, profile
+Browse via scholarship_api with ETag caching; 300 rpm read limit
+Stripe Checkout for credit packs; env variable toggles test→live; 60 rpm
+Events: student_pilot.purchase_succeeded|failed; user.signed_up
+SLO: P95 ≤60ms; 5xx ≤1%
+Ethics: coaching-only; no ghostwriting
+Revenue: direct; revenue_eta_hours: "2-6" Canary example: { "app_name": "student_pilot", "app_base_url": "https://student-pilot-jamarrlmayes.replit.app", "version": "v2.5", "status": "ok", "p95_ms": 5, "commit_sha": "workspace", "server_time_utc": "2025-10-31T00:00:00Z", "revenue_role": "direct", "revenue_eta_hours": "2-6" }
+A6 — provider_register (APP_BASE_URL=https://provider-register-jamarrlmayes.replit.app)
+Mission: B2B provider onboarding; scholarship submission workflow (draft → review → publish) with immutable audit log
+Requirements:
+
+OIDC via scholar_auth; provider role; scopes: provider.manage, write:scholarships
+Writes to scholarship_api with Idempotency-Key; enforce org ownership
+Events: provider_register.scholarship_submitted|published
+Rate limits: writes 120 rpm; reads 300 rpm
+SLO: P95 ≤90ms; 5xx ≤1%
+Revenue: direct (3% platform fee on awards); revenue_eta_hours: "3-6" Canary example: { "app_name": "provider_register", "app_base_url": "https://provider-register-jamarrlmayes.replit.app", "version": "v2.5", "status": "ok", "p95_ms": 3, "commit_sha": "workspace", "server_time_utc": "2025-10-31T00:00:00Z", "revenue_role": "direct", "revenue_eta_hours": "3-6" }
+A7 — auto_page_maker (APP_BASE_URL=https://auto-page-maker-jamarrlmayes.replit.app)
+Mission: SEO engine to generate, update, and publish scholarship pages at scale (organic acquisition, low CAC)
+Requirements:
+
+Deterministic page spec hashing; idempotent generation; versioning
+Canonical URL generation; JSON-LD structured data; E-E-A-T metadata
+Endpoints: GET /api/pages/:slug/canary, GET /rss.xml, POST /api/admin/rebuild-pages (fail-closed admin auth)
+Events: page_published with canonical URL and spec hash
+SLO: P95 ≤60ms; 5xx ≤1%
+Revenue: enables; revenue_eta_hours: "2-4" for app readiness; note: first organic signups typically 3–14 days post-indexing Canary example: { "app_name": "auto_page_maker", "app_base_url": "https://auto-page-maker-jamarrlmayes.replit.app", "version": "v2.5", "status": "ok", "p95_ms": 10, "commit_sha": "workspace", "server_time_utc": "2025-10-31T00:00:00Z", "revenue_role": "enables", "revenue_eta_hours": "2-4" }
+A8 — auto_com_center (APP_BASE_URL=https://auto-com-center-jamarrlmayes.replit.app)
+Mission: Centralized communication and notifications (students, providers, system alerts)
+Requirements:
+
+Integrations: subscribe to events from A3, A4, A5, A6; deliver email/SMS/in-app with opt-outs honored
+Templates: system, marketing, transactional separated; no dark patterns; easy unsubscribe
+SLO: P95 ≤80ms; 5xx ≤1%
+Revenue: enables; revenue_eta_hours: "0" (Verified — Production Ready) Canary example: { "app_name": "auto_com_center", "app_base_url": "https://auto-com-center-jamarrlmayes.replit.app", "version": "v2.5", "status": "ok", "p95_ms": 8, "commit_sha": "workspace", "server_time_utc": "2025-10-31T00:00:00Z", "revenue_role": "enables", "revenue_eta_hours": "0" }
+Cross-app integration checklist (follow only if referenced by your app)
+
+Auth wiring: All apps that perform auth must validate tokens from scholar_auth and enforce scopes/roles exactly as specified.
+CORS and headers: Use the exact 8-origin allowlist and 6 security headers for 100% of responses.
+Events: Emit and consume events per your section. Always include request_id for traceability.
+Idempotency: All write endpoints must enforce Idempotency-Key to prevent duplicate effects.
+Stripe: student_pilot handles Checkout; provider_register reconciles awards and routes fee data to scholarship_api as metadata or via internal event.
+Deployment and verification procedure (each app)
+
+Implement your section’s requirements.
+Run smoke tests locally; confirm /canary 9 fields; confirm P95 meets your app’s SLO target.
+Deploy to your Replit environment.
+Verify production /canary and security headers; validate CORS allowlist equals the 8 origins.
+Write U8 deliverables with evidence for all 9 validation gates and include your AGENT3_HANDSHAKE line at the top.
+Set status=ok only when all requirements pass. If anything fails, set status=degraded or fail and write the fix plan.
+Revenue readiness timeline (CEO roll-up; interpreted as “start generating revenue”)
+
+direct revenue engines:
+student_pilot: 2–6 hours once scholar_auth + scholarship_api are ok and Stripe is live.
+provider_register: 3–6 hours after scholar_auth + scholarship_api; 3% fee accrual begins with first award processing.
+enabling/protecting engines:
+scholar_auth: 0.5–2 hours (foundational identity; unlocks revenue flows)
+scholarship_api: 2–5 hours (enables reads/writes used by direct apps)
+scholarship_agent: 4–8 hours to first measurable leads (amplifies top-of-funnel)
+scholarship_sage: 2–4 hours to full revenue protection (SLO and circuit breakers)
+auto_page_maker: 2–4 hours to app readiness; organic revenue impact typically 3–14 days post-indexing
+auto_com_center: 0 hours (already production ready)
+Critical path to first dollars
+
+A1 scholar_auth → 0.5–2h
+A2 scholarship_api → +2–5h
+A5 student_pilot (B2C) and A6 provider_register (B2B) → first dollars in 2–6h and 3–6h respectively, once 1–2 are green and Stripe is live Parallel accelerants: A7 auto_page_maker, A3 scholarship_agent, A8 auto_com_center, A4 scholarship_sage
+Agent confirmation
+
+Before you begin, output your AGENT3_HANDSHAKE with your exact ASSIGNED_APP and APP_BASE_URL.
+Then execute only your app section (A1–A8).
+When done, publish your two U8 deliverables, set /canary status to ok, and report your revenue_eta_hours.
+If you detect stale public deployment vs local, deploy and re-verify /canary at your APP_BASE_URL.
+App names and APP_BASE_URLs (authoritative list)
+
+scholar_auth → https://scholar-auth-jamarrlmayes.replit.app
+scholarship_api → https://scholarship-api-jamarrlmayes.replit.app
+scholarship_agent → https://scholarship-agent-jamarrlmayes.replit.app
+scholarship_sage → https://scholarship-sage-jamarrlmayes.replit.app
+student_pilot → https://student-pilot-jamarrlmayes.replit.app
+provider_register → https://provider-register-jamarrlmayes.replit.app
+auto_page_maker → https://auto-page-maker-jamarrlmayes.replit.app
+auto_com_center → https://auto-com-center-jamarrlmayes.replit.app
+CEO note on wording: Where your section specifies revenue_eta_hours, interpret the user’s phrase “ready to stop generating revenue” as “ready to start generating revenue.” Report both your app readiness and, if applicable, the realistic time-to-impact on actual revenue.
