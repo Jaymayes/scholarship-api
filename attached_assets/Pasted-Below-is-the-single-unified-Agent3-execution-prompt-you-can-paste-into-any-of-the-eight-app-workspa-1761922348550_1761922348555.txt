@@ -1,0 +1,218 @@
+Below is the single, unified Agent3 execution prompt you can paste into any of the eight app workspaces. It includes all apps, but contains a strict scope guard so Agent3 will only act on the section for its assigned app. It also directs the app to identify itself in its canary and readiness report with its exact APP_BASE_URL, and to publish an ETA to start generating revenue.
+
+AGENT3 UNIFIED EXECUTION PROMPT v2.5 (CEO Edition — FINAL)
+
+READ ME FIRST — SCOPE GUARD (U0)
+
+You are Agent3. Execute only the section that matches your ASSIGNED_APP or APP_BASE_URL. Ignore every other app section.
+On startup, log this exact handshake line and also include it at the top of your readiness report: AGENT3_HANDSHAKE ASSIGNED_APP=<app_name> APP_BASE_URL=<app_base_url> VERSION=v2.5 ACK=I will only execute my app section.
+Determine your scope using either:
+ENV ASSIGNED_APP in {scholar_auth, scholarship_api, scholarship_agent, scholarship_sage, student_pilot, provider_register, auto_page_maker, auto_com_center}, or
+ENV APP_BASE_URL matching one of the URLs in “App Directory” below.
+If neither variable is present or you detect a mismatch, stop immediately and write a one-line error to stderr: STOP: bad_scope.
+App Directory (all eight — use only yours)
+
+scholar_auth → https://scholar-auth-jamarrlmayes.replit.app
+scholarship_api → https://scholarship-api-jamarrlmayes.replit.app
+scholarship_agent → https://scholarship-agent-jamarrlmayes.replit.app
+scholarship_sage → https://scholarship-sage-jamarrlmayes.replit.app
+student_pilot → https://student-pilot-jamarrlmayes.replit.app
+provider_register → https://provider-register-jamarrlmayes.replit.app
+auto_page_maker → https://auto-page-maker-jamarrlmayes.replit.app
+auto_com_center → https://auto-com-center-jamarrlmayes.replit.app
+Universal Requirements (U1–U9) — All Apps Must Implement These
+U1. Canary, Security, CORS, Headers
+
+Implement GET /canary (no auth) returning JSON with exactly these 9 fields (any order):
+app_name: string (your app’s canonical name)
+app_base_url: string (must equal your base URL from App Directory)
+version: "v2.5"
+status: "ok" | "degraded"
+p95_ms: integer (rolling last 5 minutes)
+commit_sha: string (best effort; “workspace” or “unknown” allowed)
+server_time_utc: ISO-8601 UTC timestamp
+revenue_role: "direct" | "enables" | "protects" | "amplifies" | "growth"
+revenue_eta_hours: string (range, e.g., "2-5")
+Add these security headers to 100% of responses:
+Strict-Transport-Security: max-age=31536000; includeSubDomains
+Content-Security-Policy: default-src 'self'; frame-ancestors 'none'; (extend minimally per app needs such as Stripe)
+X-Frame-Options: DENY
+X-Content-Type-Options: nosniff
+Referrer-Policy: strict-origin-when-cross-origin
+Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=()
+CORS allowlist must be exactly these eight origins (no wildcards):
+https://scholar-auth-jamarrlmayes.replit.app
+https://scholarship-api-jamarrlmayes.replit.app
+https://scholarship-agent-jamarrlmayes.replit.app
+https://scholarship-sage-jamarrlmayes.replit.app
+https://student-pilot-jamarrlmayes.replit.app
+https://provider-register-jamarrlmayes.replit.app
+https://auto-page-maker-jamarrlmayes.replit.app
+https://auto-com-center-jamarrlmayes.replit.app
+U2. AuthN/AuthZ, JWT, Scopes
+
+Trust scholar_auth JWKS for JWT verification.
+Enforce scopes per app section below. 401 if missing token; 403 if token present without required scopes.
+U3. Idempotency and Events
+
+For write endpoints: accept Idempotency-Key; return 409 on exact replay.
+Emit events named <app_name>.<event> for material state changes.
+U4. Validation Gates (must all pass)
+
+/canary has 9 fields and version=v2.5.
+Security headers present on 100% responses.
+CORS allowlist equals the 8-origin list above.
+X-Request-ID: accept inbound, echo in response, and correlate in logs.
+SLOs: universal P95 ≤120ms; 5xx ≤1% (per-app overrides below).
+Standard error JSON: { "error": { "code": "<UPPER_SNAKE>", "message": "<human-readable>", "details": null|object }, "request_id": "<uuid>" }
+U5. Stop Conditions (fail fast, return 503)
+
+missing_auth, cors_violation, slo_breach, ethics_guard, bad_scope.
+Log stop condition and expose “status”: "degraded" in /canary if applicable.
+U6. Monitoring & Alerts
+
+Log every request with X-Request-ID, status code, latency_ms, auth scope (if any).
+On stop conditions, emit <app_name>.alert events with details.
+U7. Revenue Reporting
+
+Set revenue_role and revenue_eta_hours in /canary as specified in your app section.
+revenue_eta_hours represents ETA to start generating revenue given dependencies.
+U8. Deliverables (exact filenames, no spaces)
+
+Write both files on successful readiness:
+e2e/reports/<app_name>/readiness_report_<app_name>v2_5_ceo_final.md
+e2e/reports/<app_name>/fix_plan<app_name>_v2_5_ceo_final.yaml
+Each readiness report must include:
+The exact handshake line
+The exact APP_BASE_URL
+Current /canary JSON
+Evidence for headers, CORS, SLO, RBAC, idempotency, and events
+Clear blockers (if any) and dependency status
+U9. Directory Integrity
+
+Create directories as needed; do not write files outside e2e/reports/<app_name>/.
+App-Specific Sections (A1–A8) — Only Execute Yours
+
+A1 — scholar_auth (APP_BASE_URL=https://scholar-auth-jamarrlmayes.replit.app)
+
+Mission: OIDC identity backbone. Roles: student, provider, admin.
+Endpoints:
+GET /.well-known/openid-configuration
+GET /.well-known/jwks.json (cache-friendly)
+POST /oauth/token (auth code, PKCE)
+POST /oauth/revoke
+POST /oauth/introspect (admin only)
+Scopes:
+read:scholarships, write:scholarships
+purchase.credits, provider.manage, analytics.export, admin
+SLOs: P95 ≤20ms; 5xx ≤1%.
+Revenue: revenue_role="enables"; revenue_eta_hours="0.5-2".
+Success: status="ok" and JWKS served; all flows verified; deliverables written.
+A2 — scholarship_api (APP_BASE_URL=https://scholarship-api-jamarrlmayes.replit.app)
+
+Mission: Authoritative read/write data for scholarships.
+Read policy (A2 clarification): Public reads allowed unless a stricter policy flag is enabled; JWT optional for reads; enforce 401/403 if policy requires JWT.
+Endpoints:
+GET /scholarships: filters, pagination, ETag, 304; 600 rpm
+GET /scholarships/{id}: ETag, 304
+POST /scholarships: JWT required, scope=write:scholarships; Idempotency-Key
+PATCH /scholarships/{id}: same as POST
+Events: scholarship_api.created|updated.
+Degraded mode: If JWKS unreachable/invalid → status="degraded"; disable writes; reads continue.
+SLOs: P95 ≤85ms; 5xx ≤1%.
+Revenue: revenue_role="enables"; revenue_eta_hours="2-5" (after A1 ok).
+Success: reads operational; writes secured; deliverables written.
+A3 — scholarship_agent (APP_BASE_URL=https://scholarship-agent-jamarrlmayes.replit.app)
+
+Mission: Autonomous growth ops for top-of-funnel and conversion; orchestrates Auto Page Maker and Com Center. No paid media; prioritize organic SEO and lifecycle messaging.
+Endpoints:
+POST /campaigns (JWT admin; scope=admin), Idempotency-Key
+POST /tasks/generate_pages → calls auto_page_maker (OIDC service token)
+POST /tasks/lifecycle_messages → calls auto_com_center (OIDC service token)
+GET /campaigns/{id}/status (JWT admin|analytics.export)
+Policies:
+Hard cap paid_budget=0 unless explicitly enabled by admin flag.
+All external sends routed via auto_com_center; never send directly.
+SLOs: P95 ≤90ms; 5xx ≤1%.
+Revenue: revenue_role="amplifies"; revenue_eta_hours="4-8" (after A2, A7, A8 ok).
+Success: can queue and complete page-gen and messaging tasks; deliverables written.
+A4 — scholarship_sage (APP_BASE_URL=https://scholarship-sage-jamarrlmayes.replit.app)
+
+Mission: Revenue protection via KPIs and circuit breakers.
+Functions:
+Poll all eight /canary endpoints every 60s ± jitter.
+GET /kpi/summary (JWT admin; scopes=admin analytics.export) — aggregates B2C, B2B, SLO, event counts.
+Trigger circuit breakers when any app reports status="degraded" or slo_breach detected; emit scholarship_sage.alert.
+SLOs: P95 ≤30ms; 5xx ≤1%.
+Revenue: revenue_role="protects"; revenue_eta_hours="2-4".
+Success: shows live KPIs and alerts; deliverables written.
+A5 — student_pilot (APP_BASE_URL=https://student-pilot-jamarrlmayes.replit.app)
+
+Mission: B2C experience — browse scholarships, purchase credits, AI coaching (no ghostwriting).
+Integrations:
+Login via scholar_auth (role=student; scopes: read:scholarships, purchase.credits).
+Browse via scholarship_api with ETag caching.
+Stripe Checkout for credit packs (CSP extended minimally).
+Events: student_pilot.purchase_succeeded|purchase_failed.
+Rate limits: browse 300 rpm; checkout 60 rpm.
+SLOs: P95 ≤60ms; 5xx ≤1%.
+Ethics: coaching only; never write content on behalf of students for submission.
+Revenue: revenue_role="direct"; revenue_eta_hours="2-6" (after A1 + A2 ok and Stripe live).
+Success: first purchase path works; deliverables written.
+A6 — provider_register (APP_BASE_URL=https://provider-register-jamarrlmayes.replit.app)
+
+Mission: B2B provider onboarding, submission, and publishing of scholarships.
+Integrations:
+OIDC via scholar_auth (role=provider; scopes: provider.manage, write:scholarships).
+Write to scholarship_api with Idempotency-Key and org ownership enforcement.
+Workflow: draft → review → publish; immutable audit log.
+Events: provider_register.scholarship_submitted|published.
+Rate limits: writes 120 rpm; reads 300 rpm.
+SLOs: P95 ≤90ms; 5xx ≤1%.
+Revenue: revenue_role="direct" (3% fee on awarded funds); revenue_eta_hours="3-6" (after A1 + A2 writes ok).
+Success: provider can publish; writes safe and idempotent; deliverables written.
+A7 — auto_page_maker (APP_BASE_URL=https://auto-page-maker-jamarrlmayes.replit.app)
+
+Mission: SEO growth engine — generate scholarship landing pages and sitemaps to drive organic traffic; zero paid CAC.
+Endpoints:
+POST /pages/generate (JWT admin|service; scope=admin), accepts batch specs (title, slug, meta, canonical, schema.org JSON-LD).
+GET /sitemap.xml and GET /sitemaps/{index}.xml (public).
+POST /rebuild (JWT admin) to regenerate indexes.
+Inputs: consumes scholarship_api listings; avoid duplicate content; ETag-aware pulling.
+Output: static pages with lean CSS/JS; OpenGraph + JSON-LD; robots.txt maintained.
+SLOs: API P95 ≤50ms; 5xx ≤1% (build jobs may be async).
+Revenue: revenue_role="growth"; revenue_eta_hours="2-4" (after A2 reads ok).
+Success: pages render, sitemaps valid, search-friendly; deliverables written.
+A8 — auto_com_center (APP_BASE_URL=https://auto-com-center-jamarrlmayes.replit.app)
+
+Mission: Centralized transactional communications (email/SMS/push) for the platform; opt-in, rate-limited, compliant.
+Endpoints:
+POST /messages (JWT service; scopes: admin), Idempotency-Key
+POST /webhooks/provider (signature-verified)
+GET /messages/{id}/status (JWT admin|analytics.export)
+Policies:
+Enforce unsubscribe and frequency caps; suppress duplicates via Idempotency-Key.
+Store minimal PII; encrypt at rest; redact logs.
+SLOs: P95 ≤60ms; 5xx ≤1%.
+Revenue: revenue_role="enables"; revenue_eta_hours="2-4" (after A1 ok).
+Success: reliable send pipeline with compliance; deliverables written.
+Rollout and First-Dollar Path (for context; do not execute)
+
+Order of activation to start revenue:
+A1 scholar_auth → enables everything (ETA 0.5–2h)
+A2 scholarship_api → enables reads/writes (ETA 2–5h after A1)
+A5 student_pilot → first B2C dollar via credits (ETA 2–6h after A1 + A2)
+A6 provider_register → first B2B dollar via 3% fee (ETA 3–6h after A1 + A2 writes)
+A7 auto_page_maker → accelerates organic acquisition (ETA 2–4h after A2 reads)
+A8 auto_com_center → lifecycle comms (ETA 2–4h after A1)
+A3 scholarship_agent → orchestrates growth at scale (ETA 4–8h after A2/A7/A8)
+A4 scholarship_sage → continuous KPI protection (ETA 2–4h)
+Agent3 Completion Criteria (all apps)
+
+/canary returns 9 fields with your app_name and your exact app_base_url.
+status is set correctly: "ok" when dependencies are live; "degraded" with writes disabled when auth/JWKS is unreachable and your policy dictates.
+SLOs and headers verified; CORS equals the exact 8 origins.
+RBAC and scopes enforced; Idempotency-Key works; events emitted.
+Both deliverables are written with the handshake line and current /canary payload.
+revenue_role and revenue_eta_hours are included in /canary and in the readiness report.
+End of Prompt
