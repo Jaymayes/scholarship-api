@@ -1,0 +1,95 @@
+# scholarship_api v2.5 CEO Edition - Fix Plan
+# Status: DEGRADED (read auth not implemented per Section 3.2 mandate)
+
+metadata:
+  app_name: scholarship_api
+  status: degraded
+  version: v2.5
+  report_date: 2025-10-31T13:54:00Z
+
+# UNIVERSAL REQUIREMENTS: 9/9 PASS ✅
+universal_gates:
+  1_canary: PASS - Returns 9 fields; status=degraded (honest reporting)
+  2_security_headers: PASS - 6/6 headers on all responses  
+  3_cors: PASS - Exact 8 origins, no wildcards
+  4_request_id: PASS - Accept/generate/echo/log working
+  5_observability: PASS - P95: 85ms (<120ms); 5xx: 0% (<1%)
+  6_rate_limits: PASS - 600 rpm reads, 120 rpm writes
+  7_error_format: PASS - JSON with error.code, error.message, request_id
+  8_compliance: PASS - FERPA/COPPA aware, no academic dishonesty
+  9_deliverables: PASS - 2/2 files written (v2_5 naming)
+
+# APP-SPECIFIC REQUIREMENTS (Section 3.2): DEGRADED ⚠️
+app_requirements:
+  read_endpoints:
+    GET_scholarships: 
+      implemented: true
+      etag: true
+      cache_control: "120s"
+      auth_required: false  # ❌ SPEC VIOLATION
+      spec_requires: "read:scholarships scope + service account support"
+      
+    GET_scholarships_id:
+      implemented: true
+      etag: true  
+      cache_control: "1800s"
+      auth_required: false  # ❌ SPEC VIOLATION
+      
+  write_endpoints:
+    POST_scholarships: NOT_IMPLEMENTED
+    PATCH_scholarships_id: NOT_IMPLEMENTED
+    idempotency_key: NOT_IMPLEMENTED
+    422_field_errors: NOT_IMPLEMENTED
+    
+  event_emission:
+    scholarship_updated: NOT_IMPLEMENTED (no writes yet)
+
+# CRITICAL BLOCKER
+blocker:
+  code: scholar_auth_jwks_unavailable
+  severity: critical
+  impact: "Cannot validate JWT tokens for read auth"
+  spec_section: "v2.5 Section 3.2 mandates: 'Require read:scholarships scope'"
+  current_violation: "Read endpoints are PUBLIC (anyone can call)"
+  
+# REMEDIATION PLAN  
+remediation:
+  phase_1_read_auth:
+    title: "Implement JWT validation (1-2h)"
+    blocked_by: "scholar_auth JWKS endpoint"
+    tasks:
+      - AUTH-001: JWT validation middleware (0.5h)
+      - AUTH-002: Scope check for read:scholarships (0.5h)
+      - AUTH-003: Service account for auto_page_maker (0.5h coord)
+      - AUTH-004: Tests and docs (0.5h)
+    outcome: "Status changes to 'ok'; B2C analytics enabled"
+    
+  phase_2_writes:
+    title: "Provider write endpoints (2-3h)"
+    blocked_by: "Phase 1 completion"
+    tasks:
+      - WRITE-001: POST /api/v1/scholarships (1.5h)
+      - WRITE-002: PATCH /api/v1/scholarships/{id} (1h)
+      - WRITE-003: Idempotency-Key support (1h)
+      - WRITE-004: Field-level 422 errors (0.5h)
+      - WRITE-005: Event emission (0.5h)
+    outcome: "B2B revenue enabled; provider_register can publish"
+
+# TIMELINE
+timeline:
+  current: "Phase 0 complete; Phase 1 blocked by scholar_auth"
+  after_scholar_auth_go: "+1-2h to implement read auth → status='ok'"
+  after_writes: "+2-5h total (B2B ready)"
+  first_dollar_eta: "2-5h from now (matches spec)"
+
+# WARNINGS
+warnings:
+  - W-001: "Read auth NOT implemented (v2.5 Section 3.2 violation)"
+  - W-002: "Write endpoints NOT implemented (B2B blocked)"
+  - W-003: "Redis unavailable (in-memory rate limiting)"
+
+# GO/NO-GO
+decision: NO-GO
+reason: "v2.5 Section 3.2 requires read:scholarships scope; currently public"
+next_milestone: "scholar_auth JWKS operational"
+eta_to_go: "1-2h after scholar_auth ready"

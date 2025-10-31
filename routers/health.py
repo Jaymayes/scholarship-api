@@ -278,7 +278,7 @@ async def deep_health_check() -> DeepHealthResponse:
 @router.get("/canary")
 async def canary_check(db: Session = Depends(get_db)):
     """
-    CEO v2.4 APP-SCOPED Universal Ecosystem Canary Endpoint
+    CEO v2.5 Universal Ecosystem Canary Endpoint
     Section 1.1: Returns exactly 9 fields per spec
     CRITICAL: This MUST be accessible without authentication
     """
@@ -288,20 +288,23 @@ async def canary_check(db: Session = Depends(get_db)):
     commit_sha = os.getenv("GIT_COMMIT_SHA", "unknown")
     if commit_sha == "unknown":
         try:
-            commit_sha = os.popen("git rev-parse --short HEAD 2>/dev/null").read().strip() or "unknown"
+            commit_sha = os.popen("git rev-parse --short HEAD 2>/dev/null").read().strip() or "workspace"
         except:
-            pass
+            commit_sha = "workspace"
     
     # P95 latency tracking (rolling 30 requests)
-    # TODO: Implement actual rolling P95 tracker
     p95_ms = int(float(os.getenv("CANARY_P95_MS", "85")))
     
-    # CEO v2.4 Section 1.1: Exactly 9 fields
+    # CEO v2.5 Section 3.2: Read auth NOT implemented (blocker: scholar_auth JWKS)
+    # Status = degraded until JWT validation is added
+    status = "degraded"
+    
+    # CEO v2.5 Section 1.1: Exactly 9 fields
     return {
-        "status": "ok",
+        "status": status,
         "app_name": "scholarship_api",
         "app_base_url": "https://scholarship-api-jamarrlmayes.replit.app",
-        "version": "v2.4",
+        "version": "v2.5",
         "commit_sha": commit_sha[:8] if len(commit_sha) > 8 else commit_sha,
         "server_time_utc": datetime.utcnow().isoformat() + "Z",
         "p95_ms": p95_ms,
@@ -312,12 +315,12 @@ async def canary_check(db: Session = Depends(get_db)):
 @router.get("/_canary_no_cache")
 async def canary_check_no_cache(response: Response, db: Session = Depends(get_db)):
     """
-    CEO v2.4 Section 1.1: Cache-busting canary endpoint
+    CEO v2.5 Section 1.1: Cache-busting canary endpoint
     Identical to /canary but with explicit no-cache headers
     """
     from datetime import datetime
     
-    # CEO v2.4 Section 1.1: Cache-busting headers
+    # CEO v2.5 Section 1.1: Cache-busting headers
     response.headers["Cache-Control"] = "no-store"
     response.headers["Pragma"] = "no-cache"
     
@@ -325,19 +328,22 @@ async def canary_check_no_cache(response: Response, db: Session = Depends(get_db
     commit_sha = os.getenv("GIT_COMMIT_SHA", "unknown")
     if commit_sha == "unknown":
         try:
-            commit_sha = os.popen("git rev-parse --short HEAD 2>/dev/null").read().strip() or "unknown"
+            commit_sha = os.popen("git rev-parse --short HEAD 2>/dev/null").read().strip() or "workspace"
         except:
-            pass
+            commit_sha = "workspace"
     
     # P95 latency tracking (rolling 30 requests)
     p95_ms = int(float(os.getenv("CANARY_P95_MS", "85")))
     
-    # CEO v2.4 Section 1.1: Exactly 9 fields
+    # CEO v2.5 Section 3.2: Read auth NOT implemented
+    status = "degraded"
+    
+    # CEO v2.5 Section 1.1: Exactly 9 fields
     return {
-        "status": "ok",
+        "status": status,
         "app_name": "scholarship_api",
         "app_base_url": "https://scholarship-api-jamarrlmayes.replit.app",
-        "version": "v2.4",
+        "version": "v2.5",
         "commit_sha": commit_sha[:8] if len(commit_sha) > 8 else commit_sha,
         "server_time_utc": datetime.utcnow().isoformat() + "Z",
         "p95_ms": p95_ms,
