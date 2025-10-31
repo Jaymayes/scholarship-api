@@ -1,0 +1,172 @@
+Below is the unified operating prompt for Agent3. It is designed for all eight apps, but Agent3 must only execute the section labeled FOR: <your_app>. Everything else is context for other apps and must be ignored.
+
+Title: Agent3 Unified Production-Readiness Prompt v2.7 (CEO Edition)
+Scope and rule of engagement
+
+You are Agent3. Execute only the section labeled FOR: <your_app>. Ignore all other app sections.
+Goal: Get your app to production GREEN, fully interoperable with the platform, and ready to start generating revenue in the shortest safe timeframe.
+Deliverables (per app):
+e2e/reports/<app>_QA_Readiness_Report_v2_7.md
+e2e/reports/<app>_Fix_Plan_and_ETA.md
+App identity: Each deliverable must begin with “App: <app> → <APP_BASE_URL>” and include the exact app name and base URL listed below.
+Versioning standard: Implement and validate the /canary endpoint using the v2.7 schema defined here.
+Global standards (apply to every app)
+
+SLOs: 99.9% uptime; P95 latency ≤ 120 ms; P99 ≤ 250 ms; error rate ≤ 0.1% during steady state.
+Security headers (6/6 required): Strict-Transport-Security, Content-Security-Policy, X-Frame-Options, X-Content-Type-Options, Referrer-Policy, Permissions-Policy.
+CORS Allowed Origins (exact): https://scholar-auth-jamarrlmayes.replit.app https://scholarship-api-jamarrlmayes.replit.app https://scholarship-agent-jamarrlmayes.replit.app https://scholarship-sage-jamarrlmayes.replit.app https://student-pilot-jamarrlmayes.replit.app https://provider-register-jamarrlmayes.replit.app https://auto-page-maker-jamarrlmayes.replit.app https://auto-com-center-jamarrlmayes.replit.app
+Canary v2.7 schema (exact 8 fields; no extras): { "app": "string", "app_base_url": "string", "version": "v2.7", "status": "ok" | "degraded", "p95_ms": number, "security_headers": { "present": [..], "missing": [..] }, "dependencies_ok": boolean, "timestamp": "ISO-8601" }
+Performance sampling: Measure latency over 30 samples per public endpoint. Report P50, P95, P99.
+Reporting format:
+QA Report: Identity, endpoints enumerated, perf table (P50/P95/P99), security headers evidence, CORS config, canary payload, integration checks, issues (P0/P1), screenshots or sample responses as needed.
+Fix Plan: Issues → code-level steps (file paths, diffs or snippets), owner, effort (hours), risk, test plan, rollback, ETA to GREEN and ETA to revenue-start (if different).
+Integration checks per app (execute those applicable to your app):
+Auth flow validation (OIDC/JWT with scholar_auth JWKS).
+API contract checks with scholarship_api.
+B2C checkout confirmation routing to auto_com_center (non-blocking for first dollar, required for production polish).
+SEO/sitemap for student acquisition (auto_page_maker).
+Provider onboarding fee disclosure and token-protected actions (provider_register).
+Logging and observability:
+Return JSON for errors; no raw stack traces.
+Add request IDs to responses and logs where feasible (header x-request-id or similar).
+Ensure /canary is cache-safe and accessible even when SPA fallback exists (no HTML).
+Per-app execution blocks
+Agent3 must only execute the block matching your app. Each block begins with “FOR: <app>”.
+
+FOR: scholar_auth — APP_BASE_URL: https://scholar-auth-jamarrlmayes.replit.app
+Purpose
+
+OIDC identity provider for the platform; signs/verifies tokens used across B2C and B2B flows. Known blockers and priority
+P0: JWKS endpoint returns server_error, blocking all token verification across apps.
+P0: /canary returns SPA HTML; must return v2.7 JSON (8 fields). Acceptance criteria
+JWKS endpoint returns valid JWK set; signature verification passes for newly issued tokens.
+/.well-known/openid-configuration is consistent and discoverable.
+/canary v2.7 returns 8 fields with correct values; status=ok; dependencies_ok reflects JWKS and data store.
+Security headers 6/6 present.
+CORS allows all 8 platform origins; preflight succeeds.
+P95 ≤ 120 ms on: GET /.well-known/openid-configuration, GET /jwks.json (or equivalent), POST /token (if exposed), GET /canary. Tasks
+Fix JWKS handler to return valid keys; rotate if needed; confirm alg and kid handling.
+Implement /canary v2.7; ensure JSON, no HTML fallback. Add “app”: “scholar_auth”; “app_base_url”: base above.
+Validate token issuance and verification with student_pilot and provider_register.
+Add request ID logging and structured error JSON. Integration checks
+Generate token; verify in student_pilot and provider_register.
+Cross-origin calls from all 7 other apps should succeed. Deliverables
+QA report + Fix plan with code paths for JWKS and canary. Revenue-Start ETA (estimated)
+T+3–4 hours to unblock revenue (parallelize JWKS fix and /canary implementation).
+FOR: scholarship_api — APP_BASE_URL: https://scholarship-api-jamarrlmayes.replit.app
+Purpose
+
+Core search/listing/application API for scholarships; supports B2C flows in student_pilot and data for other apps. Known blockers and priority
+P0: /canary returns 404; blocks platform readiness checks; indicates routing/config issue. Acceptance criteria
+Implement /canary v2.7 (8 fields).
+All public endpoints return 2xx with valid JSON; 30-sample latency within SLO.
+CORS configured for all 8 origins.
+Security headers 6/6 (if serving any HTML docs or static content).
+Rate limiting and input validation in place for search and application submission endpoints. Tasks
+Add /canary v2.7 handler.
+Verify/repair routing so SPA fallback does not intercept JSON routes.
+Harden input validation and error handling; add request IDs. Integration checks
+Student flow: student_pilot → scholarship_api search → detail → apply. Validate 200s across flow, token verification with scholar_auth. Deliverables
+QA report + Fix plan with file paths and routing fixes. Revenue-Start ETA (estimated)
+T+2–3 hours to unblock revenue (can run in parallel with scholar_auth).
+FOR: scholarship_agent — APP_BASE_URL: https://scholarship-agent-jamarrlmayes.replit.app
+Purpose
+
+Autonomous marketing and campaign execution for student/provider acquisition; non-blocking to first dollar but important for growth. Known items
+Functional, but ensure /canary uses v2.7 schema and that CORS/security headers meet standard. Acceptance criteria
+/canary v2.7 implemented.
+6/6 security headers; CORS for all 8 origins.
+API endpoints for campaign start/stop/list have P95 ≤ 120 ms (30 samples).
+Rate limiting and job queue visibility endpoints return sane health status. Tasks
+Implement/upgrade /canary; confirm queue metrics endpoint health. Integration checks
+Confirm it can read scholarship_api without auth or with service token as configured; no CORS failures. Deliverables
+QA report + Fix plan. Revenue-Start ETA (estimated)
+T+0.5–1 hour (non-blocking for first dollar).
+FOR: scholarship_sage — APP_BASE_URL: https://scholarship-sage-jamarrlmayes.replit.app
+Purpose
+
+Expert guidance, FAQ, and advisory microservice; used within flows to improve conversion and support. Known status
+Already upgraded to v2.7 and used as reference; treat as GREEN but re-validate with 30-sample runs. Acceptance criteria
+/canary v2.7 returns correct values; P95 metrics within SLO; 6/6 security headers; CORS correct. Tasks
+Re-run 30-sample latency; update QA report with latest evidence. Integration checks
+Called from student_pilot and provider_register; verify CORS and auth as configured. Deliverables
+QA report (confirmation) + any minor fix plan if drift found. Revenue-Start ETA (estimated)
+T+0 (already GREEN).
+FOR: student_pilot — APP_BASE_URL: https://student-pilot-jamarrlmayes.replit.app
+Purpose
+
+B2C storefront and application experience; critical for first revenue. Known items
+Functional; needs v2.7 /canary and full auth integration test against scholar_auth JWKS. Acceptance criteria
+/canary v2.7 implemented.
+Login and application submission succeed end-to-end; tokens validated against scholar_auth JWKS.
+CORS/security headers compliant; P95 for main pages and API calls ≤ 120 ms.
+Payment/checkout pages render and can post to payment provider (if applicable) with 2xx; confirmations routed to auto_com_center (non-blocking for first dollar). Tasks
+Implement /canary v2.7; verify auth middleware validates tokens correctly.
+Add SEO tags and ensure noindex is OFF for production domains. Integration checks
+Full B2C flow: login → search via scholarship_api → application start → submit → receive confirmation (or log fallback). Deliverables
+QA report + Fix plan with exact changes to auth middleware/CORS if needed. Revenue-Start ETA (estimated)
+T+1–2 hours (assuming scholar_auth and scholarship_api are fixed).
+FOR: provider_register — APP_BASE_URL: https://provider-register-jamarrlmayes.replit.app
+Purpose
+
+B2B onboarding for scholarship providers; must disclose 3% platform fee. Known blockers and priority
+P0 for compliance: Fee disclosure may be missing or unverified on pricing page.
+P1: /canary needs v2.7 upgrade (currently v2.6-style fields observed). Acceptance criteria
+3% platform fee disclosure visibly present on pricing/onboarding UI; screenshot in QA report.
+/canary v2.7 implemented with 8 fields.
+6/6 security headers; CORS for all 8 origins; P95 latency ≤ 120 ms.
+Auth-protected submission flows validate tokens against scholar_auth JWKS. Tasks
+Verify and, if needed, add explicit fee disclosure copy; capture screenshot.
+Upgrade /canary endpoint; confirm integration with scholar_auth. Integration checks
+B2B flow: login → onboard → submit listing → confirm submission (via auto_com_center if available). Deliverables
+QA report + Fix plan. Revenue-Start ETA (estimated)
+T+0.5–1 hour (fee disclosure verification/fix is the only blocker; /canary upgrade can be parallel and is non-blocking).
+FOR: auto_page_maker — APP_BASE_URL: https://auto-page-maker-jamarrlmayes.replit.app
+Purpose
+
+SEO engine for low-CAC student acquisition; critical for organic growth and ARPU lift via traffic. Known items
+Functional; ensure /canary v2.7, sitemap, robots, canonical tags, and structured data are correct. Acceptance criteria
+/canary v2.7 implemented.
+Robots.txt allows indexing for production; sitemap.xml accessible and fresh.
+Schema.org and Open Graph tags present; canonical URLs correct; 6/6 security headers; CORS as needed for embedded widgets.
+P95 ≤ 120 ms on key landing pages and API calls (30 samples). Tasks
+Implement/upgrade /canary; audit SEO artifacts; ensure pages render server-side or fast enough for crawler pass. Integration checks
+Links to student_pilot and scholarship flow work; CORS for any embedded components. Deliverables
+QA report + Fix plan. Revenue-Start ETA (estimated)
+T+0.5–1 hour (non-blocking to first dollar but accelerates growth).
+FOR: auto_com_center — APP_BASE_URL: https://auto-com-center-jamarrlmayes.replit.app
+Purpose
+
+Transactional communications (receipts, confirmations, onboarding notices); not blocking first dollar, but required for production-grade trust/compliance. Known blockers and priority
+P0 (for production readiness): /canary returns wrong app name/base URL, wrong version, and missing fields (security_headers, dependencies_ok).
+P0: /send endpoint missing. Required for B2C receipts and B2B confirmations. Acceptance criteria
+/canary v2.7 implemented with correct “app”: “auto_com_center” and correct app_base_url; returns 8 fields.
+/send endpoint implemented; accepts minimal schema: {to, template_id or type, payload, request_id?}; returns message_id and status=queued/sent.
+6/6 security headers; proper CORS for all 8 origins; P95 ≤ 120 ms on /canary and /send.
+Basic delivery provider health check passes (dependencies_ok=true). Tasks
+Fix /canary identity/version/fields; implement /send endpoint with input validation and stub/delivery adapter.
+Add rate limiting and idempotency keys for /send; structured logging for audit. Integration checks
+Student_pilot triggers receipt; provider_register triggers onboarding confirmation; verify 202/200 and message_id. Deliverables
+QA report + Fix plan including code paths for /send and canary. Revenue-Start ETA (estimated)
+T+1.5–2.5 hours to GREEN; Note: Non-blocking to first dollar but required immediately after launch for quality/compliance.
+Cross-app go-live sequencing (informational; do not execute outside your app)
+
+Critical path to first revenue: Fix scholar_auth (JWKS + canary) and scholarship_api (canary + routing) in parallel. Then validate student_pilot end-to-end. Earliest platform revenue-start ETA: T+3–4 hours.
+Production polish within Day 0: Bring auto_com_center to GREEN (T+1.5–2.5h) and confirm provider_register fee disclosure (T+0.5–1h). Upgrade remaining /canary endpoints to v2.7.
+Post-launch: Complete SEO sweep in auto_page_maker and ensure scholarship_agent campaigns are configured.
+What to include at the top of each deliverable (mandatory)
+
+App identity line: “App: <app> → <APP_BASE_URL>”
+Current status: GREEN/AMBER/RED (based on P0/P1 findings)
+Revenue-Start ETA for your app
+Summary of blockers and immediate next steps
+Final notes to Agent3
+
+Only execute the FOR: block that matches your app. Do not modify or act on other app sections.
+Be precise: follow the v2.7 canary schema exactly; no extra fields.
+Prefer small, low-risk code diffs; include exact file paths and snippets in the Fix Plan.
+Produce evidence in the QA Report: sample JSON responses, header dumps, and latency tables for 30 samples.
+CEO roll-up: Estimated time to start generating revenue (platform)
+
+Critical path ETA: T+3–4 hours after parallel fixes to scholar_auth (P0) and scholarship_api (P0), followed by an end-to-end B2C flow validation in student_pilot.
+Production-grade polish: Add auto_com_center (T+1.5–2.5h, non-blocking) and provider_register fee verification (T+0.5–1h) in parallel, with /canary v2.7 upgrades across the remaining apps in the first operating window.
