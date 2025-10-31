@@ -1,0 +1,58 @@
+GO. Proceed with Option A.
+
+Rationale
+
+This is a low-risk, non-destructive validation that exercises real production state with GET/HEAD/OPTIONS only, aligned with best practice to validate end-to-end behavior in a production-like environment without write operations .
+While our governance playbook favors sandbox/staging first for higher-risk changes, a read-only probe in production is appropriate here; we will follow with deeper write-path checks in a private environment if needed .
+Targets (confirming your list)
+
+scholar_auth → https://scholar-auth-jamarrlmayes.replit.app
+scholarship_api → https://scholarship-api-jamarrlmayes.replit.app (v2.6)
+scholarship_agent → https://scholarship-agent-jamarrlmayes.replit.app
+scholarship_sage → https://scholarship-sage-jamarrlmayes.replit.app
+student_pilot → https://student-pilot-jamarrlmayes.replit.app
+provider_register → https://provider-register-jamarrlmayes.replit.app
+auto_page_maker → https://auto-page-maker-jamarrlmayes.replit.app
+auto_com_center → https://auto-com-center-jamarrlmayes.replit.app
+Environment direction
+
+Option A now: Production URLs, strictly read-only (GET/HEAD/OPTIONS).
+Option C later (as needed): Run deeper, write-path checks for scholarship_api on localhost and/or a gated staging once provisioned.
+Staging status and access
+
+No separate staging URLs or credentials are provisioned for this run. If the read-only probe surfaces issues that require write-path validation, I’ll authorize a private staging deployment immediately afterward. This sequence adheres to our phased rollout stance for higher-risk testing .
+Execution constraints and guardrails
+
+Allowed methods: GET, HEAD, OPTIONS only.
+Rate limits: ≤1 RPS per app with short bursts; cap at 200 requests/app for the run.
+Window: Off-peak hours.
+Headers: Use User-Agent: ScholarAI-Agent3-E2E/1.0 and add X-Scholar-Validation: Agent3-E2E-<timestamp> to every request.
+Auth-only pages: Do not submit forms or attempt login. If a resource requires an authenticated GET, skip in production.
+Health checks: Where available, probe explicit health/status endpoints (e.g., /health, /status) to confirm liveness/readiness without side effects .
+SEO checks (Auto Page Maker): Validate robots.txt, sitemap.xml, canonical/meta tags, 200/304 responses, and crawlability. No page creation in production.
+Security headers: Record presence of standard headers and CORS configuration to surface any misconfigurations for follow-up in staging .
+No scraping of PII. Do not invoke any action that could send emails or notifications.
+Synthetic accounts
+
+For this production read-only pass, do not create or use accounts. If you uncover a need to authenticate for a GET-only check, pause and request a preissued read-only token; otherwise defer to the follow-on staging pass.
+Agent3 prompt overrides for this task
+
+Non-destructive mode: “Only perform GET/HEAD/OPTIONS; never mutate state.”
+Throttle and identify: “Honor rate limits, include the specified headers, and operate off-peak.”
+Skip auth flows: “Do not log in, register, or submit forms.”
+Evidence capture: “Record endpoint, status code, response time, selected headers, and a 1–2 line interpretation per check.”
+Health-first discovery: “Prefer explicit health/status endpoints; do not spider dynamic links beyond top-level and documented resources.”
+Security/observability hints: “Capture CORS, cache-control, and security headers; note presence of /health and any anomalies for follow-up” .
+Success criteria and deliverables (48 hours)
+
+Availability and latency snapshot vs our SLOs: report p50/p95 latencies per app and note any errors/timeouts. System-level end-to-end checks in a production-like environment are the goal for this phase .
+SEO readiness for Auto Page Maker: robots, sitemap, canonical/meta, and crawlability findings.
+Security and configuration flags: notable header/CORS gaps, missing health endpoints, or misconfigurations to address in staging next .
+E2E summary: pass/fail per app, prioritized defect list, proposed next actions (including any tests to move to staging with write paths).
+Confirming your questions
+
+Environments: Use the 8 production URLs above. No staging links or credentials for this pass.
+Credentials: None required or provided for Option A. Pause if you hit an authenticated GET requirement.
+Synthetic account rules: Not applicable for this read-only phase; no account creation or form submissions in production.
+Agent3 prompt: Apply the overrides listed above.
+If you need anything else before kickoff, say the word. Otherwise, proceed now and send me the test plan outline and execution window; I’ll greenlight on the spot.
