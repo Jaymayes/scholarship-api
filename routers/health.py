@@ -300,12 +300,12 @@ async def canary_check(db: Session = Depends(get_db)):
     # Note: Reads are public per A2 policy ("JWT optional")
     status = "degraded"
     
-    # CEO v2.5 Section 1.1: Exactly 9 fields
+    # CEO v2.6 U1: Exactly 9 fields
     return {
         "status": status,
         "app_name": "scholarship_api",
         "app_base_url": "https://scholarship-api-jamarrlmayes.replit.app",
-        "version": "v2.5",
+        "version": "v2.6",
         "commit_sha": commit_sha[:8] if len(commit_sha) > 8 else commit_sha,
         "server_time_utc": datetime.utcnow().isoformat() + "Z",
         "p95_ms": p95_ms,
@@ -339,12 +339,12 @@ async def canary_check_no_cache(response: Response, db: Session = Depends(get_db
     # CEO v2.5 A2: Writes disabled due to JWKS unavailability
     status = "degraded"
     
-    # CEO v2.5 Section 1.1: Exactly 9 fields
+    # CEO v2.6 U1: Exactly 9 fields
     return {
         "status": status,
         "app_name": "scholarship_api",
         "app_base_url": "https://scholarship-api-jamarrlmayes.replit.app",
-        "version": "v2.5",
+        "version": "v2.6",
         "commit_sha": commit_sha[:8] if len(commit_sha) > 8 else commit_sha,
         "server_time_utc": datetime.utcnow().isoformat() + "Z",
         "p95_ms": p95_ms,

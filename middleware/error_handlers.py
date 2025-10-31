@@ -200,7 +200,7 @@ async def not_found_handler(request: Request, exc: HTTPException) -> JSONRespons
 
     logger.info(
         f"Resource not found: {request.method} {request.url.path}",
-        extra={"trace_id": error_response["trace_id"]}
+        extra={"request_id": error_response["error"]["request_id"]}
     )
 
     return JSONResponse(status_code=404, content=error_response)
