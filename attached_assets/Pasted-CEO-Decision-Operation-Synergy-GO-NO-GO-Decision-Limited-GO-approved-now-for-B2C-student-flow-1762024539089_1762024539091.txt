@@ -1,0 +1,93 @@
+CEO Decision: Operation Synergy GO/NO‑GO
+
+Decision
+
+Limited GO approved now for B2C student flows only, contingent on a 2-hour manual E2E validation of student_pilot.
+NO‑GO for B2B provider flows until provider_register meets SLOs and dependency health.
+auto_com_center remains in DRY‑RUN (DISABLE_SEND=true) until B2C validation is complete and error rates are confirmed below thresholds.
+Why this decision supports the 5‑year plan
+
+Prioritizes low-CAC, SEO-driven growth via auto_page_maker while protecting brand and provider trust.
+Preserves near-term B2C revenue and data flywheel for the matching engine.
+Avoids compromising the 3% platform-fee engine with a degraded provider experience.
+Immediate Orders and Deadlines
+
+B2C activation (Owner: Frontend DRI – student_pilot)
+Deadline: 2 hours from now
+Actions:
+Manual E2E validation: login → profile CRUD → search (scholarship_api) → recommendations (scholarship_sage) → submit application → status tracking.
+Evidence to war-room:
+Screenshots + HAR file
+P50/P95 latency for each hop (≥30 samples), target P95 ≤120 ms
+Success rate ≥98%, zero CORS/auth errors
+Exit criteria to flip auto_com_center from DRY‑RUN to SEND:
+student_pilot E2E pass
+auto_com_center queue idempotency proof and unsubscribe/opt-out confirmed
+Error rate <1% over ≥30 messages in DRY‑RUN
+If criteria met: Comms DRI may enable SEND for B2C transactional emails only; keep promotional sends off.
+2. provider_register remediation (Owner: Provider Lead)
+
+Deadline: 24 hours to GREEN
+SLOs and proofs required:
+P95 latency ≤120 ms (≥30 samples)
+dependencies_ok=true with explicit dependency checklist
+RBAC isolation: cross-tenant access returns 403 (evidence: test matrix)
+3% platform fee: disclosure visible; accrual logs ON and verified
+Standardized JSON errors + 6/6 security headers
+Post-fix validation:
+Canary deploy → smoke test → production gate with evidence in war-room
+If not GREEN by 24 hours: escalate with rollback/temporary feature flag plan and revised ETA.
+3. scholarship_agent config fix (Owner: Agent Lead)
+
+Deadline: 2 hours
+Actions:
+Correct APP_BASE_URL to production
+Verify M2M auth with scholar_auth (SystemService role)
+Confirm events emitted → consumed by auto_com_center (still DRY‑RUN)
+Provide retry/circuit-breaker evidence and 200/401/403 auth matrix
+4. Security and compliance guardrails (All DRIs)
+
+Maintain 6/6 security headers, rate limiting, strict CORS, robust password hashing
+Confirm JWKS endpoint health and token validation across services
+FERPA/COPPA and CAN‑SPAM/GDPR controls: re-verify opt-out, data-minimization, audit logs
+No black-box decisions; standardized error responses in place
+Gate Plan and SLAs
+
+Gate 1: scholar_auth – GREEN (acknowledged by Ops; if state changes, immediate rollback to last stable)
+Gate 2: scholarship_api – GREEN (acknowledged; maintain P95 ≤120 ms, standardized errors)
+Gate 3: Partial GREEN
+B2C: Pending 2-hour manual E2E → then GO
+B2B: NO‑GO until provider_register GREEN
+Evidence and Reporting
+
+Section 7 reports: All 8 applications must resubmit or confirm final reports at T+60 from this decision, using the mandatory format, including lifecycle and revenue cessation analysis, and an operational readiness declaration.
+Comms DRI evidence bundle for auto_com_center at Gate 3:
+Performance: queue depth, ≥30-sample P95 enqueue/dequeue <120 ms
+Functionality: idempotency proof, unsubscribe/opt-out journey
+Security: 6/6 headers, zero-send proof in DRY‑RUN
+Compliance: CAN‑SPAM/GDPR + FERPA/COPPA verification
+KPI Tracking (post‑launch B2C)
+
+Daily dashboard (Owner: Growth Ops; start T+1):
+Student acquisition: visits → signups → verified profiles
+Free→paid conversion and ARPU (credit sales)
+Recommendation engagement rate and application starts/submits
+Latency P50/P95 per hop; error rate; comms deliverability (when SEND enabled)
+B2B (held): providers onboarded, active listings/provider, fee accrual once GREEN
+Risk Controls and Rollback
+
+If P95 latencies exceed 120 ms or error rate >2% for 15 consecutive minutes, execute automatic partial rollback (keep read paths up, pause write-heavy operations and comms SEND).
+Comms kill-switch remains available to instantly revert to DRY‑RUN.
+Capital Allocation
+
+Pre-approved: engineering focus for provider_register remediation and load/perf testing; no paid acquisition until student_pilot validation passes and SEO crawl budget is confirmed healthy.
+Next Checkpoints
+
+T+2 hours: B2C E2E validation decision post
+T+24 hours: provider_register remediation status; decision on B2B GO
+T+60 minutes from this memo: All Section 7 reports updated and filed
+Final
+
+Limited GO for B2C is authorized now, subject to the 2-hour E2E validation exit criteria above.
+B2B remains NO‑GO until provider_register meets SLOs and evidence is posted.
+Execute with urgency and post evidence to the war-room as specified.
