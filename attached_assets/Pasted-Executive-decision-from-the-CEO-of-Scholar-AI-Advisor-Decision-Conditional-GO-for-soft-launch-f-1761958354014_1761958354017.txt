@@ -1,0 +1,101 @@
+Executive decision from the CEO of Scholar AI Advisor
+
+Decision: Conditional GO for soft launch (first 10–20 customers), contingent on public production verification across three gates within 60 minutes:
+
+scholar_auth: JWKS must return valid RS256 JWKs at https://scholar-auth-jamarrlmayes.replit.app/.well-known/jwks.json
+scholarship_api: /canary must return v2.7 JSON (8 fields) at https://scholarship-api-jamarrlmayes.replit.app/canary
+student_pilot: End-to-end OIDC login, profile load, and recommendations request must succeed on production URLs
+Why conditional: Several verifications you shared were localhost-only. I need proof from the public app_base_url endpoints before we flip on external traffic. Once those three pass, proceed with the limited soft launch using auto_com_center in dry-run/manual fallback mode.
+
+Immediate actions and owners
+
+Auth (scholar_auth) – DRI: Auth Lead
+
+Target: JWKS GREEN on public URL in ≤30 minutes.
+Do now:
+Force production rebuild and invalidate cache in Replit Deployments.
+If cache persists >15 minutes, create a new production deployment (fresh URL), publish, and immediately propagate the new JWKS URL to all services (scholarship_api, scholarship_sage, student_pilot, provider_register, auto_com_center, scholarship_agent).
+Verify: curl -s https://scholar-auth-jamarrlmayes.replit.app/.well-known/jwks.json | jq . Must return “keys” array with kid, kty=“RSA”, alg=“RS256”, use=“sig”, n, e.
+Acceptance: 200 OK, valid JSON; no HTML, no redirects, no 5xx.
+API (scholarship_api) – DRI: API Lead
+
+Target: Publish v2.7 to production in ≤15 minutes.
+Verify:
+Canary schema: curl -s https://scholarship-api-jamarrlmayes.replit.app/canary | jq . Expected 8 fields exactly: app, app_base_url, version, status, p95_ms, security_headers, dependencies_ok, timestamp; version="v2.7"; status="ok".
+Security headers: curl -I https://scholarship-api-jamarrlmayes.replit.app/canary Expect 6/6: HSTS, CSP, X-Frame-Options, X-Content-Type-Options, Referrer-Policy, Permissions-Policy.
+RBAC spot-checks return 401/403 on protected routes without valid JWT.
+Acceptance: All pass; HTTP 200 on /canary.
+Student Pilot (student_pilot) – DRI: Frontend Lead
+
+Target: Smoke E2E success in ≤30 minutes after Auth/API green.
+Verify:
+Login → callback → session established (HttpOnly cookie or secure storage) and /api/auth/user=200.
+Scholarship list renders via scholarship_api.
+Recommendations fetched from scholarship_sage and displayed.
+Basic accessibility: no blocking contrast or keyboard traps on primary paths.
+Metrics to capture and post: page load (ttfb), API p95, auth success rate.
+Scholarship Sage (scholarship_sage) – DRI: Sage Lead
+
+Status: Approved GREEN for participation.
+Actions:
+Stand by to serve recommendations for student_pilot smoke and soft launch.
+Prepare T+7d A/B experiment (essay-NLP signals) but do not enable during first 48 hours.
+Provider Register (provider_register) – DRI: B2B Portal Lead
+
+Status: Ready with caveats acknowledged.
+Action (T+2h): Reduce health-check timeouts to 500 ms and make dependency checks async so /canary p95 ≤120 ms.
+Begin limited B2B onboarding when Auth/API are GREEN; continue using production-billing page with 3% disclosure.
+Auto Page Maker (auto_page_maker) – DRI: SEO Lead
+
+Action (T+24h latest, prefer T+8h): Generate and publish 50 high-intent landing pages with schema.org metadata and canonical tags. Confirm trigger on new/updated scholarships from scholarship_api.
+Auto Com Center (auto_com_center) – DRI: Comms Lead
+
+Launch mode: Dry-run + manual fallback ON for first 10–20 customers.
+T+24h: Wire up transactional provider (e.g., Postmark/SendGrid), keep unsubscribe management verified, and start capturing bounce/complaint rates.
+Scholarship Agent (scholarship_agent) – DRI: Ops Automation Lead
+
+Action: Confirm M2M token with SystemService role; verify event emission to auto_com_center for “deadline approaching” and “new match” events with retry + circuit breaker.
+Verification to post back before GO
+
+Paste the exact outputs of these three commands (public URLs only):
+
+JWKS: curl -s https://scholar-auth-jamarrlmayes.replit.app/.well-known/jwks.json | jq .
+API canary: curl -s https://scholarship-api-jamarrlmayes.replit.app/canary | jq .
+Student Pilot auth check (after login, from browser devtools or a curl with session): GET https://student-pilot-jamarrlmayes.replit.app/api/auth/user ⇒ 200 with current user JSON
+If all pass, I authorize opening the soft launch funnel to the first cohort immediately.
+
+Soft launch guardrails (first 48 hours)
+
+SLOs
+Platform API p95 ≤120 ms; alert if >250 ms for 10 minutes.
+student_pilot auth success rate ≥98%.
+auto_com_center DLQ ≤1%; if exceeded for 10 minutes, pause outbound automations.
+Rollback triggers
+JWKS errors >2% across services or sustained 5xx on scholar_auth ≥5 minutes → Freeze new logins, serve status page, initiate hotfix.
+scholarship_api 5xx >1% or RBAC bypass detected → Disable write operations until fixed.
+Critical UX outage on student_pilot (login or dashboard) >5 minutes → Route to maintenance banner and restrict to read-only.
+Comms policy
+Keep auto_com_center in dry-run/manual fallback until T+24h metrics reviewed; no promotional sends; transactional only.
+Lifecycle and revenue cessation acceptance
+
+auto_com_center: Infrastructure, 5–7 years (accepted).
+provider_register: User-facing, 3–4 years (accepted).
+scholarship_sage: Intelligence/Automation, 2–3 years (accepted).
+scholarship_api: Infrastructure, 5–7 years (accepted once deployed).
+scholar_auth: Infrastructure, 5–7 years; reassess on OAuth/JWT standard shifts or PQC migration window.
+student_pilot and auto_page_maker: Submit Section 7 lifecycle analyses by EOD today, aligned to 3–4 years (UI) and 2–3 years (automation/SEO engine) respectively.
+KPIs to report during soft launch
+
+B2C: free→paid conversion, ARPU from credits, recommendation CTR, app-start to submission rate.
+B2B: active providers onboarded, listings created, applications per listing, 3% fee accrual.
+Reliability: per-app p95, uptime, error rates; DLQ size; auth failure rate.
+SEO: number of indexed landing pages, impressions, CTR (Auto Page Maker).
+Capital allocation and priorities (next 7 days)
+
+Priority 1: Organic growth. Auto Page Maker at full throttle (within safe indexing guidelines) to expand low-CAC acquisition.
+Priority 2: Harden Auth/API and finish latency optimizations to consistently hit ≤120 ms p95.
+Priority 3: Provider onboarding playbook and first invoices (ensure 3% fee visibility and SOC2-lite controls).
+Final note
+
+I will not authorize paid acquisition until we confirm organic conversion and unit economics for the first cohort.
+Act with urgency. Post the three public verification outputs above. If the auth cache issue persists beyond 15 minutes, execute the new-deployment URL fallback immediately. Once the three gates are GREEN on the public URLs, you have GO to begin revenue.
