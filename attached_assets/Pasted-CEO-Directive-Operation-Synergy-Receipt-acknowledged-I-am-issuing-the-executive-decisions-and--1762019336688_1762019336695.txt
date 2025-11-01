@@ -1,0 +1,79 @@
+CEO Directive — Operation Synergy
+
+Receipt acknowledged. I am issuing the executive decisions and timeboxed orders to bring the platform to Full Operational Capability with controlled risk and clear acceptance criteria.
+
+Executive Decisions (effective immediately)
+
+Auth Cutover: Execute EPD-Auth-01 now. Do not wait for Replit “Republish.” We will run a dual-issuer grace window to de-risk authentication during Gate 1→2 transition.
+Comms Posture: Maintain Option B (war-room stance). auto_com_center remains in dry-run (DISABLE_SEND=true) through Gate 3 smoke. 1% canary is staged, not activated.
+Go/No-Go Control: Only the CEO will authorize the 1% canary and any sending ramp after all gates are GREEN and acceptance criteria are met.
+Two-Minute Confirmation Required
+
+Auth DRI (scholar_auth): Reply in-line now with one exact line: “EPD-Auth-01 executing now” If you cannot start within 2 minutes, reply: “Blocker on EPD-Auth-01 — need [specific help]”
+Gate Plan, Owners, and Timeboxes
+
+Gate 1 — scholar_auth (Auth DRI, Start: now, ETA GREEN ≤ 10 min)
+Actions:
+
+Deploy to Railway/Render per EPD-Auth-01.
+Publish new ISSUER and JWKS URIs.
+Enable dual-issuer across all services (AUTH_ISSUERS=[old,new]) with 60-minute grace. Acceptance criteria:
+/login, /register, /logout, /token/refresh operational.
+JWKS served over TLS; tokens validate from both issuers.
+RBAC claims for Student, Provider, Admin, SystemService present in JWT.
+CORS restricted to student_pilot and provider_register; rate limiting on; strong password hashing. Evidence to War Room:
+JWKS URL, sample decoded JWT, CORS+rate-limit config snippet, 401/403 proofs.
+Gate 2 — scholarship_api (API DRI, Trigger: Gate 1 GREEN, ETA GREEN ≤ 15 min after Gate 1)
+Actions:
+
+Deploy v2.7.
+Confirm mandatory auth middleware on all protected routes; standardized JSON errors.
+Verify integrations: provider_register and scholarship_agent (input), student_pilot, scholarship_sage, auto_page_maker (output). Acceptance criteria:
+200/401/403 matrix passes; input validation/sanitization on write paths.
+P95 ≤ 120ms (30+ samples), 5xx < 0.5%. Evidence:
+Route auth matrix, curl outputs, P95 baseline, integration health snapshot.
+Gate 3 — student_pilot (Frontend DRI, Trigger: Gate 2 GREEN, ETA smoke complete ≤ 15 min)
+Actions:
+
+E2E: login/registration, profile CRUD, scholarship search via scholarship_api, recommendations via scholarship_sage, application submission and status tracking.
+Accessibility and responsiveness pass. Acceptance criteria:
+P95 page load ≤ 2.5s, Lighthouse Accessibility ≥ 90. Evidence:
+HAR, Lighthouse, screenshots, defects.csv (severity-tagged).
+Confirmed Greens and Readiness
+
+auto_com_center: GREEN in dry-run; P95 ~98ms. Hold DISABLE_SEND=true through Gate 3. 1% canary staged with rollback thresholds (>2% bounce, >0.1% complaints). Do not activate until CEO approval.
+scholarship_sage: GREEN; P95 ~84–91ms; Section 7 reportedly submitted. Ready to support Gate 3 and capture ≥30 recommendation samples.
+provider_register: Armed for Gate 2; run the 5-minute verification the moment Gate 2 is GREEN:
+Verify 3% platform fee disclosure (P0 blocker) and RBAC tenant isolation (organizationId; 403 cross-tenant proof).
+Confirm API integration health; enable first provider cohort (10–20); fee accrual logging ON. Evidence: Screenshots, 403 proof, ledger sample.
+Outstanding/Unverified — DRI must report status within 10 minutes
+
+auto_page_maker: Must confirm 4.7.1–4.7.4 (trigger, data population, SEO metadata/schema, public deploy). This is our primary organic growth engine; treat as P0.
+scholarship_agent: Must confirm 4.3.1–4.3.4 (automation logic, M2M auth, resilient API exchange, event emission to auto_com_center). This is critical to data freshness and downstream communications.
+Risk Controls and Compliance (non-negotiable)
+
+Security: 99.9% uptime, P95 ≤ 120ms, standardized errors without PII, TLS everywhere, rate limiting, strict CORS, robust password hashing.
+Privacy/Regulatory: FERPA/COPPA adherence; CAN-SPAM/GDPR compliance and auditable opt-out in auto_com_center; role-scoped data access and tenant isolation throughout B2B.
+Responsible AI: Documented matching logic transparency in scholarship_sage; bias mitigation steps recorded in Section 7.
+KPIs Tied to Prime Directive ($10M ARR, profitable)
+
+B2C: Free→paid conversion, ARPU from credit packs, time-to-first-match, P95 recommendation latency.
+B2B: Active providers, net new scholarships per week, fill rate, 3% provider fee accrual accuracy.
+CAC: Organic traffic growth from Auto Page Maker; publish count, indexed pages, CTR.
+Reliability: Fleet P95, 5xx rate, token validation success, queue depth/latency in auto_com_center.
+Reporting Requirements — Section 7 (Mandatory Format)
+
+Each DRI submits one Section 7 report by T+60 (60 minutes from this message).
+Use the exact standardized format provided in the directive; include evidence artifacts (links, screenshots, logs).
+Lifecycle and Revenue Cessation Analysis must be included:
+Infrastructure (Auth, API, Com Center): 5–7 years horizon.
+User-Facing (Student Pilot, Provider Register): 3–4 years.
+Intelligence/Automation (Sage, Agent, Page Maker): 2–3 years. Provide an estimated obsolescence date, rationale, and contingencies.
+Final reminders
+
+auto_com_center: Stay in dry-run. Prepare 1% canary only; do not send without CEO go-ahead.
+API DRI: Deploy immediately upon Auth GREEN.
+Frontend DRI: Be staged to run smoke within 15 minutes of Gate 2 GREEN.
+DRIs missing: auto_page_maker and scholarship_agent must check in within 10 minutes with status against Section 4 tasks.
+Awaiting the Auth DRI’s 2-minute confirmation line:
+“EPD-Auth-01 executing now”
