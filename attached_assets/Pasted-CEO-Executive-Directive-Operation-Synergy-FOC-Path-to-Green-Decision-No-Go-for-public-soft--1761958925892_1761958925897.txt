@@ -1,0 +1,131 @@
+CEO Executive Directive: Operation Synergy — FOC Path to Green
+
+Decision
+
+No-Go for public soft launch until Gate 1 (scholar_auth JWKS) and Gate 2 (scholarship_api /canary v2.7) are GREEN.
+Conditional GO for internal smoke testing and dry-run transactional comms only. No promotional sends. Manual fallback remains ON.
+Why: We will not send external traffic or onboard paying providers without a cryptographically verifiable identity layer and a verified source-of-truth API. This protects student experience, brand trust, and our 5-year profitability plan.
+
+Owner Assignments, Deadlines, and Acceptance Criteria
+
+Auth Lead — scholar_auth (Owner: Auth DRI)
+Deadline: T+30 minutes
+Actions:
+Fix JWKS production endpoint (.well-known/jwks.json). If cache persists >15 minutes, create a fresh production deployment (new URL) and propagate the new JWKS URL to all seven services.
+Enforce CORS (student_pilot, provider_register), rate limiting, robust password hashing.
+Acceptance:
+JWKS returns a keys array with at least one RS256 key and kid.
+/canary P95 ≤120ms; 6/6 security headers present.
+Dependent services can validate tokens (manual validation against JWKS or /validate OK).
+2. API Lead — scholarship_api (Owner: API DRI)
+
+Deadline: T+30 minutes
+Actions:
+Deploy v2.7 /canary endpoint with exact 8-field schema.
+Ensure JWT validation against scholar_auth and RBAC (401/403 on protected).
+Input validation/sanitization enabled platform-wide.
+Acceptance:
+/canary returns: app=scholarship_api, app_base_url, version=v2.7, status=ok, p95_ms, security_headers {present: [6], missing: []}, dependencies_ok=true, timestamp.
+curl -I shows all 6 security headers.
+Protected routes return 401/403 as appropriate.
+3. Frontend Lead — student_pilot (Owner: Frontend DRI)
+
+Trigger: After Gates 1 & 2 are GREEN
+Deadline: T+60 minutes post-trigger
+Actions:
+E2E smoke: login → profile fetch → recommendations (scholarship_sage) → scholarship search (scholarship_api) → application draft → logout.
+Provide HAR or logs for each step.
+Acceptance:
+All steps 200/OK (protected resources require valid session).
+UX responsive and accessible; no console errors; P95 page transitions ≤120ms.
+4. Auto Comms — auto_com_center (Owner: Comms DRI)
+
+Status: GREEN per report; dry-run ON; manual fallback ready.
+Actions:
+Keep dry-run ON until T+48h post-soft-launch.
+T+24h: integrate provider (Postmark) + bounce/complaint webhooks; add retry and circuit breaker.
+Acceptance:
+/send/status reports mode=dry-run; queue stable; DLQ ≤1%.
+5. Provider Register — provider_register (Owner: B2B DRI)
+
+Status: GREEN (P95 89ms; headers 6/6; 3% fee disclosure verified).
+Action:
+Hold onboarding of first 10–20 providers until Gates 1 & 2 are GREEN.
+6. Scholarship Sage — scholarship_sage (Owner: Sage DRI)
+
+Status: GREEN (recommendations ready; A/B tests OFF for first 48h).
+Action:
+Stand by for student_pilot smoke; no changes required.
+7. Scholarship Agent — scholarship_agent (Owner: Agent DRI)
+
+Action:
+Event triggers to auto_com_center allowed in dry-run only; ensure M2M SystemService JWT path validated via scholar_auth once Gate 1 is GREEN.
+Acceptance:
+Events validate against standardized payload; retry + circuit breaker configured.
+8. Auto Page Maker — auto_page_maker (Owner: SEO DRI)
+
+Action:
+Pause new public landing page deployments until Gates 1 & 2 are GREEN.
+Validate templates, metadata, schema.org, and canonical tags on staging.
+Acceptance:
+Staging pages pass SEO checks; 6/6 security headers; fetches from scholarship_api succeed with valid JWT.
+Answers to Agent3’s Options Question
+
+Choose Option B: Auth Lead and API Lead own and fix their apps immediately. In parallel, Agent3 should prepare one-page deployment runbooks for both teams to minimize friction, then proceed to verify the six non-blocking apps.
+Deliverables for Agent3 within T+30 minutes:
+One-page runbook: scholar_auth Production Redeploy + JWKS Propagation.
+One-page runbook: scholarship_api v2.7 /canary Deploy + RBAC Verification.
+Verification checklist for student_pilot E2E smoke.
+Operational Guardrails (first 48 hours)
+
+Comms: Transactional only, dry-run ON, manual fallback ON. No promotional sends.
+Rollback triggers:
+Auth token validation failures >2% over 10 minutes.
+API 5xx >0.5% or P95 >120ms for 10 consecutive minutes.
+Any privacy/security incident detected.
+Observability:
+All canary endpoints instrumented; DLQ ≤1%; idempotency keys on events; structured logs.
+Mandatory Reporting (Section 7)
+
+Every DRI must submit the Section 7 report within T+2 hours using the provided format. Include:
+Exact commands and outputs used to verify endpoints (sanitized for secrets).
+Lifecycle and revenue cessation analysis:
+Infrastructure (Auth/API/Comms): 5–7 years horizon, call out OAuth/OIDC evolution, crypto agility, scale.
+User-facing (Student/Provider): 3–4 years horizon for major UX overhaul.
+Intelligence/Automation (Sage/Agent/Page Maker): 2–3 years horizon for model/logic refresh.
+Already-submitted reports (auto_com_center, provider_register, scholarship_sage) are conditionally accepted pending production verification attachments.
+Verification Commands (for DRIs to run and paste outputs)
+
+scholar_auth:
+curl -s https://scholar-auth-jamarrlmayes.replit.app/.well-known/jwks.json
+curl -sI https://scholar-auth-jamarrlmayes.replit.app/canary
+scholarship_api:
+curl -s https://scholarship-api-jamarrlmayes.replit.app/canary | jq .
+curl -I https://scholarship-api-jamarrlmayes.replit.app/canary
+student_pilot (post-auth):
+End-to-end HTTP trace or HAR for login → profile → recommendations → search → draft → logout.
+Timeline and Checkpoints
+
+T+0: This directive issued.
+T+15: Auth Lead reports JWKS fix or new URL propagated; API Lead begins production deploy.
+T+30: Expect both Gates GREEN; if not, execute fresh deployment URLs and propagate immediately.
+T+60–90: Frontend E2E smoke complete; submit HAR/logs.
+T+120: All Section 7 reports submitted with verification evidence.
+T+240: CEO review for soft launch GO. If GREEN, open traffic to first 10–20 providers; continue dry-run comms for 48 hours.
+Strategic Context and KPIs (Data-First)
+
+Unlocking revenue:
+B2B: Providers onboarded (count), listings created, 3% fee accrual per transaction.
+B2C: Free→paid conversion rate, ARPU from credits.
+Efficiency:
+CAC via SEO (Auto Page Maker) vs. paid channels; keep CAC trending down.
+Reliability:
+99.9% uptime; P95 ≤120ms across all services.
+Ethics/Compliance:
+FERPA/COPPA aligned; Responsible AI: bias checks, transparency, no academic dishonesty enablement.
+Immediate Next Steps (you can act on now)
+
+Auth Lead: Force rebuild or deploy new scholar_auth URL; propagate JWKS now.
+API Lead: Publish scholarship_api v2.7 with /canary; confirm 8-field schema and headers.
+Agent3: Deliver the two runbooks + verification checklist in 30 minutes, then proceed with non-blocking app validations.
+I will authorize the public soft launch the moment Gate 1 and Gate 2 are GREEN and the student_pilot smoke passes. Keep updates every 15 minutes until all gates are green.
