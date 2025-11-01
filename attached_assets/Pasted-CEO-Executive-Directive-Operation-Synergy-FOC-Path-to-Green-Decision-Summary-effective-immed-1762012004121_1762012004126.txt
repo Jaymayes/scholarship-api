@@ -1,0 +1,68 @@
+CEO Executive Directive — Operation Synergy (FOC Path to Green)
+
+Decision Summary (effective immediately)
+
+Gate 1 (scholar_auth) — GO NOW
+
+Auth DRI (human) must click Republish in Replit Publishing tool immediately.
+SLA: 10 minutes total (2–5 min publish + 5 min verification).
+Verification: Run the provided Gate 1 script (JWKS valid RS256, /canary v2.7, 6/6 security headers). Post outputs to war-room.
+If RED at T+30: open platform ticket with Replit and proceed with EPD prep (no cutover).
+If still RED at T+45: EXECUTE EPD-Auth-01 cutover to alternate hosting. Budget pre-approved: $1,500. Requirements: dual KID rotation (24h overlap), updated JWKS_URL in all 7 downstream services, acceptance checks before cutover.
+Gate 2 (scholarship_api) — CONDITIONAL GO
+
+Trigger: Gate 1 GREEN.
+SLA: Deploy within 30 minutes of Gate 1 GREEN; post evidence within 15 minutes of deploy.
+Acceptance: /canary v2.7 (8 fields), 6/6 headers, 401/403 RBAC, JWKS validation live, P95 ≤120ms (≤250ms acceptable during first 10 minutes warm-up), 5xx <0.5%.
+If any criterion fails, rollback immediately and redeploy within 30 minutes.
+Gate 3 (student_pilot) — CONDITIONAL GO
+
+Trigger: Gate 2 GREEN.
+SLA: E2E smoke within 15 minutes (auth → profile → search → recommendations → submit → status → dry-run comms); post HAR, screenshots, and 30-sample P95.
+auto_com_center — Maintain DRY-RUN posture
+
+Kill switch stays enabled (DISABLE_SEND=true).
+Postmark: configure only; do not activate until CEO confirms post–Gate 3.
+Evidence bundle already accepted. Continue 15-min cadence.
+scholarship_sage — GREEN accepted
+
+Participate in Gate 3 smoke; capture recommendation latency and accuracy.
+A/B testing OFF for 48 hours post platform-wide GREEN.
+provider_register — GREEN (conditional)
+
+No onboarding until Gate 2 GREEN.
+On Gate 2 GREEN: verify 3% fee disclosure and RBAC tenant isolation; then enable first cohort (10–20) within 5 minutes.
+auto_page_maker — STANDBY
+
+Fire generation webhooks post–Gate 2 GREEN; hold indexing until data accuracy is validated in production smoke.
+Assignments and Owners
+
+Auth DRI (human, with Replit access): Click Republish for scholar_auth now and run verification script. Confirm to war-room within 10 minutes.
+API DRI: Execute Gate 2 deploy within 30 minutes of Gate 1 GREEN; post evidence and declare GREEN if all checks pass.
+Frontend DRI: Run Gate 3 smoke within 15 minutes of Gate 2 GREEN; post evidence bundle.
+Comms DRI (auto_com_center): Remain in dry-run; queue events; no external sends until CEO Day-1 ramp confirmation.
+Sage DRI: Join Gate 3; record latency/accuracy; A/B off 48h.
+Contingency (EPD-Auth-01) — Pre-stage now, cutover at T+45 if needed
+
+Platform: Prepare a fast Node/Flask-friendly host (Railway or Render).
+Surface: Preserve OIDC/JWKS shape (RS256, /.well-known/jwks.json).
+Security: Publish both KIDs for 24h overlap; verify downstream acceptance.
+Config: Pre-provision JWKS_URL env updates for all 7 services. Do not apply unless Gate 1 remains RED at T+45.
+Acceptance before cutover: Canary 8/8 fields, 6/6 headers, P95 ≤120ms, RBAC 401/403, JWKS validation pass, dependencies_ok=true.
+Evidence and Cadence
+
+War-room updates every 15 minutes or on gate transition.
+Each gate evidence must include exact curl outputs, timing samples (≥30 for P95), and screenshots/HAR where applicable.
+Code freeze: v2.7 locked for 24h post platform-wide GREEN; hotfixes only.
+Go/No-Go Criteria
+
+Gate 1 GREEN required to unlock Gate 2.
+Gate 2 GREEN required to unlock Gate 3.
+No live outbound comms until Gate 3 smoke passes and CEO authorizes Day-1 ramp.
+SLO protection: 99.9% uptime, P95 ≤120ms, 5xx <0.5%.
+Immediate Confirmation Required
+
+Auth DRI: Acknowledge ability to click Republish within 5 minutes and post Gate 1 verification results within 10 minutes.
+API/Frontend/Comms/Sage DRIs: Acknowledge receipt of SLAs and readiness to execute on triggers.
+Strategic Note
+This sequencing preserves SLOs, minimizes CAC by avoiding premature comms, and keeps us on the fastest credible path to FOC. Execute with urgency and post verifiable evidence at each gate.
