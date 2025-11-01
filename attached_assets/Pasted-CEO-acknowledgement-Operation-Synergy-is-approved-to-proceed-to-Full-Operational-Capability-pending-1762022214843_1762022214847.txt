@@ -1,0 +1,61 @@
+CEO acknowledgement: Operation Synergy is approved to proceed to Full Operational Capability pending Gate 1. This remains the fastest path to our $10M ARR objective. I am issuing the following gating orders, acceptance criteria, and deadlines.
+
+Gating orders and owners
+
+Gate 1 — scholar_auth (Owner: Human Ops)
+
+Action: Republish/Redeploy scholar_auth now.
+Required confirmation in this thread within 10 minutes:
+Text: Gate 1 GREEN – scholar_auth deployed
+ISSUER_URL: https://scholar-auth-jamarrlmayes.replit.app
+JWKS_URL: https://scholar-auth-jamarrlmayes.replit.app/.well-known/jwks.json
+/login reachable: yes/no
+If JWKS still returns non-200 after redeploy: initiate manual redeploy path and escalate at T+10.
+Gate 2 — scholarship_api (Owner: API DRI)
+
+Trigger: Immediately after Gate 1 GREEN.
+Actions (complete within 15 minutes of Gate 1 GREEN):
+Deploy v2.7.
+Produce evidence: 200/401/403 auth matrix against scholar_auth JWKS; RBAC enforcement proof; input validation proof; security headers (6/6); P95 ≤120ms across ≥30 samples; integration checks: provider_register and scholarship_agent ingress; student_pilot, scholarship_sage, auto_page_maker egress.
+Post: Gate 2 GREEN with evidence bundle.
+Gate 3 — student_pilot + scholarship_sage E2E (Owners: Frontend DRI + Sage DRI; Comms support by auto_com_center)
+
+Trigger: Immediately after Gate 2 GREEN.
+Actions (complete within 20 minutes of Gate 2 GREEN):
+E2E: login → profile CRUD → search (scholarship_api) → recommendations (scholarship_sage) → application submission → status tracking.
+Evidence: HAR of full flow; ≥30 request latency samples (P50/P95); Lighthouse (A11y ≥90, Perf ≥70); no CORS/auth errors; screenshots of core flows.
+auto_com_center runs in dry-run (DISABLE_SEND=true): capture queue depth, P95 enqueue/dequeue (≥30 samples), idempotency proof, unsubscribe/opt-out end-to-end.
+FOC acceptance criteria (all must be true)
+
+Central auth live: JWKS 200; /login reachable; tokens validate cross-service.
+Standardized security: 6/6 security headers on public endpoints; HTTPS-only inter-service calls.
+Performance: P95 ≤120ms for read-heavy endpoints in scholar_auth, scholarship_api, scholarship_sage, auto_com_center queue ops (dry-run).
+Authorization: 200/401/403 matrix correct across protected routes; RBAC enforced for Student/Provider/Admin/SystemService.
+Data integrity: input validation/sanitization verified; no injection vectors found in evidence suite.
+Interop: provider_register → scholarship_api (ingress), scholarship_agent → scholarship_api (M2M), scholarship_api → student_pilot/scholarship_sage/auto_page_maker (egress) all verified with sample payloads.
+Revenue-critical checkpoints (why this matters)
+
+B2C conversion depends on: student_pilot auth + search + sage recommendations functioning E2E.
+B2B 3% platform fee depends on: provider_register CRUD + applicant review with tenant RBAC; scholarship_api write-paths hardened.
+CAC and SEO engine depend on: auto_page_maker webhooks from scholarship_api; pages generated with proper schema markup for organic growth.
+Risk gates and contingencies
+
+Gate 1 fails (JWKS not live by T+15): escalate to manual redeploy; if still failing at T+30, rollback to last known good and reschedule Gate 1 within 24 hours; non-blocking tests can continue in staging, but production cascade pauses.
+Gate 2 fails auth matrix or latency SLO: hotfix window T+15; if unresolved, feature-flag write endpoints to allow read-only browsing and keep SEO/Page Maker flowing; do not open paid flows until RBAC evidence passes.
+Gate 3 fails UX/A11y: allow limited-access beta (invite-only) and keep auto_com_center in dry-run; no external sends until compliance verified.
+Section 7 reporting — required from each DRI within T+60 of Gate 1 GREEN
+
+Use the exact “Mandatory Reporting Format” provided in the directive.
+Include concrete evidence links or artifacts for each task.
+Lifecycle and revenue cessation analysis must include a date estimate, rationale, and contingencies.
+Status acknowledgements received
+
+auto_com_center: DRI indicates GREEN in dry-run; Section 7 template prepared; obsolescence estimate Q4 2030. Accepted pending Gate 3 evidence delivery.
+scholarship_sage: DRI indicates GREEN; P95 ~84–91ms; Section 7 submitted; obsolescence estimate Q3 2027. Accepted pending Gate 3 E2E evidence.
+student_pilot, scholarship_api, provider_register: Armed and awaiting Gate 1/2. Section 7 drafts noted; final reports due T+60.
+Immediate next step
+
+Human Ops: execute Gate 1 now. Reply in-thread with: Gate 1 GREEN – scholar_auth deployed and include the two URLs and /login reachability.
+I will not move the program to “FOC: READY” until the above acceptance criteria and evidence are posted. Deadline discipline applies: if Gate 1 is not GREEN within 30 minutes, we will slip the cascade by 24 hours and publish a brief on projected ARR impact and mitigation.
+
+Proceed.
