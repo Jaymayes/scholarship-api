@@ -1,0 +1,121 @@
+Executive directive: Operation Synergy — Limited GO decisions, critical path unblocked, and accountability plan
+
+Context acknowledged. I’ve reviewed the Agent3 updates, Section 7 submissions, and gating status across apps. We will move decisively to hit our ARR plan while protecting compliance, security, and SLOs.
+
+CEO decisions (effective immediately)
+
+Gate 1 — scholar_auth
+Decision: GO to Republish now.
+Owner: Human Ops (Auth DRI). Backup: Platform Eng On-Call.
+Deadline: 15 minutes.
+Acceptance checks (must pass before any E2E resumes):
+/login, /register, /logout, /token/refresh respond 200/302 as expected.
+JWKS or /validate is reachable and reflects current signing keys.
+RBAC roles present in JWT claims (Student, Provider, Admin, SystemService).
+CORS restricted to frontend(s) per current deployment topology.
+If Republish fails: escalate to Platform Lead immediately and roll back to previous stable image; retry once with clean build; if still failing, switch to test bypass only for E2E verification (not for production).
+2. Architecture — single production hostname constraint
+
+Immediate approach: Option A approved (path-based routing).
+Owner: Platform Eng.
+Deadline: Today +4 hours for production cutover.
+Requirements:
+Route map: /scholar-auth/, /scholarship-api/, /scholarship-agent/, /scholarship-sage/, /student-pilot/, /provider-register/, /auto-page-maker/, /auto-com-center/.
+Update CORS to allow only the canonical host; prefer same-origin where feasible to eliminate CORS.
+Standardize APP_BASE_URL usage to path-relative URLs behind the single host; remove stale hard-coded subdomains.
+Canary endpoint must include the 8 required fields (app, app_base_url, version, status, p95_ms, security_headers, dependencies_ok, timestamp).
+Strategic follow-up: Option B (custom domains) is approved as the long-term solution. Target planning window: 14 days for DNS, CDN/WAF, TLS, and zero-downtime transition. Provide a migration plan with redirects and HSTS preload evaluation.
+3. B2C Limited GO — execution and evidence
+
+Status: Authorized to proceed immediately after Gate 1 turns GREEN.
+Owner: Frontend DRI (student_pilot).
+Deadline: T+2 hours from Gate 1 GREEN.
+Required E2E sequence and evidence:
+Login (scholar_auth) → Profile CRUD (student_pilot) → Search (scholarship_api) → Recommendations (scholarship_sage) → Submit application → Status tracking.
+30+ samples, P95 ≤ 120ms for each hop; success rate ≥ 98%; 0 CORS/auth errors; HAR + screenshots; standardized error payload verification.
+auto_com_center constraints:
+Remains DRY-RUN until unsubscribe/opt-out endpoints pass compliance checks.
+After verification, authorize SEND only for transactional student flows; marketing/bulk remains disabled until further notice.
+4. auto_com_center — compliance before SEND
+
+Decision: Option A (fastest) remediation approved; resolve deployment lock, verify endpoints, then enable transactional SEND.
+Owner: Comms DRI.
+Deadlines:
+Fix deploy lock + verify endpoints: Today +30 minutes after Gate 1 GREEN.
+Compliance verification (Legal/Data Protection sign-off): Today +60 minutes after endpoints pass.
+Must-have endpoints and behaviors:
+POST /api/unsubscribe and GET /api/unsubscribe?email=… return 200 with confirmation page.
+GET /api/suppression-list returns status for the requesting principal (RBAC enforced).
+Suppression check enforced in send path; idempotency verified by request_id.
+Canary endpoint contains all 8 CEO-required fields.
+5. scholarship_api — Gate 2 status
+
+Decision: Conditionally GREEN for B2C; continue optimization.
+Owner: API DRI.
+Action: Bring P95 from ~200ms down to ≤120ms within 72 hours without regressing correctness or security. Provide a tuning plan (caching, DB indexes, payload shaping) and show 30-sample evidence post-change.
+6. scholarship_sage — readiness
+
+Decision: GREEN. Continue as-is for B2C validation.
+Owner: Sage DRI.
+Action: Capture ≥30 recommendation samples during E2E; deliver latency distribution and success rate evidence to the war room.
+7. provider_register — B2B gating
+
+Current: Report indicates remediation complete and P95 ~2ms. Good.
+Decision: Conditional GREEN pending live token validation post Republish of scholar_auth.
+Owner: Provider App DRI.
+Deadlines:
+Immediate: RBAC isolation re-verified against live scholar_auth (Provider role only).
+24 hours: Shadow-mode test for 30+ samples; confirm SLOs, standardized errors, security headers, fee disclosure in-product, and tenant isolation queries (document 30+ query checks).
+B2B launch remains NO-GO until shadow validation passes and CEO receives evidence.
+8. SEO engine — auto_page_maker
+
+Decision: GREEN to operate under path-based routing and DRY-RUN comms.
+Owner: SEO/Auto Page Maker DRI.
+Action: Validate trigger on scholarship_api write events; confirm schema.org metadata and IndexNow submission. Provide 10-page sample with lighthouse scores and structured data validation screenshots.
+Risk and compliance directives
+
+Responsible AI: scholarship_sage essay guidance must remain assistive, not generative of plagiarism or cheating. Include in-product disclosures and guardrails; log high-risk prompts and apply rate limits.
+Privacy/Regulatory: Ensure unsubscribe/opt-out compliance (CAN-SPAM/GDPR). FERPA/COPPA posture: no collection of minor data without verified consent; verify data retention and deletion paths.
+Security posture: 6/6 security headers enforced across apps; rate limiting on all public endpoints; HTTPS-only; standardized JSON error schema. Confirm no PII leakage in logs.
+Reporting requirements (Section 7)
+
+Due: T+60 minutes for any app that hasn’t submitted or needs reconfirmation after today’s changes.
+Include: full template sections, integration verification, lifecycle/obsolescence estimate, and operational readiness declaration.
+Noted as received: scholarship_api (Infrastructure), scholarship_sage (Intelligence/Automation), auto_com_center (Comms) — require re-confirmation after today’s deploys.
+Lifecycle and revenue cessation outlook (CEO guidance)
+
+Infrastructure (auth, api, com center): 5–7 years baseline; re-evaluate yearly for protocol shifts (e.g., post-OIDC evolutions). Budget a rolling upgrade path, not a big-bang rewrite.
+User-facing (student_pilot, provider_register): 3–4 years before major UX overhaul to maintain conversion and retention KPIs.
+Intelligence/automation (sage, agent, page maker): 2–3 years due to rapid AI cadence; plan quarterly model and prompt updates, yearly architecture refresh budget.
+KPIs for this Limited GO window (immediate)
+
+B2C funnel (first 7 days post-activation):
+Auth success rate ≥ 98%
+E2E success rate ≥ 97%
+P95 per hop ≤ 120ms (auth/api/sage/submit/status)
+Error rate < 1%
+First-contentful-page ≤ 2.5s on student_pilot (median)
+Comms:
+Queue enqueue/dequeue P95 ≤ 120ms
+Idempotency: duplicates return same message_id
+0% sends prior to opt-out endpoints passing; post-approval: unsubscribe success ≥ 99.5%
+SEO:
+10+ pages generated and crawled; all pass schema validation
+No indexation errors; sitemap and IndexNow verified
+War room cadence and next checkpoints
+
+T+0–15 min: Human Ops Republish scholar_auth; Auth DRI posts green-check evidence (endpoints + JWKS + RBAC).
+T+15–120 min: Student E2E validation; API and Sage DRIs monitor and capture evidence. Comms DRI completes unsubscribe endpoints and legal sign-off.
+T+120: Decision to flip auto_com_center from DRY-RUN to SEND for transactional student flows if compliance evidence is green.
+T+24h: Provider_register shadow validation package; CEO decision on B2B GO.
+T+72h: scholarship_api performance optimization report with fresh latency evidence.
+Blocking issues and resolutions (explicit)
+
+Blocker: scholar_auth stale code — Resolve by immediate Republish (this is the critical path).
+Blocker: auto_com_center compliance endpoints — Code is ready; fix deployment issue and verify endpoints return 200 with suppression list enforced before SEND.
+Final directive
+
+Human Ops: Republish scholar_auth now.
+DRIs: Execute per owner/deadline above; deliver evidence bundles to the war room on schedule.
+We move when the data is green. No SENDs cross compliance gates. Organic, low-CAC B2C activation remains our priority, with B2B following on evidence of readiness.
+I will remain on-call for any exception decisions and will authorize SEND activation the moment compliance evidence is in and Gate 1 is green.
