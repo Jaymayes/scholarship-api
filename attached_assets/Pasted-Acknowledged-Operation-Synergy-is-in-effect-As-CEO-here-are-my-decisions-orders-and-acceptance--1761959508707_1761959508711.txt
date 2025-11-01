@@ -1,0 +1,118 @@
+Acknowledged. Operation Synergy is in effect. As CEO, here are my decisions, orders, and acceptance criteria to reach Full Operational Capability and proceed to a controlled soft launch.
+
+Executive decisions (effective immediately)
+
+No-GO for platform-wide launch until Gates 1 and 2 are GREEN
+Conditional GO for non-blocking services:
+auto_com_center: Approved in dry-run with manual fallback for first 10–20 customers
+scholarship_sage: Approved GREEN; A/B testing OFF for first 48 hours
+provider_register: Approved GREEN; hold B2B onboarding emails until Gates 1 & 2 are GREEN
+Feature freeze: 48-hour change freeze on non-critical features across all apps; Security and P0 stability fixes only
+Acquisition freeze: No paid acquisition until post–soft launch stability is confirmed; prioritize SEO via auto_page_maker once Gate 2 is GREEN
+Blocking gates, DRIs, deadlines, acceptance criteria
+
+Gate 1 — scholar_auth JWKS (DRI: Auth Lead) [Deadline: T+30 minutes]
+
+Required to pass:
+JWKS endpoint publicly reachable over TLS (/.well-known/jwks.json)
+RS256 keys served with kid present; token verification succeeds downstream
+CORS restricted to student_pilot and provider_register; rate limiting on all endpoints
+Security headers: HSTS, CSP, X-Frame-Options, X-Content-Type-Options, Referrer-Policy, Permissions-Policy
+P95 ≤ 120 ms on /login, /register, /token/refresh
+Authorized paths:
+Option A: Force production rebuild (preferred)
+Option B: Fresh deployment + URL propagation to all 7 services if cache persists > 15 minutes
+Escalation: If not GREEN by T+30, escalate to CTO, execute Option B immediately, and post evidence
+Gate 2 — scholarship_api /canary v2.7 (DRI: API Lead) [Start after Gate 1 GREEN; Deadline: T+30 from Gate 1 GREEN]
+
+Required to pass:
+/canary returns v2.7 with 8 fields, dependencies_ok: true, p95_ms captured
+RBAC enforced; protected routes return 401/403 (never 200/500 unauthenticated)
+Validating JWTs against scholar_auth; SystemService role accepted for M2M
+Security headers: 6/6 present on all routes
+Data validation/sanitization enabled on create/update endpoints
+Performance: P95 ≤ 120 ms; 5xx < 0.5% during canary checks
+Escalation: If not GREEN by deadline, rollback to last known good build and re-attempt within 30 minutes
+Gate 3 — student_pilot E2E smoke (DRI: Frontend Lead) [Begin after Gates 1 & 2 GREEN; Deadline: T+60 minutes]
+
+Required to pass:
+Auth flow (login/register/refresh/logout) succeeds; auth success rate ≥ 98%
+Profile create/update; search results load ≤ 2.5s; recommendations integrate from scholarship_sage
+Save/apply/status flow; no PII leaks in logs; Lighthouse accessibility ≥ 90
+P95 API latency ≤ 120 ms (auth, search, recommendations, submit)
+Deliverables: HAR file, screenshots, metrics summary
+Soft launch plan (upon all gates GREEN)
+
+Cohort: First 10–20 providers and an early user cohort; transactional comms only
+Duration: 48 hours stabilization window; no promotions
+auto_com_center: Remain in dry-run for first 24–48 hours; manual fallback engaged
+Rollout levers:
+T+0: Enable provider onboarding funnel (provider_register)
+T+0 to T+24: Monitor closed-loop flows (listing → discovery → apply → provider review)
+T+24 to T+48: If error budget healthy and metrics on target, exit dry-run in auto_com_center
+Exit criteria from soft launch:
+Platform error rate (5xx) < 0.5% sustained 6 hours
+Auth success ≥ 98%; token refresh failure < 1%
+P95 ≤ 120 ms across auth, API, recommendations, submit
+DLQ ≤ 1%; bounce/complaint webhooks operational; unsubscribe honored
+Compliance and risk controls (non-negotiable)
+
+FERPA/COPPA: No under-13 accounts; parental consent workflows enforced where applicable
+Responsible AI: scholarship_sage recommendations must provide rationale metadata; no essay auto-writing; assistive guidance only
+Security: Password hashing (argon2/bcrypt), rate limiting, input sanitization, PII redaction in logs, least-privilege tokens (SystemService for M2M)
+Data governance: Retention policies applied; user export/delete endpoints operational; HTTPS/TLS everywhere
+KPI scorecard for soft launch (daily)
+
+B2C funnel:
+Activation (profile completed within 24h): ≥ 60%
+Time-to-first-value (first 3 matches): ≤ 5 minutes median
+Save-to-apply rate: ≥ 30%; free→paid conversion baseline target: 3–5% (credits ARPU tracked)
+B2B funnel:
+Providers live: 10–20; listings created per provider: ≥ 2
+Provider response SLA: < 48h on first 10 applications
+3% fee acceptance confirmed in provider_register; disclosure visible
+Platform/SLOs:
+P95 latency ≤ 120 ms; 99.9% uptime; DLQ ≤ 1%; unsubscribe honor rate 100%
+Section 7 reporting (mandatory)
+
+Each DRI must submit the Section 7 report for their app within T+2 hours of gate completion:
+Application identification
+Task completion status (4.X)
+Integration verification
+Lifecycle and revenue cessation analysis (date, rationale, contingencies)
+Operational readiness declaration (READY/NOT READY)
+Lifecycle benchmarks:
+Infrastructure (auth, api, com center): 5–7 years
+User-facing (student_pilot, provider_register): 3–4 years
+Intelligence/automation (sage, agent, page maker): 2–3 years
+War-room cadence and evidence
+
+Cadence:
+Until all gates GREEN: 15-minute updates in the war-room channel with evidence
+During soft launch: Hourly updates first 6 hours, then every 4 hours
+Evidence bundle per gate:
+Exact curl outputs for /canary, JWKS, protected route checks
+Response headers dump displaying 6/6 security headers
+P95 samples (min N=30) and error-rate snapshot
+Any rollback or mitigation actions taken
+Capital allocation and resourcing
+
+Immediate allocation:
+Auth Lead: 1 senior engineer + 1 SRE until Gate 1 GREEN
+API Lead: 1 senior engineer + 1 QA until Gate 2 GREEN
+Frontend Lead: 1 QA + 1 UX for student_pilot smoke and accessibility
+Spend posture:
+No paid ads for 14 days; invest effort in auto_page_maker content and indexation monitoring
+Approve budget for transactional email provider (Postmark or equivalent) upon exit from dry-run
+Next required actions (owners)
+
+Auth Lead: Execute production deploy now per runbook; post JWKS and latency evidence within 30 minutes
+API Lead: Begin v2.7 canary deploy immediately after Gate 1 GREEN; post evidence within 30 minutes of start
+Frontend Lead: Prepare to run E2E smoke the moment Gate 2 flips GREEN; submit HAR, metrics, screenshots within 60 minutes
+Ops: Open incident bridge; start 15-minute update cadence; track SLO/error-budget in real time
+Agent3 leads (all apps): Submit Section 7 reports by T+2 hours post-gates
+CEO go/no-go statement
+
+Current: No-GO for general release; Conditional GO for non-blocking services in controlled mode
+Path to GO: Gates 1 and 2 GREEN → Gate 3 E2E pass → 48-hour soft launch with transactional comms only → Exit dry-run on proof of stability
+I will authorize soft launch the moment Gate 3 passes and all acceptance criteria are met. Own your gate, post your evidence, and move with urgency. Our mission is profitable ARR and market leadership—stability and trust come first.
