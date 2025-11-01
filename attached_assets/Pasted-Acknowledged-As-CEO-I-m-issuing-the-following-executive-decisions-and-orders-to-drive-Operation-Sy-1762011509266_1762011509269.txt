@@ -1,0 +1,66 @@
+Acknowledged. As CEO, I’m issuing the following executive decisions and orders to drive Operation Synergy to Full Operational Capability while protecting SLOs and revenue timelines.
+
+Decisions and Orders (effective immediately)
+
+Gate 1 — scholar_auth (P0 incident: Replit production cache)
+Decision: Escalate now. Auth DRI is Incident Commander; open a P0 with Replit platform support for production cache invalidation/unblock.
+SLA: Hard deadline T+60 minutes to restore JWKS and /canary v2.7 at production URL.
+Contingency (activate at T+45 if no green light): Prepare Emergency Parallel Deploy (EPD-Auth-01) on alternate hosting using the same code branch (v2.7.1 label). Requirements:
+Same OIDC/JWKS surface (RS256), new APP_BASE_URL and JWKS URL via config.
+Downstream services must accept the new JWKS URL via env config toggle. No hard-coded origins.
+Run the 6 acceptance checks (canary 8/8, 6/6 headers, P95 ≤120ms, 401/403 RBAC, JWKS validation, dependencies_ok=true) before traffic cutover.
+Risk guardrails: If EPD is used, rotate signing keys with overlap window and publish both KIDs for 24h.
+2. Gate sequencing and authority
+
+Gate 1 (Auth) GO is authorized upon either: a) Replit cache cleared and endpoints verified; or b) EPD-Auth-01 is live and verified.
+Gate 2 (scholarship_api) GO authorized within 30 minutes of Gate 1 GREEN. API DRI to publish, verify, and post evidence bundle.
+Gate 3 (student_pilot) GO authorized within 15 minutes of Gate 2 GREEN. Frontend DRI to run E2E smoke and post evidence.
+3. auto_com_center
+
+Remain in dry-run + manual fallback until Gates 1 and 2 are GREEN. No external sends yet.
+Postmark integration may be configured but not activated for live sends until after Gate 3 smoke passes and CEO confirms Day-1 ramp.
+Evidence bundle for v2.7 dry-run is accepted. Keep kill switch enabled.
+4. scholarship_api
+
+Standby is affirmed. On Gate 1 GREEN, publish within 30 minutes and verify:
+/canary v2.7 with 8 fields, 6/6 security headers, RBAC 401/403, JWKS validation to the active Auth JWKS, P95 ≤120ms (≤250ms acceptable for initial 10 minutes while warm-up).
+Post evidence within 15 minutes of deploy. Declare GREEN when all checks pass.
+5. scholarship_sage
+
+Status GREEN accepted. Maintain A/B testing OFF for first 48 hours post platform-wide GREEN.
+Participate in Gate 3 smoke; record recommendation latency and accuracy metrics.
+6. provider_register
+
+Status GREEN (conditional) accepted. Do not onboard new providers until Gate 2 is GREEN.
+Ensure 3% fee disclosure and role isolation are verified again post Gate 2 deploy.
+7. student_pilot
+
+Status STANDBY accepted. Execute Gate 3 E2E smoke within 15 minutes of Gate 2 GREEN:
+Full auth journey, profile save, search via API, receive Sage recommendations, submit test application, see status, and receive dry-run comms event.
+Capture HAR, screenshots, and P95 metrics; post evidence.
+8. Capital allocation and contingency runway
+
+Approved: up to $1,500 for emergency platform/hosting to execute EPD-Auth-01 if needed.
+If Replit remains blocked beyond T+60, proceed with EPD-Auth-01 and cutover configurations for dependent services.
+9. Risk, compliance, and change control
+
+Code Freeze: Lock app version at v2.7 across all services for 24 hours post GREEN, hotfixes only.
+Compliance: Continue enforcement of RBAC, FERPA/COPPA, CAN-SPAM/GDPR opt-outs, standardized error formats, HTTPS-only.
+Observability: All DRIs must capture 30-sample P95 from production canary endpoints as part of evidence bundles.
+10. War-room cadence and reporting
+
+Cadence: Every 15 minutes or on gate transitions. Use exact format: app | gate | status | canary | p95 | blocker | next action | ETA.
+Section 7 reports: Acknowledge receipt for services that submitted. Append production evidence once GREEN. If any report is missing, submit within T+60.
+Final GO/NO-GO Summary
+
+scholar_auth: GO for escalation now; GO for EPD at T+45 if needed; GREEN required to unlock Gates 2 and 3.
+scholarship_api: Conditional GO upon Gate 1 GREEN; 30-minute SLA to GREEN.
+student_pilot: Conditional GO upon Gate 2 GREEN; 15-minute SLA to smoke completion.
+scholarship_sage: GREEN; standby for Gate 3.
+provider_register: GREEN (conditional); onboarding begins immediately after Gate 2 GREEN.
+auto_com_center: GREEN in dry-run; no live sends until Gate 3 passes and CEO confirms ramp.
+CEO notes
+
+Student value drives revenue: prioritize stability in Auth and API over speed. Do not ship partial workarounds that weaken security posture.
+Keep CAC low: Do not activate SEO landing pages to index until Gate 2 is GREEN and data accuracy is confirmed.
+Proceed. DRIs: execute per above, post next war-room update in 15 minutes or upon Gate 1 transition.
