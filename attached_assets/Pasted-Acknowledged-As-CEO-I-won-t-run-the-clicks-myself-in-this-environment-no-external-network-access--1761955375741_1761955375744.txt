@@ -1,0 +1,112 @@
+Acknowledged. As CEO, I won’t run the clicks myself in this environment (no external network access), but I am directing and gating the frontend FOC checks now. Below is the concise test plan, acceptance gates, per-app checklists, deliverables, and timeline to declare GREEN across all eight apps.
+
+What’s happening now
+
+Assignments: The Agent3 instance for each app is the DRI to execute the steps below on production URLs.
+Objective: Verify that every public-facing UI flow is functional, fast, secure, accessible, and integrated end-to-end with scholar_auth and scholarship_api.
+Evidence required: Screenshots, HAR files, and short screencasts for core flows; JSON of canary responses; 5-sample latency table.
+Frontend FOC Test Suite (common for all apps)
+
+Tools: Use Chrome stable, Lighthouse (Performance + Accessibility), DevTools Network (HAR export), and your existing e2e runner (e.g., Cypress/Playwright) if available.
+Devices: Desktop 1440px and Mobile viewport 390px (iPhone 12/13 profile).
+Network: Test on “Fast 3G” throttle for UX resilience and on normal broadband.
+Security headers: Confirm 6/6 present on main UI routes (Strict-Transport-Security, X-Content-Type-Options, X-Frame-Options or CSP frame-ancestors, Content-Security-Policy, Referrer-Policy, Permissions-Policy).
+Canary v2.7: Confirm 8 fields and P95 ≤ 120ms. Capture JSON response and timing.
+Accessibility: WCAG AA quick checks via Lighthouse; no critical contrast or label issues on core flows.
+Per-app frontend checklists (production URLs)
+
+student_pilot → https://student-pilot-jamarrlmayes.replit.app
+Auth: register → verify email flow (or mock), login, logout; tokens stored securely (HttpOnly or secure storage).
+Core UX: dashboard loads; profile edit/save; search scholarships (scholarship_api), open details; apply flow including document upload; view application status; recommendations render from scholarship_sage.
+Mobile/responsive: primary pages usable at 390px; no horizontal scroll.
+Error UX: show friendly errors for 401/403/500; retry works.
+2. provider_register → https://provider-register-jamarrlmayes.replit.app
+
+Auth: login as Provider; RBAC-confirmed views.
+Scholarship management: create/edit/publish listing; data persists to scholarship_api; validation and sanitization enforced.
+Applicant review: list, filter, sort, change status; only own org’s data visible.
+Compliance: 3% Platform Fee visibly disclosed in billing area; capture screenshot.
+Performance/accessibility: Lighthouse ≥ 70 performance and ≥ 90 accessibility on key pages.
+3. scholar_auth → https://scholar-auth-jamarrlmayes.replit.app
+
+UI availability: login/register pages render without console errors.
+OIDC/OAuth redirect flows: initiate from student_pilot/provider_register and complete successfully.
+JWKS health: surface a simple status page or JSON (if provided) and verify with dependent services (screenshot of dependency health if UI exists).
+Canary v2.7: JSON returns 8 fields; latency under SLO.
+4. scholarship_api → https://scholarship-api-jamarrlmayes.replit.app
+
+API docs/landing (if UI exists): loads; CORS allows all 8 platform origins; standardized error JSON visible in console tests.
+From UIs: verify authorized reads/writes from student_pilot and provider_register succeed; unauthorized calls return 401/403 with proper JSON error.
+Canary v2.7: capture JSON + timing.
+5. scholarship_sage → https://scholarship-sage-jamarrlmayes.replit.app
+
+Any dashboard/status page (if present) loads with no console errors.
+From UIs: recommendations visible in student_pilot; advisory tools render where integrated; latency below targets.
+6. scholarship_agent → https://scholarship-agent-jamarrlmayes.replit.app
+
+Status/health UI (if present): verify event queue depth, last-run timestamps visible.
+Trigger visible outcomes in UIs: e.g., auto updates to deadlines reflected in student_pilot; capture before/after screenshots.
+7. auto_page_maker → https://auto-page-maker-jamarrlmayes.replit.app
+
+Generated landing pages: accessible and correctly populated; SEO metadata present (title, meta description, schema.org JSON-LD).
+Visual QA: consistent branding; no broken images/links; mobile renders well.
+Deployment confirmation: new/updated scholarship triggers a fresh page; provide page URL and timestamp.
+8. auto_com_center → https://auto-com-center-jamarrlmayes.replit.app
+
+Status/queue UI (if present): loads clean.
+From UIs: trigger a transactional message (dry-run if required) and confirm queued/sent status; capture response JSON and UI evidence of delivery status.
+Acceptance gates to declare GREEN
+
+Performance: Page interactive ≤ 2.5s on broadband, ≤ 4s on Fast 3G for core pages; API P95 ≤ 120ms.
+Security: 6/6 headers on UI routes; HTTPS-only; no mixed content; auth tokens secured; RBAC enforced (no provider sees other orgs; no student sees other students).
+Accessibility: Lighthouse accessibility ≥ 90 on primary flows (login, dashboard, listing, apply).
+Stability: No severe console errors; graceful error messages for network and auth failures.
+Interop: Auth redirects complete; scholarship_api read/write from UIs; sage recommendations render; auto_com_center receives at least one event-driven message reflected in UI or logs; auto_page_maker publishes at least one page from a new/updated listing.
+Compliance: 3% platform fee visibly disclosed in provider_register.
+Deliverables (submit for each app)
+
+Section 7 report (use template below).
+Evidence bundle: 3-5 screenshots per app covering core flows; 1 HAR per app of core path; Lighthouse JSON exports for desktop+mobile on one key page; canary v2.7 JSON + 5-sample latency table.
+Mandatory Section 7 reporting template
+*** BEGIN REPORT ***
+APPLICATION IDENTIFICATION
+Application Name: [e.g., scholar_auth]
+APP_BASE_URL: [URL]
+Application Type: [Infrastructure/User Facing/Intelligence/Automation]
+
+TASK COMPLETION STATUS
+
+Task 4.X.1: [Status: Complete/In Progress/Blocked] - [Notes/Verification Details]
+Task 4.X.2: [Status: Complete/In Progress/Blocked] - [Notes/Verification Details]
+Task 4.X.3: [Status: Complete/In Progress/Blocked] - [Notes/Verification Details]
+Task 4.X.4: [Status: Complete/In Progress/Blocked] - [Notes/Verification Details]
+INTEGRATION VERIFICATION
+
+Connection with [Dependent App Name]: [Verified/Failed] - [How tested + evidence]
+Connection with [Dependent App Name]: [Verified/Failed] - [Details]
+LIFECYCLE AND REVENUE CESSATION ANALYSIS
+
+Estimated Revenue Cessation/Obsolescence Date: [e.g., Q4 2028]
+Rationale: [Factors per Section 6]
+Contingencies: [What accelerates/extends timeline]
+OPERATIONAL READINESS DECLARATION
+[READY / NOT READY]
+*** END REPORT ***
+
+Timeline and ownership
+
+T+0 to T+1.5h: Agent DRIs execute front-end checks and compile evidence.
+T+1.5h to T+2h: Submit Section 7 reports + evidence bundle for each app.
+T+2h: Consolidated GO/NO-GO by me based on acceptance gates; if any app is RED but non-blocking for first revenue, we’ll proceed with documented mitigations.
+No-GO triggers
+
+scholar_auth JWKS or redirect failure.
+scholarship_api not deployed or failing 401/403 RBAC enforcement.
+student_pilot cannot complete apply flow on production.
+provider_register cannot publish a listing or fee disclosure missing.
+What I need from you to proceed fast
+
+Confirm that production deployments for scholar_auth and scholarship_api are live.
+Provide one test Student and one test Provider account (or confirm self-service registration is functional).
+Authorize DRIs to attach screenshots/HARs in a shared folder and submit the Section 7 reports.
+Once I receive the eight Section 7 reports and evidence bundles, I will issue the platform-wide readiness decision. My expectation remains first revenue today, provided auth and API are GREEN.
