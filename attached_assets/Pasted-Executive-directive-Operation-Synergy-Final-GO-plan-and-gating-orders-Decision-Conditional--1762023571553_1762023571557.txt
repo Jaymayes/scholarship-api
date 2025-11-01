@@ -1,0 +1,67 @@
+Executive directive: Operation Synergy — Final GO plan and gating orders
+
+Decision
+
+Conditional GO for FOC. We proceed when Gate 1 (scholar_auth) is GREEN within 30 minutes. Gates 2–3 follow the timeline below. If Gate 1 is not GREEN by deadline, slip 24 hours and escalate.
+Why this matters (tied to ARR plan)
+
+Gates 1–3 unlock both engines: B2C student funnel and B2B provider funnel. Readiness directly impacts:
+B2C: free→paid conversion and ARPU via credits
+B2B: 3% platform fee accrual and active provider count
+CAC: SEO-first growth depends on auto_page_maker triggers firing from scholarship_api
+Gating timeline and owners
+
+Gate 1 — scholar_auth (Owner: Human Ops)
+
+Deadline: 30 minutes from now
+Action: Republish/Redeploy in Replit UI
+Post confirmation (copy/paste): Gate 1 GREEN – scholar_auth deployed ISSUER_URL: https://scholar-auth-jamarrlmayes.replit.app JWKS_URL: https://scholar-auth-jamarrlmayes.replit.app/.well-known/jwks.json /login reachable: yes
+Acceptance evidence (Agent3 to verify within 5 minutes of confirmation):
+OAuth/OIDC: /login, /register, /logout, /token/refresh 200s
+RBAC: Student, Provider, Admin, SystemService present in JWT claims
+JWKS live and usable by dependents
+Security: CORS allowlist only student_pilot + provider_register; rate limiting on; strong password hashing; 6/6 security headers
+Gate 2 — scholarship_api (Owner: API DRI; start immediately after Gate 1 GREEN)
+
+SLA: GREEN within 20 minutes of Gate 1 GREEN
+Acceptance evidence:
+Auth matrix: 200/401/403 enforced across protected routes; tokens validate against scholar_auth
+RBAC checks applied; input validation/sanitization active
+Integrations: ingest from provider_register and scholarship_agent; egress to student_pilot, scholarship_sage, auto_page_maker
+Performance: P95 ≤ 120ms (≥30 samples); 6/6 security headers; standardized JSON errors
+HTTPS/TLS enforced end-to-end
+Gate 3 — student_pilot + scholarship_sage + auto_com_center (Owners: Frontend DRI + Sage DRI + Comms DRI)
+
+SLA: Evidence bundle within 20 minutes of Gate 2 GREEN
+Acceptance evidence:
+E2E flow: login → profile CRUD → search → recommendations → application submit; zero CORS/auth errors
+scholarship_sage: ≥30 rec samples; P95 ≤ 120ms; success rate ≥ 98%
+auto_com_center: dry-run (DISABLE_SEND=true); queue depth during smoke; ≥30-sample enqueue/dequeue P95; idempotency proof; unsubscribe/opt-out verified; 6/6 headers
+Accessibility: WCAG checks on student_pilot; Lighthouse a11y ≥ 90
+auto_page_maker: trigger on new/updated scholarships; SEO metadata present; pages deploy and publicly accessible
+Section 7 reporting (mandatory)
+
+Due: T+60 from Gate 1 GREEN
+Each DRI must submit the Section 7 report in the prescribed format, including lifecycle/revenue cessation analysis:
+Infrastructure (auth, api, com center): 5–7 year horizon, note security/standards evolution and scale limits
+User-facing (student_pilot, provider_register): 3–4 year horizon, note UX/a11y and framework shifts
+Intelligence/automation (sage, agent, page maker): 2–3 year horizon, note AI/ML advances
+Comms DRI (auto_com_center) must include: P95 queue ops < 120ms, zero-send proof, event consumption from scholarship_agent
+Risk controls and compliance (must be evidenced across reports)
+
+Regulatory: FERPA/COPPA handling; CAN-SPAM/GDPR opt-out end-to-end in auto_com_center
+Responsible AI: bias testing notes for scholarship_sage; transparent recommendation rationale; no academic dishonesty enablement
+Rollback: One-click redeploy to prior stable for auth/api; message queue drain-and-pause plan for coms
+KPIs we will audit post-FOC
+
+B2C: free→paid conversion, ARPU per credit, P95 latency of student flows
+B2B: active providers, listings created, 3% fee accrual rate
+CAC: organic sessions from auto_page_maker pages; indexation and CTR
+Immediate next step (blocking)
+
+Human Ops: Click Republish for scholar_auth now and post the “Gate 1 GREEN” confirmation exactly as specified above.
+Agent3s: Stand by to run your verification suites and deliver evidence within your SLAs once Gate 1 turns GREEN.
+Escalation
+
+If Gate 1 is not GREEN by deadline, we slip 24 hours and convene a 15-minute incident review to remove the blocker. DRIs come prepared with a one-slide plan to prevent recurrence.
+I am approving this plan with the conditional GO. Execute.
