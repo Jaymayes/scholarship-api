@@ -1,0 +1,97 @@
+CEO Decision: Conditional GO for first revenue with strict production gates
+
+I’ve reviewed your status updates and the platform dependencies. We will move fast, but we will not compromise security or interoperability. Here are my directives.
+
+GO/NO‑GO DECISION
+
+Conditional GO for a soft launch today (first 10–20 customers) if and only if two production checks pass:
+
+scholar_auth JWKS endpoint returns a valid JWKS set (RS256) at /.well-known/jwks.json.
+scholarship_api /canary returns the v2.7, 8‑field JSON schema with dependencies_ok reflecting real health.
+If both checks are GREEN in production, proceed with the soft launch using manual fallback. We will keep automation in “guarded” mode for the first cohort to hedge known Agent3 reliability limits and ensure rapid human override if needed, as recommended by our autonomous systems research and observed Agent3 reliability patterns  .
+
+EXECUTIVE ORDERS BY APPLICATION (timeboxed)
+
+scholar_auth (Infrastructure)
+Decision on your options: Execute Option 2 now. You are authorized to implement and deploy P0 fixes (JWKS + v2.7 /canary) if the auth team cannot deploy within 30 minutes.
+Requirements for the P0 patch:
+Restore JWKS at /.well-known/jwks.json and verify at least one active RS256 key.
+Ensure /canary v2.7 returns: app, app_base_url, version, status, p95_ms, security_headers {present, missing}, dependencies_ok, timestamp.
+Enforce rate limiting and CORS only for approved frontends.
+Deadline: T+60 minutes to GREEN JWKS and canary in production.
+Rationale: Auth is a single point of failure and must be resilient. Implement retry/circuit‑breaker patterns for M2M token validation pathways to prevent cascading failures under load .
+2. scholarship_api (Infrastructure)
+
+Proceed with the v2.7 /canary upgrade immediately (your Option A). Target the exact 8‑field schema and add the security_headers object and dependencies_ok boolean.
+Publish to production and verify /canary responds at the production URL.
+Deadline: T+60 minutes to GREEN.
+Additions before E2E: Harden input validation and RBAC middleware checks; adopt standardized error JSON across services; ensure all inter‑service calls are HTTPS/TLS per our interoperability standards and security posture .
+3. student_pilot (User Facing)
+
+Once auth and API canaries are GREEN, run a 30‑minute E2E smoke: login → profile → matches → essay tools → apply → status. Use HttpOnly + Secure cookies; no tokens in localStorage.
+Launch criteria: Auth success rate ≥98%, page load ≤2.5s, API P95 ≤120 ms during smoke window. If exceeded, hold launch and report.
+Note: The essay coach and matching experiences must be spotless; student value is the growth engine. Post‑launch, we will integrate qualitative essay signals deeper into matching per the Playbook pivot toward “implicit fit” to improve CTR and conversion .
+4. provider_register (User Facing)
+
+Status accepted as “Ready with Caveats.” Fix the P95 229 ms SLO miss by:
+Making dependency health checks async with 500 ms timeouts and short-lived caching.
+Re‑measure 30 samples; target P95 ≤120 ms.
+E2E validation to proceed immediately after auth/api GREEN.
+5. scholarship_sage (Intelligence)
+
+Approved as GREEN for production participation.
+Produce a 30‑sample latency report under production traffic within T+24h; prep A/B for essay‑NLP assisted matching within 7 days to support the implicit‑fit roadmap .
+6. scholarship_agent (Intelligence/Automation)
+
+Confirm M2M token acquisition from scholar_auth using SystemService role.
+Implement exponential backoff + circuit breaker on calls to scholarship_api; emit standardized events to auto_com_center for deadlines and new matches .
+Provide a dry‑run report of event volume and delivery latencies post‑launch T+24h.
+7. auto_page_maker (Intelligence/Automation)
+
+Verify the trigger on scholarship create/update events; ensure landing pages render with correct schema.org metadata and are deployed publicly.
+Track SEO page production and indexation; this is our primary low‑CAC growth engine. Report pages generated/day, indexed pages, and CTR from organic to student signups, aligning with our organic, scalable growth mandate .
+8. auto_com_center (Infrastructure)
+
+Approved as GREEN for production with initial dry‑run mode for first 10–20 customers, then schedule full automation + provider integration at T+24–48h.
+Verify opt‑out compliance and template rendering under load; maintain queue durability (no message loss), consistent with our self‑healing, resilient design goals for mission‑critical flows .
+PRODUCTION GATES AND ROLLBACK RULES
+
+Gates to flip revenue ON:
+scholar_auth JWKS: GREEN (valid keys)
+scholarship_api /canary v2.7: GREEN
+student_pilot smoke metrics: GREEN (see thresholds)
+Live rollback triggers (monitor continuously):
+Auth failures >2% for 10 consecutive minutes → rollback to “login only” and hold applications.
+API P95 >250 ms for 10 consecutive minutes → throttle non‑critical flows and reduce concurrency at the gateway; investigate and remediate with circuit breakers and timeouts .
+Messaging DLQ growth or delivery failures >1% → switch auto_com_center to dry‑run and manual comms until stabilized.
+MANDATORY REPORTING (Section 7 format)
+
+Every Agent3 instance must submit the Section 7 FOC report within T+2h of this directive. Include lifecycle/obsolescence dates grounded in your category:
+Infrastructure: 5–7 years; monitor for crypto, OAuth/OIDC, and scale limits; begin quantum‑resistance and adaptive auth exploration as a hedge .
+User Facing: 3–4 years; plan rolling UX refreshes for accessibility and competitive parity.
+Intelligence/Automation: 2–3 years; model/agent updates will outpace frontends; plan continuous upgrades.
+Reports must demonstrate compliance with centralized auth, single source of truth via scholarship_api, HTTPS/TLS everywhere, and standardized error JSON, aligning with our orchestrated, resilient multi‑app blueprint .
+LAUNCH METRICS (first 48 hours)
+
+Reliability: Uptime (target 99.9%), API P95 (≤120 ms), Auth success rate (≥98%).
+Growth: New signups, SEO traffic to signup conversion (Auto Page Maker), CAC proxy (organic).
+Monetization: Credit pack conversion rate, ARPU from B2C credits, initial B2B provider activations.
+Messaging: Deliverability, bounce/complaint rates, time‑to‑deliver at P95.
+Ethics & Compliance: Opt‑out rates and correctness, audit anomalies, and any bias flags from ML features dashboards .
+CLARIFICATIONS AND ANSWERS TO YOUR SPECIFIC REQUESTS
+
+“Should I proceed with v2.7 canary upgrade for scholarship_api?” Yes. Proceed now and push to production within 60 minutes.
+“Has the Auth Team deployed the P0 fixes?” Treat as NO. You are authorized to implement and deploy the JWKS and /canary v2.7 P0 fixes immediately if the dedicated team cannot complete within 30 minutes.
+“QA vs. Engineering role?” Temporary expansion approved. You have authority to implement P0 infra fixes required to reach FOC, with a follow‑up peer review post‑launch due to the known risks and need for vigilant oversight with Agent3 autonomy .
+EXECUTION CHECKLIST (post this back with outputs)
+
+Paste the exact production outputs for:
+curl https://scholar-auth-…/.well-known/jwks.json
+curl https://scholarship-api-…/canary
+Confirm student_pilot smoke metrics (auth success %, page load, API P95).
+Confirm auto_com_center is in dry‑run and receiving events from scholarship_agent.
+Submit Section 7 reports for all apps within T+2h.
+Strategic rationale
+
+This plan balances urgency with risk control: soft launch with manual fallback and tight SLO gates, resilient patterns (retry/circuit breaker) for inter‑service calls, and central orchestration discipline to prevent cascading faults . It aligns to the Playbook’s focus on delivering student value while scaling organic growth, especially by amplifying SEO‑driven acquisition and connecting essay assistance to higher‑quality matching for conversion lift .
+You have your orders. Execute the P0 fixes and production verification now. Post the two canary/JWKS outputs in this thread the moment they are GREEN. Then proceed to soft launch.
