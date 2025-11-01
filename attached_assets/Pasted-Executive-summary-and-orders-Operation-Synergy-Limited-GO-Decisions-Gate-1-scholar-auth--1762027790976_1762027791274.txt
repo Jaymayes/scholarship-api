@@ -1,0 +1,110 @@
+Executive summary and orders (Operation Synergy – Limited GO)
+
+Decisions
+
+Gate 1 (scholar_auth): Critical path. Republish required now. No production E2E or external sends until Gate 1 is GREEN.
+B2C Limited GO: Authorized immediately after Gate 1 GREEN and after auto_com_center opt-out endpoints verify in production (DRY-RUN only; no live sends).
+B2B GO: Not authorized. Provider flow remains in shadow mode for 24 hours with evidence bundle before decision.
+Architecture: Proceed with Option C (hybrid path-based routing) after B2C Limited GO. Do not delay E2E for this. Target completion: T+4 hours post E2E.
+Compliance gating: No outbound communication until unsubscribe/suppression endpoints are live, reachable, and verified end-to-end in production. DRY-RUN only until compliance passes.
+Immediate actions and owners
+
+Human Ops (NOW – 15 minutes)
+Action: Republish scholar_auth.
+Acceptance tests (all must pass):
+Canary: curl -s https://scholar-auth-jamarrlmayes.replit.app/canary
+JWKS: curl -s https://scholar-auth-jamarrlmayes.replit.app/.well-known/jwks.json
+Health: curl -s https://scholar-auth-jamarrlmayes.replit.app/healthz
+Confirm in channel: “Gate 1 GREEN” with:
+ISSUER_URL and JWKS_URL responding
+/login, /register, /logout, /token/refresh reachable
+JWT roles present (Student, Provider, Admin, SystemService)
+2. Platform Lead (auto_com_center routing – start now, target T+30 minutes)
+
+Triage steps:
+Verify route order: app.use('/api', router) registered before any wildcard/catch-all.
+Confirm no basePath stripping by proxy or middleware; check any rewrite rules and trailing-slash behavior.
+Validate build artifact in deployment container matches latest commit (hash/time).
+Check framework/router exports (default vs named) and ensure the server actually mounts the new router.
+Confirm CORS and body-parser are active for new routes and not gated by a path prefix.
+Acceptance tests (must pass for compliance sign-off):
+POST /api/unsubscribe returns 200 with idempotent behavior.
+GET /api/unsubscribe?email=… serves confirmation HTML.
+GET /api/suppression-list accessible only to Admin/SystemService via RBAC; 401/403 otherwise.
+Send path checks suppression before enqueue; idempotency via request_id.
+Until these pass in production: DRY-RUN only; no live sends.
+3. DRI: student_pilot (E2E lead – T+0 to T+120 after Gate 1 GREEN)
+
+Execute the full B2C journey with ≥30 samples:
+Auth (scholar_auth) → Profile CRUD (student_pilot) → Search (scholarship_api) → Recommendations (scholarship_sage) → Submit application → Status tracking.
+Targets:
+Per-hop P95 ≤ 120 ms; success rate ≥ 98%; zero CORS/auth errors.
+Accessibility (Lighthouse) ≥ 90.
+Deliverables:
+HAR file, screenshots, standardized error payload checks, P50/P95/P99 per hop.
+4. DRI: scholarship_sage (recommendations – parallel with E2E)
+
+Capture ≥30 recommendation samples during E2E.
+Deliver P50/P95/P99, success rate, sample request/response (PII-redacted).
+Maintain Responsible AI controls (assistive guidance only; no plagiarism).
+5. DRI: scholarship_api (performance plan – 72 hours)
+
+Current: P95 ≈ 200 ms (above 120 ms SLO).
+Plan:
+24h: DB indexes and N+1 fixes; enable read caches for heavy endpoints (goal P95 ≤ 150 ms).
+48h: Response slimming and compression; projection/ETag (goal P95 ≤ 130 ms).
+72h: Redis/TTL for listings and recs; conditional requests (goal P95 ≤ 120 ms).
+Verify after each phase with ≥30 samples; publish deltas.
+6. DRI: provider_register (B2B – shadow mode, 24 hours)
+
+Re-verify RBAC isolation with fresh scholar_auth keys after Gate 1.
+Execute 30+ tenant isolation checks; verify 3% fee disclosure; standardized errors; security headers; P95 compliance.
+Evidence bundle due T+24h for GO decision.
+7. DRI: auto_page_maker (SEO engine – 24 hours)
+
+Verify trigger on scholarship create/update from scholarship_api.
+Confirm page generation with correct data population, schema.org metadata, canonical URLs, and brand guidelines.
+Confirm auto-deploy and public accessibility. Provide 5 sample URLs with Lighthouse SEO ≥ 90.
+8. DRI: scholar_auth (post-republish – T+5 to T+15)
+
+Post Gate 1 GREEN evidence bundle:
+Endpoint validations, JWKS, RBAC in JWT, CORS allowlist to student_pilot and provider_register, rate limiting, and 6/6 security headers.
+Confirm P95 baseline across 30 samples.
+GO/NO-GO status (current)
+
+scholar_auth: NO-GO until republish; Gate 1 must be GREEN.
+scholarship_api: Conditional GO for B2C; performance tuning plan accepted.
+scholarship_sage: GO for B2C.
+student_pilot: GO immediately after Gate 1 GREEN (executes E2E).
+provider_register: NO-GO; shadow-only for 24 hours.
+auto_page_maker: Pending 24h verification; not on B2C critical path; must complete for SEO engine.
+auto_com_center: DRY-RUN ONLY; NO SEND until compliance endpoints verified.
+Compliance and risk posture
+
+Outbound messaging remains disabled until unsubscribe/suppression endpoints pass production tests.
+Maintain HTTPS/TLS for all inter-service calls; centralized auth only via scholar_auth; standardized JSON errors.
+Responsible AI: Continue bias mitigation, logging of high-risk prompts, transparent disclosures; no features that enable academic dishonesty.
+KPIs we will log in today’s run
+
+B2C funnel: auth success rate, profile completion rate, recommendation click-through, application submission rate.
+Latency SLO: P95 ≤ 120 ms per hop; error rate ≤ 2%.
+Auto_com_center: Compliance endpoints availability (SLA ≥ 99.9%), queue health (no dead letters), idempotent send path.
+SEO engine: Number of pages generated, indexability, Lighthouse SEO ≥ 90.
+Reporting cadence (Section 7 format)
+
+Each DRI submits or reconfirms a Section 7 report to the war room repo path you already use (include evidence artifacts).
+Deadlines:
+Gate 1 GREEN evidence: immediately after republish (T+5–15 min).
+B2C E2E report bundle: T+120 from Gate 1 GREEN.
+auto_com_center compliance sign-off: T+60 from Gate 1 GREEN (required before any SEND).
+provider_register shadow bundle: T+24h.
+scholarship_api performance deltas: T+24h, T+48h, T+72h.
+Lifecycle and revenue cessation guidance (executive framing)
+
+Infrastructure (scholar_auth, scholarship_api, auto_com_center): Plan for 5–7 year rewrites or stepwise refactors. Track security standard evolution (e.g., beyond OAuth 2.0/OIDC), scaling thresholds, and key management rotations.
+User-facing (student_pilot, provider_register): Expect 3–4 year major UX refresh cycles to maintain conversion and competitive parity.
+Intelligence/automation (scholarship_sage, scholarship_agent, auto_page_maker): 2–3 year horizon; plan for continuous model/logic upgrades to avoid value erosion.
+What I need from you now (single unblock)
+
+Human Ops: Reply “Clicking Republish now” when you press the Republish button for scholar_auth, or reply “Cannot access deployment” to trigger an immediate escalation path.
+We will hold the line on compliance and SLOs. Limited GO proceeds the moment Gate 1 turns GREEN and auto_com_center compliance endpoints validate in production (DRY-RUN).
