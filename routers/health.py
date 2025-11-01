@@ -11,7 +11,7 @@ from enum import Enum
 from typing import Any, cast
 
 import psutil
-from fastapi import APIRouter, Depends, HTTPException, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from pydantic import BaseModel
 from sqlalchemy import text
 from sqlalchemy.orm import Session
@@ -276,7 +276,7 @@ async def deep_health_check() -> DeepHealthResponse:
     )
 
 @router.get("/canary")
-async def canary_check(db: Session = Depends(get_db)):
+async def canary_check(request: Request, db: Session = Depends(get_db)):
     """
     CEO v2.7 Universal Ecosystem Canary Endpoint (Production Gates)
     Returns exactly 8 fields per CEO Executive Order spec
@@ -287,19 +287,39 @@ async def canary_check(db: Session = Depends(get_db)):
     # P95 latency tracking (rolling 30 requests)
     p95_ms = int(float(os.getenv("CANARY_P95_MS", "85")))
     
-    # Security headers check (all 6 required headers set by SecurityHeadersMiddleware)
-    # Middleware at middleware/security_headers.py sets these on all responses
-    security_headers = {
-        "present": [
-            "Strict-Transport-Security",
-            "Content-Security-Policy",
-            "X-Frame-Options",
-            "X-Content-Type-Options",
-            "Referrer-Policy",
-            "Permissions-Policy"
-        ],
-        "missing": []
-    }
+    # CEO v2.7: REAL security headers verification (not hard-coded)
+    # Check if SecurityHeadersMiddleware is installed in app middleware stack
+    REQUIRED_SECURITY_HEADERS = [
+        "Strict-Transport-Security",
+        "Content-Security-Policy",
+        "X-Frame-Options",
+        "X-Content-Type-Options",
+        "Referrer-Policy",
+        "Permissions-Policy"
+    ]
+    
+    # Verify middleware is installed (real detection)
+    from middleware.security_headers import SecurityHeadersMiddleware
+    app = request.app
+    security_middleware_installed = any(
+        isinstance(middleware, SecurityHeadersMiddleware) 
+        or (hasattr(middleware, 'cls') and middleware.cls == SecurityHeadersMiddleware)
+        for middleware in getattr(app, 'user_middleware', [])
+    )
+    
+    if security_middleware_installed:
+        # Middleware present - headers will be set on response
+        security_headers = {
+            "present": REQUIRED_SECURITY_HEADERS,
+            "missing": []
+        }
+    else:
+        # CRITICAL: Middleware missing - production blocker
+        security_headers = {
+            "present": [],
+            "missing": REQUIRED_SECURITY_HEADERS
+        }
+        logger.critical("PRODUCTION BLOCKER: SecurityHeadersMiddleware not installed!")
     
     # Dependencies health check
     dependencies_ok = True
@@ -315,8 +335,8 @@ async def canary_check(db: Session = Depends(get_db)):
         dependencies_ok = False
         logger.warning(f"Dependencies check failed in /canary: {e}")
     
-    # Status determination: ok if dependencies healthy, degraded if not
-    status = "ok" if dependencies_ok else "degraded"
+    # Status determination: ok if dependencies healthy AND headers present, degraded otherwise
+    status = "ok" if (dependencies_ok and security_middleware_installed) else "degraded"
     
     # CEO v2.7 Executive Order: Exactly 8 fields
     return {
@@ -326,12 +346,12 @@ async def canary_check(db: Session = Depends(get_db)):
         "status": status,
         "p95_ms": p95_ms,
         "security_headers": security_headers,
-        "dependencies_ok": dependencies_ok,
+        "dependencies_ok": dependencies_ok and security_middleware_installed,
         "timestamp": datetime.utcnow().isoformat() + "Z"
     }
 
 @router.get("/_canary_no_cache")
-async def canary_check_no_cache(response: Response, db: Session = Depends(get_db)):
+async def canary_check_no_cache(request: Request, response: Response, db: Session = Depends(get_db)):
     """
     CEO v2.7 Cache-busting canary endpoint
     Identical to /canary but with explicit no-cache headers
@@ -345,18 +365,36 @@ async def canary_check_no_cache(response: Response, db: Session = Depends(get_db
     # P95 latency tracking (rolling 30 requests)
     p95_ms = int(float(os.getenv("CANARY_P95_MS", "85")))
     
-    # Security headers check (all 6 required headers set by SecurityHeadersMiddleware)
-    security_headers = {
-        "present": [
-            "Strict-Transport-Security",
-            "Content-Security-Policy",
-            "X-Frame-Options",
-            "X-Content-Type-Options",
-            "Referrer-Policy",
-            "Permissions-Policy"
-        ],
-        "missing": []
-    }
+    # CEO v2.7: REAL security headers verification (not hard-coded)
+    REQUIRED_SECURITY_HEADERS = [
+        "Strict-Transport-Security",
+        "Content-Security-Policy",
+        "X-Frame-Options",
+        "X-Content-Type-Options",
+        "Referrer-Policy",
+        "Permissions-Policy"
+    ]
+    
+    # Verify middleware is installed (real detection)
+    from middleware.security_headers import SecurityHeadersMiddleware
+    app = request.app
+    security_middleware_installed = any(
+        isinstance(middleware, SecurityHeadersMiddleware) 
+        or (hasattr(middleware, 'cls') and middleware.cls == SecurityHeadersMiddleware)
+        for middleware in getattr(app, 'user_middleware', [])
+    )
+    
+    if security_middleware_installed:
+        security_headers = {
+            "present": REQUIRED_SECURITY_HEADERS,
+            "missing": []
+        }
+    else:
+        security_headers = {
+            "present": [],
+            "missing": REQUIRED_SECURITY_HEADERS
+        }
+        logger.critical("PRODUCTION BLOCKER: SecurityHeadersMiddleware not installed!")
     
     # Dependencies health check
     dependencies_ok = True
@@ -372,8 +410,8 @@ async def canary_check_no_cache(response: Response, db: Session = Depends(get_db
         dependencies_ok = False
         logger.warning(f"Dependencies check failed in /_canary_no_cache: {e}")
     
-    # Status determination: ok if dependencies healthy, degraded if not
-    status = "ok" if dependencies_ok else "degraded"
+    # Status determination: ok if dependencies healthy AND headers present, degraded otherwise
+    status = "ok" if (dependencies_ok and security_middleware_installed) else "degraded"
     
     # CEO v2.7 Executive Order: Exactly 8 fields
     return {
@@ -383,7 +421,7 @@ async def canary_check_no_cache(response: Response, db: Session = Depends(get_db
         "status": status,
         "p95_ms": p95_ms,
         "security_headers": security_headers,
-        "dependencies_ok": dependencies_ok,
+        "dependencies_ok": dependencies_ok and security_middleware_installed,
         "timestamp": datetime.utcnow().isoformat() + "Z"
     }
 
