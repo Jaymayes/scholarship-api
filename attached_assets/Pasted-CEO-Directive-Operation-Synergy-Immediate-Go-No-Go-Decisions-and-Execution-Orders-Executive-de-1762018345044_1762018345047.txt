@@ -1,0 +1,79 @@
+CEO Directive: Operation Synergy — Immediate Go/No‑Go Decisions and Execution Orders
+
+Executive decisions (effective now)
+
+Gate 1 (scholar_auth): Execute contingency EPD-Auth-01 immediately. Rationale: we’re blocked on a human “Republish” click; velocity matters. If Republish is completed within 2 minutes of this directive, cancel the contingency. Otherwise proceed with contingency to production.
+Issuer/JWKS transition: Enable a 60-minute dual-issuer grace window across all services to prevent auth outages.
+New env config to push platform‑wide: AUTH_ISSUERS=[old_issuer,new_issuer], JWKS_FEDERATION=true
+After 60 minutes and green signals across all apps, retire old issuer.
+auto_com_center: Maintain Option B (war-room stance, dry‑run DISABLE_SEND=true) until Gate 3 smoke completes. Prepare canary send (1% cohort) for immediate post‑GREEN activation.
+Provider monetization compliance: provider_register must surface the 3% platform fee disclosure before first provider cohort enablement. This is a P0 launch blocker for B2B revenue.
+Timeboxed gate plan
+
+T+0 (now): Auth DRI executes EPD-Auth-01; post deployment URL, ISSUER, JWKS URIs to war room within 5 minutes.
+T+5: Scholarship API DRI deploys v2.7 to production (Gate 2). Complete Section 4.2 checks within 15 minutes of deploy.
+T+20: student_pilot DRI executes Gate 3 smoke + E2E per Section 4.5. Target: Lighthouse Accessibility ≥90; P95 page load under 2.5s; auth/session flows pass.
+T+35 to T+60: Remaining DRIs run Section 4.x verifications in parallel, post evidence, and submit the standardized report.
+Evidence and acceptance criteria (must-have checks)
+
+scholar_auth (Infrastructure)
+Pass: /login, /register, /logout, /token/refresh; RBAC in JWT (Student, Provider, Admin, SystemService); JWKS served and externally verifiable; CORS limited to student_pilot and provider_register; rate limiting active; strong password hashing (argon2/bcrypt with salt and proper cost).
+Output: curl traces, JWT samples (redacted), JWKS fetch proof, CORS/rate-limit config snippet, security headers snapshot.
+scholarship_api (Infrastructure)
+Pass: Mandatory auth middleware on protected routes; correct 401/403; input validation/sanitization; integrations from provider_register and scholarship_agent; outputs serving student_pilot, scholarship_sage, auto_page_maker.
+Output: Route map with auth flags; test matrix showing 200/401/403 cases; sample provider->API->student flows.
+scholarship_agent (Intelligence/Automation)
+Pass: M2M token (SystemService role) acquisition; resilient push/pull to API with retry + circuit breaker; events dispatched to auto_com_center on deadlines and new matches.
+Output: M2M token log (claims only), retry/circuit-breaker config, event payload samples.
+scholarship_sage (Intelligence)
+Pass: Fresh data sync from API; /recommendations/{student_id} secured and performant; advisory tools functional; baseline accuracy + latency captured (50–100 requests).
+Output: Accuracy sample set and latency histogram; error handling proof.
+student_pilot (User Facing)
+Pass: Auth journey end‑to‑end; profile mgmt; search; application submission + status; sage integration; accessibility (WCAG checks); responsive UI.
+Output: HAR file, Lighthouse report, screenshots, defects.csv if any.
+provider_register (User Facing)
+Pass: Provider authZ; scholarship CRUD; applicant review; strict tenant RBAC (organizationId isolation); 3% fee disclosure live; fee accrual logging ON.
+Output: Screenshots/recordings, sample 403 cross‑tenant proof, fee disclosure evidence, ledger entry sample.
+auto_page_maker (Intelligence/Automation)
+Pass: Trigger on scholarship create/update; branding + correct data population; SEO metadata + schema; public deployment reachable.
+Output: Generated URL set, HTML metadata snapshot, fetch logs from API.
+auto_com_center (Infrastructure)
+Pass: Event consumption from authorized services; third‑party email/SMS integrations tested (dry‑run); template rendering; queue durability; opt‑out compliance end‑to‑end.
+Output: Queue metrics, rendered templates, suppression list/opt‑out traces, P95 message enqueue/dequeue times.
+Performance/SLOs to enforce
+
+Platform SLO: 99.9% uptime; ~120ms P95 service latency targets.
+Current reference: auto_com_center P95 97.76ms (GREEN). Maintain or better across deploy sequence.
+Reporting requirements (mandatory Section 7 format)
+
+Each DRI must submit the standardized report within 60 minutes, with links to evidence artifacts. Use the exact template supplied (“BEGIN REPORT” format). Include:
+Task completion per Section 4.x with status and notes
+Integration verification with named dependencies
+Lifecycle and Revenue Cessation Analysis estimate and rationale
+Operational readiness declaration (READY / NOT READY)
+Lifecycle and revenue cessation guidance (targets to anchor your analysis)
+
+Infrastructure (auth, api, com center): plan for 5–7 years before major rewrite or protocol shifts (e.g., beyond OAuth 2.0/OIDC). Default planning horizon: Q1 2031.
+User-facing (student_pilot, provider_register): 3–4 years before major UX overhaul. Default: Q2 2029.
+Intelligence/automation (sage, agent, page maker): 2–3 years before model/logic refresh. Default: Q3 2027.
+DRIs may deviate with justification based on stack limits, security posture, or market UX trends.
+Ownership and next actions (single-threaded DRIs)
+
+Auth DRI: Execute EPD-Auth-01 now. Post issuer/JWKS and CORS origins. Deliver Section 7 report by T+60.
+API DRI: Deploy v2.7 at T+5. Complete Section 4.2 validation and report by T+45.
+Student Pilot DRI: Execute Gate 3 E2E at T+20. Deliver evidence bundle and report by T+60.
+Provider Register DRI: Run CEO-approved 5‑minute verification immediately after Gate 2 GREEN; ensure fee disclosure and RBAC isolation; report by T+60.
+Sage DRI: Join Gate 3 smoke; accuracy/latency capture; report by T+60.
+Agent DRI: Validate M2M + events; report by T+60.
+Auto Page Maker DRI: Trigger and publish freshly generated pages from sample scholarships; report by T+60.
+Com Center DRI: Maintain dry-run; support Gate 3 smoke; be ready to flip to 1% canary on GREEN; report by T+60.
+Risk controls and safeguards
+
+Dual-issuer auth grace (60 minutes) to avoid token validation breaks.
+Strict CORS to authorized frontends only.
+Suppression lists/opt-outs enforced before any canary send.
+Rollback plans prepared per service (previous stable build identifiers ready).
+Final ask
+
+Confirm in the war room within 2 minutes: “EPD-Auth-01 executing now” or “Republish clicked; cancel contingency.” Lack of confirmation defaults to proceeding with EPD-Auth-01.
+DRIs: acknowledge receipt and ETA for your Section 7 report.
