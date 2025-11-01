@@ -1,0 +1,111 @@
+CEO Directive: Operation Synergy — Executive Orders, Gates, and Evidence Requirements
+
+Context and role
+
+I am acting as CEO. I will not execute Agent3 tasks. I will set strategy, make go/no‑go decisions, define success criteria, and require evidence. The platform’s growth and risk posture must align with the Playbook and our 5‑year $10M ARR plan, with Responsible AI and security embedded by design .
+Executive decisions
+
+Source of truth and “no localhost” policy
+All readiness and compliance must be demonstrated at public URLs only. Evidence from localhost or dev tunnels is non‑compliant. This preserves trust, reduces ambiguity, and aligns with our governance posture for autonomous systems and SRE best practices .
+2. Authentication blocker resolution (mandate)
+
+If any OIDC client registration is missing (e.g., student_pilot, provider_register), you must register clients in scholar_auth (authorization_code + refresh, scopes: openid, email, profile, offline_access; token auth: client_secret_post; production redirect URIs only). No bypasses or “test endpoints.” We will test the real production auth flow to prevent architectural drift, in line with our Responsible AI governance and auditability expectations .
+3. Architecture and resiliency guardrails (non‑negotiable)
+
+JWT/JWKS validation against scholar_auth and RBAC everywhere (Student, Provider, Admin, SystemService).
+Standardized errors and HTTP semantics across services.
+Resiliency patterns implemented for all inter‑service calls: retries with exponential backoff, circuit breakers, bulkheads, health probes. Demonstrate with test artifacts. This reduces operational risk and keeps error budgets intact .
+4. Data and product strategy alignment
+
+scholarship_api remains the single source of truth; choreography for inter‑domain events and controlled orchestration for in‑domain workflows are the default patterns to balance scale and control on Replit’s footprint .
+scholarship_sage must evolve toward “implicit fit” by integrating essay/NLP signals (consistent with Playbook V2.0), and we will measure uplift in match CTR and conversion to paid Essay Coach credits to validate monetization synergy .
+FOC gating, acceptance criteria, and evidence
+
+Gate 1 — Identity & Compliance (scholar_auth + auto_com_center)
+
+Must-have at production URLs: /canary, /.well-known/jwks.json, /login, /register, /logout, /token/refresh. Confirm 6/6 security headers, CORS allowlist, rate limiting. For auto_com_center: POST /api/unsubscribe, GET /api/unsubscribe (HTML), GET /api/suppression-list operational; DRY‑RUN mode ON; queue persistence verified. Provide JSON outputs, response headers, and timestamps. Attach HAR files and latency captures. This aligns with our compliance and accountability framework for autonomous systems .
+Gate 2 — Data Core and RBAC (scholarship_api)
+
+JWT validation against live JWKS and uniform 401/403 behavior; input validation/sanitization documented; integration tests for inbound (provider_register, scholarship_agent) and outbound (student_pilot, scholarship_sage, auto_page_maker). Provide API test suite results and error budget burn report .
+Gate 3 — E2E Flows (B2C + B2B) in DRY‑RUN
+
+B2C: student login → profile CRUD → search (scholarship_api) → recommendations (scholarship_sage) → application draft → event to auto_com_center (no real sends). ≥30 samples; success ≥98%; P95 ≤120ms per hop; zero CORS/auth errors.
+B2B: provider auth → create/update scholarship → appears in scholarship_api → auto_page_maker page generated with schema.org metadata. Provider can see and status their applications (tenant isolation verified). Provide metrics, screenshots, and links to generated pages .
+Gate 4 — Security posture and Responsible AI
+
+Evidence of standardized headers (6/6), TLS everywhere, dependency scans, and rate limits. Provide Responsible AI checklist: bias checks, explainability notes for sage scoring, and user redress channels (appeals/feedback loop). We must maintain transparency and ethical operation as a competitive advantage .
+Gate 5 — Revenue readiness checks (DRY‑RUN)
+
+B2C credit purchase flow simulated end‑to‑end (no real charges).
+B2B 3% provider fee display and calculation verified.
+Instrumentation in place to capture B2C conversion (free→paid via credits) and B2B provider fee accrual. This aligns to our Playbook’s KPI tracking foundation for growth decisions .
+Operational SLOs for all services (must be evidenced)
+
+Uptime ≥99.9%, P95 latency ≤120ms at production URLs, standardized JSON errors, consistent RBAC. Observability dashboards and canary endpoints required. Provide health checks and error budget policy references .
+Lifecycle and obsolescence guidance (for Section 6)
+
+Infrastructure (auth/api/comms): plan 5–7 year refresh horizon or earlier if standards shift (e.g., beyond OAuth 2.0; migration toward passkeys/FIDO2 or SSI). Teams must document the migration path in their reports .
+User-facing (student_pilot/provider_register): 3–4 year major UI/UX overhaul horizon to remain competitive in engagement and conversion.
+Intelligence/automation (scholarship_sage/agent/auto_page_maker): 2–3 year refresh as AI models and automation tooling advance; include retrain/replacement triggers in reports.
+What each DRI must deliver (24-hour deadline)
+
+Submit Section 7 “Mandatory Reporting Format” for your app at its production URL
+Use the exact template below and attach evidence. Where you claim “Verified,” include the concrete proof (JSON, headers, HAR, screenshots, latency tables). Non‑evidenced claims will be treated as “Not Verified.”
+2. Evidence bundle
+
+Canary and JWKS JSON responses (where applicable).
+Security headers dump (6/6).
+RBAC and 401/403 test logs.
+E2E traces (B2C/B2B) with P50/P95/P99 latency and success rates.
+DRY‑RUN flags and provider fee calculations (where applicable).
+Compliance endpoints outputs (for auto_com_center).
+Known risks and mitigation owners.
+3. KPI instrumentation confirmation
+
+Confirm that events for B2C conversion (free→paid, credit ARPU) and B2B provider fee accrual are emitted to our analytics. This is required for data‑first decision making per the Playbook .
+Standardized Section 7 template to submit
+
+*** BEGIN REPORT ***
+
+APPLICATION IDENTIFICATION
+Application Name: [Derive name from URL]
+APP_BASE_URL: [Production URL]
+Application Type: [Infrastructure/User Facing/Intelligence/Automation]
+
+TASK COMPLETION STATUS
+
+Task 4.X.1: [Status] - [Notes/Verification Details + evidence link/JSON]
+Task 4.X.2: [Status] - [Notes + evidence]
+Task 4.X.3: [Status] - [Notes + evidence]
+Task 4.X.4: [Status] - [Notes + evidence]
+INTEGRATION VERIFICATION
+
+Connection with [Dependent App]: [Verified/Failed] - [How tested + evidence]
+Connection with [Dependent App]: [Verified/Failed] - [How tested + evidence]
+Security Headers (6/6): [Yes/No] - [Header dump]
+P95 Latency (ms): [value] - [Measurement window, tool]
+LIFECYCLE AND REVENUE CESSATION ANALYSIS
+
+Estimated Obsolescence Date: [e.g., Q4 2028]
+Rationale: [Stack, standards trajectory (e.g., FIDO2/SSI), scalability limits, UX trends, AI model cadence]
+Contingencies: [What accelerates/extends timeline; migration plan triggers]
+OPERATIONAL READINESS DECLARATION
+[READY / NOT READY] for FOC
+🎉 GATE 1 COMPLIANCE: [ALL ENDPOINTS LIVE AND VERIFIED / NOT YET]
+[List compliance endpoints tested and attach JSON/headers/HAR with timestamps]
+
+*** END REPORT ***
+
+Execution cadence and ownership
+
+0–24 hours: All DRIs submit Section 7 reports with full evidence.
+24–48 hours: Central review; publish pass/fail by gate and a single source of truth board.
+48–72 hours: Remediation sprints; re‑test failed gates.
+DRIs must uphold our “architect-in-the-loop” discipline; the agent accelerates, it does not architect. Contract definitions, security patterns, and resiliency are human‑owned deliverables .
+Revenue and growth tie‑in (next 30 days post‑FOC)
+
+B2C: Track free→paid conversion and ARPU from credit sales; weekly reviews to prioritize SEO/Auto Page Maker content topics that maximize organic acquisition and conversion.
+B2B: Track number of active providers, listings, and realized 3% fees; prioritize onboarding playbooks and provider UX where drop‑off is highest. These metrics drive our capital allocation and roadmap adjustments per the Playbook’s KPI framework .
+Open decision for confirmation
+
+Confirm “Option A only” for any auth client-registration gaps (no workarounds). On confirmation, I will set the 24‑hour clock for Section 7 submissions and schedule the executive review at T+24.
