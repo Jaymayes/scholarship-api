@@ -1,0 +1,82 @@
+Executive decision: Republish now; do not accept localhost as Gate 1 compliance
+
+Rationale
+
+Brand trust, security, and interop depend on production endpoints resolving at the published URLs. Localhost evidence is insufficient to certify FOC or to unblock Limited GO.
+Gate 1 (scholar_auth) and compliance endpoints (auto_com_center) are foundational. Proceeding without public URL verification risks cascading failures in student_pilot, provider_register, and all M2M flows, and jeopardizes our SLOs and CAC targets.
+Authorizations and directives
+
+Immediate actions (T+0 to T+15 minutes)
+Human Ops:
+Execute Manual Republish for:
+scholar_auth: https://scholar-auth-jamarrlmayes.replit.app
+auto_com_center: https://auto-com-center-jamarrlmayes.replit.app
+Reply in this thread: “Clicking Republish now” (for audit trail). If you cannot access deployment, reply: “Cannot access deployment” for immediate escalation.
+DRIs on standby:
+Auth DRI: Prepare post-republish acceptance tests (see checklist below).
+Com Center DRI: Prepare post-republish compliance endpoint tests.
+2. Gate 1 acceptance checklist (must pass at public URLs)
+scholar_auth
+
+Canary: GET /canary returns status: ok, version, p95_ms
+JWKS: GET /.well-known/jwks.json live and key KID matches deployed signer
+Health: GET /healthz returns healthy true
+Auth endpoints reachable: /login, /register, /logout, /token/refresh
+RBAC: JWT roles Student, Provider, Admin, SystemService appear in claims; validate against JWKS
+CORS: Only student_pilot and provider_register origins allowed
+Rate limiting: Active and observed on burst
+Performance (warm): P95 ≤ 200ms on canary and token refresh; target ≤ 120ms after 72-hour tuning
+Security headers: 6/6 present
+auto_com_center
+
+Compliance endpoints live and routable:
+POST /api/unsubscribe → 200 with confirmation payload
+GET /api/unsubscribe (HTML) → Confirmation page
+GET /api/suppression-list → Returns schema with count
+Events disabled for real sends (DRY-RUN mode): ensure sandbox routing or suppression flag is ON
+CORS + security headers: present and correct
+Queue health: No dead-letter growth during tests
+3. Limited GO authorization (B2C) — conditional
+
+Authorized: Yes, in DRY-RUN mode, only after Gate 1 turns GREEN at public URLs for scholar_auth and auto_com_center.
+Scope:
+student_pilot full E2E with production endpoints
+scholarship_api, scholarship_sage integrations
+auto_com_center: deliverability simulated; no outbound to real users (sandboxed/suppressed)
+Exit criteria to convert from DRY-RUN to LIVE:
+Zero 5xx across auth and E2E flows over ≥30 end-to-end samples
+JWT validation success rate = 100%
+P95 per hop ≤ 120ms targets on stabilized runs (auth can be ≤ 200ms during warm, trend to 120ms within 72h)
+CORS/auth errors = 0
+Accessibility (student_pilot): Lighthouse Accessibility ≥ 90
+4. E2E execution timeline (post Gate 1 GREEN)
+
+T+0: Auth DRI posts GREEN with evidence bundle
+T+15 to T+120: E2E run (student_pilot lead)
+Flows: login → profile CRUD → scholarship search (scholarship_api) → recommendations (scholarship_sage) → application submit → status tracking
+Evidence: HAR files, screenshots, standardized error payload checks, P50/P95/P99 per hop, ≥30 samples
+T+120: Evidence bundles posted by each DRI; war room summary compiled for CEO review
+5. Fallbacks and escalation (if Replit proxy path rewrite persists)
+
+Attempt 1: Rebuild with explicit root path config and disable path rewriting; verify /.well-known/ passthrough
+Attempt 2: Switch to dedicated custom domains with TLS and a thin proxy (Cloudflare/NGINX) that preserves paths; cache JWKS with short TTL (≤ 5 min)
+Rollback: Revert to last known good build if public endpoints fail after 10 minutes; keep sandbox up for debugging
+SLA: If Gate 1 cannot be GREEN within 60 minutes, escalate to Platform Lead and move B2C validation to next window
+6. Reporting requirements (Section 7)
+
+Every DRI must submit or update the standardized Section 7 report by T+24 hours, including Lifecycle and Revenue Cessation Analysis and evidence links. No exceptions. These reports are prerequisites for FOC sign-off.
+7. Lifecycle guidance (executive expectations)
+
+Infrastructure (scholar_auth, scholarship_api, auto_com_center): Plan for 5–7 year overhaul cycles; track OAuth/OIDC evolution and crypto agility (key rotation, post-quantum roadmap).
+User-facing (student_pilot, provider_register): Expect 3–4 year major UI/UX refresh cadence; keep WCAG and design system current.
+Intelligence/automation (scholarship_sage, scholarship_agent, auto_page_maker): Assume 2–3 year replacement cycles driven by AI advances; modularize models/pipelines to swap with minimal downtime.
+Business justification
+
+Production verification avoids false positives that inflate our funnel metrics and CAC models.
+Maintaining reliability at the auth and comm layers directly impacts conversion, retention, and provider trust—key levers for our $10M ARR plan.
+DRY-RUN protects brand and compliance while validating the end-to-end path required for organic SEO growth via Auto Page Maker.
+Action required now
+
+Human Ops: Execute republish and reply “Clicking Republish now” within 15 minutes or report “Cannot access deployment.”
+Auth DRI and Com Center DRI: Prepare to run the public URL checklists immediately upon republish and post evidence bundles.
+Once Gate 1 is GREEN, I authorize the B2C Limited GO (DRY-RUN) and expect the full evidence bundle within T+120.
