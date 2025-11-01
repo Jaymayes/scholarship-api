@@ -1,0 +1,49 @@
+Executive decision: GO for auto_com_center production publish now.
+
+Owner and timing
+
+Directly responsible individual: auto_com_center DRI
+Action: Click Publish in Replit now
+SLA: Confirm “Published” status in the war-room within 5 minutes of this directive
+Scope and constraints (must be applied)
+
+Mode: Dry-run only for the first 48 hours (no promotional sends; transactional templates permitted in dry-run)
+Feature flags/env: DISABLE_SEND=true; PROMO_SENDS=false; RETRIES_ENABLED=true; RATE_LIMIT_ENABLED=true
+Security posture: Enforce JWT validation on all inbound events; no bypasses. If scholar_auth Gate 1 is not yet GREEN, service must remain in “receive-and-queue” mode (no dispatch) until JWKS validation passes
+Observability: Enable request/queue metrics, error budget tracking, and structured logs at INFO; elevate to WARN on delivery failures
+Post-publish verification (deliver evidence bundle in 15 minutes)
+Run your prepared script and attach artifacts. Minimum checks:
+
+/canary (v2.7) returns 8 fields; security headers present (6/6); P95 ≤ 120 ms with 30-sample baseline
+Auth/JWKS reachability check to scholar_auth (note: if Gate 1 not GREEN, document as “degraded – pending Gate 1” and rerun on flip)
+M2M token flow (happy-path) for SystemService role from scholarship_agent (document expected block if Gate 1 not GREEN)
+Event ingestion: Post two synthetic events (deadline_soon and new_match) → verify they land in the queue; render templates in dry-run; no external sends
+Delivery providers: Health checks to Email/SMTP and SMS gateway in dry-run; verify credential scopes and throttling
+Kill-switch validation: Confirm DISABLE_SEND toggles message dispatch off within 60 seconds
+Production guardrails (first 48 hours)
+
+No promotional campaigns; transactional-only in dry-run
+A/B testing off
+Concurrency cap to 10 msgs/minute; backoff with jitter enabled
+DLQ retention ≥ 72 hours; dead-letter ratio target < 0.5%
+Monitor SLOs: uptime ≥ 99.9%, 5xx < 0.5%, P95 ≤ 120 ms, auth success ≥ 98%, queue depth stable
+Rollback and pause criteria (any one triggers immediate pause)
+
+5xx ≥ 1% over a rolling 5-minute window
+JWT validation failures ≥ 2% on inbound events over 5 minutes
+Queue depth > 2x baseline for 10 consecutive minutes
+P95 latency > 300 ms for 5 minutes Actions: Toggle DISABLE_SEND=true, pause consumers, revert to last stable deployment, and post incident note in war-room within 10 minutes
+Coordination with platform gates
+
+Independent of Gates 1 and 2 for publish; remain in receive-and-queue and dry-run until Gate 1 (scholar_auth) is GREEN
+Once Gate 1 flips GREEN, rerun token validation tests and update evidence bundle
+Gate 2 (scholarship_api) does not block comm center publish; do a quick canary pull when it flips GREEN to validate event schema compatibility
+War-room updates
+
+T+5 minutes: Publish confirmation + link to build ID
+T+15 minutes: Evidence bundle posted; status set to “auto_com_center: GREEN (dry-run)”
+Hourly for first 6 hours, then every 4 hours during 48-hour window; earlier if any threshold breach
+Rationale tied to Prime Directive
+
+Reliable transactional communications are foundational to trust and conversion in both B2C and B2B funnels. Publishing now in dry-run removes the final blocker to FOC for this component without introducing revenue or compliance risk, while keeping CAC low and protecting our SLOs.
+Proceed and report back within the stated SLAs.
