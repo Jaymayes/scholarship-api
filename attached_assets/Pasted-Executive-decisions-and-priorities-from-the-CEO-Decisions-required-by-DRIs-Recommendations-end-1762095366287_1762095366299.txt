@@ -1,0 +1,105 @@
+Executive decisions and priorities from the CEO
+
+Decisions required by DRIs
+
+Recommendations endpoint ownership and path
+Decision: scholarship_sage is the system of record for intelligent/personalized recommendations.
+Endpoint: Use scholarship_sage /recommendations as the primary interface.
+Auth: JWT required. The service must accept either:
+GET /recommendations for the JWT subject (preferred), and
+GET /recommendations/{student_id} restricted to Admin/SystemService for support and batch operations.
+Data flow: scholarship_sage pulls current profile and scholarship data from scholarship_api via M2M and returns ranked recommendations.
+2. “Shadow endpoint” for campaigns
+
+Decision: Not for production. Do not introduce a shadow /campaigns endpoint in scholarship_sage.
+Rationale: Avoid scope creep and tech debt; keep marketing/campaigns decoupled from matching intelligence. If/when we need campaign content, we will source it via auto_com_center or a dedicated content service.
+Action: Defer campaigns to a separate track. Not a gating item for FOC.
+3. Gate 3 E2E authorization
+
+Decision: GO. E2E testing is authorized immediately.
+Preconditions: Use the already-registered OIDC client and production URLs. Do not expose secrets in client-side code. PKCE should be enabled if the client is public.
+Priority execution plan (who/what/when)
+
+Frontend DRI (student_pilot) – Start now
+
+Configure the provided production OIDC and endpoint env vars (already delivered).
+Deploy to production and execute the B2C E2E run with ≥30 samples.
+Deliver the evidence bundle within 2 hours:
+HAR files and latency (P50/P95/P99)
+Success/failure counts (401/403/4xx/5xx)
+Lighthouse accessibility report (target ≥90)
+Security headers and CSRF verification
+Feature flag: primary path points to scholarship_sage /recommendations. Keep fallback flag ready but OFF by default.
+Sage DRI (scholarship_sage) – Start now (parallel)
+
+Confirm production availability of GET /recommendations (JWT-subject) and GET /recommendations/{student_id} (Admin/SystemService).
+Enforce scopes and RBAC; document response schema and version it (v1).
+Validate M2M calls to scholarship_api; include request_id in responses and standardized errors.
+Publish a one-pager API contract link to the Section 7 evidence.
+API DRI (scholarship_api) – Start now (parallel)
+
+No change in ownership; remain source of truth for profiles, scholarships, and applications.
+Provide cached “last-known” recommendations read-through endpoint only if Sage is down (feature-flagged failover, TTL ≤24h). Default OFF.
+Ensure JWKS validation and RBAC are green; keep P95 ≤120ms.
+Auth DRI (scholar_auth)
+
+OIDC is complete; proceed to produce the HAR capture for auth code → token exchange to close the remaining evidence gap.
+Confirm JWKS endpoint health, CORS allowlist (student_pilot, provider_register), rate limiting, and rotate the student_pilot client secret at first GA milestone (≤30 days).
+B2B DRI (provider_register)
+
+Start RBAC isolation tests immediately after E2E auth confirmation from student_pilot.
+Deliver 30-sample evidence set within 12 hours of Gate 1 GREEN.
+SEO DRI (auto_page_maker) and Agent DRI (scholarship_agent)
+
+Stay on T+24h for Section 7 submissions.
+For auto_page_maker: verify trigger on scholarship create/update, metadata, schema markup, and deployment proof.
+For scholarship_agent: validate M2M auth, retries/circuit breakers, and event dispatch to auto_com_center.
+Acceptance criteria to declare FOC ready for these gates
+
+Student_pilot E2E (B2C)
+
+P95 latency ≤120ms on UI’s critical API calls
+Auth success rate ≥98%, zero P0 auth defects
+Accessibility Lighthouse ≥90
+0 critical 5xx during the test window
+Recommendations widget calling scholarship_sage /recommendations with valid JWT
+Scholarship_sage
+
+/recommendations endpoints operational with documented schema
+RBAC/scopes enforced; 401/403 verified
+Standardized error format with request_id; logs correlate requests across services
+Scholarship_api
+
+Continues to pass RBAC and SLOs; failover recommendations endpoint remains OFF
+Scholar_auth
+
+HAR evidence delivered
+CORS, rate-limiting, password hashing, JWKS validation green
+Scope discipline and risk notes
+
+Do not ship a stopgap /campaigns shadow endpoint in scholarship_sage.
+Keep marketing/campaigns separate; if needed later, we’ll route via auto_com_center or a dedicated service.
+Ensure refresh-token handling complies with security policy (httpOnly, rotation, revocation).
+FERPA/COPPA/consent flows: confirm no PII is exposed in URLs; prefer JWT-subject-based access patterns.
+Lifecycle and revenue perspective
+
+The chosen architecture aligns with our principles:
+scholarship_api as source of truth
+scholarship_sage as the intelligence layer for revenue-driving personalization
+Expected refresh horizons remain:
+scholarship_sage intelligence cycle: 2–3 years (model/logic refresh)
+student_pilot UI: 3–4 years (UX/AI-UX evolution)
+No added tech debt from shadow endpoints that would accelerate these cycles.
+Directives summary
+
+Endpoint owner: scholarship_sage
+Endpoint path: /recommendations (JWT-subject) + /recommendations/{student_id} (Admin/SystemService)
+Shadow endpoint for campaigns: No (defer)
+E2E authorization: GO now
+Deliver student_pilot E2E evidence in 2 hours; provider_register RBAC in 12 hours post-auth GREEN; remaining three Section 7 reports by T+24h
+Report back when:
+
+student_pilot E2E bundle is uploaded and green
+scholarship_sage publishes the API contract for /recommendations
+provider_register completes RBAC evidence set
+This sequencing keeps us on track for FOC while protecting long-term maintainability and revenue velocity.
