@@ -1,0 +1,97 @@
+Acknowledged. As CEO, I’m setting the strategy, success criteria, and go/no‑go decisions for Operation Synergy. Thank you for the thorough groundwork. Here are my directives.
+
+Executive decisions (effective immediately)
+
+Start 24-hour clock: Yes. T0 is now. All eight Section 7 reports must be submitted or reconfirmed by T+24h, with evidence at production URLs only.
+B2C Limited GO (DRY-RUN): Approved. Scope limited to internal testers and a pilot cohort of up to 20 students. No live emails/SMS. DRY-RUN must remain enforced.
+B2B Limited GO: Deferred. Provider performance and authorization gaps must be cleared first.
+No localhost, no bypasses: Reaffirmed. Option A only for auth. Production OAuth/OIDC flows required across all apps.
+Gate status and required actions
+
+Gate 1: Identity and Compliance
+
+scholar_auth: Conditional GREEN. Action: Register/confirm OIDC clients for student_pilot and provider_register (authorization_code + refresh_token; scopes: openid, email, profile, offline_access; token auth: client_secret_post; production redirect URIs only). Owner: Auth DRI. Deadline: T+4h. Deliver evidence: client registry export and successful auth code exchange logs.
+auto_com_center: GREEN for DRY-RUN. No live sends until Postmark (or equivalent) integration is validated and suppression list persistence (Redis/PG) is in place. Owner: Comms DRI. Deadlines: DRY-RUN E2E at T+24h; LIVE readiness checklist by T+72h (subject to Legal sign-off).
+Gate 2: Data Core and RBAC
+
+scholarship_api: GREEN with a performance improvement plan. Maintain standardized errors and RBAC. Performance target adherence (see below). Owner: API DRI. Milestones: P95 ≤150ms by T+24h; ≤130ms by T+48h; ≤120ms by T+72h.
+Gate 3: E2E Flows
+
+student_pilot: BLOCKED on client registration. Owner: Frontend DRI. Start E2E immediately after Auth DRI confirms registration. Capture ≥30 samples, full HARs, and Lighthouse (Accessibility ≥90).
+provider_register: NOT READY. Current P95 reportedly ~3.6s is unacceptable. Owner: B2B DRI. Deliver a performance plan and bring P95 ≤120ms. Deadline for plan: T+12h. Execution: T+72h.
+Intelligence/Automation
+
+scholarship_sage: GREEN with one exception. Resolve production routing issue for /api/* endpoints before LIVE traffic, or demonstrate that endpoint isn’t required for Gate 3. Owner: Sage DRI. Deadline: T+12h. Provide Responsible AI attestation (assistive only, no cheating; bias mitigation and transparency controls) in the evidence bundle.
+scholarship_agent: PENDING. Must demonstrate M2M token acquisition (SystemService role), resilient retries, and event emission to auto_com_center (DRY-RUN). Owner: Agent DRI. Deadline: T+24h.
+auto_page_maker: PENDING. Deliver three example pages generated via triggers from scholarship_api; confirm schema.org markup, titles/descriptions, canonical tags, and auto-deployment. Owner: SEO/Auto-Page DRI. Deadline: T+24h for generated pages; T+72h for initial indexation plan (sitemaps, internal linking).
+Interoperability and security mandates
+
+Centralized auth: scholar_auth remains the single authority. All services must validate tokens via JWKS; no shadow identity stores.
+Standardized errors: Maintain consistent HTTP codes and JSON error schema across services.
+CORS: Restrict to student_pilot and provider_register production origins only.
+TLS: HTTPS only, HSTS enabled. Maintain 6/6 security headers across all apps.
+SLOs, KPIs, and acceptance criteria
+
+SLOs (target P95 ≤120ms, uptime ≥99.9%):
+scholarship_api: phased targets (≤150ms T+24h; ≤130ms T+48h; ≤120ms T+72h).
+scholar_auth: maintain P95 ≤120ms.
+scholarship_sage: maintain P95 ≤120ms.
+student_pilot/provider_register: page-interactive TTI ≤2.5s on 4G; API calls P95 ≤120ms.
+B2C DRY-RUN cohort success metrics (pilot):
+Registration → first valid recommendation: ≥60% within first session.
+Registration → first application started: ≥25% within 7 days (simulated where necessary).
+Free → simulated credit purchase intent (proxy event): ≥10%.
+Zero Sev1 incidents; unsub flow functional; 0 live sends.
+B2B readiness gates (to re-open Limited GO):
+provider_register P95 ≤120ms; verified RBAC scoping (provider sees only own org data).
+End-to-end scholarship CRUD → scholarship_api → auto_page_maker trigger verified.
+Observability (non-negotiable):
+Dashboards: P50/P95/P99 latency, 5xx rate, auth failure rate, DRY-RUN comms queue depth, and funnel KPIs. Owner: Platform/Analytics. First cut by T+12h.
+Lifecycle and obsolescence planning
+
+Accept the horizon assumptions as baselines:
+Infrastructure (auth, api, com center): 5–7 years.
+User-facing (student_pilot, provider_register): 3–4 years.
+Intelligence/Automation (sage, agent, page maker): 2–3 years.
+Deliver a portfolio refresh calendar with upgrade/migration windows, deprecation triggers, and budget envelopes. Owner: CTO/PMO. Due T+7 days.
+Risk controls and compliance
+
+Responsible AI: Preserve assistive posture; no plagiarism/cheating enablement. Log high-risk prompts; enforce rate limits.
+Privacy/Compliance: CAN-SPAM/GDPR unsubscribe verified; prepare COPPA/FERPA posture. Legal sign-off required before LIVE comms.
+Security: Rate limiting on all public endpoints; password hashing best-practice; secrets rotation plan by T+14 days.
+Capital allocation and priorities
+
+Prioritize organic growth: Allocate immediate engineering time to auto_page_maker triggers and scholarship_api performance. Defer paid ads; focus on SEO landing pages, sitemaps, and internal linking.
+Fund caching and DB indexing for API (engineering hours now beat ad dollars later).
+Legal/Compliance budget for comms LIVE-readiness.
+Owner assignments and deadlines (summary)
+
+Auth DRI: OIDC client registration for student_pilot and provider_register. Due T+4h.
+Frontend DRI (student_pilot): Gate 3 E2E evidence after auth is GREEN. Due T+24h.
+B2B DRI (provider_register): Performance plan T+12h; P95 ≤120ms by T+72h.
+API DRI: Performance milestones at T+24h/48h/72h; RBAC/standardized errors maintained.
+Sage DRI: Resolve /api routing or document non-dependency; Responsible AI attestation. Due T+12h.
+Agent DRI: M2M + events to auto_com_center in DRY-RUN. Due T+24h.
+Auto Page Maker DRI: 3 production pages with full SEO schema and deployment. Due T+24h.
+Comms DRI: DRY-RUN E2E proof at T+24h; LIVE readiness checklist at T+72h.
+Platform/Analytics: War-room dashboard links and alerting. First cut T+12h.
+Reporting cadence
+
+Updates every 6 hours during the 24-hour window: Gate statuses, blockers, and evidence links.
+Executive review at T+24h for FOC decision gating and potential expansion of the B2C DRY-RUN cohort.
+Go/no-go criteria to exit DRY-RUN to LIVE (B2C)
+
+Zero Sev1 incidents for 48 consecutive hours.
+Unsubscribe/suppression proven; 0 policy violations; Legal sign-off in hand.
+End-to-end P95 ≤140ms across core APIs; page-interactive TTI ≤2.5s on 4G.
+Auth failures ≤0.5% of attempts (7-day window).
+Pilot cohort KPIs at or above targets listed above.
+Next steps
+
+Proceed with the above owner actions and timelines. Post your first status update at T+6h with:
+Auth client-registration proof (student_pilot, provider_register).
+API latency snapshot and indexing plan.
+Sage routing resolution or scope confirmation.
+DRY-RUN comms test results and queue health.
+Student_pilot E2E readiness checklist.
+This plan aligns with our 5-year ARR objective by prioritizing organic acquisition (Auto Page Maker), safeguarding user trust (Responsible AI and compliance), and driving low-CAC conversion with a performant, secure core data layer. Execute with urgency. I will hold all DRIs accountable to the timelines above.
