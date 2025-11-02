@@ -1,0 +1,134 @@
+CEO Decision Memorandum — Operation Synergy
+
+Executive summary
+
+FOC status: NOT READY. Path to GREEN within 72 hours is achievable with decisive action.
+Primary blockers:
+Centralized-auth deviations and leaked client secret(s).
+student_pilot E2E blocked by auth client registration/rotation.
+auto_com_center governance inconsistency and pending DRY-RUN.
+Missing or conflicting Section 7 reports (auto_page_maker, scholarship_agent) and duplicate/contradictory reports (scholarship_sage).
+Economic priority reminder: Auto Page Maker must be production-ready and event-driven from scholarship_api; it is our lowest-CAC growth engine. Its missing/partial readiness is a top-line risk.
+Final decisions and mandates
+
+One and only issuer
+Decision: scholar_auth remains the sole OIDC issuer. No other service may advertise, proxy, or redirect OIDC discovery or token endpoints.
+Mandate: Remove all OIDC endpoints from non-auth services and return 404 (no redirects, no “helpful” discovery). Token validation must use scholar_auth JWKS only.
+Deadline: T+6h code merged and deployed; T+12h verified in E2E logs.
+2. Secret leakage response (compromised secrets in chat/logs)
+
+Decision: Treat every previously displayed client secret as compromised.
+Mandate (Auth DRI):
+Rotate student_pilot client secret again and any other client secrets mentioned or logged.
+Invalidate all refresh tokens issued since the first exposure timestamp.
+Enforce “no secrets in logs or chat.” Add log guard rails to strip secrets and authorization headers.
+JWKS key-rotation schedule: rolling every 30 days, emergency rotation playbook documented.
+Deadline: T+1h rotation complete; T+2h audit trail and verification bundle submitted.
+3. student_pilot unblock and E2E
+
+Decision: Proceed with E2E immediately after Auth DRI confirms registration + secret rotation via secure channel.
+Acceptance criteria (30-sample run):
+Auth success rate ≥ 98%
+P95 end-to-end page-to-dashboard ≤ 120ms for API calls; zero critical 5xx
+Lighthouse accessibility ≥ 90
+Recommendations fetched from scholarship_sage primary path
+Deadline: T+4h finish E2E and submit evidence bundle.
+4. provider_register issuer configuration
+
+Decision: Update provider_register AUTH_ISSUER_URL to the production scholar_auth immediately.
+Mandate: Register client “provider-register” in scholar_auth; enforce Provider role isolation. Execute 30-sample RBAC isolation tests after student_pilot is GREEN.
+Deadline: T+6h config + registration; T+12h RBAC test bundle.
+5. auto_com_center governance and DRY-RUN
+
+Decision: The canonical state is “no OIDC endpoints present”; comply with Decision #1.
+DRY-RUN scope: Postmark (or equivalent) in sandbox mode only, queue, template rendering, bounce/complaint handling, and unsubscribe compliance.
+Acceptance criteria:
+Zero sends to live channels
+Queue durability tests at 5x peak expected load; no message loss
+Opt-out flow compliant and auditable
+Deadline: T+6h DRY-RUN start; T+18h pass report.
+6. scholarship_api stability freeze
+
+Decision: ACCEPTED as READY pending ecosystem E2E. Maintain a freeze on schema/index changes during the E2E window.
+SLO: Sustain ≤120ms P95; standardized error payloads.
+7. scholarship_sage canonicalization
+
+Decision: scholarship_sage is an Intelligence service. Use the production URL only. Remove any dev hostnames from config/docs.
+Mandate: Submit a single canonical Section 7 report with the production APP_BASE_URL and versioned /recommendations contract v1 as the only source of truth.
+Deadline: T+4h.
+8. scholarship_agent report and eventing
+
+Decision: Missing for FOC. Submit Section 7 for scholarship_agent covering M2M auth (SystemService), ingestion logic, retries/circuit breakers, and event emission to auto_com_center.
+Acceptance criteria: Demonstrate resilient fetch/push with exponential backoff and circuit break; standardized event payloads.
+Deadline: T+6h.
+9. auto_page_maker FOC-critical
+
+Decision: Missing. This is the engine for organic growth and must be GREEN before FOC.
+Mandate: Submit Section 7 with:
+Verified trigger from scholarship_api create/update
+Template population correctness
+SEO metadata (titles, descriptions, schema.org) and sitemap updates
+Automated deployment to public endpoints
+Evidence of 10+ pages generated and indexed-ready (noindex toggle off in prod)
+Deadline: T+12h submission; T+24h DRY-RUN SEO checks completed.
+10. Compliance and risk controls
+
+FERPA/COPPA and CAN-SPAM/GDPR requirements must be verified in auto_com_center and across data flows.
+Add Data Protection Impact Assessment (DPIA) summary in each Section 7 where user data is processed.
+Deadline: T+24h DPIA summaries attached to each report.
+FOC gating checklist (must all be GREEN)
+
+Centralized auth: scholar_auth only issuer; JWKS validation across all services; CORS restricted to student_pilot and provider_register.
+Secrets: All compromised secrets rotated; refresh tokens invalidated; log guards active.
+B2C E2E: student_pilot 30-sample pass with acceptance criteria met.
+B2B E2E: provider_register 30-sample RBAC isolation pass; Provider-only data access verified.
+Intelligence: scholarship_sage recommendations v1 consumed by student_pilot; response schema stable.
+Automation: scholarship_agent M2M with retries/circuit breakers; events posted to auto_com_center.
+Communications: auto_com_center DRY-RUN pass; queue durability and unsubscribe compliance verified.
+SEO engine: auto_page_maker page generation + SEO metadata + deployment verified; sitemap updated.
+SLOs: 99.9% uptime target; ≤120ms P95 for all public APIs sustained through E2E window.
+Standardized errors: Consistent JSON with request_id everywhere.
+Owner assignments and deadlines
+
+Auth DRI (owner: Auth Lead)
+Secrets rotation, refresh token invalidation, client registrations: T+1–2h
+CORS hardening to student_pilot and provider_register: T+4h
+JWKS rotation policy doc: T+6h
+student_pilot DRI (owner: Frontend Lead)
+Execute 30-sample E2E upon auth GREEN: complete by T+4h
+provider_register DRI (owner: B2B Lead)
+Update issuer to production, client registration, RBAC tests: T+12h
+auto_com_center DRI (owner: Comms Lead)
+Remove any OIDC remnants; DRY-RUN evidence at 5x load; compliance pass: T+18h
+scholarship_api DRI (owner: Platform Lead)
+Maintain freeze; provide metrics; support E2E: ongoing
+scholarship_sage DRI (owner: Intelligence Lead)
+Single canonical report and prod URL normalization: T+4h
+scholarship_agent DRI (owner: Automation Lead)
+Submit Section 7; prove event emission and resilience: T+6h
+auto_page_maker DRI (owner: Growth Platform Lead)
+Full Section 7 + DRY-RUN SEO: T+12h submit; T+24h checks
+Data-first reporting required
+
+Submit a consolidated E2E dashboard by T+24h with:
+P50/P95/P99 latency per service (24h window)
+Error rates (4xx/5xx) and top 3 standardized error codes
+Auth success funnel (authorize → token → app session)
+Messaging DRY-RUN delivery metrics and queue depth
+Auto Page Maker page counts, crawlability signals, and schema validation pass rate
+Lifecycle and revenue cessation guardrails
+
+Infrastructure (scholar_auth, scholarship_api, auto_com_center): Plan for 5–7 year refresh; budget a 2029–2031 modernization track. Monitor for OAuth standard shifts and PQC mandates.
+User-facing (student_pilot, provider_register): Plan 3–4 year redesign cadence (2028 window) with incremental accessibility improvements quarterly.
+Intelligence/Automation (scholarship_sage, scholarship_agent, auto_page_maker): Plan 2–3 year refresh (2027–2028), with continuous model/logic upgrades every quarter.
+Go/No-Go posture
+
+Current: NO-GO for FOC.
+Target: GO within 72 hours, contingent on passing the gating checklist above.
+Next executive checkpoint: T+24h with evidence bundles; T+72h final FOC review.
+Notes on contradictions detected
+
+scholarship_sage: Conflicting app type and multiple base URLs reported. Resolve to a single Intelligence service with the production URL only. Submit one canonical Section 7.
+auto_com_center: Conflicting statements about OIDC endpoints. The final, authorized state is “no OIDC endpoints exposed.” Confirm in code and evidence.
+Close
+Execute with urgency. The $10M ARR trajectory depends on the B2C engine (Auto Page Maker + student_pilot) and the B2B engine (provider_register) coming online under centralized auth, with zero ambiguity. Report back at T+24h with the consolidated evidence dashboard and any exceptions requiring executive decision.
