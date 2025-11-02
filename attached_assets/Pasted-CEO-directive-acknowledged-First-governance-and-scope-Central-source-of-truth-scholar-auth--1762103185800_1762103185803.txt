@@ -1,0 +1,73 @@
+CEO directive acknowledged.
+
+First, governance and scope
+
+Central source of truth: scholar_auth is the only OIDC issuer. auto_com_center is not an identity provider and must not advertise itself as OIDC issuer. Roll back any configuration or documentation implying an issuer at auto_com_center and standardize on scholar_auth discovery and JWKS endpoints immediately. This preserves our centralized-auth standard and reduces operational risk in a multi-app Replit topology, where we already rely on a central “Database-as-a-Service” and strict inter-service contracts for scale and security .
+Human-on-the-loop: Any auth/config change that can affect cross-app login must pass an approval gate and have an immediate rollback plan. This is standard for autonomous operations with high blast radius, aligning to our HOTL safeguards with approval gates and override mechanisms .
+Immediate security action required
+A client secret was pasted into chat. Treat it as compromised.
+
+Rotate the student_pilot client secret again in scholar_auth.
+Invalidate all refresh tokens issued to student_pilot since the compromised timestamp.
+Search code, docs, and CI logs for secret leakage; purge and replace where found.
+Confirm production discovery remains https://scholar-auth-jamarrlmayes.replit.app/.well-known/openid-configuration and JWKS is healthy.
+Document an immutable audit trail of actions taken and approvals granted. We require decision traceability for every sensitive change, consistent with our accountability framework for autonomous systems .
+Clarifications and decisions
+
+Yes, student_pilot is a separate deployed application. Each app is its own deployable microservice on Replit and must be configured independently with its own secrets and env vars .
+You will not access or deploy student_pilot from auto_com_center. Ownership stays with the student_pilot DRI; you provide the configuration contract and evidence requirements.
+Provide the student_pilot team with configuration instructions without exposing any secret values in plaintext. Use Replit Secrets only and share via our secure channel.
+FOC gating plan (next 120 minutes)
+
+Auth DRI (owner: scholar_auth)
+T+0–20: Rotate student_pilot secret (again), confirm client registration, scopes, grant types, and redirect URIs. Freeze issuer to scholar_auth only. Deliver signed change log and rollback steps.
+Success criteria: Authorization succeeds end-to-end with PKCE; no invalid_client errors; JWKS kid matches tokens.
+Frontend DRI (owner: student_pilot)
+T+20–90: Execute 30-sample E2E run across Login → Dashboard → Profile → Search → Recommendations → Applications. Collect HARs, latency, and accessibility evidence. No code changes during the window beyond env updates.
+Targets: Auth success ≥98%, P95 latency ≤120ms, Lighthouse accessibility ≥90, zero critical 5xx, 6/6 security headers.
+API DRI (owner: scholarship_api) and Intelligence DRI (owner: scholarship_sage)
+T+20–120: Sustain SLOs and support E2E. No new endpoints or schema changes during the window. Maintain standardized errors and RBAC enforcement. This aligns to our production hardening posture and the need for deliberate resiliency in a Replit multi-app system .
+Agent3: identify your app and report
+You must execute only the directives for your app per Section 4 and submit the mandatory report. Begin by confirming APP_BASE_URL from your runtime environment. Do not proceed until you post that value.
+
+Use this template verbatim:
+
+*** BEGIN REPORT ***
+
+APPLICATION IDENTIFICATION
+Application Name: [e.g., scholar_auth]
+APP_BASE_URL: [paste exact value]
+Application Type: [Infrastructure/User Facing/Intelligence/Automation]
+
+TASK COMPLETION STATUS
+
+Task 4.X.1: [Status: Complete/In Progress/Blocked] - [Notes/Verification Details]
+Task 4.X.2: [Status: Complete/In Progress/Blocked] - [Notes/Verification Details]
+Task 4.X.3: [Status: Complete/In Progress/Blocked] - [Notes/Verification Details]
+Task 4.X.4: [Status: Complete/In Progress/Blocked] - [Notes/Verification Details]
+INTEGRATION VERIFICATION
+
+Connection with [Dependent App Name]: [Verified/Failed] - [How tested, evidence link]
+Connection with [Dependent App Name]: [Verified/Failed] - [Details]
+LIFECYCLE AND REVENUE CESSATION ANALYSIS
+
+Estimated Revenue Cessation/Obsolescence Date: [e.g., Q4 2028]
+Rationale: [Infra 5–7 yrs; User Facing 3–4 yrs; Intelligence 2–3 yrs; consider standards evolution, model churn, UX trends]
+Contingencies: [Factors that could accelerate or extend timeline]
+OPERATIONAL READINESS DECLARATION
+[READY / NOT READY] and rationale
+
+*** END REPORT ***
+
+Strategic context for your analysis
+
+Our growth engine prioritizes organic SEO via Auto Page Maker. Validate triggers, templates, and metadata to keep CAC structurally low while compounding indexed pages and discoverability. The Replit constraints make a disciplined, contract-first integration essential across services and events .
+Security posture is a sales feature. Our Year 1 pen test and acceleration toward SOC 2 are core to B2B velocity; do not regress on controls, secrets hygiene, or standardized error handling during this push .
+Product fit: scholarship_sage must continue evolving toward implicit-fit recommendations by leveraging essay/NLP signals, per the revised roadmap. This directly improves student value and B2C conversion, while increasing provider marketplace value via better match quality .
+What I need from you now
+
+Post your APP_BASE_URL and confirm your assigned application.
+Confirm you have reverted any issuer misconfiguration to point exclusively to scholar_auth.
+Submit the completed Section 7 report for your app within 30 minutes.
+If you are in student_pilot or scholar_auth, confirm secret rotation, client registration, and a single successful end-to-end login round-trip (no secrets in chat). Attach evidence references via secure channel.
+This preserves our SLOs and security commitments while unblocking the E2E gate—critical steps in the data-first, low-CAC path to $10M+ ARR and sustained market leadership  .
