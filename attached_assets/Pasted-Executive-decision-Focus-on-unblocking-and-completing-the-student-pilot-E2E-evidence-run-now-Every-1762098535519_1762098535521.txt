@@ -1,0 +1,54 @@
+Executive decision: Focus on unblocking and completing the student_pilot E2E evidence run now. Everything else is secondary until Gate 3 E2E is GREEN.
+
+Why this is first
+
+It’s the CEO’s highest-priority deliverable with a 2-hour clock.
+It validates our B2C funnel, which drives low-CAC, SEO-compounding growth.
+All downstream tracks (B2B RBAC, T+24 Section 7 submissions) depend on this being green.
+What you do in the next 120 minutes
+0–20 minutes: Remove the “invalid_client” blocker
+
+Auth DRI (owner): Register the production OIDC client for student_pilot at the production issuer.
+Issuer: https-only production URL for scholar_auth.
+Client ID: student-pilot (confirm exact value in auth registry).
+Redirect URIs: production callback routes for student_pilot only. Do not include dev or preview wildcard URIs in production client.
+Grants/Scopes: authorization_code + refresh_token; openid, email, profile, offline_access.
+Token endpoint auth method: client_secret_post (or the configured standard).
+Rotate secrets immediately; do not paste them in chat. Store in secrets manager only.
+Frontend DRI (you): Remove any dev issuer from student_pilot config; set the production issuer. Clear caches, rebuild, redeploy.
+20–40 minutes: Prove the login round-trip
+
+Verify /.well-known/openid-configuration resolves for the production issuer.
+Exercise the full login flow via the UI. Confirm valid ID/Access/Refresh tokens issued; session established; logout clears session.
+Capture a HAR of the full auth journey (no secrets included).
+40–90 minutes: Execute E2E + evidence capture
+
+Paths to test: Dashboard → Profile → Search (scholarship_api) → Recommendations (scholarship_sage) → Application CRUD.
+Evidence to collect (≥30 samples):
+Latency: P50/P95/P99 for each critical endpoint; target P95 ≤120 ms.
+Success rates: ≥98% auth success; 0 critical 5xx.
+RBAC: 401/403 behave correctly when tokens/scopes are missing.
+Lighthouse: accessibility ≥90; capture report.
+Security: verify the 6/6 headers; CSRF protections in place.
+Screenshots: key flows.
+Flag any endpoint exceeding the budget; open a ticket with request IDs.
+90–120 minutes: Package and submit
+
+Assemble the evidence bundle (HAR, metrics, Lighthouse, screenshots, summary).
+Submit the Gate 3 E2E report with a one-page executive summary: status, KPIs, outliers, and remediation items.
+Secondary tasks while E2E runs
+
+scholarship_sage DRI: Keep /recommendations contract published and enforce RBAC/scopes; ensure M2M pull from scholarship_api is ready. No failover endpoint needed right now.
+scholarship_api DRI: Sustain P95 ≤120 ms; monitor RBAC/JWKS; no new endpoints pre-E2E. Keep failover recommendation endpoint behind a flag and OFF.
+auto_com_center DRI: Stay in prep; we’ll validate unsubscribe→send DRY-RUN after infra clears the canary heap pressure.
+provider_register DRI: Queue 30-sample RBAC isolation tests after E2E is GREEN.
+Risk and escalation rules
+
+If the OIDC client isn’t registered in 20 minutes, escalate to me. Do not proceed with dev issuers or insecure flows. No workarounds that bypass production issuer.
+Any secrets previously posted must be rotated now. Treat them as compromised.
+Definition of done for this window
+
+student_pilot E2E evidence bundle delivered and GREEN.
+Auth success rate ≥98%, critical API P95 ≤120 ms, Lighthouse ≥90, zero critical 5xx.
+Recommendations widget verified against scholarship_sage with valid JWT.
+Answering your direct question: Focus on student_pilot E2E setup and evidence collection right now. Pair with Auth DRI immediately to register the production OIDC client and clear the invalid_client error. Once you confirm auth GREEN, run the 30-sample E2E and deliver the bundle within the 2-hour window. After that, move to provider_register RBAC evidence.
