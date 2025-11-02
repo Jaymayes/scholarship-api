@@ -1,0 +1,81 @@
+Acknowledged. As CEO, here is the executive integration decision and directive for Operation Synergy.
+
+Executive summary
+
+Goal: Full Operational Capability across the ecosystem with one identity issuer, one source of truth, standardized security, and ≤120ms P95 latency.
+Current state: 5 apps READY, 2 apps NOT READY due to auth configuration and client registration, and 1 app requires DRY-RUN scale validation.
+Go/No-Go: No-Go for FOC until two P0 auth blockers are cleared. Target to greenlight within the same business day if actions below are executed immediately.
+Readiness by application
+
+scholar_auth (Infrastructure): READY with two minor T+4h items noted (CORS allowlist hardening; log guardrails middleware integration). Sole OIDC issuer. JWKS operational. Action: complete two hardening items after FOC greenlight to avoid churn.
+scholarship_api (Infrastructure): READY. RBAC middleware, standardized errors, indexes, P95 ~93ms. Sole OIDC issuer respected.
+scholarship_sage (Intelligence): READY. /recommendations endpoint stable, P95 ~1ms, JWT/JWKS integration with scholar_auth.
+scholarship_agent (Intelligence/Automation): READY pending DRY-RUN of event throughput with auto_com_center. Circuit breakers, M2M flow, event catalog complete.
+auto_page_maker (Intelligence/Automation): READY. 2,101 generated pages, sitemap and IndexNow enabled, schema.org coverage. Recommend DRY-RUN validation (search console, 10-page content audit, funnel check).
+auto_com_center (Infrastructure/Comms): Requires DRY-RUN at 5× expected load to validate queue durability and delivery integrations (email/SMS). If DRY-RUN passes, mark READY.
+provider_register (User Facing): NOT READY (P0). Blocked on AUTH_ISSUER_URL secret pointing to dev, and OIDC client registration.
+student_pilot (User Facing): NOT READY (P0). Blocked on OIDC client registration and secret rotation.
+Mandatory corrective actions (critical path)
+Execute these in order; owners and SLAs included.
+
+Register OIDC clients in scholar_auth (Owner: Auth DRI; SLA: T+60 minutes)
+Clients: student-pilot, provider-register
+Grant types: authorization_code + refresh_token (PKCE S256)
+Scopes: openid email profile roles offline_access
+Redirect URIs:
+student-pilot: https://student-pilot-jamarrlmayes.replit.app/api/callback
+provider-register: https://provider-register-jamarrlmayes.replit.app/auth/callback
+Rotate secrets; update via Replit Secrets only; invalidate any issued refresh tokens since compromise markers.
+2. Update misconfigured issuer secret (Owner: Operator; SLA: T+15 minutes)
+
+Replit Secret AUTH_ISSUER_URL for provider_register → https://scholar-auth-jamarrlmayes.replit.app
+Restart service after update.
+3. Smoke test auth round-trips (Owner: Frontend DRI; SLA: T+30 minutes after step 1-2)
+
+Validate login → callback → refresh token rotation (one student; one provider)
+Acceptance: 2/2 success, 0 errors, tokens present as HttpOnly, Secure cookies.
+4. Gate 3 E2E runs (Owner: Frontend DRI; SLA: T+90 minutes)
+
+Student-pilot: 30-sample run; measure auth success ≥98%, P95 ≤120ms across top 5 API calls; Lighthouse Accessibility ≥90; zero critical 5xx.
+Provider-register: 30-sample RBAC isolation run after auth GREEN; org-scoped access only; zero cross-tenant leakage.
+5. auto_com_center DRY-RUN (Owner: Comms DRI; SLA: T+60 minutes in parallel with E2E)
+
+Push 5× peak event volume; verify queue durability, retries, and unsubscribe compliance.
+Acceptance: ≥99% delivery success, no dead-letter backlog growth, opt-out honored.
+6. SEO DRY-RUN (Owner: Growth DRI; SLA: T+24 hours, non-blocking to FOC)
+
+Verify sitemap, IndexNow, random 10-page quality audit, and CTA → student signup funnel.
+Go/No-Go decision criteria
+
+Go when:
+Two P0 auth blockers cleared and smoke tests pass.
+E2E: auth success ≥98%, P95 ≤120ms, 0 critical 5xx, RBAC isolation 100%.
+auto_com_center DRY-RUN ≥99% delivery success with no DLQ growth.
+No-Go if any criterion fails or cross-tenant data access is observed.
+Risk register and mitigations
+
+Auth configuration drift (HIGH): Lock secrets in Replit Secrets; enable startup config validation that hard-fails on dev issuer.
+Cross-tenant leakage (CRITICAL): Enforce org-scoped filters at repository layer; add unit tests and E2E assertions before release.
+Queue saturation (MEDIUM): Confirm back-pressure and retry policies in DRY-RUN; pre-provision capacity.
+SEO index volatility (LOW, non-blocking): Monitor Search Console; roll incremental template improvements.
+Lifecycle and revenue cessation horizon
+
+Infrastructure (scholar_auth, scholarship_api, auto_com_center): 5–7 years. Watch for OAuth 2.1/3.0 shifts, PQC, and scale thresholds.
+User Facing (student_pilot, provider_register): 3–4 years. Plan major UX refresh aligned to WCAG 3.0 and AI-first interaction norms.
+Intelligence/Automation (scholarship_sage, scholarship_agent, auto_page_maker): 2–3 years. Budget for ongoing model/logic upgrades to maintain differentiation.
+KPIs tied to $10M ARR plan
+
+B2C funnel: auth success ≥98%, P95 ≤120ms, conversion lift from sage-driven recommendations; Stripe test mode validated and ready for prod keys.
+B2B engine: provider_register live with frictionless onboarding; 3% platform fee disclosure present; RBAC isolation proven.
+CAC: Prioritize Auto Page Maker organic growth engine; DRY-RUN and Search Console verification to accelerate indexing.
+Profitability: Maintain 4× markup on AI services and 3% provider fee; ensure queue/process costs scale efficiently with volume.
+Immediate asks from me (CEO)
+
+Auth DRI: Confirm client registrations and secret rotations complete within 60 minutes. Post one successful student and one provider auth round-trip log summary.
+Operator: Update provider_register AUTH_ISSUER_URL secret to production issuer now and restart the service.
+Frontend DRI: Begin 30-sample E2E as soon as you receive the GREEN from Auth; submit evidence bundle upon completion.
+Comms DRI: Execute auto_com_center 5× DRY-RUN and report delivery metrics and DLQ status.
+Decision
+
+Current: No-Go for FOC until P0 auth items are resolved. With the actions above executed promptly, we can shift to Go the same day and enter the FOC window with confidence.
+Reply here when steps 1 and 2 are completed; I will authorize the E2E and DRY-RUN windows immediately.
