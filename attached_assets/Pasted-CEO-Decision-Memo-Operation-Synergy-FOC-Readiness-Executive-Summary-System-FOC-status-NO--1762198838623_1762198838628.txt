@@ -1,0 +1,119 @@
+CEO Decision Memo — Operation Synergy (FOC Readiness)
+
+Executive Summary
+
+System FOC status: NO-GO (single hard gate = auto_com_center canary instability).
+B2C engine is live: student_pilot is GO; scholarship_api (SSOT) is GO; auto_page_maker is GO; scholarship_sage is GO; scholarship_agent is GO in observe-only mode.
+Primary immediate unblockers:
+Provision temporary OIDC client for provider_register to begin E2E now.
+Complete scholar_auth CORS env var sync (code already hardened; env not yet updated).
+Await auto_com_center T+90 canary results; run DRY-RUN immediately if GREEN.
+Decisions and Orders (Time-bound)
+
+provider_register — Unblock E2E now
+Decision: APPROVED — Temporary OIDC client issuance to unblock within 10 minutes.
+Auth DRI orders (immediate):
+Issue a 24-hour temporary client for provider_register with PKCE S256, scopes: openid email profile roles offline_access. Return client_id and SHA256-verified evidence.
+Alternative path: If preferred, register the existing client_id 1a899f07-751b-4697-88ef-1baa89ef44d5 and confirm within 10 minutes. Either path acceptable; choose the fastest.
+provider_register DRI orders (upon client receipt):
+T+0: Update secrets and restart workflow.
+T+10: Verify OAuth login and begin E2E.
+T+105: Submit evidence bundle with SHA256 manifest (Auth, RBAC, CRUD, latency, security headers).
+2. scholar_auth — Conditional GO close-out
+
+Decision: GO (conditional) remains in force.
+Operator order (immediate): Update CORS_ALLOWED_ORIGINS to exactly [student_pilot, provider_register, scholar_auth]. Target completion in <5 minutes.
+Auth DRI order: Deliver post-change verification within 5 minutes of completion: CORS preflight, JWKS/.well-known discovery, 6/6 security headers, P95 ≤120ms; attach SHA256-verified output.
+3. auto_com_center — Hard gate
+
+Decision: NO-GO sustained. Exit criteria unchanged:
+Zero message loss at 2× peak
+P95 delivery latency <250ms
+Opt-out/unsubscribe compliance
+Documented rollback plan
+Budget: $5k SRE approved (already). Contingency: up to $10k additional authorized if heap/GC tuning requires infra changes during DRY-RUN window.
+Comms Infra + auto_com_center DRI orders:
+T+90: Deliver joint canary stability results.
+If GREEN: Execute DRY-RUN within 120 minutes; deliver evidence bundle (10 artifacts + SHA256 manifest); binary PASS/FAIL.
+If RED: Provide root-cause, remediation plan, and new ETA within 30 minutes. Observe-only posture remains; no outbound fan-out.
+4. student_pilot — GO
+
+Orders (24-hour deliverables):
+Funnel readout: sign-ups, activation, free→paid conversion, ARPU per credit.
+Lighthouse/CWV snapshot for key flows (landing, search, application).
+Target guardrails:
+Auth success ≥98%
+P95 API latency ≤120ms
+5xx ≤0.1%
+Security headers 6/6 across UI API calls
+5. scholarship_api — GO (unconditional)
+
+Orders:
+Maintain freeze on schema and API until FOC.
+Keep standardized JSON errors with request_id; RBAC 401/403 consistency; 6/6 security headers.
+Continue observe-only event posture; no comms fan-out while NO-GO persists.
+6. auto_page_maker — GO
+
+Orders:
+Continue page generation; maintain hourly deltas and nightly sitemap/IndexNow cadence.
+Weekly report (starting post-FOC): page-count growth, indexation rate, CTR (GSC), assisted conversions to student_pilot, CWV (TTFB/LCP/INP). Keep TTFB near ~100ms.
+7. scholarship_sage — GO
+
+Orders:
+Maintain explainability (matchReasons), request correlation, P95 ≪120ms.
+Narrative/essay-signal roadmap accepted; stage feature-flag plan for post-FOC A/B with rollback and fairness monitoring.
+8. scholarship_agent — GO (observe-only)
+
+Orders:
+Maintain circuit breakers, exponential backoff, bulkheads.
+Provide 30-minute cadence status while comms is NO-GO.
+Support DRY-RUN volume generation on GREEN signal from comms.
+GO/NO-GO Board (Current)
+
+GO: student_pilot, scholarship_api, auto_page_maker, scholarship_sage, scholarship_agent (observe-only)
+GO (conditional): scholar_auth (pending CORS env var sync verification)
+READY (blocked by client): provider_register (await temp client or re-registration)
+NO-GO (hard gate): auto_com_center
+KPI Framework (Executive)
+
+B2C growth engine:
+North-star: Weekly free→paid conversion and ARPU per credit
+Leading indicators: sign-ups, activation rate, CWV/TTFB
+Targets (initial): conversion ≥3–5% (baseline), ARPU per paid user tracked daily
+B2B engine:
+Active providers onboarded
+Scholarship inventory growth (new/updated listings)
+3% fee capture per transaction
+Platform reliability:
+P95 ≤120ms across services
+Uptime ≥99.9%
+5xx ≤0.1%
+Standardized error coverage: 100%
+6/6 security headers across public endpoints
+Risk Register (Top)
+
+Comms canary heap/GC pressure — Mitigation: tuning + DRY-RUN evidence bundle; circuit breakers; bulkheads; rollback plan validated.
+Auth CORS env drift — Mitigation: dual-layer (code + env); immediate verification on update.
+Provider onboarding delay — Mitigation: temporary OIDC client path approved with 24-hour expiry; audit trail required.
+Governance and Compliance
+
+Human-on-the-loop approval gates for sensitive changes and rollbacks.
+Responsible AI: explainability, auditability, and quarterly fairness monitoring; no black-box systems.
+Regulatory: FERPA/COPPA data handling; CAN-SPAM/GDPR for comms; observe-only posture until comms GO.
+Capital Allocation
+
+Confirmed: $5k SRE for auto_com_center stability work.
+Authorized contingency: up to $10k for infra tuning if needed to pass DRY-RUN within the T+90 window.
+Immediate Next Milestones
+
+Within 10 minutes: Auth DRI issues temporary client (or re-registers existing); provider_register begins E2E.
+Within 5 minutes of operator action: scholar_auth CORS verification evidence delivered.
+T+90: auto_com_center joint canary results.
+If GREEN at T+90: DRY-RUN within 120 minutes; binary PASS/FAIL and evidence bundle.
+24 hours post student_pilot GO: funnel + Lighthouse/CWV report.
+Prime Directive Alignment
+
+Student-value-first: Fast auth and SSOT performance to protect conversion; explainable matching; frictionless UI.
+Data-first: Standardized errors with request_id; audit trails and KPIs instrumented; evidence bundles with SHA256.
+SEO-led: Auto Page Maker remains the compounding, low-CAC acquisition engine; weekly growth reporting post-FOC.
+I will reassess at T+90 on the comms canary outcome. All DRIs are authorized to proceed per the above orders and must attach SHA256-verified evidence with each status update.
