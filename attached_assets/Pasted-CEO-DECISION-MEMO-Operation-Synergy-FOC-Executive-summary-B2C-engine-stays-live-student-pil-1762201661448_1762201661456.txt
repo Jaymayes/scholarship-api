@@ -1,0 +1,113 @@
+CEO DECISION MEMO — Operation Synergy FOC
+
+Executive summary
+
+B2C engine stays live: student_pilot, scholarship_api, scholarship_sage, auto_page_maker are GO. Observe-only posture remains for all comms.
+Two gating items to FOC: (1) provider_register OAuth client resolution; (2) auto_com_center canary GREEN.
+Prime Directive alignment: We continue to maximize low-CAC SEO growth while protecting regulatory posture and brand by holding comms in observe-only until proven GREEN.
+Gate calls (current)
+
+scholar_auth: GO (conditional). Action: issue temp client for provider_register (below).
+scholarship_api: GO (unconditional).
+scholarship_sage: GO (unconditional).
+student_pilot: GO (live).
+provider_register: NO-GO pending OAuth client fix.
+auto_page_maker: GO (live; SEO engine).
+scholarship_agent: READY, observe-only.
+auto_com_center: NO-GO (hard gate; canary required).
+Immediate orders and SLAs
+
+War-room: provider_register OAuth (SLA: 15 minutes)
+Decision: Resolve now with a new temporary client to eliminate ambiguity.
+Auth DRI — do within 5 minutes:
+Register client:
+client_name: provider_register_temp_war_room
+redirect_uris:
+https://provider-register-jamarrlmayes.replit.app/auth/callback
+https://provider-register-jamarrlmayes.replit.app/api/callback
+require_pkce: true (S256)
+grant_types: authorization_code, refresh_token
+scopes: openid, email, profile, roles, offline_access
+token_endpoint_auth_method: client_secret_post
+expiry: 24 hours
+CORS allow-origin: https://provider-register-jamarrlmayes.replit.app (credentials allowed)
+Deliver client_id and secret to provider_register DRI via the approved secure channel.
+provider_register DRI — complete within 10 minutes of receipt:
+Execute 5-minute PKCE round-trip:
+/authorize → /token with S256
+Validate ID token: iss, aud, sub, email, roles includes Provider
+Submit evidence bundle (HAR + decoded JWT + server logs with request_id) and SHA256 manifest.
+Acceptance to close war-room (T+15):
+200 OK ID token with aud = provider_register_temp_war_room (or new client_id) and roles contains Provider
+Session established; RBAC check yields 403 for non-Provider routes
+One successful logout + refresh_token rotation verified
+Root-cause note: Historic mismatch between /auth/callback and /api/callback is a likely contributor. Adding both URIs removes this class of failure.
+2. auto_com_center canary (SLA: start at T+90; 120-minute DRY-RUN only after GREEN)
+
+Hard gate remains NO-GO until exact GREEN criteria are met:
+Zero loss at 2× peak (60,000 events @ 1000/min)
+P95 dispatch latency <250ms
+Heap <85% sustained under load
+DLQ = 0 (no growth)
+Error ≤0.1%
+Opt-out processed <5s with evidence
+Rollback plan SHA256-verified
+If GREEN: Execute 120-minute DRY-RUN immediately and produce 10-artifact evidence bundle within 30 minutes post-run.
+If RED: Observe-only; deliver root cause and next tuning window in 60 minutes.
+Tuning directives if heap pressure recurs:
+Cap consumer concurrency to match CPU cores with 1.2× backoff
+Enable explicit GC tuning and heap dump on threshold breach
+Apply backpressure at ingress (rate-limit + token bucket) tied to queue depth
+Set circuit breaker trip at 2× baseline P95 for 3 consecutive minutes; auto-recover on 5 consecutive green minutes
+B2C engine: 24-hour readout (owner: Product/Analytics Lead)
+
+Deliver within 24 hours:
+Sign-ups; Activation rate; Search→apply CTR; Recommendations CTR
+Free→paid conversion; ARPU per credit
+SEO-assisted conversions (auto_page_maker → student_pilot)
+CWV/Lighthouse snapshots for key pages
+Targets (initial):
+Free→paid conversion baseline ≥3.0% week 1, grow to 4.5% by day 30
+ARPU per credit: baseline ≥$6; 10% uplift by day 60 via bundles
+SEO-assisted conversions: ≥25% of new sign-ups; CTR ≥3.5% on top 100 pages
+P95 latency guardrail: ≤120ms across B2C surfaces (all apps)
+Financial and KPI alignment to $10M ARR
+
+B2C:
+Organic acquisition: Prioritize Auto Page Maker output velocity and indexation quality. CAC target: <$2 incremental; maintain CWV “good” status.
+Monetization: 4× markup on AI services; weekly price testing queued post-comms GREEN via feature flags.
+B2B:
+Provider on-platform: 25 active providers by end of Q1; 3% platform fee tracked; ensure provider_register is unblocked within today’s war-room window.
+Operating margin:
+Maintain 99.9% uptime and ~120ms P95 to protect conversion and support margins.
+Risk and compliance posture
+
+FERPA/COPPA/GDPR: Zero tolerance for violations. No production comms until auto_com_center GREEN. Opt-out <5s must be demonstrable.
+Responsible AI: Explainability enforced in scholarship_sage (matchReasons). No academic dishonesty enablement. Bias monitoring staged for narrative-signal experiments (post-FOC).
+Lifecycle and refresh windows (for planning; confirm in Section 7 reports)
+
+Infrastructure (scholar_auth, scholarship_api, auto_com_center): 5–7 years runway; plan major refresh Q1 2031–Q3 2032.
+User-facing (student_pilot, provider_register): 3–4 years; UX overhaul planning window opens in 2028.
+Intelligence/automation (scholarship_sage, scholarship_agent, auto_page_maker): 2–3 years; staged refresh by 2027–2028.
+Pre-approved budgets:
+auto_page_maker refresh reserve: $40–60k in Q2 2027 (SSR/SSG + algo shock hedging)
+scholarship_sage narrative-signal program: $50k in 2027 (feature-flagged with fairness guardrails)
+Reporting discipline and next checkpoints
+
+30-minute cadence continues from all DRIs until FOC.
+Evidence must be SHA256-verified, include request_id correlation, and standardized error formats.
+No schema/API changes until FOC; configuration-only changes allowed for unblockers and evidence capture.
+Action items by owner
+
+Auth DRI: Create and deliver temp OAuth client to provider_register within 5 minutes; confirm CORS for provider_register; stand by for live debug.
+provider_register DRI: Complete PKCE round-trip within 10 minutes of client receipt; submit SHA256-verifiable evidence; begin 90-minute E2E if GO.
+auto_com_center DRI + Comms Infra: Run T+90 canary to exact gates; GREEN → 120-minute DRY-RUN; RED → root cause + retune window in 60 minutes.
+Product/Analytics Lead: 24-hour funnel and SEO readout with targets vs actuals.
+CEO directive to Agent3 instances
+
+Identify your APP_BASE_URL, execute only your application’s directives, and submit Section 7 using the mandatory format within your next cadence update. If you are the provider_register or scholar_auth DRI, the 15-minute war-room SLA supersedes all other tasks until closed.
+FOC status today
+
+System FOC remains NO-GO pending: (1) provider_register OAuth completion; (2) auto_com_center GREEN.
+B2C engine remains LIVE to advance ARR with low-CAC growth while we protect compliance and brand.
+Act with urgency. Time-to-green on these two gates is now the critical path to our Prime Directive.
