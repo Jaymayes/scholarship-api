@@ -1,0 +1,71 @@
+CEO Decision Memo — Operation Synergy (FOC)
+
+Executive summary
+
+Portfolio posture: System remains FOC NO-GO due to a single hard gate in auto_com_center (canary instability). All other apps report GO or conditional GO. We will proceed with observe-only events until comms turns GREEN, per resilience best practices (circuit breakers, traffic shifting, and automatic rollback during canaries) to prevent cascades and protect user trust. This mirrors industry-standard controls I expect across our stack.
+Strategic alignment: Continue compounding low-CAC B2C growth via Auto Page Maker; protect Core Web Vitals; maintain SSOT stability and standardized errors in the API; uphold Responsible AI with explainability, audit trails, and bias safeguards in Sage and across intelligence surfaces.
+FOC gate calls and immediate orders
+
+auto_com_center — NO-GO (Hard Gate)
+Decision: Maintain NO-GO. $5k SRE budget is approved for heap/GC tuning, queue back-pressure, and canary hardening. Exit criteria stand: zero message loss at 2× peak, P95 dispatch <250ms with backoff/circuit breakers, opt-out compliance with evidence bundle, and documented rollback with auto traffic shifting. This is the correct resilience posture.
+Orders and timing:
+Comms Infra Team: Apply heap/GC tuning and implement back-pressure policy. Provide heap metrics and canary stability readout at T+90.
+DRI: Rollback plan is acknowledged; on GREEN, run DRY-RUN within 120 minutes and deliver evidence bundle for a binary PASS/FAIL.
+Governance note: Keep all upstream event producers in observe-only to avoid cascade risk until comms is GREEN.
+2. scholar_auth — GO (conditional)
+
+Decision: GO conditional on the operator applying the CORS env var fix. After change, Auth DRI to verify: allowlist correctness, JWKS stability, security headers, and P95 ≤120ms.
+Orders: Operator must complete env var sync immediately; Auth DRI to deliver post-change evidence within 5 minutes. This aligns to our “single authority for identity” standard and reduces edge risk.
+3. provider_register — READY pending client config confirmation
+
+Decision: Proceed with E2E immediately. Existing OIDC client is reportedly registered; if any mismatch persists, Auth DRI is authorized for a 24-hour temporary client. Provider DRI must complete the 90-minute E2E and deliver the evidence bundle (security headers, standardized errors, RBAC proofs).
+Orders: DRI to confirm client_id and issuer_url; if blocked >15 minutes, request the temporary client and proceed. Our practice is human-on-the-loop for sensitive change and rapid rollback if anomalies arise.
+4. student_pilot — GO
+
+Decision: Flip to GO. Reported acceptance gates (auth success rate, latency, 5xx=0, standardized errors, security headers) meet target. Require a Lighthouse/CWV snapshot within 24 hours to protect conversion. Continue to consume Sage recommendations and SSOT via scholarship_api.
+Orders: Deliver a 24-hour post-GO funnel readout: sign-ups, activation, free→paid conversion, and ARPU per credit. Student value and frictionless UX are our primary economic drivers; measure rigorously.
+5. scholarship_api — GO (unconditional)
+
+Decision: Maintain SSOT posture and preserve freeze on schema and API until FOC is declared. Keep event emissions observe-only during comms NO-GO. Maintain standardized JSON errors with request_id correlation and security headers. This is the backbone of API-as-product discipline.
+6. scholarship_sage — GO
+
+Decision: GO with Responsible AI verified. Keep explainable scoring and matchReasons; preserve request correlation and auditability. Continue P95 ≪120ms and RBAC enforcement. Expand roadmap to incorporate narrative/essay signals to improve “implicit fit” and lift conversion, as outlined in the Playbook.
+7. scholarship_agent — GO (observe-only)
+
+Decision: Maintain observe-only events with circuit breakers armed; no outbound fan-out to comms while NO-GO stands. Patterns—retries with backoff, circuit breakers, and bulkheads—remain the standard.
+8. auto_page_maker — GO
+
+Decision: Continue SEO page generation, sitemap/IndexNow cadence, and CWV protection. This is our lowest-CAC engine; keep hourly deltas and fast TTFB. Report page-count growth, indexation, CTR, and assisted conversions weekly.
+24–48 hour path to FOC
+
+T+90: Comms Infra + auto_com_center DRI joint canary stability results against exit criteria; if GREEN, execute DRY-RUN immediately and submit evidence bundle for CEO GO decision.
+If RED persists: Remain observe-only on event producers, repeat tuning cycle, and rerun canary. Apply self-healing patterns and formal rollback triggers to avoid user-visible impact.
+Revenue plan implication of current posture
+
+B2C: With student_pilot GO, we can begin monetization via credits immediately; expect improved conversion lift as messaging comes online later. Prioritize activation and time-to-value in-product while comms is gated. The Playbook emphasizes combining matching with essay/narrative intelligence to raise perceived value—expedite that integration.
+B2B: provider_register E2E completion unlocks two levers—inventory growth and 3% platform fee capture. Maintain SSOT and tenant isolation to preserve partner trust.
+KPI cadence (executive dashboard)
+
+B2C: sign-ups, activation rate, free→paid conversion, ARPU per credit, refund rate, CAC (organic vs paid), CWV and TTFB on landing pages.
+B2B: active providers, listings live, award volume routed, 3% fee revenue, time-to-onboard.
+Platform: P95 latency, 5xx rate, auth success, standardized error coverage, event breaker states, comms delivery SLOs, opt-out rate.
+Governance: explainability coverage, audit trail completeness, fairness checks and bias audits for ML components.
+Risk and governance posture
+
+We operate with human-on-the-loop approval gates for sensitive changes and rollbacks; all autonomous decisions that affect security, billing, or large-scale messaging require explicit guardrails and traceability. Maintain immutable audit trails and revocable credentials for agent actions.
+Continue canary-first deployments with traffic shifting and auto-rollback; uphold bulkheads and circuit breakers to contain failures. These controls are non-negotiable for FOC.
+Lifecycle outlook (replacement/refresh windows)
+
+Infrastructure (auth, api, com center): 5–7 years before standards/scale force re-architecture; track identity evolution (passkeys/WebAuthn) and gateway policy centralization.
+User-facing (student_pilot, provider_register): 3–4 years before major UX overhaul to remain competitive and protect conversion.
+Intelligence/automation (sage, agent, page_maker): 2–3 years before model/logic refresh needed; maintain explainability throughout updates.
+Decisions and deadlines (owners → deliverables)
+
+Operator (scholar_auth CORS): Execute env var fix now; Auth DRI to verify within 5 minutes.
+provider_register DRI: Start E2E immediately; if client mismatch persists >15 minutes, request temporary client; deliver evidence bundle by T+105.
+Comms Infra + auto_com_center DRI: Deliver T+90 canary results; if GREEN, DRY-RUN and evidence within 120 minutes.
+student_pilot DRI: Flip GO; deliver 24-hour funnel readout and CWV snapshot.
+scholarship_api DRI: Maintain freeze, standardized errors, and observe-only events.
+scholarship_sage DRI: Maintain GO; ship rationale logs and prepare narrative-signal integration per Playbook.
+Closing
+Our path to $10M profitable ARR is student-value-first, data-first, and SEO-led. We will not compromise resilience or Responsible AI to move faster—our controls (circuit breakers, canary + rollback, auditability, fairness monitoring) are the reason we can scale safely on an aggressive timeline. Keep execution velocity high, evidence-driven, and aligned to the above orders.
