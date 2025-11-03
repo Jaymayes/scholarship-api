@@ -1,0 +1,96 @@
+CEO Decision Memo — Operation Synergy FOC Gate Call
+
+Executive summary
+
+System FOC: NO-GO. Hard gate is auto_com_center (comms).
+B2C engine: GO and live (student_pilot + scholarship_api + scholarship_sage + auto_page_maker).
+B2B engine: provider_register blocked by OAuth client registration discrepancy; resolve immediately.
+Auth: GO-Conditional pending CORS env-var sync and verification.
+Strategic rationale
+
+Prime objective: accelerate low-CAC, SEO-led B2C growth while we hold comms in observe-only mode until auto_com_center proves GREEN. This protects compliance and margin while advancing toward our $10M ARR plan.
+Capital: previously approved refresh windows remain aligned with lifecycle analyses and will be staged off the critical path.
+Executive decisions and orders
+
+auto_com_center (Comms) — NO-GO maintained
+Decision: Maintain NO-GO until GREEN criteria are passed in canary.
+Orders:
+T+90 canary: proceed as scheduled; deliver pass/fail against exact gates (zero loss at 2× peak; P95 <250ms; heap <85%; DLQ=0; error ≤0.1%; opt-out <5s with evidence; rollback plan SHA256-verified).
+If GREEN: execute 120-minute DRY-RUN immediately; deliver 10-artifact evidence bundle within 30 minutes post-run.
+If RED: observe-only posture; publish root cause and next tuning window within 60 minutes.
+DRI: Comms Infra + auto_com_center.
+KPI link to ARR: Comms reliability enables lifecycle nudges and conversion lifts; no production fan-out until GREEN protects regulatory posture and brand.
+2. scholar_auth (Identity) — GO-Conditional (CORS sync)
+
+Decision: Proceed to GO upon CORS env-var sync + 5-minute post-sync verification.
+Orders:
+Operator: update CORS_ALLOWED_ORIGINS to match locked code (student_pilot, provider_register, scholar_auth). SLA: start now; complete in <2 minutes.
+Auth DRI: within 5 minutes of operator completion, submit evidence pack: CORS preflight (student_pilot, provider_register), JWKS availability, M2M SystemService scope enforcement, 6/6 security headers, P95 ≤120ms, and cross-service JWT validation smoke tests. Include SHA256 manifest.
+DRI: Auth + Operator.
+Gate: GO upon evidence receipt.
+3. provider_register (B2B) — Unblock OAuth now; start 90-minute E2E
+
+Decision: Resolve client mismatch and begin 90-minute E2E immediately thereafter.
+Orders (war-room, 15-minute SLA):
+Auth DRI + provider_register DRI meet now; target: either confirm client_id 1a899f07-751b-4697-88ef-1baa89ef44d5 is registered and functional OR issue a new temporary client (24h expiry, PKCE S256).
+Evidence required to close: OIDC discovery, client registry entry (redacted), successful /authorize→/token PKCE round-trip, and /introspect or at-minimum a valid ID token with correct aud and roles.
+Upon working client: provider_register E2E begins within 5 minutes; submit evidence bundle at T+105 from start (Phase 1 PKCE; Phase 2 30-sample RBAC tenant isolation; Phase 3 perf + security). Accept/reject criteria per Section 7 gates.
+DRIs: Auth + provider_register.
+Gate: GO decision pending E2E evidence.
+4. B2C engine (student_pilot + scholarship_api + scholarship_sage + auto_page_maker) — GO affirmed
+
+Decision: Stay live; maintain observe-only comms posture.
+Orders (24-hour readout):
+Product/Analytics: deliver funnel dashboard in 24 hours with: sign-ups; activation; search→apply CTR; recommendations CTR; free→paid conversion; ARPU per credit; assisted conversion from SEO pages; CWV/Lighthouse snapshots for key pages.
+scholarship_sage: keep explainability (matchReasons) and P95 ≪ 120ms; stage feature flags for post-FOC experimentation (no flips until comms GREEN).
+auto_page_maker: maintain hourly deltas/nightly sitemap and IndexNow; provide indexation rate, CTR, and assisted-conversion readout. Protect TTFB ~100ms bucket.
+DRIs: Student Pilot, scholarship_api, scholarship_sage, auto_page_maker.
+KPIs tied to ARR: free→paid conversion, ARPU/credit, SEO-assisted conversions, recommendation CTR.
+5. Freeze discipline and compliance — uphold without exception
+
+Decision: No schema/API changes until system FOC. Configuration-only changes allowed for unblockers and evidence capture.
+Orders:
+All DRIs: continue standardized errors (request_id), 6/6 security headers, HTTPS-only, and RBAC (401/403) consistency. Maintain observe-only for all events until comms GREEN.
+Budget and lifecycle confirmations
+
+Confirmed:
+auto_page_maker refresh reserve: $40k–$60k in Q2 2027 (SSR/SSG readiness; algo shock hedging).
+scholarship_sage narrative-signal plan: $50k in 2027; staged A/B via feature flags with fairness monitoring and automatic rollback.
+Lifecycle windows are accepted as submitted; revisit each in quarterly roadmap reviews to protect conversion and CAC assumptions.
+Readiness board (current)
+
+scholar_auth: GO-Conditional — action: CORS env-var sync + 5‑min evidence pack.
+scholarship_api: GO (unconditional).
+scholarship_agent: READY, observe-only — awaits comms GREEN for fan-out.
+scholarship_sage: GO (intelligence), P95 ≪ 120ms.
+student_pilot: GO (B2C live).
+provider_register: BLOCKED (OAuth client); war-room now; then 90‑minute E2E.
+auto_page_maker: GO (SEO engine live; 2,101 pages; cadence active).
+auto_com_center: NO-GO; proceed with T+90 canary and gating as specified.
+Telemetry, reporting cadence, and owners
+
+30-minute status cadence continues until system FOC is declared.
+Evidence discipline: all submissions SHA256-verified; include raw curl outputs where applicable and request_id traces.
+Owners:
+Comms canary/dry-run: Comms Infra Lead + auto_com_center DRI.
+Auth CORS sync + registry proof: Auth DRI + Operator.
+provider_register E2E: provider_register DRI (lead) + Auth DRI (support).
+B2C funnel: Product Analytics Lead, with DRIs from student_pilot, scholarship_api, scholarship_sage, auto_page_maker.
+Acceptance thresholds tied to business outcomes
+
+Near-term:
+B2C: establish 24h baselines; initial target is evidence-driven, not fixed. We will set conversion and ARPU guardrails after baseline is observed to keep CAC-to-ARPU ratio within plan.
+Comms: no production send until GREEN; compliance proof mandatory.
+System FOC may be declared only when: auto_com_center passes GREEN in canary + dry-run, provider_register E2E passes, and Auth evidence confirms CORS hardening.
+Risks and mitigations (executive)
+
+OAuth client discrepancy (Auth ↔ Provider): Resolve via joint registry and live-flow proof, time-boxed to 15 minutes. Fallback: issue fresh temp client and revoke after E2E.
+Comms heap pressure: Treat as P0 capacity tuning; heap <85% is a hard acceptance criterion before any DRY-RUN fan-out.
+SEO volatility: maintain template quality, CWV, and human-in-the-loop editorial checks on top pages; prepare SSR/SSG plan within the approved refresh window.
+Next checkpoints
+
+Now +15 minutes: Auth/Provider war-room outcome + Auth CORS sync evidence.
+T+90: Comms canary GREEN/RED decision with artifacts.
+Then: If GREEN, 120-minute DRY-RUN → 10-artifact bundle within 30 minutes post-run.
+24 hours: B2C funnel readout and CWV/Lighthouse snapshots.
+I will adjudicate GO/NO-GO transitions strictly by the evidence against the stated gates. Keep the operation lean, data-first, and move with urgency.
