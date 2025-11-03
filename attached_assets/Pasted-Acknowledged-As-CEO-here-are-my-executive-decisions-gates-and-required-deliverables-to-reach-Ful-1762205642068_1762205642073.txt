@@ -1,0 +1,89 @@
+Acknowledged. As CEO, here are my executive decisions, gates, and required deliverables to reach Full Operational Capability while protecting the $10M ARR plan.
+
+Executive status and GO/NO‑GO board
+
+GO (Conditional FOC): scholar_auth, scholarship_api, scholarship_sage, student_pilot, auto_page_maker, scholarship_agent (observe‑only fan‑out)
+NO‑GO (Blocking): auto_com_center (canary heap pressure 96.3% > 85% acceptance)
+BLOCKED: provider_register (invalid_client; pending OAuth client registration on scholar_auth)
+Orders and SLAs (clock starts now)
+
+Order A (Auth DRI) – provider_register OAuth unblock
+Action: Register temporary OAuth client as proposed by provider_register DRI OR fix the existing client. Deliver client_id and client_secret securely.
+SLA: 10 minutes
+Acceptance: OIDC discovery works, PKCE S256 enabled, redirect_uris match both callbacks, scopes include openid/email/profile/roles/offline_access, CORS origin set.
+2. Order B (Provider DRI + Auth DRI) – PKCE verification and B2B smoke test
+
+Action: Execute the 10‑minute PKCE plan immediately upon receiving credentials; then run the 15‑minute B2B smoke.
+SLA: PKCE verification completed in 10 minutes; smoke test completed in +15 minutes.
+Evidence bundle (submit within 10 minutes post‑tests):
+HAR of full PKCE flow
+Decoded ID token with roles:["Provider"]
+Server logs with request_id chain
+RBAC tests (200 for Provider routes, 403 for non‑Provider)
+SHA256 manifest
+CEO gate: On evidence approval, I will issue provider_register = GO.
+3. Order C (Comms Infra Team) – auto_com_center canary GREEN or rollback
+
+SLA: 60 minutes to GREEN or rollback + heap profile
+GREEN acceptance criteria:
+Heap utilization <85%
+0% DLQ growth over 15 minutes
+P95 ≤120ms
+≤0.1% error rate during soak
+Required artifacts:
+Canary dashboard screenshot
+Metrics export
+Heap profile + GC tuning summary
+Pod scaling diff
+DRY‑RUN readiness flag
+4. Order D (scholarship_agent DRI) – DRY‑RUN upon GREEN
+
+Pre‑req: auto_com_center canary GREEN
+Action: Launch 120‑minute DRY‑RUN within 5 minutes of GREEN; 30,000 msgs @ 500/min.
+Pass criteria:
+P95 ≤120ms end‑to‑end
+<0.1% total failures
+Zero message loss (no DLQ growth)
+Opt‑out latency <5s
+Traceable request_id end‑to‑end
+Evidence (deliver within 30 minutes post‑run):
+10‑artifact bundle as pre‑staged (event logs, CB state, P95 metrics, error distribution, DLQ report, E2E request_id samples, rollback proof, resource profiles, SHA256 manifest)
+CEO gate: On pass, I will authorize production fan‑out and declare full ecosystem FOC.
+5. Order E (Monetization switch – student_pilot)
+
+Authorization: Prepare to move Stripe from test→live in a phased rollout (10% → 50% → 100%) after provider_register = GO and before/independent of auto_com_center DRY‑RUN completion.
+Guardrails:
+Maintain observe‑only posture for marketing fan‑out until auto_com_center is GREEN; rely on on‑site confirmations and Stripe receipts for transactional notices.
+Daily revenue and chargeback monitoring; instant rollback if payment failure rate >1% or refund rate >3% in any 24‑hour window.
+Target: First B2C dollar within 2–6 hours of live flip.
+Reporting cadence (single consolidated update due in 60 minutes)
+Each DRI submits one status message containing:
+
+Current status: GREEN/YELLOW/RED
+What changed in last 60 minutes
+Evidence pointer: one request_id exemplar and SHA256 manifest (if applicable)
+Blockers and owner
+Next decision needed from CEO (if any)
+Lifecycle and revenue cessation analysis (Section 6 – standardized expectations)
+
+Infrastructure (auth, api, com center): 5–7 year horizon; plan deprecation windows tied to security protocol evolution and scale limits. Draft refresh plans by end of Q2 FY2027.
+User‑facing (student_pilot, provider_register): 3–4 year horizon; major UX refresh gate ≈ FY2028. Track CTR, retention, and cohort NPS for trigger thresholds.
+Intelligence/Automation (sage, agent, page_maker): 2–3 year horizon; allocate part of the approved $100k Q2 FY2027 refresh reserve across these services. Performance/quality regressions or API/model EOLs are early triggers.
+KPIs to protect the $10M ARR plan (active now)
+
+B2C funnel: sessions/day (SEO), visitor→signup 8–12%, free→paid 3–5%, ARPU $8–$12
+B2B funnel: providers onboarded, active listings, fee accrual (3% platform fee), time‑to‑first‑listing
+Reliability SLOs: uptime ≥99.9%, P95 ≤120ms, error rate ≤0.1%
+SEO engine: indexed pages, crawl errors, CWV (TTFB/LCP/CLS/INP), 8‑week trend watch for −15% organic decline trigger
+Compliance: unsubscribe latency <5s, FERPA/COPPA posture, audit trails with request_id
+Freeze discipline
+
+Continue platform freeze (no schema/API changes) until DRY‑RUN pass and full FOC declared. Configuration‑only changes permitted.
+CEO commitments and next decisions
+
+I will:
+Issue provider_register = GO upon acceptance of the PKCE + B2B smoke evidence bundle.
+Authorize the Stripe live rollout after provider_register = GO.
+Authorize DRY‑RUN start immediately when Comms Infra declares GREEN and artifacts are delivered.
+Declare full‑ecosystem FOC on DRY‑RUN pass and enable production fan‑out.
+Deliver what I need within the SLAs above. Keep execution velocity high and evidence‑driven.
