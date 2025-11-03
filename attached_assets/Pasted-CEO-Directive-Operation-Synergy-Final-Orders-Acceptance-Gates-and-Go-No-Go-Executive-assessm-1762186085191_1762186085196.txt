@@ -1,0 +1,102 @@
+CEO Directive: Operation Synergy – Final Orders, Acceptance Gates, and Go/No-Go
+
+Executive assessment (current snapshot)
+
+Green & Frozen (no API/schema/logic changes permitted): scholarship_api, scholarship_sage, scholarship_agent, auto_page_maker
+Green, execution pending infra: auto_com_center (5× DRY-RUN kit ready; awaiting canary “GREEN – Stable”)
+Auth path: scholar_auth reports infrastructure GREEN with OIDC/JWKS healthy; integration exhibits configuration drift across clients/environments and must be reconciled immediately
+User apps: student_pilot, provider_register readiness depends on final OIDC client/secret parity and validated E2E runs
+Critical blockers and owner/ETA
+
+Auth config drift (highest risk to schedule)
+Owner: Auth DRI
+Actions:
+Single source-of-truth (SSOT) alignment: publish current client registry (student_pilot, provider_register), active KIDs, and discovery document fingerprint
+Cross-app parity check: each consumer verifies issuer, client_id, redirect_uri, scopes, PKCE S256 flags; publish comparison matrix
+SLA: 30 minutes from now to SSOT publication and parity confirmation
+Canary heap pressure (auto_com_center)
+Owner: Comms Infra
+Actions:
+Apply GC/heap tuning + autoscaling threshold adjustments; run 10-minute rolling soak; report heap headroom ≥30% and no DLQ growth
+SLA: Must achieve “GREEN – Canary Stable” at least 15 minutes before T+270
+E2E gating (student_pilot, provider_register)
+Owners: Frontend DRIs
+Actions:
+Execute smoke + 30-sample E2E on Auth GREEN
+Submit evidence bundles (see Proof requirements)
+SLA windows:
+student_pilot: T+30 to T+150
+provider_register: T+150 to T+270
+CEO decisions (effective immediately)
+
+Freeze discipline remains in force across all apps. Only permitted changes before FOC Go/No-Go: client registrations, secret updates, and strictly non-breaking configuration required to remove blockers.
+Fallback authorization for schedule protection:
+If student_pilot cannot complete one successful auth round-trip by T+45, Auth DRI is authorized to provision a temporary client_id (“student-pilot-temp”) with production scopes and PKCE S256 for 24 hours to unblock E2E. Frontend DRI must rotate to permanent client before Go/No-Go.
+If canary remains unstable at T+270, slip auto_com_center 5× DRY-RUN to T+330 and move Go/No-Go to T+450. No other timeline slips authorized.
+No new feature work. All capacity stays focused on FOC acceptance gates and evidence.
+Acceptance gates (company-wide for FOC)
+
+Performance and reliability
+API P95 latency ≤120 ms for the top 5 endpoints per service
+Zero critical 5xx during test windows
+99.9% uptime SLO (no new incidents during FOC window)
+Security and auth
+OIDC Discovery 200 OK; JWKS served; at least one active KID; token refresh working
+RBAC enforced across roles (Student, Provider, Admin, SystemService) with roles claim verified in JWTs
+Rate limiting active; abuse yields 429 with standardized error body
+CORS restricted to authorized frontends
+Data integrity and compliance
+Standardized JSON errors with request_id across all services
+Tenant isolation verified for provider_register (org-scoped filters)
+CAN-SPAM/GDPR/FERPA checks pass; opt-out/unsubscribe completes <5 seconds (auto_com_center)
+Messaging and automation
+auto_com_center DRY-RUN: ≥99% delivery success, zero DLQ growth, circuit breakers armed, auto-rollback verified
+Proof requirements (submit with SHA256 manifest)
+
+scholar_auth
+OIDC discovery document; JWKS with active KID list
+Client registry proof for student_pilot and provider_register; redirect URIs; scopes; PKCE S256; token refresh demo
+Decoded JWT samples showing roles claim for each role; negative tests (401/403)
+student_pilot
+30-sample E2E results: auth → profile → search → recommendations → application submission
+Metrics: Auth success ≥98%; P50/P95/P99; zero critical 5xx; Lighthouse accessibility ≥90
+HAR files + standardized error samples with request_id
+provider_register
+30-sample E2E: provider auth; scholarship create/update; applicant review; status changes
+RBAC and tenant isolation proofs; 401/403 negative tests
+scholarship_api, scholarship_sage, scholarship_agent, auto_page_maker
+P95 ≤120 ms confirmation; zero critical 5xx
+Contract conformance checks; standardized errors; event emissions (where applicable)
+auto_com_center
+5× DRY-RUN results at 30,000 events load: delivery ≥99%; zero DLQ growth; opt-out <5s; auto-rollback exercised
+Third-party provider receipts; queue depth graphs; compliance checklist
+Section 7 reporting (mandatory final format)
+
+Each DRI must submit the Section 7 report in the prescribed format. If already submitted, resubmit once more with the latest timestamps and any deltas since the last version. Include the SHA256 manifest and a one-paragraph executive summary up top.
+Lifecyle and revenue cessation targets gathered so far:
+Intelligence/Automation: 2–3 year horizon; examples reported include auto_page_maker ≈ Q2 2027; scholarship_agent ≈ Q2 2028
+User-facing: 3–4 year horizon; student_pilot indicated ≈ Q3 2028
+Infrastructure: 5–7 year horizon; scholarship_api indicated Q1 2031–Q3 2032 window
+Any service without a current, dated cessation window must include one in this submission, with contingencies.
+Market/financial linkage to FOC
+
+B2C growth engine: auto_page_maker SEO output is our lowest-CAC acquisition driver; sustaining freeze and verifying page integrity/IndexNow sitemaps are mandatory to protect CAC.
+B2B engine: provider_register E2E validates the 3% fee pipeline and multi-tenant isolation—non-negotiable for trust and revenue at scale.
+Profitability guardrails: maintain 4x markup on AI services; ensure comms costs from auto_com_center stay within budgeted CPM under DRY-RUN and projected peak.
+Next checkpoints and meeting cadence
+
+T+30: Auth SSOT + parity confirmation posted; CEO reviews and clears student_pilot to run
+T+30–T+150: student_pilot E2E and evidence bundle
+T+150–T+270: provider_register E2E and evidence bundle
+T+270–T+390: auto_com_center 5× DRY-RUN and evidence bundle (or T+330 if slip invoked)
+T+390 (or T+450 if slip): CEO Go/No-Go; final decision based on acceptance gates and evidence bundles
+Direct instructions to DRIs (actionable now)
+
+Auth DRI: Publish SSOT package (discovery JSON hash, active KIDs, client registry export) and parity matrix in 30 minutes; remain online for live debugging during student_pilot and provider_register E2E.
+Frontend DRIs (student_pilot, provider_register): Prepare to run immediately on Auth GREEN; do not alter business logic; only secrets/config as needed; capture all artifacts in a SHA256-manifested bundle.
+Comms Infra + auto_com_center DRI: Resolve canary heap; post “GREEN – Canary Stable” and execute pre-flight; begin 5× DRY-RUN on signal; package delivery/provider receipts and compliance proofs.
+All DRIs: Re-submit Section 7 report in the mandatory format with current timestamps and lifecycle horizons; attach manifest and one-paragraph executive summary.
+CEO stance
+
+Mission-critical focus is achieving FOC without incurring regression risk or CAC inflation. Freeze discipline stands. Use the fallback client only if it protects the schedule without compromising security posture.
+I will make the Go/No-Go decision strictly on the evidence against the acceptance gates. Deliver the evidence, on time, with hashes.
