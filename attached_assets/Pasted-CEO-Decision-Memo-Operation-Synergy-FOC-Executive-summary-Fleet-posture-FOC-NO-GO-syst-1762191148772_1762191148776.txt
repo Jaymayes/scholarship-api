@@ -1,0 +1,100 @@
+CEO Decision Memo — Operation Synergy (FOC)
+
+Executive summary
+
+Fleet posture: FOC = NO-GO (system), pending auto_com_center infrastructure stability and completion of two E2E runs.
+Revenue posture: Proceed with limited silent go-live of B2C/B2B core flows without outbound comms. FOC declaration will wait for comms GREEN and DRY-RUN pass.
+Strategic fit: This plan preserves trust/compliance while unlocking near-term ARR from B2B (3% fee) and prepares B2C conversion the moment auth+student_pilot flip to GO.
+App-by-app GO/NO-GO decisions
+
+scholar_auth → GO (conditional)
+
+Action: Sync CORS_ALLOWED_ORIGINS env var immediately to drop auto_com_center origin. Owner: Operator. ETA: 2 minutes.
+Rationale: Client registrations for student_pilot and provider_register are confirmed; code-level CORS fallback already hardened.
+scholarship_api → GO
+
+Rationale: SSOT, P95 <120ms, RBAC + token validation verified; freeze maintained.
+auto_page_maker → GO
+
+Rationale: Triggers verified; sitemap/IndexNow current; SEO discipline and P95 at/near SLO.
+student_pilot → NO-GO (temporary) → GO upon E2E pass
+
+Directive: Run E2E harness now that auth clients are registered. 120-minute SLA to produce evidence bundle.
+Acceptance gates: Auth success ≥98%, P95 ≤120ms, Lighthouse a11y ≥90, zero critical 5xx, RBAC/standardized errors verified.
+provider_register → NO-GO (temporary) → GO upon E2E pass
+
+Directive: Execute staged E2E immediately (120-minute SLA) now that auth issuer/client is live.
+Acceptance gates: OAuth round-trip + PKCE, 30-sample RBAC tenant isolation, standardized errors with request_id.
+scholarship_sage → GO
+
+Rationale: Matching API functional, SLO/security/RBAC passed; M2M framework ready.
+scholarship_agent → GO
+
+Rationale: M2M auth, retries/circuit breakers, event emissions verified; freeze intact.
+auto_com_center → NO-GO (infrastructure blocker)
+
+Condition: Await “GREEN – Canary Stable.”
+Post-GREEN DRY-RUN (120 minutes): Event consumption, provider deliverability (allowlist), queue durability (30k msgs, zero DLQ growth), opt-out SLA <5s, error rate ≤0.1%.
+Only after DRY-RUN pass may this flip to GO.
+Immediate actions (now → next 4 hours)
+
+CORS env var sync (scholar_auth)
+
+Owner: Operator; ETA 2 minutes; non-blocking but must match code lockdown.
+student_pilot E2E run (120-minute window)
+
+Owner: student_pilot DRI
+Deliver: Evidence bundle (HAR, screenshots, metrics, Lighthouse, RBAC negatives) with SHA256 manifest.
+Decision: CEO will flip to GO on pass.
+provider_register E2E run (120-minute window)
+
+Owner: provider_register DRI
+Deliver: 30-sample RBAC proofs, OAuth/PKCE proof, standardized error samples, manifest with SHA256.
+Decision: CEO will flip to GO on pass.
+auto_com_center infrastructure stabilization
+
+Owner: Comms Infra Team
+SLA: Per standing 2-hour canary SLA; if GREEN by ETA, execute DRY-RUN immediately; if missed, remain NO-GO and keep platform in silent go-live (no outbound comms).
+Silent go-live constraints (effective immediately)
+
+Allowed: B2C/B2B core flows, SEO traffic routing, search, applications, recommendations, provider CRUD, payments in test/prod as configured.
+Not allowed: Any outbound messaging from auto_com_center until DRY-RUN passes and CEO flips to GO.
+Monitoring: Maintain 30-minute status cadence with blocker/owner/ETA/evidence links for all running E2E/DRY-RUNs.
+System-level FOC gates to declare GO
+
+Gate 1: student_pilot GO (post-E2E pass).
+Gate 2: scholar_auth GO (finalized after env var sync; treated as complete once updated).
+Gate 3: auto_com_center GO (post-infra GREEN + DRY-RUN gate pass).
+Policy: FOC remains NO-GO until all three gates pass with evidence.
+KPIs to report during silent go-live (every 24h until FOC)
+
+B2C funnel: Auth success rate, activation rate (D0), conversion to first credit, P95 latency, error rates (4xx/5xx).
+B2B funnel: Providers onboarded, scholarships created/updated, applicant review sessions, 3% fee pipeline coverage.
+Platform: Uptime, P95 per service, RBAC denials vs approvals, standardized error rate, SEO index growth and CTR from GSC.
+Risk register and mitigations
+
+Comms deliverability/regulatory exposure: Held NO-GO; DRY-RUN gates enforced; opt-out SLA target <5s.
+Auth config drift: Lock SSOT; env var sync executed; add config checksum alerting.
+RBAC/tenant isolation: Enforce negative tests in both E2E runs; block GO if any cross-tenant leak is observed.
+SEO volatility: Keep sitemap/IndexNow cadence; monitor P95 to protect CWV.
+Data protection: Continue zero-PHI/PII storage in sage; maintain data minimization and request correlation.
+Lifecycle governance (accepting submitted analyses)
+
+Infrastructure (auth, api, coms): 5–7 years; schedule 2027–2029 refresh planning.
+Intelligence/automation (sage, agent, page maker): 2–3 years; plan 2027 model/embedding refresh and feature-flagged migrations.
+User-facing (student_pilot, provider_register): 3–4 years; plan staged UX overhauls aligned with WCAG updates and framework changes.
+Decisions recorded
+
+scholarship_sage: GO
+scholarship_agent: GO
+scholar_auth: GO (conditional; finalize with env var sync now)
+scholarship_api: GO
+auto_page_maker: GO
+student_pilot: GO upon E2E pass (run now)
+provider_register: GO upon E2E pass (run now)
+auto_com_center: NO-GO; run DRY-RUN once infra GREEN; remains a hard FOC gate
+Cadence
+
+Continue 30-minute status updates for: student_pilot E2E, provider_register E2E, auto_com_center infra and DRY-RUN.
+CEO review windows: On each evidence bundle submission; immediate GO flips on gate pass.
+Stay focused on the prime directive: unlock B2B revenue now under silent go-live; clear FOC gates rapidly to enable full growth engine (outbound comms + re-engagement) for B2C scale.
