@@ -1,0 +1,86 @@
+CEO Decision Memo — Operation Synergy (FOC)
+
+Context and lens
+
+Prime Directive: Hit $10M profitable ARR in five years by dominating AI-driven scholarship access and application support. Decisions below optimize for time-to-revenue, platform trust, and low-CAC scale via organic SEO (Auto Page Maker), consistent with the updated growth model and product roadmap laid out in the revised Playbook V2.0 and our B2B-leaning economics .
+Architectural guardrails: SSOT via scholarship_api, centralized auth, secure-by-default inter-service communication, standardized errors, and phased rollouts are aligned with our autonomous API/security playbooks and Replit multi-app system guidance .
+Executive roll-up (per app)
+
+scholarship_api — GO
+
+Rationale: Reported P95 <120ms; RBAC, CORS, standardized errors, token validation present; zero critical 5xx; uptime strong. This is our SSOT; its readiness is a prerequisite for both funnels. The SSOT model is explicitly recommended for Replit-based multi-app systems to avoid brittle data sharing .
+Directive: Maintain freeze. Begin system E2E once student_pilot and auth are green.
+scholarship_agent — GO
+
+Rationale: M2M auth, retries/circuit breakers, event emissions validated; SLO margin strong. Automation is central to freshness and provider value.
+Directive: Hold event fan-out to auto_com_center in “DRY-RUN observe-only” until comms is green; continue feeding scholarship_api.
+scholarship_sage — GO
+
+Rationale: Recommendations endpoint, RBAC, OIDC integration validated; P95 within SLO. Critical to B2C conversion lift; aligns with Playbook’s push to improve “implicit fit” by integrating narrative signals into matching .
+Directive: Proceed; enable progressive enhancement once student_pilot is live.
+provider_register — GO (conditional)
+
+Rationale: Performance and security gates passed; issuer set to production. This app unlocks near-term B2B lift—our highest-ARPU engine per V2.0 results with partners validating value and quality of matches .
+Conditions: Auth client configuration finalization by Auth DRI; then commence E2E and evidence capture.
+auto_page_maker — GO
+
+Rationale: Triggers verified, schema/SEO metadata present, public deployment confirmed. This is our lowest-CAC acquisition engine; priority is warranted per strategy to emphasize organic scale .
+Directive: Keep sitemap and IndexNow feeds current; monitor P95 vs 120ms SLO; continue canonical/structured data discipline.
+scholar_auth — GO (conditional)
+
+Rationale: 7/8 acceptance gates reported as PASS; CORS hardening pending and client registration for frontends outstanding. Security posture should continue to anchor TLS1.3, strong hashing, RBAC, JWKS rotation, and prepare for PQC roadmap per our security framework .
+Conditions and deadlines:
+student_pilot and provider_register client registration: 45 minutes.
+CORS production lock (student_pilot, provider_register only): 4 hours.
+student_pilot — NO-GO (temporary)
+
+Rationale: Ready but blocked on Auth DRI client registration. This app is the B2C storefront; we do not launch without stable auth tokens and CORS.
+Directive: Convert to GO immediately upon Auth GREEN. Execute the prepared E2E harness (auth success ≥98%, P95 ≤120ms, a11y ≥90 Lighthouse, zero critical 5xx, RBAC/standardized errors) and submit evidence.
+auto_com_center — NO-GO (infrastructure blocker)
+
+Rationale: Canary heap pressure in comms infra; not within app DRI control. Until stable, we risk deliverability/regulatory compliance.
+Directive: Remain in NO-GO. Upon “GREEN – Canary Stable,” run the DRY-RUN gates: event consumption, provider deliverability, queue durability, opt-out SLA, error rate ≤0.1%. Only then flip to GO.
+Fleet-level status and path to FOC
+
+Current posture: System NO-GO for Full Operational Capability until student_pilot and auto_com_center are GREEN.
+Critical path and timing:
+Auth DRI completes client registration (student_pilot, provider_register) within 45 minutes. This is a hard gate to unlock B2C and B2B E2E. Our deployment discipline and separation of prod vs dev behavior in Replit supports tight, auditable flips here .
+Run student_pilot E2E (120-minute SLA) and submit SHA256-evidenced bundle.
+Comms Infra posts “GREEN – Canary Stable” within the 2-hour SLA, then DRY-RUN the auto_com_center acceptance gates and submit evidence.
+Execute platform E2E across critical paths:
+B2C: student_pilot → scholar_auth → scholarship_api → scholarship_sage; observe P95 ≤120ms end-to-end, standardized errors, and 99.9% uptime posture per operations targets in V2.0 .
+B2B: provider_register → scholar_auth → scholarship_api; verify tenant isolation and 3% fee auditability.
+Growth engine: scholarship_agent events → auto_com_center (post-green) and auto_page_maker deltas; confirm deliverability and indexation.
+Evidence: Maintain SHA256 manifests and standardized JSON error format with request_id across services, consistent with our autonomous API governance standards and ethics requirements for transparent, explainable operation .
+CEO decisions and directives
+
+App-specific decisions
+
+GO: scholarship_api, scholarship_agent, scholarship_sage, provider_register (conditional), auto_page_maker.
+GO (conditional): scholar_auth (pending client configs, CORS hardening).
+NO-GO: student_pilot (until auth client registration), auto_com_center (until comms canary is green and DRY-RUN passes).
+Deadlines and owners
+
+Auth DRI: Complete student_pilot/provider_register client registration and publish SSOT configuration within 45 minutes; complete CORS hardening in 4 hours, aligned with zero-trust and TLS1.3 posture .
+Frontend DRIs (student_pilot, provider_register): Execute E2E test plans and submit evidence bundles within 120 minutes of Auth GREEN.
+Comms Infra: Resolve canary heap pressure and post “GREEN – Canary Stable” within the stated 2-hour SLA; then support auto_com_center DRY-RUN and evidence submission.
+Risk management and contingencies
+
+If Auth client registration misses the 45-minute gate, escalate to temporary client issuance under CEO exception with a 24-hour expiry and strict origin lock; maintain compliance and monitoring until permanent config lands (consistent with phased rollout best practice) .
+If Comms Infra remains RED beyond SLA, we will not declare FOC. We can proceed with a limited “silent go-live” of B2C/B2B core flows without outbound comms while keeping Operation Synergy in NO-GO for FOC, preserving user trust and regulatory posture.
+Strategic linkage to ARR plan
+
+Short-term revenue unlocks:
+B2B: Prioritize provider_register + scholarship_api go-live to capitalize on higher-than-forecast partner ACV and validated demand for quality-matched applicants, accelerating marketplace revenue contribution .
+B2C: Leverage auto_page_maker’s SEO engine to drive low-CAC traffic and route to student_pilot once auth is green; reinforce conversion by improving “implicit fit” via scholarship_sage as directed in the V2.0 roadmap .
+Governance and trust:
+Maintain strict centralized auth, SSOT data access, TLS 1.3, and standardized error handling across services, with forward planning for PQC and continuous audits—these are both security imperatives and sales enablers per our security attestation experience .
+FOC declaration policy
+
+FOC remains NOT READY until:
+student_pilot: GO
+auto_com_center: GO
+scholar_auth: conditions met (client configs, CORS hardened)
+Upon clearing the above and passing platform E2E gates, I will authorize FOC immediately.
+Close
+Maintain a 30-minute status cadence with: blocker/green, owner, ETA, and links to new evidence manifests. Decisions here maximize near-term revenue impact while enforcing the reliability and security standards that underpin our brand and B2B trust. Continue executing against the V2.0 roadmap focus on narrative-aware matching to lift conversion and LTV, and keep the growth engine anchored in organic SEO to preserve CAC efficiency as we scale .
