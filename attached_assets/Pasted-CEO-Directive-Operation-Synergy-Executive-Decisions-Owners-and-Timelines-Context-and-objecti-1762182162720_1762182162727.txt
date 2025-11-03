@@ -1,0 +1,110 @@
+CEO Directive: Operation Synergy – Executive Decisions, Owners, and Timelines
+
+Context and objective
+Our mission remains unchanged: reach Full Operational Capability (FOC) without compromising our long-range goal of $10M profitable ARR. Today’s focus is to clear blockers, validate end-to-end readiness, and lock in the DRY-RUN windows with evidence that our funnels, security, and SLOs are green.
+
+Portfolio readiness snapshot
+
+READY
+scholar_auth
+scholarship_api
+scholarship_agent
+scholarship_sage
+auto_page_maker
+BLOCKED P0
+auto_com_center (canary heap pressure; prevents 5× DRY-RUN)
+BLOCKED P0 (config)
+provider_register (AUTH_ISSUER_URL secret)
+STANDING BY FOR AUTH GREEN (then E2E)
+student_pilot
+CEO decisions (GO / HOLD)
+
+GO (conditional): Open the E2E testing window immediately after the provider_register secret is corrected and Auth DRI confirms both production client registrations.
+HOLD on FOC: No FOC greenlight until auto_com_center completes a 5× DRY-RUN with ≥99% delivery success, zero DLQ growth, and verified opt-out compliance.
+GO: Growth DRI to run the auto_page_maker SEO DRY-RUN within 24 hours; non-blocking for FOC.
+Critical path: owners, actions, SLAs
+
+Operator – provider_register secret correction (P0, SLA 15 minutes)
+Action: Update Replit Secret AUTH_ISSUER_URL to https://scholar-auth-jamarrlmayes.replit.app
+Confirm restart and post evidence screenshot of Secrets panel and first successful OIDC discovery.
+Exit criteria: provider_register can perform OIDC discovery + auth callback returns session cookie (HttpOnly/Secure).
+2. Auth DRI – client registrations + token hygiene (P0, SLA 60 minutes max; most steps reported complete)
+
+Actions:
+Confirm production client registrations for student-pilot and provider-register (authorization_code + refresh_token, PKCE S256).
+Confirm scopes include openid, email, profile, roles, offline_access.
+Confirm secret rotation and refresh-token invalidation complete; share evidence bundle hash.
+Exit criteria: Both clients successfully perform a single round-trip in production; JWKS validation and roles claim verified in JWT.
+3. Frontend DRI – E2E execution windows (after Auth GREEN)
+
+Step 3: Smoke tests (SLA 30 minutes after Auth green)
+1 student round-trip; 1 provider round-trip.
+Verify HttpOnly/Secure cookies and refresh token rotation.
+Step 4: Gate 3 E2E (SLA 90 minutes after Auth green)
+student_pilot: 30-sample run; auth ≥98%, P95 ≤120ms, A11y ≥90, zero critical 5xx.
+provider_register: 30-sample RBAC isolation run; zero cross-tenant leakage.
+Evidence: HAR files, P50/P95/P99, standardized error payloads with request_id, screenshots of key flows, LH report, RBAC proofs.
+4. Comms Infra + Comms DRI – auto_com_center unblock + DRY-RUN (P0)
+
+Infra actions (SLA 2 hours):
+Fix heap pressure causing canary auto-rollback at ~96%. Acceptable mitigations: right-size memory, tune Node heap flags, GC/heap profiling, reduce resident set via dependency pruning, or scale out replicas with a canary memory guardrail.
+Exit criteria: Canary shows ≥30% memory headroom at steady state; no auto-rollback for 30 minutes under synthetic load.
+Comms DRI actions (when Infra unblocks):
+Execute 5× DRY-RUN at peak projected event volume from scholarship_agent.
+Acceptance: ≥99% delivery success; zero DLQ growth; opt-out pathways verified; bounce/complaint handling confirmed; CAN-SPAM/GDPR audit trail captured.
+Evidence: Queue depth graphs, delivery/undelivered counts, DLQ metrics, opt-out transaction logs, third-party provider receipts, message template render samples.
+5. Growth DRI – SEO DRY-RUN for auto_page_maker (non-blocking; SLA 24 hours)
+
+Tasks:
+Submit sitemap to GSC; verify coverage.
+Run a 10-page quality audit (content uniqueness, schema.org, CWV checks).
+Funnel test: CTA → student_pilot signup → first-session activation; instrument UTM and record conversion rate.
+KPIs to report: Indexed pages, impressions/CTR for first 72 hours, CTR to session, session-to-signup conversion, signup-to-profile completion rate.
+Evidence and reporting requirements
+
+All DRIs: Use the standardized Section 7 format for your app’s FOC report. Attach the evidence bundle (request_id-indexed logs, HARs, screenshots, metrics JSON, queue stats). Post the SHA256 of each artifact for immutability.
+Frontend DRI: Include a one-page executive summary with the funnel metrics and key SLOs.
+Comms DRI: Include unsubscribe/opt-out flows video capture and proof of suppression list enforcement.
+Lifecycle and revenue cessation analysis (mandatory)
+Each DRI must include Section 6 in the report:
+
+Infrastructure (auth, api, com center): 5–7 year horizon. Address standards evolution (beyond OAuth 2.0), cryptographic agility, scaling ceilings. Provide a mitigation plan for seamless key rotations and protocol upgrades.
+User-facing (student_pilot, provider_register): 3–4 year horizon. UI/UX overhaul triggers, accessibility, competitive parity. Plan for modular design to enable incremental revamps without rewriting backends.
+Intelligence/Automation (scholarship_sage, scholarship_agent, auto_page_maker): 2–3 year horizon. Model drift, data distribution shifts, content quality bar rise, search/SEO algorithm changes. Define retraining cadence, AB testing, and rollback guardrails.
+Gating criteria for FOC decision
+
+Auth success rate ≥98% across 30-sample runs (student + provider).
+P95 latency ≤120ms across top customer-facing endpoints.
+Zero cross-tenant data leakage in provider_register E2E.
+auto_com_center: 5× DRY-RUN, ≥99% delivery success, no DLQ growth, opt-out compliance verified.
+Standardized error format across services with request_id present and propagated.
+Security checks: 6/6 security headers, CORS locked to authorized frontends, rate limiting active, robust password hashing, JWKS validation.
+ARR-aligned KPIs to monitor post-FOC
+
+B2C: Organic sessions from auto_page_maker; search CTR; signup conversion; credit ARPU; free→paid conversion rate.
+B2B: Active providers onboarded/week; listings published; 3% platform fee revenue; time-to-first-applicant.
+CAC: Organic share of acquisitions; landing page-to-signup conversion; cost per incremental signup (should trend toward near-zero on organic).
+Reliability: 99.9% uptime; P95 ≤120ms; error rate <0.1%; comms delivery ≥99%.
+Risk register and mitigations
+
+Misconfigured OIDC secrets: Mitigate via secrets drift detection at startup and health endpoints that fail CLOSED on issuer mismatch.
+Comms queue DLQ growth: Rate limiters + backpressure; dead-letter reprocessing playbook; provider failover.
+Regulatory: Confirm FERPA/COPPA considerations; finalize DPIAs for automation services; ensure data minimization and explainability for scholarship_sage recommendations.
+SEO volatility: Guard with content deduplication, schema validation, CWV budgets; AB test templates; maintain IndexNow and sitemaps.
+Execution timeline (starting now)
+
+T+0 to T+15 min: Operator updates provider_register AUTH_ISSUER_URL secret; restart; post evidence.
+T+0 to T+60 min: Auth DRI reconfirms client registrations and token hygiene; posts evidence.
+T+30 min after Auth green: Frontend DRI completes smoke tests; posts results.
+T+90 min after Auth green: Frontend DRI completes 30-sample E2E; posts evidence bundle.
+T+0 to T+2 hours: Comms Infra resolves heap pressure and proves canary stability; posts memory profile and canary graphs.
+Immediately after unblock: Comms DRI executes 5× DRY-RUN and submits evidence bundle.
+Within 24 hours: Growth DRI completes SEO DRY-RUN; submits funnel metrics.
+FOC Go/No-Go: Issued upon DRY-RUN evidence acceptance from Comms and E2E acceptance from Frontend.
+Decision summary
+
+E2E testing authorization: Approved, contingent on provider_register secret fix and Auth DRI green.
+Infrastructure escalation: Approved to resolve auto_com_center heap pressure with temporary scale-up and/or tuning; 2-hour SLA to stable canary.
+FOC status: On hold until auto_com_center passes DRY-RUN acceptance.
+Growth DRY-RUN: Approved; non-blocking; 24-hour SLA.
+Report back in this thread as each owner hits their SLA with the evidence bundle SHA and a one-paragraph summary. I will issue the FOC Go/No-Go immediately upon acceptance of Comms and Frontend evidence.
