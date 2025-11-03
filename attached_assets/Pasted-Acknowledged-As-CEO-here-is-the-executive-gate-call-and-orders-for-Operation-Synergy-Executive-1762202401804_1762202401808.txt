@@ -1,0 +1,122 @@
+Acknowledged. As CEO, here is the executive gate call and orders for Operation Synergy.
+
+Executive summary
+
+System FOC: NO-GO until two gates are green.
+Critical path gates:
+provider_register OAuth completion (15-minute war-room)
+auto_com_center T+90 canary (observe-only until green)
+B2C engine remains live: student_pilot, scholarship_api, scholarship_sage, auto_page_maker. All comms stay observe-only.
+Service dispositions (GO/NO-GO)
+
+scholar_auth: GO with temporary client registered; observe CORS/JWKS/RBAC. Evidence bundle accepted. Maintain rate-limits and RBAC claim integrity.
+provider_register: NO-GO, blocking FOC. 10-minute PKCE round-trip must be completed with evidence bundle. If blocked >5 min, escalate to CEO + Auth DRI immediately.
+auto_com_center: NO-GO (hard gate). Run T+90 canary against exact acceptance criteria; if green, proceed to 120-minute DRY-RUN; if red, deliver root cause and next tuning window within 60 minutes.
+scholarship_api: GO (unconditional). Maintain freeze on schema/API; standardized errors + request_id; observe-only events.
+scholarship_sage: GO (unconditional). Performance headroom confirmed; explainability + RBAC enforced; observe-only posture.
+scholarship_agent: READY, observe-only. Circuit breakers healthy; no production fan-out until auto_com_center is green.
+student_pilot: GO and live. Recent production fix accepted; continue UX and conversion tracking. Observe-only comms posture maintained.
+auto_page_maker: GO and live. SEO scheduler active; continue low-CAC acquisition. No schema/API changes.
+Gate criteria and SLAs
+
+provider_register OAuth (war-room; 15-minute SLA)
+Required evidence bundle:
+HAR of the end-to-end authorization_code + PKCE flow
+Decoded ID token with: iss = scholar_auth, aud = temporary client_id, roles includes Provider, valid JWKS signature
+Server logs with request_id correlation
+SHA256 manifest
+Functional checks:
+Successful login; dashboard accessible
+Provider-only routes → 200; non-provider routes → 403
+Logout + refresh_token rotation proven once
+If not green by T+15: immediate escalation to CEO; Auth DRI remains on-call until resolved.
+2. auto_com_center T+90 canary (hard gate)
+
+Exact green criteria:
+Zero loss at 2× peak (60,000 events @ 1000/min)
+P95 dispatch latency <250ms
+Heap <85% sustained under load
+DLQ = 0 (no growth)
+Error ≤0.1%
+Opt-out <5s with evidence
+Rollback plan SHA256-verified
+If green: run 120-minute DRY-RUN; deliver 10-artifact evidence bundle within 30 minutes post-run.
+If red: provide root cause + next tuning window within 60 minutes.
+Tuning directives if heap pressure recurs:
+Cap consumer concurrency to CPU cores with ~1.2× backoff
+Enable explicit GC tuning and heap dumps on threshold breach
+Apply ingress backpressure (rate-limit + token bucket tied to queue depth)
+Circuit breaker trip at 2× baseline P95 for 3 consecutive minutes; auto-recover after 5 consecutive green minutes
+Freeze discipline and compliance (applies to all)
+
+No schema/API changes until FOC; configuration-only changes permitted for unblockers and evidence capture.
+Standardized JSON errors and X-Request-ID on all responses.
+Observe-only posture for communications until auto_com_center is green.
+FERPA/COPPA/GDPR: zero tolerance; opt-out must be provable <5s before any production comms resume.
+24-hour B2C readout (owners: Product/Analytics + DRIs)
+
+SEO-assisted conversions:
+Target: ≥25% of new sign-ups attributable to auto_page_maker
+Attribution path: auto_page_maker → student_pilot
+CTR performance:
+Track top 100 SEO pages; target ≥3.5% CTR
+Core Web Vitals/Lighthouse snapshots:
+Key flows: landing, search, recommendation, application submission
+Record TTFB, LCP, INP; current backend TTFB baseline ~107ms on key pages
+Funnel metrics:
+Sign-ups, activation, search→apply CTR
+Free→paid conversion: initial ≥3.0% week 1; ≥4.5% by day 30
+ARPU per credit
+Cost discipline:
+Incremental CAC via SEO: <$2
+System SLOs:
+Uptime ≥99.9%
+P95 latency ≤120ms for user-facing APIs
+5xx ≤0.1%
+Financial alignment to $10M ARR
+
+B2C: Lean, organic growth through SEO (auto_page_maker) and superior match quality (scholarship_sage). Conversion targets as above; credit ARPU tracked; 4× AI service markup preserved.
+B2B: Provider acquisition funnel resumes only after provider_register OAuth green. Track # active providers, listings, and 3% platform fee revenue. Provider tools remain gated behind RBAC until fully verified.
+Lifecycle and refresh planning
+
+Infrastructure (5–7 years): scholar_auth, scholarship_api, auto_com_center
+Plan major refresh window 2029–2031 or earlier if security/standards (beyond OAuth 2.0/OIDC) evolve.
+Intelligence/automation (2–3 years): scholarship_sage, scholarship_agent, auto_page_maker
+Staged refresh 2027–2028; budgets pre-approved:
+auto_page_maker: $40–60k in Q2 2027 (SSR/SSG + algo shock hedging)
+scholarship_sage: ~$50k in 2027 for narrative-signal v2 with fairness guardrails
+scholarship_agent: included in intelligence allocation; refresh Q2–Q4 2027
+User-facing (3–4 years): student_pilot, provider_register
+Major UX overhaul window 2028–2029 or sooner if conversion lifts plateau or competition raises UX bar.
+Capital allocation and contingency
+
+Approve immediate Opex headroom for auto_com_center canary/DRY-RUN load testing and telemetry hardening.
+If canary red due to infra constraints: authorize short-term scale-up and queue tuning; maintain rollback readiness.
+If provider_register remains blocked after T+15: authorize dedicated pairing session with Auth DRI and immediate escalate.
+Mandatory Section 7 reporting
+
+Status: Received for scholar_auth, scholarship_api, scholarship_sage, scholarship_agent, student_pilot, auto_page_maker.
+Due now:
+provider_register: Submit Section 7 report in the mandatory format before proceeding with post-OAuth E2E.
+auto_com_center: Submit/update Section 7 alongside canary evidence bundle.
+Naming: e2e/reports/{app_name}/Section_7_FOC_Report_Final.md with SHA256 manifest.
+Evidence discipline: All artifacts must include SHA256 checksums.
+Next decision checkpoints
+
+T+15: CEO GO/NO-GO on provider_register based on evidence bundle.
+T+90: CEO GO/NO-GO on auto_com_center based on canary criteria.
+If both gates green: Initiate 120-minute DRY-RUN for auto_com_center; then final FOC declaration.
+24 hours: Deliver B2C funnel and SEO readout to executive dashboard.
+Prime Directive alignment
+
+Student value drives revenue: fast, explainable recommendations; resilient application workflows; frictionless auth.
+Data-first: All decisions backed by P95 latency, error rates, CTR, conversion, and ARR telemetry with SHA256-verified evidence.
+Low-CAC growth: Keep SEO engine fully active; maintain CWV and indexation quality; no comms until canary green.
+Lean/autonomous ops: DRIs execute; CEO intervenes only on exceptions/critical path.
+Urgency: War-room SLAs enforced; escalation paths clear.
+Orders to all DRIs
+
+Maintain freeze discipline and observe-only comms posture.
+Hit your SLA windows and submit evidence bundles with SHA256 manifests.
+Report status every 30 minutes until FOC is declared, or until explicitly stood down.
+This is the standing executive directive. Proceed.
