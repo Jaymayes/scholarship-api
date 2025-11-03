@@ -1,0 +1,96 @@
+CEO Executive Decision — Operation Synergy
+
+Situation
+
+Received Section 7 reports and readiness updates from: scholar_auth, scholarship_api, scholarship_sage, scholarship_agent, auto_page_maker. auto_com_center is staged for DRY-RUN. student_pilot and provider_register have dependency blockers tied to auth configuration.
+Critical blocker: student_pilot E2E failed with invalid_client. This contradicts “Auth GREEN.” Root cause is missing/incorrect OIDC client registration and outstanding provider_register AUTH_ISSUER_URL secret update.
+CEO Decisions and Directives (effective immediately)
+
+Unblock Authentication (hard gate for FOC)
+Owner: Auth DRI
+Deadline: T+30 minutes
+Actions (must all be completed and evidenced):
+Register OIDC client: student-pilot
+client_id: student-pilot
+redirect_uris: [https://student-pilot-jamarrlmayes.replit.app/api/callback]
+grant_types: [authorization_code, refresh_token]
+response_types: [code]
+scopes: [openid, email, profile, roles, offline_access]
+PKCE: S256 enforced
+token_endpoint_auth_method: client_secret_post
+Confirm provider_register client exists and matches production redirect URIs; rotate secrets if needed.
+Publish proof bundle: discovery (200), JWKS KID, client registry entry, successful end-to-end auth for student-pilot and provider_register (screenshots or HAR), and one decoded JWT with roles claim (redacted).
+Exit criteria: student_pilot E2E can obtain code, exchange for tokens, refresh token rotates; provider_register can complete auth handshake.
+2. Fix provider_register secret
+
+Owner: Provider Register Operator
+Deadline: T+15 minutes
+Action: Update AUTH_ISSUER_URL to https://scholar-auth-jamarrlmayes.replit.app and restart. Post screenshot and one successful login round trip with role=Provider.
+Exit criteria: 1 successful login; 401/403 negative tests enforced.
+3. Resume student_pilot E2E immediately after Auth GREEN
+
+Owner: Frontend DRI (student_pilot)
+Deadline: Start T+0 after Auth DRI greenlight; complete within T+120
+Acceptance gates:
+Auth success rate ≥98%
+P95 ≤120 ms across top 5 page loads and key API calls
+Zero critical 5xx
+RBAC isolation verified; standardized JSON errors with request_id
+Evidence: HAR files, latency P50/P95/P99, screenshots, 401/403 negative tests.
+4. Execute auto_com_center 5× DRY-RUN upon infra green signal
+
+Owner: Comms DRI
+Deadline: Within 2 hours of “GREEN - Canary Stable”
+Acceptance gates:
+≥99% delivery success
+Zero DLQ growth; auto-rollback armed
+Opt-out/unsubscribe < 5 seconds
+CAN-SPAM/GDPR/FERPA checks pass
+Evidence bundle: pre-staged artifacts + SHA256 manifest.
+5. Maintain Freeze Discipline
+
+Owners: All DRIs
+Only allowed changes: client registration, secret updates, and non-breaking configuration to remove blockers. No API/schema or logic changes until FOC Go/No-Go.
+Operational Timeline (from now)
+
+T+00–T+15: provider_register secret fix
+T+00–T+30: Auth DRI completes and evidences OIDC client registration(s)
+T+30–T+150: student_pilot E2E run and evidence submission
+T+150–T+270: provider_register E2E run and evidence submission
+T+270–T+390: auto_com_center 5× DRY-RUN and evidence submission
+T+390: CEO Go/No-Go meeting; decision posted immediately after evidence review
+Readiness Board (current view)
+
+scholar_auth: Conditionally GREEN pending proof of client registration; JWKS/discovery reported OK.
+scholarship_api: GREEN, P95 ~111ms, RBAC and error standards verified.
+scholarship_sage: GREEN, P95 ~1ms, FROZEN.
+scholarship_agent: GREEN, FROZEN; ready to generate event volume.
+auto_page_maker: GREEN, FROZEN; SEO DRY-RUN complete; manual GSC steps queued.
+auto_com_center: HOLD pending canary stabilization; DRY-RUN kit ready.
+student_pilot: NOT READY due to auth dependency; resumes post-auth fix.
+provider_register: CONDITIONAL READY pending AUTH_ISSUER_URL update.
+Revenue and KPI Rationale for Priority
+
+B2C engine (student_pilot) is our primary conversion path; auth blockage directly suppresses ARPU and delays credit sales. Unblocking auth/E2E is top priority to protect near-term revenue targets.
+B2B engine (provider_register) drives 3% platform fee; secret fix is a fast, high-ROI unblock.
+auto_page_maker fuels CAC reduction via SEO at scale; technical pass is good, proceed with GSC submission to start compounding impressions.
+auto_com_center drives activation and retention nudges; DRY-RUN must validate reliability to avoid churn risk at scale.
+Risk Register (with mitigations)
+
+Auth misalignment risk: invalid_client persists. Mitigation: CEO-enforced 30-minute SLA, proof artifacts mandatory, war-room channel opened until green.
+E2E slippage: If student_pilot fails acceptance gates, fallback to focused remediation sprints (auth/session handling, caching, lazy-load), with a 24-hour retest window.
+Comms heap pressure: If canary re-fails, reduce event rate by 30% and shard queues; DRY-RUN proceeds in staged ramps (10%/25%/50%/75%/100%).
+Deliverables Required Before Go/No-Go
+
+Auth DRI: Client registration evidence bundle and GREEN signal.
+student_pilot DRI: Section 7 report with lifecycle window (3–4 years) and E2E pass evidence.
+provider_register DRI: Final Section 7 report already submitted; add E2E pass evidence post-secret update.
+auto_com_center DRI: DRY-RUN evidence with binary PASS/FAIL and compliance checks.
+Accountability
+
+If Auth GREEN is not achieved within 30 minutes, I will authorize a temporary, tightly scoped fallback client for student_pilot to complete E2E, followed by immediate post-E2E rotation. This is a last-resort option and must be accompanied by an audit entry and rotation within 2 hours.
+Next Update Cadence
+
+DRIs post status at T+15, T+30, and then hourly until Go/No-Go.
+I will issue the final Go/No-Go immediately upon receipt and review of all evidence bundles.
+Act with urgency and precision. Student value is business value; unblocking friction in authentication and E2E flows is the fastest path to revenue and market leadership.
