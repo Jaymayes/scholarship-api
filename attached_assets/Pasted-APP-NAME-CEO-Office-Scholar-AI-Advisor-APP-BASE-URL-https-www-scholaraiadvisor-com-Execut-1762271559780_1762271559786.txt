@@ -1,0 +1,75 @@
+APP_NAME: CEO Office (Scholar AI Advisor) | APP_BASE_URL: https://www.scholaraiadvisor.com
+
+Executive decisions and orders
+
+Go/No-Go decisions (effective immediately)
+
+Gate A (OAuth/Issuer): GO. Issuer URL fix verified against production. Provider flows are unblocked. provider_register proceeds with Order B smoke test upon confirmation from scholar_auth that clients can auth without invalid_client.
+Order B (provider_register smoke): GO on unblock. SLA remains 25 minutes to deliver evidence bundle (request/response traces, redactions, SHA256 manifest).
+Order 3/4 (2 scholarship activations → +2 SEO pages): CONDITIONAL GO. scholarship_api to publish 2 test scholarships immediately upon provider_register PASS; auto_page_maker to confirm 2,101 → 2,103 pages within 60 seconds and return full request_id chain (scholarship_api → auto_page_maker → indexnow) and CWV p75 checks.
+Gate B (Comms DRY-RUN: auto_com_center + scholarship_agent): HOLD until Comms Infrastructure GREEN. Launch at T+65 after GREEN; unchanged abort thresholds and pass criteria.
+student_pilot Phase 1 monetization: GO after provider_register PASS + 5 minutes. Start at 10% live Stripe traffic with guardrails; auto-rollback armed.
+Non-negotiable EOD UTC deliverables
+
+scholar_auth
+Deposit e2e/config_manifest.json and e2e/production_readiness_proof.md.
+Confirm: managed DB (not Replit DB), TLS, backups with documented RPO/RTO; RBAC for Student/Provider/Admin; rate limits (login, registration, password reset); password recovery; event notifications to auto_com_center; rotating signing keys (kid), JWKS caching/TTL.
+auto_com_center
+Deposit e2e/config_manifest.json and e2e/production_readiness_proof.md.
+Include DKIM/SPF alignment, ESP sandbox→prod switch process, ESP rate-limit plan, DLQ configuration, and /health dependency gating. Observe-only posture until Gate B PASS.
+All 8 applications
+Sentry/Datadog integration identifiers in config_manifest (DSN, service name), with P95 and error-rate dashboards and alert thresholds documented. If not already integrated, commit by the start of Phase 2.
+Confirm 6/6 security headers, HSTS, TLS-only, request_id correlation, no PII in logs. Ensure /health returns 200 only when app and critical dependencies are healthy.
+Ensure APP_NAME and APP_BASE_URL appear in headers/metadata for all artifacts and evidence bundles.
+Execution orders by team
+
+scholar_auth (Owner)
+Announce “OAuth GREEN” once a test client completes full PKCE flow and id_token validation succeeds. Include request_id, client_id (masked), and issuer in the log line.
+Deliver EOD artifacts (above). Deadline: EOD UTC.
+provider_register (Owner)
+On “OAuth GREEN,” execute Order B smoke in ≤25 minutes:
+Positive cases: Provider auth flow; token exchange; RBAC access to scholarship_api.
+Negative cases: wrong redirect_uri (400), non-Provider access (403).
+Deliver evidence bundle + SHA256 manifest. Then signal PASS/FAIL.
+scholarship_api (Owner)
+On provider_register PASS, immediately create 2 test scholarships and emit triggers to auto_page_maker. Capture request_id start→end and confirm event emissions. Keep P95 ≤120ms.
+auto_page_maker (Owner)
+On trigger, confirm +2 pages within 60s and return request_id chain and CWV p75 metrics (LCP ≤2.5s, CLS ≤0.1, INP ≤200ms). Maintain freeze (no schema/API changes).
+student_pilot (Owner)
+provider_register PASS + 5 minutes: enable 10% live Stripe traffic. Guardrails armed: payment success ≥98.5%, 5xx <0.2%, auth ≥99.5%, CVR within ±10% of baseline. Auto-rollback <60s if breached. Produce first-day revenue snapshot by T+24h.
+scholarship_sage (Owner)
+Maintain observe-only. Keep P95 ≤10ms. Validate /recommendations/{student_id} with explainability fields (matchReasons) and no PII leakage.
+scholarship_agent (Owner)
+Co-own Gate B DRY-RUN with auto_com_center. Abort automation remains: DLQ > 0; P95 >150ms for 3 consecutive minutes; failure rate >0.2% over 5 minutes. Deliver 10-artifact evidence bundle with SHA256 at T+215. Observe-only until CEO FOC authorization.
+All teams
+Confirm production managed databases (or migration plan with cutover date) and cloud storage for uploads (e.g., S3/GCS) are documented in config_manifest. Encryption at rest and signed URL access required.
+KPI and reporting cadence
+
+Daily CEO dashboard (start T+1 day after Phase 1 launch):
+B2C: SEO sessions → registrations → verified profiles → free→paid conversion; ARPU from credit sales; refund rate; churn proxy (DAU/WAU).
+B2B: Providers onboarded, active listings, application volume, 3% fee accrual.
+CAC: Organic SEO attribution (auto_page_maker) vs any paid; maintain low-CAC priority.
+SLOs: Uptime ≥99.9%, P95 ≤120ms across APIs; error rate <0.1%; auto_com_center P95 ≤120ms during DRY-RUN.
+Cost-to-revenue: 4x AI service markup coverage and net margin trend.
+All KPI snapshots must include request_id exemplars and APP_NAME/APP_BASE_URL.
+Risk register and mitigations
+
+Authentication hardening (HIGH): Complete scholar_auth artifacts and confirm managed DB, key rotation, and rate limits today. Mitigation: block any scale-up until GREEN.
+Comms DRY-RUN stability (HIGH): Proceed only after Comms Infrastructure GREEN; keep observe-only in production until PASS; abort automation armed.
+Monitoring gaps (MEDIUM): Ensure Sentry/Datadog in all apps before Phase 2; owners to post DSNs and alert thresholds in artifacts.
+Data privacy (MEDIUM): Re-verify FERPA/COPPA redaction in logs and storage policies; no PII in request traces; confirm DPA coverage for ESP and cloud storage.
+Monetization and “revenue stop point” clarification
+
+End of major development investment: December 16, 2025 (Phase 3 Go-Live). From that point, platform expected to operate as a revenue center.
+Architecture lifespan/EOL for current stack: Q4 2028–Q4 2030 before major refresh.
+What I need posted back to the CEO channel
+
+scholar_auth: “OAuth GREEN” proof + EOD artifact links (config_manifest and proof).
+provider_register: Order B evidence bundle + SHA256; PASS/FAIL.
+scholarship_api + auto_page_maker: +2 pages confirmation within 60s, request_id chain, CWV p75 metrics.
+auto_com_center + scholarship_agent: Comms Infrastructure GREEN timestamp; DRY-RUN start at T+65; evidence bundle at T+215; PASS/FAIL recommendation at T+225.
+student_pilot: Phase 1 launch confirmation, guardrail configuration, first 24h revenue snapshot schedule.
+Final note
+
+Maintain freeze discipline. No schema/API changes until Gate B PASS and Phase 1 stabilization data is reviewed.
+All artifacts, logs, and reports must include APP_NAME and APP_BASE_URL. Data leads decisions; protect our low-CAC SEO engine. Execute with urgency.
