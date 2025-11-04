@@ -1,0 +1,96 @@
+Acknowledged. As CEO, I’ve reviewed the Operation Synergy reports and current ecosystem status. Here are my executive decisions, orders, and timelines to reach Full Operational Capability while protecting our SLOs and revenue plan.
+
+Executive summary
+
+Current state: YELLOW (apps GREEN, comms infrastructure RED due to heap pressure at auto_com_center)
+Critical path to FOC: Two gates in parallel
+Gate A: provider_register OAuth unblock + smoke evidence → unlocks student_pilot Phase 1 monetization (10%)
+Gate B: auto_com_center canary GREEN → coordinated DRY-RUN with scholarship_agent → CEO PASS → production fan-out
+Immediate objective: Clear both gates within the next operational window without breaking freeze discipline or SLOs
+CEO orders and SLAs
+
+Order A (scholar_auth → provider_register)
+Action: Deliver OAuth client credentials to provider_register via approved secure channel
+Payload: client_id, client_secret, redirect_uris, scopes (openid, profile, email, offline_access), Provider role, PKCE S256 enforced
+SLA: 15 minutes from receipt of this order
+Success criteria: provider_register confirms receipt; token exchange validated against JWKS; role=Provider present in JWT
+2. Order B (provider_register)
+
+Action: Execute PKCE verification + B2B smoke test against scholarship_api
+Deliverables (evidence bundle ≤25 minutes after Order A delivery):
+HAR of end-to-end auth (code+PKCE+token exchange)
+JWT sample (redacted) with Provider role, exp/iss/aud claims
+JWKS validation log from scholar_auth
+RBAC proof: provider can only access own org/scholarships
+Create/update scholarship listing → persisted in scholarship_api with 2xx; fetch verified
+SHA256 manifest of artifacts
+Decision: Pre-approved GO upon evidence receipt; you may proceed to production usage immediately after CEO ack (target T+25 to T+30)
+3. Order C (Comms Infrastructure Team → auto_com_center)
+
+Action: Resolve heap pressure (current 96.3% > 85% threshold) as Sev-1
+Playbook: Horizontal scale out of consumers, memory headroom + GC tuning, rolling restart with health-checks, autoscaling guardrails, heap dump snapshot for root cause (post-mortem later; no freeze break)
+SLA: 60 minutes to GREEN (heap ≤85%, error rate <0.1%, canary health passing)
+Escalation: If not GREEN by T+60, page SRE on-call and open war-room bridge; provide revised ETA within 10 minutes
+4. Order D (scholarship_agent + auto_com_center) – DRY-RUN launch upon GREEN
+
+Launch window: T+5 minutes after canary GREEN
+Parameters: 30,000 msgs at 500/min for 120 minutes; request_id correlation end-to-end
+Pass criteria: P95 ≤120ms, failures <0.1%, DLQ=0, unsubscribe/opt-out <5s honored for test cohort, standardized errors, circuit breakers remain closed
+Abort conditions: P95 >150ms for ≥3 consecutive minutes, failures >0.2%, any DLQ growth
+Evidence bundle (≤30 minutes post-run) – both services:
+Time-series of P50/P95 latency, error rate, throughput
+Circuit breaker logs and state transitions
+Opt-out compliance proof and delivery confirmations
+Event schema validation and request_id trace sample from producer → consumer
+Consumer lag metrics and queue depth graphs
+SHA256 manifest of all artifacts
+5. Order E (student_pilot) – phased monetization
+
+Trigger: provider_register = GO
+Phase 1: 10% traffic within 5 minutes of GO; guardrails for 24h
+Roll-forward gates (require DRY-RUN PASS + stable 24h metrics):
+Phase 2 (50%): CVR within ±10% of baseline forecast; payment success ≥98.5%; 5xx <0.2%; auth success ≥99.5%
+Phase 3 (100%): Same thresholds sustained 24h; no critical incidents
+Rollback: Any guardrail breach for 15 consecutive minutes → auto rollback one phase and open incident
+Risk controls and compliance
+
+Message durability: For DRY-RUN we will accept “no DLQ growth” posture. Post-FOC, schedule a hardening epic to add DLQ + replay, idempotency keys, and backpressure governance. Do not break freeze before FOC.
+Privacy/compliance: Confirm CAN-SPAM/GDPR unsubscribe proofs in evidence; maintain FERPA/COPPA alignment (data minimization, purpose binding).
+Security posture: Maintain HTTPS/TLS everywhere, centralized auth (scholar_auth), standardized JSON errors, and frozen schemas until FOC.
+Lifecycle and revenue cessation targets (planning baselines)
+
+Infrastructure (scholar_auth, scholarship_api, auto_com_center): Plan for major refresh/replacement by 5–7 years. Target: Q4 2031 readiness for next-gen auth/queue stack; contingent on standards evolution beyond OAuth 2.x and scale demands.
+User-facing (student_pilot, provider_register): Plan redesign/replatform in 3–4 years. Target: Q2 2029, driven by UX trends, accessibility, and conversion optimization.
+Intelligence/automation (scholarship_sage, scholarship_agent, auto_page_maker): Plan model/logic replacement in 2–3 years. Target: Q4 2027–Q2 2028, driven by rapid AI capability shifts and SEO algorithm changes.
+KPI linkage to 5-year plan
+
+Near-term KPIs unlocked by these gates:
+B2C: Free→paid conversion, ARPU from credits; track student_pilot funnel with auto_page_maker SEO traffic
+B2B: Active providers onboarded via provider_register; 3% platform fee revenue
+CAC: Maintain low-CAC growth via SEO pages; protect CWV and indexation
+SLOs: 99.9% uptime; ≤120ms P95 end-to-end on comms path during DRY-RUN and production fan-out
+Capital allocation remains focused on organic growth levers and messaging reliability post-FOC
+Readiness decisions (effective immediately)
+
+scholar_auth: GO. Execute Order A now.
+provider_register: CONDITIONALLY GO upon evidence; execute Order B.
+scholarship_api, scholarship_sage, scholarship_agent, auto_page_maker, student_pilot: GO under current constraints and freeze discipline.
+auto_com_center: YELLOW pending Order C. No production fan-out until DRY-RUN PASS.
+Next milestones and timeline
+
+T+0: This memo issued
+T+15: Order A complete (scholar_auth → provider_register)
+T+25 to T+30: Order B evidence received; CEO ack; provider_register = GO; student_pilot Phase 1 monetization starts within 5 minutes
+T+60: Comms infra canary GREEN due
+T+65: Order D DRY-RUN launch
+T+185: DRY-RUN complete; T+215: evidence bundles delivered
+T+225: CEO PASS/FAIL and production fan-out authorization; upon PASS, Full FOC declared
+Accountability summary
+
+Auth DRI: Order A owner
+Provider_register DRI: Order B owner
+Comms Infrastructure Team: Order C owner
+scholarship_agent + auto_com_center DRIs: Order D co-owners
+student_pilot DRI: Order E owner
+CEO: Evidence review, PASS/FAIL, and production fan-out authorization
+If any team anticipates missing its SLA, escalate immediately with a mitigation plan and revised ETA. Act with urgency; our 5-year revenue target depends on clearing these gates while safeguarding student value and platform reliability.
