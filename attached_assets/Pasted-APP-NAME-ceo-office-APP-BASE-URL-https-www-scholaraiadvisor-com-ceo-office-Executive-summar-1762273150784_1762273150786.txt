@@ -1,0 +1,119 @@
+APP_NAME: ceo_office | APP_BASE_URL: https://www.scholaraiadvisor.com/ceo-office
+
+Executive summary
+
+Overall status: Strong EOD momentum with artifacts posted and SLOs largely green across apps. However, a critical inconsistency exists between the “OAuth GREEN” claim and provider_register’s invalid_client result. This blocks Gate A and the downstream Order 3/4 sequence (+2 SEO pages) and the Phase 1 monetization start.
+Prime directive alignment: Low-CAC organic engine prepared (auto_page_maker). Focus now is to clear Gate A (auth) and declare Comms Infrastructure GREEN to unlock Gate B DRY-RUN. Freeze discipline is maintained—keep it.
+Immediate decisions and orders
+
+scholar_auth — CRITICAL PATH: Resolve OAuth GREEN discrepancy within 30 minutes
+Issue: provider_register received invalid_client at authorization endpoint despite earlier “OAuth GREEN” certification.
+Mandatory actions (complete and post evidence by T+30 min):
+Verify client registration for provider_register:
+client_id is active and matches provider_register config.
+Allowed redirect_uris includes https://provider-register-jamarrlmayes.replit.app/callback with exact match.
+PKCE S256 enforced; confirm token_endpoint_auth_method matches client type (public = none, or confidential with proper secret handling).
+Ensure issuer “https://scholar-auth-jamarrlmayes.replit.app” is consistent across discovery and tokens.
+Rotate client secret if confidential client; publish masked client_id and last-4 of client secret in evidence (no full secret).
+End-to-end PKCE smoke test with test user “provider_smoke”:
+Authorization code returned to callback (HTTP 302).
+Token exchange success; id_token signature verified against JWKS; iss/aud/sub/exp/nonce validated; kid matches JWKS; at_hash present if access token issued.
+Post “OAUTH GREEN” log line to CEO channel with:
+request_id
+client_id (masked)
+issuer
+JWKS kid used
+End-to-end timing (auth code + token exchange)
+If any step fails at T+25 min, escalate to on-call and post mitigation ETA.
+Freeze discipline: No schema/API changes; configuration-only.
+2. provider_register — Execute Order B within 25 minutes of “OAUTH GREEN”
+
+On scholar_auth’s “OAUTH GREEN” announcement:
+Run the 3-phase, 25-minute test plan you documented (PKCE flow, RBAC tests, negative cases).
+Deliver evidence bundle (HAR, JWT claim redactions, JWKS kid match, RBAC proofs, SHA256 manifest) and post PASS/FAIL to CEO channel with request_id correlations.
+On PASS: Emit PASS signal immediately to unlock Order 3/4.
+3. scholarship_api — Order 3 trigger on provider_register PASS
+
+Immediately create 2 test scholarships (POST /api/v1/scholarships).
+Emit scholarship_created events to auto_page_maker.
+Capture and post request_id chain start→end (scholarship_api → auto_page_maker → indexnow).
+Maintain P95 ≤120ms during this operation.
+Evidence due within 2 minutes of provider_register PASS.
+4. auto_page_maker — Confirm +2 pages within 60 seconds of trigger
+
+On scholarship_api events:
+Confirm page count 2,101 → 2,103 in <60s.
+Post full request_id chain (scholarship_api → auto_page_maker → indexnow).
+Post CWV p75 metrics with targets: LCP ≤2.5s, CLS ≤0.1, INP ≤200ms; label PASS/FAIL per metric.
+Reiterate freeze discipline: configuration-only.
+5. auto_com_center — Declare Comms Infrastructure GREEN no later than T+60
+
+You have strong EOD artifacts; now move from observe-only to DRY-RUN readiness.
+GREEN prerequisites (provide evidence):
+Email: ESP DKIM/SPF alignment verified; seed test to 10 internal addresses with delivery ≥98%, bounce ≤1%, per-message request_id logged.
+SMS: Gateway sandbox test to 5 internal numbers with delivery ≥98%; request_id logged.
+Observability: /metrics alive; alert thresholds armed (P95 ≤120ms, error ≤0.1%, DLQ=0); DLQ empty; circuit breakers armed.
+Security: 6/6 headers and TLS-only confirmed on /health and webhook endpoints.
+Post “Comms Infrastructure GREEN” timestamp with checklist, request_ids, and evidence pointers to CEO channel by T+60.
+If not GREEN by T+60, post blocker list and ETA.
+6. scholarship_agent — Gate B DRY-RUN at T+65 after Comms GREEN
+
+Hold until auto_com_center posts GREEN.
+Launch DRY-RUN at T+65 (120-minute run).
+Abort automation unchanged: DLQ>0 immediate abort; P95>150ms for 3 consecutive minutes abort; failures>0.2% over 5 minutes abort.
+Evidence bundle (10 artifacts + SHA256) at T+215; PASS/FAIL recommendation at T+225.
+7. student_pilot — Phase 1 monetization at provider_register PASS + 5 minutes
+
+Start with 10% Stripe live traffic. Guardrails: auto-rollback <60s if breached (payments success ≥98.5%, 5xx <0.2%, auth success ≥99.5%, CVR deviation ±10%).
+First 24h revenue snapshot at T+24h from launch:
+B2C: SEO sessions → registrations → verified profiles; free→paid conversion; ARPU from credit sales; refund rate; DAU/WAU.
+Revenue: credit pack count; gross revenue; 4× AI markup contribution; net margin after Stripe fees.
+SLOs: uptime; P95 latency; 5xx rate; auth success; payment success.
+Attribution: auto_page_maker → student_pilot → conversion; CAC vs organic baseline.
+Deliver JSON report with request_id exemplars and APP metadata.
+8. scholarship_sage — Maintain observe-only and SLO posture
+
+Keep P95 ≤10ms (current 1ms is excellent).
+Ensure matchReasons explainability remains present; no PII leakage.
+No outbound comms until CEO FOC.
+Cross-cutting compliance and observability
+
+Third-party observability (Sentry/Datadog): Integration identifiers documented—activation is required before Phase 2 traffic expansion. Hard deadline: prior to Phase 2 start. No exceptions.
+Reporting standard: All posted artifacts and logs must include APP_NAME and APP_BASE_URL in headers/metadata.
+Health checks: /health must return 200 only when app and all critical dependencies are healthy; enforce TLS-only; maintain 6/6 security headers.
+Execution timeline (UTC, relative)
+
+T+00: Now — Orders issued.
+T+30: scholar_auth posts “OAUTH GREEN” (or escalates with ETA).
+T+55 to T+60: provider_register Order B evidence bundle (on time if OAUTH GREEN at T+30).
+T+60: auto_com_center posts “Comms Infrastructure GREEN” with evidence (deadline).
+T+60 to T+62: scholarship_api triggers 2 test scholarships, events emitted; auto_page_maker confirms +2 pages (<60s) and posts CWV p75 and request_id chain.
+T+65: scholarship_agent + auto_com_center start Gate B DRY-RUN (120 min).
+T+215: Gate B DRY-RUN evidence bundle delivered (10 artifacts + SHA256).
+T+225: Gate B PASS/FAIL recommendation posted.
+Provider PASS + 5 min: student_pilot Phase 1 10% Stripe live traffic begins.
+Phase 1 T+24h: student_pilot posts first revenue snapshot.
+Acceptance criteria for this cycle
+
+Gate A: “OAUTH GREEN” with full PKCE flow proof; provider_register Order B PASS with evidence.
+Order 3/4: +2 pages in <60s; complete request_id chain; CWV p75 targets met.
+Comms GREEN: Posted with seed tests, DKIM/SPF alignment, DLQ=0, circuit breakers armed.
+Gate B DRY-RUN: P95 ≤120ms; failures <0.1%; DLQ=0; evidence bundle delivered on time.
+Risks and mitigations
+
+Risk: OAuth configuration drift across environments. Mitigation: lock client registrations; export signed client registry manifest; alert on drift via scheduled diff; rotate secrets on any mismatch.
+Risk: Comms GREEN delay due to ESP/SMS config. Mitigation: use sandbox seed tests; pre-warmed sender; strict DMARC alignment; fallback ESP ready if DKIM alignment fails.
+Risk: CWV p75 misses under load. Mitigation: prioritize pre-rendering, ensure CDN caching headers, and keep page weight budgets; immediate rollback of any non-critical scripts impacting LCP/INP.
+Strategic note on “stop generating revenue” interpretation
+
+Confirmed: Revenue generation begins post-Phase 3 Go-Live (target December 16, 2025) as development spend shifts from build to operate.
+Architecture refresh planning: 3–5 year horizon; schedule modernization assessment in Q3 2028 to protect continuity of revenue through Q4 2030.
+What I expect posted back
+
+scholar_auth: OAUTH GREEN evidence by T+30.
+provider_register: Order B evidence by T+55–60 (dependent on OAUTH GREEN).
+scholarship_api + auto_page_maker: +2 pages evidence and request_id chain within 2 minutes of provider PASS; CWV p75 metrics included.
+auto_com_center: Comms Infrastructure GREEN by T+60 with seed test evidence.
+scholarship_agent: DRY-RUN start at T+65; evidence at T+215; PASS/FAIL at T+225.
+student_pilot: First 24h revenue snapshot at T+24h from launch.
+Maintain freeze discipline. Execute with urgency. Data-first decisions only. Protect the low-CAC SEO engine.
