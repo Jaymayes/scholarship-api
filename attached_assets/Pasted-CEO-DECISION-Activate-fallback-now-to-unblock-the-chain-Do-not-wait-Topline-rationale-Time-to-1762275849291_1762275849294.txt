@@ -1,0 +1,87 @@
+CEO DECISION: Activate fallback now to unblock the chain. Do not wait.
+
+Topline rationale: Time-to-GREEN for OAuth is the critical path gating provider_register, scholarship_api triggers, auto_page_maker SEO momentum, and student_pilot monetization. We will ship with a tightly guarded 24-hour fallback to keep the schedule while the root cause is investigated off the critical path.
+
+Immediate orders
+
+scholar_auth
+Action: Activate guarded static client registry entry for provider-register only, effective immediately.
+Constraints:
+client_id: provider-register
+Redirect URIs: production URIs only (deny all others)
+PKCE: S256 required
+Scopes: minimum necessary for provider onboarding and listing management
+Token TTLs: short-lived access (≤15m), refresh tokens enabled with rotation
+Logging: no PII; include request_id, client_id, redirect_uri, grant_type, PKCE S256 present=true
+Headers/Security: keep 6/6 headers; TLS-only; RBAC intact
+Auto-expiry: 24h hard stop; feature flag must default to OFF after window
+Deliverable (10 minutes from now):
+Post “OAUTH GREEN via Fallback ACTIVATED” to CEO channel with:
+APP_NAME: scholar_auth | APP_BASE_URL: https://scholar-auth-jamarrlmayes.replit.app
+Evidence bundle: adapter logs (redacted), client registry diff, PKCE enforcement proof, successful auth trace with request_id, SHA256 manifest
+Parallel: Open P1 incident for root cause; no schema/API changes; continue diagnostics off the mainline.
+2. provider_register
+
+On receipt of “OAUTH GREEN via Fallback ACTIVATED,” execute Order B immediately.
+Deliver evidence in 25 minutes per your 3-phase plan, then post “ORDER B PASS” with APP_NAME and APP_BASE_URL headers.
+If any auth success rate <99.5% over a 5-minute window, stop and page CEO.
+3. scholarship_api
+
+On “ORDER B PASS,” execute Order 3 within 2 minutes:
+Create 2 test scholarships; emit scholarship_created events.
+Maintain P95 ≤120ms.
+Post evidence and end-to-end request_id chain to CEO channel.
+Coordinate with auto_page_maker on page delta validation.
+4. auto_page_maker
+
+On scholarship_api trigger, execute within 60 seconds:
+Confirm +2 pages (2,101 → 2,103).
+Post request_id chain (scholarship_api → auto_page_maker → indexnow) and CWV p75 with PASS/FAIL for LCP ≤2.5s, CLS ≤0.1, INP ≤200ms.
+5. student_pilot
+
+Launch Phase 1 monetization at provider_register PASS + 5 minutes:
+10% Stripe live, 90% test; guardrails armed; auto-rollback <60s.
+Post “PHASE 1 LAUNCH” confirmation; deliver 24h revenue snapshot exactly T+24h.
+Rollback criteria (breach sustained 15 min): payment success <98.5%, 5xx ≥0.2%, auth success <99.5%, CVR deviation >±10%.
+6. scholarship_agent + auto_com_center
+
+Gate B DRY-RUN is GO at T+65 as planned:
+30,000 msgs @ 500/min × 120 min; abort automation thresholds unchanged (DLQ>0 immediate; P95>150ms×3min; failures>0.2%×5min).
+Post START at T+65; evidence at T+215; PASS/FAIL at T+225.
+Incident and root-cause workstream (off the critical path)
+
+scholar_auth P1 (assign DRI now):
+
+Objectives (complete within the 24h fallback window):
+Reproduce invalid_client with controlled adapter test harness.
+Verify oidc-provider adapter lifecycle and client loading order; compare startup vs runtime lookup paths.
+Run a binary bisect: lock current version, test previous minor, test latest patch; capture deltas.
+Add a one-shot runtime client registry self-check endpoint gated to Admin to diff “effective registry” vs DB.
+Prepare hotfix plan that removes static client before 24h expiry.
+Do not change schemas or RBAC; config-only and library patch-level changes allowed with rollback plan.
+Risk, compliance, and reporting guardrails
+
+Reporting standard: Every artifact must include APP_NAME and APP_BASE_URL in headers/metadata.
+Security posture: Maintain 6/6 headers, TLS-only, RBAC, PII redaction across all apps.
+SLOs: Maintain 99.9% uptime and ~120ms P95. Any breach triggers immediate postmortem and rollback as defined by each app’s guardrails.
+SEO engine protection: Treat the +2 pages and IndexNow push as a must-hit milestone; this is core to our low-CAC strategy.
+Finance/KPIs to post in student_pilot 24h snapshot:
+B2C: free→paid conversion, ARPU from credit sales, refund rate
+B2B: providers onboarded, 3% fee revenue (if applicable in scope)
+CAC: organic session → registration attribution from auto_page_maker pages
+Profitability: AI service 4x markup coverage, payment success rates
+Answer to the question
+
+Choose “Help with scholar_auth.” Activate the guarded fallback now to unblock the ecosystem, then continue root-cause investigation in parallel. Waiting is not acceptable given the 25-minute window and the downstream revenue and SEO dependencies.
+Accountability checkpoints (what I expect to see, and when)
+
+T+10: scholar_auth posts “OAUTH GREEN via Fallback ACTIVATED” with evidence.
+T+35 to T+40: provider_register posts “ORDER B PASS” with bundle.
+T+40 to T+42: scholarship_api posts Order 3 evidence.
+T+41 to T+43: auto_page_maker posts +2 pages with CWV and request_id chain.
+T+45: student_pilot posts “PHASE 1 LAUNCH.”
+T+65: scholarship_agent posts DRY-RUN START.
+T+215: scholarship_agent posts DRY-RUN evidence.
+T+225: scholarship_agent posts PASS/FAIL recommendation.
+T+24h from Phase 1 launch: student_pilot posts 24h revenue snapshot.
+Proceed now. Act with urgency, maintain freeze discipline, and post each artifact to the CEO channel as specified.
