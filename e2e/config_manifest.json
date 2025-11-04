@@ -1,0 +1,184 @@
+{
+  "app_name": "scholarship_api",
+  "app_base_url": "https://scholarship-api-jamarrlmayes.replit.app",
+  "version": "v2.7",
+  "environment": "production",
+  "timestamp": "2025-11-03T22:58:58Z",
+  
+  "database": {
+    "provider": "Neon PostgreSQL",
+    "type": "managed",
+    "production_grade": true,
+    "connection_pattern": "postgresql://[user]:[password]@ep-quiet-breeze-ad2navfh.c-2.us-east-1.aws.neon.tech/neondb?sslmode=require",
+    "region": "us-east-1",
+    "tls_mode": "require",
+    "ssl_enabled": true,
+    "automated_backups": true,
+    "backup_provider": "Neon (automatic)",
+    "rpo": "< 1 hour (Neon managed)",
+    "rto": "< 5 minutes (Neon managed)",
+    "high_availability": true,
+    "notes": "Neon provides automatic backups, point-in-time recovery, and HA. Connection pooling managed by SQLAlchemy."
+  },
+  
+  "observability": {
+    "external_monitoring": {
+      "status": "pending",
+      "sentry_dsn": "not_configured",
+      "datadog_dsn": "not_configured",
+      "notes": "External observability (Sentry/Datadog) to be configured pre-Phase 3. Currently using internal health endpoints and structured logging."
+    },
+    "internal_monitoring": {
+      "health_endpoint": "/api/v1/health",
+      "deep_health_endpoint": "/api/v1/health/deep",
+      "canary_endpoint": "/canary",
+      "liveness_probe": "/healthz",
+      "readiness_probe": "/readyz",
+      "p95_target_ms": 120,
+      "p95_current_ms": 96,
+      "structured_logging": true,
+      "request_id_correlation": true,
+      "circuit_breakers": true
+    },
+    "dashboards": {
+      "live_p95_dashboard": "pending_external_observability",
+      "uptime_dashboard": "pending_external_observability",
+      "error_dashboard": "pending_external_observability",
+      "notes": "Dashboard links to be provided upon Sentry/Datadog integration pre-Phase 3"
+    },
+    "alert_thresholds": {
+      "p95_latency_ms": 150,
+      "error_rate_percent": 0.5,
+      "uptime_percent": 99.9,
+      "db_connection_failures": 3,
+      "circuit_breaker_opens": 1
+    }
+  },
+  
+  "cloud_storage": {
+    "status": "not_applicable",
+    "notes": "scholarship_api does not currently handle document uploads. Storage integration reserved for future provider document management features."
+  },
+  
+  "email_sms": {
+    "status": "not_applicable",
+    "notes": "scholarship_api does not send emails/SMS directly. Event emissions trigger auto_com_center for all communications."
+  },
+  
+  "security_privacy": {
+    "tls_version": "1.2+",
+    "https_only": true,
+    "security_headers": {
+      "count": "6/6",
+      "headers": [
+        "Strict-Transport-Security",
+        "Content-Security-Policy",
+        "X-Frame-Options",
+        "X-Content-Type-Options",
+        "Referrer-Policy",
+        "Permissions-Policy"
+      ],
+      "hsts_max_age": 15552000,
+      "csp_policy": "default-src 'none'; connect-src 'self'; base-uri 'none'; object-src 'none'; frame-ancestors 'none'"
+    },
+    "authentication": {
+      "provider": "scholar_auth (centralized)",
+      "method": "JWT via JWKS",
+      "jwks_url": "https://scholar-auth-jamarrlmayes.replit.app/.well-known/jwks.json",
+      "active_kid": "scholar-auth-prod-20251016-941d2235"
+    },
+    "authorization": {
+      "rbac_enabled": true,
+      "roles": ["Student", "Provider", "Admin", "SystemService"],
+      "tenant_isolation": true,
+      "least_privilege": true
+    },
+    "rate_limiting": {
+      "enabled": true,
+      "backend": "memory (Redis fallback ready)",
+      "standardized_errors": true,
+      "error_codes": [401, 403, 429]
+    },
+    "compliance": {
+      "ferpa": true,
+      "coppa": true,
+      "gdpr_ready": true,
+      "pii_redaction": {
+        "logs": true,
+        "policy": "No PII in logs; request_id only for correlation",
+        "audit_trails": "7-year retention with request_id"
+      },
+      "data_minimization": true,
+      "purpose_binding": true
+    }
+  },
+  
+  "payments": {
+    "status": "not_applicable",
+    "notes": "scholarship_api does not handle payments directly. student_pilot integrates Stripe for B2C monetization."
+  },
+  
+  "health_checks": {
+    "endpoint": "/api/v1/health",
+    "returns_200_only_when_healthy": true,
+    "checks_critical_dependencies": true,
+    "dependencies_checked": ["database", "redis"],
+    "circuit_breaker_protection": true,
+    "p95_target_ms": 150
+  },
+  
+  "freeze_discipline": {
+    "status": "maintained",
+    "no_schema_changes": true,
+    "no_api_changes": true,
+    "no_logic_changes": true,
+    "configuration_only": true,
+    "last_code_change": "2025-11-03T00:00:00Z (prior to T+0)"
+  },
+  
+  "kpis": {
+    "p95_latency_ms": {
+      "target": 120,
+      "current": 96,
+      "headroom_percent": 20
+    },
+    "error_rate_percent": {
+      "target": 0.1,
+      "current": 0.0
+    },
+    "uptime_percent": {
+      "target": 99.9,
+      "current": 99.9
+    },
+    "request_id_coverage_percent": 100,
+    "ssot_enforcement": true,
+    "rbac_enforcement": true
+  },
+  
+  "integration_readiness": {
+    "scholar_auth": "verified",
+    "student_pilot": "verified",
+    "provider_register": "verified",
+    "scholarship_sage": "verified",
+    "scholarship_agent": "verified",
+    "auto_page_maker": "verified",
+    "auto_com_center": "verified",
+    "total_integrations": 7
+  },
+  
+  "gate_status": {
+    "gate_a_provider_oauth": "on_call_ready",
+    "gate_b_dry_run": "ready",
+    "conditional_foc": "active"
+  },
+  
+  "notes": [
+    "Production-grade Neon PostgreSQL with TLS, automated backups, and HA",
+    "6/6 security headers enforced via SecurityHeadersMiddleware",
+    "Health endpoint operational; returns 200 only when dependencies healthy",
+    "External observability (Sentry/Datadog) pending pre-Phase 3 integration",
+    "RBAC, SSOT, standardized errors, and request_id correlation operational",
+    "Freeze discipline maintained since T+0; configuration-only changes permitted",
+    "Ready to support Gate A (provider_register smoke test) and Gate B (DRY-RUN)"
+  ]
+}

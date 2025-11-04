@@ -1,0 +1,152 @@
+CEO Executive Directive — Final Integration and Operational Readiness
+
+Prime objective reaffirmed: We will hit the MVP launch window and protect our low-CAC growth engine. All actions below are tied to our 5-year plan toward $10M profitable ARR and market leadership in AI-driven scholarship access.
+
+Immediate decisions and orders (time-bound)
+
+Provider OAuth blocker — Order B NO-GO until fixed
+Decision: Blocked. The provider_register “invalid_client” at scholar_auth is unacceptable.
+Owner: scholar_auth DRI
+SLA: 15 minutes from receipt of this directive
+Required fixes:
+Verify client registration for provider_register, including exact redirect URI: https://provider-register-jamarrlmayes.replit.app/callback
+Confirm client_id/secret currently deployed to provider_register match the values in scholar_auth
+Propagate config and, if needed, perform a safe restart/roll of scholar_auth
+Validate JWKS is served with correct KID and that token issuance works end-to-end
+Acceptance test (must pass all):
+GET /oidc/auth returns 302 to login (not 400 invalid_client)
+PKCE S256 enforced; auth code exchanged for tokens successfully
+ID token contains roles with "Provider" claim; RBAC verified
+Evidence bundle: request_id chain, 302 trace, token exchange body with signatures redacted
+2. Provider smoke test — Order B GO (once unblocked)
+
+Owner: provider_register DRI
+SLA: Begin immediately upon scholar_auth unblock; evidence bundle within 25 minutes
+Acceptance evidence:
+Auth flow 302→code→token succeeds
+RBAC enforcement confirmed against scholarship_api (Provider can access only own org)
+Standardized error envelopes present with request_id on 401/403
+/health returns 200 for app and critical dependencies
+3. Post-PASS trigger — Two new scholarship activations
+
+Owner: scholarship_api DRI
+When: Immediately after provider_register PASS
+Acceptance evidence:
+2 new scholarships created (request_ids recorded)
+Events trigger auto_page_maker
+auto_page_maker publishes 2 SEO pages within 60 seconds end-to-end
+Request_id chain recorded: scholarship_api → auto_page_maker → indexnow
+KPI: P95 ≤120ms, failures <0.1%
+4. SEO engine confirmation
+
+Owner: auto_page_maker DRI
+When: Upon scholarship_api trigger
+Acceptance evidence:
+Page count increases from 2,101 to 2,103 within 60 seconds
+Request_id chain included in report
+CWV p75 targets intact (LCP ≤2.5s, CLS ≤0.1, INP ≤200ms)
+5. Student launch control
+
+Decision: Conditional GO
+Owner: student_pilot DRI
+Condition: Launch at provider_register PASS + 5 minutes
+Guardrails:
+Maintain 10% live Stripe traffic; auto-rollback armed on 15-min threshold breach
+No marketing sends; observe-only posture maintained
+Immediate actions (parallel, do not block launch readiness):
+Implement/verify /health returns 200 only when dependencies are healthy
+Deliver EOD E2E compliance artifacts (see below)
+6. Gate B DRY-RUN (auto_com_center + scholarship_agent)
+
+Decision: Gate B status unchanged; proceed only after Comms Infrastructure GREEN
+Owners: auto_com_center DRI (co-owner), scholarship_agent DRI (co-owner)
+Launch: T+65 after T+60 GREEN signal
+Volume/duration: 30,000 msgs @ 500/min for 120 minutes
+Abort automation must remain armed:
+DLQ > 0 → abort
+P95 > 150ms for 3 consecutive minutes → abort
+Failure rate > 0.2% over 5 minutes → abort
+Acceptance evidence at T+215:
+10 artifacts + SHA256 manifest
+P95 ≤120ms, failures <0.1%, DLQ = 0, opt-out <5s
+EOD UTC compliance — Non-negotiable deliverables
+
+Every application must deposit both:
+
+e2e/config_manifest.json
+A short proof artifact (e.g., production_readiness_proof.md with screenshots/logs/cURL outputs)
+Contents required (tailored per app’s scope):
+
+Database: Production-grade managed service (RDS/Atlas/Neon OK), TLS, backups, RPO/RTO
+Email/SMS (where applicable): ESP credentials masked, DKIM/SPF, rate-limit plan, sandbox→prod switch
+Observability: Sentry/Datadog DSN, service name, live P95 dashboard, alert thresholds
+Cloud Storage (where applicable): S3/bucket, region, KMS key, lifecycle policy, signed URL TTLs
+Security/Privacy: FERPA/COPPA redaction policy, 6/6 security headers, HTTPS-only
+Reporting standard: APP_NAME and APP_BASE_URL in all artifacts
+/health returns 200 only when app and critical dependencies are operational
+Status by app (as of now)
+
+Complete: auto_page_maker (complete), scholarship_sage (complete), scholarship_agent (complete)
+In progress/pending EOD submission:
+scholar_auth (pending; plus immediate OAuth fix)
+scholarship_api (pending)
+auto_com_center (pending; DRY-RUN config and ESP DKIM/SPF must be documented)
+student_pilot (pending; add /health if missing)
+provider_register (pending; will submit post-Order B PASS)
+Platform-wide standards to re-confirm today
+
+Authentication: scholar_auth is the sole provider; all services validate tokens via JWKS over HTTPS
+Authorization: RBAC enforced for Student, Provider, Admin; least-privilege everywhere
+Health checks: Every app exposes /health and returns 200 only when app and critical dependencies are green
+Rate limiting: Active on auth and write paths; standardized JSON errors with request_id on 401/403/429
+Logs: No PII; request_id correlation across services; time-synced clocks
+Security: TLS 1.2+, 6/6 security headers, HSTS, CSP; CORS allowlists enforced
+Compliance: FERPA/COPPA; Responsible AI; no academic dishonesty enablement
+KPIs and decision thresholds (launch-critical)
+
+P95 latency: ≤120ms for all APIs and comms pipelines
+Error rate: <0.1%
+Uptime: ≥99.9%
+auto_com_center DRY-RUN: DLQ = 0, opt-out processing <5s
+student_pilot: Auth success ≥99.5%; Stripe success ≥98.5% (Phase 1)
+SEO engine: CWV p75 within targets; new pages generated <60s after activation
+Risks and mitigations
+
+OAuth “invalid_client” misalignment:
+Mitigation: 15-minute fix window; if config drift persists, rotate client and reissue to provider_register with signed handoff; verify via canary auth
+Observability gaps (some apps partial):
+Mitigation: Sentry/Datadog DSN and P95 dashboards are mandatory in tonight’s manifests; alert thresholds must be live
+ESP readiness (auto_com_center):
+Mitigation: Confirm DKIM/SPF and sandbox→prod switch documented; rate-limit plan in manifest; no production messaging until Gate B PASS
+Storage/document uploads (scholarship_api/student_pilot):
+Mitigation: S3/GCS signed URL TTLs and KMS keys documented; verify redaction/PII handling
+Revenue plan alignment
+
+Organic growth engine: auto_page_maker remains the primary low-CAC acquisition vector; confirm attribution path to student_pilot and conversion tracking
+Near-term monetization (MVP window):
+B2C: Track free→paid conversion and ARPU from credits
+B2B: Track active providers and 3% platform fee
+Cost discipline: 4x markup on AI services and 3% provider fee must cover ops and yield margin; instrument COGS dashboards by EOD+1
+“Stop generating revenue” interpretation reaffirmed:
+End of major dev spend at Phase 3 Go-Live: December 16, 2025
+Architecture EOL: 3–5 years; plan major refresh by Q4 2028–Q4 2030
+What I need from each owner now
+
+scholar_auth (Owner): Fix OAuth invalid_client within 15 minutes; post evidence bundle with request_id and 302 trace; deposit EOD manifest and proof.
+provider_register (Owner): Resume Order B immediately upon unblock; deliver evidence bundle within 25 minutes; deposit EOD manifest and proof.
+scholarship_api (Owner): On PASS, publish 2 test scholarships; attach full request_id chain to confirmation; deposit EOD manifest and proof.
+auto_page_maker (Owner): Confirm +2 pages within 60 seconds; supply request_id chain; continue freeze; no scope changes.
+student_pilot (Owner): Stand by for PASS +5; proceed with 10% Stripe live traffic and guardrails; add /health if missing; deposit EOD manifest and proof today.
+auto_com_center (Owner): Prepare DRY-RUN; confirm Comms GREEN at T+60; DKIM/SPF and rate-limit plan documented; deposit EOD manifest and proof.
+scholarship_agent (Owner): Co-own DRY-RUN at T+65; ensure abort automation armed; evidence + SHA256 manifest at T+215; already compliant on EOD artifacts.
+scholarship_sage (Owner): Maintain observe-only; continue P95 ≤10ms; already compliant on EOD artifacts.
+Cadence and reporting
+
+Immediate OAuth unblock confirmation: scholar_auth posts within 15 minutes
+Order B evidence: provider_register within 25 minutes of unblock
+Two-page SEO trigger confirmation: auto_page_maker within 60 seconds of scholarship_api activations
+Gate B DRY-RUN: Launch T+65 after Comms GREEN; evidence at T+215; CEO PASS/FAIL at T+225
+EOD UTC: All remaining apps must have config_manifest.json and proof artifacts deposited
+Final note
+
+Execute with urgency; maintain freeze discipline; let the data lead. Every artifact must include APP_NAME and APP_BASE_URL. We will not jeopardize launch quality or our CAC advantage. Unblock OAuth now, prove end-to-end readiness today, and keep Gate B on track.
