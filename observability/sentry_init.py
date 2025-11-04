@@ -151,6 +151,19 @@ def init_sentry(
         )
         return False
     
+    # Clean up DSN - remove "dsn:" prefix if present (common formatting error)
+    sentry_dsn = sentry_dsn.strip()
+    if sentry_dsn.lower().startswith("dsn:"):
+        sentry_dsn = sentry_dsn[4:].strip()  # Remove "dsn:" prefix
+    
+    # Validate DSN format (should start with https:// or http://)
+    if not (sentry_dsn.startswith("https://") or sentry_dsn.startswith("http://")):
+        logger.error(
+            f"❌ Invalid SENTRY_DSN format - must start with https:// or http://, "
+            f"got: {sentry_dsn[:20]}..."
+        )
+        return False
+    
     # Get release from environment or default
     app_version = release or os.getenv("APP_VERSION", "v2.7")
     

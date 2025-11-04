@@ -50,6 +50,39 @@ A central event tracking system has been implemented for executive KPI reporting
 ## System Prompt Pack
 The project adopts a ScholarshipAI ecosystem-wide universal system prompt pack (v1.1) with dual architecture support. This allows for automatic app detection and feature flag support, ensuring consistent directives, guardrails, KPIs, and SLOs across applications. Verification endpoints are provided for prompt management.
 
+## Sentry Error & Performance Monitoring
+**CEO Directive 2025-11-04: Sentry Integration REQUIRED NOW - COMPLETED**
+
+A comprehensive Sentry integration has been implemented for production-grade error and performance monitoring:
+
+### Features Delivered
+- **10% Performance Sampling**: CEO-mandated sampling rate for transaction traces
+- **PII Redaction**: Automatic redaction of emails, phones, passwords, tokens, and secrets from all events
+- **request_id Correlation**: Full end-to-end tracing with request_id propagation to Sentry
+- **Intelligent Sampling**: 100% for errors, 10% for normal ops, 0% for health checks (noise reduction)
+- **FastAPI Integration**: Automatic instrumentation for FastAPI, SQLAlchemy, Redis, and HTTPX
+- **User Context Tracking**: Role-based user context (Student, Provider, Admin) without PII
+- **Error Capture**: Comprehensive exception tracking with full stack traces and context
+- **Performance Monitoring**: P95 latency tracking to verify ≤120ms SLO compliance
+
+### Implementation Details
+- **Location**: `observability/sentry_init.py` - Centralized Sentry configuration
+- **Initialization**: Early startup in `main.py` to capture all errors including startup failures
+- **Configuration**: Settings in `config/settings.py` with environment variable support
+- **Middleware Integration**: request_id correlation in `middleware/request_id.py`
+- **DSN Validation**: Automatic cleanup of "dsn:" prefix for robust configuration
+- **Freeze Compliance**: Observability-only changes, no functional modifications per CEO mandate
+
+### Production Status
+- ✅ Sentry SDK v2.43.0+ installed with FastAPI support
+- ✅ SENTRY_DSN configured and validated
+- ✅ Test message successfully sent to Sentry
+- ✅ PII redaction filters active
+- ✅ Performance tracing enabled with 10% sampling
+- ✅ Integration verified and operational
+
+This integration provides the observability foundation required for Gate B DRY-RUN and supports the P95 ≤120ms SLO verification during the 30K message volume test.
+
 # External Dependencies
 
 ## Core Framework Dependencies
