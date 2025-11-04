@@ -1,0 +1,67 @@
+Decision: Option 1 (HOLD Gate B DRY-RUN; complete full messaging infrastructure before DRY-RUN)
+
+Rationale (CEO):
+
+Revenue and retention hinge on reliable delivery (welcome, status, deadline nudges). A DRY-RUN that doesn’t actually deliver messages is a false positive. We will not accept operational risk at launch.
+We are ahead of the Nov 25 feature-freeze target; a 1–2 day slip on the comms DRY-RUN is acceptable and preserves quality.
+This aligns with our low-CAC mandate: activation and deadline reminders materially improve SEO-to-paid conversion.
+Immediate directives (binding):
+
+ESP and SMS selection
+ESP: Postmark for transactional email (primary). If procurement blocks, fallback is SendGrid with a dedicated IP and domain warm-up plan.
+SMS: Twilio. Stage as “observe-only” until A2P 10DLC brand/campaign approval; email remains the critical path for DRY-RUN.
+2. Domains, DNS, and compliance
+
+Sending domain: mail.scholaraiadvisor.com (dedicated subdomain for deliverability isolation).
+DNS: SPF (include:spf.mtasv.net for Postmark), DKIM (2 keys), DMARC at start p=none; rua to analytics inbox; move to p=quarantine after 7–10 days of clean telemetry.
+Unsubscribe: one-click for email; STOP/HELP for SMS; CAN-SPAM, TCPA, FERPA/COPPA compliant templates.
+3. Queueing and DLQ
+
+Queue: AWS SQS (Standard) with DLQ attached; visibility timeout ≥ 2x max processing time; retries with exponential backoff; idempotency keys required for all messages.
+SLOs: enqueue→send P95 < 2s; DLQ growth = 0 during DRY-RUN.
+4. Observability and incident response
+
+Sentry: REQUIRED now for all 8 apps (error and performance). Datadog is Phase 2 unless already integrated without risk.
+Correlation: Ensure request_id propagates across scholar_auth → scholarship_api → auto_com_center → ESP/SMS adapters.
+On-call: Page on DLQ > 0, delivery rate < 98%, or complaint rate ≥ 0.1% over 15-min window.
+5. Templates (MVP)
+
+Templates required before DRY-RUN: Welcome, Application Status Update, Deadline Reminder.
+Content: plain-text + lightweight HTML, signed links only, zero PII beyond first name, clear unsubscribe, accessible formatting.
+6. Keys and secrets (names are binding)
+
+POSTMARK_SERVER_TOKEN, POSTMARK_ACCOUNT_TOKEN
+TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_MESSAGING_SERVICE_SID
+SENTRY_DSN (all apps)
+AUTO_COM_CENTER_WEBHOOK_URL (set in scholar_auth and scholarship_api)
+AWS credentials for SQS with least-privilege IAM role
+Approval on pending asks:
+
+Configure the auto_com_center webhook integration now: Approved.
+Set up monitoring: Sentry now for all apps; Datadog deferred to Phase 2 unless zero-risk to enable.
+Updated schedule (UTC):
+
+Now → +4h: Provision ESP, create DNS records, set secrets, wire webhook, deploy queue + DLQ, enable Sentry. Validate /health across auto_com_center and producers.
++4h → +10h: Implement/adapt 3 templates; dry-run in staging with seed events; deliverability smoke (Postmark sandbox).
++10h → +16h: Production DRY-RUN (email live, SMS observe-only). Post evidence bundle. If executed immediately, DRY-RUN occurs within the next 16 hours. If DNS propagation lags, DRY-RUN in ≤ 24 hours.
+Pass/fail criteria for Gate B DRY-RUN (email):
+
+Delivery acceptance ≥ 98.0%
+Hard bounces ≤ 1.0%; complaints ≤ 0.1%
+Enqueue→ESP-accepted P95 < 2s; auto_com_center internal P95 < 120ms
+DLQ growth = 0; retry success ≥ 99%
+Evidence: request traces, ESP event logs, DLQ metrics, Sentry perf charts
+Dependencies owners (accountable DRIs):
+
+auto_com_center: Messaging infra, queue/DLQ, templates, ESP/Twilio adapters
+scholar_auth and scholarship_api: Event subscriptions + webhook emission
+Infra: DNS (SPF/DKIM/DMARC) and AWS SQS provisioning
+Go-forward on other gates:
+
+Gate A/OAuth chain remains GO as planned (no changes).
+scholarship_api Order 3, auto_page_maker Order 4, and student_pilot Phase 1 proceed per original triggers.
+Gate B DRY-RUN will run after messaging is truly live; post the updated start time once DNS and templates are confirmed.
+Report back
+
+Post an “Option 1 – START” update with the exact UTC start, target DRY-RUN window, and confirmation of secrets and DNS record status.
+Include the mandatory header (APP_NAME, APP_BASE_URL) in all app-originated logs and evidence.
