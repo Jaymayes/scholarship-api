@@ -1,0 +1,103 @@
+CEO Executive Response — Final Integration and Operational Readiness
+
+Prime objective alignment
+
+The plan and current posture remain aligned to our 5-year goal: profitable $10M ARR, category leadership in AI-driven scholarship access and application support.
+Success driver remains organic B2C growth via Auto Page Maker + low-CAC SEO; B2B monetization via 3% provider fee; 4x markup on AI services.
+Decisions and orders (effective immediately)
+
+Gate A (Provider OAuth) — GO
+Status accepted: scholar_auth reports Gate A unblocked; required redirect URIs and RBAC in place.
+provider_register DRI: Execute Order B smoke test now. Evidence bundle due within 25 minutes of this directive. If any step fails, escalate in-channel within 2 minutes with request_id and failing step.
+scholarship_api DRI: Remain on-call, validate RBAC and standardized error envelopes during provider_register smoke test; supply evidence artifacts.
+2. Student funnel Phase 1 — Conditional GO
+
+Trigger: student_pilot launches at provider_register PASS +5 minutes.
+Scope: 10% production traffic with guardrails.
+Auto-rollback criteria (any 15-min window breach):
+Payment success <98.5%
+5xx >=0.2%
+Auth success <99.5%
+CVR deviates >10% from baseline
+Reporting: 60-minute KPI summary after launch; then hourly through Day 1.
+3. Gate B (Comms DRY-RUN) — UNCHANGED
+
+auto_com_center + scholarship_agent: Proceed only upon T+60 GREEN. DRY-RUN at T+65; deliver evidence at T+215; CEO PASS/FAIL at T+225. Abort thresholds unchanged.
+4. Third-party production readiness — EOD compliance
+All DRIs (for your app) must deposit an e2e/config_manifest.json and a short proof artifact by EOD UTC today:
+
+Database: Production-grade managed (RDS or Atlas). Include connection string pattern, region, TLS mode, automated backups (RPO/RTO). Replit DB is not acceptable for production.
+Email/SMS: ESP/SMS credentials (masked), sending domain DKIM/SPF alignment, rate-limit plan, sandbox-to-prod switch doc.
+Observability: Sentry/Datadog DSN, service name, P95 dashboard link, alert thresholds.
+Cloud storage: S3 or equivalent bucket name, region, KMS key alias, lifecycle policy, signed URL TTLs for document uploads.
+Payments (if applicable): Stripe live keys present; webhooks secured (secret + IP allowlist), idempotency keys enforced.
+Execution details by application
+
+scholar_auth (source of truth for auth, RBAC)
+
+Action: Monitor provider_register smoke test in real time. At T+30 (post-PASS), perform scheduled JWKS key-roll dry-run in staging and post the 3-step runbook for production rotation. No production rotation today.
+KPI: 401/403 error rate from dependent apps <0.2%; token issuance P95 <120ms.
+scholarship_api (core data plane)
+
+Action: Support RBAC, SSOT, standardized errors during provider_register smoke test. After PASS, publish two test scholarship activations to trigger auto_page_maker; confirm page generation <60 seconds end-to-end; attach request_ids.
+KPI: P95 API latency ≤120ms; error rate <0.1%.
+provider_register (B2B onboarding)
+
+Action: Execute Order B smoke test now. Evidence bundle contents:
+Authorization code flow traces with request_id correlation
+id_token (redacted) + JWKS kid match proof + issuer validation
+Provider RBAC access to scholarship_api (200) and non-provider denial (403) samples
+Negative test: invalid redirect_uri path
+SHA256 manifest of artifacts
+KPI: First 5 verified providers onboarded by end of Week 2 post-launch; publish daily funnel metrics (visit→verified provider→listing published).
+student_pilot (B2C interface)
+
+Action: Launch Phase 1 at provider_register PASS +5 minutes; 10% traffic, guardrails armed. Display scholarship_sage recommendations with matchReasons.
+KPI (Day 1): Auth success ≥99.5%, P95 ≤120ms, page LCP p75 ≤2.5s on 4G, baseline CR benchmark established.
+scholarship_sage (recommendations)
+
+Action: Maintain observe-only. Ensure /recommendations/{student_id} P95 ≤10ms budgeted end-to-end including dependency lookups; matchReasons required in payload.
+KPI: Recommendation response P95 ≤10ms; 0% schema validation errors.
+auto_page_maker (SEO engine)
+
+Action: Maintain freeze. Confirm two new pages from scholarship_api triggers within 60s; log request_id chain (api → page_maker → indexnow).
+KPI: CWV p75: LCP ≤2.5s, CLS ≤0.1, INP ≤200ms. SEO pages published count = 2,101 → +2 within test window.
+auto_com_center (comms hub)
+
+Action: DRY-RUN only at T+65 upon GREEN; DLQ must remain 0; template rendering latency P95 ≤120ms.
+KPI: DRY-RUN pass on P95 ≤120ms, failures <0.1%, DLQ=0, opt-out <5s.
+scholarship_agent (admin/ops automation)
+
+Action: Co-own DRY-RUN at T+65. Keep abort automation armed. Evidence bundle: runbook, circuit-breaker checks, 10 artifacts + SHA256 at T+215.
+Security, privacy, compliance (non-negotiable)
+
+FERPA/COPPA: No PII in logs. Redact emails, names, phone numbers. Verify DPA templates for providers by Phase 2.
+Encryption: TLS 1.2+, at-rest encryption for DB and S3 with KMS; signed URL uploads only; AV scan on document ingest.
+Access: Enforce least-privilege IAM for each app to its DB, storage, and ESP; rotate any temporary keys used during testing.
+Rate limiting: Auth and write endpoints must be rate-limited and return standardized JSON errors with request_id.
+Data-first operating cadence
+
+Dashboards (all DRIs): By EOD UTC, link the live P95/uptime/error dashboards and Phase 1 funnel metrics in your config_manifest.json.
+Daily 09:00 UTC standup metrics (B2C/B2B):
+B2C: sessions, login rate, CR to application start/submit, ARPU (credits), A/B surfaced
+B2B: provider signups, verification rate, listings published, 3% fee revenue
+Infra: uptime, P95, error budgets consumed, SEO pages indexed
+Weekly: SEO growth, organic traffic, CAC trend, provider pipeline, NPS.
+Risks and mitigations
+
+Replit environment is not production-grade for DB/storage. Mitigation: enforce move to RDS/Atlas and S3 before Phase 3; EOD manifests required today.
+Key rotation readiness. Mitigation: scholar_auth to deliver runbook and staging proof today; production rotation scheduled post-Phase 2.
+Content velocity vs CWV: Maintain freeze; only delta updates; continue CWV monitoring.
+Go/No-Go gates
+
+Gate A: GO — executing now.
+Student Phase 1: GO after provider_register PASS +5 minutes.
+Gate B DRY-RUN: Proceed only with T+60 GREEN; PASS required for Full FOC.
+Full FOC: Conditional on Gate B PASS at T+225 and Phase 1 guardrail stability.
+Reporting standard reminder
+
+Every artifact, log, and report must include: APP_NAME and APP_BASE_URL.
+Every service must maintain a /health endpoint returning 200 only when app and critical dependencies are operational.
+All inter-app calls over HTTPS with scholar_auth token validation.
+Final note
+Move fast, stay within guardrails, and let the data lead. Our path to durable, low-CAC growth is through reliability, explainability, and a frictionless student and provider experience. Execute.
