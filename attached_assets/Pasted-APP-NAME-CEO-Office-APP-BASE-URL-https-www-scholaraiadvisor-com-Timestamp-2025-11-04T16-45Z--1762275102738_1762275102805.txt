@@ -1,0 +1,68 @@
+APP_NAME: CEO_Office | APP_BASE_URL: https://www.scholaraiadvisor.com
+Timestamp: 2025-11-04T16:45Z
+
+Executive Decisions and Orders
+
+Gate B — Comms DRY-RUN: GO at T+65
+Authorization: Approved to launch the 120-minute DRY-RUN at T+65 as planned.
+Abort automation: Keep thresholds unchanged (DLQ > 0 immediate abort; P95 > 150ms for 3 consecutive minutes abort; failure rate > 0.2% over 5 minutes abort).
+Deliverables: 10-artifact evidence bundle with SHA256 by T+215; PASS/FAIL recommendation by T+225.
+2. Gate A — OAuth invalid_client Blocker (scholar_auth): FIX NOW, TIME-BOXED
+
+Status: Critical runtime blocker at authorization endpoint. Not acceptable beyond the next 25 minutes.
+Orders (configuration-only; freeze discipline maintained): a) Instrumentation: Add runtime diagnostic logs on client lookup path (adapter.getClient calls, cache hits/misses, key/issuer verification). b) Cache policy: Set client cache TTL to 0 (disable) and force runtime lookup; flush Redis/session caches; warm restart. c) Key material: Re-verify issuer, kid rotation, and JWKS alignment with current signing key; confirm client_secret_post acceptance for provider-register. d) Negative/positive matrix: Test provider-register plus 2 additional clients to rule out client-specific vs. global regression.
+SLA: Declare “OAUTH GREEN” with evidence in CEO channel within 25 minutes of this order. If not GREEN by deadline: Fallback (temporary, 24h max): Enable a guarded static client registry entry for provider-register only (production redirect URIs, PKCE S256 enforced, short-lived secret rotation). Purpose: Unblock provider_register Order B and downstream Order 3/4. Security posture must remain strict.
+3. provider_register — Order B: RUN IMMEDIATELY ON OAUTH GREEN
+
+Proceed with the 25-minute, 3-phase plan exactly as submitted.
+Evidence bundle and PASS signal due at T+55–60 relative to OAUTH GREEN post.
+On PASS: Emit PASS signal immediately to unlock Order 3/4.
+4. scholarship_api — Order 3: EXECUTE ON provider_register PASS
+
+Create 2 test scholarships; emit scholarship_created events.
+Maintain P95 ≤ 120ms during operation.
+Post evidence and end-to-end request_id chain to CEO channel within 2 minutes of provider_register PASS.
+5. auto_page_maker — Order 4: EXECUTE ON scholarship_api TRIGGER
+
+Confirm +2 pages (2,101 → 2,103) within 60 seconds of trigger.
+Post full request_id chain (scholarship_api → auto_page_maker → indexnow).
+Include CWV p75 metrics and PASS/FAIL labels against LCP ≤ 2.5s, CLS ≤ 0.1, INP ≤ 200ms.
+6. student_pilot — Phase 1 Monetization: GO at provider_register PASS + 5 minutes
+
+10% Stripe live, 90% test; guardrails armed (auto-rollback <60s).
+First 24h revenue snapshot due exactly T+24h from launch using the provided JSON schema.
+7. scholarship_sage — Observe-Only Posture: MAINTAIN
+
+Keep P95 ≤ 10ms; keep matchReasons explainability; no PII leakage; no outbound comms until explicit CEO FOC.
+8. scholarship_agent — Gate B Co-Owner: HOLD → GO at T+65
+
+Execute DRY-RUN at T+65 contingent on Comms GREEN (declared).
+Deliver evidence at T+215 and PASS/FAIL at T+225.
+Operational Compliance and Reporting
+
+Reporting standard: Every artifact/update must include APP_NAME and APP_BASE_URL. Continue strict HTTPS and token validation via scholar_auth.
+Health checks: Ensure /health returns 200 only when app and all critical dependencies are healthy.
+Observability: Keep P95, error rate, DLQ, and circuit-breaker dashboards live; attach request_id exemplars in evidence bundles.
+Security: Maintain 6/6 mandatory headers, TLS-only, RBAC separation, PII redaction across logs.
+Risk, Incidents, and Owners
+
+Incident HEAP-001 (Follow-up): APPROVED
+Open ticket now; Owner: Platform Reliability DRI.
+Actions in 24h: Assign RCA owner; analyze GC metrics and any heap dumps; deliver mitigation plan; set alert for heap pressure > 80% for 15 minutes.
+OAuth Blocker RCA: Owner: scholar_auth DRI.
+Deliver OAUTH GREEN evidence pack plus root cause summary and corrective actions within 2 hours after GREEN.
+Strategic Alignment and KPIs
+
+Prime Directive: Protect and scale the low-CAC SEO engine. Order 3/4 + IndexNow must execute within targets to preserve organic acquisition momentum.
+SLO adherence: Maintain 99.9% uptime and ~120ms P95 across all apps during test windows. Any breach triggers immediate investigation and, if sustained, automatic rollback/fail-safe per guardrails.
+Monetization milestones:
+Phase 1 live (10%): student_pilot revenue snapshot in 24h; track free→paid conversion, ARPU, payment success ≥ 98.5%, auth success ≥ 99.5%.
+B2B funnel: provider_register must complete Order B today to keep provider activation on schedule.
+Confirmations Required in CEO Channel
+
+scholar_auth: Post “OAUTH GREEN” with evidence within 25 minutes or post “Fallback ACTIVATED” with controls described above.
+provider_register: Post “ORDER B PASS” with evidence bundle at T+55–60 post-GREEN.
+scholarship_api + auto_page_maker: Post the +2 pages evidence (with request_id chain and CWV p75) within 2 minutes of provider PASS.
+scholarship_agent: Post DRY-RUN START at T+65; evidence at T+215; PASS/FAIL at T+225.
+student_pilot: Post Phase 1 LAUNCH at PASS + 5 minutes; revenue snapshot at T+24h.
+Act with urgency. Maintain freeze discipline. Data-first execution only.
