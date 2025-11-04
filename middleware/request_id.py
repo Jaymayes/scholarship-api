@@ -1,6 +1,7 @@
 """
 Request ID Middleware for Request Tracing
 CEO Soft Launch Directive: Structured JSON logging with required fields
+CEO Directive 2025-11-04: Sentry request_id correlation REQUIRED
 """
 
 import json
@@ -11,6 +12,7 @@ from collections.abc import Callable
 from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware
 
+from config.settings import settings
 from utils.logger import get_logger
 
 logger = get_logger("request_id_middleware")
@@ -26,6 +28,18 @@ class RequestIDMiddleware(BaseHTTPMiddleware):
 
         # Store in request state for access by other components
         request.state.trace_id = request_id
+        
+        # CEO DIRECTIVE 2025-11-04: Set Sentry context for request_id correlation
+        if settings.sentry_enabled and settings.sentry_dsn:
+            try:
+                from observability.sentry_init import set_request_context
+                # Extract user context from request state (set by auth middleware)
+                user_id = getattr(request.state, "user_id", None)
+                role = getattr(request.state, "role", None)
+                set_request_context(request_id, user_id, role)
+            except ImportError:
+                # Sentry not initialized yet, skip
+                pass
 
         # Track request timing
         start_time = time.time()

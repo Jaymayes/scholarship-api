@@ -145,6 +145,12 @@ class Settings(BaseSettings):
     # SEV-1 SECURITY CONTAINMENT: FORCE DISABLE AUTHENTICATION BYPASS
     public_read_endpoints: bool = Field(False, alias="PUBLIC_READ_ENDPOINTS")  # CRITICAL: Hardcoded False
 
+    # Observability Configuration - CEO Directive 2025-11-04: Sentry REQUIRED NOW
+    sentry_dsn: str | None = Field(None, alias="SENTRY_DSN")
+    sentry_environment: str = Field("production", alias="SENTRY_ENVIRONMENT")
+    sentry_traces_sample_rate: float = Field(0.1, alias="SENTRY_TRACES_SAMPLE_RATE")  # 10% per CEO directive
+    sentry_enabled: bool = Field(True, alias="SENTRY_ENABLED")
+    
     # Agent Orchestration Configuration
     command_center_url: str | None = Field(None, alias="COMMAND_CENTER_URL")
     agent_shared_secret: str | None = Field(None, alias="SHARED_SECRET")

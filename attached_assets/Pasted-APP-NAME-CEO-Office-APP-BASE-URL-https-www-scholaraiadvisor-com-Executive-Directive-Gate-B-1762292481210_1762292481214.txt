@@ -1,0 +1,115 @@
+APP_NAME: CEO_Office | APP_BASE_URL: https://www.scholaraiadvisor.com
+
+Executive Directive: Gate B HOLD confirmed; Gate A proceeds; Sentry required now
+
+Date: 2025-11-04
+Time: 18:15 UTC
+
+Decisions
+
+Gate A (OAuth chain): Proceed exactly as planned. Triggers and evidence windows unchanged.
+Gate B (Messaging DRY-RUN): HOLD until messaging infrastructure is live end-to-end. Target window: within 16–24 hours of DNS/ESP readiness.
+Sentry: REQUIRED NOW for all 8 apps (error + performance). Freeze exception granted for observability only. Must not alter functional behavior. Activate today with 10% performance sampling and PII redaction.
+Twilio: Remains observe-only until A2P 10DLC approval. Email must be live for DRY-RUN.
+SEO engine (auto_page_maker): Stay ARMED; no changes. Execute on scholarship_api trigger.
+Why this matters (KPIs)
+
+Messaging reliability directly impacts B2C conversion, activation, and retention; it is a key driver to low-CAC, organic growth and revenue per our 5-year plan.
+Sentry everywhere reduces MTTR and production risk, protecting uptime and P95 ≤120ms SLO.
+Immediate Orders and Owners
+
+Infrastructure (Owner: Infra DRI)
+Start now. Post “Infra READY” by 2025-11-04 22:00 UTC.
+DNS for mail.scholaraiadvisor.com:
+SPF: v=spf1 include:spf.mtasv.net ~all
+DKIM: add the two CNAMEs provided by Postmark once domain is added
+DMARC: v=DMARC1; p=none; rua=mailto:analytics@scholaraiadvisor.com
+ESP: Provision Postmark (primary). Generate POSTMARK_SERVER_TOKEN and POSTMARK_ACCOUNT_TOKEN. Verify domain (DKIM must pass).
+AWS SQS: Create queues
+auto-com-center-messages (Standard)
+auto-com-center-dlq (DLQ)
+scholar-auth-events (Standard) with scholar-auth-events-dlq
+Apply least-privilege IAM and provide access keys to app owners.
+Secrets to set now:
+scholar_auth: SENTRY_DSN, AUTO_COM_CENTER_WEBHOOK_URL=https://auto-com-center-jamarrlmayes.replit.app/api/webhooks/events
+auto_com_center: POSTMARK_SERVER_TOKEN, SENTRY_DSN, AWS creds for SQS
+scholarship_agent, scholarship_api, student_pilot, provider_register, scholarship_sage, auto_page_maker: SENTRY_DSN
+Post the credentials handoff and DNS verification screenshots to the evidence folder. Include APP_NAME | APP_BASE_URL headers.
+2. auto_com_center (Owner: Messaging DRI)
+
+Proceed immediately with Phase 3–5 (approved as requested).
+Today (by 23:59 UTC):
+Webhook endpoints with HMAC verification
+Event-to-message dispatcher
+Unsubscribe service with DB
+Per-user throttling: email ≤10/hr, SMS ≤5/hr
+Metrics + health endpoint updates
+DRY-RUN readiness signal “Messaging Infrastructure READY” when:
+DNS: SPF and DKIM passing; DMARC p=none in place
+Postmark domain verified; test send accepted (no sandbox)
+SQS + DLQ operational; idempotency + retries active
+Sentry reporting visible for auto_com_center
+Keep SMS observe-only. Email must be fully live.
+3. scholar_auth (Owner: Auth DRI)
+
+Confirm “OAUTH GREEN – EVIDENCE” with current RFC 8414/JWKS tests and PKCE S256.
+Set SENTRY_DSN and AUTO_COM_CENTER_WEBHOOK_URL secrets immediately after Infra posts them.
+Ensure registration + password-reset webhooks are firing non-blocking with correlation IDs (already implemented per your update). Post a short proof: two production test events delivered to auto_com_center queue and accepted by the webhook, with Sentry traces.
+4. scholarship_api (Owner: API DRI)
+
+No timeline change for Order 3. Execute immediately upon provider_register “ORDER B PASS.”
+Integrate Sentry now; confirm P95 ≤120ms remains green post-integration.
+Maintain trigger emission to auto_page_maker; preserve request_id chain.
+5. provider_register (Owner: Provider DRI)
+
+Post Sentry integration evidence now. Stand by for scholar_auth “OAUTH GREEN – EVIDENCE.”
+Execute Order B on receipt; deliver evidence in 25 minutes as planned.
+6. auto_page_maker (Owner: SEO DRI)
+
+Stay ARMED. No changes. Execute +2 pages within 60 seconds of scholarship_api Order 3.
+Confirm IndexNow push and CWV p75 labels in the evidence bundle.
+7. student_pilot (Owner: Student UX DRI)
+
+Question answered: Implement Sentry NOW. Freeze exception granted for observability.
+Proceed with Phase 1 (10% Stripe live) on trigger; keep <60s auto-rollback armed.
+Post Sentry confirmation and ensure no P95 regression.
+8. scholarship_sage (Owner: ML DRI)
+
+Maintain observe-only posture. Integrate Sentry before DRY-RUN window opens.
+Keep /recommendations/{student_id} P95 ≤10ms.
+9. scholarship_agent (Owner: Agent DRI)
+
+Status: HOLD acknowledged. Integrate Sentry within +4h.
+Prepare Gate B 120-minute DRY-RUN coordination and evidence bundle pipeline.
+Gate B DRY-RUN Criteria (email live, SMS observe-only)
+
+Delivery acceptance ≥98.0%
+Hard bounces ≤1.0%
+Complaints ≤0.1%
+Enqueue→ESP-accepted P95 <2s; auto_com_center internal P95 <120ms
+DLQ growth = 0; retry success ≥99%
+Evidence bundle: request traces with request_id, ESP event logs, DLQ metrics, Sentry perf charts, unsubscribe tests, rate-limit tests
+Target Timeline (UTC)
+
+18:15: This memo effective
+22:00: Infra READY (DNS submitted, ESP provisioned, secrets delivered, SQS/DLQ live)
+23:59: auto_com_center declares “Messaging Infrastructure READY” (if DNS verifies sooner, announce earlier)
+Next 16–24h: Gate B DRY-RUN start upon auto_com_center READY + DNS verified
+Gate A chain: unchanged; continue towards student_pilot Phase 1 launch on trigger
+Budget and Compliance
+
+Approved: Postmark, Twilio (observe-only), Sentry, AWS SQS, managed DB (Neon/RDS). Keep costs minimal; use monthly starter tiers where applicable.
+Compliance: Maintain opt-in/opt-out, one-click unsubscribe, physical address, and audit logs. FERPA/COPPA alignment; no academic dishonesty features. PII redaction in all logs.
+Risks and Mitigations
+
+DNS propagation delays: Start now; DMARC p=none initially; execute DRY-RUN as soon as DKIM passes.
+Observability regressions: Sentry behind safe feature flag; revertible with env toggle.
+Queue misconfig: Validate IAM least-privilege and DLQ wiring with smoke tests.
+Reporting Discipline
+
+All status posts and artifacts must include: APP_NAME: <name> | APP_BASE_URL: <url>
+Post concise GREEN/YELLOW/RED with blocking issues and next ETA.
+CEO Close
+Execute with urgency. Gate A momentum must continue; Gate B DRY-RUN will follow as soon as messaging is truly live. Sentry everywhere today. Keep P95 ≤120ms and uptime ≥99.9%. Our north star remains low-CAC growth and student value delivery on the path to $10M ARR.
+
+End of directive.

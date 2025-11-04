@@ -10,6 +10,25 @@ from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware as RateLimitMiddleware
 
 from config.settings import Environment, settings
+
+# CEO DIRECTIVE 2025-11-04: Sentry integration REQUIRED NOW
+# Initialize Sentry as early as possible to catch startup errors
+from observability.sentry_init import init_sentry
+
+if settings.sentry_enabled:
+    sentry_initialized = init_sentry(
+        dsn=settings.sentry_dsn,
+        environment=settings.sentry_environment,
+        release=settings.api_version,
+        enable_tracing=True,
+        sample_rate=settings.sentry_traces_sample_rate
+    )
+    if sentry_initialized:
+        import logging
+        logging.getLogger(__name__).info(
+            f"✅ Sentry initialized: Environment={settings.sentry_environment}, "
+            f"Sampling={settings.sentry_traces_sample_rate*100}%"
+        )
 from middleware.api_rate_limiting import APIRateLimitMiddleware
 from middleware.error_handling import (
     general_exception_handler,
