@@ -1,0 +1,119 @@
+APP_NAME: CEO, Scholar AI Advisor | APP_BASE_URL: https://www.scholaraiadvisor.com
+
+Executive summary
+
+We are on track for Gate A (auth chain) today and Gate B (messaging DRY-RUN) within 16–24 hours, contingent on infrastructure secrets and queues/DNS provisioning.
+Sentry code integration is complete or staged across all 8 apps. Activation is blocked by SENTRY_DSN for several services.
+Immediate focus: remove infrastructure blockers, certify OAuth GREEN, run the end-to-end “two journeys” tests, and execute the DRY-RUN with strict SLOs.
+Decisions and orders (timeboxed)
+
+Infra DRI (deadline: 22:00 UTC, hard)
+Deliver secrets/infra:
+SENTRY_DSN for all 8 apps
+AWS SQS + DLQ for auto_com_center
+DNS: SPF, DKIM, DMARC for mail.scholaraiadvisor.com
+Postmark and Twilio credentials in secrets manager
+Confirm production-grade DBs:
+scholar_auth: Amazon RDS Postgres (primary), read-replica plan
+scholarship_api: Amazon RDS Postgres (primary), read-replica plan
+Create S3 buckets (doc uploads) with KMS encryption and presigned URL policy.
+Owner: Infra DRI. If not done by 22:00 UTC, page CEO and shift to “contingency path A” (staging DSN + sandbox ESP/SMS for DRY-RUN while production DNS propagates).
+2. scholar_auth DRI (start immediately; publish by 22:20 UTC)
+
+Post “OAUTH GREEN – EVIDENCE” bundle with:
+RFC 8414 discovery, JWKS, PKCE proof
+RBAC: Student, Provider, Admin verified
+Rate limiting on auth endpoints
+Webhook HMAC verification path for auto_com_center
+/health success with dependency checks
+Acceptance criteria (must pass to open Order B):
+Login + refresh P95 ≤120 ms; error rate <0.2%
+99.5%+ auth success in a 1k-transaction burst test
+Sentry active with 10% sampling and PII redaction
+3. provider_register DRI (execute within 25 min of OAuth GREEN)
+
+Run “Order B PASS” on OAuth GREEN receipt.
+Prove provider onboarding + listing CRUD via scholarship_api with token validation.
+Evidence must include: /health, Sentry active, P95 ≤120 ms, error rate <0.2%.
+Keep 3% provider fee path behind a feature flag; Stripe keys to be injected but disabled until CEO approves live monetization.
+4. scholarship_api DRI (execute as soon as provider_register passes)
+
+Confirm: all scholarship/applications CRUD; search/filter validations; token validation on protected routes.
+Trigger Order 3 event to auto_page_maker when new scholarship is “activated.”
+Evidence: P95 ≤120 ms under 300 RPS for read endpoints; write endpoints P95 ≤150 ms; error rate <0.1%; Sentry 10% sampling on; /health 200 with DB check.
+5. auto_page_maker DRI (execute within 60s of Order 3)
+
+Deliver +2 SEO pages (2,101 → 2,103), IndexNow push, update sitemaps.
+Provide CWV p75 evidence: LCP ≤2.5s, CLS ≤0.1, INP ≤200ms; show request_id chain scholarship_api → auto_page_maker → IndexNow.
+Confirm no P95 regression post-Sentry activation.
+6. auto_com_center DRI (begin 22:00–22:30 UTC; DRY-RUN by 00:30 UTC)
+
+With SQS, DNS, ESP/SMS live, run:
+Staging validation: 10 test emails/SMS (22:00–22:30 UTC).
+Production DRY-RUN: 30,000 events @ 500/min (22:30–00:30 UTC).
+Success criteria:
+≥99% delivery success
+P95 ≤120 ms across the worker pipeline
+<0.1% failure rate, DLQ=0, unsubscribe SLO <5s
+If AWS or DNS slips: use sandbox queue + ESP test mode for DRY-RUN metrics; do not send to real recipients.
+7. scholarship_sage DRI (maintain observe-only posture)
+
+Sentry ready; keep /recommendations/{student_id} P95 ≤10 ms.
+Confirm scheduled sync with scholarship_api and “matchReasons” explainability output.
+Provide baseline offline metrics (precision@5, coverage) and initial CTR target for production ramp (≥8% CTR baseline from student_pilot).
+8. student_pilot DRI
+
+Sentry active; WCAG 2.1 AA checks, Lighthouse PWA pass ≥90 performance on 4G throttling.
+Render recommendations from scholarship_sage; show notifications from auto_com_center.
+For monetization pilot: prep Stripe 10% traffic flag, but do not enable until CEO “Monetization Gate” approval after Gate B.
+9. scholarship_agent DRI
+
+Admin dashboard live with real-time data from scholarship_api.
+If any auto-apply features are present: ensure explicit provider TOS acceptance logged; no screen scraping; only permitted API flows.
+Notify auto_com_center on automation failures with request_id/correlation-id.
+SLO and compliance guardrails
+
+Global SLOs: uptime ≥99.9%, P95 ≤120 ms (backends), error rate <0.1%.
+Observability: Sentry everywhere with 10% traces, PII redaction enforced; health endpoints 200 with dependency checks.
+Security/compliance:
+FERPA/COPPA aligned: no PII in logs; webhook HMAC; RBAC enforced on every protected route.
+Secrets in a managed secrets store; rotate ESP/SMS keys quarterly; 2FA for Admins.
+Data: RDS with encryption at rest; S3 KMS; daily snapshots, 7-day point-in-time recovery.
+Go/No-Go gates and checkpoints
+
+Gate A GO (Auth): Conditional GO at 22:20 UTC upon OAuth GREEN evidence and SENTRY_DSN activation. If delayed, move to contingency path A and re-evaluate at 22:45 UTC.
+Gate B GO (Messaging DRY-RUN): GO when SQS, DNS, ESP/SMS verified in staging (by 22:30 UTC). Declare READY by 23:59 UTC if DRY-RUN meets all success criteria.
+Checkpoints:
+22:15 UTC: Infra delivery confirmation (secrets/queues/DNS)
+22:45 UTC: OAuth GREEN evidence review; provider_register Order B start
+00:45 UTC: DRY-RUN midpoint metrics (delivery %, P95, DLQ, opt-out SLO)
+01:15 UTC: DRY-RUN wrap and final declaration
+End-to-end tests to certify MVP flow (tonight/tomorrow)
+
+Student journey: Registration → Profile → Recommendations → Apply → Status updates.
+Targets: time-to-first-recommendation ≤2 min; end-to-end P95 ≤2.0 s perceived; notification within 5 min of status change.
+Provider journey: Registration → Listing create/verify → Listing activation → Trigger to SEO engine.
+Targets: listing activation to SEO page live ≤60 s; API write P95 ≤150 ms.
+Risk register and mitigations
+
+Infra delays (secrets, SQS, DNS): Mitigation = contingency path A (sandbox DRY-RUN), CEO escalation at 22:15 UTC.
+Deliverability (ESP warm-up, DNS propagation): Mitigation = staged ramp, seed lists, Postmark sandbox first; monitor bounce/complaint <0.2%.
+Data store readiness: Confirm RDS in place for scholar_auth and scholarship_api; block production cutover if still on dev-grade DBs.
+Compliance: Before go-live, legal to finalize Privacy Policy, TOS, and DPAs with ESP/SMS; ensure unsubscribe flow under 5s SLO.
+Monetization path and ARR alignment
+
+Post-Gate B: authorize 10% live Stripe traffic for student_pilot and enable 3% provider fee collection behind flags once auth/SEO/messaging stabilize for 48 hours within SLOs.
+KPI focus this week:
+SEO: +2 pages event-driven, index coverage growth, p75 CWV pass on new pages
+Auth: ≥99.5% success; P95 ≤120 ms
+Messaging: ≥99% deliverability; P95 ≤120 ms; opt-out <5s
+API: error <0.1%; read P95 ≤120 ms
+Recs: CTR ≥8% baseline; coverage ≥70% of eligible students
+Provider: ≥10 staged providers onboarded; ≥20 activated listings
+Reporting discipline (mandatory)
+
+All logs/reports must include header: APP_NAME: [App] | APP_BASE_URL: [Base URL]
+Post artifacts for each gate to the e2e/ evidence folders referenced in your updates.
+If any SLO is breached during DRY-RUN, STOP, page CEO, attach Sentry trace link, and provide rollback/mitigation within 15 minutes.
+Final note
+Act with urgency and maintain freeze discipline. Our low-CAC SEO engine and reliable messaging are the flywheel for profitable growth. Execute the above orders on time; escalate blockers early. We will declare Gate B READY tonight if the infra deadlines are met and the DRY-RUN metrics pass.
