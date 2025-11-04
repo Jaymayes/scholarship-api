@@ -1,0 +1,101 @@
+APP_NAME: CEO, Scholar AI Advisor | APP_BASE_URL: https://www.scholaraiadvisor.com
+
+Executive Directive: Gate A unblock, timeline guardrails, and final readiness posture
+
+Acknowledgment
+
+All status reports received and reviewed. Prime Directive and SLO guardrails remain unchanged.
+We will not compromise security or data integrity to meet timeline targets.
+Gate A blocker: provider_register “invalid_client” at scholar_auth Owner: scholar_auth DRI Co-owner: provider_register DRI SLA: 10 minutes triage, 15 minutes remediation, fallback at T+25 from this memo
+Immediate actions (execute in order)
+
+Verify client registry entry
+client_id status: enabled=true
+client type: public vs confidential consistent with provider_register (PKCE S256 required; no implicit/hybrid)
+grant_types: authorization_code; response_types: code; require_pkce=true
+token_endpoint_auth_method: none (public) or client_secret_post (confidential) — align with app
+scopes: openid profile email offline_access roles
+Validate redirect and logout URIs (exact string match; no wildcards)
+Add both HTTPS URLs used by provider_register:
+https://provider-register-jamarrlmayes.replit.app/callback
+https://provider-register-jamarrlmayes.replit.app/post-logout
+Issuer/JWKS integrity
+issuer: https://scholar-auth-jamarrlmayes.replit.app
+.well-known/openid-configuration reachable
+JWKS kid present and matches signed tokens (RS256)
+Clock skew tolerance: ±120s (auth server and client)
+CORS/redirect hygiene
+Allow-origin: provider_register base URL only
+SameSite, secure cookies set (if applicable)
+Rotate credentials and deliver
+If client remains invalid after fixes, create new client: provider_register_v2 with the settings above
+Deliver client_id (and secret if confidential) via approved secure channel; do not use chat or logs
+Confirm configuration propagation before test
+Provider_register smoke test (upon credential delivery)
+
+Authorization URL: return 302 to login, then code
+Token exchange: code→tokens (id_token, access_token, refresh if offline_access)
+Userinfo: returns expected claims
+Negative: wrong redirect_uri returns invalid_request
+Evidence bundle to CEO (target T+40 remains; if slip, see timeline below)
+Request/response with request_id correlation across steps
+id_token header/payload redacted sample; kid trace to JWKS
+Access token scopes and RBAC mapping proof
+401/403 standardized error sample
+Decision gates and timeline
+
+If scholar_auth resolves within 25 minutes of this memo: Gate A holds original timing (provider_register evidence 0–15 minutes later; notify exact ETA).
+If not resolved by T+25:
+Fallback A (go-to): Issue provider_register_v2 now; provider_register updates env and restarts; deliver evidence at T+25–T+40 from this memo.
+Fallback B (temporary verification path): Execute headless M2M client_credentials smoke test against scholarship_api using a Provider service principal to validate RBAC and SSOT while user-facing OAuth completes. Note: This validates B2B data-path only; it does not replace the user OAuth test. Use only if A fails.
+Student_pilot Phase 1 remains contingent on provider_register GO. Its launch shifts to T+5 after Gate A GO (relative timing), not a fixed clock time.
+Gate B (Comms DRY-RUN T+65) remains independent. No changes unless Comms Infrastructure misses T+60 GREEN.
+2. Gate B (auto_com_center + scholarship_agent DRY-RUN) — unchanged
+Owner: Comms Infrastructure Team (GREEN at T+60)
+Co-owners: auto_com_center, scholarship_agent
+
+Proceed only upon T+60 GREEN evidence. Abort automation thresholds remain as filed.
+Evidence bundle (T+215) requirements stand. No scope changes. Observe-only posture maintained until CEO PASS at T+225.
+3. scholarship_api posture — unchanged
+Owner: scholarship_api DRI
+
+Stay on-call for provider_register smoke tests (RBAC, SSOT, standardized errors, request_id correlation). Maintain P95 <120ms.
+4. auto_page_maker posture — unchanged
+Owner: auto_page_maker DRI
+
+Continue freeze discipline; maintain SEO deltas and CWV. This protects CAC. No new scope.
+5. scholarship_sage posture — unchanged
+Owner: scholarship_sage DRI
+
+Maintain observe-only comms. Support student_pilot conversion path with 1ms P95 recommendations. No outbound fan-out.
+6. Compliance and reporting requirements — all teams
+
+Include header in all reports/artifacts: APP_NAME and APP_BASE_URL.
+Ensure /health returns 200 OK when app and critical dependencies are operational.
+Centralized logging with request_id; 7-year retention policies enforced.
+Responsible AI: No black boxes. Explainability required where ML influences user outcomes.
+7. Lifecycle/Revenue cessation planning — scholar_auth (EOD deliverable)
+Owner: scholar_auth DRI
+
+Obsolescence window: Q1 2031–Q3 2032
+Rationale:
+Standards evolution (OAuth 3.x/DPoP, FIDO2/passkeys default, potential PQC for token signing)
+Token transport/delegation upgrades (GNAP-like models)
+Scale/security horizon at higher DAU and interop demands (federation, edu SSO)
+Capital planning placeholder:
+$20–40k for standards uplift and PQC migration (2029–2031 window)
+$10–15k/yr for scaling, HA, and compliance attestations
+Submit 2-page memo with triggers (accelerate/extend) and a phased migration plan. Mark complete by EOD.
+8. Clarification: “Stop generating revenue” interpretation
+
+End of major development investment: Post-Phase 3 (Dec 16, 2025) the platform transitions from cost center to revenue center; growth spend becomes selective and ROI-driven.
+End-of-life revenue horizon for current architecture: Q4 2028–Q4 2030 (ecosystem refresh expected before/around this window).
+Explicit asks and confirmations
+
+scholar_auth: Confirm in this thread within 10 minutes that client is fixed or v2 issued, with exact redirect_uris and token_endpoint_auth_method. Do not post secrets; confirm delivery channel only.
+provider_register: Acknowledge receipt, switch env, run smoke, and post evidence ETA. If not received in 15 minutes, escalate immediately.
+Comms Infrastructure: Reconfirm T+60 GREEN target; if risk >10%, flag now with mitigation.
+All DRIs: Maintain freeze discipline and observe-only where mandated. No scope changes.
+We will hold Gate A schedule if scholar_auth resolves within the SLA. If not, we will slip provider_register evidence by up to 40 minutes from this memo without impacting the DRY-RUN window. Student_pilot Phase 1 will launch T+5 after provider_register GO, not before.
+
+Act with urgency. Quality and reliability remain first principles.
