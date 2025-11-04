@@ -1,0 +1,78 @@
+CEO Directive: P1 OAuth incident response and execution sequencing
+
+Decision summary
+
+Go-to-green path: Fix routing/mount in scholar_auth directly. Treat this as a routing/middleware problem, not a client registry problem.
+Timebox: 90 minutes to green via simplified OIDC mount; do not wait for deeper library diagnosis to unblock the chain.
+Contingency: If not green at T+90, broker to a managed OIDC (Keycloak/Auth0) behind scholar_auth and re-mint first‑party JWTs so all downstream apps remain integrated with scholar_auth only.
+Preserve SEO momentum: Keep the auto_page_maker window and the Order 3/4 sequence on standby; we will trigger as soon as provider_register posts PASS.
+Answer to your implementation approach question
+
+Choose Option 2: Work directly in the scholar_auth application. The Command Center does not currently provide a proven remote configuration capability for the OAuth client registry, and this is a routing/mount issue within scholar_auth itself. After recovery, we can evaluate adding a hardened orchestration endpoint for controlled remote config.
+Orders: scholar_auth (APP_BASE_URL: https://scholar-auth-jamarrlmayes.replit.app)
+Immediate hotfix (target: T+90 min to green)
+
+Simplify OIDC mount to eliminate routing ambiguity:
+Mount provider at a single, direct path (e.g., /oidc) using provider.callback() at the root of the express app (no sub-app nesting or conditional routers).
+Ensure trust proxy and body-parsing do not interfere; explicitly log the first middleware hop for all /oidc/* requests (redacted, no PII).
+Verify /.well-known/openid-configuration and /oidc/auth are reachable and logged.
+2. Minimal config validation:
+
+Static client: provider-register (production redirect URIs only), PKCE S256 required, access_token 15m, refresh rotation on.
+JWKS kid published and stable; rotate if needed but keep kid unique.
+3. Green-gate acceptance tests (must all pass):
+
+GET /.well-known/openid-configuration → 200
+GET /oidc/auth with valid params → 302 to consent/login
+POST /oidc/token with code+verifier → 200 with access+refresh; aud/iss/sub/kid verified
+Server logs show request_id and path hits for /oidc/* during all three steps.
+Contingency (activate at T+90 if not green)
+
+Stand up a managed OIDC (Keycloak or Auth0) as an upstream identity provider.
+Keep scholar_auth as the system of record by brokering:
+scholar_auth receives the upstream ID token, performs validation, maps roles, and mints our first‑party JWTs (same iss/aud as today, our signing keys, 15m access, rotated refresh).
+Scope-limited to provider_register only during the 24h guarded window.
+Contract stability: student_pilot, scholarship_api, auto_page_maker, and provider_register continue to call only scholar_auth; no app-to-third‑party coupling.
+Security constraints remain in force: PKCE S256, prod redirect URIs only, log redaction, rate limiting, RBAC.
+Parallel root-cause (does not block go-to-green)
+
+24-hour deep dive permitted to isolate the oidc-provider routing fault (mount path, proxy headers, or library regression). Produce a short postmortem with fix plan after recovery.
+Orders: provider_register (APP_BASE_URL: https://provider-register-jamarrlmayes.replit.app)
+
+Hold at “READY” until scholar_auth posts “OAUTH GREEN.”
+Upon green, execute Order B immediately and deliver the 25-minute evidence bundle with ≥99.5% auth success confirmation.
+If auth success falls below 99.5% in any rolling 5-minute window during execution, STOP and page CEO.
+Orders: scholarship_api (APP_BASE_URL: https://scholarship-api-jamarrlmayes.replit.app)
+
+Stay ARMED. On “ORDER B PASS,” execute Order 3 within 2 minutes:
+Create 2 test scholarships; emit scholarship_created events.
+Maintain P95 ≤120ms.
+Post the full evidence bundle (request_id chain through indexnow) within the T+40–T+42 checkpoint.
+Orders: auto_page_maker (APP_BASE_URL: https://auto-page-maker-jamarrlmayes.replit.app)
+
+Stay READY. On scholarship_api trigger, confirm +2 pages (2,101 → 2,103) within 60s and post CWV p75 with PASS/FAIL against LCP ≤2.5s, CLS ≤0.1, INP ≤200ms.
+Orders: student_pilot (APP_BASE_URL: https://student-pilot-jamarrlmayes.replit.app)
+
+Execute Phase 1 Launch at PASS + 5 minutes as planned (10% live Stripe, 90% test). Guardrails remain armed; auto‑rollback <60s.
+Orders: scholarship_sage and scholarship_agent
+
+scholarship_sage: Maintain observe-only posture; keep P95 at or below target; no API/schema changes.
+scholarship_agent: Gate B DRY-RUN remains GO at T+65; post START/EVIDENCE/PASS‑FAIL per plan.
+Reporting and controls
+
+Reporting standard is mandatory: include APP_NAME and APP_BASE_URL in every artifact, log, and bundle.
+Health endpoints must return 200 OK; add a specific /oidc/health in scholar_auth that validates discovery and token flow.
+Security: No PII in logs, TLS-only, RBAC enforced, rate limits active. Maintain 24-hour fallback TTL and refresh rotation.
+Cadence:
+scholar_auth: Post “OAUTH GREEN” as soon as the hotfix passes acceptance tests, or “CONTINGENCY ACTIVATE” at T+90 with broker details (kid, iss, aud, scopes).
+provider_register: Post “ORDER B PASS” within 25 minutes of “OAUTH GREEN.”
+scholarship_api: Post Order 3 evidence at T+40–T+42 window.
+auto_page_maker: Post +2 pages confirmation at T+41–T+43 window.
+student_pilot: Post Phase 1 Launch at T+45 and 24h revenue snapshot at T+24h.
+scholarship_agent: Post DRY-RUN START at T+65, EVIDENCE at T+215, and PASS/FAIL at T+225.
+Rationale
+
+Data-first and time-to-green: Evidence shows client registry is present and verified at startup, while /oidc/auth shows invalid_client with no server-side logs. This points to routing/mount path, not client data. A direct mount hotfix is the fastest path to restore OAuth.
+Low-CAC protection: Keeping the +2 page expansion and IndexNow push on schedule preserves our organic acquisition engine.
+Contract integrity: Even if we broker to a managed OIDC temporarily, all apps continue integrating only with scholar_auth, preserving architecture and compliance.
+Proceed with urgency. Post the first status within 30 minutes, then at 60 and 90 minutes (go/no-go).
