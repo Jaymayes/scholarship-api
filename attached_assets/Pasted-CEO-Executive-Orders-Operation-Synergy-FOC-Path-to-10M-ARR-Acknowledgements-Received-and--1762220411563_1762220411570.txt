@@ -1,0 +1,112 @@
+CEO Executive Orders – Operation Synergy (FOC Path to $10M ARR)
+
+Acknowledgements
+
+Received and reviewed the latest Section 7 reports and 60-minute status updates for: scholar_auth, scholarship_api, scholarship_agent, scholarship_sage, student_pilot, provider_register, auto_page_maker, auto_com_center.
+Conditional FOC services: scholar_auth, scholarship_api, scholarship_sage, student_pilot, auto_page_maker, scholarship_agent (observe-only). Remaining gates: provider_register OAuth unblock and auto_com_center infrastructure canary GREEN + DRY-RUN pass.
+Executive Decisions (Effective Immediately)
+
+Auth DRI – Provider OAuth Unblock (Order A prerequisite for Order B)
+Decision: Execute a “fire-drill” client registration now.
+SLA: 15 minutes from receipt of this order.
+Actions (must all be completed):
+Create or fix OAuth client for provider_register with:
+Redirect URIs: https://provider-register-jamarrlmayes.replit.app/auth/callback and https://provider-register-jamarrlmayes.replit.app/api/callback
+PKCE S256: enabled
+Scopes: openid email profile roles offline_access
+CORS origin: https://provider-register-jamarrlmayes.replit.app
+Deliver client_id and client_secret securely to provider_register DRI.
+Evidence bundle: OIDC client JSON (redacted secret), JWKS validation sample, and a successful authorization URL test returning code.
+Fallback if SLA is missed:
+Create a temporary client with a 2-hour secret TTL scoped only to provider role, deliver immediately, and proceed with Order B using that client.
+Post-mortem due within 24 hours on why the original client remained invalid.
+2. provider_register – Order B GO on Delivery
+
+Decision: Pre-approved to GO immediately upon evidence completion.
+Gate: Start as soon as Auth DRI delivers valid credentials.
+Required evidence (25 minutes total from credential receipt):
+10-minute PKCE verification bundle (HAR, ID token decode, JWKS signature verified, roles=Provider present, request_id chain).
+15-minute B2B smoke test: create/update/delete scholarship (Provider=200), negative RBAC test (non-Provider=403), tenant isolation proof, 3% fee disclosure on UI, request_id traces.
+SHA256 manifest of artifacts.
+CEO will issue provider_register = GO upon receipt; no additional approvals needed if evidence passes.
+3. Comms Infrastructure Team – auto_com_center Canary GREEN (Order C)
+
+Decision: Resolve canary heap pressure and turn canary GREEN.
+SLA: 60 minutes from receipt of this order.
+Acceptance criteria:
+Heap utilization ≤85% sustained for 15 minutes at idle and ≤90% during a 10-minute synthetic burst (500 msgs/min).
+P95 end-to-end processing ≤120ms in canary; error rate <0.1%; DLQ = 0 during burst.
+Allowed mitigations (pick and execute immediately as needed):
+Right-size memory/instances; tune GC; reduce message prefetch/concurrency; scale queue partitions; enable backpressure at producer.
+Fallback if SLA is missed:
+Execute reduced-volume canary (250 msgs/min) to achieve GREEN; increase to 500 msgs/min within the next 60 minutes after initial GREEN.
+If still blocked, shift canary to alternate region/runner; proceed with DRY-RUN there.
+4. scholarship_agent – Order D DRY-RUN Authorization
+
+Decision: Pre-authorized to launch DRY-RUN immediately when auto_com_center declares canary GREEN.
+DRY-RUN parameters (as proposed):
+Volume: 30,000 messages @ 500/min for 120 minutes.
+Pass criteria: P95 ≤120ms end-to-end, failure rate <0.1%, DLQ growth = 0, opt-out latency <5s, 10 end-to-end request_id traces verified.
+Evidence bundle due within 30 minutes post-run (10 artifacts + SHA256 manifest).
+Abort conditions:
+Any DLQ growth >0, or sustained P95 >150ms for 3 minutes, or failures >0.2% over 5 minutes. On abort, roll back to observe-only and deliver partial bundle + root-cause hypothesis.
+5. student_pilot – Order E Monetization Switch
+
+Decision: Pre-authorized to initiate Stripe live mode Phase 1 (10% traffic) immediately after provider_register = GO. Marketing fan-out remains disabled until auto_com_center DRY-RUN PASS.
+Guardrails:
+Keep observe-only marketing posture; allow only Stripe-native transactional emails.
+Rollback to test mode within 60 seconds if payment failure >1% in 24h or refunds >3%.
+Phase advancement:
+Phase 2 (50%) and Phase 3 (100%) permitted after 24-hour metrics stability and auto_com_center DRY-RUN PASS.
+6. Full FOC Declaration Gate
+
+Sequence to Full FOC:
+provider_register = GO (Order B evidence approved by CEO).
+auto_com_center canary GREEN (Order C acceptance criteria met).
+scholarship_agent DRY-RUN PASS with 10-artifact bundle (Order D).
+CEO issues production fan-out authorization; declare Full FOC.
+If Order C is delayed >4 hours:
+Proceed with limited B2C monetization (student_pilot Phase 1 live payments) using Stripe transactional receipts only; keep communications center observe-only; re-evaluate every 2 hours.
+Risk, Compliance, and SLO Guardrails
+
+FERPA/COPPA: Audit trails with request_id correlation remain mandatory across all production flows.
+Responsible AI: Maintain explainability in scholarship_sage (matchReasons) and never assist academic dishonesty.
+Security: Centralized auth only (scholar_auth), HTTPS/TLS everywhere, standardized error format with request_id, RBAC enforced on all protected routes.
+SLOs: Uptime ≥99.9%, P95 ≤120ms, error rate ≤0.1%. Any breach triggers an immediate rollback to the last known-good posture.
+Week-1 KPI Targets (post-FOC)
+
+B2C:
+Organic sessions/day: ≥1,000 (auto_page_maker baseline sustained).
+Visitor→signup: 8–12%.
+Free→paid: 3–5% (Day 1–7).
+ARPU: $8–$12 per paid user (credit packages at 4× AI markup).
+B2B:
+Providers onboarded: 5–8.
+Active listings: 40–60.
+GMV equivalent to yield ≥$2,000 in week-1 fee accrual potential.
+Ops:
+Zero RBAC violations, zero DLQ growth, P95 ≤120ms across services.
+Lifecycle and Capital Allocation Confirmation
+
+Infrastructure (scholar_auth, scholarship_api, auto_com_center): 5–7 year horizon; track standards evolution (beyond OAuth 2.0) and scale limits.
+User-facing (student_pilot, provider_register): 3–4 year horizon; major UX refresh likely in that window.
+Intelligence/Automation (scholarship_sage, scholarship_agent, auto_page_maker): 2–3 year horizon; draw from the approved $100k Q2 FY2027 refresh reserve; early triggers include API/model EOL, ≥20% performance or quality regression, or competitive price compression on AI services.
+Owner, SLA, and Next Update Cadence
+
+Auth DRI (Order A prerequisite): 15-minute SLA to deliver provider OAuth client credentials. Report back with evidence immediately upon completion.
+provider_register DRI (Order B): 25-minute SLA from credential receipt to evidence submission. Pre-approved to GO on evidence acceptance.
+Comms Infra Team (Order C): 60-minute SLA to canary GREEN. Report status at T+30 and T+60.
+scholarship_agent DRI (Order D): Launch DRY-RUN within 5 minutes of canary GREEN; evidence bundle due T+30 post-run.
+student_pilot DRI (Order E): Launch Phase 1 immediately after provider_register GO; hold at 10% until DRY-RUN PASS.
+Status cadence: Maintain 60-minute updates until Full FOC; shift to daily executive metrics thereafter.
+CEO Summary and Current GO/NO-GO Board
+
+scholar_auth: GO (Action: deliver provider OAuth client now).
+scholarship_api: GO.
+scholarship_sage: GO.
+student_pilot: GO for live payments post provider_register GO; held at 10% pending DRY-RUN PASS.
+provider_register: NO-GO until OAuth unblocked; pre-approved to GO upon Order B evidence.
+auto_page_maker: GO.
+scholarship_agent: GO (observe-only); DRY-RUN pre-authorized on Comms GREEN.
+auto_com_center: NO-GO (infra canary). 60-minute SLA to GREEN.
+Act with urgency. Report back on Orders A, B, and C per the SLAs above. Pending those completions, I will issue the production fan-out authorization and declare Full FOC.
