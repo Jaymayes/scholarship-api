@@ -1,0 +1,86 @@
+APP_NAME: CEO | APP_BASE_URL: https://www.scholaraiadvisor.com
+
+CEO DECISION MEMO — Gate A Escalation, OAuth P0, and Staging Validation
+
+Posture
+
+Overall: HOLD for production messaging; GO for staging-only execution and evidence.
+Prime objective guardrails: protect low-CAC SEO engine, maintain ≤120ms P95, <0.1% error rate, 99.9% uptime, evidence-first.
+Decisions and Orders (timeboxed, evidence-required)
+
+scholar_auth (https://scholar-auth-jamarrlmayes.replit.app) — P0 “invalid_client”
+Decision: Proceed with Option A now (deep investigation + debug logging).
+Timebox: 90 minutes from receipt of this memo.
+Guardrails:
+Staging only. No demo-mode bypass. No production change.
+Keep RBAC and token flows intact; do not weaken validations.
+Evidence required (within 90 minutes):
+Update e2e/reports/scholar_auth/P0_PROVIDER_REGISTER_STATUS.md with root cause, failing validation step, and the minimal patch.
+Curl test must return consent page for client_id=provider-register.
+Fallback if not resolved in 90 minutes:
+Enable Option B only in staging, behind IP allowlist and request_id tracing; use for provider_register Order B unblock only.
+Parallel track: open technical spike plan for Option C (no library switch yet). Deliver spike plan doc and risk matrix.
+2. Infra DRI — Secrets and Messaging Prereqs (15 minutes)
+
+Deliver to secrets manager: SENTRY_DSN (raw URL), AWS SQS + DLQ credentials/IAM, Postmark + Twilio secrets.
+DNS for mail.scholaraiadvisor.com: SPF/DKIM/DMARC alignment.
+Evidence bundle to e2e/reports/infra/SECRETS_AND_DNS_EVIDENCE.md:
+Secret names/last-rotated (no secrets in clear), DKIM selectors, SPF/DMARC records, IAM policy ARN references.
+3. auto_com_center (https://auto-com-center.scholaraiadvisor.com) — Staging Validation ONLY
+
+GO for staging validation immediately after secrets land.
+Acceptance (post-secrets, within T+30 minutes):
+Unsubscribe SLA <5s, P95 ≤120ms end-to-end, DLQ=0, queue_depth metrics, request_id propagation.
+Evidence: e2e/reports/auto_com_center/staging_validation.md plus DNS_EVIDENCE.md, Prometheus snapshot, and Sentry trace links.
+Production ramp: NOT APPROVED. 1% ramp requires CEO sign-off after evidence review and A2P 10DLC approval confirmation.
+4. provider_register (https://provider-register-jamarrlmayes.replit.app) — Order B
+
+Trigger: scholar_auth posts PASS for provider-register client (consent page visible; no invalid_client).
+SLA: Execute within 20 minutes of unblock.
+Evidence: e2e/reports/provider_register/ORDER_B_EVIDENCE.md with PKCE S256 flow screenshots, JWT roles=["Provider"], CRUD proof, P95 ≤120ms from ≥20 requests, request_id chain, Sentry trace.
+5. scholarship_api (https://scholarship-api-jamarrlmayes.replit.app) — Order 4
+
+Trigger: provider_register Order B PASS.
+SLA: Execute within 20 minutes.
+Create and activate 2 scholarships; emit event for auto_page_maker.
+Evidence: e2e/reports/scholarship_api/ORDER_4_EVIDENCE.md with write P95 ≤150ms, read P95 ≤120ms, error rate <0.1%, event emission proof, request_id → Sentry trace chain.
+RDS migration plan remains due Nov 7, 22:00 UTC. No change. Deliver plan doc as scheduled.
+6. auto_page_maker (https://auto-page-maker-jamarrlmayes.replit.app) — +2 Pages
+
+GO: Armed; execute on scholarship_api event within 60 seconds.
+Evidence (within 10 minutes post-event): e2e/reports/auto_page_maker/ORDER_4_EVIDENCE.md including sitemap diff (+2), IndexNow receipts, CWV p75 GREEN, P95 ≤120ms, request_id chain, Sentry traces.
+7. scholarship_sage (https://scholarship-sage-jamarrlmayes.replit.app) — M2M Secret + 48h Baseline
+
+Auth DRI: Generate and distribute M2M_SCHOLARSHIP_SAGE_SECRET in 10 minutes; evidence to e2e/reports/scholar_auth/M2M_SECRET_DISTRIBUTION.md.
+Sage DRI: Start 48-hour baseline immediately on receipt; observe-only posture.
+Evidence due +48h: e2e/reports/scholarship_sage/baseline_metrics_evidence.md including precision@5 method, early metrics, coverage %, matchReasons samples, and request_id chains.
+8. student_pilot (https://student-pilot-jamarrlmayes.replit.app)
+
+Continue weekly cohort reporting. Keep accessibility remediation on Nov 11–25 timeline.
+No new actions. Maintain P95 ≤120ms and <0.1% error rate.
+Production Messaging Gate
+
+Remains LOCKED. Requirements to unlock 1% ramp:
+DNS/A2P verified with evidence.
+auto_com_center staging validation PASS with evidence.
+scholar_auth OAuth stability verified (no invalid_client regressions).
+Centralized Sentry traces with request_id correlation across flows.
+KPIs CEO is monitoring this gate
+
+P95: ≤120ms (reads/user flows), ≤150ms (writes).
+Error rate: <0.1%.
+SEO: pages_total +2 with IndexNow receipts; CWV p75 GREEN.
+B2C activation: ≥50%, median time-to-activation ≤24h (student_pilot).
+Evidence-first: All artifacts in e2e/reports/ with APP_NAME | APP_BASE_URL header.
+Risk Notes
+
+Security/Trust: No demo-mode, no prod shortcuts; staging-only workarounds if needed.
+Timeline: Today’s P0 must resolve or have a controlled staging workaround to keep Order B → Order 4 → +2 pages chain on track.
+RDS migration: Stay on the Nov 7 plan; protect SLOs during cutover.
+Checkpoints
+
+T+10: Confirm Infra secrets + scholar_auth M2M secret delivered with evidence.
+T+30: Report on scholar_auth P0 status; if PASS, confirm provider_register executed Order B; if not, confirm staging-only workaround enabled and used.
+T+50: Confirm scholarship_api Order 4 evidence; within +60s confirm auto_page_maker +2 pages and evidence posted.
+Close
+Act with urgency, maintain chain-of-custody, and keep everything evidence-first. No production messaging until gates are verifiably green.
