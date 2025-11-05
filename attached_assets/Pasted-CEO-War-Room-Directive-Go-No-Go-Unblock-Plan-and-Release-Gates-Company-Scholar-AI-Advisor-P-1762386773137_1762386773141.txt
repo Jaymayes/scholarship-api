@@ -1,0 +1,111 @@
+CEO War‑Room Directive: Go/No‑Go, Unblock Plan, and Release Gates (Company: Scholar AI Advisor)
+
+Prime Directive Alignment
+
+Objective: Stay on path to $10M profitable ARR and market leadership while upholding SLOs (≥99.9% uptime, ≤120ms P95) and Responsible AI.
+Strategy: Protect and compound the organic SEO flywheel (Auto Page Maker), drive low-CAC growth, and enable B2B provider onboarding to feed the ecosystem.
+Executive Decisions (effective immediately)
+
+Staging IdP (Auth) path: APPROVED Option 2 (Replit OIDC/OAuth) for staging to unblock the T+ chain today. In parallel: Infra to provision production IdP (Keycloak/Auth0) with OIDC discovery by Nov 8, 18:00 UTC.
+Secrets and DNS/A2P: Escalated to Infra and Compliance as a P0. Delivery deadline remains Nov 6, 16:00 UTC (09:00 MST). Auto‑escalate if missed.
+Production lock: Remains in place for all outbound messaging and ramped traffic until defined release gates pass (see global gates below).
+Evidence‑first discipline: All artifacts must include APP_NAME and APP_BASE_URL headers, E2E request_id traces, and SLO proofs.
+Global Release Gates (must be evidenced to unlock prod ramp 1% → 5% → 25% → 100%)
+
+auth: 24‑hour soak with 0 invalid_client and successful token refresh flow; revocation verified.
+api: P95 read/write ≤120ms at 95th under expected staging load; ACID or equivalent consistency verified; Swagger/OpenAPI public to the ecosystem.
+auto_com_center: Unsubscribe SLA <5s and DLQ=0 under test load; DNS (SPF/DKIM/DMARC) green; A2P brand/campaign approved; deliverability smoke tests passed.
+cross‑app tracing: request_id propagates across all 8 apps, visible in correlation board.
+Responsible AI: No academic dishonesty enablement; PII redaction and data‑min active; fairness telemetry where applicable.
+Per‑App Directives, Ownership, and ETAs
+
+APP_NAME: scholar_auth
+APP_BASE_URL: https://scholar-auth-jamarrlmayes.replit.app
+
+Decision: APPROVE Option 2 (Replit OIDC/OAuth) for staging immediately.
+Actions:
+Publish OIDC discovery URL, JWKS, client config for all 7 clients today. Include claims parity: sub, email, aud, roles, offline_access.
+Implement and verify: PKCE S256, refresh tokens, token revocation, session expiry, secure storage.
+Evidence due: Staging issuer parity report and discovery URL by Nov 5, 23:59 UTC. 24h soak countdown starts once dependent apps authenticate cleanly.
+Production IdP: Infra to deploy Keycloak/Auth0 with the same claims by Nov 8, 18:00 UTC.
+APP_NAME: scholarship_api
+APP_BASE_URL: https://scholarship-api-jamarrlmayes.replit.app
+
+Status: ARMED for Order 4.
+Actions on trigger: Execute Order 4 within 20 minutes of provider_register evidence; publish ORDER_4_EVIDENCE.md with:
+Endpoint inventory (CRUD for scholarships, student profiles, provider data, app status) + Swagger link.
+Security: validate scholar_auth tokens; role‑based access checks; audit log sample.
+Performance: P95 reads/writes under staging load; ACID/consistency mechanism overview; error rate <0.1%.
+Downstream triggers: auto_page_maker + auto_com_center events emission armed but production‑locked.
+APP_NAME: scholarship_agent
+APP_BASE_URL: https://scholarship-agent-jamarrlmayes.replit.app
+
+Decision: Maintain monitoring stance; enforce T+10/T+30/T+50 checkpoints and auto‑escalation if secrets miss.
+Actions:
+Keep request_id correlation board live; post checkpoint memos with SLO proofs.
+No production auto‑apply or notifications until auto_com_center gates pass.
+APP_NAME: scholarship_sage
+APP_BASE_URL: https://scholarship-sage-jamarrlmayes.replit.app
+
+Decision: GO observe‑only baseline once M2M secret received.
+Actions:
+Start +48h baseline immediately upon M2M secret from staging IdP.
+Deliver baseline_metrics_evidence.md at +48h with precision@5, coverage, matchReasons exemplars, fairness telemetry, SLO proofs, and trace links.
+Constraint: No outbound messaging until CEO clearance post‑baseline.
+APP_NAME: student_pilot
+APP_BASE_URL: https://student-pilot-jamarrlmayes.replit.app
+
+Decision: Feature flag posture accepted; keep recommendations UI locked until scholarship_sage baseline clears and CEO approves.
+Actions:
+Run cross‑browser and mobile responsiveness checks; attach evidence to e2e/reports/student_pilot/ui_responsiveness.md.
+Prepare a scripted end‑to‑end journey test to run immediately when staging IdP is live; include screenshots and P95 timings.
+APP_NAME: provider_register
+APP_BASE_URL: https://provider-register-jamarrlmayes.replit.app
+
+Decision: READY; execute Order B upon staging IdP discovery URL.
+SLA: Post ORDER_B_EVIDENCE.md within 20 minutes of receiving issuer details:
+PKCE S256 flow proof, roles=["Provider"] JWT verification, CRUD round‑trip against scholarship_api, P95 ≤120ms, trace links, and security headers.
+Upon posting: Trigger scholarship_api Order 4 immediately.
+APP_NAME: auto_page_maker
+APP_BASE_URL: https://auto-page-maker-jamarrlmayes.replit.app
+
+Decision: GO and ARMED preserved.
+Actions:
+Execute +2 pages within 60 seconds of scholarship_api Order 4 completion; post evidence within 10 minutes.
+Guardrail: Auto‑rollback if CWV p75 regresses >5%. Maintain p75 GREEN and P95 ≤120ms.
+APP_NAME: auto_com_center
+APP_BASE_URL: https://auto-com-center.scholaraiadvisor.com
+
+Decision: Production LOCKED; staging validation proceeds once secrets land.
+Accepted ETAs: Staging Validation Nov 6, 21:00 UTC (contingent on secrets by 16:00 UTC); ARR ignition Nov 12 (contingent on A2P approvals).
+Infra Dependencies to deliver (P0 by Nov 6, 16:00 UTC):
+SENTRY_DSN, AWS SQS+DLQ (IAM + policies), Postmark API key, Twilio credentials, DNS SPF/DKIM/DMARC for mail.scholaraiadvisor.com, A2P brand + campaign filings.
+Staging Validation must evidence:
+Unsubscribe SLA <5s; DLQ=0; 10 Postmark sandbox sends; rate‑limit enforcement; P95 ≤120ms; request_id traces; Prometheus queue_depth; Sentry trace links.
+Fallback posture:
+If A2P approval lags, proceed with email‑only staging; SMS disabled in production until approved. No production sends without unsubscribe <5s and DLQ=0 proof.
+Owner Assignments and Escalations
+
+Infra DRI (P0): Deliver all secrets/DNS/A2P by Nov 6, 16:00 UTC. If at risk, escalate to CEO at T‑60 min with a mitigation plan; otherwise expect auto‑escalation and reallocation of resources.
+Auth DRI: Execute Replit OIDC staging today; publish discovery + JWKS + client configs and parity evidence. Start 24h soak across dependent apps once live.
+App DRIs (api, provider, page_maker, com_center, agent, sage, student): Execute per above, publish evidence to the e2e/reports path with required headers and trace links.
+KPI Watchlist (reported daily at 17:00 UTC during launch window)
+
+B2C: free→paid conversion; ARPU from credits; activation within 24h (target ≥50%).
+B2B: active providers; listings added per day; time‑to‑first‑listing.
+Platform: P95 ≤120ms, error <0.1%, uptime ≥99.9%; SEO pages indexed; CWV p75 GREEN.
+Messaging: unsubscribe SLA, deliverability rate, A2P approval status.
+Risks and Mitigations
+
+A2P approval SLA uncertainty: Mitigate by sequencing email‑only first; SMS disabled until approval. Maintain compliance logging and opt‑out evidence for audits.
+IdP delay: Approved staging via Replit reduces risk now; parallel track for production‑grade IdP by Nov 8 ensures parity before ramp.
+SEO regression: Strict >5% CWV rollback policy; no template changes without pre/post CWV diff.
+Next Checkpoints
+
+T+10 (Nov 6, 16:00 UTC): Secrets/DNS/A2P delivery. If missed, auto‑escalation fires and contingency path enacted (email‑only staging; SMS deferred).
+T+30 after secrets: auto_com_center staging validation evidence due; provider_register Order B due within 20 minutes of IdP live; scholarship_api Order 4 due 20 minutes after Order B.
+T+50 chain completion: auto_page_maker +2 pages evidence within 10 minutes of Order 4.
+CEO Authorization Notes
+
+Proceed with all steps above. Production remains locked until gates evidenced and CEO authorizes 1% ramp.
+Maintain evidence‑first posture; ship proofs, not assertions.
