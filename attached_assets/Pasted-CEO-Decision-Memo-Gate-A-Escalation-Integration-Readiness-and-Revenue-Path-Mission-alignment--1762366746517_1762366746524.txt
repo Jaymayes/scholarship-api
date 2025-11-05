@@ -1,0 +1,95 @@
+CEO Decision Memo — Gate A Escalation, Integration Readiness, and Revenue Path
+
+Mission alignment
+
+Prime directive unchanged: hit $10M profitable ARR within 5 years by owning AI-driven scholarship access and applications. Protect low-CAC SEO engine, keep P95 ≤120ms, error rate <0.1%, uptime ≥99.9%, and maintain evidence-first execution.
+Immediate executive decisions
+
+scholar_auth P0 “invalid_client” — Option A GO (90-minute timebox), Option B fallback armed
+Option A (GO now, 90 minutes): Deep-dive and remediate. Acceptance to close P0:
+Consent page renders for client_id=provider-register without invalid_client
+Full PKCE S256 code flow succeeds; token exchange returns JWT with roles=["Provider"]
+/health enumerates oidc_clients and dependencies (DB, JWKS) as OK
+Request_id chain present; Sentry traces correlated; error rate <0.1% during tests
+Evidence: e2e/reports/scholar_auth/P0_PROVIDER_REGISTER_STATUS.md (APP_NAME | APP_BASE_URL header; logs redacted)
+Required diagnostic steps (execute in parallel):
+Restart the OIDC service to invalidate any stale in-memory client cache after DB edits
+Verify adapter returns an exact match for client_id (no trailing/hidden chars). Add a raw hex dump of client_id to logs
+Validate redirect_uri used in the failing request exists verbatim in DB (scheme, host, path, no trailing slash mismatch)
+Confirm token_endpoint_auth_method for provider-register is client_secret_post and response_types=["code"], grant_types=["authorization_code"]
+Inspect JSON storage for clients: ensure JSONB fields are not double-stringified; re-save via validated schema if needed
+Temporarily register one known-good static client in-memory to isolate adapter vs library. If static works and DB-backed fails, the adapter path is the fault domain
+Enable oidc-provider authorization.error and client lookup traces; attach stack and client record snapshot to evidence
+Roll back the change that broke /health client enumeration; re-validate health after each fix
+Option B (arm now; execute only if A fails in 90 minutes): Stage-only managed auth to unblock chain
+Stand up Keycloak (or Auth0 tenant) in staging; import clients via script; publish JWKS to known endpoint
+Update relying parties to use staging issuer; keep production locked
+SLA: 60 minutes to green-light provider_register Order B after Option A timeout
+Evidence: e2e/reports/scholar_auth/STAGING_FALLBACK_EVIDENCE.md
+2. Secrets and infra — GO, deadlines firm
+
+Infra DRI must deliver within 15 minutes:
+SENTRY_DSN (raw URL), AWS SQS + DLQ IAM, Postmark, Twilio, DNS SPF/DKIM/DMARC for mail.scholaraiadvisor.com
+Evidence: e2e/reports/infra/SECRETS_AND_DNS_EVIDENCE.md (record values redacted, include validation outputs)
+A2P registration status for SMS must be included in evidence with brand/campaign approval or ETA.
+3. auto_com_center — Staging validation GO (post-secrets)
+
+Proceed exactly per acceptance criteria already defined (unsubscribe <5s; P95 ≤120ms end-to-end; DLQ=0; Prometheus queue_depth exported; request_id tracing; 10 Postmark sandbox sends)
+Evidence due T+30 after secrets: e2e/reports/auto_com_center/staging_validation.md
+Production messaging remains LOCKED pending CEO sign-off.
+4. provider_register — HOLD for scholar_auth PASS; then GO within 20 minutes
+
+On scholar_auth PASS, execute Order B end-to-end immediately; SLA 20 minutes to evidence
+Evidence: e2e/reports/provider_register/ORDER_B_EVIDENCE.md (PKCE S256, JWT roles, CRUD proof, P95 ≤120ms from ≥20 reqs, <0.1% error, request_id→Sentry, security headers, /health=200)
+5. scholarship_api — ARMED; execute Order 4 on Order B PASS
+
+Create and activate +2 scholarships within 20 minutes of Order B PASS; emit scholarship_created event
+Evidence: e2e/reports/scholarship_api/ORDER_4_EVIDENCE.md (write P95 ≤150ms, read P95 ≤120ms, error <0.1%, event emission proof, request_id chain, Sentry traces)
+6. auto_page_maker — ARMED; +2 pages within 60 seconds of event
+
+Evidence within 10 minutes post-event: e2e/reports/auto_page_maker/ORDER_4_EVIDENCE.md (sitemap diff +2, IndexNow receipts, CWV p75 GREEN, P95 ≤120ms, request_id chain, Sentry traces)
+7. scholarship_sage — GO on M2M secret; 48-hour baseline only
+
+Upon M2M secret delivery, start 48-hour observe-only baseline. No outbound messaging
+Evidence at +48h: e2e/reports/scholarship_sage/baseline_metrics_evidence.md (precision@5 method, early metrics, coverage%, matchReasons samples, request_id chains)
+8. student_pilot — GREEN; continue current plan
+
+Continue weekly cohort reporting, maintain P95 ≤120ms and <0.1% error
+Accessibility remediation remains Nov 11–25; publish updated report at completion
+Cross-cutting governance and compliance
+
+Reporting standard: Every artifact must include APP_NAME: [Name] | APP_BASE_URL: [Base URL] in header or metadata
+Observability: Centralized Sentry with 10% sampling, PII redaction, request_id propagation across all apps; publish trace links in evidence bundles
+Security/SLOs: HTTPS only, scholar_auth as sole IdP, RBAC enforced, /health returns 200 with dependency checks, uptime ≥99.9%, P95 ≤120ms, error rate <0.1%
+Data and storage: Proceed with RDS migration plan; deadline remains Nov 7, 22:00 UTC; evidence to e2e/reports/scholarship_api/RDS_MIGRATION_PLAN.md
+FERPA/COPPA and Responsible AI: No academic dishonesty features; bias mitigation, transparency, and student empowerment remain mandatory
+KPI guardrails (tracked at each checkpoint)
+
+Tech SLOs: P95 ≤120ms; error rate <0.1%; uptime ≥99.9%
+Growth engine: Auto Page Maker pages_total +2 on Order 4; IndexNow receipts posted; CWV p75 GREEN
+B2B funnel: Provider activation proof via Order B; two live scholarships created and indexed
+B2C funnel: Student activation monitoring via student_pilot weekly cohorts; activation ≥50%, median time-to-activation ≤24h (track only during staging)
+Checkpoints and SLAs
+
+T+10: Infra secrets and DNS/A2P evidence posted
+T+30: scholar_auth P0 PASS posted (Option A) or trigger Option B fallback; provider_register executes Order B within 20 minutes of PASS
+T+50: scholarship_api posts Order 4 evidence; auto_page_maker produces +2 pages within 60 seconds; evidence within 10 minutes post-event
+All evidence in e2e/reports/[app]/, with request_id→Sentry trace links
+Production messaging gate
+
+Remains LOCKED until:
+DNS/A2P verified with evidence
+auto_com_center staging validation PASS with evidence
+scholar_auth OAuth stability PASS (no invalid_client regressions)
+Centralized Sentry traces with request_id correlation
+CEO explicit sign-off for 1% ramp
+Revenue timing clarification
+
+“Stop generating revenue” language is corrected to “start generating revenue.” We begin revenue generation at Phase 3 go-live (target December 16, 2025). Architecture EOL horizon Q4 2028–Q4 2030 is acceptable for financial planning. Keep CAC low by prioritizing SEO flywheel; protect P95 ≤120ms to preserve rankings and conversion.
+Capital allocation approvals (staging only)
+
+Approve spend for: Postmark sandbox, Twilio A2P registration, AWS SQS + DLQ, S3 for document uploads (scholarship_api), Sentry organization-wide. RDS migration remains approved to plan.
+Next CEO review
+
+I will review T+30 status. If scholar_auth P0 is not resolved by T+30 via Option A, immediately trigger Option B fallback to unblock the chain and hit T+50 milestones. Maintain evidence-first posture and do not compromise prime objective guardrails.
+Act with urgency. Keep every artifact audit-ready, and ensure all headers include APP_NAME | APP_BASE_URL.
