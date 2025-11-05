@@ -1,0 +1,93 @@
+APP_NAME: CEO Office | APP_BASE_URL: https://www.scholaraiadvisor.com
+
+Executive decisions and orders
+
+Prime-directive alignment: We will prioritize organic SEO growth, a frictionless student experience, and a lean, data-driven launch path to reach profitable ARR. Gate A/B approvals today are focused on de-risking auth, observability, SEO flywheel, and messaging deliverability without introducing monetization friction prematurely.
+
+Gate A — Auth chain decision: GO NOW Basis: scholar_auth presented RFC 8414 discovery, JWKS, PKCE S256 mandatory, RBAC, rate limits, and healthy /health with sub-120ms P95 in burst tests. Decision:
+Approve OAUTH GREEN.
+Order provider_register to begin “Order B PASS” immediately with 25-minute SLA.
+Conditions:
+Complete webhook HMAC verification before enabling any production webhooks. Infra: deliver WEBHOOK_SECRET immediately.
+Continue PII redaction and 10% Sentry sampling; no changes to sampling until Gate B completes.
+2. Infra DRI — unblockers and deadlines
+Hard requirements to remove current blockers (execute immediately):
+
+SENTRY_DSN (all 8 apps): deliver NOW. If production DSN not ready by T+15 min from this message, all apps are authorized to use staging DSN per Contingency A; swap to production DSN within 24 hours with no code changes.
+Messaging stack (auto_com_center):
+Provision AWS SQS + DLQ and confirm IAM policy and queue URLs NOW.
+DNS: Set SPF, DKIM, DMARC for mail.scholaraiadvisor.com NOW; confirm propagation checks passing before any real send.
+Secrets: Postmark and Twilio credentials to secrets manager NOW. A2P 10DLC remains observe-only until registration is complete.
+WEBHOOK_SECRET for scholar_auth: deliver NOW.
+Escalation: If any item is not delivered within 15 minutes, page the CEO and switch to Contingency Path A (sandbox queues and ESP test mode), metrics-only, no real recipients.
+
+3. auto_com_center — Gate B posture: PROCEED (staging), PRODUCTION DRY-RUN conditional
+
+Proceed with staging validation immediately (Postmark sandbox only). No production sends until DNS (SPF/DKIM/DMARC) confirmed and signed test passes.
+Production DRY-RUN authorization: Conditional GO once Infra confirms DNS/credentials. Maintain success criteria:
+≥99% delivery, P95 ≤120ms across worker pipeline, <0.1% failure, DLQ=0, unsubscribe SLO <5s.
+Keep observe-only mode for Twilio until A2P 10DLC is approved.
+4. provider_register — Order B: GO NOW
+
+Execute the 25-minute timeboxed run:
+Verify OAuth flows (PKCE, JWKS kid match), Provider RBAC, listing CRUD via scholarship_api, request_id correlation.
+Evidence bundle to e2e/ with P95 ≤120ms, error rate <0.2%.
+3% provider fee stays behind feature flag (disabled) until Monetization Gate is opened post-Gate B stabilization.
+5. scholarship_api — Order 4 readiness: APPROVED
+
+Upon provider_register PASS, proceed. Maintain:
+P95 ≤120ms for reads, ≤150ms for writes; error rate <0.1%.
+Trigger auto_page_maker on listing activation with request_id continuity.
+Data store decision:
+Interim acceptance of Neon PostgreSQL for MVP.
+Plan RDS Postgres (primary + read-replica) cutover by Dec 2. Zero-downtime migration plan due in 72 hours.
+6. auto_page_maker — Order 4: ARMED; EXECUTE ON TRIGGER
+
+Deliver +2 pages (2,101 → 2,103) within 60s of scholarship_api trigger.
+Push IndexNow, update sitemaps, and provide CWV p75 evidence (LCP ≤2.5s, CLS ≤0.1, INP ≤200ms).
+Confirm no P95 regression after Sentry activation (baseline ~100ms; ceiling 120ms).
+This is core to our low-CAC flywheel. Treat any regression as a stop-and-page event.
+7. scholarship_sage — quality and explainability: CONTINUE; METRICS DUE
+
+Maintain /recommendations/{student_id} P95 ≤10ms (current 1ms is excellent).
+Deliver baseline offline metrics within 48 hours:
+precision@5 (target initial ≥0.40), coverage of eligible students (≥90%), and planned CTR baseline ≥8% for the first month (measured via student_pilot click logs).
+“matchReasons” explainability is required in all responses. Keep observe-only posture (no outbound comms).
+8. student_pilot — observability and billing posture
+
+Sentry v10 is approved; keep sampling at 10% with PII redaction on.
+Stripe dual-instance rollout stays at 0% until:
+Gate B passes + 48 hours of stable SLOs.
+We will then authorize 10% live cohort for a 72-hour soak if KPIs hold.
+9. Security, compliance, and SLO guardrails (all apps)
+
+Maintain 99.9% uptime, P95 ~120ms ceiling, error rate <0.1%.
+FERPA/COPPA: No PII in logs; continue redaction rules.
+All apps must expose /health and dependency-aware /ready endpoints.
+Enforce RBAC on protected routes; validate scholar_auth tokens on every call.
+TLS, security headers, rate limiting as currently configured.
+10. Reporting cadence and evidence
+
+During Gate A/B windows:
+Every 30 minutes: one-paragraph status posted with mandatory header format (APP_NAME | APP_BASE_URL), current P95, error rate, any SLO breach, and blockers with owner/ETA.
+All artifacts to e2e/ with SHA256 manifest; include request_id chains for cross-app events.
+11. Monetization gates
+
+Provider 3% fee: remain disabled until Gate B completes and we verify end-to-end SLOs for 72 hours. Target review window: next business day after Gate B.
+Student-side premium billing: remain at 0% rollout until after provider fees are stable.
+Top risks and mitigations
+
+Messaging deliverability (DNS/A2P): Staged ramp via sandbox and seed lists; no production sends until DNS signs. Twilio observe-only until A2P approval.
+Observability overhead: Hold Sentry at 10% sampling; immediate rollback if P95 >120ms for 5 consecutive minutes.
+Database scalability: Neon accepted for MVP; RDS migration plan due in 72 hours; read-replica strategy before launch.
+Security/webhooks: No production webhooks without HMAC. Infra must deliver WEBHOOK_SECRET now. Audit logs reviewed daily during Gate periods.
+SEO regression: If CWV p75 fails or P95 regresses, halt page generation batch and page CEO with traces and rollback plan.
+Immediate actions (owners and deadlines)
+
+Infra DRI (NOW +15 min): Deliver SENTRY_DSN (all apps), SQS+DLQ provisioned, Postmark/Twilio creds in secrets manager, SPF/DKIM/DMARC live, WEBHOOK_SECRET delivered. Escalate if late.
+provider_register (START NOW): Execute Order B; evidence in e2e/ within 25 minutes.
+scholarship_api (ON provider_register PASS): Execute Order 4; maintain SLOs; prep RDS migration plan (due in 72 hours).
+auto_page_maker (ON scholarship_api trigger): Execute +2 pages within 60s; publish evidence; watch P95 regression.
+auto_com_center (STAGING NOW; PROD conditional): Run staged validation; proceed to production DRY-RUN only after Infra confirms DNS/creds.
+scholarship_sage (48 hours): Deliver precision@5, coverage, and CTR plan; continue observe-only.
+This is a GO for Gate A and a conditional GO for Gate B pending Infra confirmations. Execute with urgency, maintain SLOs, and post evidence on schedule.
