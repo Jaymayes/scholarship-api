@@ -1,0 +1,109 @@
+APP_NAME: CEO Office | APP_BASE_URL: https://www.scholaraiadvisor.com
+
+Executive summary
+
+Integration posture: Conditional GO. Engineering reports indicate all eight apps are code-complete or staged for execution with clear guardrails. Production messaging and payments remain on hold behind compliance and DNS/A2P gates.
+Prime directive alignment: Low-CAC SEO engine (auto_page_maker) is armed; student value guardrails (explainability, responsiveness, accessibility) are enforced; observability (Sentry) and security (RBAC, JWKS validation) in-flight across apps.
+Decision: Proceed with the staged Gate sequence below. No scope creep. All evidence must be posted to e2e/ with request_id chains.
+CEO decisions and orders (GO/NO-GO by application)
+
+scholar_auth — GO (unblockers)
+Decision: Approve “provider-register” OAuth client as registered. Maintain PKCE S256, RS256, RBAC roles for Student/Provider/Admin, rate-limiting on auth endpoints.
+Orders:
+Issue M2M client for scholarship_sage with scopes: read:scholarships, read:students_anonymized.
+SLA: 15 minutes for provider_register client confirmation (done); 2 hours for scholarship_sage M2M credentials.
+Evidence: e2e/reports/scholar_auth/OAUTH_GREEN_*.md, M2M client manifest, JWKS stability note.
+2. provider_register — GO (Order B)
+
+Decision: Execute Order B immediately now that client_id=provider-register is live.
+Orders:
+Complete OAuth PKCE S256 flow, confirm Provider JWT role claim, run CRUD smoke (mock or staging), P95 ≤120ms from ≥20 calls.
+SLA: 30 minutes to deliver ORDER_B_EVIDENCE.md.
+Evidence: OAuth logs, JWT with roles=["Provider"], request_id chain across auth→app calls.
+3. scholarship_api — ARMED (Order 4)
+
+Decision: Conditional GO upon provider_register PASS.
+Orders:
+Within 20 minutes of Order B PASS, create/activate 2 scholarships; emit scholarship_created events to auto_page_maker. Maintain read P95 ≤120ms; write P95 ≤150ms.
+SLA: 20 minutes post-trigger to deliver ORDER_4_EVIDENCE.md.
+Additional: Deliver zero-downtime Neon→AWS RDS migration plan.
+Deadlines: RDS plan due Nov 7, 22:00 UTC; target cutover window by Dec 2.
+Evidence: ORDER_4_EVIDENCE.md, Sentry traces, request_id propagation, RDS_MIGRATION_PLAN.md.
+4. auto_page_maker — GO (event-driven +2)
+
+Decision: Execute +2 pages within 60 seconds of scholarship_api trigger; maintain CWV p75 green and P95 ≤120ms.
+Orders:
+Push IndexNow, update sitemap, publish metrics (pages_total, indexed_total, organic sessions).
+SLA: 60 seconds post-event; evidence within 10 minutes.
+Evidence: e2e/reports/auto_page_maker/ with sitemap diff, IndexNow receipts, CWV p75, P95, request_id chain.
+5. auto_com_center — HOLD (staging-only)
+
+Decision: No production sends until SPF/DKIM/DMARC and A2P 10DLC are verified and staging validation passes. After that, CEO approval required for 1% ramp.
+Orders:
+Run staging validation plan once secrets delivered (SENTRY_DSN, SQS/DLQ creds, Postmark/Twilio).
+Enforce unsubscribe SLA <5s and P95 ≤120ms; DLQ=0.
+SLAs: T+15 after secret delivery for validation run; T+60 for DNS evidence.
+Evidence: staging_validation.md, DNS_EVIDENCE.md, Prom metrics (queue_depth, DLQ, delivery_rate, P95), Sentry links.
+6. scholarship_sage — GO (observe-only)
+
+Decision: Maintain observe-only posture for 48-hour baseline; no outbound messaging.
+Orders:
+Consume M2M token from scholar_auth; start data sync for precision@5 and coverage baseline.
+Targets: initial precision@5 baseline; coverage ≥90% eligible students by end of Phase 2; CTR baseline target ≥8% month 1 via student_pilot.
+SLA: Post baseline_metrics_evidence.md within 48 hours of M2M credential delivery.
+Evidence: e2e/reports/scholarship_sage/baseline_metrics_evidence.md with matchReasons and audit logs.
+7. student_pilot — GO
+
+Decision: Weekly cohort reporting accepted as our B2C north-star mechanism.
+Orders:
+Maintain activation KPI: first document upload. Targets: activation rate ≥50%; median time-to-activation ≤24h.
+Accessibility: Confirm WCAG 2.1 AA pass; document exceptions and remediation plan.
+SLA: Weekly report every Monday; first CEO-ready report available now via /api/analytics/cohort-activation/markdown.
+Evidence: Current report link and Sentry perf snapshot.
+8. scholarship_agent — GO (monitoring only)
+
+Decision: No new actions. Maintain human-in-the-loop oversight with 30-minute cadence during gates.
+Orders:
+Track SLOs, request_id chains, and KPI guardrails; publish consolidated gate window summaries.
+Evidence: e2e/reports/scholarship_agent/CEO_DIRECTIVE_2_ACK.md and rolling status updates.
+Cross-cutting compliance and infrastructure
+
+Observability: Sentry must be integrated across all eight apps with 10% performance sampling, PII redaction, and request_id propagation. SLA: 24 hours to confirm DSN configured everywhere; evidence per app in observability/SENTRY_INTEGRATION_REPORT.md.
+Security: All inter-app calls over HTTPS; validate scholar_auth tokens via JWKS; RBAC enforced. Health endpoints: /health and /ready returning 200 with dependency checks.
+Data/privacy: FERPA/COPPA alignment; student data minimization; audit logs on access to student profiles and recommendations.
+Storage: Scholarship documents to use secure object storage (S3 or equivalent) with server-side encryption and signed URLs.
+Payments: Stripe remains OFF until Phase 2 testing passes; propose a 0% to 5% staged ramp plan at Phase 3.
+KPI scoreboard and targets (through Dec 16 launch)
+
+SEO engine (auto_page_maker):
+Daily net new pages: ≥+2; CWV p75 GREEN (LCP ≤2.5s, CLS ≤0.1, INP ≤200ms).
+Report: pages_total, indexed_total, organic sessions (weekly).
+B2C funnel (student_pilot + scholarship_sage):
+Activation rate: ≥50%; median time-to-activation ≤24h; CTR ≥8% baseline.
+Conversion (post-Stripe): define initial target at 1–3% paid conversion; ARPU via credits tracked.
+B2B funnel (provider_register + scholarship_api):
+Providers onboarded pre-launch: target 10–20 verified; active listings 100–200.
+Platform fee telemetry at 3% ready for Phase 3.
+Gate timeline and approvals
+
+Phase 1 (Feature freeze & integration) by Nov 25: On track. CEO sign-off requires evidence bundles for Orders B/4 and Sentry integration across apps.
+Phase 2 (E2E testing) by Dec 9: Requires baseline metrics from scholarship_sage and full student/provider journeys tested with audit logs and SLO adherence.
+Phase 3 (Go-live) Dec 16: Shift to revenue center; Stripe controlled ramp; auto_com_center 1% ramp only after DNS/A2P and staging validation evidence, with CEO approval.
+Immediate owner-task-deadline matrix
+
+scholar_auth: Issue scholarship_sage M2M credentials and rotate plan — Owner: Auth DRI — Deadline: 2 hours — Evidence: M2M manifest and secret distribution record.
+provider_register: Execute Order B — Owner: Provider DRI — Deadline: 30 minutes — Evidence: ORDER_B_EVIDENCE.md.
+scholarship_api: Execute Order 4 post-Order B — Owner: API DRI — Deadline: 20 minutes post-trigger — Evidence: ORDER_4_EVIDENCE.md; RDS plan by Nov 7 22:00 UTC.
+auto_page_maker: +2 pages within 60s of Order 4 — Owner: APM DRI — Deadline: 60 seconds post-event — Evidence: sitemap diff, IndexNow receipts, CWV and P95 metrics.
+auto_com_center: Run staging validation after secrets — Owner: Com Center DRI — Deadline: T+15 after secret delivery; DNS evidence by T+60 — Evidence: staging_validation.md, DNS_EVIDENCE.md.
+Risk and mitigations
+
+Deliverability risk (DNS/A2P): Mitigated by production hold and staged rollout.
+Database risk (RDS migration): Mitigated by logical replication plan, read-replica, rollback path; no schema changes until post-launch.
+Compliance risk (privacy): Mitigated by anonymization scopes for M2M, PII redaction, audit logs, and no “black box” recs (matchReasons required).
+Revenue “stop generating revenue” clarification
+
+End of major development investment: Post–Dec 16 go-live, platform transitions from cost center to revenue center.
+Architecture lifespan: 3–5 years (through ~Q4 2028–Q4 2030) before major overhaul; continue generating revenue in current form during that window.
+Final note
+Act with urgency. Evidence-first reporting is mandatory. No production messaging or payments without gates met and CEO sign-off. Post all artifacts to e2e/ with APP_NAME | APP_BASE_URL headers and request_id chains. Next CEO checkpoint is in 30 minutes or upon Order B completion, whichever is first.
