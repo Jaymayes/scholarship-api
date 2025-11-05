@@ -1,0 +1,95 @@
+CEO WAR-ROOM DIRECTIVE — Operation Integration Day
+Date: 2025-11-05 | Time standard: UTC
+Prime Directive: Hold path to Dec 16 go-live and ARR ignition; protect SEO flywheel (Auto Page Maker), uphold SLOs (P95 ≤120ms, error <0.1%, uptime ≥99.9%), enforce Responsible AI.
+
+Executive Decisions (GO/NO-GO)
+
+Production: LOCKED. No production traffic until all release gates pass and CEO-controlled ramp is authorized (1% → 5% → 25% → 100%).
+Staging: GO, contingent on secrets delivery. Option B (staging IdP) approved to unblock chain.
+Observability: Mandatory request_id propagation across all 8 apps; Sentry 10% sampling with PII redaction.
+Cross-Functional Critical Path (time-boxed SLAs)
+
+Infra DRI — Secrets & Messaging (T+10 from receipt of this memo)
+
+Deliver per-app SENTRY_DSN
+AWS SQS + DLQ credentials (IAM policy/keys)
+Postmark (ESP) and Twilio (SMS) secrets
+DNS/A2P: SPF, DKIM, DMARC; A2P brand + campaign submissions Escalation: If missed, scholarship_agent triggers auto-escalation immediately.
+Auth DRI — Option B Staging IdP (Immediate)
+
+Stand up issuer (Keycloak/Auth0), publish OIDC discovery URL
+Configure 7 OAuth clients (3 user-facing + 4 M2M) with claims parity (roles, sub, email, aud, offline_access)
+Publish STAGING_IDP_PARITY_EVIDENCE.md
+provider_register — ORDER B (20 minutes after issuer live)
+
+Post e2e/reports/provider_register/ORDER_B_EVIDENCE.md with PKCE S256 flow, roles=["Provider"], CRUD roundtrip to scholarship_api, P95 ≤120ms, request_id traces
+scholarship_api — ORDER 4 (20 minutes after Order B evidence)
+
+Create +2 scholarships, emit scholarship_created events to auto_page_maker and auto_com_center
+Post e2e/reports/scholarship_api/ORDER_4_EVIDENCE.md (P95 read ≤120ms, write ≤150ms, event emission proof)
+auto_page_maker — +2 Pages (within 60s of Order 4 trigger; evidence in 10 minutes)
+
+Post e2e/reports/auto_page_maker/ORDER_4_EVIDENCE.md including:
+APP_NAME | APP_BASE_URL header
+Sitemap diff (+2 pages)
+IndexNow receipts
+CWV p75 GREEN (LCP, CLS, INP)
+P95 ≤120ms
+request_id trace links
+Guardrail: Any CWV p75 regression >5% → automatic rollback
+auto_com_center — Staging Validation (T+30 after secrets)
+
+Run webhook→queue→worker→dispatcher path
+Release gates: Unsubscribe SLA <5s and DLQ=0
+Post e2e/reports/auto_com_center/staging_validation.md with SLO evidence and trace links
+Per‑App Directives and Current CEO Decisions
+
+APP_NAME: scholar_auth | APP_BASE_URL: https://scholar-auth-jamarrlmayes.replit.app
+Decision: GO for Option B staging IdP; primary IdP remains P0 to restore with a true restart mechanism. Requirement before any production unlock: 24h soak with 0 invalid_client.
+
+APP_NAME: scholarship_api | APP_BASE_URL: https://scholarship-api-jamarrlmayes.replit.app
+Decision: GO on Order 4 upon provider_register evidence. Maintain event emission to auto_page_maker and auto_com_center. RDS migration remains Nov 7 22:00 UTC; publish RDS_MIGRATION_PLAN.md by EOD Nov 6 UTC.
+
+APP_NAME: scholarship_agent | APP_BASE_URL: https://scholarship-agent-jamarrlmayes.replit.app
+Decision: Service Catalog Attestation accepted. Maintain T+10/T+30/T+50 checkpoint enforcement; auto‑escalate if Infra misses secrets SLA. Keep request_id correlation board live.
+
+APP_NAME: scholarship_sage | APP_BASE_URL: https://scholarship-sage-jamarrlmayes.replit.app
+Decision: GO observe‑only baseline immediately upon M2M secret receipt. Post baseline_metrics_evidence.md at +48h with precision@5, coverage, matchReasons, fairness. No outbound messaging until CEO clearance.
+
+APP_NAME: student_pilot | APP_BASE_URL: https://student-pilot-jamarrlmayes.replit.app
+Decision: Stay GREEN on SLOs and WCAG 2.1 AA remediation. Weekly cohort report continues. Hold recommendations UI behind feature flag until scholarship_sage baseline completes and is cleared.
+
+APP_NAME: provider_register | APP_BASE_URL: https://provider-register-jamarrlmayes.replit.app
+Decision: GO for Order B upon issuer live. Evidence due within 20 minutes; then trigger scholarship_api Order 4.
+
+APP_NAME: auto_page_maker | APP_BASE_URL: https://auto-page-maker-jamarrlmayes.replit.app
+Decision: GO and ARMED. Execute +2 pages on Order 4; evidence in 10 minutes. Maintain CWV p75 GREEN; >5% regression rollback is mandatory.
+
+APP_NAME: auto_com_center | APP_BASE_URL: https://auto-com-center-jamarrlmayes.replit.app
+Decision: BLOCKED pending secrets and DNS/A2P. Contingency invoked.
+Blockers Report (CEO accepted):
+
+Dependencies: SENTRY_DSN, AWS SQS+DLQ, Postmark, Twilio, SPF/DKIM/DMARC, A2P brand/campaign.
+Realistic ETA for staging validation: Nov 6, 2025, 14:00 MST (on secrets delivery by Nov 6, 09:00 MST).
+Revenue readiness date (ESP/SMS production messaging): Nov 12, 2025 (contingent on A2P approval SLAs). Requirement: No production messaging until Unsubscribe SLA <5s and DLQ=0 are evidenced.
+Evidence-First Requirements (applies to every artifact today)
+
+Include APP_NAME and APP_BASE_URL in header
+Include request_id trace links end‑to‑end
+Publish artifacts to e2e/reports/<app>/<artifact>.md
+SLO proofs: P95 latency, error rate, uptime snapshots
+Security: 6/6 headers, RBAC, JWKS validation, rate limiting where applicable
+Responsible AI: For scholarship_sage outputs, include matchReasons and fairness notes; never facilitate academic dishonesty
+KPIs to Report at Close of Day (single dashboard snapshot)
+
+B2C funnel: activation rate, application conversion, ARPU (credits)
+B2B funnel: active providers, active listings, time‑to‑first‑listing
+CAC: organic share vs paid (target: organic majority via Auto Page Maker)
+Platform: P95 latency, error rate, uptime, SEO CWV p75
+Communications: unsubscribe SLA, DLQ depth (target zero), send/deliver rates (staging)
+Final Notes
+
+Production remains LOCKED until all release gates pass and CEO war‑room authorizes phased ramp.
+If any team cannot hit the EOD staging objectives above, stop work and publish a blockers report immediately with ETA and revenue readiness date, per the contingency protocol.
+Maintain the SEO flywheel: no actions that risk CWV p75 GREEN. Roll back on >5% regression.
+Execute with urgency and ship evidence, not assertions.
