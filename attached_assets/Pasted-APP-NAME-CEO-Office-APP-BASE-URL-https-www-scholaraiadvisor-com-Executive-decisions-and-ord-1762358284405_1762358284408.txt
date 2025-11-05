@@ -1,0 +1,80 @@
+APP_NAME: CEO Office | APP_BASE_URL: https://www.scholaraiadvisor.com
+
+Executive decisions and orders (effective immediately)
+
+Gate posture
+
+Gate A: GO. Auth chain, health endpoints, SLO conformance, and observability are cleared to proceed.
+Gate B: Conditional GO. Messaging and comms dry-run only until DNS (SPF/DKIM/DMARC) and A2P 10DLC are verified. No production sends until both are green.
+Blocker resolution and clarifications
+
+provider_register auth: Use scholar_auth only. The fallback Replit OAuth path is not authorized. The scholar_auth client for provider_register is confirmed live; proceed with Order B using the registered redirect URIs and RBAC=Provider. Close the earlier Replit OAuth blocker and proceed immediately with Order B evidence. Rationale: single source of truth for identity minimizes risk and lock-in while enabling unified governance across the ecosystem .
+Database posture: scholarship_api may operate on Neon as an interim measure. Infra DRI to deliver a zero-downtime AWS RDS migration plan within 72 hours (logical replication, staged cutover, primary + read-replica). This reduces platform lock-in risk and improves long-term scalability beyond Replit’s constraints, which we explicitly plan around .
+Observability and governance: Sentry DSNs must be standardized and activated (raw URL, no “dsn:” prefix) across all eight apps with 10% sampling, PII redaction, and request_id propagation. This aligns with unified governance and API-as-product discipline, required for an agentic organization at scale .
+Immediate orders by application
+
+scholar_auth
+Action: Confirm JWKS kid stability and RBAC roles (Student, Provider, Admin) in production config. Publish a short GREEN attestation with metrics in e2e/ within 30 minutes.
+Evidence: OAUTH GREEN manifest (client_id, redirect URIs, JWKS kid), rate limits, and /health + /ready output attached.
+2. scholarship_api
+
+Action: On receipt of provider_register “Order B PASS,” execute Order 4: create and activate exactly two scholarships, trigger auto_page_maker with request_id chain, and post ORDER_4_EVIDENCE.md within 20 minutes.
+Guardrails: Maintain read P95 ≤120ms and write P95 ≤150ms during execution; post trace links. Justification: event-driven expansion protects low-CAC SEO at scale while keeping inter-domain comms loosely coupled .
+3. auto_page_maker
+
+Action: On trigger, generate +2 pages (2,101 → 2,103) within 60 seconds, push IndexNow, update sitemaps, and publish the full evidence bundle. Guardrails armed: stop-and-page if P95 >120ms for 5 minutes, CWV p75 fails (LCP >2.5s, CLS >0.1, INP >200ms), or generation >60s.
+Strategic note: This is our primary low-CAC engine; continue to bias toward asynchronous, non-blocking execution to minimize compute cost under Replit’s pricing dynamics .
+4. student_pilot
+
+Action: Treat the Sentry DSN prefix warning as non-blocking; proceed with Gate A. Infra DRI to deliver corrected SENTRY_DSN within 15 minutes. Maintain Stripe rollout at 0% until 48h of green SLOs, then request CEO approval for a 10% canary.
+KPI instrumentation: Confirm event capture for “First Document Upload” activation metric; this is our north-star activation driver per Playbook emphasis on early value realization and SEO-led MAU growth .
+5. provider_register
+
+Action: Proceed with Order B now using scholar_auth. Deliver evidence: OAuth PKCE S256 success, RBAC=Provider in tokens, and successful listing creation via scholarship_api.
+SLA: Post ORDER_B_EVIDENCE.md within 30 minutes.
+6. scholarship_sage
+
+Action: Maintain observe-only posture; keep /recommendations performant and explainable with matchReasons. Start 48-hour baseline collection: precision@5, coverage ≥90% of eligible students, CTR measurement via student_pilot events. This supports the Playbook priority to move from explicit eligibility to implicit fit by fusing essay/narrative signals into matching .
+7. auto_com_center
+
+Action: Remain in sandbox-only mode. Execute staging validation as soon as Infra delivers SENTRY_DSN, SQS+DLQ IAM, and Postmark/Twilio secrets. No production sends until SPF/DKIM/DMARC and A2P 10DLC are verified and CEO lifts the hold.
+Architecture note: Keep the asynchronous queue worker pattern and DLQ monitoring; this is consistent with the hybrid orchestrated/choreographed model recommended for resilient multi-app systems .
+8. scholarship_agent
+
+Action: Keep the admin dashboard operational, Sentry active at 10% sampling, and automation failure notifications routed to auto_com_center once DNS and A2P complete. Continue distributed tracing with request_id across hops for CEO evidence reviews.
+Infra DRI: mandatory deliverables and SLAs
+
+T+15 minutes:
+SENTRY_DSN (raw) for student_pilot, scholarship_sage, auto_com_center.
+AWS SQS + DLQ IAM policy/credentials for auto_com_center; confirm queue permissions.
+T+60 minutes:
+DNS: SPF/DKIM/DMARC for mail.scholaraiadvisor.com with evidence in e2e/DNS_EVIDENCE.md.
+ASAP (but not gating staging):
+Twilio A2P 10DLC registration status and ETA to “registered” state. Rationale: staging in sandbox and phased rollout are core to responsible, low-risk activation and align with governance/ethics best practices and phased, sandboxed deployment guidance .
+SLOs, compliance, and health checks
+
+All apps must expose /health and /ready with dependency verification. Maintain uptime ≥99.9%, P95 ≤120ms for user-facing APIs, error rate <0.1%.
+Enforce HTTPS for all inter-app calls; validate scholar_auth tokens on protected routes; keep 6/6 security headers and PII redaction.
+Continue to operate with human-in-the-loop controls and staged autonomy; do not expand agent autonomy without CEO approval, consistent with tiered autonomy governance .
+30/60/90-day KPI focus and alignment to Prime Directive
+
+30 days:
+SEO pages: steady growth with CWV p75 green; organic traffic lift from Auto Page Maker expansions; measure CTR from scholarship_sage recommendations in student_pilot.
+Activation: “First Document Upload” rate increase; weekly cohort tracking .
+60 days:
+Matching uplift: early gains in CTR and application starts from implicit-fit signals (essay narrative integration) per revised roadmap .
+90 days:
+Provider flywheel: active provider count, active listings, and quality score; begin B2B analytics instrumenting as foundation for high-margin revenue lines .
+Reporting cadence (mandatory)
+
+Every app posts status to e2e/reports/ every 30 minutes during Gate windows using the required header: Format: APP_NAME: [Your App Name] | APP_BASE_URL: [Your App Base URL] Include: P95, error rate, uptime, SLO breaches, blockers (owner/ETA), and links to artifacts.
+auto_page_maker and scholarship_api must include request_id chain evidence to validate end-to-end traceability for Order 4.
+Strategic note
+
+We will continue to leverage Replit for velocity while actively mitigating vendor lock-in and scaling risks via cloud-native data and messaging backbones and a hybrid choreography/orchestration pattern that reduces coupling, latency, and cost at scale .
+Go/No-Go summary (current)
+
+GO: scholar_auth, scholarship_api, auto_page_maker (armed), student_pilot (DSN fix pending but non-blocking), scholarship_sage, scholarship_agent.
+Conditional GO (sandbox only): auto_com_center (awaiting DNS, A2P, SQS credentials).
+provider_register: GO for Order B now with scholar_auth.
+Act with urgency. The SEO engine is our CAC advantage; protect P95 and CWV while we light up auth, data, and comms with unified governance. This is how we compound student value into durable, profitable growth toward the $10M ARR objective .
