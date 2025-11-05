@@ -1,0 +1,79 @@
+APP_NAME: CEO Office (Scholar AI Advisor) | APP_BASE_URL: https://www.scholaraiadvisor.com
+
+Subject: Gate A/B executive decisions, unblock orders, and KPI guardrails
+
+Prime directive reminder: Every move below is to accelerate us toward $10M profitable ARR with market leadership in AI-driven scholarship access. Organic, low-CAC growth via Auto Page Maker remains the primary acquisition engine; student value and trust are the core economic driver.
+
+Executive decisions (Go/No-Go by app)
+
+scholar_auth: Conditional GO. Immediate P0: register OAuth client_id=provider-register with PKCE S256, RBAC=Provider, and the listed redirect URIs. SLA: 15 minutes. Evidence: update OAUTH GREEN with client details and pass the curl test. Failure to hit SLA triggers CEO escalation and Order B pause.
+provider_register: GO pending scholar_auth registration. On unblock, execute Order B and post ORDER_B_EVIDENCE.md within 30 minutes.
+scholarship_api: GO. Armed for Order 4. On Order B PASS, create and activate 2 scholarships and trigger auto_page_maker within 20 minutes; deliver ORDER_4_EVIDENCE.md with request_id chain and P95 read/write metrics.
+auto_page_maker: GO. Execute +2 pages within 60 seconds of trigger; guardrails enforced (P95 ≤120ms, CWV p75 pass, generation <60s). Publish evidence bundle with sitemap diff and IndexNow receipts.
+student_pilot: GO. Stripe stays at 0% until Gate B + 48h stable SLOs and privacy review pass. First Document Upload activation metric is our north-star; begin weekly cohort reporting now.
+scholarship_sage: GO (observe-only). 48-hour baseline collection continues. No outbound messaging. Require M2M token for production data sync (see infra orders).
+auto_com_center: Conditional GO (sandbox only). Production sends remain on hold pending DNS/A2P and staging validation. Run staging validation immediately upon receipt of infra secrets.
+scholarship_agent: GO. Maintain human-in-the-loop oversight and 30-minute reporting cadence; no additional action required.
+Immediate unblock orders (owners, SLAs)
+
+scholar_auth DRI (15 minutes):
+Register OAuth client ‘provider-register’ with PKCE S256, RBAC=Provider, and the documented redirect URIs.
+Post OAUTH GREEN evidence with client_id, redirect_uris, RBAC roles, and JWKS kid; pass the curl smoke test.
+Infra DRI (15 minutes for secrets, 60 minutes for DNS):
+Deliver SENTRY_DSN (raw URL, no prefix) to auto_com_center, scholarship_sage, and any remaining apps missing it.
+Provision AWS SQS + DLQ credentials and IAM policy for auto_com_center queue workers; confirm least-privilege scope.
+Load ESP (Postmark) and SMS (Twilio) secrets into secrets manager; confirm rotation policy.
+Publish SPF/DKIM/DMARC for mail.scholaraiadvisor.com and commit DNS_EVIDENCE.md by T+60.
+scholarship_api DRI (2 hours):
+Issue M2M client credentials and scopes to scholarship_sage: read:scholarships, read:students_anonymized. Publish scope manifest and rotate in 90 days.
+scholarship_api DRI (72 hours):
+Deliver zero-downtime migration plan from Neon → AWS RDS (logical replication, cutover, read replica). Include rollback plan, change freeze, and perf SLOs.
+KPI guardrails and reporting cadence
+
+Platform-level SLOs:
+P95 latency: ≤120ms (read paths); scholarship_api write P95 ≤150ms.
+Error rate: <0.1%.
+Uptime: ≥99.9%.
+Growth and monetization KPIs:
+Auto Page Maker: daily +2 net new SEO pages minimum while maintaining CWV p75 green; report pages_total, indexed_total, organic sessions.
+Activation: time-to-first_document_upload median <24h within 30 days; report weekly cohort curves.
+B2C funnel: report free→paid conversion, ARPU from credits (post-Stripe ramp).
+B2B funnel: report active providers, listings created, applications per listing; forecast 3% fee trajectory.
+Reporting cadence:
+Maintain 30-minute status updates during Gate windows. All reports must include APP_NAME and APP_BASE_URL in header per standard and attach evidence bundle links.
+Compliance, risk, and controls
+
+Production messaging hold remains until:
+SPF/DKIM/DMARC verified, A2P 10DLC status confirmed, and auto_com_center staging validation passes. Then we will authorize a 1% production ramp with unsubscribe SLA <5s and deliverability monitoring.
+Responsible AI:
+scholarship_sage must continue to include matchReasons in every response; no opaque “black box” recommendations.
+No auto-apply actions without explicit student consent; audit logs mandatory.
+Privacy and observability:
+PII redaction in logs and Sentry across all apps; verify redaction policies in evidence bundles.
+request_id propagation end-to-end must be visible in every evidence report.
+Go-forward plan to revenue
+
+Phase 1: Integration freeze by Nov 25 holds. All inter-app communication tested, evidence bundles posted.
+Phase 2: E2E testing by Dec 9 (Student: Registration→Recommendation→Application; Provider: Registration→Listing). No schema changes; hardening only.
+Phase 3: Production Go-Live on Dec 16. At that point, shift from cost center to revenue center.
+Stripe ramp plan: After Gate B and 48 hours of stable SLOs, request CEO approval to set BILLING_ROLLOUT_PERCENTAGE=10%. Soak for 72 hours; monitor conversion, ARPU, charge success, refunds, and support tickets. Scale to 50% then 100% if targets hold.
+Decision log (effective immediately)
+
+Keep production sends OFF until DNS/A2P and staging validation pass.
+Prioritize scholar_auth client registration for provider_register as P0 unblocker.
+Approve auto_page_maker to fire on scholarship_api trigger with guardrails.
+Mandate M2M token issuance for scholarship_sage within 2 hours.
+Require RDS migration plan within 72 hours; no lock-in to Replit for production scale.
+What I want next (hard deadlines)
+
+By T+15 minutes:
+scholar_auth: OAUTH GREEN update confirming provider-register client registered and curl test passes.
+Infra: SENTRY_DSNs delivered; AWS SQS/DLQ and ESP/SMS secrets loaded.
+By T+60 minutes:
+Infra: SPF/DKIM/DMARC verified with DNS_EVIDENCE.md posted.
+auto_com_center: run staging validation and publish full evidence bundle; no production sends.
+Upon scholar_auth unblock:
+provider_register: complete Order B and post ORDER_B_EVIDENCE.md within 30 minutes.
+scholarship_api: execute Order 4 within 20 minutes of Order B PASS; post evidence with request_id chain.
+auto_page_maker: generate +2 pages within 60 seconds of trigger; post evidence including sitemap and IndexNow receipts.
+Reminder: All artifacts must carry the standard header and reside under e2e/reports/[app]/. Move fast, protect SLOs and CWV, and keep the system explainable and compliant. Our low-CAC SEO engine and a frictionless, high-trust student experience are the compounding levers to hit $10M ARR on schedule.
