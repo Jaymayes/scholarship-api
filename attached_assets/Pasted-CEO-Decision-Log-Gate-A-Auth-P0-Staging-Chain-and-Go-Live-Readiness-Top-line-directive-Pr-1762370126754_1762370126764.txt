@@ -1,0 +1,81 @@
+CEO Decision Log — Gate A: Auth P0, Staging Chain, and Go-Live Readiness
+
+Top-line directive
+
+Prime objective: Unblock the staging chain now, protect the SEO engine, and keep us on the Nov 25 feature-complete and Dec 16 go-live path to ARR.
+Decision: Proceed with Option B for authentication in staging immediately. In parallel, Infra must restore primary scholar_auth via a true cold restart and configuration fix.
+Authentication P0 — decision and actions
+Decision: GO on Option B (staging IdP fallback) now. Rationale: We cannot stall the chain on a soft-restart limitation. Staging needs a working issuer to complete Order B → Order 4 → +2 pages with evidence.
+Scope for Option B:
+Stand up Keycloak/Auth0 staging issuer with 71 client redirects.
+Claims parity: roles, sub, email, offline_access, aud. No schema drift.
+Token lifetime and rotation: match current policy; enforce PII redaction in traces.
+Parallel path (must complete within 24 hours):
+Infra DRI: Implement a true cold-restart path for scholar_auth (kill-and-respawn or clean redeploy) and reinitialize OIDC clients. Fix invalid_client and re-run full success criteria.
+Deliverable: e2e/reports/scholar_auth/STAGING_IDP_PARITY_EVIDENCE.md (Option B) + e2e/reports/scholar_auth/PRIMARY_IDP_RESTORED.md (primary).
+Reversion plan: When primary scholar_auth passes P0 and soaks for 24h with 0 invalid_client errors, revert staging issuer back to primary. Scholarship_agent to post the cutover checkpoint and traces.
+2. Secrets and infra blockers — hard deadlines
+
+Due in T+10 (from now), Infra DRI must deliver:
+SENTRY_DSN (raw URL) for all 8 apps
+AWS SQS + DLQ credentials/IAM for auto_com_center
+Postmark and Twilio secrets in secrets manager
+DNS/A2P evidence for mail.scholaraiadvisor.com (SPF/DKIM/DMARC + A2P brand/campaign)
+Escalation: If any item slips T+10, scholarship_agent triggers human-in-the-loop escalation and records it in T+10 checkpoint.
+3. Staging chain — explicit GO order and success criteria
+
+provider_register: GO upon Option B issuer live. Execute Order B and publish ORDER_B_EVIDENCE.md within 20 minutes. Include:
+PKCE S256 screenshots, roles=["Provider"] in JWT
+CRUD proof via scholarship_api; ≥20 requests P95 ≤120ms; error <0.1%
+request_id → Sentry trace link; /health with dependencies; security headers
+scholarship_api: On Order B evidence posted, GO on Order 4. Publish ORDER_4_EVIDENCE.md within 20 minutes.
+auto_page_maker: On Order 4 signal, GO. Generate +2 pages in <60s; evidence bundle within 10 minutes with sitemap diff, IndexNow receipts, CWV p75 GREEN, P95 ≤120ms, and trace correlation.
+scholarship_agent: Monitoring-only; post checkpoint summaries at T+10, T+30, T+50.
+4. auto_com_center — staging validation gate
+
+Status: Production messaging remains LOCKED.
+Staging validation: GO immediately after secrets land.
+Must evidence: Unsubscribe SLA <5s; E2E P95 ≤120ms (webhook→queue→worker→ESP); DLQ=0; Prometheus queue_depth; request_id tracing; 10 Postmark sandbox sends.
+Deliver e2e/reports/auto_com_center/staging_validation.md with required headers and artifacts.
+5. scholarship_sage — baseline start
+
+On receipt of M2M secret from auth fallback, start 48-hour observe-only baseline immediately.
+Deliver e2e/reports/scholarship_sage/baseline_metrics_evidence.md at +48h with precision@5 method, early metrics, coverage, matchReasons, request_id traces.
+6. Observability and compliance — non-negotiables
+
+All 8 apps must:
+Maintain SLOs: P95 ≤120ms read paths, error rate <0.1%, uptime ≥99.9%.
+Include APP_NAME | APP_BASE_URL in every evidence artifact.
+Propagate request_id end-to-end with 10% Sentry sampling, PII redaction on.
+/health returns 200 and enumerates critical dependencies (auth, DB, queue, storage).
+7. Data and platform risks — mitigations
+
+Auth fallback drift: Enforce claims parity checks in evidence. No schema drift is allowed.
+RDS migration (scholarship_api): Deadline Nov 7, 22:00 UTC. This is a gating risk; failure escalates to CEO review. Publish RDS_MIGRATION_PLAN.md on time.
+FERPA/COPPA: Continue PII redaction across logs/traces; confirm anonymization on scholarship_sage inputs.
+SEO: auto_page_maker must keep CWV p75 GREEN; any regression >5% triggers rollback of latest template changes.
+8. Production gate and controlled ramp
+
+Production remains LOCKED until all are true:
+DNS/A2P: SPF/DKIM/DMARC validated and A2P brand/campaign approved
+scholar_auth: Primary IdP P0 PASS + 24h soak, 0 invalid_client
+auto_com_center: Staging validation PASS with artifacts
+Centralized observability: Sentry request_id chain (10% sampling, PII redaction)
+After CEO war-room sign-off: controlled 1% ramp, then stepwise to 5%/25%/100% with evidence at each step.
+9. Timeline reaffirmation and ARR path
+
+Phase 1 (Feature Freeze & Integration): by Nov 25, 2025 — unchanged.
+Phase 2 (E2E Testing & Stabilization): by Dec 9, 2025 — unchanged.
+Phase 3 (Go-Live): Dec 16, 2025 — unchanged; revenue start at launch.
+Architecture lifespan for current form: 3–5 years (Q4 2028–Q4 2030) before major overhaul; continue investing in Auto Page Maker SEO engine for organic, low-CAC growth.
+Explicit answers to the two asks
+
+Proceed with Option B? Yes — GO now. Set up staging Keycloak/Auth0 with 71 client redirects; enforce claims parity and evidence.
+Do we have a method to force a true Node.js cold restart? Infra DRI to implement and execute immediately. If the hosting platform cannot guarantee kill-and-restart, perform a clean redeploy. Evidence must show initializeOIDCProvider re-executed and oidc_clients enumerated in /health.
+Accountability and next checkpoints
+
+T+10: Infra secrets delivered; scholarship_agent posts checkpoint; escalate any misses.
+T+30: Expect provider_register ORDER_B_EVIDENCE.md and scholarship_api ORDER_4_EVIDENCE.md to be in place, contingent on Option B issuer live.
+T+50: Expect auto_page_maker evidence; scholarship_agent posts T+50 checkpoint summary.
+Within 24h: Primary scholar_auth cold restart + P0 PASS plan and evidence.
+Act with urgency. Evidence-first discipline applies at every step.
