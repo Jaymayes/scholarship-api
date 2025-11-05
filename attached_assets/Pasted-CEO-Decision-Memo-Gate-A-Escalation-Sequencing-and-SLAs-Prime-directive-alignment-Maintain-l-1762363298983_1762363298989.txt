@@ -1,0 +1,118 @@
+CEO Decision Memo – Gate A Escalation, Sequencing, and SLAs
+
+Prime directive alignment: Maintain low-CAC SEO growth, protect student trust, ship evidence-first. We are in a Conditional GO across the stack. The only P0 blocker to the Gate A chain is scholar_auth not registering provider_register’s OAuth client. We will clear this now, then run the event chain through Order B → Order 4 → +2 SEO pages, with evidence at each step. Messaging remains in staging-only posture pending DNS/A2P approvals.
+
+Immediate CEO Orders (timeboxed)
+
+P0 Escalation – scholar_auth (Owner: Auth DRI)
+
+Deadline: 10 minutes from receipt
+Action: Register OAuth client “provider-register” with the configuration provided by provider_register DRI (authorization_code + refresh_token, PKCE=S256, Provider role).
+Acceptance tests:
+The authorization URL for client_id=provider-register returns the consent page (not invalid_client).
+JWKS token validation and RBAC=Provider confirmed in logs with request_id.
+Evidence required:
+e2e/reports/scholar_auth/PROVIDER_REGISTER_CLIENT_REGISTRATION.md
+Include exact client record (secrets redacted), curl test output, request_id.
+If missed: Move to HOLD and re-baseline the Gate A window; no demo-mode bypass approved.
+Order B – provider_register (Owner: Provider DRI)
+
+Trigger: On scholar_auth registration PASS
+Deadline: 20 minutes after unblock
+Action: Execute end-to-end provider login with PKCE, create/manage a listing via scholarship_api with Provider role.
+Acceptance tests:
+OAuth redirect, token exchange, RBAC=Provider scoped calls to scholarship_api.
+/health returns 200 with dependency checks.
+Evidence required:
+e2e/reports/provider_register/ORDER_B_EVIDENCE.md
+Screens, request_id chain, Sentry trace, P95 ≤120ms.
+Order 4 – scholarship_api (Owner: API DRI)
+
+Trigger: On Order B PASS
+Deadline: 20 minutes post-trigger
+Action: Create and activate 2 scholarships; emit scholarship_created events to auto_page_maker with request_id propagation.
+Acceptance tests:
+Write P95 ≤150ms during creation; Read P95 ≤120ms; error rate <0.1%.
+Event emission confirmed; Sentry traces linked across components.
+Evidence required:
+e2e/reports/scholarship_api/ORDER_4_EVIDENCE.md
+Include payload hashes, IDs, timings, and request_id chain.
+Event-Driven +2 Pages – auto_page_maker (Owner: APM DRI)
+
+Trigger: On scholarship_api event
+Deadline: 60 seconds post-event; evidence within 10 minutes
+Action: Generate 2 pages; update sitemap; push IndexNow; export metrics.
+Acceptance tests:
+CWV p75 GREEN; P95 ≤120ms; pages_total incremented by +2.
+Evidence required:
+e2e/reports/auto_page_maker/ORDER_4_EVIDENCE.md
+Sitemap diff, IndexNow receipts, CWV and P95 metrics, request_id chain.
+Staging Validation – auto_com_center (Owner: Comms DRI; Infra DRI supporting)
+
+Posture: HOLD for production sends
+Infra delivery deadline: 15 minutes from receipt
+SENTRY_DSN (raw URL)
+AWS SQS + DLQ credentials/IAM policy
+Postmark + Twilio secrets in secrets manager
+DNS records for SPF/DKIM/DMARC on mail.scholaraiadvisor.com
+After secrets delivery: T+15 to run staging validation
+Acceptance tests:
+Unsubscribe SLA <5s; P95 ≤120ms; DLQ=0; queue_depth metrics exported.
+Evidence required:
+e2e/reports/auto_com_center/staging_validation.md
+e2e/reports/auto_com_center/DNS_EVIDENCE.md
+Prometheus metrics snapshot and Sentry trace links.
+CEO note: 1% production ramp remains NOT APPROVED until DNS/A2P verified and staging validation passes.
+M2M for Recommendations – scholarship_sage (Owner: Auth DRI + Sage DRI)
+
+Status: M2M client is configured; finalize secret distribution
+Auth DRI deadline: 10 minutes
+Generate and load M2M_SCHOLARSHIP_SAGE_SECRET; distribute via approved secure channel.
+Evidence: e2e/reports/scholar_auth/M2M_SECRET_DISTRIBUTION.md
+Sage DRI deadline: Start 48-hour baseline immediately upon secret receipt
+Observe-only posture; no outbound messaging.
+Evidence (due at +48h): e2e/reports/scholarship_sage/baseline_metrics_evidence.md
+Must include precision@5 methodology, early measurements, coverage %, matchReasons samples, and request_id chains.
+Student Frontend – student_pilot (Owner: Student DRI)
+
+Posture: Green; continue weekly cohort reporting and accessibility remediation plan
+Evidence cadence: Keep CEO markdown endpoint live and accurate
+KPI focus: Activation ≥50%, median time-to-activation ≤24h
+Cross-Cutting Requirements (all apps)
+
+Reporting header: APP_NAME | APP_BASE_URL in every artifact and log context.
+Observability: Sentry 10% performance sampling, PII redaction, request_id propagation. Confirm /health OK with dependency checks.
+Security/Privacy: HTTPS only; scholar_auth token validation via JWKS; RBAC enforced; FERPA/COPPA alignment; audit logs active.
+Payments: Stripe remains at 0% rollout until Phase 3.
+Approvals and Holds
+
+auto_com_center: Production messaging NOT APPROVED. Staging-only until SPF/DKIM/DMARC and A2P 10DLC verified and staging validation passes. A later 1% ramp requires my explicit sign-off.
+auto_page_maker: GO on event; constrained by upstream triggers; proceed immediately once Order 4 fires.
+scholarship_api RDS Migration: Proceed per plan; deliver RDS_MIGRATION_PLAN.md by the stated deadline; include rollback steps and zero-downtime strategy.
+Stripe: Hold at 0% until Dec 16 go-live window.
+Risks and Mitigations
+
+Risk: OAuth client registration delays the entire Gate A chain.
+Mitigation: P0 escalation with 10-minute SLA; no demo-mode bypass approved to preserve security posture and audit integrity.
+Risk: Messaging compliance (DNS/A2P) delays.
+Mitigation: Keep production sends locked; Infra DRI timeboxed to 15 minutes for secrets; publish DNS evidence on completion.
+Risk: Data privacy/FERPA scope creep for recommendations.
+Mitigation: Enforce read:students_anonymized scope; audit access; matchReasons required in all responses.
+KPI Guardrails I am watching in this window
+
+P95 latency: ≤120ms across all public/user flows; ≤150ms writes on scholarship creation.
+SEO engine: +2 pages event-driven; CWV p75 GREEN; pages_total/indexed_total evidence.
+B2C activation: Activation ≥50%, median ≤24h; student_pilot reporting live.
+Error rate: <0.1% across apps; Sentry traces with request_id correlation.
+Checkpoints
+
+T+10 minutes: scholar_auth OAuth client registration evidence posted; if missed, we move Gate A to HOLD and re-timebox. No conditional pass.
+T+30 minutes: Expect Order B evidence; if posted, scholarship_api executes Order 4 within 20 minutes; auto_page_maker +2 pages within 60 seconds of event.
+Staging validation for auto_com_center: Run immediately after secrets; evidence posted within the hour.
+scholarship_sage: Start 48-hour baseline the moment the M2M secret is delivered; evidence due at +48h.
+Final CEO Notes
+
+We operate evidence-first. If it’s not in e2e/reports with request_id chains and Sentry traces, it’s not done.
+Protect the low-CAC SEO engine. Do not compromise security or compliance for speed; our compounding growth depends on trust.
+Act with urgency, but keep the chain-of-custody tight. No demo bypasses for auth.
+I will be back on the channel in 30 minutes for the next checkpoint or sooner if the P0 unblock is confirmed earlier.
