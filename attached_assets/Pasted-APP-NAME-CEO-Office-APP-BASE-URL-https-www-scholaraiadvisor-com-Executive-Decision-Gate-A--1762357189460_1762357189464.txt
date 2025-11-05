@@ -1,0 +1,123 @@
+APP_NAME: CEO Office | APP_BASE_URL: https://www.scholaraiadvisor.com
+
+Executive Decision: Gate A = GO NOW. Gate B = Conditional GO upon infra secrets and DNS completion. Production sends are prohibited until DNS (SPF/DKIM/DMARC) and A2P 10DLC are verified.
+
+Topline Objectives for this window
+
+Unblock auth and observability within 15 minutes
+Execute provider_register Order B within 25 minutes after auth unblock
+Trigger scholarship_api → auto_page_maker +2 pages within 60 seconds of Order B PASS
+Keep P95 latency within ceilings (platform: 120ms; scholarship_sage: 10ms)
+Maintain zero production emails/SMS until DNS/A2P complete
+Critical unblockers and CEO decisions
+
+OAuth client registration (BLOCKING now)
+Decision: Emergency registration authorized immediately.
+Owner: scholar_auth DRI
+SLA: 15 minutes
+Action: Create OAuth client “provider_register” with PKCE S256, RBAC=Provider, redirect URIs: https://provider-register-jamarrlmayes.replit.app/auth/callback https://provider-register-jamarrlmayes.replit.app/login/callback http://localhost:3000/auth/callback (staging/dev only)
+Evidence: Post client_id, allowed_redirects, JWKS kid in e2e/OAUTH_CLIENTS.md
+2. Sentry DSN fix (BLOCKING in multiple apps)
+
+Decision: Standardize SENTRY_DSN to raw URL format across all 8 apps. Remove any “dsn:” prefix.
+Owner: Infra DRI
+SLA: 15 minutes
+Action: Update secret to the URL form only. Confirm app boot logs show “Sentry initialized” with 10% sampling and PII redaction enabled.
+Contingency A: If production DSN not ready by SLA, inject staging DSN. Swap to production within 24h.
+3. Messaging infra and DNS (BLOCKING for Gate B sends)
+
+Decision: auto_com_center must operate in sandbox-only mode until mail DNS and A2P 10DLC are verified.
+Owners: Infra DRI (DNS), auto_com_center DRI (queue/ESP integration)
+SLA: DNS SPF/DKIM/DMARC published and verified today; A2P approval as soon as carrier returns (ETA external).
+Proof: e2e/DNS_EVIDENCE.md with screenshots/records; ESP domain verified status.
+Cross-cutting SLO and compliance guardrails
+
+Global SLOs: Uptime ≥99.9%; P95 ≤120ms (≤10ms for scholarship_sage); Error rate <0.1%
+Security/Compliance: TLS-only, 6/6 security headers, rate limiting on auth and write endpoints, no PII in logs (FERPA/COPPA), RBAC enforced, /health and /ready on all services.
+Observability: Sentry v10+ (10% sampling), request_id propagation across all hops, /metrics exposing latency, error_rate, queue_depth, DLQ, delivery_rate, P95.
+App-by-app directives and acceptance criteria
+
+scholar_auth
+Action: Execute emergency OAuth client registration (above).
+Action: Implement webhook HMAC verification using WEBHOOK_SECRET before any production webhooks.
+Deliverables (by T+15 min):
+OAUTH_CLIENTS.md updated with provider_register client
+WEBHOOK HMAC enabled; post sample signature verification log (redacted)
+Gate A Exit Criteria: /health and /ready return 200; RBAC for Student/Provider/Admin enforced; JWKS kid stable.
+2. provider_register
+
+Decision: Proceed with Order B using scholar_auth once client is live. Replit OAuth allowed only as fallback demo if scholar_auth slips.
+SLA: Start Order B immediately upon client availability; PASS within 25 minutes.
+Acceptance: Evidence bundle with:
+Successful OAuth PKCE + role=Provider token
+CRUD for provider listings (create/update/read/delete) with P95 ≤120ms, error rate <0.2%
+JWKS kid match verified, RBAC confirmed
+If scholar_auth not ready by T+15: proceed with fallback demo to keep schedule, but do not mark Gate A complete until scholar_auth flows pass.
+3. scholarship_api
+
+Status: ARMED for Order 4.
+Action on provider_register PASS: Within 60s, create and activate 2 scholarships, emit scholarship_created events to auto_page_maker with request_id.
+Evidence: e2e/reports/scholarship_api/ with write P95 ≤150ms, read P95 ≤120ms, error rate <0.1%, Sentry trace links showing request_id chain.
+4. auto_page_maker
+
+Action: On trigger, generate +2 pages (2,101 → 2,103) within 60s, push IndexNow, update sitemaps.
+Guardrail: Stop-and-page if P95 >120ms for 5 consecutive minutes, CWV p75 fails (LCP >2.5s, CLS >0.1, INP >200ms), or page gen >60s.
+Evidence: Execution report with before/after counts, IndexNow receipts, sitemap diff, CWV p75, P95 regression check.
+5. auto_com_center
+
+Action: Execute STAGING VALIDATION in sandbox mode only (10 test emails, unsubscribe <5s, /ready dependency checks).
+Blockers: SQS/DLQ security token, DNS SPF/DKIM/DMARC, SENTRY_DSN; Twilio in observe-only until A2P approved.
+Dry-run criteria (metrics-only, no real recipients): ≥99% internal delivery, DLQ=0, pipeline P95 ≤120ms.
+6. scholarship_sage
+
+Status: P95 ~1ms is excellent; maintain ≤10ms.
+Action: Activate Sentry upon DSN delivery (or staging DSN per Contingency A).
+Deliverables (48 hours): Baseline metrics evidence bundle:
+precision@5 ≥0.40 initial baseline
+coverage ≥90%
+planned CTR ≥8% month-one measurement plan with student_pilot instrumentation
+Include matchReasons in every response; keep observe-only posture (no direct comms).
+7. student_pilot
+
+Action: Ensure recommendations display, accessibility (WCAG 2.1), and Sentry activation upon DSN fix.
+Monetization: Stripe remains OFF (0% rollout). Post Gate B + 48h stable SLOs: activate 10% live cohort for 72-hour soak.
+KPIs for soak: conversion rate, ARPU from credits, checkout success, refund rate, P95 ≤120ms, error rate <0.1%.
+8. scholarship_agent
+
+Status: Admin dashboard live with real-time scholarship_api; notify auto_com_center on automation failure (observe-only until DNS/A2P).
+Action: Resolve /ready routing conflict after Gate B (non-blocking now).
+Maintain 10% sampling Sentry, PII redaction, and request_id correlation.
+Infrastructure and data platform decisions
+
+Database: Neon Postgres accepted for MVP. RDS Postgres migration plan due in 72 hours with zero-downtime (logical replication, controlled cutover) and target completion by Dec 2.
+Secrets management: Single source of truth via secrets manager. Name/versioning conventions standardized today. Rotate SENTRY_DSN if mishandled.
+Cloud Storage: S3 configured for document uploads with KMS, lifecycle policies, signed URLs.
+Payment: Stripe feature-flagged off until Gate B + 48h stable SLOs. Dual-instance architecture with deterministic hash assignment prepared.
+Reporting cadence and format (MANDATORY)
+
+Every 30 minutes during Gate A/B windows, each app posts a one-paragraph status including:
+APP_NAME | APP_BASE_URL header
+Current P95, error rate, any SLO breach, blockers with owner/ETA
+Link to new artifacts (e2e/, observability/)
+Maintain /health and /ready endpoints with dependency checks. All inter-app calls over HTTPS. All tokens from scholar_auth validated.
+Immediate timeline and checkpoints
+
+T+00: Issue received; decisions above are active.
+T+15: scholar_auth client registered; SENTRY_DSN corrected; WEBHOOK_SECRET and AUTO_COM_CENTER_WEBHOOK_URL delivered. If not, execute Contingency A (staging DSN) and proceed with provider_register fallback demo while continuing to work the auth client.
+T+15 → T+40: provider_register Order B PASS; scholarship_api Order 4 triggers; auto_page_maker +2 pages within 60s.
+Next status consolidation: In 30 minutes, CEO Office expects:
+Auth client evidence posted
+Sentry activation confirmations from all apps
+provider_register Order B progress/result
+If PASS: scholarship_api and auto_page_maker evidence bundles
+Strategic alignment to Prime Directive
+
+We protect the low-CAC SEO engine: auto_page_maker is prioritized, with stop-and-page guardrails.
+We keep student trust and speed: uncompromising on P95 and privacy, with clear explainability in scholarship_sage.
+We defer monetization until stability: Stripe remains off until Gate B + 48h of green SLOs.
+Owners, respond in thread with your status within 15 minutes:
+
+scholar_auth DRI: “CLIENT REGISTERED + WEBHOOK HMAC ENABLED” with evidence links
+Infra DRI: “SENTRY_DSN FIXED + DNS STATUS” with evidence links
+provider_register DRI: “ORDER B STARTED” or “FALLBACK DEMO STARTED” with ETA
+Act with urgency. Our next gating decision depends on these deliverables.
