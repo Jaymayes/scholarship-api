@@ -1,0 +1,92 @@
+CEO Executive Directive — 8‑App Go‑Live Orchestration
+Date: 2025-11-06 | Status: Production LOCKED; Staging GO per gates | Prime Directive: Preserve Nov 9 controlled ramp and Nov 12 ARR ignition
+
+Acknowledgment and framing
+
+Noted: auto-escalation endpoint for auto_com_center 16:00 UTC secrets deadline is implemented and verified. Keep it armed and evidence-based.
+Operating principle: Evidence-first, data-driven, SEO-first growth, and Responsible AI guardrails. Student value is business value; activation is “first document upload,” not sign-up count. Maintain SLOs (≤120 ms P95, 99.9% uptime) and compliance posture (CAN-SPAM/TCPA/FERPA/COPPA). The product strategy should emphasize activation via early document upload and eventual integration of essay/narrative signals into matching for “implicit fit” to improve conversion and ARPU .
+Rollouts: Staged and observe-first where applicable; avoid “big bang” and begin in monitor-only modes as needed to derisk launch . Responsible AI requires fairness telemetry and auditability from day one .
+Executive decisions and deadlines (UTC)
+
+scholar_auth (APP_BASE_URL: https://scholar-auth-jamarrlmayes.replit.app)
+Decision: Option A approved with hard timebox. Allocate 15 minutes to resolve invalid_client by unifying issuer configuration and discovery (ensure issuer with /oidc is consistent across discovery, tokens, and error routes). If not green by T+15, execute Plan B fallback (manual client allowlist + static client registry; publish CLIENT_REGISTRY_SNAPSHOT.md; proceed with staging validation while continuing root-cause analysis in parallel).
+Go/No-Go: No-Go for any dependent staging tests until authorize endpoint returns consent screen (not invalid_client) for student_pilot and provider_register.
+Evidence required: AUTH_OPTION_C_EVIDENCE.md + CLIENT_REGISTRY_SNAPSHOT.md posted immediately upon fix.
+2. scholarship_api (APP_BASE_URL: https://scholarship-api-jamarrlmayes.replit.app)
+
+Status: Armed; Staging GO immediately after scholar_auth clears.
+Deliverable by 06:05: ORDER_4_EVIDENCE.md covering endpoint inventory (/docs), ACID proofs, token validation, P95 reads ≤120 ms, P95 writes ≤150 ms, error <0.1%, rate limits/RBAC, event emissions to auto_page_maker and auto_com_center, and request_id to Sentry links.
+Rationale: API reliability and ACID consistency are foundational to student value and downstream SEO and comms automations; treat it as the “database-as-a-service via API” anchor for the ecosystem .
+3. scholarship_agent (APP_BASE_URL: https://scholarship-agent-jamarrlmayes.replit.app)
+
+Decision: Observe-only stance reaffirmed (no auto-apply). Focus on search, identify, pre-qualify, and notify; ensure fairness telemetry and explainability for match reasons in evidence bundle per Responsible AI guidelines .
+Deliverable: Post CEO_OPTION_C_ACKNOWLEDGMENT.md and list current scopes and webhook targets; include request_id propagation proof.
+4. scholarship_sage (APP_BASE_URL: https://scholarship-sage-jamarrlmayes.replit.app)
+
+Decision: Start 48h observe-only baseline immediately upon M2M secret rotation from scholar_auth; no student-facing autonomy during baseline.
+Deliverable at +48h: baseline_metrics_evidence.md with precision@5, coverage, matchReasons, fairness telemetry, P95 ≤120 ms, error <0.1%, uptime ≥99.9%, and request_id traces. This aligns with our staged, monitor-first rollout policy to minimize risk .
+5. student_pilot (APP_BASE_URL: https://student-pilot-jamarrlmayes.replit.app)
+
+Decision: Staging GO once auth clears.
+Deliverable by 05:25: E2E_JOURNEY_EVIDENCE.md (95 steps, multi-device screenshots, 9 P95 metrics, cross-browser pass, request_id traces, consent/privacy confirmations).
+Activation KPI: Report “First Document Upload” activation rate in evidence bundle; this is the key activation moment and must be our north star for B2C funnel optimization and ARR uplift .
+6. provider_register (APP_BASE_URL: https://provider-register-jamarrlmayes.replit.app)
+
+Decision: Staging GO once auth clears.
+Deliverable by 05:25: ORDER_B_EVIDENCE.md (PKCE S256 flow proof, roles=["Provider"] in JWT, Scholarship CRUD to scholarship_api, dashboard checks, ≥20 reqs P95 ≤120 ms, request_id correlation, client/server validation proofs).
+B2B KPI: Report “active providers” and creation-to-approval throughput; tie to 3% platform fee projection.
+7. auto_page_maker (APP_BASE_URL: https://auto-page-maker-jamarrlmayes.replit.app)
+
+Decision: Staging GO and ARMED; Production LOCKED pending cross-app traces and evidence gates.
+Requirements: Canonicals, robots discipline, noindex on staging; IndexNow receipts; p75 CWV green and P95 fetches within ≤120 ms; rollback guard if >5% CWV regression.
+Strategic note: SEO-first growth is our lowest-CAC lever; treat Auto Page Maker as the flywheel that turns new scholarships and provider content into demand capture. Maintain domain health and custom domain linkage best practices per our deployment standards and secrets management discipline .
+8. auto_com_center (APP_BASE_URL: Staging https://auto-com-center-jamarrlmayes.replit.app | Prod https://auto-com-center.scholaraiadvisor.com)
+
+Decision: Staging GO upon secrets delivery by 16:00; Production LOCKED. Email-only via Postmark until A2P brand/campaign is fully approved; defer SMS to prod until A2P green.
+Deliverable by 21:00: STAGING_VALIDATION.md proving unsubscribe <5s under load; DLQ=0; SPF/DKIM/DMARC green for mail.scholaraiadvisor.com; P95 ≤120 ms; error <0.1%; uptime ≥99.9%; request_id tracing and Sentry correlation across all 8 apps; compliance logs for CAN-SPAM/TCPA/FERPA/COPPA; Prometheus snapshots.
+Escalation: Auto-escalate to Infra Lead + CFO at 16:01 UTC if any secret missing; keep deduplicated logging active. Ensure secrets and domain configurations are managed as per deployment readiness standards .
+Third-party systems checklist (confirm status in each evidence report)
+
+Identity/OIDC: scholar_auth (issuer, discovery, token signing keys, JWKS)
+Email: Postmark (primary staging), SendGrid/SMTP (secondary), DNS (SPF, DKIM, DMARC)
+SMS: Twilio A2P (block prod until brand/campaign approved)
+Observability: Sentry, Prometheus/Grafana, request_id propagation
+Database: PostgreSQL (ACID), backups/retention policies
+CDN/DNS: Custom domains for prod endpoints per Replit custom domain guidance and snapshot publishing discipline; do not bypass publish flow; manage secrets via Replit Secrets, not workspace files .
+Go/No-Go gates for unlocking production on Nov 9 (1% ramp)
+
+Cross-app request_id traces correlate auth → API → UX → comms.
+SLOs met in staging: P95 ≤120 ms across critical paths; uptime ≥99.9%; error <0.1%.
+Compliance evidence posted for comms and data privacy.
+student_pilot activation evidence shows document-upload activation funnel operational and measured; plan to iterate UI to lift this KPI, per Playbook emphasis on “first document upload” as the activation lever .
+Risk register and mitigations
+
+Auth issuer mismatch (critical path): Timebox Option A; if not green, execute Plan B (static client registry allowlist) to unblock dependent staging evidence while continuing deeper fix. Owner: Auth DRI. Due: immediate.
+A2P SMS approval lag: Use email-only fallback; no SMS to production until approved. Owner: Comms DRI. Due: before Nov 9.
+Deliverability/DNS: SPF/DKIM/DMARC must be green before any ramp. Owner: Infra + Comms DRI. Due: today.
+Security and governance with agentic tooling: Maintain automated scanning, secret hygiene, and small, reviewable changes; do not accept “big PRs” without review. This reduces latent security debt inherent to AI-accelerated code production .
+Responsible AI: Maintain fairness telemetry and explainability in scholarship recommendations; integrate monitor-first baselines and periodic audits to mitigate bias and sustain trust .
+Revenue readiness checkpoints
+
+ARR ignition Nov 12 unchanged. Track:
+B2C: activation rate (% new users with ≥1 document uploaded in first session) and conversion to paid credits (Essay Coach synergy) .
+B2B: number of active providers and 3% fee run rate.
+CAC: organic SEO traffic growth from Auto Page Maker; CWV and indexation health support SEO-led low-CAC acquisition.
+Unit economics: 4x markup on AI services; ensure infra/secrets enable right-size autoscale per app to protect gross margin.
+DRI action items to close today
+
+Auth DRI: Timebox Option A fix; post AUTH_OPTION_C_EVIDENCE.md + CLIENT_REGISTRY_SNAPSHOT.md; confirm consent screen for student_pilot and provider_register.
+provider_register DRI: Post ORDER_B_EVIDENCE.md within 10 minutes of CLIENT_REGISTRY_SNAPSHOT.md.
+student_pilot DRI: Post E2E_JOURNEY_EVIDENCE.md by 05:25 once auth clears; include activation metric.
+scholarship_api DRI: Post ORDER_4_EVIDENCE.md by 06:05.
+auto_page_maker DRI: Hold for scholarship_api event trigger; post sitemap diffs, IndexNow receipts, CWV and rollback guard proof on execution.
+auto_com_center DRI: Deliver STAGING_VALIDATION.md by 21:00; keep auto-escalation armed.
+scholarship_sage DRI: Start 48h baseline upon secret rotation; log start time; deliver evidence at +48h.
+scholarship_agent DRI: Post CEO_OPTION_C_ACKNOWLEDGMENT.md and observe-only confirmation; include fairness telemetry and explainability approach.
+Request for evidence and status
+
+Attach or point me to the posted evidence artifacts above as they land. If any artifact cannot be delivered by the specified deadline, include:
+Estimated go-live (date/time), ARR ignition estimate, list of required third-party systems with integration status and current blockers.
+This directive maintains our production lock until evidence gates and cross-app traces are complete, preserves the Nov 9 ramp and Nov 12 ARR ignition, and aligns with our Playbook’s activation strategy and ethical operations posture    .
+
+I will review artifacts as they are posted and issue the production unlock when all gates are green.
