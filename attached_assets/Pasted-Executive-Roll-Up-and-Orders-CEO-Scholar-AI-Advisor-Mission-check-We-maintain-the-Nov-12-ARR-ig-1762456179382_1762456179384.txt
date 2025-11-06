@@ -1,0 +1,105 @@
+Executive Roll-Up and Orders — CEO, Scholar AI Advisor
+Mission check: We maintain the Nov 12 ARR ignition target. We stay SEO-first (Auto Page Maker), evidence-first, and will not compromise auth/security.
+
+Decision (Go/No-Go)
+
+Nov 9 (1% ramp): Conditional GO only if scholar_auth achieves AUTH_GREEN by today with passing OIDC smoke test and auto_com_center resolves DNS before external comms ramp. Otherwise re-slot to Nov 10 (1% ramp). ARR Nov 12 remains protected.
+Chain-wide blockers to clear
+
+Auth: scholar_auth invalid_client error; no passing OIDC smoke yet.
+Communications: auto_com_center external sends blocked (SPF/DKIM/DMARC not configured); AWS SQS credentials invalid (DLQ).
+M2M secret for scholarship_sage baseline not yet issued (not on Nov 9 critical path).
+Orders (immediate)
+
+scholar_auth DRI: Execute Track B now. Ship the minimal static client registry for student_pilot and provider_register to achieve AUTH_GREEN fastest. Then backfill Track A root-cause fix post-green. Deliver the AUTH_GREEN evidence package immediately upon pass (/.well-known OK, /authorize consent, /token code→tokens, refresh_token, revocation, exact redirect_uri). This unblocks the chain.
+auto_com_center DRI: Add SPF/DKIM/DMARC for the production sending domain and complete provider verification (e.g., SendGrid/SMTP). Correct AWS SQS credentials and prove DLQ visibility. Until DNS propagates, limit to in-app notifications for roll-up traces.
+scholarship_api DRI: Hold state; maintain request_id propagation. Stand by to execute cross-app traces the minute AUTH_GREEN lands.
+student_pilot DRI: Remain on HOLD. SLA: 10 minutes to run 95-step E2E after AUTH_GREEN and post E2E_JOURNEY_EVIDENCE.md.
+provider_register DRI: Remain on HOLD. SLA: 15 minutes to ORDER_B_EVIDENCE.md after AUTH_GREEN (auth→create scholarship→dashboard).
+auto_page_maker DRI: Continue compounding. Execute ORDER_4 trigger on schedule. Maintain IndexNow success ≥95% and CWV p75 GREEN. Post evidence by the agreed deadline.
+scholarship_sage DRI: Not on Nov 9 critical path. Start 48h baseline immediately upon receiving M2M_SCHOLARSHIP_SAGE_SECRET. Must not slip past Nov 8 ~16:00 UTC.
+Cross-App Readiness Summary (by application)
+Application: scholar_auth
+APP_BASE_URL: https://scholar-auth-jamarrlmayes.replit.app
+
+Status: RED. invalid_client during provider instantiation; OIDC static client schema mismatch.
+Today’s objective: AUTH_GREEN via Track B (minimal static clients with PKCE). Then resume Track A for permanent fix (issuer/basePath, proxy headers, client registry parity).
+Estimated Go-Live: Today via Track B (fast path). If Track B fails, escalate with pair-debug and re-target tomorrow morning local time.
+ARR Ignition: Must be GREEN by Nov 9 to preserve Nov 12 ignition.
+Third-Party/Infra: OIDC provider, reverse proxy, app configs/env, token storage, revocation store. Integration status: In progress. Blocker: client metadata validation mismatch.
+Application: scholarship_api
+APP_BASE_URL: https://scholarship-api-jamarrlmayes.replit.app
+
+Status: GREEN. P95 ~73.62ms; error 0%; RBAC write endpoints secure (403 on unauthorized); request_id propagation active.
+Go-Live: Ready now. Will participate in cross-app traces post-AUTH_GREEN.
+ARR Ignition: Contributes immediately once auth unblocks B2C/B2B flows.
+Third-Party/Infra: PostgreSQL (ACID validation complete), monitoring and tracing configured. Integration status: Complete.
+Application: scholarship_agent
+APP_BASE_URL: https://scholarship-agent-jamarrlmayes.replit.app
+
+Status: GREEN. Evidence delivered. Observe-only posture; fairness telemetry and “Why this match?” explainability live. P95 ~42ms; 0% errors; 100% uptime during validation window.
+Go-Live: Ready. Not blocked for evidence; will join cross-app traces when AUTH is GREEN.
+ARR Ignition: Supports activation/retention and match quality; observe-only is acceptable for initial ramp.
+Third-Party/Infra: scholarship_api and auto_com_center for notifications. Integration status: Ready; notifications to remain internal until comms DNS is GREEN.
+Application: scholarship_sage
+APP_BASE_URL: https://scholarship-sage-jamarrlmayes.replit.app
+
+Status: GREEN on code/SLOs (P95 ~1ms, error 0%, uptime 100%). Awaiting M2M_SCHOLARSHIP_SAGE_SECRET to start 48h baseline.
+Go-Live: Baseline start as soon as secret is issued. Must complete by Nov 8 ~16:00 UTC.
+ARR Ignition: Not on Nov 9 critical path; supports ARPU lift post-baseline.
+Third-Party/Infra: M2M secret from auth; telemetry and guardrails ready. Integration status: Awaiting secret.
+Application: student_pilot
+APP_BASE_URL: https://student-pilot-jamarrlmayes.replit.app
+
+Status: READY but AUTH-GATED. All infra staged (Stripe, Sentry, Object Storage). 95-step E2E ready.
+Go-Live: Trigger on AUTH_GREEN, deliver evidence in 10 minutes.
+ARR Ignition: B2C activation loop depends on this. Stripe remains in TEST mode for E2E; production keys remain controlled.
+Third-Party/Infra: scholar_auth, scholarship_api, Stripe, Sentry, storage. Integration status: Ready; blocked by auth.
+Application: provider_register
+APP_BASE_URL: https://provider-register-jamarrlmayes.replit.app
+
+Status: READY but AUTH-GATED. OAuth config aligned with either Track A or B once AUTH is GREEN.
+Go-Live: Trigger on AUTH_GREEN, deliver ORDER_B evidence in 15 minutes.
+ARR Ignition: B2B 3% fee flow depends on this; acceptable 24–48h slip if auth slips, to protect quality.
+Third-Party/Infra: scholar_auth, scholarship_api. Integration status: Ready; blocked by auth.
+Application: auto_page_maker
+APP_BASE_URL: https://auto-page-maker-jamarrlmayes.replit.app
+
+Status: GREEN. Primary CAC lever protected. IndexNow success and CWV p75 GREEN maintained. 2,101 pages operational; +2 queued on ORDER_4 trigger.
+Go-Live: Ongoing; keep compounding.
+ARR Ignition: Critical to low-CAC growth. No dependency on auth for generation and indexing.
+Third-Party/Infra: IndexNow/search engines; internal links into student_pilot. Integration status: Active.
+Application: auto_com_center
+APP_BASE_URL: https://auto-com-center-jamarrlmayes.replit.app
+
+Status: YELLOW/RED. Internals GREEN (P95 87ms; 0% errors). External sends blocked (DNS RED). SQS credentials invalid for DLQ monitoring. Request_id traces pending AUTH_GREEN.
+Go-Live: Internal/in-app only until DNS verified. External email GO after SPF/DKIM/DMARC propagate.
+ARR Ignition: Needed for activation/retention; not a hard blocker for initial 1% ramp if we restrict to in-app + test emails.
+Third-Party/Infra: DNS (SPF/DKIM/DMARC), email provider (e.g., SendGrid/SMTP), AWS SQS. Integration status: DNS Not Started/RED; SQS In Progress; internal comms Complete.
+Go/No-Go guardrails and timeline
+
+AUTH_GREEN deadline: Today. If Track B minimal clients pass OIDC smoke test, proceed with cross-app traces immediately and maintain preliminary GO for Nov 9 (1% ramp).
+If AUTH remains RED today: NO-GO for auth-dependent flows. SEO/non-auth work continues. Re-slot ramp to Nov 10 (1%).
+auto_com_center DNS: Execute today. Expect DNS propagation in hours; validate tomorrow before enabling external sends for ramp.
+KPIs to report at roll-up (evidence-first)
+
+Platform SLOs: P95 ≤120ms; error <0.1%; uptime ≥99.9% per app.
+Tracing: request_id correlation scholar_auth ↔ student_pilot ↔ scholarship_api ↔ auto_com_center (when AUTH_GREEN).
+B2C: Time-to-First Document Upload; free→paid conversion (post-ramp); ARPU from credits.
+B2B: Active providers onboarded; 3% platform fee revenue.
+SEO: IndexNow success rate; CWV p75 GREEN; number of pages generated and indexed.
+Risk register and mitigations
+
+Auth schema/issuer mismatch: Mitigate with Track B static minimal clients now; complete Track A after green.
+External comms deliverability: Execute DNS and warm-up plan; monitor bounce/complaint rates; keep unsubscribe latency <5s (already excellent).
+Schedule slip vs. trust: If auth slips 24–48h, we accept schedule slip to protect security/trust. ARR Nov 12 still protected.
+Final CEO directives
+
+Scholar_auth: Proceed with minimal client config now. Do not miss today’s AUTH_GREEN. Evidence package on completion.
+Student_pilot and Provider_register: On standby. Hit 10-minute and 15-minute SLAs respectively once auth clears.
+Auto_com_center: Complete DNS and SQS fixes. Use in-app notifications until DNS is GREEN; then enable external sends with monitored ramp.
+Auto_page_maker: Keep compounding. Evidence by the agreed deadline with IndexNow ≥95% and CWV p75 GREEN.
+Scholarship_api: Maintain; be ready to run cross-app request_id traces immediately after AUTH_GREEN.
+Scholarship_sage: Start 48h baseline immediately upon receiving M2M secret; must not slip past Nov 8 ~16:00 UTC.
+Scholarship_agent: Remain observe-only; present fairness/explainability proof and join cross-app traces after auth clears.
+I will issue the final Go/No-Go call for the Nov 9 1% ramp upon receipt of the AUTH_GREEN evidence package and confirmation that auto_com_center DNS is configured (external sends may remain gated during the first 1% if needed). ARR Nov 12 remains protected under both scenarios.
