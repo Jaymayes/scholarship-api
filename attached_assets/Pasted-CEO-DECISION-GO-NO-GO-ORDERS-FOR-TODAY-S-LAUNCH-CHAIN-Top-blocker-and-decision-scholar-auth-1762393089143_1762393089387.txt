@@ -1,0 +1,93 @@
+CEO DECISION: GO/NO-GO + ORDERS FOR TODAY’S LAUNCH CHAIN
+
+Top blocker and decision
+
+scholar_auth is the single-point blocker. Execute a manual cold restart now. DRI must reply “restarted” within 5 minutes and publish CLIENT_REGISTRY_SNAPSHOT.md within +5 minutes.
+Acceptance criteria after restart:
+authorize endpoint renders for three clients: provider-register, student-pilot, scholarship-agent (no invalid_client)
+camelCase client registry active (clientId, redirectUris, grantTypes present)
+token mint, refresh, and revocation verified end-to-end
+15-minute soak: zero invalid_client, zero 5xx
+Critical path timeline (UTC)
+
+05:05–05:10: scholar_auth restart and smoke verify
+05:15: CLIENT_REGISTRY_SNAPSHOT.md posted (auth)
+05:25: ORDER_B_EVIDENCE.md posted (provider_register)
+05:45–06:05: ORDER_4_EVIDENCE.md posted (scholarship_api)
+05:46–05:47: auto_page_maker generates +2 pages
+05:55: auto_page_maker evidence posted
+16:00: Infra secrets deadline for auto_com_center (auto-escalate at 16:01)
+21:00: auto_com_center STAGING_VALIDATION.md posted
+App-by-app status and orders
+
+scholar_auth — NO-GO until restart completes
+Order: Perform manual cold restart now; then publish:
+CLIENT_REGISTRY_SNAPSHOT.md (client list, camelCase/ snake_case parity)
+AUTH_SOAK.md (15-min soak, zero invalid_client, refresh + revocation proof)
+Fallback at 05:12: If restart fails or soak fails, deploy fresh staging IdP (Option C) and circulate new issuer URL to all apps immediately.
+2. provider_register — READY, gated by auth
+
+Order B: Execute within 10 minutes of CLIENT_REGISTRY_SNAPSHOT.md.
+Evidence (by 05:25):
+Successful PKCE S256 flow (screenshots)
+JWT roles=[“Provider”]
+Scholarship CRUD against scholarship_api
+≥20 requests with P95 ≤120ms and trace links
+Security headers proof
+3. scholarship_api — READY, contingent on Order B
+
+Slot: 05:45–06:05
+Evidence (ORDER_4_EVIDENCE.md):
+Endpoint inventory + Swagger link
+Token validation vs scholar_auth
+RBAC proof, ACID transaction proof
+P95 reads ≤120ms, writes ≤150ms, error <0.1%
+Event emission to auto_page_maker and auto_com_center
+request_id → Sentry trace links
+4. scholarship_agent — GO FOR MONITORING ONLY
+
+Orders: Post checkpoint memos T+10/T+30/T+50 with SLO proofs; no auto-apply, no notifications until comms gates pass.
+5. scholarship_sage — READY
+
+Orders: Start 48h observe-only baseline upon M2M secret rotation. Deliver baseline_metrics_evidence.md at +48h (precision@5, coverage, matchReasons, fairness, SLO proofs, request_id traces).
+6. student_pilot — READY, gated by auth
+
+Orders: Execute full 95-step E2E within 10 minutes of auth evidence.
+Deliver E2E_JOURNEY_EVIDENCE.md with 25+ screenshots, 9 P95 metrics, cross-browser pass, request_id traces, activation metric confirmation.
+7. auto_page_maker — GO AND ARMED
+
+Orders: On scholarship_api Order 4 event, generate +2 pages within 60 seconds.
+Evidence: ORDER_4_EVIDENCE.md (sitemap diff, IndexNow receipts, CWV p75 green, P95 proof, request_id traces, rollback guard confirmation).
+8. auto_com_center — STAGING GO upon secrets; PRODUCTION LOCKED
+
+APP_NAME: Auto Command Center (auto_com_center)
+APP_BASE_URL (Staging): https://auto-com-center-jamarrlmayes.replit.app
+APP_BASE_URL (Prod): https://auto-com-center.scholaraiadvisor.com
+Secrets deadline: 16:00 UTC (SENTRY_DSN, SQS/DLQ, Postmark, Twilio creds + A2P brand/campaign, DNS/SPF/DKIM/DMARC). Auto-escalate 16:01 if any missing.
+If A2P pending: run email-only via Postmark; SMS disabled.
+Deliver STAGING_VALIDATION.md by 21:00 with:
+Unsubscribe <5s under load, DLQ=0, SPF/DKIM/DMARC green
+P95 ≤120ms E2E, error <0.1%, uptime ≥99.9%
+Compliance logs (CAN-SPAM/TCPA/FERPA/COPPA), PII redaction, rate limits
+Prometheus snapshots, cross-app request_id, Sentry correlation
+Security, risk, and release gates (no exceptions)
+
+Auth: 24h soak prior to production lift; zero invalid_client; refresh + revocation verified.
+API: ACID + P95 ≤120ms, Swagger public.
+Comms: Unsubscribe <5s, DLQ=0, DNS green, A2P approved (email-only permissible until A2P).
+Tracing: request_id propagation across all 8 apps with Sentry correlation.
+Responsible AI: Bias/fairness telemetry, transparent explanations, no academic dishonesty enablement.
+ARR alignment and KPIs
+
+ARR ignition still Nov 12; earliest prod ramp Nov 9 at 1% if all gates evidenced.
+KPIs to post EOD:
+B2C: activation rate (first doc upload), free→paid conversion readiness checkpoints
+B2B: provider activation (first scholarship published), time-to-first-applicant
+CAC: organic traffic delta from +2 pages; IndexNow receipts; CWV p75
+SLOs: P95s per app, error rates, uptime, unsubscribe latency, DLQ
+Immediate actions required (owners)
+
+Auth DRI: Perform cold restart now; respond “restarted” and publish CLIENT_REGISTRY_SNAPSHOT.md within 10 minutes total.
+Infra DRI: Deliver all auto_com_center secrets by 16:00; confirm DNS/SPF/DKIM/DMARC green.
+App DRIs: Execute in sequence per timeline; publish evidence bundles to the specified paths with request_id-linked proofs.
+This plan is approved. Execute with urgency. Production remains locked until all release gates are evidenced.
