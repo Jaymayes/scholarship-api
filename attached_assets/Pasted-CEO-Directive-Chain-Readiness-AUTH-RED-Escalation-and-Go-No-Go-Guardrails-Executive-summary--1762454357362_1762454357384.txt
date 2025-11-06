@@ -1,0 +1,114 @@
+CEO Directive: Chain Readiness, AUTH RED Escalation, and Go/No-Go Guardrails
+
+Executive summary
+
+Auth is RED. Evidence-first discipline remains in force. Do not run auth-dependent flows without a passing OIDC smoke test.
+Continue all non-auth workstreams to protect our SEO-driven, low-CAC growth engine and Nov 12 ARR ignition window.
+If AUTH is not GREEN by 19:00 UTC today, we will declare NO-GO for auth-dependent validations in today’s chain and re-slot the ramp window while preserving Auto Page Maker and other non-auth traffic compounding.
+Decisions and orders (effective immediately)
+
+scholar_auth — CRITICAL PATH RED
+Deadline: 19:00 UTC hard stop for AUTH_GREEN.
+
+Two-track plan:
+Track A (Primary fix, 60–90 minutes):
+
+Validate issuer/basePath: The provider’s issuer must exactly match the advertised /.well-known/openid-configuration issuer, including any path prefix used (e.g., /oidc). Mismatch frequently manifests as invalid_client at /authorize.
+Client registry parity: Ensure the active adapter (DB) is the same source used by oidc-provider at runtime. If you pass a static clients array to Provider() while also using an adapter, precedence conflicts can yield “client exists in DB but is invalid at runtime.” Align on one source and prove it with a dump of the runtime-resolved client object.
+token_endpoint_auth_method and response_types: Set provider-register client to: client_id: provider-register grant_types: [authorization_code, refresh_token] response_types: [code] token_endpoint_auth_method: client_secret_basic (or client_secret_post, but match code and runtime) redirect_uris: exact-match URIs (no trailing slash drift)
+PKCE for public clients only: For confidential web apps (provider_register), do not require PKCE unless configured consistently on both client and provider.
+Proxy/host headers: On Replit/proxied envs, enable trust proxy and ensure x-forwarded-host/x-forwarded-proto are honored so the issuer and calculated callbacks match.
+Version pinning: Pin oidc-provider to the validated version used in recent passing environments. Library regressions can alter validation behavior.
+Observability: Enable detailed client lookup logs; emit the final resolved client metadata on /authorize; log adapter method hits (find, upsert) to confirm code path.
+Track B (Contingency, 45 minutes in parallel):
+
+Stand up a static client registry fallback: Configure Provider({ clients: [...] }) with only the two staging clients needed for today (provider_register, student_pilot), bypassing DB lookup. Ship with a clear switch (ENV flag) so we can revert to adapter-backed clients after validation.
+Narrow scope: Staging only, minimum viable set of scopes (openid, offline_access, profile, email). Do not expand beyond what’s needed for today’s chain.
+AUTH_GREEN evidence required (unchanged):
+
+CLIENT_REGISTRY_SNAPSHOT with SHA-256 fingerprint + timestamp
+/.well-known/openid-configuration 200 OK
+/authorize -> consent screen screenshot for provider_register
+/token code→tokens (redacted) + refresh_token works
+revocation endpoint returns 200 OK
+Exact passing redirect_uri documented
+If AUTH still RED at 19:00:
+
+Declare AUTH RED for today’s chain; suspend auth-dependent validations; publish postmortem-lite with root-cause hypothesis, evidence, and next ETA.
+2. auto_com_center (Auto Command Center)
+APP_BASE_URL (Staging): https://auto-com-center-jamarrlmayes.replit.app
+APP_BASE_URL (Prod): https://auto-com-center.scholaraiadvisor.com
+
+Continue as planned with email-only internal validation.
+Do not send external email if DNS not GREEN at 17:00 UTC.
+Deliver STAGING_VALIDATION.md by 21:00 UTC with:
+Postmark deliverability checks (internal loopback if DNS not green)
+DLQ=0 evidence
+P95 ≤120ms evidence
+Unsubscribe ≤5s at 100 concurrent
+Note trace limitations if AUTH remains RED.
+3. auto_page_maker
+APP_BASE_URL: https://auto-page-maker-jamarrlmayes.replit.app
+
+Continue as planned. ORDER_4 trigger armed.
+Maintain IndexNow success ≥95% and CWV p75 GREEN.
+Deliver evidence by 20:30 UTC. This is our primary CAC lever; keep compounding.
+4. scholarship_api
+APP_BASE_URL: https://scholarship-api-jamarrlmayes.replit.app
+
+Maintain readiness; ORDER_4 evidence received.
+Keep request_id propagation active for cross-app traces once AUTH is GREEN.
+No additional action until AUTH_GREEN.
+5. provider_register
+APP_BASE_URL: https://provider-register-jamarrlmayes.replit.app
+
+HOLD on ORDER_B until AUTH_GREEN.
+SLA upon AUTH_GREEN: 15 minutes to execute ORDER_B and post ORDER_B_EVIDENCE.md (auth → create scholarship → view dashboard with traces).
+6. student_pilot
+APP_BASE_URL: https://student-pilot-jamarrlmayes.replit.app
+
+HOLD on E2E until AUTH_GREEN.
+SLA upon AUTH_GREEN: 10 minutes to run 95-step E2E and post E2E_JOURNEY_EVIDENCE.md with cross-browser/device screenshots, P95 ≤120ms, error <0.1%, and Stripe test path.
+7. scholarship_sage
+APP_BASE_URL: https://scholarship-sage-jamarrlmayes.replit.app
+
+Not on Nov 9 critical path. Await M2M_SCHOLARSHIP_SAGE_SECRET.
+Start 48h baseline immediately on secret receipt. Report baseline start timestamp in the 21:15 UTC roll-up.
+Must not slip past Nov 8 ~16:00 UTC.
+8. scholarship_agent
+APP_BASE_URL: https://scholarship-agent-jamarrlmayes.replit.app
+
+Evidence delivered; observe-only posture is appropriate. Participate in the roll-up with status and fairness/explainability confirmation.
+Go/No-Go guardrails and schedule
+
+If AUTH GREEN by 19:00 UTC:
+Proceed with cross-app traces 19:00–20:30 UTC.
+Maintain preliminary GO for Nov 9 1% ramp.
+Final evidence roll-up at 21:15 UTC.
+If AUTH RED at 19:00 UTC:
+NO-GO for auth-dependent flows in today’s chain.
+Preserve SEO/non-auth workstreams (auto_page_maker, scholarship_api public reads, auto_com_center internal).
+Re-slot ramp window: target Nov 10 1% ramp subject to a clean full-chain validation on Nov 9 UTC.
+Publish AUTH incident update with new ETA and validated fix plan by 20:00 UTC.
+Risk and ARR impact
+
+B2B (3% fee) and B2C (ARPU via credits) both depend on auth to complete the monetization loop. A 24–48h slip is acceptable if we protect quality, security, and trust.
+Preserve ARR ignition on Nov 12 by ensuring:
+AUTH fix complete and stable with ≥500 auth cycles, P95 ≤120ms, error <0.1%.
+Provider_register and student_pilot validations executed with evidence no later than Nov 9 UTC.
+CAC discipline: Stay SEO-first. No paid acquisition until AUTH is stable.
+KPIs for today’s 21:15 UTC roll-up
+
+AUTH: pass/fail against required evidence; root-cause + fix path if fail.
+API: P95, error rate, uptime, RBAC proofs.
+Comms: Postmark checks, DLQ=0, P95 ≤120ms, unsubscribe ≤5s.
+SEO: IndexNow success rate, CWV p75 status, number of generated pages ready.
+Traceability: request_id correlation where auth permits.
+Answer to “continue debugging or escalate”
+
+You escalated correctly. Continue debugging under Track A while bringing Track B fallback online in parallel. The objective is to secure a passing OIDC smoke test by 19:00 UTC. If you miss the window, we will formally declare AUTH RED for today, protect the Nov 12 ARR objective, and re-slot the ramp.
+Accountability
+
+Auth DRI owns the 19:00 UTC bar with Track A/Track B execution and evidence.
+Each app DRI owns their evidence artifacts and attends the 21:15 UTC roll-up with a clear GO/NO-GO recommendation conditioned on AUTH status.
+Act with urgency, protect quality, and document evidence. We are optimizing for sustainable ARR, not rushed validation.
