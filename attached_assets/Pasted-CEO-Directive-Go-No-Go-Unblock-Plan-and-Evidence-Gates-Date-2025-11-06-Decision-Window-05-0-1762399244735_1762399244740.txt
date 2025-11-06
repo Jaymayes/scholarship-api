@@ -1,0 +1,120 @@
+CEO Directive: Go/No-Go, Unblock Plan, and Evidence Gates
+
+Date: 2025-11-06
+Decision Window: 05:00–21:00 UTC
+Prime Objective: Protect the 5-year plan by shipping evidence-backed staging today; keep production locked until all gates are proven. ARR ignition target remains Nov 12.
+
+Executive Summary
+
+Staging: GO for all apps contingent on auth fix and required secrets. Execute the chained orders and deliver evidence on time.
+Production: NO-GO for all apps until release gates are evidenced. No exceptions.
+Critical blocker: scholar_auth invalid_client due to redirectUriAllowed() failing. Approve Option A immediately.
+Priority 0 Blocker: scholar_auth (APP_BASE_URL: https://scholar-auth-jamarrlmayes.replit.app)
+Decision
+
+Approve Option A now: Enable debug logging to diagnose redirectUriAllowed() failures.
+Fallback escalation path: If Option A does not yield a fix in 30 minutes, execute Option B. Option C is a last resort only if we miss the 05:15 UTC auth artifact deadline by more than 60 minutes.
+Orders to Auth DRI (effective immediately)
+
+Enable DEBUG and restart:
+Set environment variable: DEBUG=oidc-provider:*
+Perform manual cold restart (stop workflow, wait for termination, start).
+Deadline: Start now, complete within 10 minutes.
+Produce diagnostic evidence:
+AUTH_DEBUG_LOG.md: include the authorize request validation logs showing redirect comparison details.
+CLIENT_REGISTRY_SNAPSHOT.md: for all 71 clients, show client_id, grant_types, redirect_uris (effective list after env/DB merge), token_endpoint_auth_method, and enforcement of PKCE for public clients.
+Test three clients and capture results: provider-register, student-pilot, static-test-client (base). Include the exact authorize URL, resolved redirect_uri, and the observed validation branch in logs.
+Deadline: 05:15 UTC for CLIENT_REGISTRY_SNAPSHOT.md. If late, publish immediately with revised timestamps and notify all DRIs.
+If still failing at T+15 minutes from restart:
+Execute Option B: temporary /debug/client-test endpoint to call redirectUriAllowed() and return detailed comparison artifacts (normalized URIs, exact string match vs. regex, trailing slash, query string, and fragment handling).
+Deliver DEBUG_ENDPOINT_EVIDENCE.md within 20 minutes of implementation.
+Acceptance to clear the blocker
+
+Hitting /oidc/auth with provider-register and student-pilot yields consent/login screen (no invalid_client).
+Redirect URI in logs matches exactly one of the registered URIs post-normalization.
+CLIENT_REGISTRY_SNAPSHOT.md posted and acknowledged by provider_register and student_pilot DRIs.
+Chain of Execution and SLAs (unchanged)
+
+05:15 UTC: CLIENT_REGISTRY_SNAPSHOT.md from auth (auth DRI).
+By 05:25 UTC: ORDER_B_EVIDENCE.md from provider_register (provider_register DRI).
+05:45–06:05 UTC: scholarship_api executes Order 4 and posts ORDER_4_EVIDENCE.md by 06:05 UTC (scholarship_api DRI).
+05:46–05:47 UTC: auto_page_maker generates +2 pages; evidence by 05:55 UTC (auto_page_maker DRI).
+21:00 UTC: auto_com_center posts STAGING_VALIDATION.md (auto_com_center DRI).
+Per-App Decisions and Orders
+
+scholar_auth
+Status: Blocked on invalid_client. Option A approved now.
+Evidence required: AUTH_DEBUG_LOG.md, CLIENT_REGISTRY_SNAPSHOT.md.
+Security: Confirm OAuth 2.0/OIDC, refresh token rotation, immediate revocation, secure storage. Include token lifetime and session timeout policy in evidence.
+Load: Provide a brief locust/k6 sample proving P95 authorize/token ≤120ms under expected concurrency.
+2. scholarship_api (APP_BASE_URL: https://scholarship-api-jamarrlmayes.replit.app)
+
+Staging: GO once auth clears.
+Deliver ORDER_4_EVIDENCE.md by 06:05 UTC with:
+Endpoint inventory and /docs link.
+Token validation against scholar_auth (post-restart).
+ACID proof: transaction log for a create→update→rollback.
+P95 reads ≤120ms; writes ≤150ms; error <0.1%; uptime ≥99.9%.
+Event emissions to auto_page_maker and auto_com_center.
+request_id to Sentry trace links.
+3. scholarship_agent (APP_BASE_URL: https://scholarship-agent-jamarrlmayes.replit.app)
+
+Staging: Observe-only for today; limit to notifications for new matches once auto_com_center is live on staging.
+Evidence: Matching accuracy spot-check on 20 samples; show decision trace and reasons. Do not auto-apply without explicit test accounts and compliance sign-off.
+4. scholarship_sage (APP_BASE_URL: https://scholarship-sage-jamarrlmayes.replit.app)
+
+Status: READY.
+Orders: Start 48h observe-only baseline immediately after M2M secret rotation; deliver baseline_metrics_evidence.md at +48h covering precision@5, coverage, matchReasons, fairness telemetry, SLO proofs, request_id traces.
+5. student_pilot (APP_BASE_URL: https://student-pilot-jamarrlmayes.replit.app)
+
+Staging: GO after auth clears.
+SLA: Execute full 95-step E2E and post E2E_JOURNEY_EVIDENCE.md by 05:25 UTC (10-minute SLA from CLIENT_REGISTRY_SNAPSHOT.md).
+Evidence: 25+ screenshots (desktop/tablet/mobile), 9 P95 metrics, cross-browser pass, request_id traces, activation metric (First Document Upload).
+6. provider_register (APP_BASE_URL: https://provider-register-jamarrlmayes.replit.app)
+
+Staging: GO after auth clears.
+SLA: Execute Order B and post ORDER_B_EVIDENCE.md by 05:25 UTC.
+Evidence: OAuth PKCE S256 flow, JWT roles=["Provider"], full scholarship CRUD round-trip, dashboard checks, ≥20 requests perf with P95 ≤120ms, request_id traces.
+7. auto_page_maker (APP_BASE_URL: https://auto-page-maker-jamarrlmayes.replit.app)
+
+Staging: GO and armed; execute +2 pages within 60 seconds of scholarship_api Order 4 trigger.
+Evidence by 05:55 UTC: sitemap diff, IndexNow receipts, CWV p75 green, P95 proof, request_id traces, rollback guard proof.
+8. auto_com_center
+
+APP_BASE_URL (Staging): https://auto-com-center-jamarrlmayes.replit.app
+APP_BASE_URL (Prod): https://auto-com-center.scholaraiadvisor.com
+Staging: GO contingent on secrets by 16:00 UTC. Production remains locked.
+Required secrets/config by 16:00 UTC:
+SENTRY_DSN
+AWS SQS/DLQ credentials + IAM policies
+Postmark API key
+Twilio credentials + A2P brand/campaign status
+DNS SPF/DKIM/DMARC for mail.scholaraiadvisor.com
+SLAs and release gates for STAGING_VALIDATION.md by 21:00 UTC:
+Unsubscribe under 5 seconds under load
+DLQ = 0
+SPF/DKIM/DMARC green
+P95 ≤120ms E2E, error <0.1%, uptime ≥99.9%
+CAN-SPAM/TCPA/FERPA/COPPA logs, PII redaction, rate limits (10 email/hr, 5 SMS/hr)
+Observability: Prometheus snapshots, cross-app request_id across 8 apps, Sentry correlation
+Fallback posture: If A2P pending, run email-only via Postmark; post evidence bundle; keep SMS disabled until A2P approved.
+Risk, Compliance, and Observability
+
+Compliance: No academic dishonesty enablement. Enforce Responsible AI guardrails, PII redaction, and transparent explanations across apps. FERPA/COPPA posture confirmed.
+Observability: Every app must propagate request_id end-to-end; all evidence must include at least one cross-app trace with Sentry links.
+Security: No production tokens or secrets in logs. Redact PII in artifacts. Confirm immediate token revocation and refresh rotation in auth evidence.
+CAC and ARR: Prioritize Auto Page Maker for organic growth; no paid acquisition changes today. ARR ignition remains Nov 12; earliest production ramp at 1% is Nov 9 contingent on all staging evidence gates passing.
+Escalations and Governance
+
+16:01 UTC: If any auto_com_center secrets are missing, auto-escalate to Infra lead and CFO to unblock vendor access.
+Auth Blocker Escalation: If Option A + B fail to clear by 05:45 UTC, convene a 15-minute war room to decide between (a) hotfixing redirect_uri normalization or (b) clean redeploy (Option C) with revised SLAs. No silent slips.
+Evidence-first rule: No production changes without artifacts. Publish all evidence to the designated e2e/reports paths.
+KPIs to Report at Close of Day (21:00 UTC)
+
+Per app: P95 latency, error rate, uptime, security/compliance check results, and link to evidence bundle.
+Cross-app: request_id completion rate across the 8-app chain; number of successful end-to-end journeys; any DLQ or retries in comms.
+Final CEO Decision
+
+Staging GO across the board contingent on auth fix and secrets delivery; execute the chain and deliver all evidence on time.
+Production remains locked. We will not jeopardize our five-year plan or our brand with evidence-free assertions.
+Option A for scholar_auth is approved now. Move.
