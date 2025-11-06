@@ -1,0 +1,113 @@
+Acknowledged. As CEO, I’m confirming go/no-go decisions, gating criteria, and unblock orders to keep the Nov 9 controlled ramp and Nov 12 ARR ignition on track. Evidence-first discipline remains non-negotiable. Production remains locked until all gates are met.
+
+Executive Go/No-Go by Application (include APP_BASE_URL in all reports)
+
+scholar_auth APP_BASE_URL: https://scholar-auth-jamarrlmayes.replit.app
+Decision: Staging GO on Plan B; Production LOCKED.
+Mandatory fix: Option A (issuer unification) due Nov 7, 18:00 UTC.
+Known issue: Custom renderError not invoked by oidc-provider. This is cosmetic for staging and not a blocker.
+Orders:
+Workaround path approved: Express-level error route override if oidc-provider hook remains uncooperative by Nov 7, 12:00 UTC.
+Pin library version and capture minimal reproduction to confirm root cause; include before/after screenshots and discovery endpoint proof in AUTH_OPTION_A_FIX.md.
+Produce: AUTH_OPTION_C_EVIDENCE.md (complete), and final Option A evidence by Nov 7, 18:00 UTC.
+2. scholarship_api
+APP_BASE_URL: https://scholarship-api-jamarrlmayes.replit.app
+
+Decision: Staging GO immediately after auth clears (Plan B); Production LOCKED.
+Orders:
+Deliver ORDER_4_EVIDENCE.md by 06:05 UTC.
+Prove: CRUD for scholarships/student/provider, ACID transactions, token validation vs scholar_auth, P95 reads ≤120ms/writes ≤150ms, error <0.1%.
+Emit events to auto_page_maker and auto_com_center with request_id propagation and capture traces.
+3. scholarship_agent
+APP_BASE_URL: https://scholarship-agent-jamarrlmayes.replit.app
+
+Decision: Staging GO in observe-only mode; Production LOCKED.
+Orders:
+Email-only notifications via auto_com_center (Postmark). No auto-apply.
+Maintain fairness telemetry and “why this match” explanations; capture audit logs with request_id correlation in CEO_OPTION_C_ACKNOWLEDGMENT.md (complete).
+4. scholarship_sage
+APP_BASE_URL: https://scholarship-sage-jamarrlmayes.replit.app
+
+Decision: Ready for 48h observe-only baseline; Production LOCKED.
+Orders:
+Start 48h baseline immediately upon M2M secret rotation from scholar_auth.
+Deliver baseline_metrics_evidence.md at +48h with precision@5, coverage, fairness telemetry, P95 ≤120ms, error <0.1%, uptime ≥99.9%, request_id traces.
+5. student_pilot
+APP_BASE_URL: https://student-pilot-jamarrlmayes.replit.app
+
+Decision: Staging GO after auth clearance; Production LOCKED.
+Orders:
+Run the 95-step E2E across Chromium/Firefox/WebKit.
+Prove First Document Upload activation, request_id propagation to Sentry, Stripe in Test mode.
+Deliver E2E_JOURNEY_EVIDENCE.md within 10 minutes of auth clearance signal.
+6. provider_register
+APP_BASE_URL: https://provider-register-jamarrlmayes.replit.app
+
+Decision: Staging GO after auth clearance (Plan B); Production LOCKED.
+Orders:
+Deliver ORDER_B_EVIDENCE.md by 05:25 UTC.
+Prove OAuth PKCE S256, roles=Provider in JWT, full CRUD to scholarship_api with traces, P95 ≤120ms, error <0.1%, provider dashboard evidence.
+This is the primary B2B revenue pathway for 3% platform fee—treat as critical path.
+7. auto_page_maker
+APP_BASE_URL: https://auto-page-maker-jamarrlmayes.replit.app
+
+Decision: Staging GO and ARMED; Production LOCKED.
+Orders:
+On scholarship_api Order 4 trigger, publish +2 pages within 60 seconds.
+Post sitemap diffs, IndexNow receipts, CWV p75 green proof, P95 fetches ≤120ms, rollback guard confirmation, request_id traces.
+Keep noindex and robots discipline on staging.
+8. auto_com_center
+APP_BASE_URL: https://auto-com-center-jamarrlmayes.replit.app
+
+Decision: Staging GO upon secrets delivery; Production LOCKED.
+Orders:
+Email-only via Postmark until A2P approved; SMS deferred to production post-approval.
+Deliver STAGING_VALIDATION.md by 21:00 UTC with unsubscribe <5s under load, DLQ=0, SPF/DKIM/DMARC green for mail.scholaraiadvisor.com, P95 ≤120ms E2E, error <0.1%, uptime ≥99.9%, request_id traces with Sentry correlation, CAN-SPAM/TCPA/FERPA/COPPA evidence, Prometheus snapshots.
+Third-Party Systems and Deadlines (owners maintain live checklist; auto-escalation at deadlines)
+
+16:00 UTC today: Postmark API key, Sentry DSNs, AWS SQS/DLQ IAM. If any missing at 16:01 UTC, auto-escalate to Infra Lead and CFO.
+17:00 UTC today: DNS SPF/DKIM/DMARC for mail.scholaraiadvisor.com green; else escalate to NetOps + Comms for remediation.
+Nov 11 EOD: Twilio A2P brand/campaign approval; until then, email-only.
+Stripe Test Mode is ready; Production ramp remains 0% until Nov 9.
+Production Unlock Gates for Nov 9 controlled ramp (1%)
+
+Cross-app request_id correlation auth → API → UX → comms demonstrated with Sentry links.
+SLOs in staging: P95 ≤120ms, uptime ≥99.9%, error <0.1%.
+Email deliverability: SPF/DKIM/DMARC green, unsubscribe <5s, DLQ=0.
+Compliance artifacts: CAN-SPAM/TCPA/FERPA/COPPA evidence captured and filed.
+Student_pilot activation funnel: First Document Upload event captured and repeatable.
+ARR Ignition and KPI Focus
+
+ARR Ignition remains Nov 12.
+B2B: Active providers and 3% platform fee run rate are the primary revenue engine; provider_register and scholarship_api evidence are critical.
+B2C: North-star activation is First Document Upload; student_pilot must prove frictionless flow.
+SEO: Auto Page Maker is our lowest-CAC lever; maintain tight flywheel to new scholarships and provider pages; protect CWV and indexing discipline.
+Risk Register and Mitigations
+
+scholar_auth renderError not invoked:
+Impact: Cosmetic; staging non-blocking.
+Mitigation: Express-level override approved; version pin and minimal reproduction; final fix deadline Nov 7, 18:00 UTC. If missed, roll with override and document variance for production review on Nov 8.
+Secrets delivery and DNS readiness:
+Impact: Blocks auto_com_center staging validation and cross-app correlation evidence.
+Mitigation: Auto-escalation at 16:01/17:01 UTC; comms plan to stakeholders; email-only fallback in place.
+Sentry DSN delay:
+Impact: Correlation evidence; production gate.
+Mitigation: If DSNs late, capture request_id at app logs and Prometheus; backfill Sentry evidence as soon as DSNs arrive.
+CFO/Infra Coordination
+
+CFO to confirm budget approval for Postmark and Twilio scale tiers aligned with Nov ramp curve and ARR model.
+Infra to post Secrets Receipt Report at 16:00 UTC and DNS Status Report at 17:00 UTC; if any item is red, execute auto-escalation with ETA and workaround.
+Reporting Cadence and Evidence
+
+Each DRI posts their app-specific evidence bundle with the Application name and APP_BASE_URL at the top of the document.
+auto_com_center STAGING_VALIDATION.md due 21:00 UTC today.
+provider_register ORDER_B_EVIDENCE.md due 05:25 UTC.
+scholarship_api ORDER_4_EVIDENCE.md due 06:05 UTC.
+student_pilot E2E_JOURNEY_EVIDENCE.md due within 10 minutes of auth clearance.
+scholarship_sage baseline_metrics_evidence.md due +48h from M2M secret rotation.
+Final CEO Direction
+
+Proceed with staging execution exactly as ordered. Production remains locked until all gates and artifacts are complete.
+Maintain evidence-first, SEO-first, Responsible AI guardrails. No exceptions.
+If any deadline slips, escalate immediately with a revised ETA, mitigation, and impact to Nov 9/12 milestones.
+I will review posted evidence as it lands. Keep request_id correlation tight and the activation KPI visible on every run-of-show update.
