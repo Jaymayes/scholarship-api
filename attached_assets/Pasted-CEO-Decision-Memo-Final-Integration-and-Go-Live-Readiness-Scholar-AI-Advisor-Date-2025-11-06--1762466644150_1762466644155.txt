@@ -1,0 +1,108 @@
+CEO Decision Memo — Final Integration and Go‑Live Readiness (Scholar AI Advisor)
+Date: 2025-11-06
+Time: 23:45 UTC
+
+Platform Decision
+
+Logged-in flows: GO, contingent on immediate E2E evidence passing. AUTH_GREEN evidence has been received and accepted.
+Non-auth flows: GO (continue compounding).
+Nov 9 (1% ramp): Conditional GO pending student_pilot and provider_register evidence on time.
+Nov 12 ARR ignition: Protected if today’s E2E and acceptance complete and auto_com_center email DNS/SQS unblocked by Nov 8.
+Orders start now. Evidence-first discipline applies. Any regression to error ≥0.1% or P95 >120ms triggers immediate freeze and CEO review within 15 minutes.
+
+Application Decisions, Orders, and Deadlines
+
+scholar_auth APP_BASE_URL: https://scholar-auth-jamarrlmayes.replit.app
+Decision: GREEN — Accepted. AUTH_GREEN evidence pack received.
+Orders (now):
+Maintain Track B static client registry integrity; no changes until after Nov 12 freeze.
+Deliver M2M secret to scholarship_sage environment within 30 minutes. Owner: Auth DRI. Due: 00:15 UTC.
+Post a short addendum note with the final client registry hash after any secret issuance step (hash must remain unchanged for web clients).
+KPIs: P95 ≤120ms, error <0.1%, uptime ≥99.9%.
+2. scholarship_api
+APP_BASE_URL: https://scholarship-api-jamarrlmayes.replit.app
+
+Decision: GREEN — Hold state.
+Orders:
+Join cross-app traces once student_pilot E2E passes.
+No schema or RBAC changes before Nov 12 without CEO approval.
+KPIs: P95 ~73.6ms; error 0%; uptime 100% (maintain).
+3. scholarship_agent
+APP_BASE_URL: https://scholarship-agent-jamarrlmayes.replit.app
+
+Decision: GREEN (observe-only).
+Orders:
+Remain observe-only through Nov 9 ramp; auto-apply remains disabled until CEO lift.
+Provide cross-app request_id traces immediately after student_pilot E2E passes.
+Keep fairness telemetry and explainability on; deliver a 24h fairness summary by Nov 10, 12:00 UTC.
+KPIs: P95 ~42ms; error 0%; uptime 100%.
+4. scholarship_sage
+APP_BASE_URL: https://scholarship-sage-jamarrlmayes.replit.app
+
+Decision: GREEN with an integration blocker (M2M secret missing).
+Orders:
+Start 48h baseline immediately upon receipt of M2M_SCHOLARSHIP_SAGE_SECRET. Owner: Sage DRI.
+Evidence due: baseline_metrics_evidence.md by Nov 8, 16:00 UTC.
+If secret not delivered by 00:15 UTC, escalate to CEO and Auth DRI; post a timestamped blocker note.
+KPIs: P95 ~1ms; error 0%; uptime 100%.
+5. student_pilot
+APP_BASE_URL: https://student-pilot-jamarrlmayes.replit.app
+
+Decision: GO, pending E2E evidence within SLA.
+Orders (clock starts now):
+Execute 95-step E2E immediately. SLA: 30 minutes from this memo. Due: 00:15 UTC.
+Deliver E2E_JOURNEY_EVIDENCE.md with screenshots, P95 ≤120ms, error <0.1%, and cross-app request_id traces (student_pilot→scholar_auth→scholarship_api).
+If any invalid_client or auth anomaly appears, halt and escalate within 5 minutes; attach logs and request_id.
+KPIs: First Document Upload activation rate, P95 ≤120ms, error <0.1%.
+6. provider_register
+APP_BASE_URL: https://provider-register-jamarrlmayes.replit.app
+
+Decision: YELLOW → GO upon student_pilot E2E pass; acceptance needed.
+Orders:
+Execute ORDER_B acceptance immediately after student_pilot passes.
+Deliver ORDER_B_EVIDENCE.md by Nov 7, 16:00 UTC (earlier is better).
+Confirm consent screen, code→token with PKCE S256, P95 ≤120ms, error <0.1%, no invalid_client.
+KPIs: Provider onboarding completion rate, time-to-first-scholarship creation.
+7. auto_page_maker
+APP_BASE_URL: https://auto-page-maker-jamarrlmayes.replit.app
+
+Decision: GREEN — Continue compounding.
+Orders:
+Execute ORDER_4; maintain IndexNow ≥95% and CWV p75 GREEN.
+Post evidence per SLA; ensure internal links to conversion surfaces are live and tagged with request_id.
+KPIs: Pages live 2,101; CWV p75 GREEN; P95 ~100ms; error 0%; uptime 100%.
+8. auto_com_center
+APP_BASE_URL: https://auto-com-center-jamarrlmayes.replit.app
+
+Decision: PARTIAL GREEN — In-app notifications GO; external email NO-GO until DNS/SQS cleared.
+Orders:
+Infra/NetOps: Implement SPF/DKIM/DMARC per provided guide. First verification: Nov 8, 12:00 UTC; Email Go-Live target: Nov 8 afternoon. Owner: Infra/NetOps.
+SecOps: Rotate AWS SQS/IAM; restore DLQ monitoring by Nov 8, 16:00 UTC. Owner: SecOps.
+Continue in-app notifications now; maintain unsubscribe P95 ≤50ms and delivery P95 ≤120ms.
+KPIs: In-app Latency P95 87ms (maintain ≤120ms), Unsubscribe P95 18.8ms, external deliverability ≥98% once DNS green.
+War-Room Cadence and Escalations
+
+Hourly check-ins until student_pilot E2E and provider_register acceptance complete.
+Immediate escalation if:
+Any auth regression (invalid_client, token validation failure).
+Error rate ≥0.1% for 5 consecutive minutes on any core app.
+P95 >120ms sustained for 10 minutes on scholar_auth, scholarship_api, or student_pilot.
+Freeze: No config or dependency changes to auth, API, or schema until after Nov 12 unless CEO-approved.
+ARR Protection and KPI Focus (Nov 9–Nov 12)
+
+B2C funnel: Track free→paid conversion, First Document Upload activation, ARPU from credits.
+B2B funnel: Active providers, net-new scholarships posted, 3% platform fee revenue.
+CAC: Prioritize SEO from auto_page_maker; no incremental paid channels before Nov 12.
+Profitability: Maintain 4x AI service markup; ensure platform fee capture is operational on first provider transactions.
+Critical Path Summary
+
+Now to 00:15 UTC: student_pilot 95-step E2E evidence due; Auth to deliver Sage M2M secret.
+Post-E2E: provider_register executes acceptance; scholarship_agent provides cross-app traces; scholarship_api joins traces.
+By Nov 8: auto_com_center external email DNS/SQS cleared; Sage 48h baseline in flight.
+Nov 9: 1% ramp (conditional GO) with agent observe-only.
+Nov 12: ARR ignition on schedule.
+Ownership and Next Checkpoint
+
+DRIs proceed per above. Post evidence to the named report paths and announce in war-room upon upload.
+Next CEO checkpoint: 00:20 UTC for student_pilot E2E validation and Sage secret confirmation.
+Decision: Proceed per above. Evidence-first discipline remains in force.
