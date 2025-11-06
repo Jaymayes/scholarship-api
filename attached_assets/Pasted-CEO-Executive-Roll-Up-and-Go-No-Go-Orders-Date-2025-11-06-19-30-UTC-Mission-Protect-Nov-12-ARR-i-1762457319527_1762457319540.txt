@@ -1,0 +1,118 @@
+CEO Executive Roll-Up and Go/No-Go Orders
+Date: 2025-11-06 19:30 UTC
+Mission: Protect Nov 12 ARR ignition; run a safe, evidence-first 1% ramp; preserve SEO-first, low-CAC growth.
+
+Executive Decision
+
+Go/No-Go: Conditional GO for Nov 9 1% ramp, gated by:
+AUTH GREEN (achieved) + Track A backfill plan locked.
+External email DNS GREEN before any outbound ramp; until then, in-app notifications only.
+Provider auth acceptance criteria satisfied in production (unfreezes ORDER_B).
+If any gate misses its deadline, re-slot to Nov 10 1% ramp; Nov 12 ARR remains protected.
+Chain-Level Hard Gates and Deadlines
+
+AUTH Track B: GREEN and accepted for 1% ramp. Deadline met at 2025-11-06 19:13 UTC. Proceed.
+AUTH Track A backfill (required pre-broader ramp):
+PostgreSQL adapter, refresh_token grant, revocation endpoint on, issuer/basePath parity.
+Due: Nov 11, 18:00 UTC. DRI: Auth.
+External Comms DNS (SPF, DKIM, DMARC): Must be GREEN before any external email.
+Publish records immediately; verify; expect 24–48h propagation.
+Interim: In-app notifications only; internal email test only.
+First verification window: Nov 8, 12:00 UTC. DRI: Comms/Infra.
+AWS SQS DLQ monitoring: Rotate credentials; restore DLQ alarms.
+Due: Nov 8, 16:00 UTC (Prometheus fallback remains active until then). DRI: Infra/Security.
+Provider auth acceptance (to unfreeze ORDER_B):
+/authorize consent page working for provider-register client_id in prod; <0.1% 10-min error; P95 in SLO; evidence posted.
+Due: Nov 7, 16:00 UTC. DRI: Auth + Provider Register.
+Per-Application Status, Orders, and URLs
+
+scholar_auth APP_BASE_URL: https://scholar-auth-jamarrlmayes.replit.app
+Status: GREEN (Track B). OIDC discovery, /auth, /token operational; PKCE S256 enforced; static clients: student_pilot, provider_register.
+Known limitations (acceptable for 1% ramp): no refresh tokens, no revocation, in-memory state.
+Orders:
+Execute Track A backfill (PostgreSQL adapter, refresh_token, revocation). Due Nov 11, 18:00 UTC.
+Provide signed evidence pack: discovery, revocation endpoint 200, refresh flow, restart persistence test.
+2. scholarship_api
+APP_BASE_URL: https://scholarship-api-jamarrlmayes.replit.app
+
+Status: GREEN. P95 ~73.62ms; error 0%; ACID via PostgreSQL; RBAC write endpoints secure (403 when unauthorized); request_id propagation active.
+Orders:
+Hold state. Join cross-app traces once student_pilot E2E runs. No changes until AUTH Track A lands.
+3. scholarship_agent
+APP_BASE_URL: https://scholarship-agent-jamarrlmayes.replit.app
+
+Status: GREEN. Observe-only; fairness telemetry and explainability live; P95 ~42ms; error 0%.
+Orders:
+Remain observe-only for Nov 9 1% ramp. Provide cross-app request_id trace evidence after student_pilot E2E. Do not enable auto-apply.
+4. scholarship_sage
+APP_BASE_URL: https://scholarship-sage-jamarrlmayes.replit.app
+
+Status: GREEN on code/SLOs; awaiting M2M_SCHOLARSHIP_SAGE_SECRET to start 48h baseline; not on Nov 9 critical path.
+Orders:
+Auth to issue M2M secret today. Start 48h baseline immediately; must complete by Nov 8 ~16:00 UTC. Deliver baseline_metrics_evidence.md at +48h.
+5. student_pilot
+APP_BASE_URL: https://student-pilot-jamarrlmayes.replit.app
+
+Status: READY; was AUTH-gated. Infra staged (Stripe TEST, Sentry, Object Storage); 95-step E2E ready.
+Orders:
+Execute 95-step E2E now that AUTH is GREEN. SLA: 10 minutes to post E2E_JOURNEY_EVIDENCE.md with cross-browser/device screenshots, P95<=120ms across 9 critical paths, error<0.1%, Stripe TEST proof, and cross-app request_id traces.
+After evidence, remain ready for Nov 9 1% ramp.
+6. provider_register
+APP_BASE_URL: https://provider-register-jamarrlmayes.replit.app
+
+Status: FROZEN pending production auth verification. B2B revenue path blocked until cleared.
+Orders (must satisfy to unfreeze ORDER_B):
+Provide evidence: discovery 200; /authorize consent page screenshot for provider client_id; <0.1% 10-min error; SLO P95 OK; IdP logs show no invalid_client (last 15 min).
+Deadline: Nov 7, 16:00 UTC. Once cleared, unfreeze ORDER_B and begin controlled provider onboarding (no paid campaigns until auto_com_center DNS is GREEN).
+7. auto_page_maker
+APP_BASE_URL: https://auto-page-maker-jamarrlmayes.replit.app
+
+Status: GREEN. 2,101 pages operational; IndexNow ≥95% target; CWV p75 GREEN; no auth dependency; P95 ~100ms; 0% errors; uptime 100%.
+Orders:
+Continue compounding; execute ORDER_4 trigger on schedule; keep IndexNow ≥95% and CWV p75 GREEN. Post evidence per SLA.
+8. auto_com_center
+APP_BASE_URL: https://auto-com-center-jamarrlmayes.replit.app
+
+Status: Internal: GREEN. External: RED (SPF/DKIM/DMARC not configured); AWS SQS credentials invalid.
+Metrics: Unsubscribe P95 18.8ms; latency P95 87ms; error 0%.
+Orders:
+Publish SPF/DKIM/DMARC per DNS_CONFIGURATION_REQUIRED.md immediately; verify via provider dashboard; do not send external emails until GREEN.
+Rotate SQS/IAM credentials; restore DLQ alarms by Nov 8, 16:00 UTC.
+Nov 9 ramp: in-app notifications only until DNS is GREEN.
+Ramp Plan and Decision Framework
+
+Nov 7
+Provider auth acceptance evidence due 16:00 UTC.
+Sage M2M secret issued; baseline starts (runs to Nov 8 ~16:00 UTC).
+Nov 8
+First DNS verification window at 12:00 UTC; SQS DLQ restored by 16:00 UTC.
+Nov 9 (Target 1% ramp)
+Proceed only if: AUTH GREEN (yes), student_pilot E2E evidence posted (due now), provider_register acceptance cleared (B2B partial), auto_com_center DNS GREEN for any external sends.
+If DNS still propagating: proceed with in-app notifications only; no external email.
+Nov 10 (Fallback 1% ramp if any gate misses)
+Same gating; ARR Nov 12 protected.
+Nov 12 (ARR ignition milestone)
+Expand based on Track A auth completion and DNS GREEN; initiate measured email flows once deliverability verified.
+Risk Register and Mitigations
+
+External email deliverability (HIGH): DNS not configured. Mitigation: configure records now; staggered rollout; start with low-volume warm-up after GREEN.
+Auth persistence/refresh/revocation (MEDIUM): Track B lacks persistence; acceptable for 1% ramp. Mitigation: Track A backfill by Nov 11, 18:00 UTC.
+Provider trust (MEDIUM): Recent invalid_client incident. Mitigation: hard acceptance criteria before unfreezing; add automated /authorize probe pre-execution.
+DLQ monitoring (MEDIUM): SQS credentials invalid. Mitigation: rotate keys; Prometheus fallback active until fixed.
+KPIs for Launch Readiness
+
+SLOs: P95 ≤120ms; error <0.1%; uptime ≥99.9% across apps. Current windows all GREEN.
+SEO engine: Maintain IndexNow ≥95%; CWV p75 GREEN; pages compounding. Current: GREEN.
+B2C activation: student_pilot First Document Upload metric captured in E2E evidence.
+B2B readiness: provider_register acceptance cleared; initial onboarding measured; no paid campaigns until DNS GREEN.
+Capital Allocation and Focus
+
+Prioritize engineering time to AUTH Track A backfill and DNS/SQS fixes; defer non-critical feature work until these close.
+Zero incremental paid acquisition before DNS GREEN; lean into auto_page_maker compounding.
+Immediate Orders (next 60–120 minutes)
+
+student_pilot: Run 95-step E2E and post evidence within 10 minutes.
+Auth: Kick off Track A; confirm provider acceptance criteria met by Nov 7, 16:00 UTC; issue Sage M2M secret now.
+Comms/Infra: Publish SPF/DKIM/DMARC now; rotate SQS/IAM; post verification timestamps.
+DRIs: Post evidence links to the chain roll-up channel; tag CEO upon completion.
+This decision maximizes ARR protection, preserves trust and deliverability, and maintains our SEO-first, low-CAC operating model. Proceed.
