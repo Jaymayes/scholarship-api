@@ -1,0 +1,135 @@
+CEO GO/NO-GO DECISION AND ORDERS
+Date: 2025-11-06 | Decision Window: 05:00–21:00 UTC
+
+Executive decision
+
+Staging: GO, contingent on immediate scholar_auth cold restart and infra secrets delivery by 16:00 UTC.
+Production: NO-GO. Production remains locked until all release gates are evidenced.
+ARR ignition: Nov 12 remains the target. Earliest production ramp: Nov 9 at 1% if evidence gates pass.
+Critical blocker to clear now
+
+scholar_auth must be manually cold restarted. The automated restart tool does not terminate the long-lived Node process. Owner must stop the “Start application” workflow, wait for termination, then start it again. Post CLIENT_REGISTRY_SNAPSHOT.md immediately afterward.
+Immediate orders by application
+
+scholar_auth APP_BASE_URL: https://scholar-auth-jamarrlmayes.replit.app
+Status: NO-GO until manual cold restart completes and client registry normalization is live.
+Actions (Owner: Auth DRI)
+Now: Manual cold restart. Post “restarted” confirmation with timestamp.
+By 05:15 UTC: Publish CLIENT_REGISTRY_SNAPSHOT.md (shows camelCase/snake_case parity for client fields, grant types, redirect URIs) and pass smoke test for authorize endpoint (no invalid_client).
+Token lifecycle: Prove OAuth2/OIDC flows, refresh, revocation, and token validation from dependents.
+Acceptance tests
+authorize returns consent screen for provider-register and student-pilot clients.
+OIDC well-known responds; JWKS rotates as configured; refresh tokens valid; revocation immediate.
+Protected routes on all dependents redirect correctly to auth.
+2. provider_register
+APP_BASE_URL: https://provider-register-jamarrlmayes.replit.app
+
+Status: READY, blocked by auth.
+Orders (Owner: Provider DRI)
+Trigger: Upon CLIENT_REGISTRY_SNAPSHOT.md from auth.
+SLA: Execute Order B within 10 minutes; deliver ORDER_B_EVIDENCE.md by 05:25 UTC.
+Evidence: Full flow (register → auth → create scholarship → manage dashboard), client/server validation proof, request_id traces.
+3. scholarship_api
+APP_BASE_URL: https://scholarship-api-jamarrlmayes.replit.app
+
+Status: READY, contingent on Order B.
+Orders (Owner: API DRI)
+Trigger: Upon ORDER_B_EVIDENCE.md from provider_register.
+Window: 05:45–06:05 UTC to execute Order 4.
+Deliver ORDER_4_EVIDENCE.md by 06:05 UTC with:
+Endpoint inventory + Swagger link
+Token validation vs scholar_auth
+RBAC proof, ACID/transaction proof
+P95 reads ≤120ms; writes ≤150ms; error <0.1%
+Emitted events to auto_page_maker and auto_com_center with request_id → Sentry links
+4. auto_page_maker
+APP_BASE_URL: https://auto-page-maker-jamarrlmayes.replit.app
+
+Status: GO AND ARMED; no blockers.
+Orders (Owner: APM DRI)
+Trigger: scholarship_api Order 4 event.
+Execute: Generate +2 pages within 60 seconds (target 05:46–05:47 UTC).
+Evidence: ORDER_4_EVIDENCE.md components by 05:55 UTC (sitemap diff, IndexNow receipts, CWV p75 green, P95 proof, request_id traces, rollback guard confirmation).
+KPI focus: Organic CAC reduction, traffic delta from +2 pages, CWV p75.
+5. auto_com_center
+APP_BASE_URL (Staging): https://auto-com-center-jamarrlmayes.replit.app
+APP_BASE_URL (Prod): https://auto-com-center.scholaraiadvisor.com
+
+Status: Code complete; blocked on infra secrets.
+Orders (Owner: Comms DRI)
+Deadline: 16:00 UTC for secrets delivery (auto-escalate 16:01 UTC if any missing).
+Required secrets/config
+SENTRY_DSN
+AWS SQS/DLQ credentials + IAM policies
+Postmark API key
+Twilio credentials + A2P brand/campaign status
+DNS SPF/DKIM/DMARC for mail.scholaraiadvisor.com
+Evidence: STAGING_VALIDATION.md by 21:00 UTC with:
+Unsubscribe <5s under load; DLQ=0; SPF/DKIM/DMARC “green”
+P95 ≤120ms E2E; error <0.1%; uptime ≥99.9%
+CAN-SPAM/TCPA/FERPA/COPPA logs; PII redaction; rate limits (10 email/hr, 5 SMS/hr)
+Prometheus snapshots; cross-app request_id; Sentry correlation
+Fallback: If A2P pending, run email-only via Postmark; proceed with evidence bundle.
+6. student_pilot
+APP_BASE_URL: https://student-pilot-jamarrlmayes.replit.app
+
+Status: READY, gated by auth.
+Orders (Owner: Student Pilot DRI)
+Trigger: CLIENT_REGISTRY_SNAPSHOT.md from auth.
+SLA: Execute full 95-step E2E within 10 minutes; deliver E2E_JOURNEY_EVIDENCE.md by 05:25 UTC.
+Evidence: 25+ screenshots (desktop/tablet/mobile), 9 P95 metrics, cross-browser pass, request_id traces, activation metric (First Document Upload).
+7. scholarship_agent
+APP_BASE_URL: https://scholarship-agent-jamarrlmayes.replit.app
+
+Status: GO FOR MONITORING ONLY.
+Orders (Owner: Agent DRI)
+No auto-apply, no notifications until comms gates pass.
+Post checkpoint memos with SLO proofs at T+10, T+30, T+50.
+Maintain request_id correlation board.
+8. scholarship_sage
+APP_BASE_URL: https://scholarship-sage-jamarrlmayes.replit.app
+
+Status: READY.
+Orders (Owner: Sage DRI)
+Trigger: M2M secret rotation after auth restart.
+Start 48h observe-only baseline immediately; deliver baseline_metrics_evidence.md at +48h (precision@5, coverage, matchReasons, fairness telemetry, SLO proofs, request_id traces).
+Third-party systems and integration status (relevant today)
+
+Postmark (Email): Awaiting API key (auto_com_center). Status: In Progress; fallback path available (email-only).
+Twilio (SMS + A2P): Awaiting credentials + A2P brand/campaign approval. Status: In Progress; SMS disabled until approved.
+AWS SQS/DLQ: Awaiting credentials + IAM. Status: In Progress.
+Sentry: Awaiting DSN for comms app. Status: In Progress.
+DNS (SPF/DKIM/DMARC): Awaiting records for mail.scholaraiadvisor.com. Status: In Progress.
+Compliance and Responsible AI
+
+No auto-apply or messaging until comms evidence passes.
+Enforce PII redaction, rate limits, consent and unsubscribe flows, and audit logging across apps.
+Maintain transparent explanations (scholarship_sage matchReasons) and fairness telemetry.
+Revalidate FERPA/COPPA posture before any production ramp.
+Execution timeline (UTC)
+
+Now–05:10: Auth DRI manual cold restart and smoke verify.
+05:15: CLIENT_REGISTRY_SNAPSHOT.md posted by auth.
+05:15–05:25: provider_register executes Order B; ORDER_B_EVIDENCE.md posted.
+05:45–06:05: scholarship_api executes Order 4; ORDER_4_EVIDENCE.md posted.
+05:46–05:47: auto_page_maker generates +2 pages; evidence by 05:55.
+16:00: Infra secrets deadline for auto_com_center (auto-escalate 16:01).
+21:00: auto_com_center STAGING_VALIDATION.md due.
+KPIs for this launch chain
+
+B2C: Conversion lift from student_pilot E2E improvements; ARPU from content-led activation; activation metric “First Document Upload.”
+B2B: New provider activation via provider_register; event-driven listings flowing into scholarship_api.
+CAC: Organic traffic delta attributable to +2 pages; IndexNow receipts; CWV p75 green.
+SLOs: P95 ≤120ms across services; error <0.1%; uptime ≥99.9%.
+Profit: Confirm 4x AI services markup + 3% provider fee cover costs on staging load sims.
+Escalation matrix
+
+05:10: If auth not restarted, reassign to secondary DRI and page SRE-on-call.
+16:01: If any comms secrets missing, auto-escalate to Infra lead and CFO for vendor access unblock.
+Any SLO breach: Trigger rollback guard; halt production ramp gating.
+Final CEO directives
+
+Auth DRI: Perform the manual cold restart now and confirm “restarted” with timestamp. Post CLIENT_REGISTRY_SNAPSHOT.md by 05:15 UTC.
+All DRIs: Evidence-first. No production assertions without artifacts. Production remains locked until every release gate is proven.
+Agent3 (auto_com_center): Proceed with staging validation as soon as secrets are delivered; run email-only fallback if A2P lags; deliver STAGING_VALIDATION.md by 21:00 UTC.
+Proceed with urgency. The five-year plan depends on disciplined, evidence-driven launches that compound into durable, low-CAC growth and profitable ARR.
