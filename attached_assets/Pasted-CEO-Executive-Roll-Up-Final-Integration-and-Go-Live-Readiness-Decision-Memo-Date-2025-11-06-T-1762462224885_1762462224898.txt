@@ -1,0 +1,186 @@
+CEO Executive Roll-Up — Final Integration and Go-Live Readiness (Decision Memo)
+Date: 2025-11-06
+Time: 23:15 UTC
+Prime Objective: Protect Nov 12 ARR ignition; enable safe Nov 9 (1% ramp) under evidence-first discipline.
+
+Executive Summary
+
+Overall decision: Conditional GO, tightly scoped.
+Logged-in flows: NO-GO until hard AUTH_GREEN evidence is produced. This is the gating item for student_pilot and provider_register E2E.
+Non-auth flows: GO. auto_page_maker compounding continues; scholarship_agent observe-only telemetry remains ON; auto_com_center in-app notifications only until DNS/SQS are GREEN.
+Mission protection: If AUTH is not green with artifacts by Nov 7 12:00 UTC, we slip the Nov 9 1% ramp by 24–48 hours. Nov 12 ARR remains achievable if AUTH is fixed within 12–18 hours and student_pilot E2E completes immediately after.
+scholar_auth APP_BASE_URL: https://scholar-auth-jamarrlmayes.replit.app
+Status: YELLOW (claims of GREEN conflict with live evidence from student_pilot invalid_client)
+
+What’s green:
+OIDC discovery reportedly live
+Track B plan documented; Track A backfill plan documented
+Sage M2M secret reportedly issued; provider acceptance criteria defined
+Blocker (critical):
+invalid_client returned for student_pilot login; indicates client registration/redirect_uri mismatch or missing client in static registry
+CEO Orders (evidence-first, immediate):
+Within 60 minutes: Post AUTH_GREEN evidence pack containing:
+CLIENT_REGISTRY_SNAPSHOT with SHA-256 + timestamp
+/.well-known/openid-configuration 200 OK capture
+/authorize → actual consent screen screenshot for student-pilot client_id
+/token code→token (redacted) proving PKCE S256 path
+The exact redirect_uri values now allowed for student_pilot and provider_register (include test and prod)
+Screenshot/log of successful refresh_token where applicable (Track B limits noted if refresh is Track A)
+Align client_id, redirect_uri, scopes with student_pilot and provider_register DRIs; publish a single source-of-truth client config file
+Produce a 10-minute smoke test video/GIF showing authorize→consent→token→app redirect for student_pilot
+Estimated Go-Live (AUTH_GREEN with artifacts): Nov 6, 24:15–24:45 UTC if executed now; hard backstop Nov 7, 12:00 UTC
+ARR Ignition Contribution Start: Immediately after student_pilot E2E passes (same day)
+Security/SLO guardrails:
+Maintain OAuth2/OIDC best practices, revocation endpoint working, secure storage, rotating secrets; P95 ≤120ms; 99.9% uptime
+2. scholarship_api
+APP_BASE_URL: https://scholarship-api-jamarrlmayes.replit.app
+
+Status: GREEN
+
+Endpoints: CRUD for scholarships, profiles, providers, applications; docs in place
+Performance: P95 ~73.6ms; error 0%; uptime 100%
+Security: Token validation enforced; RBAC on writes (403 when unauthorized)
+Data: PostgreSQL ACID validated
+Orders: Hold state; join cross-app traces upon student_pilot E2E completion
+Estimated Go-Live: Live
+ARR Ignition: Supports both funnels immediately when student_pilot unblocks
+Third-party: PostgreSQL (operational, GREEN)
+3. scholarship_agent
+APP_BASE_URL: https://scholarship-agent-jamarrlmayes.replit.app
+
+Status: GREEN (observe-only)
+
+Core: Matching logic accurate; fairness telemetry and explainability on; auto-apply disabled
+Performance: P95 ~42ms; error 0%; uptime 100%
+Integrations: Auth path asserted but waits on student_pilot cross-app traces
+Orders:
+Remain observe-only for Nov 9 1% ramp
+Provide cross-app request_id traces right after student_pilot E2E passes
+Estimated Go-Live: Live (observe-only)
+ARR Ignition: Contributes immediately post student_pilot unblocking
+4. scholarship_sage
+APP_BASE_URL: https://scholarship-sage-jamarrlmayes.replit.app
+
+Status: GREEN
+
+Advisory quality: Ready; safety and relevance guardrails in place
+Performance: P95 ~1ms; error 0%; uptime 100%
+Integration: Needs M2M secret; report says secret issued; begin 48h baseline
+Orders:
+Start 48h baseline immediately; deliver baseline_metrics_evidence.md by Nov 8 ~16:00 UTC
+Estimated Go-Live: Live (advisory baseline underway)
+ARR Ignition: Supports ARPU lift post-baseline; not blocking ramp
+5. student_pilot
+APP_BASE_URL: https://student-pilot-jamarrlmayes.replit.app
+
+Status: RED (auth gate)
+
+Evidence: invalid_client on redirect to scholar_auth
+Impact: 95-step E2E blocked; cannot deliver cross-app traces; logged-in user journey blocked
+CEO Orders:
+Await AUTH evidence; once posted, execute 95-step E2E within 30 minutes
+Post E2E_JOURNEY_EVIDENCE.md: screenshots, metrics, traces, P95 ≤120ms, error <0.1%
+Estimated Go-Live: T+30 min after AUTH_GREEN artifacts
+ARR Ignition: At risk until unblocked; requires immediate resolution (see CEO Risk Gate below)
+Responsiveness/compatibility: Non-auth pages OK; final validation after E2E
+6. provider_register
+APP_BASE_URL: https://provider-register-jamarrlmayes.replit.app
+
+Status: YELLOW (ready but auth acceptance pending)
+
+What’s ready: Healthy runtime (P95 ~2ms); OIDC wiring complete on app side; validation/logging good
+Blocker: OAuth client not registered or redirect URIs not whitelisted in scholar_auth
+Orders:
+Execute acceptance criteria after AUTH DRI registers client and whitelists redirect URIs
+Deliver ORDER_B_EVIDENCE.md confirming 200 OK discovery, consent screen, error-rate <0.1%, P95 ≤120ms, and no invalid_client
+Estimated Go-Live: Nov 7, 16:00 UTC (on-time if AUTH fixed now)
+ARR Ignition: Enables B2B revenue (3% fee) post-acceptance
+7. auto_page_maker
+APP_BASE_URL: https://auto-page-maker-jamarrlmayes.replit.app
+
+Status: GREEN
+
+Metrics: 2,101 pages live; IndexNow ≥95%; CWV p75 GREEN; P95 ~100ms; errors 0%; uptime 100%
+Auth dependency: None
+Orders: Continue compounding; execute ORDER_4; maintain IndexNow ≥95% and CWV GREEN; post evidence per SLA
+Estimated Go-Live: Live
+ARR Ignition: Drives low-CAC top-of-funnel now
+8. auto_com_center
+APP_BASE_URL: https://auto-com-center-jamarrlmayes.replit.app
+
+Status: INTERNAL GREEN; EXTERNAL RED
+
+Internal: In-app notifications ready; Unsubscribe P95 18.8ms; Latency P95 87ms; Error 0%
+External blockers:
+DNS (SPF/DKIM/DMARC) not configured; cannot send external emails
+AWS SQS credentials invalid; DLQ monitoring in fallback with Prometheus
+Orders:
+In-app only until DNS GREEN
+Infra/NetOps to implement DNS per DNS_CONFIGURATION_REQUIRED.md; first verification window Nov 8, 12:00 UTC
+Security/Infra to rotate/repair SQS/IAM per AWS_SQS_CREDENTIALS_ISSUE.md; deadline Nov 8, 16:00 UTC
+Estimated Go-Live:
+In-app: Live now
+Email: Nov 8 afternoon after DNS verification completes
+ARR Ignition: Supports activation and reminders; email channel activates after DNS pass
+CEO Risk Gate and Timeline
+
+Gate 1 (Critical): AUTH_GREEN with artifacts for student_pilot and provider_register
+Deadline: Nov 6, 24:45 UTC (aggressive); absolute backstop Nov 7, 12:00 UTC
+If missed: Slip Nov 9 1% ramp by 24–48 hours; protect Nov 12 ARR via compressed E2E and staged ramp starting Nov 10–11
+Gate 2: Provider auth acceptance
+Deadline: Nov 7, 16:00 UTC (on schedule contingent on Gate 1)
+Gate 3: External Comms (Email) DNS
+First verification: Nov 8, 12:00 UTC; activate email channel on pass
+Gate 4: AWS SQS credentials rotation
+Deadline: Nov 8, 16:00 UTC; restore DLQ/real-time alerting
+Gate 5: AUTH Track A backfill (refresh tokens, revocation, issuer/basepath parity)
+Deadline: Nov 11, 18:00 UTC
+Immediate, Time-Boxed Orders (next 120 minutes)
+
+Auth DRI (owner: Auth)
+Register/verify student_pilot and provider_register clients; whitelist exact redirect URIs (test + prod)
+Post full AUTH_GREEN evidence pack (see scholar_auth section) within 60 minutes
+Coordinate 10-minute live smoke with student_pilot DRI right after posting
+student_pilot DRI (owner: Frontend)
+Execute 95-step E2E within 30 minutes of AUTH evidence; post E2E_JOURNEY_EVIDENCE.md; include request_id traces end-to-end
+provider_register DRI (owner: B2B Frontend)
+Run acceptance criteria immediately after AUTH GREEN; post ORDER_B_EVIDENCE.md; unfreeze ORDER_B
+auto_com_center DRI (owner: Comms)
+Keep in-app live; monitor metrics; no external email until DNS verified
+Infra/NetOps (owner: Infra)
+Implement SPF/DKIM/DMARC records now; be ready for Nov 8, 12:00 UTC verification
+Security/Infra (owner: SecOps)
+Rotate SQS/IAM; restore DLQ with alerts by Nov 8, 16:00 UTC
+scholarship_sage DRI
+Start 48h baseline now; log start timestamp; deliver baseline_metrics_evidence.md by Nov 8 ~16:00 UTC
+scholarship_agent DRI
+Remain observe-only; capture cross-app traces right after student_pilot E2E; no auto-apply until CEO lift
+Monetization and KPI Guardrails
+
+B2C: Conversion dependent on student_pilot; do not scale spend; rely on auto_page_maker SEO compounding. Target: preserve ARPU via Sage uplift post-baseline.
+B2B: Provider acceptance unlocks 3% fee; prioritize auth acceptance by Nov 7.
+CAC: Maintain low-CAC model; no incremental paid channels until post-Nov 12 stability report.
+SLOs: Hold 99.9% uptime and ≤120ms P95 across apps; continue request_id propagation for traceability.
+Responsible AI and Compliance
+
+Keep scholarship_agent observe-only through the ramp; no auto-apply until fairness telemetry reviewed post-ramp.
+Maintain explainability (“Why this match?”) and bias monitoring in both agent and sage.
+Ensure FERPA/COPPA alignment; no PII in logs; unsubscribe and spam compliance verified before enabling external email.
+CEO Decision
+
+Nov 9 1% ramp: Conditional GO, scope-limited to non-auth surfaces and observe-only agent; in-app notifications only. Full GO for logged-in journeys is contingent on AUTH evidence and passing student_pilot E2E.
+Nov 12 ARR ignition: On track if AUTH gate is cleared within the next 12–18 hours and provider acceptance completes by Nov 7, 16:00 UTC.
+Escalation Protocol
+
+War-room opens now; hourly check-ins until AUTH evidence posted.
+If AUTH evidence is not posted by Nov 7, 12:00 UTC, I will re-baseline the ramp schedule and publish a revised ARR plan within 2 hours.
+Accountability Snapshot (Owners and Deadlines)
+
+Auth DRI: AUTH_GREEN evidence pack — due T+60 min; Track A backfill by Nov 11, 18:00 UTC
+student_pilot DRI: 95-step E2E evidence — due T+90 min (post-AUTH)
+provider_register DRI: Acceptance evidence — due Nov 7, 16:00 UTC
+Comms DRI: In-app live now; email on DNS GREEN Nov 8, 12:00 UTC; SQS restored Nov 8, 16:00 UTC (with Infra/SecOps)
+Sage DRI: 48h baseline evidence — due Nov 8 ~16:00 UTC
+Agent DRI: Cross-app traces — immediately post student_pilot E2E
+Infra/NetOps & SecOps: DNS and SQS fixes by Nov 8 checkpoints
+We move with urgency, evidence-first. Student value equals business value, and AUTH is our hard gate to deliver that value. Focus all hands on clearing the auth evidence gap now.
