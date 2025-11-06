@@ -1,0 +1,111 @@
+CEO DECISION: INTEGRATION READINESS AND ORDERS (War-Room, 2025-11-06 05:00 UTC)
+
+Top-line
+
+Staging: NO-GO until scholar_auth is hard-restarted and client registration verified.
+Production: LOCKED. Do not lift until all global release gates are evidenced.
+ARR ignition target (Nov 12) stands; earliest production ramp start remains Nov 9 contingent on gates.
+Immediate unblock order (critical path)
+
+scholar_auth: Execute Option A (manual cold restart) now.
+SLA: 5 minutes to stop/start; 5 minutes to verify.
+Post CLIENT_REGISTRY_SNAPSHOT.md with passing authorize flow for provider_register and student_pilot immediately after restart.
+If restart fails in 5 minutes, execute Option C: deploy fresh staging IdP and rotate dependent app configs (30–60 minutes). Notify all DRIs of new IdP URL.
+Updated timeline (UTC)
+
+05:05–05:10: scholar_auth manual cold restart and smoke verify (authorize/consent renders; no invalid_client).
+05:15: CLIENT_REGISTRY_SNAPSHOT.md posted; token issuance + refresh verified.
+05:25: provider_register executes Order B; posts ORDER_B_EVIDENCE.md.
+05:45: scholarship_api executes Order 4; posts ORDER_4_EVIDENCE.md; emits events.
+05:46–05:47: auto_page_maker generates +2 pages off Order 4 events.
+05:55: auto_page_maker posts evidence bundle.
+16:00: Infra secrets delivery deadline for auto_com_center (Sentry DSN, AWS SQS+DLQ, Postmark, Twilio, DNS SPF/DKIM/DMARC, A2P filings). Auto-escalate if missed; run email-only fallback if Postmark available and A2P lags; SMS disabled.
+21:00: auto_com_center staging validation evidence posted.
+App-by-app orders and GO/NO-GO
+
+scholar_auth | APP_BASE_URL: https://scholar-auth-jamarrlmayes.replit.app
+Status: BLOCKED by stale process; fix is code-complete.
+Orders:
+Do manual cold restart now. Confirm process uptime resets; verify /oidc/authorize for provider_register and student_pilot renders consent (no invalid_client).
+Ensure client metadata normalization (camelCase + snake_case) persists on boot and add startup self-check that fails fast if any client lookup mismatch is detected.
+Deliver: CLIENT_REGISTRY_SNAPSHOT.md with registered clients, grant_types, redirect_uris, PKCE=S256, scopes; plus authorize URL proofs and id_token validation snippet.
+2. provider_register | APP_BASE_URL: https://provider-register-jamarrlmayes.replit.app
+
+Status: READY; blocked by auth.
+Orders (triggered post-auth evidence):
+Execute Order B within 10 minutes.
+Deliver ORDER_B_EVIDENCE.md: successful PKCE flow, JWT roles=["Provider"], scholarship CRUD via scholarship_api, dashboard views, ≥20 reqs P95 ≤120ms, request_id traces, security headers proof.
+3. student_pilot | APP_BASE_URL: https://student-pilot-jamarrlmayes.replit.app
+
+Status: READY; blocked by auth.
+Orders (triggered post-auth evidence):
+Execute full E2E within 10 minutes.
+Deliver E2E_JOURNEY_EVIDENCE.md: 95 steps, 25+ screenshots (desktop/tablet/mobile), 9 P95 metrics, cross-browser pass, request_id traces, activation metric confirmation.
+4. scholarship_api | APP_BASE_URL: https://scholarship-api-jamarrlmayes.replit.app
+
+Status: ARMED; conditional GO.
+Orders (triggered by provider_register Order B evidence):
+Execute Order 4 within 20 minutes.
+Deliver ORDER_4_EVIDENCE.md: endpoint inventory + Swagger link, token validation, RBAC, audit logs, P95 reads ≤120ms/writes ≤150ms, error <0.1%, ACID transaction proof, event emission to auto_page_maker and auto_com_center, request_id to Sentry trace links.
+5. auto_page_maker | APP_BASE_URL: https://auto-page-maker-jamarrlmayes.replit.app
+
+Status: GO AND ARMED.
+Orders (triggered by scholarship_api Order 4):
+Generate +2 pages within 60 seconds.
+Deliver ORDER_4_EVIDENCE.md: sitemap diff, IndexNow receipts, CWV p75 green, P95 proof, request_id traces, rollback guard confirmation (>5% regression triggers rollback).
+6. auto_com_center
+
+APP_BASE_URL (Staging): https://auto-com-center-jamarrlmayes.replit.app
+APP_BASE_URL (Prod): https://auto-com-center.scholaraiadvisor.com
+Status: Code complete; blocked on secrets/A2P; staging GO upon secrets; production LOCKED.
+Orders:
+Infra deliver secrets by 16:00 UTC; auto-escalate at 16:01 UTC if any missing.
+If A2P pending, proceed email-only with Postmark; SMS disabled.
+Deliver STAGING_VALIDATION.md by 21:00 UTC with:
+Release gates: unsubscribe <5s under load, DLQ=0, DNS SPF/DKIM/DMARC green.
+SLOs: P95 ≤120ms end-to-end, error rate <0.1%, uptime ≥99.9%.
+Compliance: CAN-SPAM/TCPA/FERPA/COPPA logs, PII redaction, rate limits (10 email/hr, 5 SMS/hr).
+Observability: Prometheus snapshots, cross-app request_id, Sentry correlation.
+Blockers log any gate failing; halt ramp until re-evidenced.
+7. scholarship_sage | APP_BASE_URL: https://scholarship-sage-jamarrlmayes.replit.app
+
+Status: READY.
+Orders:
+Start 48-hour observe-only baseline upon rotated M2M secret distribution.
+Deliver baseline_metrics_evidence.md at +48h: precision@5, coverage, matchReasons samples, fairness telemetry, SLO proofs, request_id traces.
+8. scholarship_agent | APP_BASE_URL: https://scholarship-agent-jamarrlmayes.replit.app
+
+Status: GO for monitoring only.
+Orders:
+Post checkpoint memos at T+10/T+30/T+50 with SLO proofs and trace links.
+No auto-apply and no notifications until comms gates pass and production ramp begins.
+Global release gates (no exceptions)
+
+Auth: 24h soak with zero invalid_client; refresh and revocation verified.
+API: P95 ≤120ms, ACID, public Swagger.
+Comms: unsubscribe <5s, DLQ=0, DNS green, A2P approved; email-only permissible if A2P pending for ramp preview, SMS remains off until approval.
+Tracing: request_id propagates across all 8 apps; Sentry correlation with PII redaction.
+Responsible AI: bias/fairness telemetry, transparent explanations, no academic dishonesty enablement.
+Escalation and contingencies
+
+If scholar_auth restart not verified by 05:10 UTC:
+Execute new staging IdP deployment (Option C) immediately; rotate configs for provider_register, student_pilot, scholarship_api; re-run chain.
+If any Infra secret missing at 16:00 UTC:
+Auto-escalate to Infra leadership; proceed with email-only staging validation if Postmark present; do not attempt production comms or SMS until gates are evidenced.
+Any gate failure at any step:
+Halt ramp; fix-first; re-run evidence.
+KPIs to report tonight
+
+Staging chain lead time from auth-unblock to +2 pages generated.
+P95 by app vs ≤120ms target; error rate; uptime.
+Comms unsubscribe latency p95 under load; DLQ count.
+SEO pages delta and IndexNow receipts count.
+Evidence completeness rate (delivered vs committed).
+ARR alignment
+
+Maintain organic SEO flywheel as primary low-CAC engine (auto_page_maker).
+Unlock comms (email-only if needed) to begin nurturing flows ahead of Nov 12 ARR ignition.
+No paid acquisition until unit economics confirmed from organic funnel.
+Final directive
+
+Execute manual cold restart of scholar_auth now and post proof in 10 minutes. All downstream DRIs execute their SLAs upon unblock. Evidence-first culture: no assertions without artifacts. Keep me updated at each milestone with request_id-linked proofs.
