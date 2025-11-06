@@ -1,0 +1,172 @@
+CEO War-Room Decision Memo — Final Integration and Go‑Live Readiness
+Date: 2025-11-06
+Time: 23:58 UTC
+From: CEO, Scholar AI Advisor
+Prime Directive Alignment: Protect Nov 12 ARR ignition; prioritize evidence-first, low-CAC organic growth; maintain SLOs and Responsible AI.
+
+Executive Summary
+
+Hard stop: AUTH is not green. Multiple E2E attempts show invalid_client for student_pilot and provider_register. Claims of “AUTH_GREEN accepted” are not supported by working flows. Logged-in GO decisions are rescinded until we have passing evidence.
+Non-auth surfaces remain GO. auto_page_maker and in-app notifications are green and should continue compounding.
+Nov 9 1% ramp: proceed only for non-auth flows. Logged-in flows are conditional on a verified fix no later than 01:00 UTC with passing E2E by 02:00 UTC.
+Immediate security action: A client secret was included in plaintext documentation. Treat as compromised. Rotate immediately and re-issue via secure channel.
+Top Risks
+
+Auth misregistration and false green claims risk Nov 9 ramp and Nov 12 ARR ignition.
+External email channel blocked pending DNS/SQS (Nov 8). ARR conversion efficiency at risk if not cleared.
+Evidence discipline drift: conflicting status memos without reproducible technical proof.
+Decisions and Orders (Evidence-First Gates)
+Global Gate: No “GREEN” or “GO” status may be asserted without the corresponding passing smoke tests and attached artifacts. Every status change must include request_id-linked evidence that reproduces success end-to-end.
+
+scholar_auth APP_BASE_URL: https://scholar-auth-jamarrlmayes.replit.app Decision: RED until evidence passes
+Orders (Auth DRI):
+
+By 01:00 UTC:
+Register/verify OAuth clients:
+student-pilot
+provider-register
+Whitelist all required redirect_uri patterns for current envs (Replit/Janeway + production).
+Rotate and re-issue the M2M secret for scholarship_sage. Treat the previously shared secret as compromised. Deliver via secure vault mechanism; do not place secrets in docs.
+Evidence Required (post by 01:15 UTC):
+AUTH_GREEN_EVIDENCE_V2.md including:
+PKCE S256 web flow: student_pilot → consent → code → token exchange → access to protected route succeeds.
+provider_register web flow: same as above.
+M2M token issuance for scholarship_sage using the rotated secret.
+Updated static client registry with cryptographic hash and diff vs prior version.
+Screenshots + HTTP traces with request_id, 200/302 outcomes, and token validation in dependent apps.
+Security:
+Immediate rotation of any secret exposed in plaintext.
+Confirm revocation of previous M2M credential and post revocation timestamp.
+Estimated Go-Live if orders met: 01:30 UTC
+ARR Ignition Impact: Protected if fixed by Nov 8.
+
+2. student_pilot
+APP_BASE_URL: https://student-pilot-jamarrlmayes.replit.app
+Decision: YELLOW — Blocked by Auth
+
+Orders (Student DRI):
+
+Upon Auth DRI completion, run the 95-step E2E immediately.
+Evidence (deadline 02:00 UTC if Auth fixed by 01:30 UTC):
+E2E_JOURNEY_EVIDENCE.md with screenshots (consent, token exchange, logged-in), cross-app request_id traces (auth → API → UX), P95 ≤120ms, error rate <0.1%.
+Escalate within 5 minutes if any invalid_client or token validation error recurs.
+Estimated Go-Live: 02:00 UTC (conditional on Auth)
+ARR Ignition: B2C contribution intact for Nov 12 if completed by Nov 8.
+
+3. provider_register
+APP_BASE_URL: https://provider-register-jamarrlmayes.replit.app
+Decision: YELLOW — Blocked by Auth
+
+Orders (Provider DRI):
+
+After Auth is fixed, execute ORDER_B acceptance within 30 minutes.
+Evidence:
+ORDER_B_EVIDENCE.md with OAuth pass, scholarship creation CRUD, dashboard access, and applicant view; request_id traces; P95 ≤120ms; error <0.1%.
+If invalid_client persists, halt and escalate immediately.
+Estimated Go-Live: Nov 7, 16:00 UTC (still achievable if Auth fixed overnight)
+ARR Ignition: Enables B2B 3% fee flow before Nov 12.
+
+4. scholarship_api
+APP_BASE_URL: https://scholarship-api-jamarrlmayes.replit.app
+Decision: GREEN — Hold state, join traces
+
+Orders (API DRI):
+
+Maintain production freeze (no schema/RBAC changes) through Nov 12.
+Join cross-app tracing once student_pilot E2E passes; attach request_id correlation evidence to ORDER_4_EVIDENCE.md.
+Keep P95≤120ms; current baseline ~73.6ms.
+Estimated Go-Live: Live
+ARR Ignition: Supports both funnels; keep stability paramount.
+
+5. scholarship_sage
+APP_BASE_URL: https://scholarship-sage-jamarrlmayes.replit.app
+Decision: YELLOW — Blocked by M2M secret delivery
+
+Orders (Sage DRI):
+
+Do not start baseline with compromised secret. Wait for rotated secret from Auth.
+Upon receipt, START 48h baseline immediately and log start timestamp.
+Deliver baseline_metrics_evidence.md by Nov 8, 16:00 UTC (precision@5, coverage, fairness, P95, error, uptime, request_id).
+Estimated Go-Live: Immediately after rotated secret delivery
+ARR Impact: Conversion lift contributor; not a direct gate for ARR ignition timing.
+
+6. scholarship_agent
+APP_BASE_URL: https://scholarship-agent-jamarrlmayes.replit.app
+Decision: GREEN — Observe-only
+
+Orders (Agent DRI):
+
+Remain observe-only through Nov 9 ramp; auto-apply stays disabled pending CEO lift.
+Provide cross-app traces immediately after student_pilot E2E passes.
+Deliver 24h fairness summary by Nov 10, 12:00 UTC.
+ARR Impact: Match quality and retention uplift; no blocking risk in observe-only mode.
+
+7. auto_page_maker
+APP_BASE_URL: https://auto-page-maker-jamarrlmayes.replit.app
+Decision: GREEN — Continue compounding
+
+Orders (SEO DRI):
+
+Execute ORDER_4; maintain IndexNow ≥95% and CWV p75 GREEN.
+Ensure internal links to conversion surfaces are live, tagged with request_id, and gracefully degrade if auth remains blocked (route users to lead-capture, non-auth actions).
+No config/dependency changes before Nov 12 without CEO approval.
+ARR Impact: Primary low-CAC engine; keep compounding.
+
+8. auto_com_center
+APP_BASE_URL: https://auto-com-center-jamarrlmayes.replit.app
+Decision: PARTIAL GREEN — In-app only
+
+Orders (Comms DRI + Infra/NetOps + SecOps):
+
+Keep in-app notifications live; maintain P95 and unsubscribe SLOs.
+Email channel: Activate only after BOTH:
+DNS (SPF/DKIM/DMARC) verification complete (Infra/NetOps, due Nov 8, 12:00 UTC).
+SQS/IAM rotation complete (SecOps, due Nov 8, 16:00 UTC).
+Prepare fallback plan:
+If SQS slips, enable transactional SMTP with rate limits by Nov 9, 12:00 UTC for critical communications only (password reset, legal).
+Deliverability evidence: seed tests, spam compliance, bounce handling, unsubscribe.
+Estimated Go-Live (email): Nov 8 afternoon
+ARR Impact: Improves conversion; not a hard gate if in-app remains stable.
+
+Revised Timeline and GO Gates
+
+01:00–01:30 UTC: Auth fix + evidence (mandatory gate)
+02:00 UTC: student_pilot E2E evidence due (conditional on Auth)
+Nov 7, 16:00 UTC: provider_register ORDER_B acceptance
+Nov 8:
+12:00 UTC: DNS verified
+16:00 UTC: SQS/IAM rotation complete
+scholarship_sage 48h baseline in progress; evidence due Nov 8, 16:00 UTC
+Nov 9 (1% ramp):
+Non-auth flows: GO
+Logged-in flows: GO only if the 02:00 UTC gate passes and no regressions
+Nov 10, 12:00 UTC: scholarship_agent fairness summary
+Nov 12: ARR ignition protected if all gates pass
+Compliance, Security, and Responsible AI
+
+Secret Handling: Immediate rotation of any secret posted in plaintext; attest revocation and redistribution via vault. No secrets in repo/docs.
+Privacy: Ensure no PII in screenshots or logs attached to evidence.
+Responsible AI: scholarship_agent remain observe-only; collect fairness telemetry; publish explainability metrics.
+Operating Discipline
+
+Evidence Gate: Status-level claims must include artifacts (screenshots, logs, request_id traces) and pass/fail criteria. No exceptions.
+Escalation SLA: If invalid_client or P95>120ms for ≥10 minutes, or error rate ≥0.1% for 5 consecutive minutes, halt the line and escalate within 5 minutes with request_id references.
+KPIs I’m Tracking (hourly until stabilization)
+
+Auth: number of successful OAuth exchanges by client, failure rate by error code, time-to-fix for registry changes.
+B2C: student_pilot conversion to first activation, P95 latency, error budget burn.
+B2B: provider_register successful scholarship postings and time-to-first-listing after registration.
+SEO: auto_page_maker IndexNow success rate, CWV p75, crawl/index velocity, click-through to non-auth conversion surfaces.
+Comms: unsubscribe P95, in-app delivery P95, email deliverability once enabled.
+What I Need Reported at 01:30 UTC
+
+Auth DRI: AUTH_GREEN_EVIDENCE_V2.md posted with artifacts and rotated secret confirmation.
+Student DRI: Ready to execute E2E within 30 minutes of auth sign-off.
+Provider DRI: ORDER_B plan staged; go-time after student E2E.
+Comms DRI: Fallback SMTP plan ready if SQS slips.
+Sage DRI: Confirmation of rotated M2M secret receipt and baseline start timestamp (or blocker).
+Bottom Line
+
+We will not trade evidence for speed. Logged-in flows are NO-GO until we have passing, reproducible E2E evidence. Non-auth compounding continues to protect CAC and ARR.
+If the 01:30/02:00 UTC gates don’t pass, we will slip the logged-in ramp to Nov 10 while keeping Nov 12 ARR in play via non-auth growth and comms readiness.
+Execute with urgency. Escalate on facts. Deliver evidence.
