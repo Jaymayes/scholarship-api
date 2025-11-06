@@ -1,0 +1,115 @@
+CEO Decision: APPROVE Option B now. Execute immediately.
+
+Rationale: /oidc/auth is being rejected pre-middleware by oidc-provider, indicating client registration or redirect URI validation failure. Option A logging did not surface the cause. We need a deterministic, self-serve validation path to unblock the chain within the 10-minute window.
+
+Immediate Orders (Auth DRI – scholar_auth | APP_BASE_URL: https://scholar-auth-jamarrlmayes.replit.app)
+
+Proceed with Option B now:
+
+Implement /debug/client-test to invoke redirectUriAllowed() and surface the exact failing validation for any client_id + redirect_uri.
+Return JSON payload with fields: client_id, provided_redirect_uri, registered_redirect_uris[], reason, expected, result.
+Timebox: Implement and deploy within 10 minutes. Post results for each client below.
+Client registry ground truth to verify via /debug/client-test and publish CLIENT_REGISTRY_SNAPSHOT.md:
+
+student_pilot
+client_id: student-pilot
+redirect_uri: https://student-pilot-jamarrlmayes.replit.app/auth/callback
+grant_types: authorization_code + PKCE S256
+provider_register
+client_id: provider-register
+redirect_uri: https://provider-register-jamarrlmayes.replit.app/auth/callback
+grant_types: authorization_code + PKCE S256
+scholarship_agent
+client_id: scholarship-agent
+m2m client_credentials (no redirect_uri)
+scholarship_sage
+client_id: scholarship-sage
+m2m client_credentials (no redirect_uri)
+student_pilot backchannel (if applicable)
+client_id: student-pilot-m2m
+client_credentials
+Notes:
+Enforce exact-match redirect URIs (no trailing slash drift, no http/http(s) mismatch, no missing URL-encoding).
+Ensure issuer = https://scholar-auth-jamarrlmayes.replit.app matches discovery.
+Confirm PKCE S256 required for public browser clients.
+Evidence to publish by 05:15 UTC:
+
+AUTH_DEBUG_LOG.md (post-restart logs with validation traces)
+CLIENT_REGISTRY_SNAPSHOT.md (complete client entries)
+Screenshot/HTTP dump: /oidc/auth now reaches consent/login for provider-register and student-pilot.
+Go/No-Go Matrix and Orders by App
+
+auto_com_center | Staging: GO upon secrets | Prod: LOCKED
+
+APP_BASE_URL (Staging): https://auto-com-center-jamarrlmayes.replit.app
+APP_BASE_URL (Prod): https://auto-com-center.scholaraiadvisor.com
+Secrets deadline: 16:00 UTC. Auto-escalate to Infra Lead and CFO at 16:01 UTC if any missing.
+Fallback: Email-only via Postmark if A2P SMS not production-ready. SMS remains disabled until A2P brand/campaign approved.
+Evidence due 21:00 UTC: STAGING_VALIDATION.md proving unsubscribe <5s under load, DLQ=0, SPF/DKIM/DMARC green, P95 ≤120ms, error <0.1%, request_id tracing, Sentry correlation, CAN-SPAM/TCPA/FERPA/COPPA compliance logs.
+auto_page_maker | Staging: GO | Prod: LOCKED
+
+APP_BASE_URL: https://auto-page-maker-jamarrlmayes.replit.app
+Execute +2 pages within 60 seconds of scholarship_api Order 4 trigger.
+Evidence: sitemap diff, IndexNow receipts, CWV p75 green, P95 proof, request_id traces, rollback guard proof.
+SEO guardrails: canonical tags, hreflang (if multi-locale), noindex on staging, ensure robots.txt consistent.
+provider_register | Staging: GO after auth clears | Prod: LOCKED
+
+APP_BASE_URL: https://provider-register-jamarrlmayes.replit.app
+SLA: ORDER_B_EVIDENCE.md within 10 minutes of CLIENT_REGISTRY_SNAPSHOT.md.
+Evidence: PKCE auth flow screenshots, JWT roles=["Provider"], full scholarship CRUD via scholarship_api, ≥20 req perf with P95 ≤120ms, request_id traces, security headers.
+Compliance: Terms/Privacy acceptance gating, PII minimization at form level.
+student_pilot | Staging: GO after auth clears | Prod: LOCKED
+
+APP_BASE_URL: https://student-pilot-jamarrlmayes.replit.app
+SLA: E2E_JOURNEY_EVIDENCE.md within 10 minutes of CLIENT_REGISTRY_SNAPSHOT.md.
+Evidence: 25+ screenshots across devices, 9 P95 metrics, cross-browser pass, request_id traces, activation metric = First Document Upload.
+Guardrails: No academic dishonesty features; explicit consent and privacy notices.
+scholarship_api | Staging: GO (post-auth) | Prod: LOCKED
+
+APP_BASE_URL: https://scholarship-api-jamarrlmayes.replit.app
+ORDER_4_EVIDENCE.md due by 06:05 UTC:
+Endpoint inventory + /docs
+Token validation against scholar_auth
+ACID proof: create → update → rollback
+P95 reads ≤120ms; writes ≤150ms; error <0.1%; uptime ≥99.9%
+Event emissions to auto_page_maker and auto_com_center
+request_id → Sentry trace links
+Rate limiting and RBAC verified.
+scholarship_sage | Staging: READY | Prod: LOCKED
+
+APP_BASE_URL: https://scholarship-sage-jamarrlmayes.replit.app
+Start 48h observe-only baseline immediately after M2M secret rotation.
+Deliver baseline_metrics_evidence.md at +48h with precision@5, coverage, matchReasons, fairness telemetry, SLO proofs, request_id traces.
+scholarship_agent | Staging: Observe-only today | Prod: LOCKED
+
+APP_BASE_URL: https://scholarship-agent-jamarrlmayes.replit.app
+No auto-apply. Notifications only via auto_com_center when live on staging.
+Prepare 20-sample spot-check framework with decision traces and request_id links; hold until instructed to execute.
+Critical Path Timeline (UTC)
+
+Now: APPROVED Option B; implement /debug/client-test; restart; post CLIENT_REGISTRY_SNAPSHOT.md by 05:15.
+05:15: Auth clears blocker → triggers provider_register Order B.
+05:25: provider_register ORDER_B_EVIDENCE.md delivered.
+05:45–06:05: scholarship_api Order 4 window; deliver ORDER_4_EVIDENCE.md by 06:05.
+~05:46–05:55: auto_page_maker generates +2 pages and posts evidence.
+16:00: auto_com_center secrets deadline; escalate at 16:01 if any missing.
+21:00: auto_com_center STAGING_VALIDATION.md due.
+Production Policy
+
+Production remains LOCKED for all apps until staging evidence gates are met and cross-app request_id traces correlate across auth → API → UX → comms.
+Earliest controlled prod ramp: Nov 9 at 1%.
+ARR ignition target: Nov 12 remains unchanged.
+Risk Register and Mitigations
+
+OIDC invalid_client: Addressed via Option B debug endpoint and registry snapshot. Timeboxed now.
+Messaging compliance (A2P): Keep SMS off until brand/campaign approved. Email-only via Postmark remains compliant with CAN-SPAM. Ensure SPF/DKIM/DMARC fully green.
+Secrets delivery: Auto-escalate at 16:01 UTC to Infra Lead and CFO. Blockers here do not stop staging email-only validation.
+Data protection: Verify PII redaction in logs; rotate M2M secrets before 48h scholarship_sage baseline start.
+Performance SLOs: Enforce P95 ≤120ms and error <0.1% across apps; rollback guard triggers at >5% regression.
+Final Executive Directives
+
+Auth DRI: Proceed with Option B immediately and publish CLIENT_REGISTRY_SNAPSHOT.md by 05:15 UTC.
+All DRIs: Maintain evidence-first discipline. No further production assertions without artifacts.
+PMO: Keep the staging chain countdown dashboard active with checkpoints above; alert on misses.
+CFO + Infra: Ensure auto_com_center secrets delivered before 16:00 UTC; be on standby for escalation.
+Answer to your question: Yes—proceed with Option B now. Time is critical. Execute, publish evidence, and unblock the chain.
