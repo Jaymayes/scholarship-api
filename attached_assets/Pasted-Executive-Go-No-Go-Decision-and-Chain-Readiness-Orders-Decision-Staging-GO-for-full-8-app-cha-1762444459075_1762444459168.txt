@@ -1,0 +1,104 @@
+Executive Go/No-Go Decision and Chain Readiness Orders
+
+Decision
+
+Staging: GO for full 8‑app chain validation today as scheduled. Maintain observe-only where specified.
+Production: LOCKED. Next formal go/no-go at Nov 8, 18:30 UTC, contingent on all gates below.
+Controlled ramp: Target Nov 9 at 1% if gates met; ARR ignition Nov 12 remains approved.
+Immediate Deadlines and Escalations (today)
+
+16:00 UTC: Secrets (Postmark, Sentry DSNs, AWS SQS/DLQ IAM) due. Auto‑escalate at 16:01 UTC if any missing.
+17:00 UTC: SPF/DKIM/DMARC “green” for mail.scholaraiadvisor.com. If not green at 17:01 UTC, hold outbound and execute logs-only validation.
+21:00 UTC: Auto Command Center STAGING_VALIDATION.md due (evidence package below).
+21:15 UTC: Chain‑wide roll‑up summary due (each DRI submits).
+App‑by‑App CEO Assessment, Orders, and Go-Live Targets
+
+scholar_auth
+
+Staging: GO under Plan B. Cosmetic error page is acceptable for staging.
+Production: LOCKED pending Option A fix by Nov 7, 18:00 UTC. If not met, proceed with Express‑level override by Nov 7, 18:00 UTC as documented fallback.
+Orders: Publish CLIENT_REGISTRY_SNAPSHOT.md and M2M secret rotation today; notify all DRIs on completion.
+scholarship_api
+
+Staging: GO on auth clearance. ORDER_4_EVIDENCE.md required.
+Production: CONDITIONAL. Needs cross‑app request_id correlation and P95 ≤120ms (reads), ≤150ms (writes), error <0.1%, ACID proof, RBAC token validation.
+Orders: On trigger, fan‑out events to auto_page_maker + auto_com_center; provide Sentry trace URLs.
+scholarship_agent
+
+Staging: GO in observe‑only mode; email‑only notifications via auto_com_center; no auto‑apply.
+Production: CONDITIONAL. Requires fairness telemetry and “Why this match?” explainability evidence in roll‑up.
+Orders: Monitor chain KPIs and file escalation if any gate drifts.
+scholarship_sage
+
+Staging: READY. Begin 48‑hour observe‑only baseline immediately upon M2M secret rotation.
+Production: CONDITIONAL on baseline completion + fairness telemetry + explainability evidence.
+Orders: Deliver baseline_metrics_evidence.md at +48h with precision@5, coverage, fairness, P95, error rate, uptime, request_id traces.
+student_pilot
+
+Staging: READY; execute 95‑step cross‑browser E2E within 10 minutes of auth clearance.
+Production: CONDITIONAL. Requires First Document Upload activation proof (north‑star KPI), Stripe test flow proof, cross‑app tracing.
+Orders: Deliver E2E_JOURNEY_EVIDENCE.md with screenshots and SLOs.
+provider_register
+
+Staging: READY; execute ORDER_B_EVIDENCE.md within 10 minutes of auth clearance.
+Production: CONDITIONAL. Requires PKCE + roles=Provider JWT proof; CRUD to scholarship_api; cross‑app traces; P95 ≤120ms; error <0.1%.
+Orders: Report time‑to‑first‑scholarship‑published and provider→first‑applicant metrics.
+auto_page_maker
+
+Staging: READY; maintain noindex/robots discipline. Execute +2 pages within 60 seconds on scholarship_api Order 4 event.
+Production: CONDITIONAL. Requires CWV p75 green, request_id traces, IndexNow receipts, P95 ≤120ms, rollback guard.
+Orders: Provide sitemap diffs, IndexNow receipts, CWV snapshots.
+auto_com_center (Auto Command Center)
+
+Staging: GO on secrets; email‑only via Postmark. SMS deferred to Nov 11 EOD.
+Production: LOCKED until deliverability and observability gates pass.
+Orders: Deliver STAGING_VALIDATION.md by 21:00 UTC with:
+Unsubscribe under 5s at 100 concurrent (summary + histogram)
+DLQ=0 (SQS/DLQ metric screenshot + 15‑min Prometheus)
+SPF/DKIM/DMARC “green” proof (DNS TXT + test report)
+P95 ≤120ms end‑to‑end (15‑ and 60‑min Grafana)
+Error <0.1%, uptime ≥99.9% panels for validation window
+request_id traces with Sentry correlation across 8 apps (≥1 trace URL: auth→API→UX→comms)
+Compliance artifacts (CAN‑SPAM/TCPA/FERPA/COPPA: headers, consent logs, suppression, age gating)
+Prometheus snapshots (latency, error rate, queue depth, bounce/retry, suppression)
+Production Unlock Gates (must all be green to start 1% ramp on Nov 9)
+
+Cross‑app request_id correlation with Sentry trace links for representative E2E flows (auth→provider_register→scholarship_api→auto_page_maker; auth→student_pilot→scholarship_agent→auto_com_center).
+SLOs: P95 ≤120ms (service‑level), uptime ≥99.9%, error <0.1% over 24h.
+Email deliverability: SPF/DKIM/DMARC “green,” unsubscribe <5s at 100 concurrent, DLQ=0.
+Compliance: Evidence packages approved (CAN‑SPAM/TCPA/FERPA/COPPA); fairness telemetry and explainability active where applicable.
+B2C activation: First Document Upload captured in staging E2E.
+B2B pathway: Provider publishes scholarship and receives first applicant in staging.
+If 100% readiness is not possible today
+
+New dates are approved as follows:
+scholar_auth production readiness: Nov 7, 18:00 UTC (Option A fix or Express override).
+auto_com_center SMS enablement: Nov 11, 23:59 UTC.
+Controlled ramp start: Nov 9, 16:00 UTC (1%) contingent on gates above.
+ARR ignition: Nov 12, 16:00 UTC. No change.
+Any slip against the above must be escalated with a quantified impact on ARR and a revised recovery plan the same day.
+KPI Operating Targets for the Next 72 Hours
+
+B2B: Providers onboarded, scholarships published, provider→first applicant conversion time; target first provider→first applicant within staging today.
+B2C: First Document Upload activation rate; Stripe test success; session→activation conversion.
+Platform: P95 ≤120ms; error <0.1%; uptime ≥99.9%; email deliverability ≥98% inbox placement (post‑DNS green).
+SEO: auto_page_maker CWV p75 green; indexing discipline intact; +2 page trigger validated.
+Capital Allocation and Constraints
+
+No paid acquisition. SEO-first growth via auto_page_maker remains primary CAC lever.
+Approve operational spend necessary for: Postmark credits, Sentry seats/retention, AWS SQS/DLQ, DNS provider updates. Keep within current monthly budget envelope; CFO to flag exceptions immediately.
+Risk and Ethics Controls
+
+Maintain observe-only for scholarship_agent and scholarship_sage through baseline period.
+Enforce Responsible AI: fairness telemetry, explainability, audit trails. No auto‑apply in staging.
+Compliance: Do not send production email/SMS until DNS is green and unsubscribe performance meets threshold; do not process under‑age data without age gating and verified consent.
+Deliverables and Format Reminders (mandatory)
+
+Every evidence file starts with:
+Application: <app_name>
+APP_BASE_URL: <url>
+DRIs deliver to e2e/reports/<app_name>/ and include Sentry trace links, Prometheus/Grafana screenshots, and raw metrics exports where applicable.
+Final CEO Instruction
+
+Proceed with the staged validation today exactly as outlined. Maintain production lock until all gates are evidenced. Escalate at 16:01 and 17:01 UTC if secrets or DNS are not green. Deliver the 21:00 UTC Auto Command Center package and the 21:15 UTC chain roll‑up with explicit GO/NO‑GO recommendation for Nov 9 1% ramp, including any residual risks to the Nov 12 ARR ignition milestone.
+I will review the 21:15 UTC roll‑up personally and issue final ramp authorization if all gates are green.
