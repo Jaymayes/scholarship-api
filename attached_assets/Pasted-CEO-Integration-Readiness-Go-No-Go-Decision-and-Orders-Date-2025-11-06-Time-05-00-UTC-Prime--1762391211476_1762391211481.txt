@@ -1,0 +1,118 @@
+CEO Integration Readiness – Go/No-Go Decision and Orders
+Date: 2025-11-06 | Time: 05:00 UTC
+Prime Directive Alignment: Protect the SEO flywheel, minimize CAC, evidence-first. Production remains locked until all gates pass.
+
+Executive Summary
+
+Staging Chain: NO-GO right now due to authentication client registration gaps (provider_register and student_pilot). Target fix in 30 minutes, then immediate re-run.
+Production: LOCKED. Earliest ramp window remains Nov 9–12, contingent on comms gates and 24h auth soak.
+ARR Ignition: Target Nov 12, contingent on auto_com_center comms gates (email-only acceptable if A2P lags).
+Critical Dependencies: Infra secrets for auto_com_center (Sentry, SQS/DLQ, Postmark, Twilio, DNS, A2P) due by 16:00 UTC.
+Critical Blockers (Must Fix Now)
+
+scholar_auth client registry gaps
+Issue: provider_register and student_pilot not registered as OIDC clients, causing invalid_client failures. This blocks Order B (providers) and the student E2E journey.
+Owner: Auth DRI
+SLA: 30 minutes from now
+Required action:
+Register clients with PKCE S256 and correct redirect URIs and scopes.
+Post client registry snapshot and a passing authorize URL proof for both apps.
+Evidence to publish:
+e2e/reports/scholar_auth/CLIENT_REGISTRY_SNAPSHOT.md (client_id, redirect_uris, scopes, pkce_required: true; all secrets redacted)
+e2e/reports/provider_register/ORDER_B_EVIDENCE.md (successful login + CRUD round-trip)
+e2e/reports/student_pilot/E2E_JOURNEY_EVIDENCE.md (full journey screenshots and timings)
+2. auto_com_center third-party secrets and comms posture
+
+Issue: Missing production-grade comms and observability secrets; A2P status pending.
+Owner: Infra DRI
+SLA: 16:00 UTC today
+Deliver:
+Sentry DSN, AWS SQS + DLQ (with policies), Postmark API key, Twilio credentials, DNS SPF/DKIM/DMARC; A2P brand + campaign filings.
+Approval posture:
+Email-only fallback is approved if A2P lags; no SMS in production until A2P is green.
+Go/No-Go by Application (Staging)
+
+scholar_auth
+Status: Incident response and M2M rotation acknowledged as complete; however, the OIDC client registry is incomplete relative to claims. This is the primary chain blocker.
+Decision: NO-GO until client registry evidence is posted and authorize flows pass for provider_register and student_pilot.
+Today’s SLA: 30 minutes to register clients + publish proof.
+Evidence: CLIENT_REGISTRY_SNAPSHOT.md + passing authorize requests.
+2. scholarship_api
+
+Status: ARMED; P95 reads ~96ms; Swagger live; ACID with transactions; RBAC active; event emission to auto_page_maker and auto_com_center ready.
+Decision: CONDITIONAL GO once Order B evidence is posted.
+Action: Execute Order 4 within 20 minutes of receiving provider_register evidence; create +2 scholarships; emit events; publish ORDER_4_EVIDENCE.md.
+3. scholarship_agent
+
+Status: Monitoring only; health 200 OK; P95 3–18ms; uptime 100%.
+Decision: GO for monitoring; NO production actions (no auto-apply, no notifications) until comms gates pass.
+Action: Post checkpoint memos at T+10/T+30/T+50 with SLO proofs and trace links.
+4. scholarship_sage
+
+Status: Ready; P95 ~1ms; observe-only baseline pending rotated M2M secret distribution.
+Decision: GO for 48h observe-only baseline immediately after secret distribution.
+Action: Deliver baseline_metrics_evidence.md at +48h with precision@5, coverage, matchReasons samples, fairness telemetry, and SLO proofs.
+5. student_pilot
+
+Status: Application ready; blocked by missing OIDC client.
+Decision: NO-GO until scholar_auth registers client and authorize flow passes.
+Action: Within 10 minutes after unblock, post E2E_JOURNEY_EVIDENCE.md with full journey, timings, and request_id traces.
+6. provider_register
+
+Status: App ready; blocked by missing OIDC client.
+Decision: NO-GO until scholar_auth registers client and authorize flow passes.
+Action: Post ORDER_B_EVIDENCE.md immediately upon unblock (login + scholarship CRUD + dashboard view).
+7. auto_page_maker
+
+Status: GO AND ARMED; 2,101 pages live; IndexNow initialized; P95 ~100ms; CWV p75 green; rollback guard armed for >5% regression.
+Decision: GO upon scholarship_api Order 4; generate +2 pages within 60 seconds of event; post evidence within 10 minutes.
+Evidence: ORDER_4_EVIDENCE.md must include sitemap diff, IndexNow receipts, CWV p75 green, P95 proofs, request_id traces.
+8. auto_com_center
+
+Status: Code complete; blocked waiting for Infra secrets and A2P. Email-only fallback approved.
+Decision: STAGING GO once secrets arrive; PRODUCTION LOCKED.
+SLAs: Secrets by 16:00 UTC; staging validation evidence by 21:00 UTC.
+Evidence: STAGING_VALIDATION.md with unsubscribe SLA <5s under load, DLQ=0, DNS green, deliverability smoke tests, rate limits, CAN-SPAM/TCPA/FERPA/COPPA logs, PII redaction, SLO proofs, and trace links.
+Global Release Gates (Must be evidenced before any production ramp)
+
+Auth: 24h soak; zero invalid_client; refresh and revocation flows verified.
+API: P95 ≤120ms; ACID consistency; Swagger publicly available to ecosystem.
+Comms (auto_com_center): Unsubscribe <5s under load; DLQ=0; DNS SPF/DKIM/DMARC green; A2P approved (or email-only with SMS disabled).
+Cross-app tracing: request_id propagates across all 8 apps with resolving trace links.
+Responsible AI: No academic dishonesty; PII redaction; fairness telemetry for scholarship_sage.
+ARR and Go-Live Targets
+
+Staging Chain: Resume today after auth client registration fix; complete Order B → Order 4 → +2 pages and publish all evidence.
+Production Earliest Ramp: Nov 9 (1% → 5% → 25% → 100%), pending all gates and 24h auth soak completion.
+ARR Ignition: Nov 12, contingent on comms gates (email-only acceptable if A2P pending; SMS added post-approval).
+KPI Focus for Day 0/Week 1:
+B2C: Activation rate (First Document Upload), match views per student, free→credit conversion, ARPU for credit packs.
+B2B: Provider activation to first scholarship posted, time-to-list, application volume, 3% fee pathway confirmation.
+Comms: Deliverability, unsubscribe SLA, DLQ depth, complaint rate.
+Platform SLOs: P95 latency, error rate, uptime, end-to-end request_id coverage.
+Orders and Owners (firm deadlines)
+
+Auth DRI (Due +30 min):
+Register OIDC clients for provider_register and student_pilot (PKCE S256, correct scopes/redirects).
+Publish CLIENT_REGISTRY_SNAPSHOT.md and authorize URL proofs.
+provider_register DRI (Due +10 min after auth fix):
+Execute Order B and publish ORDER_B_EVIDENCE.md.
+scholarship_api DRI (Due +20 min after Order B):
+Execute Order 4 and publish ORDER_4_EVIDENCE.md (including event emission proof).
+auto_page_maker DRI (Due <10 min after Order 4):
+Generate +2 pages and publish ORDER_4_EVIDENCE.md with sitemap diff, IndexNow receipts, CWV p75 green, P95 proofs, and request_id traces.
+Infra DRI (Due 16:00 UTC):
+Deliver Sentry, SQS/DLQ, Postmark, Twilio, DNS SPF/DKIM/DMARC; A2P filings. Auto-escalation triggers if late.
+auto_com_center DRI (Due 21:00 UTC):
+Complete staging validation; publish evidence bundle. If A2P pending, run email-only plan.
+Escalation Protocol
+
+If Auth DRI misses +30 min: Immediate escalation to me; chain remains paused; we re-forecast the day’s timeline.
+If Infra DRI misses 16:00 UTC: Auto-escalation; proceed with email-only validation if Postmark is available; SMS remains disabled.
+Any gate failure (unsubscribe >5s, DLQ>0, DNS not green, invalid_client reappears): Halt production ramp; fix-first, re-evidence.
+CEO Decision
+
+Staging: NO-GO until scholar_auth registers provider_register and student_pilot and posts evidence. Expecting unblock in 30 minutes; then proceed down the chain per SLAs above.
+Production: LOCKED. No change.
+ARR: Target Nov 12 stands, dependent on evidence. Organic SEO growth via auto_page_maker remains the primary acquisition lever; paid acquisition stays off until unit economics are proven.
+Deliver evidence, not assertions. Maintain Responsible AI posture and compliance at every step.
