@@ -1,0 +1,73 @@
+Executive decision memo – CEO, Scholar AI Advisor
+
+Prime directive check: The plan below preserves the Nov 9 controlled prod ramp and Nov 12 ARR ignition while keeping CAC low (SEO-first), SLOs intact (≤120 ms P95, 99.9% uptime), and Responsible AI guardrails.
+
+Immediate approvals and orders
+
+scholar_auth: APPROVE Option C now. Implement the adapter change (return class constructor, not instance) immediately. Timebox: 10 minutes including unit + smoke tests. Preserve Option B’s /debug/client-test for verification but restrict to admin, log-only, and remove before prod. Deliver AUTH_OPTION_C_EVIDENCE.md (repro steps, fix diff, logs showing ClientAdapter invoked, successful authorize → consent → token, request_id trace) within 20 minutes of start.
+Production lock: Remains in effect for all apps until staging evidence gates are met and cross-app request_id traces correlate end-to-end (auth → API → UX → comms).
+Secrets deadline for auto_com_center: 16:00 UTC firm. If any secret is missing at 16:01 UTC, auto-escalate to Infra Lead and CFO. Email-only fallback via Postmark is authorized; SMS disabled until A2P is fully approved and in green status.
+Critical path timeline (UTC)
+
+Now → +10 min: scholar_auth Option C fix + smoke test + AUTH_OPTION_C_EVIDENCE.md
+05:15: CLIENT_REGISTRY_SNAPSHOT.md (auth) — unchanged target
+05:25: ORDER_B_EVIDENCE.md from provider_register and E2E_JOURNEY_EVIDENCE.md from student_pilot
+05:45–06:05: scholarship_api ORDER_4_EVIDENCE.md; triggers auto_page_maker +2 pages within 60 seconds and evidence
+16:00: auto_com_center secrets deadline; at 21:00 deliver STAGING_VALIDATION.md
+Nov 9: earliest prod ramp 1% if all gates green
+Nov 12: ARR ignition target remains
+Per-application go/no-go and evidence requirements
+
+scholar_auth | APP_BASE_URL: https://scholar-auth-jamarrlmayes.replit.app
+Status: Blocking chain; Option C approved now.
+Evidence today: AUTH_OPTION_C_EVIDENCE.md + CLIENT_REGISTRY_SNAPSHOT.md. Include token lifetimes, refresh flow, revocation test, PKCE S256, roles claims, and request_id traces. Add integration test to prevent regression of invalid_client.
+2. scholarship_api | APP_BASE_URL: https://scholarship-api-jamarrlmayes.replit.app
+
+Status: Armed; GO after auth clears.
+Evidence by 06:05: ORDER_4_EVIDENCE.md with endpoint inventory (/docs), token validation vs scholar_auth, ACID proof (create→update→rollback), P95 reads ≤120 ms/writes ≤150 ms, error <0.1%, event emissions to auto_page_maker and auto_com_center, rate limiting and RBAC checks, request_id→Sentry links.
+3. scholarship_agent | APP_BASE_URL: https://scholarship-agent-jamarrlmayes.replit.app
+
+Status: Ready; observe-only. No auto-apply. Notify via auto_com_center only once comms are green.
+Evidence: Keep spot-check framework locked (403) until explicit CEO token. Show monitoring panel with UTC checkpoints and request_id correlation.
+4. scholarship_sage | APP_BASE_URL: https://scholarship-sage-jamarrlmayes.replit.app
+
+Status: Ready; start 48h observe-only baseline immediately after M2M secret rotation from auth.
+Evidence at +48h: baseline_metrics_evidence.md including precision@5, coverage, matchReasons, fairness telemetry, P95 ≤120 ms, error <0.1%, uptime ≥99.9%, request_id traces.
+5. student_pilot | APP_BASE_URL: https://student-pilot-jamarrlmayes.replit.app
+
+Status: Staging GO once auth clears.
+Evidence by 05:25: E2E_JOURNEY_EVIDENCE.md with 95-step flow, 25+ screenshots across devices, 9 P95 metrics, cross-browser pass, request_id traces, First Document Upload activation metric, consent/privacy confirmations.
+6. provider_register | APP_BASE_URL: https://provider-register-jamarrlmayes.replit.app
+
+Status: Staging GO once auth clears.
+Evidence by 05:25: ORDER_B_EVIDENCE.md with OAuth PKCE S256, Provider role in JWT, Scholarship CRUD to scholarship_api, dashboard checks, ≥20 requests with P95 ≤120 ms, request_id correlation, client/server validation proofs.
+7. auto_page_maker | APP_BASE_URL: https://auto-page-maker-jamarrlmayes.replit.app
+
+Status: Staging GO and armed; Prod locked.
+Evidence on trigger: Sitemap diff, IndexNow receipts, CWV p75 green, P95 proof, request_id traces, rollback guard. Maintain canonical tags, noindex on staging, robots.txt consistency.
+8. auto_com_center | APP_BASE_URL (Staging): https://auto-com-center-jamarrlmayes.replit.app | APP_BASE_URL (Prod): https://auto-com-center.scholaraiadvisor.com
+
+Status: Code 100% complete; awaiting secrets.
+Evidence by 21:00: STAGING_VALIDATION.md demonstrating unsubscribe <5 s under load, DLQ=0, SPF/DKIM/DMARC green for mail.scholaraiadvisor.com, P95 ≤120 ms end-to-end, error <0.1%, uptime ≥99.9%, request_id tracing and Sentry correlation across all 8 apps, CAN-SPAM/TCPA/FERPA/COPPA compliance logs, Prometheus snapshots.
+Fallback authorized: Email-only via Postmark until A2P is green. No SMS to production until A2P brand/campaign approved.
+Risk management and guardrails
+
+Security and privacy: Enforce least-privilege IAM for SQS/DLQ and comms providers. Validate token signature, audience, scopes on every sensitive endpoint. Ensure revocation works and is logged. Maintain PII minimization and explicit consent.
+Responsible AI: No academic dishonesty enablement anywhere. scholarship_agent remains observe-only until CEO approval to progress.
+Deliverability: SPF/DKIM/DMARC must be green. Monitor bounce/complaint rates; hold sends if rates breach thresholds.
+Contingency: If scholar_auth Option C is not green within 30 minutes, prepare emergency staging-only fallback using the provider’s default memory adapter to complete evidence runs. CEO approval required before using fallback.
+KPIs and financial alignment
+
+B2C funnel: Track free→paid conversion, ARPU from credits, First Document Upload activation.
+B2B funnel: Active providers count, 3% platform fee run-rate, time-to-first-posted-scholarship.
+Platform SLOs: P95 ≤120 ms, error <0.1%, uptime ≥99.9% across all apps.
+CAC: Prioritize Auto Page Maker SEO; no paid spend increases before SEO telemetry shows lift.
+Owners and escalation
+
+Auth DRI: Own Option C fix and evidence delivery now; page the CEO if any deviation from 10-minute plan.
+API, student_pilot, provider_register DRIs: Hit 05:25/06:05 evidence deadlines.
+Infra Lead + CFO: On-call at 16:00 UTC for auto_com_center secrets; auto-escalate at 16:01 UTC if any secret is missing.
+Compliance Lead: Sign off CAN-SPAM/TCPA/FERPA/COPPA in STAGING_VALIDATION.md.
+Final directive
+
+Execute Option C for scholar_auth immediately. Post evidence as specified. All other DRIs proceed per the timeline above. Production remains locked until evidence gates are met and traces correlate. ARR ignition remains Nov 12.
