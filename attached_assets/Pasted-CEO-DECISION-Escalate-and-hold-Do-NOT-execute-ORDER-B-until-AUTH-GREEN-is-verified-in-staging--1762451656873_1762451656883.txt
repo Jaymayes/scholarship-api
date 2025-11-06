@@ -1,0 +1,58 @@
+CEO DECISION: Escalate and hold. Do NOT execute ORDER_B until AUTH_GREEN is verified in staging.
+
+Rationale
+
+Evidence-first principle: We have a hard “invalid_client” from scholar_auth; claims of clearance without a passing authorize→consent→code→token flow are not sufficient.
+Risk: Proceeding will burn time, block evidence, and jeopardize the Nov 9 ramp and Nov 12 ARR ignition.
+Immediate orders (effective now)
+
+scholar_auth — FIX AND PROVE AUTH_GREEN (Owner: Auth DRI)
+Deadline: T+20 minutes for a working flow; absolute cutoff 19:00 UTC for today’s validation plan.
+Required fixes:
+Register or re-register provider_register client correctly.
+Whitelist all staging redirect_uris actually in use (include current replit domain variants seen in error logs).
+Enforce PKCE S256; ensure correct client type (public vs confidential) aligned with provider_register.
+Evidence to deliver to all dependents:
+Updated CLIENT_REGISTRY_SNAPSHOT with SHA-256 fingerprint and timestamp.
+OIDC smoke test proof:
+GET .well-known openid-configuration (200 OK)
+/authorize returns consent (screenshot) for provider_register
+/token exchanges code→tokens (log with redacted tokens)
+refresh_token works; revocation works (200 OK)
+Copy of exact redirect_uri used during the passing test.
+If not green by 19:00 UTC:
+Declare AUTH RED for today’s chain; we will shift the Nov 9 ramp decision accordingly at 21:15 UTC.
+2. provider_register — STAND BY; PREP TO EXECUTE ORDER_B ON AUTH_GREEN (Owner: Provider DRI)
+
+Do not start ORDER_B until Auth DRI posts the above evidence.
+Pre-stage two redirect_uris:
+The stable app URL callback.
+The current ephemeral staging callback in use.
+Upon AUTH_GREEN: execute ORDER_B immediately and deliver ORDER_B_EVIDENCE.md within 15 minutes (end-to-end auth→create scholarship→view dashboard).
+3. student_pilot — HOLD E2E UNTIL AUTH_GREEN (Owner: Student DRI)
+
+Maintain 10-minute SLA to run the 95-step E2E once Auth posts passing evidence.
+Evidence pack must include cross-app request_id trace auth→api→ui→auto_com_center (internal only if DNS not green).
+4. auto_com_center — CONTINUE EMAIL-ONLY; BLOCK EXTERNAL IF DNS NOT GREEN (Owner: Comms DRI)
+
+If SPF/DKIM/DMARC not GREEN, block external sends; run internal loopbacks only.
+Deliver STAGING_VALIDATION.md by 21:00 UTC; include Postmark deliverability checks, DLQ=0, P95 ≤120ms, unsubscribe ≤5s @100 conc.
+5. scholarship_sage — SECRET DISCREPANCY (Owner: Sage DRI + Auth DRI)
+
+Auth DRI: deliver M2M_SCHOLARSHIP_SAGE_SECRET to Sage env within T+30 minutes.
+Sage: start 48h baseline immediately on receipt; report baseline start timestamp in the 21:15 UTC roll-up. Not on Nov 9 critical path, but must not slip past Nov 8 ~16:00 UTC.
+6. scholarship_api and auto_page_maker — CONTINUE AS PLANNED
+
+scholarship_api: ORDER_4 evidence received; maintain readiness and request_id propagation.
+auto_page_maker: Stay staged for ORDER_4-driven generation; keep rollback guard armed, IndexNow success ≥95%, CWV p75 GREEN.
+GO/NO-GO guardrails for today
+
+If AUTH_GREEN achieved by 19:00 UTC and holds steady through ≥500 auth cycles (student_pilot + provider_register mix) with P95 ≤120ms and error rate <0.1%, we maintain the preliminary GO for the Nov 9 1% ramp.
+If not, prepare a NO-GO recommendation for auth-dependent flows at 21:15 UTC; we will preserve SEO/non-auth workstreams and re-slot the ramp window.
+Escalation protocol
+
+This message constitutes the escalation. Auth is RED until evidence proves otherwise.
+Any miss on the above deadlines triggers immediate page to CEO and an updated impact note on the 21:15 UTC roll-up.
+Answer to your dilemma
+
+Do not proceed with ORDER_B on trust. Wait for verified auth clearance and escalate (which we have now done). Execute ORDER_B immediately after AUTH_GREEN evidence is posted. This protects the Nov 9 ramp and Nov 12 ARR ignition while adhering to our evidence-first, low-CAC, Responsible AI operating model.
