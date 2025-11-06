@@ -1,0 +1,95 @@
+CEO Directive — Final Integration and Go‑Live Readiness Decision (as of 2025-11-06 UTC)
+
+Executive Summary
+
+Overall status: Conditional GO for today’s full staging validation; preliminary GO for Nov 9 (1% production ramp) if gates are met; ARR ignition remains Nov 12.
+Critical 16:00 UTC gates: secrets/DSNs delivery and CLIENT_REGISTRY_SNAPSHOT.md from scholar_auth. 17:00 UTC gate: DNS posture (SPF/DKIM/DMARC) GREEN.
+Chain trigger: scholarship_api ORDER_4 at 17:05 UTC to validate cross-app events and request_id propagation to auto_page_maker and auto_com_center.
+Ethical guardrails: Auto-apply remains disabled; communications compliant; Responsible AI standards affirmed.
+Per‑App Readiness and Orders
+
+scholar_auth APP_BASE_URL: https://scholar-auth-jamarrlmayes.replit.app
+Status: Ready; credential delivery pending. SCHOLAR_AUTH_READINESS.md prepared and corrected (scopes fixed; secure delivery protocol in place).
+Required by 16:00 UTC: Deliver CLIENT_REGISTRY_SNAPSHOT.md to all dependents; rotate/deliver M2M secret for scholarship_sage.
+Escalation: If any secret/registry artifact is not delivered by 16:05 UTC, page Auth DRI; by 16:15 UTC, escalate to CEO.
+Go‑Live: Today on secrets delivery. ARR role: Enabler for both funnels.
+2. scholarship_api
+APP_BASE_URL: https://scholarship-api-jamarrlmayes.replit.app
+
+Status: Ready. P95 ~96ms; ACID on PostgreSQL; JWT validation integrated; OpenAPI docs available. Awaiting secrets/DSN.
+Order at 17:05 UTC: Execute ORDER_4, emit events (scholarship_created/updated, match_generated), and capture request_id propagation.
+Evidence by 19:00 UTC: e2e/reports/scholarship_api/ORDER_4_EVIDENCE.md covering OpenAPI link, token validation proof, ACID notes, load summary, event logs with request_id.
+Ramp: GO (conditional on gates).
+3. scholarship_agent
+APP_BASE_URL: https://scholarship-agent-jamarrlmayes.replit.app
+
+Status: Evidence delivered early. P95 ~42ms; auto-apply disabled; fairness/explainability telemetry and request_id traces ready.
+Dependencies: auto_com_center secrets/DSNs, DNS GREEN.
+Ramp: Conditional GO for Nov 9; ARR unchanged (supports B2C activation and retention through match quality).
+4. scholarship_sage
+APP_BASE_URL: https://scholarship-sage-jamarrlmayes.replit.app
+
+Status: Code 100%; blocked on M2M secret rotation. Baseline (48h) starts immediately upon secret receipt.
+Estimated Go‑Live: Nov 8 ~16:00 UTC if secret delivered by 16:00 today (+48h baseline). Not on critical path for Nov 9 ramp.
+ARR: On track for Nov 12; baseline informs precision/coverage/fairness.
+5. student_pilot
+APP_BASE_URL: https://student-pilot-jamarrlmayes.replit.app
+
+Status: Ready; 95‑step E2E suite staged; cross‑browser/device validation and nine P95 metrics instrumented. Awaiting auth clearance.
+On auth receipt: Execute E2E; evidence E2E_JOURNEY_EVIDENCE.md within 10 minutes, including request_id traces, Stripe test flow, First Document Upload activation metric.
+Escalation: If auth not cleared by 17:30 UTC, page CEO with impact.
+Ramp: Conditional GO on auth and SLOs; this is the B2C north-star funnel.
+6. provider_register
+APP_BASE_URL: https://provider-register-jamarrlmayes.replit.app
+
+Status: Ready; OAuth PKCE S256, JWT roles=["Provider"], RBAC enforced. Awaiting CLIENT_REGISTRY_SNAPSHOT.md and Sentry DSN (non-blocking for staging).
+On auth receipt: Execute ORDER_B test suite; deliver ORDER_B_EVIDENCE.md within 10 minutes.
+Ramp: Conditional GO on auth; ARR path via 3% fee begins Nov 12.
+7. auto_page_maker
+APP_BASE_URL: https://auto-page-maker-jamarrlmayes.replit.app
+
+Status: Ready; P95 ~100ms; 2,101 pages operational; IndexNow/CDN/DNS/Sentry prepared. Awaiting scholarship_api ORDER_4.
+On ORDER_4: Generate ≥2 pages within 60s; propagate request_id; send IndexNow.
+Evidence within 10 minutes of trigger; complete package by 20:30 UTC (sitemap diff, IndexNow receipts, CWV p75 green, P95 proof, rollback guard proof, request_id traces).
+Ramp: GO; cornerstone for low‑CAC SEO growth.
+8. auto_com_center
+APP_BASE_URL (Staging): https://auto-com-center-jamarrlmayes.replit.app
+APP_BASE_URL (Prod): https://auto-com-center.scholaraiadvisor.com
+
+Status: Ready; awaiting secrets at 16:00 UTC; SMS deferred to Nov 11 EOD. Monitoring and auto‑escalation armed.
+17:00 UTC: Verify SPF/DKIM/DMARC; hold outbound if not GREEN.
+Evidence by 21:00 UTC: STAGING_VALIDATION.md (unsubscribe <5s @ 100 concurrent; DLQ=0; latency SLO P95 ≤120ms; reliability ≥99.9%; cross‑app tracing; compliance artifacts; Prometheus snapshots).
+Ramp: Conditional GO for email on DNS GREEN; SMS starts Nov 11.
+Gating Criteria for Today’s GO/NO‑GO
+
+Auth: CLIENT_REGISTRY_SNAPSHOT.md delivered; M2M secret rotated for scholarship_sage; protected route redirects validated in dependent apps.
+DNS: SPF/DKIM/DMARC GREEN by 17:00 UTC; else NO‑GO for outbound email (internal validation may proceed).
+Performance: P95 ≤120ms; error rate <0.1%; uptime target ≥99.9% during validation windows.
+Events/Tracing: ORDER_4 events fan out; request_id traces visible across api → auto_page_maker → auto_com_center.
+Compliance: Unsubscribe SLA met; CAN‑SPAM/TCPA/FERPA/COPPA evidence in‑bundle; auto‑apply remains disabled.
+Executive Decisions and Orders
+
+Decision: Conditional GO for full staging validation today; pre‑approved GO for Nov 9 1% production ramp if all gates pass and evidence is delivered on time.
+Secrets/DSNs: Deliver by 16:00 UTC; 16:05 page Auth DRI if late; 16:15 escalate to CEO.
+DNS Gate: If SPF/DKIM/DMARC not GREEN by 17:01 UTC, outbound email NO‑GO; continue internal testing; root‑cause and remediate; re‑request GO at or before 20:30 UTC with proof.
+scholarship_api ORDER_4: Execute at 17:05 UTC. Auto Page Maker to publish within 60s; Auto Com Center to log, queue, and show DLQ=0; all with request_id continuity.
+Evidence deadlines: scholarship_api 19:00; auto_page_maker 20:30; auto_com_center 21:00; chain roll‑up at 21:15 with GO/NO‑GO recommendation.
+Risk protocol: Immediate page to CEO on any of: secrets not delivered by 16:15; DNS not GREEN by 17:01; P95 drift >120ms; DLQ growth >0; any blocker jeopardizing 21:00/21:15 deliverables.
+KPI Alignment (week 1 targets post‑ramp)
+
+B2C funnel (student_pilot): First Document Upload activation rate ≥35% of new sign‑ups; match‑to‑open rate ≥55%; time‑to‑first‑value ≤10 minutes median.
+SEO (auto_page_maker): +2 pages on ORDER_4; maintain p75 CWV GREEN; IndexNow confirmations ≥95% success; 7‑day impressions +20% vs. baseline.
+B2B funnel (provider_register): 10 net‑new verified providers by Nov 12; ensure roles/CRUD fully operational; 3% fee path verified in staging and test‑mode payments validated.
+Platform SLOs: P95 ≤120ms; error <0.1%; uptime ≥99.9%; unsubscribe SLA under 5s at 100 concurrent.
+CAC discipline: Prioritize organic traffic; no paid spend authorization until SEO ramp and CRs are verified.
+Responsible AI and Compliance
+
+Auto‑apply remains disabled; human‑in‑the‑loop required.
+Maintain fairness telemetry and “Why this match?” explainability in scholarship_agent and surface in student experience.
+CAN‑SPAM/TCPA/FERPA/COPPA artifacts to be included in tonight’s evidence; hold any channel that lacks compliant configuration.
+ARR Timeline (no change)
+
+Nov 9: 1% production ramp (conditional GO).
+Nov 11: SMS channel activation EOD (post‑compliance check).
+Nov 12: ARR ignition for both B2C and B2B engines.
+Agent3 and DRIs — Confirm receipt of this directive, execute per above timeline, and deliver all evidence artifacts on schedule. Any gate miss triggers immediate escalation per the risk protocol.
