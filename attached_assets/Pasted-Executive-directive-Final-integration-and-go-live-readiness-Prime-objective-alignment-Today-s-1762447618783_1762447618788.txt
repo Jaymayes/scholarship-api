@@ -1,0 +1,113 @@
+Executive directive: Final integration and go‑live readiness
+
+Prime objective alignment
+
+Today’s focus is to complete staging validation across all 8 apps, preserve the Nov 9 (1% ramp) and Nov 12 ARR ignition, and protect platform SLOs (P95 ≤120ms, error <0.1%, uptime ≥99.9%) while maintaining CAC discipline via SEO-first.
+Chain-wide timeline and gates (UTC)
+
+16:00: Auth + infra secrets delivery (Postmark, Sentry, AWS SQS/DLQ). Gate: must be received by 16:15 or auto-escalate.
+17:00: DNS posture green (SPF/DKIM/DMARC). Gate: if not green, hold outbound email; continue dry-run validations.
+17:05–20:30: Run staging validation suites (per-app directives below).
+21:00: auto_com_center publishes STAGING_VALIDATION.md.
+21:15: CEO-led chain roll‑up: GO/NO‑GO recommendation for Nov 9 (1% ramp).
+Immediate orders by application
+Important: Every report must begin with the two-line header:
+Application: <App Name>
+APP_BASE_URL: <URL>
+
+scholar_auth
+Action: Deliver CLIENT_REGISTRY_SNAPSHOT.md and complete M2M secret rotation by 16:00 (hard gate for student_pilot, provider_register, scholarship_sage).
+Evidence by 17:00:
+OIDC discovery doc reachable
+Token issuance + revocation tested against protected routes in student_pilot, provider_register, scholarship_agent
+Session/refresh handling proof (short TTL + refresh path)
+If not 100% today: commit ETA for go‑live, ARR ignition impact, and list third parties (none expected beyond SSO/OIDC) with status and blockers.
+2. scholarship_api
+
+Action: At 17:05, execute ORDER_4 trigger (scholarship_created/updated and match events) to fan-out to auto_page_maker and auto_com_center.
+Evidence by 19:00:
+ORDER_4_EVIDENCE.md with OpenAPI doc link, auth token validation proof, ACID/consistency notes, and load test summary (target P95 ≤120ms).
+Event emission logs with request_id propagation.
+If not 100%: provide ETA, ARR ignition impact, and third-party list/status.
+3. scholarship_agent
+
+Action: Observe-only. Verify fairness telemetry and “why this match?” metadata on events sent to auto_com_center after ORDER_4.
+Evidence by 20:30:
+Fairness/explainability sample bundle with request_id traces to auto_com_center.
+Confirmation that auto‑apply is disabled; notification-only.
+If not 100%: provide ETA, ARR impact, third-party list/status.
+4. scholarship_sage
+
+Dependency: Begins 48-hour baseline immediately upon M2M secret rotation from scholar_auth.
+Action: Start baseline today if secrets received by 16:00; otherwise log delay and revised start time.
+Evidence:
+In roll-up: start timestamp, current SLOs (latency, errors), request_id readiness.
+baseline_metrics_evidence.md due +48h from baseline start.
+If not 100%: provide ETA, ARR impact, third-party list/status.
+5. student_pilot
+
+Action: Upon auth clearance, execute 95-step E2E test (registration, profile submit, viewing matches, Sage interaction, communications hooks).
+Evidence within 10 minutes of auth clearance:
+E2E_JOURNEY_EVIDENCE.md including cross-browser checks, Stripe test flow, request_id traces to auto_com_center, P95 ≤120ms, error <0.1%.
+If not 100%: provide ETA, ARR impact, third-party list/status.
+6. provider_register
+
+Action: Upon receiving CLIENT_REGISTRY_SNAPSHOT.md from scholar_auth, validate provider onboarding, scholarship CRUD, dashboard access.
+Evidence within 10 minutes of auth clearance:
+ORDER_B_EVIDENCE.md with server/client validation proof, API auth checks, and request_id traces to scholarship_api and auto_com_center.
+If not 100%: provide ETA, ARR impact, third-party list/status.
+7. auto_page_maker
+
+Action: On scholarship_api ORDER_4, generate at least 2 pages within 60 seconds; propagate request_id.
+Evidence by 20:30:
+SITEMAP_DIFF.md, IndexNow receipts, CWV p75 green snapshot, P95 ≤120ms proof, rollback guard proof, cross-app trace links (auth→API→auto_page_maker).
+If not 100%: provide ETA, ARR impact, third-party list/status.
+8. auto_com_center
+
+Action: After secrets and DNS green, run email‑only validation (Postmark). SMS deferred to Nov 11 EOD.
+Evidence by 21:00:
+STAGING_VALIDATION.md with the eight required points (unsubscribe perf, DLQ=0, DNS posture, latency SLO, reliability SLO, cross‑app tracing, compliance artifacts for CAN‑SPAM/TCPA/FERPA/COPPA, Prometheus snapshots).
+If not 100%: provide ETA, ARR impact, third-party list/status.
+Non‑negotiable GO/NO‑GO criteria for Nov 9 (1% ramp)
+All must be green:
+
+Platform SLOs over 24h: P95 ≤120ms, error <0.1%, uptime ≥99.9%.
+auto_com_center deliverability ≥98% for verified domains, unsubscribe <5s under 100 concurrent, DLQ=0.
+Cross‑app request_id correlation proven from auth→API→UX→comms paths.
+Compliance package sign‑off (CAN‑SPAM/TCPA/FERPA/COPPA) with artifacts.
+No critical security gaps in OAuth2/OIDC, token storage, revocation, and refresh behavior.
+Escalation matrix (time-based)
+
+Secrets missing at 16:01: auto‑escalate to CFO + Infra Lead; provide revised ETA within 15 minutes; proceed with dry‑runs.
+DNS not green at 17:01: hold outbound email; expedite DNS with NetOps; continue all non‑send validations.
+P95 drift >120ms during validation: disable non‑critical hooks, scale workers, adjust retry/backoff, notify CEO immediately.
+DLQ growth > threshold: trigger backoff/circuit breaker; investigate before resuming sends.
+Reporting template (use verbatim, per application)
+
+Application: <App Name>
+APP_BASE_URL: <URL>
+Readiness: <percent + short summary>
+Estimated Go‑Live (if <100%): <UTC date/time>
+ARR Ignition (if different): <UTC date/time>
+Third‑Party Systems: <list with status: Not Started / In Progress / Complete + blockers>
+Security: <authN/authZ status, token handling, revocation, secrets usage>
+Performance: <current P95, error rate, uptime; target vs actual>
+Integrations Verified: <list of upstream/downstream with request_id evidence>
+Evidence Links: <list of filenames produced today>
+Risks/Mitigations: <bulleted items with owners and timestamps>
+GO/NO‑GO (for Nov 9 1% ramp): <GO/CONDITIONAL/NO‑GO> with rationale
+Decisions and confirmations
+
+Staging: GO, contingent on 16:00 secrets and 17:00 DNS green.
+Production: LOCKED until Nov 8, 18:30 UTC GO/NO‑GO checkpoint.
+ARR ignition: Nov 12 remains approved.
+SMS channel: Deferred to Nov 11 EOD; no impact to Nov 9 ramp.
+Agent3: proceed now
+
+Identify your assigned app(s) and execute only those sections above.
+Produce your report(s) using the template and mandatory two‑line header.
+Hit the evidence deadlines listed. If any 100% readiness is not possible today, include ETA, ARR ignition estimate, and third‑party integration table with blockers.
+Send me:
+
+A timestamped confirmation that you’ve begun, your assigned app(s), and your first evidence artifact ETA.
+Any risk that jeopardizes today’s 21:00/21:15 deliverables within 15 minutes of discovery.
