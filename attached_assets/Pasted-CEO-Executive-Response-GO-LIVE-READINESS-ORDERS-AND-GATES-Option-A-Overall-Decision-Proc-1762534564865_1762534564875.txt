@@ -1,0 +1,125 @@
+CEO Executive Response — GO-LIVE READINESS, ORDERS, AND GATES (Option A)
+
+Overall Decision
+
+Proceed with Option A. Hard gate remains: P95 ≤120ms for authorize, token, jwks, discovery by 00:00 UTC; slip allowed to 00:15 UTC. If the gate is not met at 00:15 UTC, NO-GO and slip +24h.
+We do not accept YELLOW on JWKS. Bring JWKS ≤120ms P95.
+Critical Execution Orders (effective immediately)
+
+Auth DRI (owner: @auth-lead)
+
+Register three OAuth clients now and signal completion:
+student-pilot: authorization_code + refresh_token, PKCE S256, redirect: https://student-pilot-jamarrlmayes.replit.app/callback
+provider-register: authorization_code + refresh_token, PKCE S256, redirect: https://provider-register-jamarrlmayes.replit.app/callback
+scholarship_sage: client_credentials with read-only scopes (student.read, scholarship.read, scholarship.search or equivalent)
+Execute latency optimizations before 23:45 UTC:
+Pre-warm authorize, token, discovery, jwks for 10 minutes at 30–50 RPS (keep-alive on).
+Enable connection pooling to DB/IDP dependencies (reuse agents/HTTP keep-alive).
+Add in-memory cache for discovery + JWKS (TTL 300s; ETag; Cache-Control: public, max-age=300, stale-while-revalidate=30).
+Precompute JWKS JSON and ETag in-memory on boot; avoid per-request crypto/serialization.
+Preload client metadata and hot path checks.
+Metrics cadence: Post p50/p95 by endpoint every 20 minutes (rolling 15-min window) plus error rates and sample sizes.
+AUTH_FIXLOG: Maintain in scholar_auth repo. Include timestamps, diffs, metrics before/after, and owners for each change. Post initial entry within 15 minutes.
+Agent3 (auto_com_center) — continue as coordination hub
+
+Maintain war-room cadence and evidence intake. Do not attempt auth execution. Keep all DRI owners on schedule.
+Keep DELIVERABILITY_SNAPSHOT on track for 00:00 UTC.
+Student DRI
+
+Re-run PKCE flow for student_pilot immediately upon Auth DRI’s “clients registered” signal; produce E2E evidence within 30 minutes of AUTH GREEN TAG.
+Provider DRI
+
+Execute ORDER_B within 60 minutes of AUTH GREEN TAG.
+Stripe production verification must be complete by 22:00 UTC:
+Live keys present; webhook secret verified; 3% platform fee transparency captured in evidence.
+If Stripe prod cannot be verified by 22:00 UTC, hold ORDER_B and alert IC.
+Sage DRI
+
+Execute 3-grant M2M validation within 30 minutes of AUTH GREEN TAG and deliver evidence (latency, scope enforcement, request_id lineage).
+API DRI
+
+Monitor 401/5xx during JWKS rehearsal (23:30–23:45 UTC) and at AUTH GREEN TAG window. Provide cross-app traces (auth→api→app) for evidence by ~01:30 UTC.
+Comms DRI (auto_com_center)
+
+SendGrid: Verify DKIM/SPF/DMARC “verified” status and production sender by 20:30 UTC; share test deliverability results (seed list).
+Twilio SMS (if used tonight): Confirm A2P 10DLC registration and campaign approved; otherwise disable SMS for tonight and note in snapshot.
+War-Room Timeline (UTC)
+
+19:00: Auth: “Clients registered” signal due; Metrics Snapshot #1
+19:20: Metrics Snapshot #2
+20:00: War-room opens; 30-min checkpoints
+23:30–23:45: JWKS rehearsal; all DRIs monitor; API DRI on 401/5xx
+23:45: P95 checkpoint — all four endpoints trending ≤120ms
+00:00: AUTH GREEN TAG gate (slip allowed to 00:15)
+00:30: student_pilot E2E evidence due
+01:00: provider_register ORDER_B evidence due
+~01:30: scholarship_api ORDER_4 addendum due
+Go/No-Go Criteria (must all be true at the gate)
+
+scholar_auth: P95 ≤120ms for authorize, token, jwks, discovery over a rolling 15-min window; error rate ≤0.5%; zero invalid_client since registration.
+JWKS rotation rehearsal yields zero validation errors across clients.
+scholarship_api: 401/5xx within budget (<1%) during and after rehearsal; token validation continuity intact.
+student_pilot: PKCE flow success and protected routes pass-through.
+provider_register: PKCE + fee capture verified in evidence; Stripe production confirmed (keys + webhook).
+scholarship_sage: M2M client_credentials success; read-only scopes enforced.
+Risk Controls
+
+If JWKS remains >120ms P95 after caching/precompute:
+Increase JWKS cache TTL to 600s temporarily with stale-while-revalidate=60; confirm auditability.
+Ensure HTTP keep-alive pool tuned to peak concurrent; avoid cold starts by pre-warming every 5 minutes until gate.
+If still failing at 00:15 UTC: NO-GO and slip +24h. Protect trust/SLOs.
+ARR Impact and Targets
+
+If AUTH GREEN tonight:
+B2C upsell: +48h (earliest 2025-11-10 00:00 UTC).
+B2B 3% platform fee: upon ORDER_B completion (earliest 2025-11-08 01:30–03:00 UTC).
+Auto Page Maker continues CAC-lean compounding regardless of gate outcome; no changes through Nov 12.
+Per-Application Status — Confirmed and Orders
+
+Application Name: scholar_auth
+APP_BASE_URL: https://scholar-auth-jamarrlmayes.replit.app
+
+Status: Functionally GREEN; Performance YELLOW (JWKS ~130ms P95).
+Orders: Execute client registration and five optimizations now; post metrics q20m; deliver AUTH_FIXLOG updates.
+Application Name: scholarship_api
+APP_BASE_URL: https://scholarship-api-jamarrlmayes.replit.app
+
+Status: GREEN.
+Orders: Monitor token validation continuity; capture cross-app traces; post ORDER_4_EVIDENCE addendum by ~01:30 UTC.
+Application Name: scholarship_agent
+APP_BASE_URL: https://scholarship-agent-jamarrlmayes.replit.app
+
+Status: GREEN (Frozen) through Nov 9.
+Orders: Observe-only; no changes.
+Application Name: scholarship_sage
+APP_BASE_URL: https://scholarship-sage-jamarrlmayes.replit.app
+
+Status: READY pending M2M client.
+Orders: Execute 3-grant M2M validation within 30 minutes of AUTH GREEN; deliver evidence.
+Application Name: student_pilot
+APP_BASE_URL: https://student-pilot-jamarrlmayes.replit.app
+
+Status: Blocked by invalid_client until Auth DRI registers client.
+Orders: Re-run PKCE E2E immediately after AUTH GREEN; deliver evidence by 00:30–00:45 UTC.
+Application Name: provider_register
+APP_BASE_URL: https://provider-register-jamarrlmayes.replit.app
+
+Status: GREEN pending client registration; Stripe prod verification required by 22:00 UTC.
+Orders: Execute ORDER_B within 60 minutes of AUTH GREEN; deliver evidence by ~01:00 UTC.
+Application Name: auto_page_maker
+APP_BASE_URL: https://auto-page-maker-jamarrlmayes.replit.app
+
+Status: GREEN (Frozen) through Nov 12.
+Orders: Monitor only; deliver daily rollups 06:00 UTC.
+Application Name: auto_com_center
+APP_BASE_URL: https://auto-com-center-jamarrlmayes.replit.app
+
+Status: PROVISIONALLY GREEN.
+Orders: Maintain war-room cadence; deliver DELIVERABILITY_SNAPSHOT at 00:00 UTC; confirm SendGrid/Twilio production posture.
+Required Confirmations (post back within 15 minutes)
+
+Auth DRI: “Clients registered” + link to AUTH_FIXLOG entry + Metrics Snapshot #1.
+Comms DRI: “SendGrid verified” (DKIM/SPF/DMARC) and SMS decision/disable.
+Finance/Platform Ops: “Stripe prod verified” or escalation.
+Final Note
+Quality and trust over speed. If P95 ≤120ms is not achieved by 00:15 UTC, we NO-GO and slip 24 hours. Auto Page Maker continues to compound organic demand; ARR ignition remains intact with minimal schedule impact.
