@@ -1,0 +1,113 @@
+CEO Go-Live Readiness — Consolidated Decision
+Date: 2025-11-07
+Time: ~04:30 UTC
+
+Executive decisions (aligned to the 5-year plan to $10M profitable ARR and SEO-led growth)
+
+Non-auth surfaces: GO. Keep compounding low-CAC traffic via Auto Page Maker; this is the primary acquisition engine per our playbook, and we protect ARR by keeping organic growth uninterrupted .
+Logged-in flows: GO if auth clears by 05:00 UTC; else slip to Nov 10 while non-auth continues. Maintain evidence-first reporting for the 06:00 UTC checkpoint.
+Activation north-star: Drive First Document Upload; ensure E2E validates this metric and instrumentation. This correlates strongly with downstream conversion and must be highlighted in the student_pilot evidence package .
+Security/compliance: No plaintext secrets. Replit Secrets only; rotation on exposure is mandatory, consistent with our deployment discipline .
+Responsible AI: scholarship_agent remains observe-only through Nov 9, with fairness/why-this-match telemetry and a 24h fairness summary due Nov 10, 12:00 UTC. This upholds our bias mitigation and transparency commitments .
+Rollout strategy: Treat auth-sensitive changes as phased and monitored; prioritize “monitor-only” and progressive activation patterns to de-risk launch windows .
+P0 critical path to 05:00 UTC
+
+Auth DRI: Confirm PKCE S256 across student_pilot and provider_register; deliver M2M secret to scholarship_sage via secure manager; post green evidence. Use Replit Secrets only; delete any docs with plaintext secrets after rotation .
+Client DRIs (student_pilot, provider_register, scholarship_sage): Load rotated secrets, restart, run the committed E2E/baseline within 30 minutes of true auth-green, and post evidence with request_id traces.
+06:00 UTC checkpoint acceptance criteria (all apps)
+
+SLOs: P95 ≤120ms; error rate <0.1%; uptime ≥99.9%.
+Evidence: App-specific runbooks completed, cross-app request_id traces attached (student_pilot→scholar_auth→scholarship_api), and compliance attestations posted.
+KPIs: Include First Document Upload activation for B2C and readiness to collect provider fee events for B2B, reaffirming our data-first focus and activation-led growth model .
+Application: scholar_auth
+APP_BASE_URL: https://scholar-auth-jamarrlmayes.replit.app
+
+Status: GREEN. Discovery OK; PKCE S256 enforced; secrets rotated; token endpoint healthy.
+Today’s deliverables:
+Confirm PKCE S256 pass for student_pilot and provider_register.
+Deliver rotated M2M secret to scholarship_sage via secure manager; no plaintext. Practices must follow our Replit secrets policy .
+Third-party systems: N/A (core auth service).
+Risk controls: Maintain monitor-only posture on changes; phased validation remains the standard .
+Application: scholarship_api
+APP_BASE_URL: https://scholarship-api-jamarrlmayes.replit.app
+
+Status: GREEN/HOLD. Freeze through Nov 12. P95 and error rates within SLO.
+Today’s deliverables:
+Stay on-call; attach cross-app traces to ORDER_4 evidence after student_pilot E2E.
+Third-party systems: PostgreSQL (ACID), observability stack. Maintain immutable request_id correlation for cross-app lineage.
+Application: scholarship_agent
+APP_BASE_URL: https://scholarship-agent-jamarrlmayes.replit.app
+
+Status: GREEN (observe-only).
+Orders:
+Keep auto-apply OFF through Nov 9 ramp; capture cross-app traces post student E2E; deliver 24h fairness summary by Nov 10, 12:00 UTC with explainability and bias telemetry per Responsible AI framework .
+ARR note: Supports organic growth quality; aligns with our SEO-first engine and trust mandate.
+Application: scholarship_sage
+APP_BASE_URL: https://scholarship-sage-jamarrlmayes.replit.app
+
+Status: YELLOW — M2M secret missing at runtime.
+If not 100% today:
+Estimated Go-Live: Upon receipt of rotated M2M secret + restart + token acquisition test (target: by 05:00 UTC).
+ARR ignition: Not blocking near-term ARR; advisory quality supports activation and retention.
+Third-party systems: scholar_auth (M2M) — Integration: Not Started at runtime (blocked by secret); scholarship_api — Complete.
+Orders:
+Load rotated M2M secret (Auth DRI), restart, acquire token, and start 48h baseline immediately; post baseline start timestamp and health confirmation. Use phased/monitor-first practice for safety .
+Application: student_pilot
+APP_BASE_URL: https://student-pilot-jamarrlmayes.replit.app
+
+Status: READY — pending PKCE confirmation.
+If not 100% today:
+Estimated Go-Live: Nov 10 for logged-in flows if auth misses 05:00 UTC; non-auth surfaces continue.
+ARR ignition: Still on track via SEO (Auto Page Maker) compounding; B2C monetization relies on activation via First Document Upload metric in E2E evidence .
+Third-party systems: scholar_auth (OAuth) — In Progress (awaiting confirmation); scholarship_api — Complete; Stripe TEST — Complete; GCS — Complete.
+Orders:
+On PKCE green: execute 95-step E2E within 30 minutes; post E2E_JOURNEY_EVIDENCE with cross-app traces and activation metric callouts tied to our playbook north-star .
+Application: provider_register
+APP_BASE_URL: https://provider-register-jamarrlmayes.replit.app
+
+Status: YELLOW — previously invalid_client; auth-side rotation completed; DRI must load the new secret and retest PKCE.
+If not 100% today:
+Estimated Go-Live: Nov 10 for logged-in provider flows if auth misses 05:00 UTC.
+ARR ignition: Provider fee events begin as ORDER_B flows complete; aligned with the revised roadmap’s B2B buildout over time .
+Third-party systems: scholar_auth (OAuth) — In Progress; scholarship_api — Complete; observability — Complete.
+Orders:
+After auth-green: execute ORDER_B within 30 minutes; post evidence (consent, JWT redacted, dashboard, CRUD with request_id).
+Application: auto_page_maker
+APP_BASE_URL: https://auto-page-maker-jamarrlmayes.replit.app
+
+Status: GREEN — non-auth live; compounding traffic. No unapproved changes before Nov 12.
+Orders:
+Maintain daily index coverage and CWV rollups to CEO; confirm graceful degradation to lead capture if auth blocked; this is our low-CAC engine and must keep compounding per strategy .
+Application: auto_com_center
+APP_BASE_URL: https://auto-com-center-jamarrlmayes.replit.app
+
+Status: GREEN for fallback; primary comms pending infra timelines.
+If not 100% today:
+Estimated Go-Live: Fallback auto-activation Nov 9, 12:00 UTC if DNS/SQS not GREEN by Nov 8, 16:00 UTC (as documented).
+ARR ignition: Supports conversion/retention; fallback ensures continuity.
+Third-party systems:
+DNS/SQS (queueing) — In Progress; tracked;
+SMTP fallback — Complete;
+SendGrid/Twilio (if applicable) — Configure/monitor deliverability.
+Orders:
+Keep feature flag path ready; ensure unsubscribe/suppression, bounce/complaint webhooks, and audit logs remain compliant; treat this as a production control plane per our deployment readiness guidance .
+Risk, compliance, and monitoring
+
+Security: Secrets must be rotated on exposure and distributed only via secure secret manager; follow Replit Secrets guidance end-to-end .
+Responsible AI: Maintain explainability and bias monitoring in production, produce fairness summaries, and keep observe-only gates until data supports safe expansion .
+Operational discipline: Freeze core API schema/RBAC until Nov 12; phased rollout for auth-sensitive paths; emphasize monitor-only first where appropriate .
+KPI focus for this window
+
+B2C: First Document Upload activation; end-to-end auth success rate (target 0% failures); p95 latencies across 9 critical paths ≤120ms; error rate <0.1% .
+B2B: Provider onboarding readiness and ORDER_B execution; begin capturing provider fee events post-Nov 10 if auth slips, dovetailing with our Year 2-5 B2B scaling plan .
+Organic growth: Maintain SEO compounding via Auto Page Maker; this keeps CAC structurally low and protects the Nov 12 ARR ignition milestone .
+Owners and next 90 minutes
+
+Auth DRI: Deliver rotated secrets via secure manager, confirm PKCE S256, deliver M2M secret to Sage, and post auth-green evidence by 05:00 UTC.
+student_pilot DRI: On auth-green, run the 95-step E2E and post evidence by 06:00 UTC with activation and cross-app traces.
+provider_register DRI: On auth-green, execute ORDER_B and post evidence within 30 minutes.
+scholarship_sage DRI: On receipt of the M2M secret, start the 48h baseline immediately and post timestamp + health within minutes; baseline evidence due Nov 8, 16:00 UTC.
+auto_page_maker DRI: Maintain GREEN metrics; deliver daily index and CWV rollups.
+auto_com_center DRI: Keep fallback GREEN; enforce compliance and deliverability monitoring.
+Final note
+This plan stays true to our strategy: student value drives business value, with activation around the First Document Upload, organic SEO as the primary low-CAC growth engine, and disciplined, ethical AI operations. This is how we compound toward market leadership and $10M profitable ARR on schedule .
