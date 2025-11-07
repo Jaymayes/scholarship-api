@@ -1,0 +1,101 @@
+Agent3 — Executive Direction from CEO, Scholar AI Advisor
+
+Bottom line
+
+Primary objective remains unchanged: hit the Nov 8, 00:00 UTC AUTH GREEN TAG and protect ARR ignition on Nov 12.
+You will execute a dual-track plan on the M2M discovery blocker: immediate bypass to unblock dependent services + parallel root-cause fix with SME escalation.
+You will also lead war-room setup, evidence templates, and KPI dashboard prep to keep the rest of the portfolio moving.
+Decisions and orders (timeboxed, with owners and success criteria)
+
+P0 — scholar_auth: M2M discovery blocker (client_credentials not advertised)
+
+Decision: Run two tracks in parallel (do not wait on a single fix path).
+Track 1 (Bypass to unblock): Configure dependent clients (scholarship_sage, scholarship_agent, scholarship_api if applicable) to bypass OIDC discovery for M2M and call the token endpoint directly using client_credentials with known token URL, client_id/secret, scopes.
+Owner: Agent3 with Sage and Agent DRIs
+Start: Now
+Done when: M2M token issuance and verification succeeds end-to-end without relying on discovery document; evidence posted (request_id lineage, token introspection/validation log, and 3 successful token grants).
+Deadline: Today, within 2 hours
+Track 2 (Root fix): Ensure the Koa middleware that augments the discovery JSON actually executes.
+Owner: Auth DRI; Agent3 drives escalation and coordination
+Actions:
+Instrumentation: Add explicit startup assertions that confirm middleware registration order and emit a fail-fast log if provider.app.use middleware count < expected. Add a “MIDDLEWARE REGISTERED” and “DISCOVERY MIDDLEWARE HIT” log, and assert hit within a test request.
+Mounting order: Ensure our Koa app wraps provider.app so our middleware precedes provider’s discovery handler (construct our Koa app, app.use(ourMiddleware), then app.use(provider.app.callback())).
+Version gate: Prepare a fast test against the immediately previous minor version and the immediately next minor (if available in our lockfile constraints) to rule out a 9.5.1-specific regression without destabilizing code.
+Evidence: Post before/after discovery JSON showing grant_types_supported includes client_credentials and include logs proving middleware execution.
+Deadline: 4 hours for determination. If unresolved, proceed with SME pair-debug.
+SME escalation: Engage an oidc-provider SME now (parallel to Track 2). Provide minimal reproducible snippet, logs, and current mount strategy.
+Owner: Agent3
+Deadline: SME confirmed and calendar hold within 1 hour; pair-debug window scheduled within next 6 hours.
+Risk policy on P0
+
+Gate remains: Nov 8, 00:00 UTC AUTH GREEN TAG.
+If Track 1 bypass is successful and all auth flows (authorization_code + M2M token issuance via direct token endpoint) are green, we accept launch with discovery JSON still missing client_credentials, provided:
+All dependent apps operate without discovery for M2M.
+Security review signs off that the bypass uses standard token endpoint with proper client auth and scope checks.
+Evidence pack posted.
+If P0 is missed at 00:00 UTC, immediately activate Contingency A (non-auth surfaces live, lead capture on across student_pilot and provider_register waitlist), keep Nov 8, 12:00 UTC as the hard stop for recovery.
+P1 — Portfolio readiness acceleration (execute in parallel)
+
+War-room setup (tonight 20:00–01:00 UTC)
+Owner: Agent3
+Deliver:
+Channel with 30-min checkpoint agenda and owners per app.
+Live checklist pinned: AUTH GREEN TAG, E2E_JOURNEY_EVIDENCE.md (student_pilot), ORDER_B_EVIDENCE.md (provider_register), ORDER_4_EVIDENCE.md (scholarship_api).
+Incident template and escalation tree pinned.
+2. Evidence templates (make it impossible to fail the documentation)
+
+Owner: Agent3
+Deliver:
+student_pilot/E2E_JOURNEY_EVIDENCE.md template: cross-browser table, first-document-upload activation highlight, 9 P95 metrics, request_id propagation, error budget summary, auth success = 0 failures.
+provider_register/ORDER_B_EVIDENCE.md template: client/server validation artifacts, 3% fee transparency screenshots, publish-to-dashboard flow proof, P95 ≤120ms, 100% auth pass.
+scholarship_api/ORDER_4_EVIDENCE.md addendum skeleton: cross-app traces (auth→api→app), token validation logs, latency P95, error budget.
+Deadline: In repo and pinned in war-room before 20:00 UTC.
+3. scholarship_sage M2M baseline
+
+Status: Waiting on M2M secret; our Track 1 bypass above removes dependency on discovery.
+Owner: Sage DRI; Agent3 to validate bypass works for Sage as soon as token flow is unblocked.
+Deliver:
+Baseline evidence by Nov 8, 16:00 UTC: request_id lineage, safety proof meeting thresholds (selection parity 0.8–1.25; FPR by segment ≤2%; rationale coverage ≥95%; manual override available; no PII leakage).
+Preparatory task (Agent3): Ensure the safety metrics export and report generator are wired to the evidence template.
+4. auto_com_center external dependencies
+
+Owner: Agent3 coordinating with Infra/NetOps and SecOps
+Actions:
+DNS (SPF/DKIM/DMARC) verification: Track to Nov 8, 12:00 UTC. If GREEN, immediately run seed inbox deliverability test and post inbox rate ≥95%, spam <0.2%.
+SQS credentials: Confirm by Nov 8, 16:00 UTC; if delayed, enforce Email-only fallback with current suppression/audit.
+Evidence: Post DNS verification proof, seed test results, and SQS confirmation.
+5. student_pilot and provider_register execution on AUTH GREEN
+
+Owner: Respective DRIs; Agent3 to coordinate and timebox
+Trigger: AUTH GREEN TAG at 00:00 UTC
+Deadline: Evidence posted within 30 minutes (student_pilot) and within 30 minutes (provider_register) after trigger; both complete by 01:00 UTC.
+If AUTH gate slips, execute Contingency A within 30 minutes.
+6. KPI and financial guardrails
+
+Owner: Agent3
+Deliver by 06:00 UTC daily through Nov 12:
+Auth success rate (>99.9%), E2E pass rate (100%), P95 per app (≤120ms), error budget (<0.1%), first-document-upload activation funnel, lead volume, cross-app request_id propagation (100%).
+Call out exceptions and corrective action plans.
+Constraints and guardrails (reaffirmed)
+
+CAC: Organic-only through Nov 12; no paid acquisition.
+Margins: Maintain 4× AI services markup and 3% provider fee.
+Freeze discipline: No schema/RBAC/config changes on frozen apps without CEO approval.
+Responsible AI: Auto-apply remains OFF through Nov 9; fairness and safety must be GREEN before enabling.
+Your immediate next actions (in order)
+
+Launch Track 1 bypass for M2M now; target completion and evidence within 2 hours.
+Kick off Track 2 root-cause with logs/assertions and schedule SME pair-debug; secure calendar within 1 hour.
+Publish the three evidence templates and open the war-room with pinned checklist before 20:00 UTC.
+Coordinate DNS verification follow-up for auto_com_center and be ready to run the seed inbox test as soon as DNS is GREEN.
+Confirm with student_pilot and provider_register DRIs their 30-minute evidence delivery plan post AUTH GREEN, with exact owners for each artifact.
+Answer to your question
+
+Yes, escalate now to an oidc-provider SME while you continue executing the bypass and root-cause tracks in parallel. Timebox each step, post evidence at each gate, and keep the Nov 8, 00:00 UTC AUTH GREEN TAG as the working deadline.
+Report back cadence
+
+Post a checkpoint update in 90 minutes with:
+M2M bypass status (success/fail with evidence).
+SME escalation confirmation (name, time).
+Middleware instrumentation results (did the discovery middleware fire?).
+War-room and templates readiness status.
