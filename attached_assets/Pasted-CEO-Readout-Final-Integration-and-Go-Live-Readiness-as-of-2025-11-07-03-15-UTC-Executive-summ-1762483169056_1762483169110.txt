@@ -1,0 +1,114 @@
+CEO Readout: Final Integration and Go‑Live Readiness (as of 2025-11-07 ~03:15 UTC)
+
+Executive summary
+
+Overall: Non-auth surfaces are GO. Logged-in flows remain YELLOW pending final OAuth client configuration/verification and M2M secret propagation. Fallback SMTP is implemented and ready; Nov 9 ramp and Nov 12 ARR remain protected.
+Decision: Proceed with non-auth acquisition (Auto Page Maker compounding). Convene a 60‑minute auth war-room immediately to clear student_pilot and provider_register, then run student_pilot 95‑step E2E and provider_register ORDER_B within 30 minutes of AUTH GREEN.
+Next checkpoint: 06:00 UTC today for a final GO/NO‑GO on logged‑in flows.
+scholar_auth APP_BASE_URL: https://scholar-auth-jamarrlmayes.replit.app
+Status: GREEN (post-rotation). Discovery endpoint 200 OK; client secrets rotated and delivered to dependent apps.
+Actions required now:
+War-room with student_pilot and provider_register to confirm PKCE S256 flows with the new client secrets.
+Confirm scholarship_sage M2M credentials received and loaded into runtime envs (Sage DRI reports “not received”).
+Go-Live: Ready now (pending dependent client updates).
+ARR Ignition impact: None; enabling logged-in flows is prerequisite for B2C/B2B monetization signals.
+2. scholarship_api
+APP_BASE_URL: https://scholarship-api-jamarrlmayes.replit.app
+
+Status: GREEN/HOLD. Freeze active through Nov 12; P95 ~74ms; error 0%; uptime 100%. ACID Postgres; request_id propagation active.
+Actions required now:
+None. Await cross-app traces post student_pilot E2E.
+Go-Live: Ready now.
+ARR Ignition impact: Supports both funnels; no blockers.
+3. scholarship_agent
+APP_BASE_URL: https://scholarship-agent-jamarrlmayes.replit.app
+
+Status: GREEN (observe-only). Auto-apply disabled. Fairness telemetry active; P95 ~42ms; uptime 100%.
+Actions required now:
+Provide cross-app traces after student_pilot E2E passes.
+Deliver 24h fairness summary by Nov 10, 12:00 UTC.
+Go-Live: Observe-only ready now (no auto-apply).
+ARR Ignition impact: Contributes insight and matching quality; auto-apply remains off through Nov 9 ramp.
+4. scholarship_sage
+APP_BASE_URL: https://scholarship-sage-jamarrlmayes.replit.app
+
+Status: YELLOW. SLOs are GREEN, but baseline is blocked awaiting rotated M2M secret confirmation in env.
+Actions required now:
+Auth DRI + Sage DRI: verify delivery and load of scholarship-sage-m2m credentials; start 48h baseline immediately.
+Evidence: baseline_metrics_evidence.md per plan.
+Estimated Go-Live: Advisory is functional; baseline telemetry start within 1 hour of secret receipt.
+ARR Ignition impact: Advisory lift supports conversion; not a blocker for Nov 12 ARR.
+5. student_pilot
+APP_BASE_URL: https://student-pilot-jamarrlmayes.replit.app
+
+Status: YELLOW (awaiting final PKCE confirmation). Infra, tests, and evidence pack staged; Stripe TEST confirmed.
+Actions required now:
+Load new OAuth client secret; verify PKCE S256; execute 95‑step E2E within 30 minutes of AUTH GREEN.
+Post E2E_JOURNEY_EVIDENCE.md with request_id traces.
+Estimated Go-Live: 2 hours after auth war-room start (target by 06:00 UTC).
+ARR Ignition impact: Critical for B2C monetization path. Must be GREEN before Nov 9 ramp.
+6. provider_register
+APP_BASE_URL: https://provider-register-jamarrlmayes.replit.app
+
+Status: YELLOW (auth dependency). App SLOs GREEN; waiting to confirm OAuth client registration/secret.
+Actions required now:
+Confirm client registration present; load rotated secret; complete PKCE; run ORDER_B within 30 minutes of AUTH GREEN; post ORDER_B_EVIDENCE.md.
+Estimated Go-Live: 2 hours after auth war-room start (target by 06:00 UTC).
+ARR Ignition impact: Critical for B2B revenue via 3% platform fee; must be GREEN ahead of Nov 12 ARR.
+7. auto_page_maker
+APP_BASE_URL: https://auto-page-maker-jamarrlmayes.replit.app
+
+Status: GREEN. Pages 2,101 live; IndexNow ≥95% monitoring; CWV p75 GREEN; P95 ~100ms; error 0%; uptime 100%.
+Actions required now:
+Continue compounding; no unapproved changes pre‑Nov 12; ensure graceful degradation to lead capture when auth blocked.
+Go-Live: LIVE (non-auth).
+ARR Ignition impact: Primary low‑CAC acquisition engine; compounding protects Nov 12 ARR.
+8. auto_com_center
+APP_BASE_URL: https://auto-com-center-jamarrlmayes.replit.app
+
+Status: GREEN for fallback. Fallback SMTP plan implemented (Postmark direct), routes live, metrics/audit logs, rate‑limiting, compliance.
+Known external dependencies:
+DNS SPF/DKIM/DMARC: pending Infra/NetOps by Nov 8, 12:00 UTC.
+AWS SQS credentials rotation: pending SecOps by Nov 8, 16:00 UTC.
+Activation triggers:
+Nov 9, 12:00 UTC: Activate fallback if DNS or SQS not GREEN by Nov 8, 16:00 UTC.
+Go-Live: Ready now for fallback path; primary path awaits DNS/SQS GREEN.
+ARR Ignition impact: Ensures reliable comms for conversion and retention; fallback protects ramp.
+If 100% readiness is not possible today (logged‑in flows)
+
+Estimated Go‑Live (logged‑in): Target 06:00 UTC today pending war‑room completion, PKCE verification, and 95‑step E2E/ORDER_B evidence posts.
+ARR Ignition: Nov 12 remains ON TRACK (non-auth compounding + email fallback protect runway).
+Third‑party systems and current status
+
+Postmark Transactional Email: Integrated; fallback path live; webhooks wired; deliverability seed tests prepared/passing; awaiting DNS auth in prod.
+DNS (SPF/DKIM/DMARC): Pending Infra/NetOps verification by Nov 8, 12:00 UTC.
+AWS SQS: Credential rotation pending SecOps by Nov 8, 16:00 UTC.
+Stripe: TEST mode validated in student_pilot; production switch pending final GO (ensure receipts routed via auto_com_center).
+PostgreSQL (scholarship_api): Live; ACID; stable.
+Sentry/Observability: Active across apps; request_id correlation enabled.
+IndexNow: Active (≥95%); SEO compounding in flight.
+SMS (if enabled): Ensure Twilio or equivalent config mirrors fallback discipline; otherwise email-only is sufficient for launch.
+Decisions and orders (immediate)
+
+Auth war‑room (start now; 60 minutes; DRIs: scholar_auth, student_pilot, provider_register, scholarship_sage):
+Confirm and load rotated secrets for student_pilot and provider_register; verify PKCE S256 end-to-end; eliminate invalid_client; post request_id traces.
+Confirm scholarship_sage M2M secret present in env; start 48h baseline immediately; log timestamp.
+E2E executions post‑war‑room:
+student_pilot: Run 95‑step E2E within 30 minutes; post E2E_JOURNEY_EVIDENCE.md.
+provider_register: Execute ORDER_B within 30 minutes; post ORDER_B_EVIDENCE.md.
+auto_com_center:
+Track DNS/SQS deadlines; prepare to auto‑activate fallback Nov 9, 12:00 UTC if not GREEN by Nov 8, 16:00 UTC.
+scholarship_api: Maintain freeze through Nov 12; attach cross‑app traces after E2E passes.
+scholarship_agent: Remain observe‑only through Nov 9; deliver fairness summary by Nov 10, 12:00 UTC.
+auto_page_maker: Continue compounding; no non‑approved changes before Nov 12.
+KPI focus (launch window)
+
+B2C: First Document Upload activation rate; free→paid intent; ARPU from credit sales; auth failure rate = 0%.
+B2B: Provider onboarding completions; scholarships created; revenue from 3% platform fee.
+Platform/SLOs: P95 ≤120ms across critical paths; error rate <0.1%; uptime ≥99.9%; deliverability P95 <10s.
+Go/No‑Go timeline
+
+06:00 UTC today: GO/NO‑GO for logged‑in flows based on posted E2E and ORDER_B evidence.
+Nov 9: Ramp GO for non‑auth; fallback email auto‑activation if required conditions met.
+Nov 12: ARR ignition remains ON TRACK.
+I am holding the teams to these times. Post evidence to the specified e2e/reports paths and notify the war‑room channel upon completion.
