@@ -1,0 +1,102 @@
+CEO Decision Memo — Go-Live Readiness and Gate Enforcement
+Company: Scholar AI Advisor (www.scholaraiadvisor.com)
+Date/Time: 2025-11-07 ~23:30 UTC
+
+Executive Decision
+
+Conditional GO for AUTH during the 00:00–00:15 UTC Green-Tag window, contingent on two immediate proof points:
+A fresh metrics snapshot NOW and at 23:40/23:55 UTC showing P95 ≤120ms and error rate ≤0.1% across all four endpoints.
+Evidence package posted with raw metrics and diffs for tonight’s changes.
+If any endpoint exceeds P95 120ms at 00:15 UTC, we slip 24 hours. Quality over speed remains non-negotiable.
+What I Have Reviewed
+
+Agent3 reports indicate: “GATE PASSED” with P95s Discovery 86ms, JWKS 113ms, Token 104ms, Authorize 100ms; 0.00% error; with the finding that Neon performs better without persistent DB connections and Cloudflare cache not deployed.
+Earlier checkpoints were missed; therefore, I will accept a GO only with current snapshots and evidence to close the gap between claims and artifacts.
+Immediate Orders (next 60 minutes)
+
+Auth DRI
+
+Produce metrics NOW and at 23:40/23:55 UTC for:
+POST /authorize, POST /token, GET /.well-known/jwks.json, GET /.well-known/openid-configuration
+Include P50, P95, and error rate
+Post the final evidence bundle links called out in prior updates:
+e2e/reports/auth/FINAL_GATE_VALIDATION_... (attach exact file)
+AUTH_FIXLOG with diffs, timestamps, and before/after metrics
+Lock the “no persistent connections” configuration that met the target. Document the rationale in an Engineering Decision Record (EDR-Auth-2025-11-07).
+Cloudflare edge cache: keep the prepared worker disabled behind a feature flag; schedule an A/B test in a staging window on Nov 9. Not blocking tonight’s GO.
+Neon paid tier: approved. If already upgraded, keep. If not yet upgraded, do not change state tonight (avoid variance). We will revisit after we have 24–48 hours of real load.
+auto_com_center
+
+Maintain war-room cadence and broadcast the 23:40/23:55/00:10 UTC snapshots to the leadership channel.
+Prepare a single “AUTH GREEN TAG” message template to send at 00:00–00:15 UTC upon validation.
+scholarship_api
+
+Monitor 401/5xx during any JWKS activity and capture request_id lineage for the evidence package. Post ORDER_4_EVIDENCE by ~01:30 UTC.
+student_pilot
+
+Upon AUTH GREEN TAG, execute the E2E PKCE flow and UI walkthrough. Deliver E2E_JOURNEY_EVIDENCE by ~00:30–00:45 UTC.
+scholarship_sage
+
+Upon AUTH GREEN TAG, run 3x client_credentials grants, enforce read-only scopes, and deliver M2M_BYPASS_EVIDENCE within 30 minutes.
+provider_register
+
+Do NOT run ORDER_B unless Stripe production verification is complete. If Finance/Platform Ops did not confirm by 22:00 UTC, escalate now.
+If Stripe is confirmed and AUTH is GREEN, execute ORDER_B within 60 minutes and deliver ORDER_B_EVIDENCE by ~01:00 UTC.
+Application Readiness Summary (Name + APP_BASE_URL + Status)
+
+scholar_auth
+
+APP_BASE_URL: https://scholar-auth-jamarrlmayes.replit.app
+Status: Conditional GO pending live snapshots at 23:40/23:55 UTC and evidence bundle. Current config (no persistent DB connections) appears best-performing. Cloudflare cache staged but off.
+scholarship_api
+
+APP_BASE_URL: https://scholarship-api-jamarrlmayes.replit.app
+Status: GREEN. Monitor token validation and error budget during the window; provide ORDER_4_EVIDENCE.
+scholarship_agent
+
+APP_BASE_URL: https://scholarship-agent-jamarrlmayes.replit.app
+Status: GREEN, FROZEN through Nov 9. Fairness summary due Nov 10, 12:00 UTC.
+scholarship_sage
+
+APP_BASE_URL: https://scholarship-sage-jamarrlmayes.replit.app
+Status: READY. Execute M2M validation and scopes within 30 minutes of AUTH green.
+student_pilot
+
+APP_BASE_URL: https://student-pilot-jamarrlmayes.replit.app
+Status: READY. Run full E2E upon AUTH green; capture PKCE flow and UI evidence.
+provider_register
+
+APP_BASE_URL: https://provider-register-jamarrlmayes.replit.app
+Status: TECHNICALLY GREEN; EXECUTION BLOCKED pending Stripe production verification. ORDER_B only after Stripe confirmed and AUTH green.
+auto_page_maker
+
+APP_BASE_URL: https://auto-page-maker-jamarrlmayes.replit.app
+Status: GREEN, FROZEN through Nov 12; monitor-only; daily KPI rollups 06:00 UTC.
+auto_com_center
+
+APP_BASE_URL: https://auto-com-center-jamarrlmayes.replit.app
+Status: GREEN; comms ready; Postmark only; SMS disabled. Orchestrate war-room updates.
+ARR Ignition Plan (assumes AUTH GREEN)
+
+B2C: Earliest 2025-11-10 00:00 UTC (upsell motion, credit ARPU expansion).
+B2B (3% provider fee): Execute ORDER_B after Stripe confirmation; earliest ignition ~01:30–03:00 UTC Nov 8.
+If NO-GO at 00:15 UTC
+
+Slip 24 hours. Maintain warm-up schedule. Keep Auto Page Maker compounding. Re-run the same gate with unchanged “no persistent connections” baseline and complete Cloudflare A/B tests in staging prior to next attempt.
+Risk and Mitigation
+
+Auth latency regression under real load
+Mitigation: 24–48 hours of intensive telemetry; alerting at P95 >110ms; hold Cloudflare cache in reserve behind a flag.
+Payments readiness (Stripe)
+Mitigation: Require Finance/Platform Ops confirmation before ORDER_B; no exceptions.
+JWKS/discovery cache consistency
+Mitigation: Keep auto-purge hooks prepared; rehearse off-peak on Nov 9 with scholarship_api monitoring.
+Evidence Required Before I Confirm GO
+
+Auth: Final gate validation file + raw metrics snapshots for 23:30/23:40/23:55/00:10 UTC, with P50/P95 and error rates.
+student_pilot: E2E evidence after green tag.
+scholarship_sage: 3x grant evidence, scope enforcement, and lineage.
+scholarship_api: ORDER_4_EVIDENCE with cross-app request_id traces.
+provider_register: Stripe production verification artifact; then ORDER_B_EVIDENCE.
+Final CEO Note
+Tonight’s objective is binary: uphold the P95 ≤120ms gate with clean evidence or slip 24 hours. We will not trade reliability for speed. Deliver the snapshots and files now; if they are consistent with the reported P95s, I will authorize AUTH GREEN TAG within the 00:00–00:15 UTC window and proceed with the downstream validations and ORDER_B (subject to Stripe).
