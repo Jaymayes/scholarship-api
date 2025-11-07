@@ -1,0 +1,97 @@
+CEO Directive — Go-Live Readiness, Scope Confirmation, and Immediate Actions
+
+Executive clarifications
+
+scholarship_agent vs scholarship_sage: They are distinct applications. Tonight’s scope reduction applies to scholarship_agent only. Do not revert scholarship_sage M2M bypass. Proceed exactly as planned: scholarship_sage is the only new M2M client tonight; scholarship_agent remains frozen in observe-only mode through Nov 9.
+WebSocket error on scholarship_sage: Non-blocking for AUTH GREEN TAG. Defer the fix until after the gate. Quick remediation (post-gate): disable HMR for production builds or explicitly set the dev WS URL so no wss://localhost:undefined is referenced at runtime. This does not affect core auth/M2M or API paths.
+Tonight’s simplified critical path (confirmed)
+
+Auth gate target: Nov 8, 00:00 UTC
+Track 1: scholarship_sage M2M bypass evidence complete before war-room cutover
+Track 2: scholar_auth root fix and discovery stability
+E2E flows on green tag: student_pilot and provider_register Rationale: This prioritization maximizes launch certainty on the P0 path and protects ARR ignition by sequencing agent enablement after auth stability, consistent with our operating playbook to keep surface area low before critical gates and to bias toward B2B enablement for revenue acceleration .
+App-by-app executive status and orders
+
+scholar_auth APP_BASE_URL: https://scholar-auth-jamarrlmayes.replit.app
+Status: Proceed to AUTH GREEN TAG tonight, with Track 1 (scholarship_sage M2M bypass) + Track 2 (root fix).
+Orders:
+Evidence required at gate: OIDC discovery (auth code + PKCE S256 working), client_credentials for scholarship_sage only, token lifecycle (mint, refresh, revoke), JWKS rotation, protected-route redirects for student_pilot and provider_register.
+Security posture: Confirm no hardcoded secrets; all client secrets in environment variables. This aligns with our secure credential management standard on Replit (use Secrets; never commit credentials) and our key/session management guidance (no hardcoded keys; strong token hygiene) .
+2. scholarship_api
+APP_BASE_URL: https://scholarship-api-jamarrlmayes.replit.app
+
+Status: Green and frozen for tonight; focus on validating PKCE tokens from student_pilot and provider_register after the auth gate.
+Orders:
+Capture cross-app traces (auth→api→app) with request_id lineage; append to ORDER_4 evidence package.
+Maintain performance within SLO (≤120ms P95) and strict token validation against scholar_auth.
+3. scholarship_sage
+APP_BASE_URL: https://scholarship-sage-jamarrlmayes.replit.app
+
+Status: In-scope M2M client tonight via bypass path; proceed.
+Orders:
+Complete M2M bypass per plan; submit token acquisition and scope-enforcement evidence (read-only).
+Advisory quality: Validate contextual advice using profile + scholarship data from scholarship_api.
+WebSocket: Treat HMR WS error as non-blocking; fix post-gate by disabling HMR for production or pinning a valid dev WS URL. No production functionality should depend on HMR.
+4. student_pilot
+APP_BASE_URL: https://student-pilot-jamarrlmayes.replit.app
+
+Status: Ready for 95-step E2E on AUTH GREEN TAG.
+Orders:
+Deliver complete E2E evidence including first document upload. The “first document upload” is our critical activation lever and must be a visible checkpoint in the journey evidence .
+Confirm responsive design across major browsers/mobile as part of evidence.
+5. provider_register
+APP_BASE_URL: https://provider-register-jamarrlmayes.replit.app
+
+Status: Yellow (blocked on auth), then execute ORDER_B immediately after AUTH GREEN TAG.
+Orders:
+Evidence by ~01:00 UTC: provider creation → scholarship publish → dashboard view; token logs confirming PKCE S256.
+6. scholarship_agent
+APP_BASE_URL: https://scholarship-agent-jamarrlmayes.replit.app
+
+Status: Frozen, observe-only through Nov 9; no code changes.
+Orders:
+Maintain telemetry-only operations; auto-apply remains OFF.
+Contingent path: Nov 10 GO/NO-GO at 12:00 UTC; if GO, implement M2M read-only by 16:00 UTC pending 24h auth stability and no P95/error regressions.
+7. auto_page_maker
+APP_BASE_URL: https://auto-page-maker-jamarrlmayes.replit.app
+
+Status: Green and frozen; observer role tonight.
+Orders:
+Continue daily 06:00 UTC rollups; maintain CAC-lean growth posture. This supports our low-CAC growth engine central to the 5-year plan and B2B-led ARR strategy .
+8. auto_com_center
+APP_BASE_URL: https://auto-com-center-jamarrlmayes.replit.app
+
+Status: Reported complete. Tonight: respond to agent and pilot/provider events.
+Orders:
+By gate: Post deliverability snapshot (inbox placement, bounce, complaint) and confirm SPF/DKIM alignment for the sending domain(s). Ensure templates are production-configured for student and provider notifications.
+Third-party systems — executive checklist for tonight
+
+OIDC/Auth: scholar_auth (internal) — must attest discovery + grants as above.
+Database: PostgreSQL — confirm ACID baseline and backup schedule for tonight’s runs.
+Email: SendGrid or SMTP — DRI to post production keys/regions, DKIM alignment, and current deliverability stats prior to gate.
+SMS (if used): Twilio — DRI to confirm sender registration/A2P status and per-carrier compliance.
+Monitoring/Tracing: Ensure request_id lineage across auth/api/app in evidence package. These confirmations align with our security and resiliency standards and limit late-stage risk during the gate window .
+Performance and SLO guardrails for the gate
+
+Availability ≥99.9% during war-room window; API P95 ≤120ms; error rate ≤1%.
+Auth: zero hardcoded secrets; all clients via env vars (Replit Secrets best practice) .
+Evidence completeness: token lifecycle, cross-app traces, and protected-route redirects verified.
+If any app cannot achieve 100% readiness tonight
+
+Provide a precise ETA with date/time, ARR ignition impact, and third-party blockers with status (Not Started / In Progress / Complete). This is mandatory for exceptions.
+ARR ignition and revenue posture
+
+ARR Ignition remains targeted for Nov 12. B2C activation (first document upload) plus B2B provider flows are tonight’s priority because our path to $10M ARR depends on accelerating the institutional marketplace while sustaining CAC-lean student growth and monetization via credits/ARPU uplift .
+War-room cadence (unchanged)
+
+Open 20:00–01:00 UTC; 30-minute checkpoints.
+Owners: Auth (Track 1 + Track 2), B2C (student_pilot), B2B (provider_register), API (traces), Comms (auto_com_center).
+Evidence bundles due immediately after each flow completes.
+Direct answers to the open questions
+
+Are scholarship_agent and scholarship_sage the same? No; they are different services. Tonight’s “no M2M bypass” decision applies only to scholarship_agent. Continue with scholarship_sage M2M bypass tonight.
+Should the M2M bypass work be reverted? No. Keep scholarship_sage M2M bypass in place and deliver evidence tonight. scholarship_agent remains frozen until the Nov 10 GO/NO-GO.
+Fix the WebSocket issue now? No. Defer until after the gate (it is non-blocking). Post-gate, disable HMR in production or set a valid dev WS URL to eliminate the localhost:undefined reference.
+Final CEO call
+
+Proceed with the simplified plan. Focus all execution energy on scholar_auth GREEN TAG, scholarship_sage M2M bypass, and the student_pilot/provider_register E2E flows. Maintain freeze everywhere else. Deliver complete, data-backed evidence at each checkpoint. This plan aligns with our data-first operating model and revenue strategy to prioritize scalable activation and B2B monetization velocity .
