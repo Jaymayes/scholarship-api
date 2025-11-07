@@ -1,0 +1,96 @@
+Executive Decision and Next Actions (CEO)
+
+Decision: Slip all logged-in flows to Nov 10. No emergency fix attempts tonight. Protect Nov 12 ARR ignition via non-auth SEO compounding. Rationale: Security and trust > schedule; time-boxed fix and validation will deliver higher-confidence go-live and preserve brand integrity.
+
+Agent3: Orchestrate the following plan and confirm completion in a single consolidated readiness brief at 06:00 UTC and daily thereafter until Nov 12.
+
+scholar_auth (owner: Auth DRI)
+Goal: Restore client_credentials (M2M) and public-client PKCE flows; register all clients; deliver verifiable evidence.
+Actions (today):
+Enable and advertise client_credentials in OIDC discovery.
+Register clients: student_pilot (PKCE S256), provider_register (PKCE S256), scholarship_sage (M2M), scholarship_agent (M2M if required by design), auto_com_center (webhook verification scopes if applicable).
+Deliver secrets to client apps via Replit Secrets with final names/values. Post a single mapping table (client_id, flow, secret name).
+Validate token minting, refresh, revocation; JWKS served and rotating; scopes enforced.
+Prove protected-route redirects are functioning across dependent apps.
+Evidence to post:
+AUTH_FIXLOG_2025-11-07.md with: OIDC /.well-known snapshot (showing grant_types includes client_credentials), PKCE enforcement checks, token acquisition/redaction proofs for each client, revocation test, sample request_id lineage traces, P95 under light load, 401 rate <0.1%.
+Deadline: Fix and evidence by Nov 7, 12:00 UTC; re-verify 18:00 UTC; final green tag by Nov 8, 00:00 UTC.
+2. scholarship_api (owner: API DRI)
+
+Goal: Hold freeze; attach cross-app traces once E2E resumes.
+Actions:
+Maintain freeze (schema/RBAC/config).
+After student_pilot E2E, append request_id lineage to ORDER_4_EVIDENCE.md.
+Deadline: Within 1 hour of successful student E2E on Nov 8 window.
+3. scholarship_sage (owner: Sage DRI)
+
+Goal: Start 48h baseline immediately when M2M secret lands.
+Actions:
+On receipt of M2M secret, restart → acquire token → start baseline (48h).
+Post baseline start timestamp and initial telemetry.
+Evidence to post:
+e2e/reports/scholarship_sage/baseline_metrics_evidence.md (token proof redacted, health=200, P95/error snapshot, matchReasons=ON, request_id lineage).
+Deadline: Start baseline by Nov 7, 13:00 UTC latest; completes by Nov 9, 13:00 UTC; initial evidence within 15 minutes of start.
+4. student_pilot (owner: Student DRI)
+
+Goal: Execute 95-step E2E after AUTH green.
+Actions:
+On AUTH green tag, run 95-step E2E across Chromium/Firefox/WebKit, instrument First Document Upload activation, capture request_id lineage (auth → api), verify P95 ≤120ms, error <0.1%.
+Evidence to post:
+e2e/reports/student_pilot/E2E_JOURNEY_EVIDENCE.md with activation metric, cross-browser snapshots, traces, and SLOs.
+Deadline: Start within 15 minutes of AUTH green; deliver within 30 minutes (target Nov 8, 00:30 UTC if AUTH green at 00:00).
+5. provider_register (owner: Provider DRI)
+
+Goal: Execute ORDER_B after AUTH client registration fixed.
+Actions:
+Re-test OAuth; on success, create provider, publish scholarship via scholarship_api, verify dashboard views and applicant data.
+Evidence to post:
+e2e/reports/provider_register/ORDER_B_EVIDENCE.md with screenshots, request_id lineage, P95 ≤120ms, 0 auth failures.
+Deadline: Complete within 30 minutes after AUTH green; target Nov 8, 00:30–01:00 UTC.
+6. scholarship_agent (owner: Agent DRI)
+
+Goal: Observe-only until Nov 9; prep fairness reporting.
+Actions:
+Keep auto-apply OFF through Nov 9.
+Prepare 24h fairness summary (selection parity, false-positive rate by segment, action explainability).
+Evidence to post:
+FAIRNESS_24H_SUMMARY_2025-11-10.md (due Nov 10, 12:00 UTC).
+Deadline: Nov 10, 12:00 UTC.
+7. auto_page_maker (owner: SEO DRI)
+
+Goal: Continue non-auth compounding; daily proof.
+Actions:
+Maintain freeze; post daily SEO/CWV rollup.
+Ensure graceful degradation to lead capture while auth is slipped.
+Evidence to post (today):
+seo/daily_rollup/2025-11-07.md with pages_live (target 2,101), IndexNow ≥95%, CWV p75 GREEN, error 0%, P95 ~100ms, uptime 100%.
+Deadline: 06:00 UTC today and daily through Nov 12.
+8. auto_com_center (owner: Comms DRI)
+
+Goal: Remain GREEN; close external DNS and infra tasks.
+Actions:
+Complete DMARC/SPF/DKIM DNS verification; confirm SQS credentials delivery if applicable; maintain unsubscribe/suppression hygiene; seed-inbox deliverability checks; keep CAN-SPAM/GDPR/FERPA/TCPA controls on.
+Evidence to update:
+e2e/reports/auto_com_center/AUTO_COM_CENTER_06_00_CHECKPOINT.md with DNS verification status and deliverability snapshot (open/click/spam-complaint rate).
+Deadlines: DNS by Nov 8, 12:00 UTC; SQS creds by Nov 8, 16:00 UTC.
+Go-Live Calendar (locked)
+
+Nov 7: Auth fix + secrets; Sage baseline starts; SEO compounding continues.
+Nov 8 00:00 UTC: AUTH green tag. Student_pilot 95-step E2E + provider_register ORDER_B. API traces appended.
+Nov 9: Agent observe-only ends; final readiness checks.
+Nov 10: Logged-in flows go live. Agent fairness report due 12:00 UTC.
+Nov 12: ARR ignition; non-auth compounding feeds conversions; logged-in experiences fully online.
+KPIs and Guardrails to Monitor Daily
+
+Acquisition engine: pages_live, IndexNow %, CWV p75, lead-capture conversion rate.
+Auth health: token success rate >99.9%, 401 rate <0.1%, P95 ≤120ms.
+E2E stability: error <0.1%, request_id end-to-end propagation rate 100%.
+Deliverability: bounce <1%, spam complaints <0.1%, unsubscribe latency <100ms write.
+Profitability: keep paid acquisition OFF; organic-only growth; no unapproved changes in SEO surfaces.
+Agent3: What to work on next
+
+Drive the Auth fix to closure. Time-box the DRI, enforce the evidence package, and do not allow scope drift.
+Stage and coordinate the chained validations (Sage baseline → Student 95-step → Provider ORDER_B → API trace append).
+Ensure 06:00 UTC deliverables are posted for auto_page_maker and auto_com_center, and publish a single-page status digest noting the slip decision, updated timelines, and any changes to risk posture.
+Escalate immediately if Auth cannot produce the green tag by Nov 8, 00:00 UTC; the Nov 10 go-live depends on it.
+I will review your 06:00 UTC consolidated readiness brief and unblock anything requiring executive intervention.
