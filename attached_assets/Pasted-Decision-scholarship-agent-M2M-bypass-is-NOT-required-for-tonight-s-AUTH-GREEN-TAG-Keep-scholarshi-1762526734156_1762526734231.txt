@@ -1,0 +1,35 @@
+Decision: scholarship_agent M2M bypass is NOT required for tonight’s AUTH GREEN TAG. Keep scholarship_agent frozen in observe-only mode.
+
+Rationale
+
+Current posture is GREEN and auth-independent for observe-only operations. Introducing code churn before the gate adds risk without impacting tonight’s objective.
+Our P0 is scholar_auth readiness; scholarship_agent is not on the critical path for the Nov 8, 00:00 UTC gate.
+We protect ARR ignition by sequencing the agent’s M2M enablement after auth stabilizes and evidence is posted.
+Directive and timeline
+
+Now through Nov 9 (observe-only window): No changes to scholarship_agent. Maintain freeze; continue telemetry-only.
+By Nov 10, 16:00 UTC (firm): Implement M2M client_credentials on scholarship_agent if it will make server-to-server reads from scholarship_api before Nov 12. Use the same direct-token pattern already delivered for scholarship_sage.
+Go/No-Go for M2M on agent (CEO gate): Nov 10, 12:00 UTC. Criteria: (a) scholar_auth fixlog complete, (b) 24h stable token issuance/validation on scholarship_sage, (c) no regression in P95/API error budget. If all green, proceed with agent M2M; otherwise defer to Nov 12+1d.
+Owner assignments
+
+Auth DRI (owner): Provision a least-privilege client for scholarship_agent with scope read:scholarships only, no write; rotate any exposed secrets; distribute via env vars (no hardcoding). Due Nov 10, 10:00 UTC.
+scholarship_agent DRI (owner): Implement direct token acquisition using provided token URL/client_id/secret; add request_id propagation; no auto-apply code paths enabled. Due Nov 10, 16:00 UTC.
+scholarship_api DRI (observer): Validate incoming agent tokens; capture token validation logs and request_id lineage in ORDER_4 addendum within 1 hour of first M2M call.
+Evidence required (post-implementation)
+
+Three successful client_credentials grants for scholarship_agent with request_id lineage captured across auth → agent → api.
+JWT verification logs on scholarship_api showing correct scope enforcement (403 on write endpoints).
+P95 latency ≤120ms and error rate <0.1% across the three M2M calls.
+Security: secrets only via environment; attest secret rotation completed.
+Risk controls
+
+No auto-apply before Nov 12 (remains OFF).
+Scope-constrained client (read-only).
+Rollback plan: toggle to observe-only without M2M by removing env vars; agent must degrade to cached/mock reads.
+War-room coordination
+
+Tonight’s war-room remains focused on scholar_auth GREEN TAG and dependent B2C/B2B flows (student_pilot, provider_register). scholarship_agent DRI participates as observer only; no code changes authorized before the gate.
+Bottom line
+
+For tonight: No M2M change on scholarship_agent.
+For ARR ignition readiness: Implement read-only M2M by Nov 10, 16:00 UTC, contingent on stable auth signals.
