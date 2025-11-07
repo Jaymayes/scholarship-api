@@ -1,0 +1,74 @@
+Acknowledged. Executive decision and orders follow.
+
+Decision: GO on tonight’s plan as scoped
+
+scholarship_sage M2M bypass: Proceed exactly as planned.
+scholarship_agent: Frozen, observe-only through Nov 9. No code changes.
+WebSocket/HMR issue: Defer until post-gate; production HMR disabled after the gate.
+Direct answer to your clarification
+
+Yes: For scholarship_sage, “M2M bypass” means you will:
+Call scholar_auth’s token endpoint directly with client_credentials (skip discovery).
+Acquire read-only scopes, then make authenticated calls to scholarship_api.
+Produce evidence of token lifecycle (mint, refresh, revoke), introspection, and JWKS verification.
+No additional implementation is required beyond the bypass and evidence capture. Ensure scholarship_agent is not referenced anywhere in tonight’s flows.
+What to execute next (with owners and deadlines, UTC)
+Track 1 — scholarship_sage M2M bypass (Auth DRI + Sage DRI)
+
+By 18:40: Post evidence of 3 successful grants (distinct request_id lineage) using read-only scopes, plus:
+Token mint/refresh/revoke results with timestamps
+Introspection output and exp claims
+Proof that secrets are from Replit Secrets (screenshots/redacted env listing)
+3 signed calls to scholarship_api with 200 responses and ≤120ms P95
+By 19:15: Pre–war-room smoke re-test; attach results to TRACK_1_M2M_BYPASS_EVIDENCE.md
+Track 2 — scholar_auth root fix + discovery stability (Auth DRI)
+
+By 20:40: Discovery advertises authorization_code + PKCE S256 + client_credentials; health check green.
+JWKS rotation rehearsal: 23:30–23:45 window
+Rotate keys, verify new kid served at /.well-known/jwks.json
+Validate old tokens continue to pass until expiry; attach logs
+Evidence: AUTH_FIXLOG_2025-11-07.md containing:
+P95 and 401/5xx rates during window
+Zero hardcoded secrets confirmation
+Protected-route redirects for student_pilot and provider_register
+E2E gates (triggered on AUTH GREEN TAG at 00:00)
+
+student_pilot (B2C DRI): By 00:30
+95-step E2E with First Document Upload checkpoint visible
+Cross-browser responsive check
+Evidence: E2E_JOURNEY_EVIDENCE with request_id lineage
+provider_register (B2B DRI): By 01:00
+ORDER_B: provider creation → scholarship publish → dashboard view
+PKCE S256 proof, 3% fee transparency, ≤120ms P95
+Evidence: ORDER_B_EVIDENCE.md with request_id lineage
+scholarship_api (API DRI): Within 1 hour of E2E
+Append cross-app traces (auth→api→app) to ORDER_4 addendum
+Enforce strict token validation; P95 ≤120ms, error ≤1%
+Security and compliance hard lines
+
+No hardcoded secrets anywhere; all creds via Replit Secrets.
+PKCE S256 enforced for public clients; M2M scopes read-only for scholarship_sage.
+Token lifecycle verified (mint/refresh/revoke) and JWKS rotation proof collected.
+Request_ID lineage must span scholar_auth → scholarship_api → app.
+FERPA/COPPA posture: No PII beyond minimum necessary; logging excludes sensitive fields.
+Stop-the-line criteria (auto page to Incident Commander)
+
+P95 >120ms sustained 10 minutes on any critical path
+Error rate >1% over 5-minute rolling window
+Token issuance or validation failures >0.5% over 10 minutes
+JWKS rotation breaks validation for any in-flight tokens
+KPIs to capture tonight (ties to ARR plan)
+
+B2C: First Document Upload activation rate and time-to-activation
+B2B: Provider ORDER_B completion rate; scholarship publish-to-dashboard latency
+Auth: Conversion funnel success (auth → token → API) and P95
+Platform: Availability ≥99.9%, error ≤1%
+Your question on proceeding with AUTH_FIXLOG: Approved. Proceed now. Include P95, 401/5xx snapshots, and the JWKS rotation rehearsal.
+
+Final confirmation
+
+Scope: Correct and locked.
+M2M bypass testing for scholarship_sage: Execute now and deliver pre–war-room evidence.
+AUTH_FIXLOG evidence package: Build and post by 00:00.
+E2E evidence deadlines: 00:30 (student_pilot), 01:00 (provider_register).
+I will hold us to the above acceptance criteria at the 20:00–01:00 UTC war room and will call GO/NO-GO at 00:00 based on AUTH GREEN TAG evidence.
