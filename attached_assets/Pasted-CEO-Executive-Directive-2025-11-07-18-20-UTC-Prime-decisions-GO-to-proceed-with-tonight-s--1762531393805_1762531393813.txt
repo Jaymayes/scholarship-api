@@ -1,0 +1,96 @@
+CEO Executive Directive — 2025-11-07, ~18:20 UTC
+
+Prime decisions
+
+GO to proceed with tonight’s plan as scoped. scholarship_agent remains frozen and excluded from all flows through Nov 9.
+Yes: Proceed now with testing the OAuth flows for student_pilot and provider_register to capture protected-route redirect evidence and PKCE S256 proof. Evidence must include Application Name and APP_BASE_URL at the top of each report.
+Critical risk and required mitigations before the 00:00 UTC AUTH GREEN TAG
+
+Auth latency YELLOW (P95 ~200ms vs ≤120ms target). This remains a hard gate. Mandate the following optimizations immediately (owner: Auth DRI):
+Pre-warm and keep-warm: token endpoint and discovery endpoints. Run steady 30–50 RPS synthetic traffic for 10 minutes to stabilize JIT/connection pools.
+Enable/verify connection pooling and HTTP keep-alive between dependent apps and scholar_auth; raise pool size to match expected concurrent flows during gate tests.
+Cache controls:
+In-memory cache for .well-known/openid-configuration (TTL ≥300s).
+In-memory cache for JWKS (TTL ≥300s) with proactive refresh 60s before expiry.
+Reduce overhead in token issuance path:
+Avoid synchronous logging and expensive JSON stringification in hot path; shift to structured, buffered logs.
+Ensure hashing/crypto libs use hardware-accelerated primitives available in the runtime.
+Optimize DB/secret lookups (if any) on token path: preload client metadata; no per-request disk/env reads.
+Re-run load to confirm P95 ≤120ms for:
+POST /oauth/token (auth code + client_credentials)
+GET /.well-known/openid-configuration
+GET /jwks.json
+Contingency if P95 still >120ms at 23:45 UTC:
+00:00 gate slips up to 30 minutes while mitigation continues.
+If P95 remains >120ms at 00:15 UTC, NO-GO for AUTH GREEN TAG; reschedule gate by 24 hours with written postmortem + fix plan by 02:00 UTC.
+War-room cadence and ownership (all artifacts must start with Application Name + APP_BASE_URL)
+
+19:15 UTC pre-war-room smoke: Confirm Track 1 evidence is reproducible and latency trending down.
+20:00 UTC war-room open; 30-minute checkpoints; Auth DRI owns latency track-down; Sage DRI stands by for M2M validations; API DRI monitors validation continuity.
+23:30–23:45 UTC JWKS rotation rehearsal: Success means zero validation errors across all apps; rollback plan documented and tested. API DRI to watch 401/5xx spike alarms.
+Immediate execution orders
+
+Auth DRI
+Complete Track 2 discovery fix and PKCE S256 enforcement validation.
+Execute latency mitigations listed above; post metrics snapshots every 20 minutes (P50/P95, error rate, throughput).
+Produce AUTH_FIXLOG_2025-11-07.md by 00:00 UTC including:
+Discovery evidence (authorization_code + client_credentials).
+PKCE S256 enforcement with redacted logs.
+Token lifecycle (mint/refresh/revoke).
+JWKS rotation rehearsal results.
+Performance: P95 ≤120ms target across endpoints; error ≤1%; availability ≥99.9%.
+Sage DRI
+Track 1 M2M bypass: Confirmed complete. Maintain green status; re-run 3-grant sequence after auth optimizations to verify latency improvement and attach fresh timings.
+Ensure read-only scopes enforced; keep evidence current.
+student_pilot DRI
+Upon AUTH GREEN TAG, execute full E2E and post E2E_JOURNEY_EVIDENCE.md by 00:30 UTC:
+Registration/login redirect proof (protected-route redirects to scholar_auth).
+Profile submission to scholarship_api (200s; request_id lineage).
+Interaction with scholarship_sage (contextual advice call evidence).
+PKCE S256 proof with redacted auth logs.
+P95 ≤120ms for all critical API calls (≥20 requests).
+provider_register DRI
+Execute ORDER_B between 00:00–01:00 UTC; post ORDER_B_EVIDENCE.md by 01:00 UTC:
+Provider creation → scholarship publish → dashboard view.
+3% platform fee visibility evidence.
+PKCE S256 proof; request_id lineage across provider_register → scholar_auth → scholarship_api.
+P95 ≤120ms (≥20 requests).
+scholarship_api DRI
+Within 1 hour of E2E completion (target ~01:30 UTC), post ORDER_4_EVIDENCE.md addendum:
+Cross-app traces for PKCE (student_pilot, provider_register) and M2M (scholarship_sage).
+Strict token validation proof; scope enforcement.
+P95 ≤120ms; error budget ≤1%; availability ≥99.9%.
+Monitor during JWKS rehearsal for seamless key rollover.
+auto_com_center DRI
+Deliver DELIVERABILITY_SNAPSHOT_2025-11-07.md by 00:00 UTC:
+Inbox placement ≥95%, bounce <5%, complaint <0.1%.
+SPF/DKIM/DMARC alignment proof.
+Production templates (student + provider) staged; end-to-end send tests attached.
+Answer to question/next step
+
+Yes—proceed to test OAuth flows for student_pilot and provider_register now to capture protected-route redirect evidence and PKCE S256 proof. Ensure each report starts with the correct Application Name and APP_BASE_URL, includes request_id lineage, redacts all PII/secrets, and attaches latency distributions (P50/P95) for token and API calls.
+KPI capture aligned to ARR plan
+
+B2C: First Document Upload activation rate; time-to-activation; auth→token→API funnel success.
+B2B: ORDER_B completion rate; publish-to-dashboard P95 latency.
+Auth: P95 latency on token and discovery; 401/5xx rates; availability.
+Platform: Availability ≥99.9% during 20:00–01:00 UTC; error ≤1%.
+Stop-the-line criteria (unchanged)
+
+P95 >120ms sustained 10 minutes on any critical path.
+Error rate >1% over 5-minute rolling window.
+Token issuance/validation failures >0.5% over 10 minutes.
+JWKS rotation causes validation failures.
+ARR ignition and scope confirmations
+
+ARR ignition earliest dates remain tied to:
+B2C upsell readiness (student_pilot): post-GREEN TAG + 48 hours of stable metrics.
+B2B fee capture (provider_register): confirmation of 3% fee transparency and settlement path in evidence.
+scholarship_agent remains frozen through Nov 9; observe-only; no references in tonight’s flows.
+auto_page_maker stays frozen, observer role, daily 06:00 UTC rollups continue.
+Reporting hygiene
+
+Every artifact must begin with Application Name and APP_BASE_URL.
+Use request_id lineage in all cross-app evidence.
+Redact PII; no secrets in logs; all credentials via Replit Secrets.
+I will render a GO/NO-GO at 00:00 UTC based on the evidence package and the auth latency remediation results. Maintain urgency; post intermediate metrics every 20 minutes to the war-room channel.
