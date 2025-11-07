@@ -1,0 +1,94 @@
+Decision: Approved with urgency
+
+Proceed now with FALLBACK_SMTP_PLAN.md. Deliver the document and seed-test artifacts by 01:30 UTC. This protects Nov 9 ramp and Nov 12 ARR in case DNS or SQS slip.
+
+Fallback SMTP plan — required contents
+
+Scope and trigger
+Trigger: If SQS or DNS is not GREEN by Nov 8, 16:00 UTC, enable fallback for critical emails only.
+Scope: Password reset, legal/terms, security alerts, receipt confirmations.
+Provider and configuration
+Primary: Postmark Transactional API (bypass SQS).
+Credentials handling: from secret store only; no plaintext anywhere.
+IP/Domain: use authenticated sending domain with SPF/DKIM/DMARC aligned; include DNS records checklist.
+Deliverability and compliance
+List-Unsubscribe and List-Unsubscribe-Post headers for any non-critical notices (if any creep in, block them).
+CAN-SPAM/GDPR/FERPA guardrails; no PII beyond minimum required.
+Bounce, complaint, and spam feedback webhook handling with suppression list updates.
+Rate limiting and safety rails
+Start 5 emails/min/domain; ramp to 60/min after seed tests pass and bounce rate <1% and complaint rate <0.1%.
+Global cap and per-user cooldowns; exponential backoff on 4xx/5xx.
+Observability and evidence
+Message_id → request_id correlation, delivery and open events stored.
+Seed test matrix across major inbox providers (Gmail, Outlook, Yahoo, Apple); screenshots and headers captured.
+Real-time dashboard: send attempts, deliveries, bounces, complaints, unsubscribes.
+Activation and rollback runbook
+1-click feature toggle, change log entry, and rollback steps.
+Post-activation validation checklist (5 min, 30 min, 2 hr).
+Data retention and privacy
+Redaction policy; retention windows for logs and content.
+Deliverables by 01:30 UTC
+
+Link to FALLBACK_SMTP_PLAN.md
+Seed test evidence pack (headers, screenshots, delivery timings)
+Webhook event samples proving bounce/complaint/unsubscribe handling
+Screenshot or metrics export of rate-limiter settings and counters
+Executive status and orders by application
+
+scholar_auth (APP_BASE_URL: https://scholar-auth-jamarrlmayes.replit.app)
+Status: RED until proven otherwise.
+Gate to turn GREEN: Passing, reproducible PKCE S256 flows from both student_pilot and provider_register against production client registrations with screenshots and request_id traces. No “green” without those artifacts.
+Deliver: AUTH_GREEN_EVIDENCE_V2 with live client flows, not synthetic. Due immediately; verify again at 01:30 UTC.
+scholarship_api (APP_BASE_URL: https://scholarship-api-jamarrlmayes.replit.app)
+Status: GREEN/HOLD.
+Orders: Maintain freeze through Nov 12 (no schema/RBAC/config changes). Keep P95 ≤120ms; attach request_id correlation once student_pilot E2E passes.
+scholarship_agent (APP_BASE_URL: https://scholarship-agent-jamarrlmayes.replit.app)
+Status: GREEN (observe-only).
+Orders: Stay observe-only through Nov 9 ramp; auto-apply disabled. Deliver 24h fairness summary by Nov 10, 12:00 UTC. Provide cross-app traces after student_pilot E2E passes.
+scholarship_sage (APP_BASE_URL: https://scholarship-sage-jamarrlmayes.replit.app)
+Status: YELLOW (awaiting rotated M2M secret).
+Orders: Do not start baseline with compromised secret. Start 48h baseline immediately upon rotated secret receipt; log start timestamp. Deliver baseline_metrics_evidence.md by Nov 8, 16:00 UTC.
+student_pilot (APP_BASE_URL: https://student-pilot-jamarrlmayes.replit.app)
+Status: YELLOW (blocked by auth).
+Orders: Within 30 minutes of true AUTH GREEN, execute 95-step E2E and post E2E_JOURNEY_EVIDENCE.md by 02:00 UTC. Escalate within 5 minutes if invalid_client recurs.
+provider_register (APP_BASE_URL: https://provider-register-jamarrlmayes.replit.app)
+Status: YELLOW (blocked by auth).
+Orders: Execute ORDER_B acceptance within 30 minutes of AUTH GREEN. Post ORDER_B_EVIDENCE.md. Deadline: Nov 7, 16:00 UTC.
+auto_page_maker (APP_BASE_URL: https://auto-page-maker-jamarrlmayes.replit.app)
+Status: GREEN (non-auth surfaces).
+Orders: Continue compounding; maintain IndexNow ≥95% and CWV p75 GREEN. Ensure graceful degradation routes to lead-capture when auth blocked. No non-approved changes before Nov 12.
+auto_com_center (APP_BASE_URL: https://auto-com-center-jamarrlmayes.replit.app)
+Status: PARTIAL GREEN: In-app notifications LIVE; email NO-GO until DNS+SQS GREEN.
+Orders: Produce FALLBACK_SMTP_PLAN.md now; prove seed deliverability; be activation-ready by Nov 9, 12:00 UTC if SQS/DNS slip.
+Go/No-Go gates and timelines
+
+01:30 UTC checkpoint
+Auth: Evidence of working PKCE from both client apps or remain RED.
+Sage: Rotated M2M secret receipt confirmation and baseline start (if received).
+Auto_com_center: Fallback plan doc + seed test artifacts posted.
+Auto_page_maker: Hourly SEO metrics posted; IndexNow ≥95%.
+Scholarship_api: Freeze compliance; P95 report.
+02:00 UTC gate (conditional on Auth)
+Student_pilot: 95-step E2E evidence posted.
+Provider_register: Staged for ORDER_B immediately after.
+Nov 9 ramp
+GO: Non-auth flows only (auto_page_maker, in-app notifications, observe-only agent).
+Logged-in flows: GO only if 02:00 UTC evidence passes.
+Nov 12 ARR ignition
+Protected if the above gates pass by Nov 8 EOD; if not, we slip logged-in ramp but continue compounding non-auth acquisition.
+KPI focus (hourly until stabilization)
+
+B2C: Free→paid conversion, ARPU from credits, first document upload activation rate, step‑throughput of the 95-step journey, auth failure rate (target 0%).
+B2B: Active providers onboarded, scholarships created/approved, time-to-first-applicant, 3% fee accrual.
+Platform: P95 latency ≤120ms across all apps; error budget <0.1%; uptime ≥99.9%.
+SEO engine: IndexNow success rate, CWV p75 GREEN, crawl/index velocity, CTR to conversion surfaces.
+Evidence-first enforcement
+
+No GREEN/GO without attached artifacts from live flows.
+All evidence must include request_id traces, timestamps, and no PII.
+Any secret appearing in documentation is treated as compromised and rotated.
+Confirm back
+
+Confirm you are proceeding with FALLBACK_SMTP_PLAN.md now.
+Post links to the plan and seed-test artifacts by 01:30 UTC.
+Each DRI: acknowledge orders and due times; post your evidence file paths at the checkpoint.
