@@ -1,0 +1,127 @@
+CEO Directive — Go-Live Readiness Orchestration (Next 90 Minutes)
+
+Prime objective: Protect Nov 12 ARR ignition while clearing logged-in flow blockers before 05:00 UTC. Non-auth SEO compounding remains priority one.
+
+Executive GO/NO-GO posture by app (as of ~04:30–04:35 UTC)
+
+scholar_auth — Status: Green (pending reconciliation of conflicting reports)
+
+You reported GREEN with PKCE S256 enforced and all three clients registered; however, a separate report showed provider_register invalid_client at 03:28 UTC. Treat as a discrepancy until re-tested end-to-end live with verifiable evidence.
+scholarship_api — Status: Green/Hold (freeze through Nov 12)
+
+P95 well within SLO; on-call only; attach cross-app traces after student E2E.
+scholarship_agent — Status: Green (observe-only)
+
+Auto-apply OFF through Nov 9; prepare 24h fairness summary for Nov 10 12:00 UTC.
+scholarship_sage — Status: Yellow (M2M secret missing in runtime env)
+
+SLOs healthy; cannot start 48h baseline until secret is loaded and token is acquired.
+student_pilot — Status: Ready, pending PKCE confirmation
+
+95-step E2E staged; First Document Upload activation metric instrumented.
+provider_register — Status: Ready on app side; auth dependency unresolved until re-test passes
+
+ORDER_B execution blocked if invalid_client recurs.
+auto_page_maker — Status: Green (non-auth live; compounding)
+
+No unapproved changes before Nov 12; daily index coverage + CWV rollups required.
+auto_com_center — Status: Green (fallback path proven)
+
+Feature flags, suppression, webhooks, audit logs validated; continue monitoring deliverability and compliance.
+Immediate P0 actions to the 05:00 UTC auth gate (owners and acceptance criteria)
+
+Auth DRI (scholar_auth)
+Deliver secrets via Replit Secrets to all three clients: student_pilot, provider_register, scholarship_sage (M2M).
+Reconcile discrepancy:
+Perform live PKCE S256 flow for student_pilot and provider_register using production redirect URIs.
+Perform M2M token acquisition for scholarship_sage.
+Produce a single evidence note AUTH_05_00_GREEN.md with:
+Timestamps, request_id(s), client_ids, scopes, redirect URIs used.
+Discovery doc hash, and proof of token issuance (id_token and access_token headers redacted, claims screenshot allowed).
+Confirmation that provider-register client is present in registry and accepted.
+Acceptance to turn status Green: Both PKCE E2E attempts succeed (student_pilot, provider_register) + M2M token for sage succeeds. No invalid_client, invalid_grant, or PKCE verifier mismatches.
+2. scholarship_sage DRI
+
+Upon receipt of M2M secret, restart → acquire token → start 48h baseline immediately.
+Post baseline start timestamp and /health confirmation within minutes:
+Evidence file: e2e/reports/scholarship_sage/baseline_metrics_evidence.md
+Include token acquisition proof (headers redacted), initial P95/error snapshots, and matchReasons telemetry “ON.”
+Acceptance: Baseline timestamp posted by 05:00 UTC; health=200; token verified.
+3. student_pilot DRI
+
+On AUTH_05_00_GREEN.md receipt, execute 95-step E2E within 30 minutes.
+Evidence file: e2e/reports/student_pilot/E2E_JOURNEY_EVIDENCE.md
+Highlight First Document Upload activation metric, cross-browser snapshots, cross-app request_id lineage (auth → api), P95 ≤120ms, error <0.1%.
+Acceptance for 06:00 UTC: Evidence posted, activation metric confirmed, 0% auth failures.
+4. provider_register DRI
+
+After AUTH_05_00_GREEN.md, re-test OAuth; if Green, execute ORDER_B immediately.
+Evidence file: e2e/reports/provider_register/ORDER_B_EVIDENCE.md
+Include provider creation, scholarship publish via scholarship_api, dashboard view, and applicant data fetch; request_id lineage, P95 ≤120ms.
+Acceptance for 06:00 UTC: ORDER_B evidence posted and auth success rate 100% for the run.
+5. scholarship_api DRI
+
+Remain on-call; no changes (freeze).
+After student_pilot E2E, attach cross-app traces (request_id series) into:
+e2e/reports/scholarship_api/ORDER_4_EVIDENCE.md
+Acceptance for 06:00 UTC: ORDER_4 updated with lineage from student E2E and P95 snapshot (≤120ms).
+6. auto_com_center DRI
+
+Monitor live webhooks (bounces/complaints) and suppression updates; store 3 recent POST samples in audit with request_id correlation.
+Confirm DMARC/SPF/DKIM alignment screenshots for the domain in evidence locker; no plaintext secrets.
+No new sends unless triggered by agent observe-only notifications. Keep fallback flags ready.
+7. auto_page_maker DRI
+
+Maintain daily index coverage and CWV rollups to CEO by 06:00 UTC:
+Evidence: seo/daily_rollup/YYYY-MM-DD.md with pages_live, IndexNow %, CWV p75, error rate, P95.
+Confirm graceful degradation path to lead capture is functioning if auth slips.
+05:00 UTC GO gate — single-page acceptance checklist
+
+PKCE S256: Student and Provider flows pass end-to-end with tokens issued (scholar_auth → student_pilot/provider_register).
+M2M token: scholarship_sage obtains token and starts 48h baseline; timestamp posted.
+No invalid_client or invalid_grant errors observed during the gate window.
+All evidence files referenced above exist and contain request_id lineage and redacted token proofs.
+No config/schema changes on scholarship_api (freeze honored).
+If any item fails by 05:00 UTC
+
+Logged-in flows slip to Nov 10 as pre-communicated.
+Non-auth surfaces continue compounding via auto_page_maker (no disruption).
+auto_com_center remains ready; only operational for allowed notifications.
+Nov 12 ARR ignition remains protected; B2C activation work continues off the auth-critical path.
+06:00 UTC checkpoint — required deliverables
+
+AUTH_05_00_GREEN.md posted (or slip declaration with root cause and ETA).
+student_pilot: E2E_JOURNEY_EVIDENCE.md posted with First Document Upload activation metric called out.
+provider_register: ORDER_B_EVIDENCE.md posted (if auth gate green).
+scholarship_api: ORDER_4_EVIDENCE.md updated with cross-app traces.
+scholarship_sage: baseline_metrics_evidence.md updated with start timestamp and initial telemetry.
+auto_page_maker: seo/daily_rollup/YYYY-MM-DD.md posted with index coverage + CWV.
+auto_com_center: Audit snippet with last 3 webhook payloads (redacted), unsubscribe/suppression proof.
+Strategic risk register (today)
+
+Risk: Auth registry drift vs. client expectations (provider_register “invalid_client” discrepancy).
+
+Mitigation: Single source of truth evidence via AUTH_05_00_GREEN.md with live re-test; no GO without it.
+Risk: scholarship_sage baseline delay due to secret delivery gap.
+
+Mitigation: Priority secret delivery; start baseline immediately; baseline deadline Nov 8, 16:00 UTC remains.
+Risk: Premature changes jeopardizing Auto Page Maker compounding.
+
+Mitigation: Strict freeze on unapproved changes until Nov 12; daily rollups.
+ARR alignment notes
+
+CAC discipline: Auto Page Maker continues compounding; do not jeopardize SEO.
+B2C activation: First Document Upload remains the north-star; ensure today’s E2E proves this metric with instrumentation.
+B2B: Ensure provider_register can authenticate and publish; this is prerequisite to 3% platform fee flywheel.
+Direct answers to “What should I work on next?”
+
+Auth DRI: Deliver secrets to all 3 clients; run live PKCE and M2M tests; publish AUTH_05_00_GREEN.md by the gate.
+Sage DRI: The moment the M2M secret lands, start the 48h baseline and post timestamp + health.
+Student Pilot DRI: On auth green, run the 95-step E2E; deliver evidence with activation metric by 06:00.
+Provider Register DRI: On auth green, execute ORDER_B; deliver evidence by 06:00.
+API DRI: Stand by to append cross-app traces after student E2E; maintain freeze.
+Auto Page Maker DRI: Keep compounding; post daily index/CWV rollup by 06:00; no changes pre–Nov 12.
+Auto Com Center DRI: Monitor deliverability/webhooks; maintain fallback; ensure audit trails and compliance.
+Final note
+
+Our Nov 12 ARR ignition target remains protected. The only way we miss near-term logged-in value is if the 05:00 auth gate fails. Resolve the registry/secret discrepancies now, prove PKCE/M2M with evidence, and get the student activation E2E over the line by 06:00. Student value is business value—ship the activation proof.
