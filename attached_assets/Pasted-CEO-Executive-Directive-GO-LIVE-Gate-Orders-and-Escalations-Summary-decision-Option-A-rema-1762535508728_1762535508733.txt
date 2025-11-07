@@ -1,0 +1,113 @@
+CEO Executive Directive — GO-LIVE Gate, Orders, and Escalations
+
+Summary decision
+
+Option A remains in force. Hard gate: P95 ≤120ms for authorize, token, jwks, discovery by 00:00 UTC; slip allowed to 00:15 UTC, then NO-GO +24h.
+3/4 endpoints green is not sufficient. We need 4/4 ≤120ms. Token at 130ms is a blocker.
+Strategic rationale
+
+Trust and security are our brand. Auth latency is a user trust KPI and a conversion driver across both B2C and B2B funnels.
+ARR timeline protection: If Auth goes green tonight, we unlock the B2C upsell window in 48h and B2B ORDER_B within ~1–3 hours after the gate. Auto Page Maker growth continues regardless, preserving CAC efficiency.
+Decisions and owner orders
+
+Authentication (scholar_auth) — P0 now Application Name: scholar_auth APP_BASE_URL: https://scholar-auth-jamarrlmayes.replit.app
+Gate: Must deliver P95 ≤120ms for authorize, token, jwks, discovery by 00:00–00:15 UTC.
+Status: 3/4 green; token at 130ms. Not acceptable.
+Required optimizations (execute now; keep risk low):
+Pre-warm: 30–50 RPS for 10 minutes on authorize and token.
+Connection reuse: Enable HTTP keep-alive; DB pool tuned (min 5–10, max 20).
+Client metadata cache: LRU in-memory by client_id, 300s TTL; cache scopes and grant types (do not cache secrets).
+Token path hot path:
+Reuse signing KeyObject; avoid repeated key parsing.
+Prefer ES256 or EdDSA if available; if RS256 is mandatory, preload key and use async sign.
+Move non-critical grant logging to async queue/outbox.
+Minimize JWT claims to essentials (iss, aud, sub, exp, iat, scope, jti).
+Secret verification: Constant-time compare; ensure KDF cost is moderate and non-blocking (offload heavy work if present).
+JWKS/discovery caching: 300s TTL already working — keep.
+Metrics cadence: Post endpoint P50/P95 and error rate every 20 minutes starting immediately. Agent3 will track.
+Deliverables tonight:
+AUTH_FIXLOG entry with exact diffs and timestamps.
+Screenshots/metrics of pre/post P95 for token.
+Escalation: If token remains >120ms at 23:45 UTC checkpoint, run a 10-minute intensified warm-up and confirm DB pool headroom. If still failing at 00:00–00:15 UTC, NO-GO +24h.
+2. Communications (auto_com_center) — Email only, Postmark confirmed
+Application Name: auto_com_center
+APP_BASE_URL: https://auto-com-center-jamarrlmayes.replit.app
+
+Provider: Postmark is the official provider. Remove SendGrid from tonight’s requirements.
+SMS: Disabled; no action required. Ensure UI copy and templates are email-only.
+Comms DRI by 20:30 UTC:
+Confirm DKIM/SPF/DMARC “Verified” for mail.scholaraiadvisor.com in Postmark.
+Post deliverability snapshot and bounce/complaint thresholds.
+3. Payments (provider_register) — Stripe prod confirmation
+Application Name: provider_register
+APP_BASE_URL: https://provider-register-jamarrlmayes.replit.app
+
+Finance/Platform Ops by 22:00 UTC:
+Confirm live mode keys and webhook registration; send test event; verify 200 OK with signature validation; confirm 3% platform fee flow.
+If missed: Hold ORDER_B and slip B2B ARR by 24h. provider_register remains technically ready.
+4. API (scholarship_api) — Operational, monitor during auth rehearsal
+Application Name: scholarship_api
+APP_BASE_URL: https://scholarship-api-jamarrlmayes.replit.app
+
+Keep server hot; monitor 401/5xx during JWKS rehearsal (23:30–23:45 UTC). Error budget <1%.
+Provide cross-app request_id lineage evidence in ORDER_4_EVIDENCE by ~01:30 UTC.
+Confirm token validation continuity across the rehearsal window.
+5. Student frontend (student_pilot) — E2E evidence post-gate
+Application Name: student_pilot
+APP_BASE_URL: https://student-pilot-jamarrlmayes.replit.app
+
+After AUTH GREEN TAG, execute PKCE flow evidence within 30 minutes (target 00:30–00:45 UTC).
+Capture: registration/login via scholar_auth, profile submission to scholarship_api, sage UI interaction (read-only). Error rate <1%, P95 UI API calls within SLO.
+6. Scholarship Sage (scholarship_sage) — M2M read-only validation
+Application Name: scholarship_sage
+APP_BASE_URL: https://scholarship-sage-jamarrlmayes.replit.app
+
+Execute 3x client_credentials token grants after Auth confirms client registration.
+Requirements: P95 ≤120ms for token grants; scopes read-only (student.read, scholarship.read, scholarship.search).
+Deliver evidence within 30 minutes of AUTH GREEN TAG, including request_id lineage to scholarship_api.
+7. Auto Page Maker (auto_page_maker) — Frozen; monitor-only
+Application Name: auto_page_maker
+APP_BASE_URL: https://auto-page-maker-jamarrlmayes.replit.app
+
+Status: Green, frozen through Nov 12. No changes.
+Daily KPI rollups continue at 06:00 UTC. Maintain current CWV and error rates.
+8. Scholarship Agent (scholarship_agent) — Frozen; observe-only
+Application Name: scholarship_agent
+APP_BASE_URL: https://scholarship-agent-jamarrlmayes.replit.app
+
+Status: Green, frozen through Nov 9. Auto-apply OFF.
+No deliverables tonight; fairness summary due Nov 10, 12:00 UTC.
+War-room timeline (UTC)
+
+19:20: Auth Metrics Snapshot #2 (must include token improvements).
+20:00: War-room opens (30-minute cadence). Agent3 leads coordination.
+23:30–23:45: JWKS rehearsal; scholarship_api monitors 401/5xx.
+23:45: Token P95 checkpoint. If >120ms, run intensified warm-up + final tuning.
+00:00–00:15: AUTH GREEN TAG window. If token P95 still >120ms at 00:15, NO-GO +24h.
+00:30–00:45: student_pilot E2E evidence.
+~01:00: provider_register ORDER_B evidence (contingent on Stripe confirmation).
+~01:30: scholarship_api ORDER_4 addendum with cross-app traces.
+KPI reporting tonight
+
+Auth: P50/P95 per endpoint, error rate, RPS, and notes on each optimization.
+API: 401/5xx during JWKS rehearsal, request_id lineage, and latency distribution.
+Comms: Postmark verification screenshots and deliverability snapshot.
+Payments: Stripe live-mode confirmation artifacts and webhook test proof.
+E2E: Evidence packages must display Application Name + APP_BASE_URL at the top.
+Risk and contingency
+
+Primary risk: token endpoint P95 >120ms. Mitigations above must be executed now. If risk materializes at gate, we take a disciplined NO-GO and slip 24h to protect trust and error budget.
+Secondary risk: Stripe prod confirmation misses 22:00 UTC. Contingency is to delay ORDER_B and B2B ARR ignition by 24h; B2C unaffected; Auto Page Maker continues compounding.
+ARR ignition windows (if AUTH GREEN tonight)
+
+B2C upsell: Earliest 2025-11-10 00:00 UTC.
+B2B 3% fee: Upon ORDER_B completion (earliest 2025-11-08 ~01:30–03:00 UTC).
+Organic growth: Auto Page Maker continues independent of gate outcome.
+Accountability checkpoints (next 60–90 minutes)
+
+Auth DRI: Confirm “clients registered,” AUTH_FIXLOG link, Metrics Snapshot #2 by 19:20 UTC; post every 20 minutes thereafter.
+Comms DRI: Postmark verified by 20:30 UTC; SMS disabled attestation in evidence.
+Finance/Platform Ops: Stripe prod verification by 22:00 UTC.
+CEO stance
+
+Quality over speed. We will not ship with a yellow token endpoint. Deliver the final 10–15ms improvement now or we slip. Agent3 has my full authority to enforce the hard gate and escalate immediately if owners miss checkpoints.
