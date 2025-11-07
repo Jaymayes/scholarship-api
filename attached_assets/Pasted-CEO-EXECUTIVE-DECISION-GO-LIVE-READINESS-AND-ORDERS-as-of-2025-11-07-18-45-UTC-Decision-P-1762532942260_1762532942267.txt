@@ -1,0 +1,101 @@
+CEO EXECUTIVE DECISION — GO-LIVE READINESS AND ORDERS (as of 2025-11-07 ~18:45 UTC)
+
+Decision
+
+Proceed with Option A: Execute auth latency mitigation immediately and permit a schedule slip up to 00:15 UTC if P95 ≤120ms is not met by 23:45 UTC. If still >120ms by 00:15 UTC, NO-GO and reschedule +24h with a postmortem delivered by 02:00 UTC.
+Authorize pre-warming and the creation of AUTH_FIXLOG now. Engage an auth SME in parallel for a 30-minute pair-debug window (no dependency on this aid to proceed, but permitted to accelerate).
+Cross-system Go/No-Go Gates
+
+Auth P95 across authorize, token, jwks, and discovery ≤120ms with error rate ≤1% for 10 consecutive minutes.
+invalid_client eliminated for student_pilot, provider_register, and scholarship_sage.
+Successful PKCE S256 proof on student_pilot and provider_register; successful M2M (client_credentials) on scholarship_sage with scope enforcement.
+JWKS rotation rehearsal completes with zero validation errors.
+scholarship_api validation continuity throughout.
+War-Room Cadence (UTC)
+
+19:15 pre-smoke, 20:00 open, 30-minute checkpoints, 23:30–23:45 JWKS rehearsal, 00:00 auth gate, 00:30 E2E student_pilot evidence, 01:00 provider_register ORDER_B, 01:30 scholarship_api ORDER_4 addendum.
+ARR ignition targets if AUTH GREEN TAG achieved tonight
+
+B2C upsell experiences: +48h after AUTH GREEN TAG (earliest: 2025-11-10 00:00 UTC).
+B2B 3% provider fee: upon provider_register ORDER_B completion and first provider activation (earliest: 2025-11-08 01:30–03:00 UTC window).
+Per-Application Readiness, Orders, and Dates
+
+Application Name: scholar_auth APP_BASE_URL: https://scholar-auth-jamarrlmayes.replit.app
+Status: YELLOW. P95 ~200ms vs ≤120ms target; invalid_client for student_pilot and provider_register; M2M client for scholarship_sage not provisioned.
+Orders (start now):
+Register clients: student-pilot (auth code + refresh, PKCE S256), provider-register (auth code + refresh, PKCE S256), scholarship_sage (client_credentials, read-only scopes). Ensure correct redirect_uris for prod and current dev URLs; token_endpoint_auth_method client_secret_post or basic; S256 supported.
+Enable/verify caching: discovery and JWKS (300s TTL), guard for fast key rollover; add in-memory cache and, if available, edge cache.
+Pre-warm authorize and token endpoints at 30–50 RPS for 10 minutes; run in 20-minute intervals until P95 stabilizes ≤120ms.
+Connection pooling and keep-alive tuning; ensure JSON serialization optimized; gzip/brotli enabled; avoid DB hits on hot path (client lookup cache).
+Instrument request_id and per-endpoint P50/P95 reporting; publish metrics every 20 minutes to war-room.
+Estimated Go-Live: 2025-11-08 00:00 UTC if P95 ≤120ms; slip allowed to 00:15 UTC; else NO-GO +24h.
+ARR Ignition: Enables B2C +48h; enables B2B immediately after provider_register ORDER_B.
+Third-Party Systems: Database (PostgreSQL) – Complete; CDN/Edge cache (if configured) – In Progress; Observability (logs/metrics) – Complete. Blockers: client registration (P0), latency (P0).
+2. Application Name: scholarship_api
+APP_BASE_URL: https://scholarship-api-jamarrlmayes.replit.app
+
+Status: GREEN. Token validation ready; internal P95 within SLO; error rate 0%; ACID DB connected.
+Orders: Monitor 401/5xx during JWKS rehearsal; capture cross-app traces and scope enforcement. Post ORDER_4_EVIDENCE addendum by ~01:30 UTC.
+Estimated Go-Live: Tonight, contingent on auth.
+ARR Ignition: Indirect; supports both B2C and B2B flows.
+Third-Party Systems: PostgreSQL – Complete; Observability – Complete.
+3. Application Name: scholarship_agent
+APP_BASE_URL: https://scholarship-agent-jamarrlmayes.replit.app
+
+Status: GREEN (Frozen). Observe-only; excluded from all flows through Nov 9.
+Orders: No changes through Nov 9; maintain observe-only telemetry.
+ARR Ignition: None until unfrozen after Nov 9.
+Third-Party Systems: N/A for tonight.
+4. Application Name: scholarship_sage
+APP_BASE_URL: https://scholarship-sage-jamarrlmayes.replit.app
+
+Status: READY pending auth M2M client. Track 1 M2M bypass implemented; ready to re-run 3-grant sequence.
+Orders: Immediately after auth optimization + client provisioning, execute 3-grant M2M validation with request_id lineage; enforce read-only scopes; post M2M_BYPASS_EVIDENCE_FINAL within 30 minutes of auth GREEN.
+Estimated Go-Live: Tonight, contingent on auth.
+ARR Ignition: Indirect uplift to B2C conversion and retention.
+Third-Party Systems: Auth M2M – In Progress (blocked by client provisioning).
+5. Application Name: student_pilot
+APP_BASE_URL: https://student-pilot-jamarrlmayes.replit.app
+
+Status: RED → At Risk. invalid_client at auth; latest measured OAuth latency ~136ms (above threshold) prior to optimizations; protected-route redirect logic and PKCE S256 setup appear correct pending client registration fix.
+Orders: After auth client registration, re-run PKCE S256 flow; capture protected-route redirect evidence; target P95 ≤120ms; ensure responsive layout validated across Chrome, Safari, Firefox, iOS/Android. Post E2E_JOURNEY_EVIDENCE by 00:30–00:45 UTC if auth GREEN at 00:00–00:15.
+Estimated Go-Live: Tonight if auth GREEN and ≤120ms achieved; else slips with auth.
+ARR Ignition: +48h after auth GREEN (earliest 2025-11-10 00:00 UTC).
+Third-Party Systems: Auth – In Progress (P0 blocker); scholarship_api – Complete.
+6. Application Name: provider_register
+APP_BASE_URL: https://provider-register-jamarrlmayes.replit.app
+
+Status: GREEN pending auth client registration. Redirect/PKCE S256 evidence captured; API protection returning 401 unauthenticated as expected; app performance healthy.
+Orders: After client registration, run ORDER_B immediately upon auth GREEN; deliver ORDER_B_EVIDENCE by ~01:00 UTC.
+Estimated Go-Live: Tonight if auth GREEN.
+ARR Ignition: Immediate upon first provider activation and fee capture (earliest 2025-11-08 01:30–03:00 UTC).
+Third-Party Systems: Auth – In Progress (P0); Payment processor (if required for fee capture) – Confirm production keys and webhooks prior to first live fee (Owner: Finance/Platform Ops).
+7. Application Name: auto_page_maker
+APP_BASE_URL: https://auto-page-maker-jamarrlmayes.replit.app
+
+Status: GREEN (Frozen). Observer role; P95 ~100ms; CWV p75 GREEN; IndexNow ≥95%.
+Orders: No changes through Nov 12; continue 06:00 UTC daily rollups; monitor for anomalies only.
+ARR Ignition: Ongoing CAC-lean traffic compounding; no change tonight.
+Third-Party Systems: Search indexing – Complete; telemetry – Complete.
+8. Application Name: auto_com_center
+APP_BASE_URL: https://auto-com-center-jamarrlmayes.replit.app
+
+Status: PROVISIONALLY GREEN. Multi-channel tested; deliverability snapshot scheduled 00:00 UTC.
+Orders: Confirm DKIM/SPF/DMARC alignment; verify SendGrid/Twilio production configs, suppression lists, and bounce/complaint rates; ensure in-app notifications fire on OAuth success and M2M validations. Post DELIVERABILITY_SNAPSHOT at 00:00 UTC.
+ARR Ignition: Supports conversion and retention messaging on B2C; provider onboarding comms for B2B.
+Third-Party Systems: SendGrid – Complete; Twilio (if SMS) – In Progress/Confirm; SMTP (fallback) – Standby.
+Immediate Actions and Owners (start now)
+
+Auth DRI: Execute client registration, caching, pre-warming, and connection tuning; post P50/P95 metrics at 19:00, 19:20, 19:40, 20:00 UTC and every 20 minutes thereafter. Produce AUTH_FIXLOG by 00:00 UTC.
+Student DRI: Prepare to re-run OAuth PKCE tests as soon as auth signals GREEN; assemble E2E evidence by 00:30–00:45.
+Provider DRI: Ready to execute ORDER_B within 30–60 minutes of auth GREEN; evidence by ~01:00.
+Sage DRI: Execute M2M 3-grant sequence and evidence within 30 minutes of auth GREEN.
+API DRI: Monitor validation, collect cross-app traces, and deliver ORDER_4 addendum by ~01:30.
+Comms DRI: Confirm production deliverability; publish snapshot at 00:00 and watch spam/complaints.
+Incident Commander: Enforce gates, timing, and escalation. If auth P95 >120ms persists at 23:45 UTC, authorize up to 30-minute slip; at 00:15 UTC, call NO-GO.
+Answer to Agent3
+
+Proceed with pre-warming now and produce AUTH_FIXLOG. Maintain metrics cadence every 20 minutes. Coordinate DRIs per above and be ready to validate evidence packages on receipt. If any gate risks trend red before 23:45 UTC, escalate immediately with a concrete rollback or NO-GO recommendation.
+CEO note
+
+We will not trade long-term trust and SLOs for a hasty launch. If the P95 target is not met by the slip window, we will NO-GO and protect student/provider experience and our error budget. The organic growth engine (auto_page_maker) remains healthy; ARR ignition remains intact with a ≤24h delay if necessary. Act with urgency, but protect quality and security.
