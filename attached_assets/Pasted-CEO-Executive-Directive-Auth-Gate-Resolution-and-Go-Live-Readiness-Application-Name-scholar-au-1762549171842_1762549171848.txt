@@ -1,0 +1,93 @@
+CEO Executive Directive — Auth Gate Resolution and Go‑Live Readiness
+
+Application Name: scholar_auth
+APP_BASE_URL: https://scholar-auth-jamarrlmayes.replit.app
+
+Decision Summary
+
+We will hold the hard gate: all four auth endpoints must meet P95 ≤120ms. No exceptions.
+Execute infrastructure upgrade now and deploy edge caching in parallel to eliminate variance.
+If token P95 >120ms at 00:15 UTC, we slip 24h (NO‑GO).
+Immediate Orders (Effective now)
+
+Infrastructure Upgrade (Primary path)
+Action: Upgrade Neon to a paid tier immediately.
+Owner: Auth DRI (@auth-lead).
+Budget: Approved ($19/month).
+Start: Now.
+Done-by: 20:15 UTC initial validation; 20:40 UTC confirmation snapshot.
+Success criteria:
+POST /token P95 ≤110ms in isolation and ≤120ms under mixed load with authorize/jwks/discovery.
+Error rate ≤0.1% across all four endpoints.
+Notes:
+Keep DB pool tuned (min 5–10, max 20).
+Maintain HTTP keep-alive.
+Preserve existing 300s caches (discovery/JWKS).
+No change to token claims beyond minimal set already approved.
+2. Edge Cache for Discovery/JWKS (Stability path in parallel)
+
+Action: Front /.well-known/openid-configuration and /.well-known/jwks.json with Cloudflare edge cache.
+Owner: Platform Ops (with Auth DRI for purge hooks).
+Start: Now.
+Done-by: 21:00 UTC.
+Policy:
+TTL: 300s; cache-key includes path only; block query param poisoning.
+Purge automation tied to key rotation; must purge within 2s of rotation.
+Health check: If 5xx or signature mismatch occurs, auto-bypass cache and alert.
+Success criteria: P95 ≤90ms and variance ≤20% for both endpoints.
+3. Pre‑warm and Metrics Cadence (Continue as ordered)
+
+Pre‑warm: 30–50 RPS on authorize and token for 10 minutes every time the service restarts.
+Metrics snapshots (must include P50/P95 and error rate for all four endpoints):
+19:40 UTC
+20:00 UTC (war room open)
+20:20, 20:40, 21:00, then every 20 minutes through gate
+Evidence: Post screenshots and raw metrics in e2e/reports/auth with Application Name + APP_BASE_URL at the top.
+Gate Criteria and Escalation
+
+Hard gate: P95 ≤120ms for authorize, token, jwks, discovery by 00:00–00:15 UTC.
+If 19:40 UTC snapshot shows token P95 >125ms → Immediate escalation to CEO for check-in.
+If 20:20 UTC snapshot shows token P95 >120ms → Confirm Neon upgrade complete and validate Cloudflare caching; escalate if incomplete.
+If 23:45 UTC snapshot shows token P95 >120ms → Intensify warm-up and finalize tuning; prepare NO‑GO plan.
+If 00:15 UTC token P95 >120ms → NO‑GO +24h.
+Dependencies and Deadlines (No change)
+
+Application Name: auto_com_center | APP_BASE_URL: https://auto-com-center-jamarrlmayes.replit.app
+Postmark is the sole email provider. SMS is disabled. Comms DRI must confirm DKIM/SPF/DMARC by 20:30 UTC.
+Application Name: provider_register | APP_BASE_URL: https://provider-register-jamarrlmayes.replit.app
+Finance/Platform Ops must confirm Stripe live keys + webhook signature + 3% platform fee by 22:00 UTC. If missed, hold ORDER_B and slip B2B ARR 24h.
+Application Name: scholarship_api | APP_BASE_URL: https://scholarship-api-jamarrlmayes.replit.app
+Monitor 401/5xx during JWKS rehearsal 23:30–23:45 UTC; keep server hot; error budget <1%.
+Application Name: scholarship_sage | APP_BASE_URL: https://scholarship-sage-jamarrlmayes.replit.app
+Execute 3x client_credentials validation within 30 minutes of AUTH GREEN TAG; verify read-only scopes; deliver evidence.
+Application Name: student_pilot | APP_BASE_URL: https://student-pilot-jamarrlmayes.replit.app
+Run E2E PKCE flow 00:30–00:45 UTC if AUTH GREEN; deliver evidence.
+Application Name: scholarship_agent | APP_BASE_URL: https://scholarship-agent-jamarrlmayes.replit.app
+Frozen through Nov 9; observe-only; fairness summary due Nov 10 12:00 UTC.
+Application Name: auto_page_maker | APP_BASE_URL: https://auto-page-maker-jamarrlmayes.replit.app
+Frozen through Nov 12; monitor-only; daily KPI rollups 06:00 UTC.
+Evidence and Compliance Requirements
+
+Every evidence file must begin with Application Name + APP_BASE_URL.
+Auth DRI: Create AUTH_FIXLOG_2025-11-07 with exact diffs, timestamps, before/after metrics, and screenshots. Include all optimization and infra change details.
+Security/ethics: No PII or secrets in logs or evidence. Maintain Responsible AI practices; no system changes that compromise transparency or student empowerment.
+Reliability targets: 99.9% uptime, P95 ~120ms. Maintain error budget discipline.
+ARR Impact and Plan
+
+If AUTH GREEN tonight:
+B2C upsell earliest: 2025-11-10 00:00 UTC.
+B2B (3% fee) earliest: upon ORDER_B evidence (~Nov 8 01:00 UTC) and Stripe confirmation (22:00 UTC today).
+If NO‑GO:
+Slip 24h; maintain warm-up schedule; re-run the same gate with paid Neon + edge caching baseline fully in place.
+Approvals
+
+Neon paid tier: Approved immediately.
+Cloudflare worker/cache: Approved within current budget (free/low-cost tier acceptable).
+Agent3 — Required Actions
+
+Enforce the timeline and gate. If any checkpoint is missed, escalate immediately.
+Keep the war room on 30-minute cadence starting 20:00 UTC.
+Ensure all DRIs publish metric snapshots on schedule with required headers.
+Bottom Line
+
+We are not relaxing the target. Execute Neon upgrade now and deploy edge caching for discovery/JWKS in parallel. Hit P95 ≤120ms across all four endpoints by the 00:00–00:15 UTC window or we slip 24 hours. Maintain quality over speed.
