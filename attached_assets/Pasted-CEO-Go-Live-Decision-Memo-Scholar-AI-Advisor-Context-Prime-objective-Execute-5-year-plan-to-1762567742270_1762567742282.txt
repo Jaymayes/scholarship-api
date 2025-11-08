@@ -1,0 +1,94 @@
+CEO Go-Live Decision Memo — Scholar AI Advisor
+
+Context
+
+Prime objective: Execute 5-year plan toward $10M profitable ARR, prioritizing organic, low-CAC growth, reliability (P95 ≤120ms), and Responsible AI.
+This decision covers the 8-application ecosystem readiness, gate criteria, ARR ignition, and risk controls based on Agent3’s reports and current constraints.
+Go/No-Go Decisions (by application)
+
+scholar_auth (https://scholar-auth-jamarrlmayes.replit.app)
+
+Decision: Conditional GO. Issue AUTH GREEN TAG only if the 00:10 UTC snapshot and the 00:15 UTC roll-up confirm all four endpoints meet P95 ≤120ms and error rate ≤0.1%.
+Notes:
+23:52 UTC: Token P95 129ms (above threshold) — acceptable if transient and not present in the 00:10/00:15 window.
+23:56 UTC: Discovery error_rate reported at 1.00% was labeled “within tolerance.” Correct this: error_rate ≤0.1% is the gate. Any >0.1% during 00:00–00:15 requires NO-GO. Outside the window requires root cause and fixlog before final GREEN TAG.
+Required actions:
+Provide the 00:10 UTC snapshot and 00:15 UTC roll-up immediately upon capture.
+Maintain configuration lock (non-persistent DB connections). Cloudflare Worker remains disabled until Nov 9 A/B.
+scholarship_api (https://scholarship-api-jamarrlmayes.replit.app)
+
+Decision: GO for gate monitoring.
+Deliver ORDER_4_EVIDENCE by ~01:30 UTC with: request_id traces from student_pilot, scholarship_sage, and provider_register (if Stripe is green); P50/P95 latencies for protected endpoints; error budget summary (<1%); ACID confirmation; token validation proofs.
+scholarship_agent (https://scholarship-agent-jamarrlmayes.replit.app)
+
+Decision: GO (observe-only through Nov 12).
+Daily fairness rollups start Nov 10 12:00 UTC; publish by 12:15 UTC. Enforce thresholds: selection parity 0.8–1.25 (2-day breach → Sev-2), FPR >2% (24h) → Sev-2, rationale coverage <95% → Sev-3 with auto-apply blocked.
+scholarship_sage (https://scholarship-sage-jamarrlmayes.replit.app)
+
+Decision: Conditional GO, dependent on AUTH GREEN TAG.
+Deliver M2M_BYPASS_EVIDENCE by 00:45 UTC (3x client_credentials grants, read-only scope enforcement, request_id lineage, P50/P95).
+student_pilot (https://student-pilot-jamarrlmayes.replit.app)
+
+Decision: Conditional GO, dependent on AUTH GREEN TAG.
+Deliver E2E_JOURNEY_EVIDENCE by 00:45 UTC (PKCE, protected routes, profile CRUD, sage interaction, request_id lineage, P50/P95, desktop + mobile).
+provider_register (https://provider-register-jamarrlmayes.replit.app)
+
+Decision: BLOCKED until Stripe production is verified.
+Drop-dead decision: 00:20 UTC. If Stripe production (live secret, webhook registered, webhook secret match, test webhook 200 OK, production mode ON) is not confirmed by 00:20 UTC, slip B2B by 24 hours. No exceptions.
+If Stripe confirmed and AUTH GREEN TAG issued, execute ORDER_B immediately and post ORDER_B_EVIDENCE by ~01:00 UTC including 3% platform fee evidence and request_id lineage.
+auto_page_maker (https://auto-page-maker-jamarrlmayes.replit.app)
+
+Decision: GO — FROZEN through Nov 12; monitor-only.
+Keep daily 06:00 UTC KPI rollups (pages live, IndexNow ≥95%, CWV p75 GREEN, error rate, P95). This remains our primary low-CAC growth lever.
+auto_com_center (https://auto-com-center-jamarrlmayes.replit.app)
+
+Decision: GO for coordination, metrics broadcasting, and deliverability.
+Broadcast snapshots at 23:40, 23:55, 00:10 UTC and enforce gate criteria exactly as stated below.
+Send AUTH GREEN TAG announcement only after explicit CEO authorization (see Gate Criteria).
+Gate Criteria and Enforcement (authoritative)
+
+Pass requires BOTH:
+All four scholar_auth endpoints at 00:10 snapshot and 00:15 roll-up: P95 ≤120ms and error_rate ≤0.1%.
+No exceptions, no averaging across endpoints or windows.
+Enforcement:
+If any endpoint exceeds P95 120ms in the 00:10/00:15 window → NO-GO; slip 24 hours.
+If any endpoint error_rate >0.1% during 00:00–00:15 window → NO-GO; slip 24 hours.
+Auto-page if error_rate >0.1% for 3 consecutive minutes at any time.
+Evidence standards:
+Retain per-endpoint distributions, request_id, and fix logs (no PII/secrets).
+ARR Ignition Plan (unchanged unless gates fail)
+
+B2C (student_pilot): Earliest 2025-11-10 00:00 UTC. KPIs: free→paid conversion, credit ARPU, 7-day activation, support tickets <2%.
+B2B (provider_register): Earliest 01:30–03:00 UTC Nov 8, contingent on AUTH GREEN TAG and Stripe production verification. KPIs: activated providers, successful charges with 3% platform fee, time-to-first-disbursement, provider NPS.
+Organic (auto_page_maker): Continue SEO-led compounding. KPIs: organic sessions, indexed pages, CTR, SERP rank, sign-up velocity.
+Risk and Compliance Directives
+
+Stripe dependency (B2B): Finance/Platform Ops provides written confirmation by 00:20 UTC. If missed, we slip B2B 24 hours and keep provider pipeline warm; no production charges attempted.
+Responsible AI: Maintain observe-only posture on scholarship_agent until Nov 12 unless Sev-1 safety issue emerges. No auto-apply expansion until fairness metrics stabilize within thresholds.
+Security and privacy: Maintain OAuth2/OIDC best practices, secure token storage, revocation, and refresh handling. Confirm FERPA/COPPA/DMARC/SPF/DKIM compliance. No SMS until Twilio is fully configured and tested with opt-out compliance.
+SLOs: Hold to 99.9% uptime and ~120ms P95 latency; alert thresholds set with headroom.
+Observability: Request_id propagation is mandatory across all apps; provide dashboard links and 7-day retention. Any P95 regression >10ms sustained >10 minutes is a Sev-3 for investigation.
+Immediate Actions and Deadlines (UTC)
+
+23:40, 23:55, 00:10: auto_com_center broadcasts snapshots with pass/fail flags per endpoint; scholar_auth DRI ensures data quality.
+00:00–00:15: AUTH GREEN TAG window. auto_com_center holds messaging until CEO GO.
+00:15: CEO Go/No-Go. If pass, auto_com_center issues AUTH GREEN TAG immediately.
+00:20: Stripe production verification decision. If not confirmed, B2B slips 24h; do not attempt ORDER_B.
+00:30–00:45: student_pilot E2E + scholarship_sage M2M evidence due.
+~01:00: provider_register ORDER_B evidence due (only if Stripe confirmed).
+~01:30: scholarship_api ORDER_4_EVIDENCE due.
+Clarifications and Corrections Required
+
+Correct the “Discovery error_rate 1.00% (within tolerance)” statement. It is not within tolerance. Provide root cause, remediation, and confirm clean results in the 00:10/00:15 window before GREEN TAG.
+Ensure all evidence files begin with “Application Name” and “APP_BASE_URL” as mandated.
+Capital and Resource Authorizations
+
+Approved: Postmark production spend for launch communications; continue SPF/DKIM/DMARC monitoring.
+Approved: Minimal incremental infra headroom for scholar_auth and scholarship_api during gate window to protect P95.
+Not approved: No paid acquisition. Maintain SEO-led growth focus.
+CEO Closing
+
+Quality over speed is non-negotiable. If the final window does not cleanly pass, we slip 24 hours.
+If the 00:10 snapshot and 00:15 roll-up both pass all criteria, auto_com_center is authorized to send AUTH GREEN TAG immediately and trigger downstream validations per schedule.
+B2B proceeds only with confirmed Stripe production. If not confirmed by 00:20, slip B2B by 24 hours; do not attempt ORDER_B.
+Execute with precision. Maintain evidence discipline. Keep CAC low and reliability high.
