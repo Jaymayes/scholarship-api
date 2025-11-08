@@ -1,0 +1,94 @@
+CEO Decision Memo — Scholar AI Advisor
+Date: 2025-11-08
+Time: ~16:15 UTC
+
+Summary
+
+17:00 UTC auth target missed (P95 ~191–205ms across 4 endpoints). Quality bar remains unchanged.
+Decision: Continue deep remediation immediately AND keep auto-slip communications fully staged. Gate discipline stands.
+Directives by Application
+
+scholar_auth APP_BASE_URL: https://scholar-auth-jamarrlmayes.replit.app
+Status Call
+
+Targets remain:
+17:30 UTC: Canary results and rollout plan
+18:45 UTC: P95 ≤110ms @ 500 rps
+20:00 UTC: Soak P95 ≤120ms + error_rate ≤0.1% (≥1,000 samples/endpoint, 10 min)
+If any 20:00 criterion fails → auto-slip to Nov 10 (no exceptions).
+Remediation Focus (execute now)
+
+Middleware isolation (suspected shared overhead):
+Create route-level “fast path” stacks for /.well-known/openid-configuration, /.well-known/jwks.json, /oauth/token, /oauth/authorize with ONLY essential middleware (authz, minimal logging, request_id). Temporarily disable body parsers, cookie parsing, CSRF, compression, and rate limiting on these four endpoints if not strictly required by spec; preserve security semantics.
+Add per-middleware high-resolution timing logs (on-CPU, wall clock) and emit top 3 contributors per request_id. Deliver a 2-minute histogram at 17:30.
+Verify no DB touch on JWKS/discovery; confirm DB RTT separately for token/authorize.
+Serialization and transport:
+Disable response compression on the four endpoints during remediation window.
+Ensure Keep-Alive is on; confirm connection reuse; maintain cap so CPU <70% and event loop latency <10ms.
+Validation:
+A/B canary: 5% traffic on “fast path” per endpoint for 5 minutes. If P95 improves ≥30% vs baseline, ramp to 100% and lock change until after gate.
+Evidence Required
+
+16:30 UTC: Before/after P95, CPU, DB RTT, top-3 latency contributors.
+17:30 UTC: Canary A/B table (per endpoint), per-middleware timing histogram, decision to roll or not.
+19:15 UTC: ≥500 samples/endpoint, latency histograms, error budget summary.
+20:00 UTC: Soak evidence per gate spec.
+Budget/Infra
+
+Neon Pro upgrade: Approved (already authorized).
+Monitoring at 1-min granularity, 7-day retention: Approved within $1,500 window.
+2. provider_register
+APP_BASE_URL: https://provider-register-jamarrlmayes.replit.app
+
+Stripe Hard Gate
+
+Deadline: 18:00 UTC. Must have live key loaded, webhook registered, and 200 OK test event in production mode.
+If at risk now: Escalate to CFO and open Stripe priority support immediately. Up to $500 pre-approved (requires CFO confirmation).
+If missed: B2B remains blocked regardless of auth status.
+3. auto_com_center
+APP_BASE_URL: https://auto-com-center-jamarrlmayes.replit.app
+
+Orders
+
+Keep both staged messages ready. Do not issue AUTH GREEN TAG without explicit CEO authorization after the 00:15 UTC roll-up.
+Checkpoints to CEO: 16:30, 17:30, 19:15, 20:05, 23:35 UTC. Deliver evidence bundles on schedule.
+SMS stays disabled; maintain Postmark/DKIM/SPF/DMARC monitoring.
+4. scholarship_api
+APP_BASE_URL: https://scholarship-api-jamarrlmayes.replit.app
+
+Posture
+
+Change freeze remains in effect. Monitor-only. Evidence harness ready. No logic/infra changes.
+5. student_pilot
+APP_BASE_URL: https://student-pilot-jamarrlmayes.replit.app
+
+Posture
+
+Change freeze. E2E harness staged. Execute T+30 after AUTH GREEN TAG.
+6. scholarship_sage
+APP_BASE_URL: https://scholarship-sage-jamarrlmayes.replit.app
+
+Posture
+
+Change freeze. M2M evidence harness staged. Execute T+30 after AUTH GREEN TAG.
+7. auto_page_maker
+APP_BASE_URL: https://auto-page-maker-jamarrlmayes.replit.app
+
+Orders
+
+Change freeze. Deliver the overdue 06:00 UTC KPI rollup today (2025-11-08) by 17:00 UTC and resume daily cadence.
+8. scholarship_agent
+APP_BASE_URL: https://scholarship-agent-jamarrlmayes.replit.app
+
+Posture
+
+Change freeze; observe-only through Nov 12. Maintain fairness rollups and summaries.
+Gate Discipline and ARR Timeline
+
+20:00 UTC soak test: If ANY auth endpoint exceeds P95 120ms or error_rate 0.1%, auto-slip to Nov 10 00:00–00:15 UTC gate window. No exceptions.
+B2C earliest: Nov 10 00:00 UTC (dependent on AUTH GREEN TAG).
+B2B earliest: Nov 9 01:30–03:00 UTC if Stripe verified by 18:00 UTC today AND AUTH passes at 20:00 UTC; otherwise aligns to the next green window post-auth.
+Answer to Agent3’s question
+
+Do both: Continue debugging the deeper bottleneck now (middleware isolation plan above) and keep AUTO-SLIP communications fully prepared. Gate rules stand unchanged.
+Next CEO touchpoint: 16:30 UTC — deliver the remediation snapshot with the per-middleware timing data and canary plan. Guard the gate.
