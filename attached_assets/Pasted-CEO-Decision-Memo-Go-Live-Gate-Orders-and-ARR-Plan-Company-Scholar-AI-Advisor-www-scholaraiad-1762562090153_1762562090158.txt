@@ -1,0 +1,133 @@
+CEO Decision Memo — Go-Live Gate, Orders, and ARR Plan
+Company: Scholar AI Advisor (www.scholaraiadvisor.com)
+Date/Time: 2025-11-07 ~23:35 UTC
+
+Executive Summary
+
+Authorization Gate: Conditional GO approved. Final AUTH GREEN TAG will be issued in the 00:00–00:15 UTC window contingent on fresh snapshots meeting SLOs (P95 ≤120ms; error rate ≤0.1%). Quality over speed remains non-negotiable.
+Current Signal: Latest snapshots indicate readiness. Configuration locked for scholar_auth (no persistent DB connections). Cloudflare worker staged, disabled until Nov 9 A/B.
+B2B Constraint: provider_register execution (ORDER_B) is BLOCKED pending Stripe production verification; escalate until confirmed. Do not proceed without confirmation.
+Responsible AI: scholarship_agent fairness telemetry infrastructure is approved. Operate in observe-only mode through Nov 12; no changes to matching logic until metrics prove stable.
+Non-Negotiable Reporting Format for All Agent3 Deliverables
+
+Every report must begin with:
+Application Name
+APP_BASE_URL
+Gate Criteria for AUTH GREEN TAG (00:00–00:15 UTC)
+
+Required metrics at 23:40, 23:55, and 00:10 UTC:
+GET /.well-known/openid-configuration: P50, P95, error_rate
+GET /.well-known/jwks.json: P50, P95, error_rate
+POST /token: P50, P95, error_rate
+POST /authorize: P50, P95, error_rate
+Pass: P95 ≤120ms for each endpoint and error rate ≤0.1%.
+Fail: If any endpoint exceeds P95 120ms at 00:15 UTC, slip 24 hours with current config preserved.
+Orders by Application
+
+scholar_auth APP_BASE_URL: https://scholar-auth-jamarrlmayes.replit.app
+Status: Gate-ready; Conditional GO.
+Orders:
+Keep DB connections non-persistent (locked). Document rationale in EDR with before/after metrics.
+Maintain 1-minute rolling SLI and 5-minute SLO snapshots during gate. If error_rate >0.1% for 3 consecutive minutes, auto-page to War Room and halt downstream E2E tests.
+Cloudflare worker stays disabled until Nov 9 A/B. Prepare rollback plan and a 2-hour comparative test plan for TTFB/latency/cache-hit.
+Retain 7 days of auth metrics and request_id logs for audit.
+2. scholarship_api
+APP_BASE_URL: https://scholarship-api-jamarrlmayes.replit.app
+
+Status: GREEN; ready for gate monitoring.
+Orders:
+During 23:40/23:55/00:10 snapshots, capture 401 and 5xx counts, and confirm continuous JWKS validation.
+Deliver ORDER_4_EVIDENCE by ~01:30 UTC:
+Cross-app request_id traces: student_pilot → scholar_auth → scholarship_api; scholarship_sage → scholar_auth → scholarship_api; provider_register → scholar_auth → scholarship_api (if ORDER_B runs).
+P50/P95 latency for protected endpoints; error budget summary (<1%).
+Confirmation of ACID consistency and token validation enforcement.
+3. scholarship_agent
+APP_BASE_URL: https://scholarship-agent-jamarrlmayes.replit.app
+
+Status: Fairness telemetry infrastructure delivered; restart confirmed.
+Orders (Responsible AI, observe-only through Nov 12):
+Begin daily fairness rollups at 12:00 UTC with report published by 12:15 UTC.
+Hard thresholds and alerts:
+Selection parity per cohort outside 0.8–1.25 for 2 consecutive days → raise Sev-2, freeze algorithmic changes.
+False Positive Rate (human-review-based) >2% in rolling 24h → Sev-2.
+Rationale coverage <95% → Sev-3 and block new auto-apply actions until back >95%.
+No mutation to matching logic until Nov 12 unless Sev-1 safety issue. All telemetry must remain PII-safe and append-only; exec/admin role required for endpoints.
+Prepare a bias red-team test plan for week of Nov 12; include synthetic cohorts and counterfactual tests.
+4. scholarship_sage
+APP_BASE_URL: https://scholarship-sage-jamarrlmayes.replit.app
+
+Status: READY, waiting for AUTH GREEN TAG.
+Orders:
+Within 30 minutes of AUTH GREEN TAG, execute 3x client_credentials grants; verify read-only scopes; produce evidence with P50/P95 latency and request_id lineage.
+Confirm no write/delete capabilities accessible via M2M token; attach redacted token claim samples in evidence.
+5. student_pilot
+APP_BASE_URL: https://student-pilot-jamarrlmayes.replit.app
+
+Status: READY, awaiting AUTH GREEN TAG.
+Orders:
+Execute full E2E PKCE flow immediately after AUTH GREEN TAG; deliver evidence by 00:45 UTC:
+Registration/Login via scholar_auth.
+Profile submission to scholarship_api.
+scholarship_sage interaction.
+P50/P95 latency, error rate, and cross-app request_id lineage screenshots (secrets redacted).
+Validate responsive behavior across a desktop and a mobile viewport; log any P95 >120ms as a UI Sev-3 with remediation owner.
+6. provider_register
+APP_BASE_URL: https://provider-register-jamarrlmayes.replit.app
+
+Status: Technically GREEN; EXECUTION BLOCKED pending Stripe production verification.
+Orders:
+Immediate escalation to Finance/Platform Ops until the following are confirmed in production:
+Live STRIPE_SECRET_KEY (not test).
+Webhook endpoint registered; STRIPE_WEBHOOK_SECRET matches.
+Test webhook sent and 200 OK verified; production mode enabled.
+Decision point:
+If Stripe production verification confirmed by 00:20 UTC and AUTH GREEN TAG issued → Execute ORDER_B within 60 minutes; deliver ORDER_B_EVIDENCE by ~01:00 UTC, including 3% platform fee capture proof.
+If not confirmed by 00:20 UTC → Slip B2B by 24 hours; do not execute ORDER_B.
+7. auto_page_maker
+APP_BASE_URL: https://auto-page-maker-jamarrlmayes.replit.app
+
+Status: GREEN; FROZEN through Nov 12; monitor-only.
+Orders:
+Continue daily KPI rollups at 06:00 UTC (pages live, IndexNow ≥95%, CWV p75 GREEN, error rate, P95).
+No changes until Nov 12 unless Sev-1 availability issue. Ensure sitemap/index feeds remain fresh.
+8. auto_com_center
+APP_BASE_URL: https://auto-com-center-jamarrlmayes.replit.app
+
+Status: READY; War Room cadence active.
+Orders:
+Broadcast metrics snapshots at 23:40, 23:55, and 00:10 UTC to leadership channel using the required format.
+On final approval, send AUTH GREEN TAG message using the approved template. Maintain deliverability health (SPF, DKIM, DMARC aligned; unsubscribe compliance).
+ARR Ignition Plan and KPIs
+
+B2C (student_pilot):
+Earliest ignition: 2025-11-10 00:00 UTC.
+KPIs: Free→Paid conversion rate, credit ARPU, 7-day activation rate, support ticket rate (<2% of active users).
+B2B (provider_register):
+Earliest ignition: ~01:30–03:00 UTC Nov 8, contingent on AUTH GREEN TAG and Stripe production verification.
+KPI: Activated providers, successful charges with 3% platform fee, time-to-first-disbursement, provider NPS.
+CAC and Growth:
+Primary lever: Auto Page Maker SEO compounding; maintain low-CAC growth focus.
+Weekly: Organic sessions, indexed pages, CTR, SERP rank for top queries; correlate with sign-up velocity.
+Reliability SLOs:
+Uptime ≥99.9%, P95 ≤120ms across core auth and API touchpoints; maintain error budget <1%.
+Risks and Mitigations
+
+Auth regression risk: Keep non-persistent DB connections; roll back any change that causes Token/Authorize P95 >120ms for 5 consecutive minutes during gate.
+Stripe dependency: Enforced “no ORDER_B without production verification.” If missed tonight, slip B2B by 24h; keep provider pipeline warm.
+Cloudflare unknowns: A/B test in controlled staging Nov 9; no change to production path before then.
+Responsible AI: Fairness telemetry running with strict thresholds and incident response. No auto-apply expansion until fairness stability confirmed.
+Decisions and Next Checkpoints
+
+AUTH GREEN TAG Decision: Final at 00:00–00:15 UTC window; requires snapshots meeting SLOs.
+Evidence Deadlines:
+student_pilot E2E: by 00:45 UTC.
+scholarship_sage M2M: by 00:45 UTC.
+provider_register ORDER_B: by ~01:00 UTC (only if Stripe confirmed).
+scholarship_api ORDER_4_EVIDENCE: by ~01:30 UTC.
+Fairness Telemetry: First daily report 2025-11-10 12:15 UTC; alerts live immediately.
+Required Acknowledgements (reply all in War Room)
+
+Agent3: Confirm receipt of this memo and readiness to execute per-application orders and deadlines.
+Finance/Platform Ops: Confirm Stripe production verification status and ETA immediately.
+Auth DRI: Confirm that snapshot automation is scheduled and evidence bundle locations are set.
+We will not trade reliability for speed. Hit the gate cleanly or we slip 24 hours. Maintain focus on low-CAC, SEO-led compounding growth and Responsible AI as force multipliers for ARR.
