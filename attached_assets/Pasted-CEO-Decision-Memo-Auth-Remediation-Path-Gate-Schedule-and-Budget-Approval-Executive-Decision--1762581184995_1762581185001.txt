@@ -1,0 +1,73 @@
+CEO Decision Memo — Auth Remediation Path, Gate Schedule, and Budget Approval
+
+Executive Decision
+
+Decision on Agent3 request: Approve Option 1 — 2-hour remediation deadline extension to 14:00 UTC today, while preserving the Nov 9 00:00–00:15 UTC re-gate window.
+Contingency guardrail: If staging P95 remains >120ms or error_rate >0.1% for any auth endpoint during a sustained 10-minute load test window at or after 20:00 UTC, we auto-slip the ecosystem gate by 24 hours to Nov 10 00:00–00:15 UTC. No exceptions.
+Non-Negotiable Gate Criteria
+
+scholar_auth: P95 ≤120ms and error_rate ≤0.1% for all four endpoints at both the 00:10 snapshot and 00:15 roll-up.
+Evidence discipline: Every artifact must begin with Application Name + APP_BASE_URL and include request_id lineage.
+Remediation Directives — scholar_auth (Owner: Auth DRI)
+Warmup and Startup Discipline (now → 14:00 UTC)
+
+Fix entry-point to guarantee performWarmup() executes on process start; add a readiness gate that blocks traffic until warmupDatabase() completes successfully.
+Execute standalone warmup script immediately and attach logs + commit hash proving invocation path and timings.
+Deliver delta-diff of startup/health/readiness probes showing readiness gating is active before traffic cutover.
+Database and Infra Headroom (complete by 16:00 UTC)
+
+Neon/Postgres
+Upgrade compute one tier for the next 7 days; enable/validate PgBouncer or equivalent pooling.
+Set min idle connections ≥10, keep-alive pings at 30–60s, and disable autosuspend for the auth DB.
+App scaling
+Pre-scale to 3 replicas (minReplicas=3) with HPA enabled; set minReadySeconds ≥15 and maxSurge ≥1.
+Enable HTTP keep-alive and confirm TLS session reuse at the ingress.
+Caching (safe-only)
+CDN-cache /.well-known/openid-configuration and JWKS at TTL=300s with background refresh; do not cache token endpoints or authorization decisions.
+Synthetic keep-warm
+Schedule 60s pings to discovery + JWKS endpoints; exclude from production error_rate (see monitoring fix below).
+Monitoring and Evidence (complete by 08:00 UTC bug fix; full package staged by 23:30 UTC)
+
+Correct the monitoring classification bug to separate negative-test failures from production error_rate; ship dashboards with per-endpoint RED metrics (rate, errors, duration).
+Enforce end-to-end request_id propagation (ingress → app → DB) and include 7-day retention.
+Prepare evidence bundle: load-test reports (≥1,000 samples/endpoint), config diffs, capacity plan, and dashboard screenshots with timestamps aligned to snapshots.
+Performance Targets (prove by rehearsal)
+
+Working target for headroom: P95 ≤100ms on staging under representative load, to ensure margin vs ≤120ms gate.
+Security Controls (unchanged but re-verified today)
+
+OAuth2/OIDC flows (PKCE for public clients, client_credentials for M2M), secure token storage, revocation, refresh rotation, and strict scope enforcement.
+JWKS rotation tolerance verified with CDN cache policy above.
+Time-Boxed Test Plan
+
+12:30–13:30 UTC: Load test #1 after warmup fix; deliver preliminary P50/P95 and error_rate by 14:00 UTC.
+16:00–18:00 UTC: Apply any complementary mitigations (pool, replicas, CDN, keep-alives) based on findings.
+20:00 UTC: Soak test #2 with ≥1,000 samples/endpoint; if not meeting targets, auto-trigger 24h slip to Nov 10 gate.
+22:00 UTC: Full staging rehearsal; publish results with request_id traces.
+23:30 UTC: Evidence pre-check; ready for gate.
+Finance and Capital Allocation (approved)
+
+Infra buffer approved for 7 days (Neon compute + CDN/monitoring): up to $1,500 incremental spend.
+Rationale: Protect ARR ignition milestones; minimize CAC impact from a poor launch experience.
+Cross-Functional Deadlines and Orders
+
+Finance/Platform Ops (Stripe for provider_register): Hard deadline 18:00 UTC today to confirm live STRIPE_SECRET_KEY, webhook registration with matching secret, test webhook 200 OK in production mode. If missed, B2B remains blocked for the next gate, regardless of AUTH.
+Platform Ops (Monitoring fix): Complete by 08:00 UTC and validate on staging with screenshots included in scholar_auth evidence bundle.
+auto_com_center: Maintain gate enforcement. Prepare “Gate Day T-0” broadcast for 00:00 UTC Nov 9; keep AUTH GREEN TAG messaging on hold until explicit CEO authorization.
+scholarship_api, scholarship_sage, student_pilot: Remain in ready/blocked posture; evidence templates confirmed; execute immediately upon AUTH GREEN TAG.
+provider_register: Technically green; do not execute ORDER_B until both AUTH and Stripe are green.
+KPIs and ARR Impact (unchanged for now)
+
+B2C earliest ARR ignition: 2025-11-10 00:00 UTC (contingent on AUTH passing before then).
+B2B earliest ARR ignition: Nov 9 01:30–03:00 UTC (contingent on AUTH + Stripe by 18:00 UTC). If Stripe misses 18:00, B2B slips automatically to the next green window post-auth.
+Organic growth (auto_page_maker): Unaffected; continue daily 06:00 UTC KPI rollups. This remains our primary low-CAC engine.
+Quality and Ethics
+
+Quality over speed remains non-negotiable. No averaging across endpoints or snapshots. No exceptions to gate criteria.
+Responsible AI and compliance requirements are unchanged and enforced.
+Summary to Agent3 and DRIs
+
+Execute the 2-hour extension plan now; keep the Nov 9 00:00–00:15 UTC re-gate.
+If at 20:00 UTC scholar_auth cannot demonstrate stable P95 ≤120ms and error_rate ≤0.1% under load on staging, we will slip the ecosystem gate by 24 hours to Nov 10 00:00–00:15 UTC.
+Stripe production verification is a hard dependency for B2B by 18:00 UTC; missed deadline keeps B2B blocked.
+Maintain evidence discipline and readiness across all apps; auto_com_center holds the line on enforcement.
