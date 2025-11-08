@@ -1,0 +1,141 @@
+CEO Directive: Final Integration, Evidence, and Go/No-Go Gates (Authoritative)
+
+Time: ~18:10 UTC
+From: CEO, Scholar AI Advisor
+To: All DRIs (Apps 1–8) + Finance/Platform Ops
+Prime Directive: Guard the gate. Zero compromises on issuer correctness, security, performance, or deliverability. ARR goals stand; execute with rigor.
+
+Top Decisions (Immediate)
+
+Stripe Gate (provider_register) — Activate graceful fallback now
+Decision: Option A approved. Enable ENABLE_WAITLIST_MODE=true in Replit Secrets immediately.
+Rationale: Protect provider UX and brand; avoid failed checkouts while Stripe evidence is missing. Capture demand; defer payment.
+Owner: provider_register DRI + Finance/Platform Ops
+Deadline: 18:20 UTC for flag enable; 18:50 UTC for evidence that flag is live (logs + request_id samples).
+Evidence required to close fallback activation:
+Screenshot or config diff proving ENABLE_WAITLIST_MODE=true (redacted)
+10 request_id samples showing waitlistMode=true rendered to provider UI
+200 OK health on relevant endpoints; error rate ≤0.1%
+2. Stripe Verification Evidence Package (Hard Gate) — Escalate
+
+Decision: Escalate with Stripe Priority Support now; CFO authorized up to $500 for priority support.
+Owner: Finance/Platform Ops
+Deadline: 21:00 UTC evidence package or revised ETA with Stripe case ID.
+Evidence required to PASS gate:
+Masked screenshot: production live key configured
+Webhook registration proof (endpoint, secret, version)
+Signed event received and 200 OK response with request_id lineage
+Optional: $0.50 live charge proof with redactions
+3. Deliverability Guardrails (auto_com_center) — Execute full verification now
+
+Decision: Authorized. Run the complete DKIM/SPF/DMARC + seed inbox test suite immediately. No broadcasts until GREEN.
+Owner: auto_com_center DRI (Agent3 coordination + team execution)
+Deadline: Start now; GREEN/RED certification and report by 22:00 UTC.
+Acceptance criteria (Email):
+DKIM: pass; SPF: pass; DMARC: policy p=quarantine or p=reject with alignment; evidence via dig outputs
+Seed inbox placement ≥90% across Gmail/Outlook/Yahoo; zero spam-folder for transactional templates
+Bounce <1%, complaint <0.1%; no blocklist hits
+Acceptance criteria (SMS, if applicable):
+STOP/HELP logged and honored in ≤5s; rate limits enforced; opt-in evidence captured
+If SMS not fully configured: keep SMS channel OFF; email-only until GREEN.
+4. Replit P1 + Cloudflare (scholar_auth) — Deliver infra proof
+
+Decision: Deliver P1 ticket + Cloudflare provisioning proof for auth.scholaraiadvisor.com.
+Owner: Platform Ops + scholar_auth DRI
+Deadline: 19:30 UTC was missed; new hard deadline 20:15 UTC.
+Evidence required:
+Replit P1 ticket ID
+Cloudflare DNS screenshot/proof: auth CNAME/AAAA/ALIAS; SSL/TLS Full (strict)
+Workers deployed: /.well-known/openid-configuration, /jwks.json, proxy paths; Cache-Control: public, max-age=300; ETag present
+Curl traces with request_id: discovery, JWKS, authorize, token; P95 ≤120ms; error rate ≤0.1%
+Application Orders and Status Gates
+
+scholar_auth APP_BASE_URL: https://scholar-auth-jamarrlmayes.replit.app
+Orders: Complete Cloudflare/DNS/Workers evidence above; maintain 99.9% uptime and P95 ≤120ms. Prepare Nov 9 issuer cutover readiness report.
+Deadline: 20:15 UTC infra evidence; Nov 9 cutover window 17:00–19:00 UTC.
+2. scholarship_api
+APP_BASE_URL: https://scholarship-api-jamarrlmayes.replit.app
+
+Orders: Frozen until Nov 9. Participate in pre-soak, 401/5xx handling, revocation checks, PKCE + M2M conformance. Deliver P50/P95 histograms and error tallies.
+Deadlines: Nov 9 19:15 UTC (config confirm); Nov 9 20:45 UTC (pre-soak evidence); Nov 10 T+30 (full bundle).
+3. scholarship_agent
+APP_BASE_URL: https://scholarship-agent-jamarrlmayes.replit.app
+
+Orders: Observe-only; join Nov 9 pre-soak for OIDC/E2E. Maintain fairness rollups (12:00 UTC).
+Deadline: Nov 9 pre-soak participation.
+4. scholarship_sage
+APP_BASE_URL: https://scholarship-sage-jamarrlmayes.replit.app
+
+Orders: Frozen; Nov 9 M2M issuer switch; enforce read-only scopes; pre-soak evidence (latency, scopes, lineage).
+Deadlines: Nov 9 19:15 (config confirm); Nov 9 20:45 (pre-soak evidence); Nov 10 T+30 (M2M bundle).
+5. student_pilot
+APP_BASE_URL: https://student-pilot-jamarrlmayes.replit.app
+
+Orders: Frozen; Nov 9 config-only issuer switch; run full E2E harness; deliver T+30 E2E after AUTH GREEN TAG.
+Deadlines: Nov 9 19:15 (config confirm); Nov 9 20:00–21:00 (pre-soak); Nov 10 T+30 (E2E bundle).
+6. provider_register
+APP_BASE_URL: https://provider-register-jamarrlmayes.replit.app
+
+Orders (Immediate):
+Enable ENABLE_WAITLIST_MODE=true by 18:20 UTC.
+Post waitlist activation evidence by 18:50 UTC (10 request_id samples).
+Coordinate with auto_com_center to stage waitlist messaging; do NOT broadcast until deliverability GREEN.
+Orders (Stripe Hard Gate):
+Deliver Stripe evidence by 21:00 UTC or post Stripe case ID + ETA.
+7. auto_page_maker
+APP_BASE_URL: https://auto-page-maker-jamarrlmayes.replit.app
+
+Orders: Remain frozen; continue 06:00 UTC KPI rollups only. No publishing logic changes during auth window.
+KPI watch: indexation ≥95%; CWV p75 GREEN; error rate = 0%; P95 ~100ms.
+8. auto_com_center
+APP_BASE_URL: https://auto-com-center-jamarrlmayes.replit.app
+
+Orders: Execute full deliverability suite now. No outbound broadcasts until GREEN certification is posted.
+After GREEN: Release two controlled communications (sequenced, low-volume canaries first):
+Provider waitlist confirmation (provider_register dependency)
+Student onboarding update (non-promotional, transactional)
+Evidence Packaging and Reporting Cadence
+
+Master Evidence Index: Centralized, app-scoped, with request_id lineage links. Owner: Agent3 coordination. Update live as artifacts arrive.
+Tonight:
+18:20 UTC: provider_register waitlist flag enabled
+18:50 UTC: waitlist activation evidence posted
+20:15 UTC: Replit P1 + Cloudflare evidence posted
+21:00 UTC: Stripe evidence package posted or Stripe case ID + ETA
+22:00 UTC: auto_com_center deliverability GREEN/RED certification
+Nov 9:
+17:00–19:00 UTC: issuer config-only switches
+19:15 UTC: config confirmations (apps 1, 2, 4, 5)
+20:00–21:00 UTC: pre-soak
+20:45 UTC: pre-soak evidence bundles
+Nov 10:
+00:00–00:15 UTC: AUTH GREEN TAG gate
+T+30: E2E and M2M evidence bundles (where applicable)
+ARR Windows and Conditions
+
+B2B ARR earliest: Nov 10 01:30–03:00 UTC conditional on Stripe PASS and AUTH GREEN TAG. Under waitlist mode, B2B ARR is paused but provider capture proceeds; conversion messaging released only after deliverability GREEN + Stripe PASS.
+B2C ARR earliest: Nov 11 00:00 UTC conditional on AUTH GREEN TAG, pre-soak PASS, and deliverability GREEN for transactional emails.
+Risk Controls (Non-negotiable)
+
+No broadcasts without deliverability GREEN certification.
+No payments without Stripe evidence PASS.
+Exact issuer: https://auth.scholaraiadvisor.com post-cutover.
+Performance SLOs: P95 ≤120ms key endpoints; error rate ≤0.1%.
+Observability: request_id lineage Cloudflare → origin; 7-day retention; no PII in logs.
+Ethical guardrails: No dark patterns; STOP/HELP honored; read-only scopes enforced for M2M.
+Open Questions (Answer in your next update)
+
+provider_register DRI: Confirm ENABLE_WAITLIST_MODE=true set and post the 10 request_id samples by 18:50 UTC.
+Finance/Platform Ops: Confirm Stripe priority case ID; ETA for evidence by 21:00 UTC.
+Platform Ops: Post Cloudflare/Replit evidence package by 20:15 UTC.
+auto_com_center: Confirm test start, ETA 22:00 UTC for GREEN/RED.
+Execution Note
+
+This is a CEO order. If you cannot meet the deadlines, escalate immediately with:
+
+Current status
+Blocker
+Request_id references
+Remediation plan
+New ETA
+Guard the gate. Proceed.
