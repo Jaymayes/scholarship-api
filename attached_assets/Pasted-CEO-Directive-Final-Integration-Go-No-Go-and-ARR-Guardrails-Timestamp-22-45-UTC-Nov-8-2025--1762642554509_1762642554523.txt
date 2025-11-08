@@ -1,0 +1,102 @@
+CEO Directive: Final Integration, Go/No-Go, and ARR Guardrails
+Timestamp: 22:45 UTC Nov 8, 2025
+
+Acknowledgement
+
+I have reviewed Agent3’s updates, the consolidated status ticker, and the delivered Conversion Playbook. Direction below is final and binding for tonight and the Nov 9 pre-soak.
+Decisions and Orders
+
+Conversion Playbook (provider_register)
+Status: Approved as v1 for execution readiness; do not execute externally until gates are green.
+Ownership: provider_register DRI is the execution owner. Agent3 retains advisory role for comms/deliverability evidence only.
+Required edits by 09:00 UTC Nov 9 (provider_register DRI):
+Add legal/terms snippet clarifying the 3% platform fee, refund SLA, and dispute process.
+Include explicit data retention and FERPA/COPPA compliance notes for provider-uploaded applicant data.
+Add “canary review checklist” for support load and incident escalation.
+Deliverable: Post revised playbook link in ops channel by 09:00 UTC Nov 9. Execution begins only after all gates green.
+2. Deliverability Gate (auto_com_center)
+
+Trigger contingency now. Deputy Ops: provision interim subdomain immediately (e.g., mail.scholaraiadvisor.net) if primary DNS write access is not available within 15 minutes of this memo.
+T0 Definition: When Deputy Ops posts “DNS_READY” with TXT/MX/SPF/DKIM/DMARC entries visible in DNS.
+Agent3: On T0, run T+90 pipeline exactly as proposed (SPF/DKIM/DMARC → seed inbox tests → GREEN certification evidence bundle). DMARC must be p=quarantine for warmup; move to p=reject after 7-day positive signal or earlier if seed placement ≥95% with stable bounces <0.3%.
+Evidence: Attach screenshots/headers, blocklist checks, and bounce analysis in Master Evidence Index within 15 minutes of completion.
+3. Payments Gate (Stripe)
+
+COO: Post Priority Support case ID and ETA within 30 minutes of this memo. Maintain hourly updates until PASS.
+Execution posture until Stripe PASS: provider_register stays in Waitlist ON; no charging in production; internal test transactions only with test keys and redacted logs.
+4. Nov 9 Internal Pre-Soak: Go
+
+Scope: All apps participate per frozen posture; scholarship_agent remains observe-only.
+Pass criteria (all must be met):
+Uptime ≥99.9% each app during window
+P95 latency ≤120 ms by app; ≤200 ms for cross-app E2E flows
+Error rate ≤0.1% with no auth/token correctness violations
+End-to-end request_id lineage captured across auth → API → app
+OAuth2/OIDC: PKCE (B2C) and M2M (B2B) validated; immediate revocation proof
+Evidence: Post T+30 bundles per app to the Master Evidence Index with short executive summaries.
+5. Go/No-Go Cadence
+
+Evidence review: 20:45–21:00 UTC Nov 9
+If all pass criteria met:
+AUTH GREEN TAG issued immediately.
+ARR ignition windows proceed as below, still gated by Deliverability GREEN and Stripe PASS.
+If any fail:
+24-hour hold; DRIs post root cause and fix plan within 2 hours; retest window scheduled next day.
+6. ARR Ignition Windows (earliest)
+
+B2B (provider_register): Nov 10–11 earliest
+Gates: Deliverability GREEN + Stripe PASS + AUTH GREEN TAG
+Tranches: Canary (5) → Alpha (15) → Beta (30) → General; daily cap to protect support/infra
+KPIs: Waitlist-to-active ≥30%; payment success ≥95%; refund ≤2% target (5% yellow; 10% red/abort)
+B2C (student_pilot): Nov 11–12 earliest
+Gates: Deliverability GREEN + pre-soak PASS
+Activation flow: first document upload anchor; email → in-app nudge → follow-up
+KPIs: Activation ≥35% from registration to profile complete within 72h; email open ≥40% (seed-adjusted)
+7. Product/Tech Governance Guardrails
+
+scholar_auth (APP_BASE_URL: https://scholar-auth-jamarrlmayes.replit.app)
+
+Maintain freeze; focus on revocation, PKCE S256, M2M issuer correctness; provide latency and error evidence.
+scholarship_api (APP_BASE_URL: https://scholarship-api-jamarrlmayes.replit.app)
+
+Freeze; verify CRUD integrity, token validation, 401/5xx handling; post P50/P95, request_id lineage.
+scholarship_agent (APP_BASE_URL: https://scholarship-agent-jamarrlmayes.replit.app)
+
+Observe-only; fairness telemetry daily; no external comms until gates green; transparent match reasons retained.
+scholarship_sage (APP_BASE_URL: https://scholarship-sage-jamarrlmayes.replit.app)
+
+Read-only scopes enforced; M2M issuer switch in config window; post scope enforcement proof and latency.
+student_pilot (APP_BASE_URL: https://student-pilot-jamarrlmayes.replit.app)
+
+E2E activation path in pre-soak; mobile/desktop responsiveness checks; zero PII in client logs.
+provider_register (APP_BASE_URL: https://provider-register-jamarrlmayes.replit.app)
+
+Waitlist ON; finalize playbook edits by 09:00 UTC Nov 9; no external sends until Deliverability GREEN + Stripe PASS.
+auto_page_maker (APP_BASE_URL: https://auto-page-maker-jamarrlmayes.replit.app)
+
+GREEN (Frozen; monitor-only) through Nov 12. Daily KPI rollup 06:00 UTC: indexation ≥95%, CWV p75 GREEN, P95 ≈100 ms, zero publish errors. No sitemap or template changes.
+auto_com_center (APP_BASE_URL: https://auto-com-center-jamarrlmayes.replit.app)
+
+DNS contingency now; T0 → T+90 certification; enforce domain alignment (SPF include for Postmark, aligned From/Return-Path), list-unsubscribe headers, CAN-SPAM compliance.
+8. Risk and Ethics
+
+FERPA/COPPA: No PII in logs; access scoped to minimum; audit tokens and role grants weekly.
+Academic integrity: No auto-apply without explicit user consent; advice transparency on “why matched.”
+Security posture: Immediate token revocation tested; rotate secrets per playbook; monitor anomaly auth patterns.
+9. Reporting Cadence (until all gates green)
+
+Now: Deputy Ops posts DNS readiness or interim subdomain within 15 minutes.
+30 minutes from this memo: COO posts Stripe case ID + ETA.
+Hourly: Gate status updates from owners.
+Evidence posts: within 15 minutes after each milestone to Master Evidence Index.
+Next CEO checkpoint: 23:30 UTC (DNS/T0 status, Stripe case state), then 09:30 UTC Nov 9 (pre-soak readiness).
+Answers to Agent3’s clarifications
+
+Conversion playbook: Yes, prepared now was correct; provider_register DRI owns execution. Agent3 supports deliverability and evidence only.
+auto_com_center: Authorized to execute T+90 pipeline on interim subdomain if primary DNS is not ready by the 15-minute mark from this memo.
+Bottom Line
+
+We proceed with an internal pre-soak Nov 9 under strict SLOs and evidence gates.
+No external comms or payments until Deliverability GREEN and Stripe PASS.
+ARR ignition earliest: B2B Nov 10–11, B2C Nov 11–12, contingent on evidence.
+Execute with urgency. Protect the SEO flywheel. Maintain the evidence bar.
