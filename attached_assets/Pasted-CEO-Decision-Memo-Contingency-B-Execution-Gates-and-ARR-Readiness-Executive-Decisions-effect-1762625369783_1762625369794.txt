@@ -1,0 +1,94 @@
+CEO Decision Memo — Contingency B Execution, Gates, and ARR Readiness
+
+Executive Decisions (effective immediately)
+
+Go/No-Go: NO GO for current auth path. Proceed with Contingency B (issuer migration to auth.scholaraiadvisor.com). Cancel tonight’s soak tied to the current issuer; run pre-soak only after migration on Nov 9.
+Comms Authorization: Auto Com Center is authorized to broadcast the Infrastructure Intercept message variant now that 18:15 UTC returned RED. Hold the other two variants in reserve for post-migration pre-soak outcomes.
+Stripe Gate (B2B): Hard deadline remains 18:00 UTC. Budget up to $500 approved for escalation. If evidence package is not delivered by 18:00 UTC, B2B remains BLOCKED regardless of auth outcomes.
+Change Freeze: Maintained across all apps except scholar_auth activities required for Contingency B and config-only issuer updates during the Nov 9 window.
+Migration and Validation Plan (authoritative)
+
+Canonical Issuer: https://auth.scholaraiadvisor.com (Cloudflare-fronted)
+Change Window: Nov 9, 17:00–19:00 UTC (all relying parties config-only update)
+Pre-Soak: Nov 9, 20:00–21:00 UTC (≥500 samples per endpoint; P95 ≤120ms; error ≤0.1%)
+Gate: Nov 10, 00:00–00:15 UTC (AUTH GREEN TAG decision window)
+Acceptance Criteria (must meet all):
+P95 ≤120ms on Discovery, JWKS, authorize, token
+Error rate ≤0.1%
+Correct issuer end-to-end; OIDC conformance passes
+Proper cache headers (ETag + Cache-Control: public, max-age=300)
+Request_id lineage through Cloudflare → origin, with 7-day logs
+Evidence Required:
+RFC-001 OIDC Issuer Migration posted by 21:00 UTC today
+Replit P1 ticket ID and Cloudflare provisioning proof
+Pre-soak histograms and error tallies; config diffs (redacted)
+Revised ARR Timing (unchanged from Agent3 proposal)
+
+B2C (student_pilot): Gate Nov 10; earliest ignition Nov 11 00:00 UTC
+B2B (provider_register): Earliest Nov 10 01:30–03:00 UTC if Stripe evidence delivered today and Auth passes Nov 10 gate
+Organic (auto_page_maker): Unaffected; continue daily SEO cadence
+Per-Application Executive Posture and Orders
+
+Application Name: scholar_auth
+APP_BASE_URL: https://scholar-auth-jamarrlmayes.replit.app
+Status: RED (infrastructure-blocked at root Discovery; /oidc path >120ms P95)
+Orders:
+
+Execute Contingency B. Publish RFC-001 by 21:00 UTC.
+Open P1 with Replit and begin Cloudflare provisioning (per timeline).
+Prepare and validate Discovery/JWKS at new issuer with required cache headers.
+Deliver pre-soak results Nov 9 and gate readiness artifacts for Nov 10.
+Application Name: scholarship_api
+APP_BASE_URL: https://scholarship-api-jamarrlmayes.replit.app
+Status: GREEN (Frozen)
+Orders: No code changes. Prepare config-only issuer switch Nov 9 window; run OIDC conformance and end-to-end token validation with student_pilot and scholarship_sage.
+
+Application Name: scholarship_sage
+APP_BASE_URL: https://scholarship-sage-jamarrlmayes.replit.app
+Status: GREEN (Frozen)
+Orders: Config-only issuer update Nov 9; validate client_credentials M2M flow; enforce read-only scope post-migration.
+
+Application Name: student_pilot
+APP_BASE_URL: https://student-pilot-jamarrlmayes.replit.app
+Status: GREEN (Ready/Blocked; Frozen)
+Orders: Config-only issuer update Nov 9; full E2E harness run post-update; deliver T+30 evidence after AUTH GREEN TAG.
+
+Application Name: provider_register
+APP_BASE_URL: https://provider-register-jamarrlmayes.replit.app
+Status: AMBER (Stripe evidence pending by 18:00 UTC)
+Orders: Maintain freeze except Stripe. Deliver 18:00 UTC evidence package (live key, webhook verified, signed event 200 OK, logs). If at risk, escalate to CFO + Stripe Priority Support now.
+
+Application Name: scholarship_agent
+APP_BASE_URL: https://scholarship-agent-jamarrlmayes.replit.app
+Status: GREEN (Observe-only)
+Orders: Maintain freeze; prep config-only issuer update Nov 9; participate in conformance and E2E token validation.
+
+Application Name: auto_page_maker
+APP_BASE_URL: https://auto-page-maker-jamarrlmayes.replit.app
+Status: GREEN (Unaffected)
+Orders: Maintain freeze; continue 06:00 UTC KPI rollups; no auth dependencies.
+
+Application Name: auto_com_center
+APP_BASE_URL: https://auto-com-center-jamarrlmayes.replit.app
+Status: GREEN
+Orders: Broadcast Infrastructure Intercept + Issuer Migration message now based on 18:15 RED; hold PASS/FAIL variants for post-migration pre-soak outcomes.
+
+Security, Compliance, and SLOs (non-negotiable)
+
+Security: Do not relax issuer correctness, token validation, or revocation semantics. No temporary bypasses.
+SLOs: 99.9% uptime and P95 ~120ms remain in force for auth endpoints post-migration.
+Compliance: Maintain FERPA/COPPA posture; ensure no PII leakage in logs; redact secrets in evidence.
+Executive Checkpoints to CEO
+
+18:00 UTC: Stripe evidence package (Finance/Platform Ops) — send summary and artifacts
+19:30 UTC: Confirmation of Replit P1 + Cloudflare provisioning started (Platform Ops)
+21:00 UTC: RFC-001 posted; share link and change plan summary (Auth DRI)
+Nov 9, 19:15 UTC: Confirm all relying parties updated to new issuer
+Nov 9, 20:45 UTC: Pre-soak results and go/no-go for gate
+Nov 10, 00:20 UTC: Gate outcome and GREEN TAG issuance, or next-window plan
+Rationale tied to Prime Directive
+
+Preserving trust and meeting performance/security bars protects our brand and long-term ARR scalability.
+Organic growth via Auto Page Maker continues compounding, preserving low CAC while auth stability is finalized.
+A 24-hour slip is acceptable to ensure a resilient, scalable foundation for both B2C and B2B revenue engines.
+Proceed.
