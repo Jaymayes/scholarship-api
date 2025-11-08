@@ -1,0 +1,113 @@
+CEO Directive Memo — Scholar AI Advisor
+Date: 2025-11-08 | Time: ~16:30 UTC
+
+Prime decision
+
+Continue deep remediation on scholar_auth immediately, while keeping auto-slip communications fully staged. Gate rules remain unchanged. Quality bar is non-negotiable.
+scholar_auth APP_BASE_URL: https://scholar-auth-jamarrlmayes.replit.app
+Status acknowledgement
+
+JWKS P95 117ms: Green.
+Discovery P95 ~200ms and wrong issuer: Red. Root cause appears to be a routing precedence conflict (catch‑all intercepting /.well-known/*), compounded by a suspected build/caching artifact.
+Token/Authorize not yet revalidated under the new fast-path stack.
+Executive decisions and deadlines (UTC)
+
+16:50: Post “route precedence” proof: route table dump showing explicit handlers registered ahead of any catch‑all; include server start logs with mount order.
+17:10: Clean-build and cold-start plan executed across all workers/pods. Artifacts required: build logs, image/tag IDs, and process list to rule out stale TypeScript transpilation.
+17:30: Canary A/B results for all four endpoints on fast-path (≥5% traffic, 5 minutes). Success threshold: ≥30% P95 improvement versus baseline.
+18:15: Discovery endpoint must be Green on both correctness (issuer, jwks_uri, endpoints, scopes) and performance (P95 ≤120ms) under canary. If not green by 18:15, execute Contingency A below without waiting for further approval.
+18:45: Headroom target: P95 ≤110ms @ 500 rps for all four endpoints.
+19:15: Pre-soak verification: ≥500 samples/endpoint, latency histograms, error rate ≤0.1%.
+20:00: Soak test gate (non-negotiable): P95 ≤120ms and error ≤0.1% for all four endpoints, ≥1,000 samples each, sustained 10 minutes. Any miss → auto-slip to Nov 10.
+Controls and guardrails
+
+Security is paramount: No temporary changes that weaken token integrity, issuer correctness, or revocation semantics.
+JWKS/Discovery must not touch the DB; verify via query logs and middleware timings.
+Keep-Alive on; compression off for the four fast-path endpoints until after gate; event loop latency <10ms; CPU <70%.
+Contingency A (if Discovery not green by 18:15 UTC)
+
+Isolate /.well-known/* and /oidc/* into a pre-mounted “front-of-line” router with explicit paths that cannot be shadowed by any catch‑all. Require:
+Correct issuer EXACTLY matching the public base URL used by all relying parties.
+Static, signed Discovery responses are prohibited. Dynamic responses must come from the authoritative OIDC provider instance configured with the correct issuer and jwks_uri.
+Cache headers: ETag + Cache-Control: public, max-age=300 for Discovery and JWKS only.
+Evidence: route order proof, OIDC configuration snapshot (issuer, jwks_uri, authorization_endpoint, token_endpoint), and a downstream validation via oidc-client conformance script.
+Resourcing and escalation
+
+Assign an SRE peer for pair-review on routing/mount order and build pipeline. If the issue persists past 18:15 UTC, pull in the Architecture Lead to review issuer construction and reverse-proxy rewrites.
+2. provider_register (Stripe hard gate)
+APP_BASE_URL: https://provider-register-jamarrlmayes.replit.app
+
+Decision and deadlines (UTC)
+
+16:35: Immediate status ping. If ANY item is at risk, escalate now to CFO and open Stripe priority support. Up to $500 approved pending CFO confirmation.
+18:00: Hard deadline for production readiness:
+Live STRIPE_SECRET_KEY loaded (production).
+Webhook registered and verified in Stripe Dashboard.
+200 OK test event received in production mode.
+Consequence: If missed, B2B remains blocked regardless of auth outcome.
+Evidence required
+
+Screenshot or export of Stripe Dashboard settings, webhook secret, event delivery logs, and server logs showing verified signature and 200 OK.
+3. auto_com_center
+APP_BASE_URL: https://auto-com-center-jamarrlmayes.replit.app
+
+Decision
+
+Proceed with “both messages staged” posture. Do not broadcast unless triggered by the 20:00 soak outcome.
+Maintain SMS disabled. Ensure email deliverability safety:
+DMARC/DKIM/SPF alignment confirmed and documented.
+Seed-list inbox placement checks ready.
+Unsubscribe and frequency caps verified.
+4. auto_page_maker
+APP_BASE_URL: https://auto-page-maker-jamarrlmayes.replit.app
+
+Acknowledgement
+
+2025-11-08 06:00 UTC KPI rollup delivered early (16:12 UTC). Good. Maintain daily 06:00 UTC cadence under change freeze.
+Next-week KPI goals (organic engine)
+
+Pages live: +10% week-over-week.
+IndexNow success ≥95%.
+CWV p75 green across all top templates.
+Error rate ≤0.2%; P95 ≤120ms; uptime ≥99.9%.
+5. student_pilot
+APP_BASE_URL: https://student-pilot-jamarrlmayes.replit.app
+
+Decision
+
+Remain change-frozen. E2E harness executes T+30 after AUTH GREEN TAG. Prepare evidence package with full request_id lineage and mobile/desktop parity.
+6. scholarship_api
+APP_BASE_URL: https://scholarship-api-jamarrlmayes.replit.app
+
+Decision
+
+Remain change-frozen; monitor-only. Ensure token validation against scholar_auth issuer reflects the corrected Discovery metadata once fixed. Evidence harness ready.
+7. scholarship_sage
+APP_BASE_URL: https://scholarship-sage-jamarrlmayes.replit.app
+
+Decision
+
+Remain change-frozen; M2M evidence executes T+30 after AUTH GREEN TAG. No changes.
+8. scholarship_agent
+APP_BASE_URL: https://scholarship-agent-jamarrlmayes.replit.app
+
+Decision
+
+Observe-only through Nov 12. Continue daily fairness rollups at 12:00/12:15 UTC. No changes.
+Revenue timing and gates (unchanged)
+
+B2C earliest ignition: Nov 10 00:00 UTC, contingent on AUTH GREEN TAG.
+B2B earliest ignition: Nov 9 01:30–03:00 UTC, contingent on Stripe by 18:00 UTC and auth soak pass at 20:00 UTC; else align to next green window post-auth.
+If 20:00 soak fails: auto-slip to Nov 10 00:00–00:15 UTC gate. No exceptions.
+Evidence schedule to CEO (UTC)
+
+16:50: scholar_auth routing/build evidence snapshot.
+17:30: Canary A/B results with per-middleware timing histogram and rollout decision.
+18:15: Discovery endpoint Green-or-Contingency A execution proof.
+19:15: Pre-soak verification package (≥500 samples/endpoint).
+20:05: Soak outcome and go/auto-slip confirmation.
+23:35: Final evidence review (if soak passed) for 00:00–00:15 gate.
+Direct answer to Agent3’s question
+
+Continue debugging now under the plan above and execute Contingency A automatically at 18:15 UTC if Discovery is not Green. Auto-slip communications remain staged. Gate rules stand.
+Guard the gate.
