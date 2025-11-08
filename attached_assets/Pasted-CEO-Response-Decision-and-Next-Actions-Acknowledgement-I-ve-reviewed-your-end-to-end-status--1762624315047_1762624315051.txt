@@ -1,0 +1,90 @@
+CEO Response — Decision and Next Actions
+
+Acknowledgement
+
+I’ve reviewed your end-to-end status, the staged communications, and the late-breaking finding that /.well-known/openid-configuration is being intercepted upstream of your Express app on Replit, causing the wrong issuer to be served and preventing code-level remediation. Your conclusion that Contingency A cannot resolve the root-path Discovery issue is accepted.
+Executive Decisions
+
+Guard the gate; quality bar stands
+We will not weaken security or relax performance targets to force a launch. If Auth fails to meet the criteria, we slip. Non-negotiable.
+2. 18:15 UTC decision stands; Contingency A superseded for root path
+
+Proceed with the current schedule through 18:15 UTC. If Discovery is not GREEN, we will treat root-path /.well-known as an infrastructure defect outside our control and will not attempt risky workarounds tonight.
+3. New plan authorized: Contingency B — Issuer and Discovery stabilization
+
+Objective: Eliminate upstream interception risk and stabilize OIDC Discovery with deterministic latency.
+Approach:
+Adopt a canonical issuer on a dedicated subdomain: auth.scholaraiadvisor.com fronted by Cloudflare (or equivalent), with Workers/Routes handling:
+/.well-known/openid-configuration (served correctly, with correct issuer)
+/jwks.json
+/authorize, /token proxied to origin
+Origin can remain the current Replit app endpoints (e.g., /oidc/*) during migration. Clients only see auth.scholaraiadvisor.com as the issuer.
+This change requires an issuer update across all relying parties. We will execute as a controlled, config-only change window with full conformance testing.
+Rationale: Removes Replit edge interference, standardizes caching for Discovery/JWKS, and positions us for future scale without vendor-specific quirks.
+4. Stripe gate remains hard for B2B
+
+If Finance/Platform Ops cannot deliver the Stripe evidence package by 18:00 UTC, B2B stays blocked irrespective of auth outcomes. Escalate to CFO and Stripe Priority Support immediately if anything is at risk.
+Schedule and Revised Milestones
+
+Today
+18:15 UTC: If Discovery not GREEN, do not pursue code hacks; declare infrastructure-blocked for root-path Discovery and trigger auto-slip posture toward the Nov 10 gate. Keep both pass/fail messages staged; do not broadcast unless triggered by the 20:00 outcome.
+18:00 UTC: Stripe evidence package due. If missing, B2B is blocked until resolved.
+20:00 UTC: If soak proceeds and fails, broadcast auto-slip; if we cancel soak due to Contingency B migration prep, broadcast the staged slip message with the new plan (see Messaging below).
+Contingency B plan
+By 19:30 UTC today: Open P1 support tickets with Replit (document upstream intercept), and begin Cloudflare provisioning (DNS, SSL/TLS, Workers, Routes) in parallel.
+By 21:00 UTC today: Publish RFC-001 OIDC Issuer Migration with test plan and backout plan.
+Nov 9, 17:00–19:00 UTC: Controlled change window:
+Update relying parties to issuer: https://auth.scholaraiadvisor.com
+Run OIDC conformance and end-to-end token exchange tests for student_pilot, provider_register, scholarship_api, scholarship_sage, scholarship_agent.
+Nov 9, 20:00–21:00 UTC: Pre-soak on new issuer (≥500 samples/endpoint, error ≤0.1%, P95 ≤120ms).
+Nov 10, 00:00–00:15 UTC: Auth gate window.
+ARR timing (updated if we slip tonight)
+B2C (student_pilot): Gate Nov 10 00:00–00:15 UTC → ignition Nov 11 00:00 UTC.
+B2B (provider_register): If Stripe evidence meets the 18:00 UTC hard deadline and Auth passes the Nov 10 gate, B2B ignition Nov 10 01:30–03:00 UTC; otherwise next green window after both gates are satisfied.
+What I need now (evidence and escalations)
+
+Auth DRI
+18:15 UTC: Final GREEN/RED on Discovery. If RED, include proof that root /.well-known is intercepted (logs that never fire, timing diffs, curl traces), and confirm /oidc path stability. Mark Contingency A as insufficient for root path and shift to Contingency B.
+21:00 UTC: RFC-001 OIDC Issuer Migration draft with:
+Canonical issuer and Discovery document
+JWKS strategy and cache headers (ETag + Cache-Control: public, max-age=300)
+Relying party update steps, test matrix, and rollback
+Performance SLOs and acceptance criteria
+Finance/Platform Ops (Stripe)
+Immediately: Status ping. If any risk, escalate to CFO and open Stripe Priority Support (budget up to $500).
+18:00 UTC: Evidence package:
+Dashboard settings screenshot/export
+Webhook secret and event delivery logs
+Server logs with verified signature and 200 OK in production mode
+auto_com_center
+Keep both messages staged. Add a third pre-approved variant for the “infrastructure intercept — issuer migration” narrative. Do not broadcast unless triggered by the outcome gate.
+All other apps
+Maintain change freeze. Prepare to consume new issuer via config-only change during the Nov 9 window.
+Answer to your question
+
+Yes. Document these findings for both the user and CEO.
+Incident Documentation — Required contents and format
+
+Title: OIDC Discovery Interception — Root-Path Infrastructure Incident
+Applications affected: scholar_auth (primary), all relying parties (secondary)
+APP_BASE_URL and Application Name at the top for each app section
+Timeline (UTC): Detection → Diagnosis → Decision points
+Impact: Incorrect issuer, latency >120ms P95, inability to remediate via code due to upstream interception
+Root cause analysis: Evidence that Express handlers never execute on /.well-known, while /oidc/.well-known works; upstream edge interference identified
+Decision log: 18:15 UTC gate honored; Contingency A insufficient; approve Contingency B (issuer migration)
+Risk assessment: Security integrity preserved; schedule impact; ARR timing adjustments
+Remediation plan (Contingency B): Domain, proxy, issuer, test plan, rollback
+Acceptance criteria: All four auth endpoints P95 ≤120ms under load, error ≤0.1%, correct issuer end-to-end, conformance tests passing, JWKS/Discovery cache headers correct
+Evidence appendix: Logs, curl traces, timing histograms, config diffs (with secrets redacted), Replit ticket IDs
+Go/No-Go posture for today
+
+Go only if Auth meets correctness and performance at 20:00 UTC soak. Otherwise, auto-slip. No exceptions.
+Owner assignments
+
+Auth DRI: Contingency B execution and RFC-001 by 21:00 UTC today
+Platform Ops: Cloudflare/DNS setup, conformance test harness
+Finance/CFO: Stripe escalation and evidence by 18:00 UTC
+auto_com_center: Maintain staged comms; add issuer-migration variant
+Close
+
+You have executive approval to proceed with Contingency B if the 18:15 UTC check fails. Preserve security, preserve trust, and protect the gate. The short-term slip is acceptable to ensure long-term stability and ARR scalability.
