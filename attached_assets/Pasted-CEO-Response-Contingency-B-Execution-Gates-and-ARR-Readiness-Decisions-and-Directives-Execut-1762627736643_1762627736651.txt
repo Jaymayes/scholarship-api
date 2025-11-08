@@ -1,0 +1,112 @@
+CEO Response: Contingency B Execution, Gates, and ARR Readiness — Decisions and Directives
+
+Executive acknowledgement
+
+I’ve reviewed Agent3’s integrated status package and confirm: Contingency B stands, all acceptance criteria remain non-negotiable, and the controlled change/gate schedule is approved as published.
+RFC-001 early delivery is accepted. Proceed with the Nov 9 pre-soak and Nov 10 gate exactly as planned.
+Organic growth stays primary; no temporary security or compliance bypasses.
+Decision: provider_register graceful fallback vs. change freeze
+
+Policy: Do not deploy fallback if Stripe evidence is delivered by 18:00 UTC and validated.
+Conditional exemption to change freeze: Authorized only if the Stripe evidence package is not delivered on time or fails validation.
+Actioning rules:
+Pre-stage the waitlist-without-payment code behind a feature flag today; do not enable unless the Stripe hard gate is missed.
+If missed: enable the feature flag immediately and broadcast clear provider messaging via auto_com_center. No broken checkout paths.
+Rollback plan: ability to disable the flag within five minutes once Stripe is production-verified.
+Evidence required if enabled: screenshots, server logs, request_id lineage, and provider-facing copy sample.
+Decision: Stripe hard gate (18:00 UTC)
+
+Deliver the full evidence package by 18:00 UTC. If at risk, escalate within 10 minutes to CFO and Stripe Priority Support (budget to $500 pre-approved).
+Evidence contents:
+Live key loaded (production) and masked screenshot
+Webhook registered, signing secret configured; signed test event returns 200 OK (logs attached)
+First authorized-and-voided live-mode charge if policy permits (proof redacted)
+Server logs with verified signature and request_id
+If delivered and validated: maintain freeze; fallback remains staged and disabled.
+Decision: Auth Contingency B (canonical issuer)
+
+Canonical issuer: https://auth.scholaraiadvisor.com via Cloudflare (DNS, SSL/TLS, Workers, Routes).
+Acceptance criteria (must all pass):
+Performance: P95 ≤120ms on Discovery, JWKS, Authorize, Token; error rate ≤0.1%.
+Correctness: issuer exactly https://auth.scholaraiadvisor.com end-to-end; OIDC conformance; revocation intact.
+Caching: Discovery and JWKS with ETag + Cache-Control: public, max-age=300.
+Observability: request_id lineage Cloudflare → origin; 7-day retention, no PII; alerts for ≥0.1% error spikes and P95 regressions.
+Schedule (authoritative):
+Nov 9, 17:00–19:00 UTC: Config-only issuer updates (no code changes).
+Nov 9, 20:00–21:00 UTC: Pre-soak (≥500 samples/endpoint); any breach triggers fail broadcast and slip to next window.
+Nov 10, 00:00–00:15 UTC: Sole AUTH GREEN TAG gate.
+Application directives and APP_BASE_URLs
+
+Application Name: scholar_auth
+APP_BASE_URL: https://scholar-auth-jamarrlmayes.replit.app
+
+Proceed with Cloudflare-fronted issuer; pre-provision low-TTL DNS.
+Publish Discovery and JWKS with required cache headers; verify via multi-region checks.
+OIDC conformance: run and attach report.
+Rehearse five-minute rollback and staged key rotation (kid change) pre-gate.
+Deliver end-to-end request_id lineage samples.
+Application Name: scholarship_api
+APP_BASE_URL: https://scholarship-api-jamarrlmayes.replit.app
+
+Config-only issuer switch in Nov 9 window.
+Verify 401/5xx handling and token revocation behavior with new issuer.
+Produce redacted config diff, P50/P95 latency histograms, and error tallies.
+Participate in OIDC conformance with student_pilot and scholarship_sage tokens.
+Application Name: scholarship_agent
+APP_BASE_URL: https://scholarship-agent-jamarrlmayes.replit.app
+
+Maintain freeze; observe-only.
+Prep config-only issuer switch; participate in OIDC/E2E validation.
+Continue daily fairness rollups (12:00 UTC) and summaries (12:15 UTC).
+Application Name: scholarship_sage
+APP_BASE_URL: https://scholarship-sage-jamarrlmayes.replit.app
+
+Config-only issuer switch; validate client_credentials flow.
+Enforce read-only scopes; attach proof.
+T+30 after GREEN TAG: deliver M2M evidence (latency, new-issuer tokens, scope enforcement, request_id lineage).
+Application Name: student_pilot
+APP_BASE_URL: https://student-pilot-jamarrlmayes.replit.app
+
+Config-only issuer switch; run full E2E harness post-update.
+T+30 after GREEN TAG: deliver E2E evidence (mobile/desktop sanity, PKCE S256 flow, profile CRUD, sage interaction, request_id lineage).
+Application Name: provider_register
+APP_BASE_URL: https://provider-register-jamarrlmayes.replit.app
+
+Stripe evidence due 18:00 UTC (hard gate). If missed, enable graceful fallback under the conditional exemption above.
+During fallback: collect provider registrations to waitlist; clear messaging; no broken checkout.
+Prepare post-gate validation with 3% platform fee transparency intact.
+Application Name: auto_page_maker
+APP_BASE_URL: https://auto-page-maker-jamarrlmayes.replit.app
+
+GREEN, unaffected; maintain freeze.
+Continue 06:00 UTC KPI rollups (daily indexation, CWV p75, error rate, P95).
+Do not alter publishing logic during auth change window.
+Application Name: auto_com_center
+APP_BASE_URL: https://auto-com-center-jamarrlmayes.replit.app
+
+Deliverability guardrails approved. Requirements before any PASS/FAIL broadcast:
+DKIM, SPF, DMARC alignment checks; seed inbox tests (Gmail, Outlook, Yahoo, others).
+Targets: ≥99% accepted, ≥95% inbox placement for transactional mail.
+Throttle by domain if needed; monitor blocklists in real time.
+SMS is opt-in only; confirm STOP/HELP and per-country rate limits before any scaled use.
+Risk and mitigation confirmations
+
+Replit dependency: P1 ticket must be opened; post ticket ID and Cloudflare provisioning proof by 19:30 UTC.
+DNS/propagation: Pre-provision low-TTL; validate from multiple regions prior to pre-soak.
+Pre-soak breach: Immediate fail broadcast via auto_com_center; slip to next window; no partial go-lives.
+ARR timing (authoritative, unchanged)
+
+B2B: Earliest Nov 10, 01:30–03:00 UTC (requires Stripe evidence today + Auth gate pass).
+B2C: Earliest Nov 11, 00:00 UTC (requires Auth gate pass).
+Organic: Auto Page Maker continues compounding; low CAC preserved.
+What I need, by when
+
+18:00 UTC: Stripe evidence package delivered and logged; if at risk, escalate within 10 minutes.
+19:30 UTC: Replit P1 ticket ID and Cloudflare provisioning proof posted.
+Nov 9, 19:15 UTC: Confirmation that all relying-party config-only issuer updates are complete.
+Nov 9, 20:45 UTC: Pre-soak histograms, error tallies, issuer correctness proof, and go/no-go.
+Nov 10, T+30 after GREEN TAG: Evidence bundles from scholar_auth, scholarship_api, scholarship_sage, student_pilot.
+Final
+
+Guard the gate. No compromises on issuer correctness, security, or performance. ARR ignition follows stability.
+Proceed under this directive and report exceptions immediately.
