@@ -1,0 +1,64 @@
+CEO Decision Memo — Scholar AI Advisor
+Date: 2025-11-08
+Time: ~16:05 UTC
+
+Executive Summary
+
+Proceed with emergency auth remediation now. Do not wait for further review. I’ll review evidence in parallel.
+Approve Neon Pro upgrade immediately for scholar_auth datastore. Book it under the pre-authorized infra budget.
+Reaffirm hard gates: Stripe verification by 18:00 UTC; auth soak test by 20:00 UTC. Auto-slip to Nov 10 if any auth endpoint breaches criteria.
+Hold all non-essential changes across the ecosystem until gate is cleared. Quality over speed remains non-negotiable.
+Decisions and Directives
+
+Emergency Remediation — Start Now (scholar_auth)
+Owner: Auth DRI; support: Platform Ops
+Actions (in order): a) Roll back the recent caching middleware change behind a 5% canary. If P95 improves ≥30% within 5 minutes, ramp to 100%. b) Reintroduce deterministic warmup: pre-open DB connections and compile prepared statements 10 minutes before each test window; disable any lazy init on hot paths. c) Pooling: set max connections to 20 with queueing enabled; confirm connection reuse and TCP keepalive=on; cap request concurrency to keep CPU <70% and event loop latency <10ms. d) JWKS: keep 300s TTL with background refresh; ensure no caching on /authorize and /token; verify ETag revalidation isn’t adding per-request overhead. e) Instrumentation: enable endpoint-level timing with percentiles (P50/P90/P95) and request_id across ingress → app → DB; add a one-click profile capture during the 10-minute windows.
+Targets:
+By 17:00 UTC: P95 ≤140ms across all four endpoints under 300 rps synthetic load.
+By 18:45 UTC: P95 ≤110ms headroom (target) under 500 rps synthetic load.
+Soak test at 20:00 UTC must pass P95 ≤120ms and error_rate ≤0.1% for all four endpoints over ≥1,000 samples/endpoint sustained 10 minutes.
+2. Infra Allocation — Approved
+
+Neon Pro upgrade: Approved now ($19/mo). Justification: HA/failover and lower cold start/db latency risk on gate night.
+Monitoring: Proceed with any minor cost increases required to capture P95 at 1-min granularity and preserve 7-day retention. Keep total within the pre-authorized $1,500 window.
+3. Stripe (provider_register) — Hard Gate Enforced
+
+16:00 UTC: If risk remains, escalate to CFO and open a Stripe priority support ticket. Budget up to $500 pre-approved; CFO confirmation required.
+18:00 UTC: If production verification is not complete (live key, webhook registered, 200 OK test event), B2B remains blocked regardless of auth status.
+4. Gate Discipline — Non-Negotiable
+
+20:00 UTC soak test auto-slip rule stands: if any auth endpoint exceeds P95 120ms or error_rate 0.1%, auto-slip to Nov 10 00:00–00:15 UTC. No exceptions, no averaging.
+Nov 9 00:00–00:15 UTC window: both 00:10 snapshot and 00:15 roll-up must meet criteria on all four endpoints.
+5. Evidence and Reporting — Required Cadence
+
+Evidence package received; I’ll review in parallel. Continue with the mandated format and times.
+Add interim check-ins today:
+16:30 UTC: Remediation progress snapshot with before/after P95, CPU, DB RTT, and top-3 latency contributors.
+17:30 UTC: Canary results and plan to 100% rollout (if not already rolled).
+19:15 UTC: Pre-soak verification run with ≥500 samples/endpoint; include histograms and error budget.
+Evidence content (unchanged): application header with APP_BASE_URL, commit hashes, diffs, redacted logs/screens, P50/P95, error_rate, and full request_id lineage.
+6. Communications — auto_com_center
+
+Stage two messages now:
+Proceed package: “Auth soak test PASS — Gate remains Nov 9 00:00–00:15 UTC. AUTH GREEN TAG contingent on both snapshots.”
+Auto-slip package: “Soak test FAIL — Gate slips to Nov 10 00:00–00:15 UTC. Timelines auto-refreshed.”
+Do not issue AUTH GREEN TAG without explicit CEO authorization after the 00:15 roll-up.
+Keep SMS disabled as documented; maintain deliverability monitoring (Postmark/DKIM/SPF/DMARC).
+7. Change Freeze — All Other Apps
+
+scholarship_api, scholarship_sage, student_pilot, scholarship_agent, auto_page_maker, provider_register: no logic or infra changes today unless explicitly authorized for remediation. Maintain ready/blocked posture and evidence readiness.
+8. Compliance and Responsible AI — Reaffirmed
+
+No PII in logs; 7-day retention minimum.
+scholarship_agent remains observe-only through Nov 12; no auto-apply without explicit student consent and audit trail.
+Revenue Timeline (unchanged pending today’s gates)
+
+B2C (student_pilot): Earliest Nov 10 00:00 UTC; depends on AUTH GREEN TAG.
+B2B (provider_register): Earliest Nov 9 01:30–03:00 UTC if Stripe verified by 18:00 UTC and AUTH passes; otherwise next green window post-auth.
+Organic (auto_page_maker): Continue daily 06:00 UTC KPI rollups; treat as primary low-CAC engine.
+Immediate Answers to Agent3
+
+Begin the emergency fix now. I will review the evidence package in parallel; no need to pause.
+Proceed with Neon Pro upgrade immediately.
+Keep me updated at 16:30, 17:30, 19:15 UTC, plus the scheduled 20:05 and 23:35 UTC touchpoints.
+Guard the gate.
