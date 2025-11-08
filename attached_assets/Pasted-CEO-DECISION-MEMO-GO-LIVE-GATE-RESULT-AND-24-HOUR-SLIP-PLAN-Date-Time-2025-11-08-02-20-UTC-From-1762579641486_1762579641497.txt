@@ -1,0 +1,121 @@
+CEO DECISION MEMO — GO-LIVE GATE RESULT AND 24-HOUR SLIP PLAN
+Date/Time: 2025-11-08 02:20 UTC
+From: CEO, Scholar AI Advisor
+Prime Directive Alignment: Quality over speed; data-first; low-CAC, SEO-led growth; Responsible AI
+
+Executive Decision
+
+Result: NO-GO for ecosystem due to scholar_auth gate failure
+Action: Slip 24 hours. Re-run the identical gate at 2025-11-09 00:00–00:15 UTC
+Rationale: 02:09 UTC snapshot shows all four scholar_auth endpoints exceeded P95 ≤120ms by 63–103ms; gate criteria were not met and the 00:10/00:15 window passed
+Immediate Orders (Owners, Deadlines UTC)
+
+Auth DRI (now)
+Establish War Room and lead RCA on latency regression from 23:56→02:09
+Deliver preliminary RCA and remediation plan by 05:00
+Execute remediation by 12:00; provide proof via repeatable load test
+Platform Ops (now)
+Fix monitoring classification bug: “Synthetic check failed: Unexpected status 200”
+Separate negative-test 400/401s from error_rate; report both “production error_rate” and “test_failure_rate”
+Patch by 08:00 and validate on staging
+Finance + Platform Ops (Stripe)
+Obtain and document Stripe production confirmations by 18:00
+If Stripe not confirmed by 18:00, B2B remains blocked for the next gate window
+Auto Com Center
+Maintain enforcement. Do not issue AUTH GREEN TAG without explicit CEO authorization after the next gate
+Prepare “Gate Day T-0” broadcast for 2025-11-09 00:00 with snapshot drilldown and single-source-of-truth scoreboard
+All DRIs
+Evidence discipline remains mandatory. Every artifact begins with Application Name and APP_BASE_URL
+Re-Gate Schedule (Nov 9 window)
+
+00:00–00:15: Gate monitoring
+00:10 snapshot and 00:15 roll-up: Must pass all four endpoints with P95 ≤120ms and error_rate ≤0.1% (no exceptions, no averaging)
+If pass: CEO authorizes AUTH GREEN TAG immediately; proceed to downstream validations
+If fail: Slip another 24 hours
+Required Remediations and Hardening for scholar_auth (Authorize to implement immediately)
+
+Capacity and pooling
+Double replicas for auth service; enable HPA with sane targets
+Increase DB connection pool and validate max_in_flight; confirm no connection churn
+Caching and edge
+Statically serve and CDN-cache Discovery and JWKS with a short TTL (e.g., 300s) and cache-busting on key rotation
+Crypto and CPU
+Profile token signing and PKCE verifier; confirm no debug flags, no N+1 I/O
+Network path
+Validate TLS termination and keep-alives; confirm no egress rate limits
+Observability
+Enforce end-to-end request_id propagation
+Add red/green SLO dashboard with P50/P95/P99 and per-endpoint error budget
+Targeting
+Operate to a working target of P95 ≤100ms to preserve headroom; gate remains ≤120ms
+Evidence Requirements for Next Gate (all due prior to 23:30 UTC Nov 8 for pre-check, then final artifacts after the gate)
+
+scholar_auth: Load-test reports (≥500 samples/endpoint), config diffs, capacity plan, dashboard screenshots
+scholarship_api: ORDER_4_EVIDENCE package template ready; token validation proofs
+student_pilot: E2E_JOURNEY_EVIDENCE harness updated; ready to run at T+15 if GREEN
+scholarship_sage: M2M_BYPASS_EVIDENCE harness ready; three client_credentials runs scripted
+provider_register: STRIPE_PRODUCTION_VERIFICATION bundle finalized; ORDER_B_EVIDENCE template staged
+Application Decisions and Orders
+
+Application Name: scholar_auth APP_BASE_URL: https://scholar-auth-jamarrlmayes.replit.app
+Decision: NO-GO; Gate Failed
+Mandates:
+Deliver preliminary RCA by 05:00 and remediation by 12:00 with proof
+Rehearse gate with staging at 22:00; publish results to War Room
+Next gate: Nov 9 00:00–00:15; pass criteria unchanged
+2. Application Name: scholarship_api
+APP_BASE_URL: https://scholarship-api-jamarrlmayes.replit.app
+
+Decision: GO for monitoring; blocked on AUTH GREEN TAG for cross-app evidence
+Deliver ORDER_4_EVIDENCE by ~01:30 after GREEN TAG on Nov 9
+3. Application Name: scholarship_agent
+APP_BASE_URL: https://scholarship-agent-jamarrlmayes.replit.app
+
+Decision: GO (Observe-Only through Nov 12)
+Orders: Proceed with fairness rollups; no matching logic changes; provide daily summaries at 12:15
+4. Application Name: scholarship_sage
+APP_BASE_URL: https://scholarship-sage-jamarrlmayes.replit.app
+
+Decision: Conditional GO; blocked until AUTH GREEN TAG
+Orders: Prepare M2M_BYPASS_EVIDENCE for T+30 after next GREEN TAG
+5. Application Name: student_pilot
+APP_BASE_URL: https://student-pilot-jamarrlmayes.replit.app
+
+Decision: Conditional GO; blocked until AUTH GREEN TAG
+Orders: Deliver E2E_JOURNEY_EVIDENCE by T+30 after next GREEN TAG
+6. Application Name: provider_register
+APP_BASE_URL: https://provider-register-jamarrlmayes.replit.app
+
+Decision: BLOCKED pending Stripe production verification
+Orders: Do not execute ORDER_B until both Stripe and AUTH are green; re-aim earliest B2B ignition to Nov 9 01:30–03:00 contingent on gates
+7. Application Name: auto_page_maker
+APP_BASE_URL: https://auto-page-maker-jamarrlmayes.replit.app
+
+Decision: GO — FROZEN through Nov 12; monitor-only
+Orders: Continue 06:00 daily KPI rollups; this remains our primary low-CAC growth lever
+8. Application Name: auto_com_center
+APP_BASE_URL: https://auto-com-center-jamarrlmayes.replit.app
+
+Decision: GO for coordination and enforcement
+Orders: Enforce gate without exceptions; hold messaging until CEO authorization next gate night
+ARR and KPI Impact
+
+B2C (student_pilot): Earliest remains 2025-11-10 00:00 UTC; contingent on AUTH passing before then
+B2B (provider_register): Earliest shifts to Nov 9 01:30–03:00 UTC contingent on Stripe + AUTH
+Organic (auto_page_maker): Unaffected; continue SEO compounding
+KPIs to monitor daily:
+Auth: P95 per endpoint, error_rate, error budget burn
+B2C: Free→Paid conversion, ARPU from credits, 7-day activation, support <2%
+B2B: Activated providers, 3% platform fee revenue, time-to-disbursement, NPS
+Organic: Indexed pages, organic sessions, CTR, SERP rank, sign-up velocity
+Risk and Compliance
+
+Maintain Responsible AI posture; no compromises on privacy, FERPA/COPPA, or academic integrity
+Ensure token revocation, refresh handling, and secure storage validated in remediation
+If error_rate >0.1% for 3 consecutive minutes at any point during the next gate, auto-page and halt
+Communications
+
+Internal: War Room open; hourly updates until 12:00, then at 18:00, then pre-gate 23:30
+External: Providers kept warm; no production charges; communicate stability-first stance as a trust signal
+Final Instruction
+Hold the line on quality. Execute the remediation plan with urgency and discipline. We re-gate in 24 hours. No exceptions.
