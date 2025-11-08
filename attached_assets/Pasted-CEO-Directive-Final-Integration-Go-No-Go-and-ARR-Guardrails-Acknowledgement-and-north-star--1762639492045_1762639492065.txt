@@ -1,0 +1,75 @@
+CEO Directive — Final Integration, Go/No‑Go, and ARR Guardrails
+
+Acknowledgement and north star
+
+Prime directive confirmed: we protect brand trust, keep the SEO-led low-CAC flywheel compounding, and pursue B2B-first revenue while B2C activation is optimized around “first document upload.” This is exactly what our Playbook prescribes: prioritize organic acquisition and activation over paid CAC, leverage Auto Page Maker for scale, and use B2B as the near-term revenue engine with higher ACV, while B2C monetization is an upsell anchored on activation events like the first document upload .
+Gate philosophy: No broadcast without deliverability GREEN; no payments without Stripe PASS; issuer correctness enforced; and we uphold pre‑soak/UAT before any general availability. These are standard quality gates for integration/system/UAT prior to production release .
+Decisions now (binding)
+
+DNS ownership and path to GREEN (auto_com_center unblock)
+Decision: We will keep DNS at the current registrar for the next 72 hours to avoid migration delay. Cloudflare migration will be assessed post-launch window. Objective is speed-to-GREEN for deliverability.
+Owner: Platform Ops Lead (DNS Admin of record) — designated today.
+What to add now (registrar DNS):
+Create subdomain: mail.scholaraiadvisor.com
+SPF TXT at root: v=spf1 include:spf.mtasv.net -all
+DMARC TXT at _dmarc.scholaraiadvisor.com: v=DMARC1; p=none; rua=mailto:dmarc@scholaraiadvisor.com; aspf=s; adkim=s; pct=100
+DKIM: add the two DKIM records provided by Postmark when Agent3 initiates verification (selectors vary; use exactly what Postmark returns).
+Timer start and deadlines:
+T0 = the minute Platform Ops confirms “DNS write access ready” in our ops channel.
+T+45: DNS records added and propagated check started.
+T+90: auto_com_center GREEN deliverability certification submitted.
+Rationale: This preserves our SEO-led, low-CAC growth engine while avoiding a risky DNS migration under time pressure; deliverability GREEN is a precondition to any communication at scale per our growth model .
+2. Stripe escalation (payments gate)
+
+Decision: Finance/Platform Ops must file a Stripe Priority Support case now and post the case ID and ETA.
+Owner: Finance Lead (DRI).
+Deadline: 30 minutes from this directive.
+Scope: Confirm account health, production API status, webhook signing and retries, platform fee and payout schedules, and any limits that affect near-term B2B invoices. We will not enable any B2B collection flow or provider payouts until Stripe PASS is confirmed.
+3. provider_register waitlist flag
+
+Decision: ENABLE_WAITLIST_MODE must be turned on immediately.
+Owner: provider_register DRI.
+Exact action: Set Replit Secret ENABLE_WAITLIST_MODE=true; app auto-restart will apply the gate.
+Deadlines:
+Activation confirmation: within 10 minutes of this directive.
+Evidence: within 40 minutes (10 request_id samples with waitlistMode=true, healthcheck 200 OK, ≤0.1% error rate).
+Why: We maintain demand capture without premature payments until Stripe PASS. This protects trust and ensures B2B ARR ramps cleanly .
+4. Timers clarification (for Agent3)
+
+We adopt Option B. T+45 and T+90 start at the moment the DNS admin confirms “access ready” in the ops channel (not before). This aligns with dependency‑driven gating and avoids penalizing teams for blockers they don’t control, while still enforcing velocity once unblocked.
+Go/No‑Go call for today
+
+No‑Go for any external broadcast (auto_com_center) and any payment flows (provider_register) until:
+Deliverability GREEN (auto_com_center) and
+Stripe PASS (Finance/Platform Ops).
+Proceed with internal pre‑soak only on Nov 9 for auth/API/agent/student flows to validate issuer correctness, latency targets, and 401/5xx handling before any public cutover; this is consistent with integration/system/UAT best practices for risk reduction prior to release .
+Per‑application Executive posture and next actions
+
+scholar_auth — Frozen pending infra confirmation; participate in Nov 9 pre‑soak. Maintain issuer correctness and SLOs; no external dependency on today’s DNS decision for auth itself beyond planned cutover.
+scholarship_api — Frozen; Nov 9 pre‑soak for P50/P95, 401/5xx, revocation checks, PKCE/M2M conformance.
+scholarship_agent — Frozen, observe‑only through Nov 12; fairness telemetry daily 12:00 UTC; pre‑soak participation only. Maintain Responsible AI posture.
+scholarship_sage — Frozen; Nov 9 M2M issuer switch with read‑only scopes; pre‑soak evidence.
+student_pilot — Frozen; Nov 9 pre‑soak then T+30 E2E evidence bundle; activation focus remains “first document upload,” our proven B2C lever for long‑term monetization and engagement .
+provider_register — Enable waitlist now; no payments until Stripe PASS; evidence as specified. This supports near‑term B2B-first revenue once Stripe clears, consistent with our financial model shift to higher‑ACV institutional demand .
+auto_page_maker — Frozen, monitor‑only. 06:00 UTC KPI rollups: indexation ≥95%, CWV p75 GREEN, zero publishing errors. This is our low‑CAC growth engine; preserve stability and quality to protect compounding organic traffic .
+auto_com_center — Execute Option A the moment DNS access is confirmed; deliver GREEN certification within T+90 (from access confirmation). No broadcast prior to GREEN.
+Ownership confirmations required in ops channel (immediately)
+
+DNS Admin for scholaraiadvisor.com: Platform Ops Lead acknowledges “DNS write access ready” and confirms registrar name. If registrar UI access is delayed, Platform Ops must paste the exact TXT/CNAME records to the registrar’s support chat and request expedited add; post a screenshot of confirmation.
+Stripe case: Finance Lead posts case ID and ETA within 30 minutes.
+provider_register: DRI posts secret set confirmation within 10 minutes; evidence within 40 minutes.
+ARR ignition windows (conditional)
+
+B2B: Earliest start after Stripe PASS + Auth GREEN TAG; provider_register remains on waitlist until PASS. This follows our B2B-first revenue reality with higher ACV and faster payback .
+B2C: Earliest after Auth GREEN + deliverability GREEN + pre‑soak PASS; activation anchored to “first document upload” to maximize conversion and LTV per Playbook .
+Risk posture and rationale
+
+We keep the operation lean, autonomous, and evidence‑driven. Agents execute; leadership governs strategy, sets gates, and unblocks dependencies. This is essential when operating a distributed, Replit‑based system where production rigor and gating compensate for platform constraints, and where human governance remains critical over autonomous agents .
+Next executive checkpoint
+
+I will reconvene in 60 minutes to confirm:
+DNS “access ready” posted,
+Stripe case ID + ETA posted,
+provider_register waitlist activated (with evidence on track).
+If any of the three are not confirmed, I will reassign ownership and move to a contingency path (including alternate ESP or suspending provider intake) to protect the launch gates and our brand.
+Agent3 — you are green‑lit to proceed exactly as outlined once DNS access is confirmed. Keep the evidence tight, time‑stamped, and minimal‑promise, maximum‑proof.
