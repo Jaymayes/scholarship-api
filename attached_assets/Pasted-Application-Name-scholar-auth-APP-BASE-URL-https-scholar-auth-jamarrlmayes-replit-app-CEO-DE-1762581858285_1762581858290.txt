@@ -1,0 +1,85 @@
+Application Name: scholar_auth
+APP_BASE_URL: https://scholar-auth-jamarrlmayes.replit.app
+
+CEO DECISION: PROCEED NOW
+
+Approved: Execute the full set of infrastructure improvements immediately. The 14:00 UTC remediation deadline stands. Budget buffer up to $1,500 remains authorized for 7 days.
+Gate remains Nov 9 00:00–00:15 UTC. Contingency auto-slip to Nov 10 if 20:00 UTC staging soak test fails. Gate criteria are non-negotiable: P95 ≤120ms and error_rate ≤0.1% for all 4 auth endpoints at both 00:10 and 00:15 snapshots.
+Non-Negotiable Remediation Orders (with deadlines)
+
+Warmup and Readiness (hard deadline: 10:30 UTC)
+Make performWarmup() run on process bootstrap (explicit call in the server main). Add a readiness probe that blocks traffic until warmupDatabase() finishes successfully.
+Ensure DATABASE_URL and any required secrets are available at warmup time; do not run warmup from a context that lacks env access.
+Evidence required: commit hash, diff of startup/health/readiness probes, logs showing warmup start/finish, and first successful DB queries.
+2. Database/Infra Headroom (complete by 16:00 UTC)
+
+Neon/Postgres: Upgrade compute one tier; enable PgBouncer (or equivalent) pooling; min idle conns ≥10; keep-alives 30–60s; disable autosuspend.
+App scaling: Pre-scale minReplicas=3; enable HPA; minReadySeconds ≥15; maxSurge ≥1; enable HTTP keep-alive; confirm TLS session reuse at ingress.
+Caching (safe-only): CDN-cache Discovery + JWKS (TTL=300s) with background refresh. Do NOT cache token endpoints or authorization decisions.
+Synthetic keep-warm: Schedule 60s pings to Discovery + JWKS; exclude these from production error_rate metrics.
+Evidence required: infra config diffs, screenshots of CDN rules and pooling settings, autosuspend disabled proof, replica counts, and ingress settings.
+3. Monitoring and Evidence (08:00 UTC bugfix; 23:30 UTC full package)
+
+08:00 UTC: Monitoring classification bug fix must be complete and validated in staging; separate negative-test failures from production error_rate.
+Ship RED dashboards per endpoint; enforce request_id propagation end-to-end; confirm 7-day retention. No PII/secrets in logs.
+Evidence bundle at 23:30 UTC: load-test reports (≥1,000 samples/endpoint), config diffs, capacity plan, dashboard screenshots with timestamps and request_id lineage.
+Performance Targets and Tests
+
+Working target on staging: P95 ≤100ms for margin against the ≤120ms gate.
+Load test #1: 12:30–13:30 UTC. Deliver P50/P95 and error_rate by 14:00 UTC.
+Soak test #2 (critical): 20:00 UTC, ≥1,000 samples/endpoint over a sustained 10-minute window. If ANY endpoint breaches P95 >120ms or error_rate >0.1%, we auto-slip to Nov 10. No exceptions.
+Security/OIDC Must-Pass
+
+Enforce OAuth2/OIDC with PKCE, correct token lifetimes, refresh token handling, immediate revocation, and strict validation on all dependent apps.
+JWKS rotation resilience validated; protected routes in student_pilot, provider_register, scholarship_agent must redirect to scholar_auth on 401.
+Evidence: token flow traces with request_id lineage; revocation test showing denied access within SLA; JWKS refresh logs.
+Application Name: provider_register
+APP_BASE_URL: https://provider-register-jamarrlmayes.replit.app
+
+Stripe Production Verification — HARD DEADLINE 18:00 UTC
+
+Required confirmations by 18:00 UTC:
+Live STRIPE_SECRET_KEY (not test)
+Webhook registered with matching STRIPE_WEBHOOK_SECRET
+Test webhook returns 200 OK in production mode
+Consequence: If missed, B2B remains blocked for the next gate regardless of AUTH status. Finance/Platform Ops must escalate to CFO and Stripe support immediately if any blocker emerges before 16:00 UTC.
+Application Name: scholarship_api
+APP_BASE_URL: https://scholarship-api-jamarrlmayes.replit.app
+
+Posture: Ready/Blocked. No changes required. Execute immediately upon AUTH GREEN TAG.
+Evidence template confirmed; monitor 401/5xx at re-gate.
+Application Name: scholarship_sage
+APP_BASE_URL: https://scholarship-sage-jamarrlmayes.replit.app
+
+Posture: Ready/Blocked. M2M bypass validated. Execute T+30 after AUTH GREEN TAG with evidence pack (client_credentials grants, p50/p95, scope enforcement, lineage).
+Application Name: student_pilot
+APP_BASE_URL: https://student-pilot-jamarrlmayes.replit.app
+
+Posture: Ready/Blocked. E2E harness ready. Execute T+30 after AUTH GREEN TAG.
+Evidence: PKCE S256 flow, protected-route redirects, profile CRUD via scholarship_api, sage interaction, desktop/mobile, p50/p95, request_id lineage.
+Application Name: scholarship_agent
+APP_BASE_URL: https://scholarship-agent-jamarrlmayes.replit.app
+
+Posture: Observe-only through Nov 12. Fairness rollups at 12:00 UTC and summaries at 12:15 UTC; no matching logic changes.
+Application Name: auto_page_maker
+APP_BASE_URL: https://auto-page-maker-jamarrlmayes.replit.app
+
+Status: Unaffected. Proceed with 06:00 UTC daily KPI rollups (pages live, IndexNow ≥95%, CWV p75 GREEN, error rate, P95, uptime). Continue SEO-led low-CAC compounding.
+Application Name: auto_com_center
+APP_BASE_URL: https://auto-com-center-jamarrlmayes.replit.app
+
+Maintain gate enforcement. Prepare “Gate Day T-0” broadcast for Nov 9 00:00 UTC. Hold AUTH GREEN TAG messaging until explicit CEO authorization.
+KPIs and ARR Timeline (unchanged)
+
+B2C (student_pilot): Earliest Nov 10 00:00 UTC, contingent on AUTH passing before then.
+B2B (provider_register): Earliest Nov 9 01:30–03:00 UTC, contingent on AUTH passing and Stripe verified by 18:00 UTC.
+Organic (auto_page_maker): Unaffected; continue daily rollups. This remains our primary low-CAC engine.
+Answer to your direct question
+
+Yes—proceed immediately with the infrastructure improvements and the warmup/readiness fix. Report back at:
+08:00 UTC: Monitoring bug-fix validation snapshot
+14:00 UTC: Load test #1 results
+18:00 UTC: Stripe verification status (Go/Block)
+20:00 UTC: Soak test decision point (auto-slip if fail)
+22:00 UTC and 23:30 UTC: Staging rehearsal and evidence pre-check
+Quality over speed remains non-negotiable. Hold the line on gate criteria and evidence discipline.
