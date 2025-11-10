@@ -1,0 +1,63 @@
+Executive Response — CEO, Scholar AI Advisor
+
+Prime assessment
+
+Overall: Good operational traction with appropriate freezes. Primary risk remains scholar_auth latency; all downstream FULL GO stays gated on it.
+ARR focus: Maintain low-CAC engine integrity (auto_page_maker), unblock B2C/B2B monetization the moment auth and deliverability clear.
+Decisions and directives by application
+
+scholar_auth
+
+Decision: Proceed with current performance remediation. The ≤120ms P95 by Nov 12, 20:00 UTC remains a hard gate for any downstream FULL GO.
+MFA directive: Do not block the GREEN gate on broad MFA. Require admin-only MFA now if and only if it does not jeopardize the P95 target. If there is any risk to P95, implement compensating controls immediately (admin IP allowlist, strict rate limits, alerting) and deliver admin MFA by Nov 15, 20:00 UTC. Student/provider MFA: rollout plan due Nov 15 with staged enforcement starting Nov 18.
+Reporting: Keep the 06:00 UTC daily performance report and 12-hour HOTL checkpoints. Escalate immediately if P95 >140ms during pre-soak.
+auto_page_maker
+
+KPI export to scholarship_sage: Option A approved (file-based, zero code change). scholarship_sage will ingest existing seo/daily_rollup/*.md. No changes to auto_page_maker until freeze lifts Nov 12, 20:00 UTC.
+Continue freeze and daily KPI rollups. Protect indexation and CWV.
+scholarship_sage
+
+Dashboards: Test existing dashboards now; document results. Do not change schema during the freeze.
+Fairness telemetry: Choose C with A. Document the current state and schedule the fairness tile/ingest integration immediately post-freeze. Deliver minimal integration spec by Nov 12, 22:00 UTC; implement Nov 13–14.
+auto_com_center
+
+Proceed with Reserved VM deployment as planned. Maintain “no sends” until Postmark DKIM/CNAME verified and warm-up confirmed.
+Gate: Deliverability GREEN by Nov 11, 20:00 UTC. If not GREEN, enable contingency: in-app notifications for critical flows in student_pilot and hold all email-triggered journeys. Provide Postmark readiness evidence (SPF/DKIM/DMARC, bounce/complaint thresholds) in the T+24 package. DMARC policy: start p=none for warm-up; target p=quarantine by Nov 20 pending metrics.
+provider_register
+
+Status remains: Conditional GO in waitlist mode.
+Gates to FULL GO: Stripe PASS (Finance confirmation due Nov 11, 18:00 UTC), auto_com_center deliverability GREEN, and scholar_auth ≤120ms P95 by Nov 12, 20:00 UTC.
+Security posture: Keep admin access behind scholar_auth and compensating controls until MFA is live for admins. No autonomous payments until Stripe PASS confirmed. T+30 evidence as scheduled.
+scholarship_api
+
+FULL GO approved and affirmed. Maintain freeze through Nov 12, 20:00 UTC. Keep request_id traces and audit logs flowing and daily KPI at 06:00 UTC. This remains the deterministic backbone for eligibility and pricing.
+student_pilot
+
+GO/NO-GO target: Nov 13, 16:00 UTC. Preconditions: scholar_auth GREEN and auto_com_center deliverability GREEN.
+Prep: Confirm onboarding funnel, first-document activation telemetry, and credit purchase flow are production-ready with rollbacks. If mobile clients are in scope, confirm offline cache for critical info and deferred sync.
+Cross-cutting directives
+
+SLOs: 99.9% uptime, P95 ≤120ms, error rate ≤0.1% across all public surfaces. Any breach triggers automatic freeze extension on dependent apps.
+Security and compliance: Continue TLS 1.3, HSTS, least privilege, PII-safe audit logs, and request_id lineage. For sensitive admin surfaces, apply compensating controls until MFA is fully rolled out.
+Reporting cadence: Daily metrics at 06:00 UTC across apps; scholarship_sage to assemble the cross-app executive rollup.
+Capital allocation: Approved — Reserved VM for auto_com_center (~$25/month). No new spend until auth/deliverability gates clear.
+Responsible AI: Maintain rules-based, explainable decisions in scholarship_api and fairness telemetry in scholarship_agent. No black-box ML in eligibility or pricing.
+Answers to open questions
+
+scholar_auth MFA before GREEN gate: No for broad user base. Yes for admin-only if it does not risk the P95 remediation; otherwise use compensating controls and deliver admin MFA by Nov 15, 20:00 UTC. Staged MFA plan for providers/students due Nov 15.
+auto_page_maker KPI export: Option A (file-based) approved. scholarship_sage to ingest immediately; no code changes during freeze.
+scholarship_sage fairness telemetry: Test current dashboards now, document status, and implement the fairness tile post-freeze. Spec due Nov 12, 22:00 UTC.
+Checkpoints
+
+Nov 11, 06:00 UTC: First daily KPI rollups (all apps).
+Nov 11, 18:00 UTC: Finance to deliver Stripe PASS confirmation.
+Nov 11, 20:00 UTC: auto_com_center deliverability gate decision; contingency activation if not GREEN.
+Nov 12, 20:00 UTC: scholar_auth P95 ≤120ms hard deadline; freeze lift decision.
+Nov 12, 22:00 UTC: scholarship_sage fairness integration spec due.
+Nov 13, 16:00 UTC: student_pilot GO/NO-GO.
+ARR alignment
+
+Preserve and scale the low-CAC SEO engine (auto_page_maker).
+Unblock B2C credits the moment auth and deliverability pass gates.
+Hold B2B provider monetization behind Stripe PASS + auth + deliverability to ensure clean revenue capture.
+Execute against the above. Send me a one-page checkpoint summary after each gate with pass/fail, impact, and next actions.
