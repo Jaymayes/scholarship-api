@@ -1,0 +1,102 @@
+Agent3 — CEO Directive and Go/No-Go Calls (Time-critical)
+
+Executive priorities aligned to Prime Directive: unblock ARR ignition with the lowest CAC, ship with proof, protect the SEO flywheel.
+
+Immediate answers to your three questions
+
+AWS SQS token issue (auto_com_center): YES — fix now. This is a P0 because it breaks business event instrumentation and deliverability gate evidence. Execute an immediate key rotation and credential remediation, and stop the 1.2s hot loop with jittered exponential backoff. Deadline: 60 minutes from receipt of this memo.
+
+scholar_auth JWKS 404: Treat as functionally green based on your latest tests; proceed under a YELLOW performance gate. You are authorized to continue pre-soak if:
+
+OIDC discovery and JWKS return 200 from 3 regions for 15 consecutive minutes with error rate ≤0.1%.
+Temporary performance threshold: P95 ≤180ms (tighten to ≤140ms inside 48 hours).
+3. Timeline clarification: We are revising tonight’s schedule to preserve momentum and evidence deadlines:
+
+01:15–01:30 UTC: Multi-region synthetic probes (US-East, US-West, EU-West) for OIDC + JWKS
+01:30 UTC: Go/No-Go on pre-soak based on probe results
+01:45–02:45 UTC: Pre-soak window (student_pilot, provider_register, scholarship_api, scholar_auth)
+03:15 UTC: T+30 evidence bundle posted
+T0 for deliverability (auto_com_center) will trigger immediately after Postmark “Verified” + DNS live; T+90 certification due 105 minutes after T0
+CEO decisions and orders
+Auth and performance gate
+
+scholar_auth is functionally GREEN, performance YELLOW. Proceed with pre-soak tonight if probes pass. Conditions to lift YELLOW:
+Fix health check connection leak (release pool client on query failure) within 6 hours.
+Add per-request metrics and spans on discovery and JWKS paths within 6 hours.
+Profile and remove tail latency; target P95 ≤140ms within 48 hours. Daily report until green.
+Deliverability and metrics
+
+auto_com_center SQS credential incident: Rotate keys, validate IAM policy, and swap to STS/assume-role if available. Store in your secrets vault, restart workers, and implement:
+Jittered exponential backoff with max backoff ≥60s
+Circuit breaker to prevent queue thrash
+Dead-letter queue and alerting on poison messages Deadline: 60 minutes for restoration; 120 minutes for backoff/circuit-breaker and DLQ.
+Escalation and access
+
+If you lack code or KMS access for scholar_auth again, escalate immediately to the scholar_auth DRI while you continue to lead incident command. You are authorized to publish a static JWKS fallback only if DRI is unresponsive for 30 minutes during a P1.
+Updated go-to-market gates
+
+student_pilot: Conditional GO remains Nov 11, 16:00 UTC if tonight’s pre-soak + T+30 + deliverability GREEN + Stripe PASS.
+provider_register: Earliest GO Nov 12, 16:00 UTC after all gates GREEN; stay in waitlist mode.
+auto_page_maker: Freeze stays through Nov 12; daily KPI rollups continue.
+scholarship_agent and scholarship_sage: Frozen observer; no changes.
+Evidence requirements (no exceptions)
+
+Pre-soak T+30 bundle (due 03:15 UTC): P50/P95 service + E2E histograms, uptime, error tallies, 10+ request_id traces (scholar_auth → scholarship_api → app), PKCE S256 proof, immediate token revocation proof, no-PII logging proof, TLS 1.3 proof, EXEC PASS/FAIL summary.
+Deliverability GREEN/RED call: Post within 15 minutes of T+105.
+Daily performance note (auth) until YELLOW lifted: P50/P95, error rate, tail causes, actions taken.
+CEO status reports (for your assigned scopes)
+
+APPLICATION NAME: scholar_auth APP_BASE_URL: https://scholar-auth-jamarrlmayes.replit.app
+Status: GO-LIVE READY (FUNCTIONAL), YELLOW (PERFORMANCE)
+
+Functional: OIDC discovery 200 OK; JWKS 200 OK; valid RSA key; error rate ≤0.1% in last checks.
+Gaps: P95 discovery ~290ms; P95 JWKS ~240ms; health check connection leak; missing per-request metrics. Actions/Deadlines:
+Fix connection leak + add metrics within 6 hours.
+Profile and reduce P95 to ≤140ms within 48 hours. Evidence: e2e/reports/auth/CEO_P1_JWKS_RESOLUTION_2025-11-10.md
+APPLICATION NAME: auto_com_center APP_BASE_URL: https://auto-com-center-jamarrlmayes.replit.app
+Status: DELAYED (Deliverability Gate), P0 Incident IN PROGRESS
+
+Blocker: “The security token included in the request is invalid” for SQS; queue worker thrashing.
+Immediate Orders: Rotate/validate AWS creds, implement STS/assume-role, add backoff + circuit breaker + DLQ. Deadlines:
+60 minutes: Credentials fixed, workers stable.
+120 minutes: Backoff/circuit-breaker + DLQ + alerts live. ARR Impact: Deliverability certification is required for student_pilot GO and provider_register GO.
+APPLICATION NAME: scholarship_api APP_BASE_URL: https://scholarship-api-jamarrlmayes.replit.app
+Status: PRE-SOAK PARTICIPANT (READY, BLOCKED ON AUTH PROBE PASS)
+
+Health: Running; error rate 0%; change freeze maintained.
+Requirement: Provide 10+ request_id lineage traces and no-PII proof in T+30 bundle; meet ≤120ms service P95 and ≤200ms E2E P95. Action: Participate in pre-soak once auth probes pass.
+APPLICATION NAME: student_pilot APP_BASE_URL: https://student-pilot-jamarrlmayes.replit.app
+Status: DELAYED; CONDITIONAL GO Nov 11, 16:00 UTC
+
+Gates: Pre-soak PASS tonight + T+30 evidence + Deliverability GREEN + Stripe PASS.
+ARR: B2C credits at 4× AI markup; activation on first doc upload + first successful match.
+APPLICATION NAME: provider_register APP_BASE_URL: https://provider-register-jamarrlmayes.replit.app
+Status: DELAYED; Waitlist Mode ON
+
+Earliest GO: Nov 12, 16:00 UTC after all gates GREEN.
+Dependency: OIDC/PKCE with scholar_auth; requires PKCE S256 + revocation proof + lineage in evidence.
+APPLICATION NAME: auto_page_maker APP_BASE_URL: https://auto-page-maker-jamarrlmayes.replit.app
+Status: GO-LIVE READY, FROZEN (AFFIRMED)
+
+Freeze through Nov 12; daily KPI rollups continue (next due 06:00 UTC).
+Role: Primary organic engine; protect SEO flywheel; keep CAC minimal.
+APPLICATION NAME: scholarship_agent APP_BASE_URL: https://scholarship-agent-jamarrlmayes.replit.app
+Status: GO-LIVE READY, FROZEN (Observer)
+
+Fairness telemetry on schedule; no changes.
+APPLICATION NAME: scholarship_sage APP_BASE_URL: https://scholarship-sage-jamarrlmayes.replit.app
+Status: GO-LIVE READY, FROZEN (Observer)
+
+HOTL gates enforced; no changes.
+Risk controls and guardrails
+
+If multi-region auth probes show any 404/5xx ≥0.1% or P95 >180ms during the pre-soak window, abort pre-soak and reschedule to the next window; publish an incident note with tail-latency root cause hypothesis.
+Do not spend on paid acquisition until Deliverability GREEN and Stripe PASS are confirmed.
+Enforce no-PII logging and RBAC checks during pre-soak; post proofs in T+30.
+What I need back from you
+
+01:30 UTC: Auth probe results + Go/No-Go call for pre-soak.
+02:45 UTC: Pre-soak completion note with preliminary metrics.
+03:15 UTC: T+30 evidence bundle link.
+T+105 (+15 min): Deliverability GREEN/RED decision link after T0.
+Act with urgency. Guard the gate. Unlock ARR only when the gates are green.
