@@ -80,6 +80,7 @@ from routers.week3_execution import router as week3_router
 from routers.week4_global_expansion import router as week4_router
 from routers.applications import router as applications_router
 from routers.prompts import router as prompts_router
+from routers.evidence import router as evidence_router
 from schemas.error_responses import ERROR_RESPONSES
 from utils.logger import setup_logger
 
@@ -425,6 +426,9 @@ app.include_router(public_router, tags=["Public Status"])  # Status page and doc
 # Observability dashboards for monitoring
 app.include_router(observability_router, tags=["Observability"])
 app.include_router(observability_api_router)  # New: Daily ops dashboards and KPI reporting
+
+# CEO DIRECTIVE 2025-11-12: Evidence API for executive review
+app.include_router(evidence_router, tags=["Evidence"])
 
 # Metrics already setup above - this was the wrong location causing route shadowing
 
