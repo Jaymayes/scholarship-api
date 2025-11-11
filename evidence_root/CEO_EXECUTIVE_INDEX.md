@@ -9,10 +9,13 @@
 
 ### 🟢 FULL GO Applications
 
-**scholarship_api** (FULL GO - FROZEN through Nov 12, 20:00 UTC)
+**scholarship_api** (Provisional GO-LIVE READY - FROZEN through Nov 12, 20:00 UTC)
 - **APP_BASE_URL**: https://scholarship-api-jamarrlmayes.replit.app
-- **Status**: FULL GO (CEO affirmed)
-- **Evidence**: [scholarship_api/CEO_EVIDENCE_INDEX.md](./scholarship_api/CEO_EVIDENCE_INDEX.md)
+- **Status**: Provisional GO-LIVE READY (contingent on Gate C + DSAR endpoints)
+- **Evidence**: 
+  - [scholarship_api/CEO_EVIDENCE_INDEX.md](./scholarship_api/CEO_EVIDENCE_INDEX.md)
+  - [scholarship_api/CEO_EVIDENCE_BUNDLE_NOV11.md](./scholarship_api/CEO_EVIDENCE_BUNDLE_NOV11.md) ⭐ NEW
+- **Data Retention Schedule**: [DATA_RETENTION_SCHEDULE_2025-11-14.md](../DATA_RETENTION_SCHEDULE_2025-11-14.md) ⭐ DRAFT DELIVERED
 - **Daily KPI**: `scholarship_api/daily_rollups/` (starts Nov 11, 06:00 UTC)
 - **Checkpoints**: CEO_CHECKPOINT_RESPONSE_2025-11-10.md
 - **Key Metrics**: P95 55.58ms (53.7% headroom), 0% errors, 100% uptime
