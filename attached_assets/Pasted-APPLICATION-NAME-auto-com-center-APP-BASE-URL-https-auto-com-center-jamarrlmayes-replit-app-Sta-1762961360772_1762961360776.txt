@@ -1,0 +1,126 @@
+APPLICATION NAME: auto_com_center APP_BASE_URL: https://auto-com-center-jamarrlmayes.replit.app
+Status: DELAYED (Go/No-Go at 20:00–20:15 UTC)
+
+Summary
+
+Primary ESP: Postmark. DNS (DKIM) propagation underway; DMARC set to p=none per CEO directive.
+Contingency: SendGrid pre-staged. Pivot only if both conditions hit at 16:00 UTC: Postmark DKIM not verified or inbox placement <95% after 30 minutes, AND SendGrid fully verified.
+Section IV compliance snapshot
+
+Security/Compliance: Auth via scholar_auth; RBAC enforced; HTTPS/TLS; secrets in Replit Secrets; audit logging on. Prepared for SOC 2-style evidence capture. Webhook signing validation on.
+Scalability/Performance: Async email queue + rate limits; target P95 ≤120ms; autoscaling rules defined; health checks in place.
+Integration: OIDC with scholar_auth; event webhooks consumed by scholarship_sage; campaign orchestration gated by scholarship_agent; notifications to student_pilot; API contracts documented.
+Reliability/Maintainability: 99.9% uptime SLO; monitors/alerts configured; daily backups; blue/green deploy with rollback.
+Data/Analytics: Event pipeline to scholarship_sage; seed-list deliverability testing; BI exports enabled.
+Blockers
+
+DNS: DKIM and Return-Path CNAME verification pending global propagation.
+Deliverability: Seed-list test must meet ≥95% inbox placement during Gate A.
+Dependencies: Gate C (scholar_auth P95 ≤120ms) must pass.
+Estimated Go-Live
+
+Decision window: 20:00–20:15 UTC tonight.
+If Postmark passes: GO-LIVE at 20:30 UTC.
+If pivot to SendGrid required: GO-LIVE slips to Nov 13, 16:00 UTC.
+ARR Ignition
+
+Nov 13–15. Enables transactional and lifecycle comms for B2C conversion and B2B ops.
+Third-Party Dependencies
+
+Postmark (primary), SendGrid (contingency), DNS provider, seed-list testing service, monitoring stack (Prometheus/Grafana).
+Evidence
+
+Checkpoint report: published 14:00 UTC (“IN PROGRESS – DNS propagation underway”).
+Readiness checklist: scheduled 15:30 UTC (SPF/DKIM/DMARC/webhooks/seed-list).
+Gate A deliverability and latency evidence: to publish within 30 minutes post-window.
+APPLICATION NAME: provider_register APP_BASE_URL: https://provider-register-jamarrlmayes.replit.app
+Status: PENDING REVIEW (Release Captain role)
+
+Summary
+
+Gate B test window: 18:00–18:15 UTC. DRI to deliver evidence bundle by 18:15–18:20 UTC.
+PASS criteria: Auth via scholar_auth; RBAC; provider onboarding flow; fee calc 3%; API/webhook integration with scholarship_api; audit logs; P95 ≤120ms; error rate <0.1%.
+Blockers
+
+None if evidence delivered on time. If absent: automatic FAIL at 18:20 UTC with 1-hour remediation plan.
+Estimated Go-Live
+
+If PASS at 18:20 UTC: GO-LIVE tonight.
+If FAIL: Remediation + retest by Nov 13, 16:00 UTC.
+ARR Ignition
+
+Immediate upon GO-LIVE via 3% platform fee on provider transactions.
+Third-Party Dependencies
+
+Payment gateway, DNS/SSL, monitoring stack.
+Evidence
+
+DRI-owned bundle due 18:15–18:20 UTC; Release Captain will issue PASS/FAIL by 18:20 UTC.
+APPLICATION NAME: scholar_auth APP_BASE_URL: https://scholar-auth-jamarrlmayes.replit.app
+Status: PENDING GATE (Coordination role)
+
+Summary
+
+Gate C window: 20:00–20:15 UTC. Targets: P95 ≤120ms; 99.9% uptime; MFA/SSO; OIDC/SAML; full audit trails.
+Blockers
+
+Must present latency and error-rate evidence; must verify token/session hardening; confirm RBAC policy enforcement.
+Estimated Go-Live
+
+If Gate C PASS: tonight. Else: remediate by Nov 13, 16:00 UTC.
+ARR Ignition
+
+Indirect; unlocks B2C/B2B funnels by enabling secure auth across apps.
+Third-Party Dependencies
+
+Identity provider configs, DNS/SSL, monitoring stack.
+Evidence
+
+Gate C dashboard and logs required by 20:15 UTC; CEO review by 20:30 UTC.
+APPLICATION NAME: scholarship_agent APP_BASE_URL: https://scholarship-agent-jamarrlmayes.replit.app
+Status: GO-LIVE READY (Observer Mode; sends blocked)
+
+Summary
+
+Monitoring and fairness telemetry active; HOTL approval gates enforced; campaign sends locked pending Gate A (auto_com_center), Gate C (scholar_auth), and Legal sign-off.
+Next step
+
+Await CEO greenlight post-Gates A + C and Legal. Warm-up plan 14–21 days then scaled sending.
+ARR Ignition
+
+Dec 4+ after warm-up completion; earlier value via insights/targeting to student_pilot.
+APPLICATION NAME: student_pilot APP_BASE_URL: https://student-pilot-jamarrlmayes.replit.app
+Status: DELAYED (Conditional GO)
+
+Summary
+
+COPPA age gate implemented behind feature flag; server-side <13 block; audit logging active; UX flows complete.
+Blockers: Legal sign-off on ToS/Privacy; dependency on Gate A (deliverability) and Gate C (auth latency).
+Estimated Go-Live
+
+Nov 13, 16:00 UTC, contingent on above gates and Legal.
+ARR Ignition
+
+Nov 13–15 via B2C credit sales at 4x markup.
+Third-Party Dependencies
+
+scholar_auth, auto_com_center, analytics stack.
+CEO decisions and directives
+
+Approve Gate A deliverability target at ≥95% and DMARC p=none for tonight only. If ≥95% sustained for 48 hours, move DMARC to p=quarantine, then p=reject after 7 days of stable domain health.
+Enforce 16:00 UTC pivot rule exactly. Do not pivot if SendGrid is not fully verified by 16:00 UTC.
+Evidence discipline: Every gate must publish artifacts within 30 minutes of window close. Missing evidence = FAIL.
+Security posture: Confirm MFA and SSO active on scholar_auth and admin consoles; verify RBAC policy coverage across all apps before any public traffic ramp.
+Legal: Student_pilot cannot go live without ToS/Privacy sign-off. If not received by 18:00 UTC today, escalate to me with red/amber status and a 24-hour remediation plan.
+CAC strategy: No paid acquisition until Auto Page Maker SEO canaries pass tonight’s health checks; publish canary evidence by 22:15 UTC.
+Next checkpoints (UTC)
+
+15:30: Auto_com_center readiness check (SPF/DKIM/DMARC/webhooks/seed-list).
+16:00: Pivot decision (Postmark vs SendGrid).
+18:15–18:20: Provider_register Gate B evidence; Release Captain issues PASS/FAIL.
+20:00–20:15: Gates A (auto_com_center) and C (scholar_auth).
+20:45: CEO review of Gate A/C evidence; greenlight decision for scholarship_agent warm-up pending Legal.
+22:15: Auto_page_maker canary evidence.
+23:00: Consolidated evidence package.
+Act with urgency. Keep evidence flowing. If any gate risks slipping, escalate to me immediately with a one-line cause and a concrete, time-bound recovery plan.
+
