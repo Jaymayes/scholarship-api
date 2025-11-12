@@ -1,0 +1,65 @@
+CEO DECISION MEMO — Scholar AI Advisor
+
+Prime Directive alignment: Proceed only if actions improve time-to-revenue, hit SLOs, and protect student trust at low CAC. This decision advances the 5-year plan toward $10M profitable ARR by enabling controlled learning and early revenue without compromising reliability or ethics.
+
+Decision summary
+
+Gate A (auto_com_center): APPROVED for Conditional GO-LIVE as Private Beta, effective immediately, under strict guardrails listed below.
+scholarship_api: GO-LIVE READY approved for production use.
+auto_page_maker: Canary approved on schedule.
+scholarship_agent: Remains in observer mode; no outbound campaigns until Gate A and Gate C fully PASS.
+scholar_auth (Gate C): Internal/UAT only pending MFA/SSO/RBAC/audit evidence.
+provider_register (Gate B): Delayed; retest on Nov 13 as planned.
+student_pilot: HOLD pending Legal ToS/Privacy/COPPA clearance.
+Conditions and guardrails for auto_com_center Private Beta
+
+Traffic cap: ≤150 requests/second.
+Canary: 10% traffic shard; ramp only after 60-minute stable window.
+Auto-kill protection: Disable external sends and page on-call if P95 >250ms for 10 consecutive minutes or error budget >0.1%.
+Rollback: One-click revert with no data migration dependency.
+SLO target for production unlock: P95 ≤120ms on 30K replay.
+Performance posture and path to production
+
+Current state acknowledged: Functional correctness perfect on 30K replay; P95 ≈231ms (material improvement from ~895ms), still above 120ms SLO.
+Immediate plan: Continue Private Beta using the optimized in-memory queue that achieved ~231ms P95. Do not deploy Redis/BullMQ to production if it degrades latency; further queue/infra changes must prove net benefit in controlled tests before rollout.
+Optimization workstream (time-boxed):
+Remove off-path overhead; batch DB writes; ensure keep-alives and HTTP/2 multiplexing; pre-allocate buffers; minimize serialization; co-locate compute and DB to reduce RTT; tune connection pools and indexes.
+Instrument ingress/worker/DB histograms and end-to-end lineage to precisely attribute latency.
+Evidence requirement to unlock full production: 30K replay at ≤120ms P95; lineage traces; RBAC matrix; immutable audit log chain; error budget accounting.
+Access and accountability
+
+Platform Ops: Grant Agent3 Editor access to auto_com_center immediately. If not granted within 10 minutes, execute break-glass per policy with full audit trail and auto-revoke after 3 hours.
+DRI: Agent3 remains DRI for Gate A execution and evidence bundle delivery. Operations to support with monitoring, canary, and rollback automation.
+Security: Produce scholar_auth MFA, SSO, token lifecycle, RBAC, and audit evidence to move Gate C from UAT to PASS.
+Legal: Deliver final ToS/Privacy/COPPA approvals to lift student_pilot HOLD.
+Timeline and checkpoints
+
+Now: Private Beta ON for auto_com_center under guardrails; scholarship_api in production; auto_page_maker canary per schedule.
+By 22:00 UTC: Post-mortem and owner assignments confirmed.
+00:30–01:30 UTC: Execute targeted latency optimization and 1K smoke; only proceed if interim P95 trend indicates ≤120ms is feasible. If not, remain in Private Beta and re-scope.
+02:00 UTC: 30K replay. If P95 ≤120ms, authorize production integration window Nov 13, 16:00 UTC. If not, maintain Private Beta and continue optimization; do not expand traffic shard.
+ARR impact and KPIs
+
+ARR ignition window remains Nov 13–15.
+B2C: Enable early credit sales (4x markup) via student-facing flows as soon as Legal clears student_pilot; prioritize organic SEO acquisition via auto_page_maker to keep CAC near zero.
+B2B: Maintain provider_register retest on Nov 13; target rapid ramp post-PASS to capture 3% platform fee volume.
+KPI guardrails for this phase:
+Platform SLO: 99.9% uptime; Gate A P95 ≤250ms during beta; ≤120ms for production.
+Error budget: ≤0.1% during beta.
+Conversion telemetry: Track free→paid conversion, ARPU per credit; enforce no paid spend for acquisition until SEO pages demonstrate indexation and conversion.
+Security/compliance: Audit coverage, RBAC scope, and data protection adherence (FERPA/COPPA/GDPR) verified; no exceptions.
+Risk and ethics
+
+Continue enforcing Responsible AI: no academic dishonesty, transparent decisioning, bias mitigation.
+Keep canary/killswitch live throughout beta; no expansion without stable SLO compliance and error budget headroom.
+Capital allocation
+
+Approved: Minimal, data-driven optimization tasks with clear SLO impact. Halt or roll back any infrastructure change (e.g., Redis/BullMQ) that increases P95; complexity without measurable benefit is not funded.
+Allocate engineering hours to latency hotspots identified by telemetry, not speculative rewrites.
+CEO directives — required confirmations back to me
+
+Platform Ops: Confirm Agent3 access granted or break-glass executed within 10 minutes of this memo.
+Agent3: Confirm Private Beta is enabled with guardrails, monitoring is green, and ETA for delivering the evidence bundle. If 00:30–01:30 UTC trends do not indicate ≤120ms feasibility, flag early and propose the next-best plan to maximize learning while protecting SLOs and ARR timeline.
+Security and Legal: Provide expected sign-off times for scholar_auth evidence and student_pilot approvals to keep the Nov 13–15 revenue window intact.
+Decision: Conditional GO-LIVE for auto_com_center Private Beta — APPROVED.
+All other statuses and constraints as stated above stand. Execute with urgency and maintain a zero-regret option via canary, killswitch, and rollback.
