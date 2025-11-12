@@ -26,6 +26,28 @@ SERVICE_AUTH_SECRET = settings.jwt_secret_key or "INSECURE_DEFAULT_SECRET_REPLAC
 if not settings.jwt_secret_key:
     logger.warning("⚠️ SERVICE_AUTH_SECRET not configured - using insecure default. Configure JWT_SECRET_KEY in production!")
 
+# Replay protection: Track used request IDs with TTL (in-memory, migrate to Redis for horizontal scaling)
+# Structure: {request_id: expiry_timestamp}
+# TTL: 5 minutes (matches max drift window) - auto-cleanup prevents memory leaks
+from collections import OrderedDict
+
+_used_request_ids: OrderedDict[str, float] = OrderedDict()
+_REPLAY_CACHE_TTL_SECONDS = 300  # 5 minutes (matches max drift window)
+
+
+def _cleanup_expired_replay_ids():
+    """Remove expired request IDs from replay protection cache"""
+    current_time = time.time()
+    expired_ids = [
+        request_id for request_id, expiry in _used_request_ids.items()
+        if current_time > expiry
+    ]
+    for request_id in expired_ids:
+        del _used_request_ids[request_id]
+    
+    if expired_ids:
+        logger.debug(f"Replay protection: Cleaned up {len(expired_ids)} expired request IDs")
+
 
 class ServiceAuthMiddleware:
     """
@@ -141,6 +163,31 @@ class ServiceAuthMiddleware:
                 }
         except ValueError:
             return {"valid": False, "reason": "Invalid timestamp format"}
+        
+        # Replay protection: Check if request_id has already been used
+        if request_id:
+            # Cleanup expired entries before checking (prevents memory leaks)
+            _cleanup_expired_replay_ids()
+            
+            # Check if request_id exists and is not expired
+            if request_id in _used_request_ids:
+                expiry = _used_request_ids[request_id]
+                if current_time <= expiry:
+                    return {
+                        "valid": False,
+                        "reason": f"Replay attack detected: request_id {request_id} already used"
+                    }
+                # Expired entry, remove and allow (though cleanup should have handled this)
+                del _used_request_ids[request_id]
+            
+            # Mark request_id as used with TTL expiry
+            expiry_time = current_time + _REPLAY_CACHE_TTL_SECONDS
+            _used_request_ids[request_id] = expiry_time
+            
+            logger.debug(
+                f"Replay protection: Stored request_id {request_id} with {_REPLAY_CACHE_TTL_SECONDS}s TTL | "
+                f"cache_size={len(_used_request_ids)}"
+            )
         
         # Read request body for signature validation
         body = await request.body()

@@ -63,11 +63,18 @@ class WAFProtection(BaseHTTPMiddleware):
         }
         
         # Orchestration endpoints that should bypass SQL injection WAF (legitimate JSON payloads)
+        # SECURITY: Exact matches only - no broad prefix bypasses
         self._waf_bypass_paths = {
             "/command",  # Agent Bridge orchestration from Command Center
             "/billing/external/credit-grant",  # External billing app credit grants (signed JSON)
             "/billing/external/provider-fee-paid",  # External billing app provider fees (signed JSON)
         }
+        
+        # SECURITY: Regex patterns for dynamic routes that require WAF bypass
+        # CEO Directive Gate B: Only HMAC-authenticated callback routes bypass SQL checks
+        self._waf_bypass_patterns = [
+            re.compile(r'^/api/v1/partners/[^/]+/onboarding/[^/]+/complete$'),  # Onboarding callback only
+        ]
 
         logger.info(f"WAF Protection initialized - Block mode: {self.block_mode}")
 
@@ -335,6 +342,7 @@ class WAFProtection(BaseHTTPMiddleware):
         # SQL injection exempt endpoints (legitimate content may contain SQL keywords)
         sql_exempt_paths = {
             "/partner/register",  # Partner registration may contain text like "select scholarships"
+            "/api/v1/partners/register",  # New partner registration endpoint (legitimate JSON)
             "/api/v1/launch/simulate/traffic",
             # CEO P0 DIRECTIVE: Auth endpoints exempt from SQL injection checks (T+3h gate)
             # Authentication JSON payloads contain "password", "username" which trigger false positives
@@ -349,6 +357,7 @@ class WAFProtection(BaseHTTPMiddleware):
         # Add orchestration bypass paths (legitimate JSON from Command Center)
         sql_exempt_paths.update(self._waf_bypass_paths)
 
+        # Check exact path matches
         if request.url.path in sql_exempt_paths:
             # Log auth endpoint bypasses for monitoring and alerting
             from observability.metrics import metrics_service
@@ -359,6 +368,12 @@ class WAFProtection(BaseHTTPMiddleware):
             else:
                 logger.debug(f"WAF: Allowing SQL-exempt endpoint - {request.method} {request.url.path}")
             return False
+        
+        # Check regex pattern matches for dynamic bypass routes (SECURITY: narrow scope only)
+        for bypass_pattern in self._waf_bypass_patterns:
+            if bypass_pattern.match(request.url.path):
+                logger.debug(f"WAF: Allowing HMAC-authenticated callback (pattern match) - {request.method} {request.url.path}")
+                return False
 
         # Check URL parameters
         query_string = str(request.url.query)

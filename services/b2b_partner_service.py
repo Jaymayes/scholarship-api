@@ -323,26 +323,33 @@ class B2BPartnerService:
         step: PartnerOnboardingStep,
         step_data: dict[str, Any]
     ) -> bool:
-        """Validate onboarding step completion"""
+        """
+        Validate onboarding step completion
+        
+        Business data is expected in metadata.additional_data
+        """
+        # Extract business data from metadata
+        metadata = step_data.get("metadata", {})
+        business_data = metadata.get("additional_data", {})
 
         for rule in step.validation_rules:
             if rule == "required_fields":
                 required_fields = ["organization_name", "primary_contact_email", "tax_id"]
-                if not all(field in step_data and step_data[field] for field in required_fields):
+                if not all(field in business_data and business_data[field] for field in required_fields):
                     return False
 
             elif rule == "email_format":
-                email = step_data.get("primary_contact_email", "")
+                email = business_data.get("primary_contact_email", "")
                 if not re.match(r'^[^@]+@[^@]+\.[^@]+$', email):
                     return False
 
             elif rule == "agreement_acknowledged":
-                if not step_data.get("agreement_acknowledged"):
+                if not business_data.get("agreement_acknowledged"):
                     return False
 
             elif rule == "listing_complete":
                 required_listing_fields = ["title", "description", "award_amount", "application_deadline"]
-                if not all(field in step_data and step_data[field] for field in required_listing_fields):
+                if not all(field in business_data and business_data[field] for field in required_listing_fields):
                     return False
 
         return True

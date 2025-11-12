@@ -49,6 +49,7 @@ from routers.analytics import router as analytics_router
 from routers.auth import router as auth_router
 from routers.auto_page_seo import router as auto_seo_router
 from routers.b2b_commercial import router as b2b_commercial_router
+from routers.b2b_partner import router as b2b_partner_api_router
 from routers.b2b_partner_portal import b2b_router
 from routers.b2b_partner_portal import router as b2b_partner_router
 from routers.ceo_marketing_dashboard import router as ceo_dashboard_router
@@ -404,6 +405,7 @@ app.include_router(documents_router, tags=["Document Hub"])
 app.include_router(predictive_matching_router, tags=["Predictive Matching"])
 
 # AI Scholarship Playbook: B2B Partner Portal endpoints
+app.include_router(b2b_partner_api_router, tags=["B2B Partners API"])
 app.include_router(b2b_partner_router, tags=["B2B Partners"])
 app.include_router(b2b_commercial_router, tags=["B2B Commercial"])
 app.include_router(partner_sla_trust_center_router, tags=["Partner SLA & Trust Center"])

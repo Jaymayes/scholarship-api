@@ -68,14 +68,14 @@ class TestProviderOnboardingCallback:
     def test_partner_id(self) -> str:
         """Create test partner for onboarding callback tests"""
         test_partner_data = {
-            "organization_name": "Test University - Callback E2E",
-            "partner_type": PartnerType.UNIVERSITY,
+            "organization_name": "Test University Callback E2E",
+            "partner_type": PartnerType.EDUCATIONAL,
             "primary_contact_name": "Test Contact",
             "primary_contact_email": "test@example.edu",
-            "primary_contact_phone": "+1-555-0100",
+            "primary_contact_phone": "+15550100",
             "website_url": "https://example.edu",
-            "tax_id": "12-3456789",
-            "address_line1": "123 Test St",
+            "tax_id": "123456789",
+            "address_line1": "123 Test Street",
             "city": "Test City",
             "state": "CA",
             "zip_code": "90210",
@@ -161,6 +161,7 @@ class TestProviderOnboardingCallback:
         step_id = first_incomplete_step["step_id"]
         
         # Prepare callback payload (simulates provider_register callback)
+        # Include required business data for Organization Registration step in metadata.additional_data
         callback_payload = OnboardingCallbackPayload(
             step_data=OnboardingStepData(
                 completed_at=datetime.utcnow().isoformat() + "Z",
@@ -169,7 +170,13 @@ class TestProviderOnboardingCallback:
                 metadata=OnboardingStepMetadata(
                     source="provider_register",
                     environment="test",
-                    integration_test=True
+                    integration_test=True,
+                    additional_data={
+                        "organization_name": "Acme Scholarship Foundation",
+                        "primary_contact_email": "contact@acme-scholarships.org",
+                        "tax_id": "12-3456789",
+                        "agreement_acknowledged": True
+                    }
                 )
             )
         )

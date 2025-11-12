@@ -179,9 +179,13 @@ class IdempotencyRecord(BaseModel):
     response: dict[str, Any] = Field(..., description="Cached response for idempotent replays")
     
     @staticmethod
-    def generate_key(partner_id: str, step_id: str, completed_at: str) -> str:
-        """Generate idempotency key"""
+    def generate_key(partner_id: str, step_id: str, completed_at: str, request_id: str = "") -> str:
+        """
+        Generate idempotency key
+        
+        Includes request_id to prevent replay attacks with modified timestamps
+        """
         import hashlib
         
-        payload = f"{partner_id}:{step_id}:{completed_at}"
+        payload = f"{partner_id}:{step_id}:{completed_at}:{request_id}"
         return hashlib.sha256(payload.encode('utf-8')).hexdigest()

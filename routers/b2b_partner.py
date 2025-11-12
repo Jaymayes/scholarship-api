@@ -36,9 +36,29 @@ router = APIRouter(prefix="/api/v1/partners", tags=["B2B Partners"])
 openai_service = OpenAIService()
 partner_service = B2BPartnerService(openai_service)
 
-# Idempotency store for callback deduplication (in-memory for now)
+# Idempotency store for callback deduplication with TTL (in-memory for now)
+# Structure: {idempotency_key: (IdempotencyRecord, expiry_timestamp)}
+# TTL: 24 hours (allows retries within reasonable window)
 # TODO: Move to persistent storage (Redis/PostgreSQL) for production
-_idempotency_store: dict[str, IdempotencyRecord] = {}
+from collections import OrderedDict
+import time
+
+_idempotency_store: OrderedDict[str, tuple[IdempotencyRecord, float]] = OrderedDict()
+_IDEMPOTENCY_TTL_SECONDS = 86400  # 24 hours
+
+
+def _cleanup_expired_idempotency_records():
+    """Remove expired idempotency records from cache"""
+    current_time = time.time()
+    expired_keys = [
+        key for key, (record, expiry) in _idempotency_store.items()
+        if current_time > expiry
+    ]
+    for key in expired_keys:
+        del _idempotency_store[key]
+    
+    if expired_keys:
+        logger.debug(f"Idempotency: Cleaned up {len(expired_keys)} expired records")
 
 # Request/Response Models
 class PartnerRegistrationRequest(BaseModel):
@@ -185,28 +205,40 @@ async def complete_onboarding_step(
         # Extract step data
         step_data = callback_payload.step_data
         
-        # Idempotency check
+        # Idempotency check (includes request_id to prevent replay with modified timestamps)
         idempotency_key = IdempotencyRecord.generate_key(
             partner_id=partner_id,
             step_id=step_id,
-            completed_at=step_data.completed_at
+            completed_at=step_data.completed_at,
+            request_id=request_id
         )
+        
+        # Cleanup expired idempotency records before checking (prevents memory leaks)
+        _cleanup_expired_idempotency_records()
         
         # Check if this callback was already processed
         if idempotency_key in _idempotency_store:
-            cached_record = _idempotency_store[idempotency_key]
+            cached_record, expiry = _idempotency_store[idempotency_key]
+            current_time = time.time()
             
-            logger.info(
-                f"🔄 Idempotent callback replay detected | "
-                f"partner_id={partner_id} | "
-                f"step_id={step_id} | "
-                f"request_id={request_id} | "
-                f"original_request_id={cached_record.request_id} | "
-                f"cached_response_returned"
-            )
+            # Check if record is still valid (not expired)
+            if current_time <= expiry:
+                logger.info(
+                    f"🔄 Idempotent callback replay detected | "
+                    f"partner_id={partner_id} | "
+                    f"step_id={step_id} | "
+                    f"request_id={request_id} | "
+                    f"original_request_id={cached_record.request_id} | "
+                    f"cached_response_returned | "
+                    f"ttl_remaining={(expiry - current_time):.0f}s"
+                )
+                
+                # Return cached response
+                return OnboardingCallbackResponse(**cached_record.response)
             
-            # Return cached response
-            return OnboardingCallbackResponse(**cached_record.response)
+            # Expired record, remove and process as new
+            del _idempotency_store[idempotency_key]
+            logger.debug(f"Idempotency: Removed expired record for key {idempotency_key}")
         
         # Process onboarding step completion
         completed_step = await partner_service.complete_onboarding_step(
@@ -227,14 +259,21 @@ async def complete_onboarding_step(
             message=f"Onboarding step '{step_id}' completed successfully"
         )
         
-        # Store in idempotency cache
-        _idempotency_store[idempotency_key] = IdempotencyRecord(
+        # Store in idempotency cache with TTL expiry
+        idempotency_record = IdempotencyRecord(
             idempotency_key=idempotency_key,
             partner_id=partner_id,
             step_id=step_id,
             completed_at=step_data.completed_at,
             request_id=request_id,
             response=response.model_dump()
+        )
+        expiry_time = time.time() + _IDEMPOTENCY_TTL_SECONDS
+        _idempotency_store[idempotency_key] = (idempotency_record, expiry_time)
+        
+        logger.debug(
+            f"Idempotency: Stored callback result with {_IDEMPOTENCY_TTL_SECONDS}s TTL | "
+            f"cache_size={len(_idempotency_store)}"
         )
         
         logger.info(
