@@ -58,14 +58,27 @@
 - **Encryption in Transit**: ✅ TLS
 - **Audit Logging**: ✅ ENABLED
 
-### Known Issues (Non-Blocking)
+### ⚠️ PRODUCTION DEGRADED STATUS
 
-#### Redis Rate Limiting (DEF-005)
-- **Status**: DEGRADED (expected)
-- **Fallback**: In-memory rate limiting (single-instance)
-- **Impact**: None for tonight (no release window)
-- **Remediation**: DEF-005 provisioning (Day 1-2 priority - post-freeze)
-- **SLA Impact**: None (single instance sufficient for current load)
+#### Redis Rate Limiting Backend Unavailable (DEF-005)
+- **Severity**: 💥 PRODUCTION DEGRADED
+- **Log Message**: "PRODUCTION DEGRADED: Redis rate limiting backend unavailable. Error: Error 99 connecting to localhost:6379. Cannot assign requested address."
+- **Current State**: Fallback to in-memory rate limiting (single-instance only)
+- **Blocking Tonight's Operations**: ❌ NO
+  - scholarship_api has NO RELEASE WINDOW TONIGHT (monitoring only)
+  - In-memory fallback is operational and meeting SLOs
+  - Performance: <10ms P95 (91.7% headroom vs 120ms target)
+  - Error Rate: 0%
+  - Single-instance deployment adequate for current load
+- **Remediation Required**: DEF-005 Redis provisioning (Day 1-2 priority - POST-FREEZE)
+- **Change Freeze Protocol**: Issue documented; remediation deferred until freeze lifts per policy
+- **SLA Impact**: None (SLOs met with fallback; traffic volume supports single-instance operation)
+
+**Attestation**: While PRODUCTION DEGRADED flag is accurate, the degradation does NOT block tonight's gate operations because:
+1. scholarship_api has no release window tonight (monitoring only)
+2. Fallback mechanism is working (0% error rate, <10ms latency)
+3. Change freeze prohibits non-emergency infrastructure changes
+4. Remediation is appropriately scheduled post-freeze per DEF-005 timeline
 
 ### API Contract Documentation
 
