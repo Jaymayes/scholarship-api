@@ -1,0 +1,84 @@
+Executive Direction from the CEO of Scholar AI Advisor
+Prime objective: Protect tonight’s Gate windows, preserve ARR ignition Nov 13–15, and maintain compliance and performance guardrails.
+
+Decisions and directives
+
+ESP/DKIM plan (auto_com_center)
+Primary: Stay on Postmark for Gate A tonight.
+Contingency: Pre-stage SendGrid DNS and credentials now, but do not pivot unless the below conditions fail by the decision deadline.
+Deadlines and criteria
+
+14:00 UTC checkpoint: Publish “IN PROGRESS – DNS propagation underway” if DKIM is not yet green. Proceed. Approved.
+15:30 UTC internal readiness check:
+Required on Postmark: SPF pass, DKIM verified (green), DMARC policy published (p=none acceptable for Gate A), webhooks live, seed-list test plan queued.
+16:00 UTC pivot decision rule:
+Pivot to SendGrid only if BOTH conditions hold:
+Postmark DKIM still not verified OR verified but seed-list test cannot achieve ≥95% inbox placement on Gmail/Outlook/iCloud within 30 minutes, and
+SendGrid domain and DKIM are already verified and ready to send immediately.
+If SendGrid DNS is not fully verified by 16:00 UTC, do not pivot; remain on Postmark and continue monitoring.
+20:00–20:15 UTC Gate A execution criteria (must all pass):
+Deliverability: ≥95% inbox placement on the 20-address seed list with aligned SPF/DKIM/DMARC
+Latency: P95 send API ≤120 ms across 500 test sends
+Reliability: Process 30,000 event webhooks in staging replay without data loss; end-to-end request_id lineage present in logs and BI sink
+Error rate: <0.1% for send API and webhook processing over the test window
+Evidence: Headers (SPF/DKIM/DMARC), seed-list outcomes, Prometheus/ELK screenshots, webhook replay metrics, request_id traces; bundle published within 30 minutes of completion
+2. Secrets and credentials
+
+Immediate: Obtain required credentials via secure secret management only. No plaintext secrets in code or chat. Rotate any keys exposed during testing post-Gate A.
+Required variables for auto_com_center: POSTMARK_API_TOKEN, FROM_EMAIL, Return-Path domain; and pre-staged SendGrid keys if contingency is invoked.
+DMARC posture: Keep p=none through Gate A; escalate to p=quarantine after warm-up performance stabilizes and complaint rate ≤0.1% for 72 hours.
+3. Role and repo access clarity
+
+auto_com_center: You are DRI with write access. If you do not currently have repo access, request and obtain it from DevOps immediately. If access is not granted by 05:30 UTC, command the current auto_com_center DRI to execute the DKIM/verifications and deliver evidence to you. You remain accountable for Gate A readiness.
+provider_register: You are Release Captain only. Do not write code. Confirm the 18:00–18:15 UTC test window and evidence bundle with their DRI. If no evidence by 18:20 UTC, issue FAIL and escalate to me with a one-line cause and a one-hour remediation plan.
+scholarship_api and scholar_auth: Coordination only. Enforce evidence discipline and gates; no code.
+4. Legal and compliance holds
+
+student_pilot: COPPA age gate must remain OFF until Legal signs at 18:00 UTC. Do not override. No B2C traffic ramp until Gate A (auto_com_center) and Gate C (scholar_auth) pass, and Legal confirms consent flows. This protects risk, brand, and long-term ARR.
+5. ARR and growth guardrails
+
+ARR ignition target remains Nov 13–15. A same-day ESP pivot is acceptable only if it preserves Gate A tonight with verifiable deliverability; otherwise it risks cold-domain warm-up drag. The default is Postmark with monitoring; pivot only under the 16:00 UTC rule above.
+CAC discipline: Continue prioritizing organic/SEO (Auto Page Maker) and defer any paid spend until Gate A and Gate C pass and initial conversion telemetry confirms the funnel.
+Section V status confirmations
+
+APPLICATION NAME: auto_com_center
+APP_BASE_URL: https://auto-com-center-jamarrlmayes.replit.app
+Status: IN PROGRESS (Gate A tonight)
+
+What’s done: DNS records added; DKIM propagation pending; webhooks, rate limiting, dashboards prepared; 1-click activation/rollback procedures documented.
+Blockers: DNS propagation timing; secrets must be injected via vault.
+Go/No-Go plan: As above. Publish 14:00 UTC checkpoint as “IN PROGRESS – DNS propagation underway.” Approved.
+Evidence to publish: DKIM/SPF/DMARC headers, seed-list results, API latency P95, webhook replay metrics, request_id traces.
+APPLICATION NAME: scholarship_agent
+APP_BASE_URL: https://scholarship-agent-jamarrlmayes.replit.app
+Status: GO-LIVE READY (Observer Mode)
+
+Action: Remain blocked from campaign sends until Gate A and Gate C pass and Legal signs off. Warm-up starts only after my greenlight.
+APPLICATION NAME: student_pilot
+APP_BASE_URL: https://student-pilot-jamarrlmayes.replit.app
+Status: DELAYED (Conditional GO)
+
+Blockers: COPPA age gate pending Legal at 18:00 UTC; dependent on Gate A and Gate C.
+Estimated Go-Live: Nov 13, 16:00 UTC contingent on passes.
+ARR ignition: Nov 13–15 remains on plan.
+APPLICATION NAME: provider_register
+APP_BASE_URL: https://provider-register-jamarrlmayes.replit.app
+Status: PENDING Gate B
+
+18:00–18:15 UTC: Execute tests per plan.
+18:15 UTC: Evidence due.
+18:20 UTC: You issue PASS/FAIL. If FAIL or no evidence, escalate to me with remediation path.
+APPLICATION NAME: scholar_auth
+APP_BASE_URL: https://scholar-auth-jamarrlmayes.replit.app
+Status: PENDING Gate C
+
+Requirement: P95 ≤120 ms, 99.9% availability, RBAC verified, SSO/MFA functioning, audit logs and request_id lineage confirmed. Run at 20:00–20:15 UTC.
+Direct answers to your explicit questions
+
+Publish the 14:00 UTC checkpoint as “IN PROGRESS – DNS propagation underway”? Yes. Do it.
+If Postmark is not verified by 16:00 UTC, execute SendGrid pivot? Conditional yes: Only pivot if SendGrid domain/DKIM are already verified and seed-list deliverability can be proven within the hour; otherwise, hold on Postmark and continue to monitor. Do not risk a cold-domain warm-up that jeopardizes tonight’s Gate A.
+Evidence discipline
+
+All artifacts must be published per app at /evidence/YYYYMMDD/ with SHA-256 manifests, screenshots, and raw logs. Summaries are insufficient; include machine-verifiable proof.
+Final note
+Act with urgency, preserve tonight’s gates, and keep the operation lean and data-first. Escalate immediately if any gate risks slipping beyond its window.
