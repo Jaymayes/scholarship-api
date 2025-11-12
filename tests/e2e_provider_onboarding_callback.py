@@ -1,7 +1,7 @@
 """
 E2E Test Suite: Provider Onboarding Callback Integration
 CEO Directive: Gate B - provider_register callback path fix
-Deliverable: Passing E2E test and trace evidence
+Deliverable: Passing E2E test and trace evidence with service-to-service authentication
 """
 
 import json
@@ -15,7 +15,9 @@ import pytest
 from fastapi.testclient import TestClient
 
 from main import app
+from middleware.service_auth import generate_service_auth_signature
 from models.b2b_partner import PartnerStatus, PartnerType, PartnerOnboardingStep
+from schemas.provider_callback_contract import OnboardingCallbackPayload, OnboardingStepData, OnboardingStepMetadata
 from services.b2b_partner_service import B2BPartnerService
 from services.openai_service import OpenAIService
 
@@ -35,12 +37,32 @@ class TestProviderOnboardingCallback:
     
     Scenario: provider_register completes onboarding step and calls back to scholarship_api
     Success criteria:
-    1. Callback endpoint returns 200 OK
-    2. Onboarding step marked as completed
-    3. request_id traced end-to-end
-    4. Response time <120ms (P95 SLO)
-    5. No data loss or errors
+    1. Service-to-service authentication passes (X-Service-Auth HMAC)
+    2. Callback endpoint returns 200 OK
+    3. Onboarding step marked as completed
+    4. request_id traced end-to-end
+    5. Response time <120ms (P95 SLO)
+    6. Idempotency works (retries return same response)
+    7. No data loss or errors
     """
+    
+    def _generate_auth_headers(self, method: str, path: str, body: str, request_id: str) -> dict:
+        """
+        Generate service auth headers for callback requests
+        
+        Simulates provider_register generating auth signature
+        """
+        import time
+        
+        auth_headers = generate_service_auth_signature(
+            method=method,
+            path=path,
+            body=body,
+            timestamp=time.time(),
+            request_id=request_id
+        )
+        
+        return auth_headers
     
     @pytest.fixture
     def test_partner_id(self) -> str:
@@ -120,7 +142,7 @@ class TestProviderOnboardingCallback:
         """
         Test: POST /api/v1/partners/{partner_id}/onboarding/{step_id}/complete
         
-        Critical path: provider_register completes onboarding step via callback
+        Critical path: provider_register completes onboarding step via authenticated callback
         """
         request_id = str(uuid4())
         
@@ -139,27 +161,39 @@ class TestProviderOnboardingCallback:
         step_id = first_incomplete_step["step_id"]
         
         # Prepare callback payload (simulates provider_register callback)
-        callback_payload = {
-            "step_data": {
-                "completed_at": datetime.utcnow().isoformat(),
-                "completed_by": "provider_register_system",
-                "verification_status": "verified",
-                "metadata": {
-                    "source": "provider_register",
-                    "environment": "test",
-                    "integration_test": True
-                }
-            }
-        }
+        callback_payload = OnboardingCallbackPayload(
+            step_data=OnboardingStepData(
+                completed_at=datetime.utcnow().isoformat() + "Z",
+                completed_by="provider_register_system",
+                verification_status="verified",
+                metadata=OnboardingStepMetadata(
+                    source="provider_register",
+                    environment="test",
+                    integration_test=True
+                )
+            )
+        )
+        
+        # Serialize payload
+        payload_json = callback_payload.model_dump_json()
+        
+        # Generate service auth headers (simulates provider_register signing request)
+        callback_path = f"/api/v1/partners/{test_partner_id}/onboarding/{step_id}/complete"
+        auth_headers = self._generate_auth_headers(
+            method="POST",
+            path=callback_path,
+            body=payload_json,
+            request_id=request_id
+        )
         
         start_time = datetime.now()
         
-        # Execute callback (provider_register → scholarship_api)
+        # Execute authenticated callback (provider_register → scholarship_api)
         response = client.post(
-            f"/api/v1/partners/{test_partner_id}/onboarding/{step_id}/complete",
-            json=callback_payload,
+            callback_path,
+            content=payload_json,
             headers={
-                "X-Request-ID": request_id,
+                **auth_headers,
                 "Content-Type": "application/json",
                 "User-Agent": "provider_register/1.0.0"
             }
@@ -173,20 +207,20 @@ class TestProviderOnboardingCallback:
         completed_step = response.json()
         assert completed_step["step_id"] == step_id
         assert completed_step["completed"] == True, "Step should be marked as completed"
+        assert completed_step["success"] == True
         
         # Verify trace propagation
-        response_headers = response.headers
-        trace_verified = "X-Request-ID" in response_headers or request_id in response.text
+        assert completed_step.get("request_id") == request_id, "request_id should be propagated in response"
         
         # Performance SLO check
         assert duration_ms < 120, f"Callback latency {duration_ms}ms exceeds P95 SLO of 120ms"
         
         logger.info(
-            f"✅ Complete onboarding step: 200 OK | "
+            f"✅ Complete onboarding step (authenticated): 200 OK | "
             f"request_id={request_id} | "
             f"step_id={step_id} | "
             f"latency={duration_ms:.2f}ms | "
-            f"trace_verified={trace_verified}"
+            f"service_auth=PASSED"
         )
         
         return {
@@ -195,7 +229,7 @@ class TestProviderOnboardingCallback:
             "latency_ms": duration_ms,
             "step_id": step_id,
             "completed": True,
-            "trace_verified": trace_verified
+            "service_auth": "passed"
         }
     
     def test_complete_onboarding_step_idempotency(self, test_partner_id: str):

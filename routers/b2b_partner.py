@@ -1,13 +1,16 @@
 # AI Scholarship Playbook - B2B Partner Portal API
 # Self-serve partner onboarding and marketplace management
 
+import hashlib
 import logging
+from datetime import datetime
 from typing import Any
 
-from fastapi import APIRouter, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel, EmailStr
 
 from middleware.rate_limiting import search_rate_limit as rate_limit
+from middleware.service_auth import require_service_auth
 from models.b2b_partner import (
     Partner,
     PartnerAnalytics,
@@ -16,6 +19,12 @@ from models.b2b_partner import (
     PartnerStatus,
     PartnerSupportTicket,
     PartnerType,
+)
+from schemas.provider_callback_contract import (
+    IdempotencyRecord,
+    OnboardingCallbackErrorResponse,
+    OnboardingCallbackPayload,
+    OnboardingCallbackResponse,
 )
 from services.b2b_partner_service import B2BPartnerService
 from services.openai_service import OpenAIService
@@ -26,6 +35,10 @@ router = APIRouter(prefix="/api/v1/partners", tags=["B2B Partners"])
 # Initialize partner service
 openai_service = OpenAIService()
 partner_service = B2BPartnerService(openai_service)
+
+# Idempotency store for callback deduplication (in-memory for now)
+# TODO: Move to persistent storage (Redis/PostgreSQL) for production
+_idempotency_store: dict[str, IdempotencyRecord] = {}
 
 # Request/Response Models
 class PartnerRegistrationRequest(BaseModel):
@@ -144,24 +157,151 @@ async def complete_onboarding_step(
     request: Request,
     partner_id: str,
     step_id: str,
-    step_request: OnboardingStepRequest
-) -> PartnerOnboardingStep:
-    """Complete specific onboarding step"""
+    callback_payload: OnboardingCallbackPayload,
+    auth_result: dict = Depends(require_service_auth)
+) -> OnboardingCallbackResponse:
+    """
+    Complete specific onboarding step
+    
+    CEO Directive: Gate B - Secure callback from provider_register
+    
+    This endpoint is called by provider_register when an onboarding step is completed.
+    Requires service-to-service authentication (X-Service-Auth header).
+    Implements idempotency to handle retries safely.
+    
+    Args:
+        partner_id: Partner identifier
+        step_id: Onboarding step identifier
+        callback_payload: OnboardingCallbackPayload with step completion data
+        auth_result: Service authentication result (injected by dependency)
+    
+    Returns:
+        OnboardingCallbackResponse with completion status
+    """
+    start_time = datetime.now()
+    request_id = request.headers.get("X-Request-ID", "unknown")
+    
     try:
-        return await partner_service.complete_onboarding_step(
-            partner_id, step_id, step_request.step_data
+        # Extract step data
+        step_data = callback_payload.step_data
+        
+        # Idempotency check
+        idempotency_key = IdempotencyRecord.generate_key(
+            partner_id=partner_id,
+            step_id=step_id,
+            completed_at=step_data.completed_at
         )
+        
+        # Check if this callback was already processed
+        if idempotency_key in _idempotency_store:
+            cached_record = _idempotency_store[idempotency_key]
+            
+            logger.info(
+                f"🔄 Idempotent callback replay detected | "
+                f"partner_id={partner_id} | "
+                f"step_id={step_id} | "
+                f"request_id={request_id} | "
+                f"original_request_id={cached_record.request_id} | "
+                f"cached_response_returned"
+            )
+            
+            # Return cached response
+            return OnboardingCallbackResponse(**cached_record.response)
+        
+        # Process onboarding step completion
+        completed_step = await partner_service.complete_onboarding_step(
+            partner_id, step_id, step_data.model_dump()
+        )
+        
+        # Calculate latency
+        latency_ms = (datetime.now() - start_time).total_seconds() * 1000
+        
+        # Build response
+        response = OnboardingCallbackResponse(
+            success=True,
+            step_id=step_id,
+            partner_id=partner_id,
+            completed=completed_step.completed,
+            completed_at=step_data.completed_at,
+            request_id=request_id,
+            message=f"Onboarding step '{step_id}' completed successfully"
+        )
+        
+        # Store in idempotency cache
+        _idempotency_store[idempotency_key] = IdempotencyRecord(
+            idempotency_key=idempotency_key,
+            partner_id=partner_id,
+            step_id=step_id,
+            completed_at=step_data.completed_at,
+            request_id=request_id,
+            response=response.model_dump()
+        )
+        
+        logger.info(
+            f"✅ Onboarding callback processed | "
+            f"partner_id={partner_id} | "
+            f"step_id={step_id} | "
+            f"request_id={request_id} | "
+            f"latency={latency_ms:.2f}ms | "
+            f"completed_by={step_data.completed_by} | "
+            f"source={step_data.metadata.source if step_data.metadata else 'unknown'}"
+        )
+        
+        # Performance SLO check
+        if latency_ms > 120:
+            logger.warning(
+                f"⚠️ Callback latency exceeded P95 SLO | "
+                f"latency={latency_ms:.2f}ms | "
+                f"target=120ms | "
+                f"request_id={request_id}"
+            )
+        
+        return response
 
     except ValueError as e:
+        error_response = OnboardingCallbackErrorResponse(
+            error="InvalidStepError",
+            reason=str(e),
+            step_id=step_id,
+            partner_id=partner_id,
+            request_id=request_id,
+            hint="Verify step_id is valid and matches an onboarding step for this partner"
+        )
+        
+        logger.error(
+            f"❌ Invalid onboarding step | "
+            f"partner_id={partner_id} | "
+            f"step_id={step_id} | "
+            f"error={str(e)} | "
+            f"request_id={request_id}"
+        )
+        
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(e)
+            detail=error_response.model_dump()
         )
+        
     except Exception as e:
-        logger.error(f"Failed to complete onboarding step: {str(e)}")
+        error_response = OnboardingCallbackErrorResponse(
+            error="CallbackProcessingError",
+            reason=f"Failed to process onboarding callback: {str(e)}",
+            step_id=step_id,
+            partner_id=partner_id,
+            request_id=request_id,
+            hint="Check request payload format and service logs"
+        )
+        
+        logger.error(
+            f"❌ Callback processing failed | "
+            f"partner_id={partner_id} | "
+            f"step_id={step_id} | "
+            f"error={str(e)} | "
+            f"request_id={request_id}"
+        )
+        
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to complete onboarding step"
+            detail=error_response.model_dump()
         )
 
 # Partner Portal Management
