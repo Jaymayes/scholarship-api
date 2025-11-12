@@ -1,0 +1,58 @@
+Executive Decision: Go/No‑Go, Evidence, and Next Actions
+
+I have reviewed the gate-readiness updates and tonight’s Prime Directive execution plan. Decisions below are issued to protect trust/SLOs while preserving the Nov 13–15 ARR ignition window.
+
+Portfolio decisions
+
+Gate A (auto_com_center): NO‑GO for production traffic. Proceed with observer mode and internal canary only. The 30K webhook replay must pass cleanly (idempotent, ordered, ≥99.9% delivered) and P95 ≤120ms before any external sends. Evidence gaps (deliverability, webhooks at scale, RBAC, audit logs) must be closed before promotion.
+Gate C (scholar_auth): Conditional GO for internal/UAT traffic only. OIDC/JWKS is verified; however, full MFA/SSO, token lifecycle, RBAC, and audit-log evidence must be produced before enabling broader ecosystem dependencies. Any auth anomaly triggers immediate rollback.
+student_pilot: HOLD. No prod release until Legal completes ToS/Privacy/COPPA approval and age-gated consent is validated in evidence. Your hold is correct.
+provider_register: DELAYED as planned. Retest window Nov 13 18:00–19:00 UTC stands; ensure 3% fee E2E, circuit breaker, UAT sign-offs are in the evidence bundle.
+auto_page_maker: GO for the 22:15 UTC canary under strict guardrails. Success requires CWV pass (LCP ≤2.5s at p75, CLS ≤0.1, INP within guidance), IndexNow ≥95%, and error rate ≤0.10%. Auto-rollback if thresholds are breached for >10 minutes. Cap canary to a minimal page cohort and publish the canary list in the evidence.
+scholarship_agent: Observer mode only (no outbound campaigns) until Gate A/C pass and Legal consent is cleared. Warm-up staging and telemetry are approved.
+scholarship_api: Maintain change freeze; continue SLO monitoring. Open a Sev‑2 on the Redis degradation with a post-freeze remediation plan and rollback playbook.
+Directive on the 30K webhook replay (Gate A)
+
+Decision on your A/B/C question: C for the next 15 minutes, then A.
+Immediately run a 1K–5K synthetic webhook batch to capture high-signal diagnostics within the evidence window, but do not claim PASS. Use this to localize the bottleneck.
+Then prioritize a root-cause sprint and re-run the full 30K replay before 02:00 UTC. Full PASS at 30K is mandatory for production GO.
+Triage steps to execute now:
+Queue/backpressure: Inspect broker metrics (enqueue/dequeue, consumer lag), worker concurrency, and per-shard saturation. Eliminate single-threaded bottlenecks.
+HMAC/CPU: Measure HMAC verification cost; ensure vectorized/async verification and reuse of parsed headers. Confirm constant-time compare.
+Storage hot spots: Check DB write IOPS, lock contention, and partition hot keys on idempotency and request_id indexes; add covering indexes where missing.
+Idempotency store: Verify O(1) lookups, TTL policy, and unique constraints on event_id. Confirm exactly-once semantics under retry storms.
+Retry/backoff: Confirm 202 ack-on-receipt, exponential backoff with jitter, dead-letter policy, and per-tenant rate limits. Eliminate synchronous downstream calls in the webhook path.
+Network/egress quotas: Validate outbound limits, TLS session reuse, and ephemeral port exhaustion.
+Evidence required for PASS:
+30K replay report with ordered delivery proofs, dedupe metrics, and zero data loss
+P95/P99 histograms under load; error-budget ledger
+Immutable audit logs with request_id lineage across producer → consumer → persistence
+RBAC test matrix and HOTL approvals
+SPF/DKIM/DMARC and seed‑list deliverability at ≥95%
+Evidence and reporting (Section V format)
+
+For every app you directly own tonight, submit Section V status reports with the exact header format:
+APPLICATION NAME: [App Name]
+APP_BASE_URL: [URL]
+Status: [GO-LIVE READY | DELAYED | OBSERVER MODE | HOLD]
+Include explicit links to health endpoints, API docs, and evidence bundles with SHA‑256 manifests.
+Deadlines:
+20:30 UTC: Submit interim evidence bundles for Gate A and Gate C, marked CONDITIONAL and noting every gap.
+22:00 UTC: Post-mortem note on the webhook failure mode with mitigation plan and owners.
+02:00 UTC: Re-run 30K replay and file final Gate A PASS/FAIL.
+09:00 UTC (Nov 13): Daily checkpoint with KPI deltas and revised GO/NO‑GO.
+Operational guardrails and rollback
+
+Gate A auto-abort if sustained >5 minutes: P95 >120ms, error rate >0.10%, inbox placement <95%, or webhook ordering/idempotency anomalies.
+Gate C abort if: OIDC discovery/JWKS failures, token revocation lag >2 minutes, or any RBAC escalation.
+auto_page_maker canary rollback if CWV or error-rate thresholds breach >10 minutes.
+ARR and KPI alignment
+
+ARR ignition window Nov 13–15 remains achievable with the above gating:
+B2C: student_pilot remains blocked pending Legal; no exceptions.
+B2B: provider_register retest on Nov 13 is the critical path for fee capture. Ensure payment flows and fee accrual evidence are complete.
+Organic growth: auto_page_maker canary is approved; prioritize CWV and indexing gains to feed low‑CAC acquisition.
+Close
+
+Execute the above immediately. Keep operations lean and data-first. Do not trade security, compliance, or reliability for speed.
+Return the Section V reports per assigned app within the stated deadlines. If any deadline is at risk, escalate with a timestamped blocker, owner, and recovery ETA.
