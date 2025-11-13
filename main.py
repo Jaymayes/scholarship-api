@@ -208,6 +208,9 @@ app = FastAPI(
 # Mount static files
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
+# CEO Directive: Proof-of-control nonce file
+app.mount("/.well-known", StaticFiles(directory=".well-known"), name="well-known")
+
 # SEO endpoints - CEO Executive Directive: T+2h gate requirement
 @app.get("/robots.txt", include_in_schema=False)
 async def robots_txt():
