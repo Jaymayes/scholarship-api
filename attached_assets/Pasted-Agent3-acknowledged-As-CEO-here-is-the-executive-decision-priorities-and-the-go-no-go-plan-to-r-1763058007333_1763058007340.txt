@@ -1,0 +1,112 @@
+Agent3, acknowledged. As CEO, here is the executive decision, priorities, and the go/no-go plan to recover schedule, protect security, and hit ARR ignition with confidence.
+
+Executive decisions
+
+Foundation first: Proceed with Path A. Scholar_auth is the critical path; all services depend on it. You are authorized to pause downstream work until service-to-service auth and RBAC are correct and verified.
+Correctness over speed: Take the 2 hours to fix the execution packet completely before distribution. No teams start on Gate 0 until your corrected packet is issued.
+Feature freeze: Effective immediately, freeze all net-new features across the 8 apps. Only security, integration, defect fixes, and test coverage are allowed until go-live.
+De-scope offline mode: Offline mode for student_pilot is out of scope for this release. Reassess for Q1 2026.
+Traffic control: Auto Page Maker can continue SEO content and capture leads, but product CTAs must route to a waitlist until Gate 2 passes. No paid acquisition until Gate 2 is green.
+Budget approval: Approved to provision Reserved VM/Autoscale for scholar_auth and scholarship_api to meet availability and P95 latency targets. Proceed.
+48-hour recovery plan and gates
+Gate 0 – Foundations (deadline: Nov 14, 10:00 MST)
+
+Health endpoints: All 8 services must expose /health with dependency checks (DB, outbound providers, and auth reachability).
+Configuration: Zero hardcoded URLs. All services must use environment variables; boot-time fail-fast on missing env.
+CORS lockdown: Explicit allowlist to student_pilot and provider_register only. Deny-by-default policy.
+Auth packet: Finalize and distribute the corrected Env/Auth Standards packet (RS256/JWKS, client credentials, RBAC claims). Exit criteria: 100% services pass /health with dependencies; config audits clean; CORS allowlist in place; Auth packet distributed.
+Gate 1 – Security and reliability (deadline: Nov 15, 18:00 MST)
+
+scholar_auth: OAuth2 client-credentials grant, RS256 tokens with kid and JWKS; issuer/audience claims; roles and fine-grained permissions in token; token TTL 5 minutes; rotation guidance (90-day key rotation with overlapping validity and JWKS caching).
+JWT validation stability: scholarship_api fixes middleware to select key by kid, cache JWKS with backoff, verify iss/aud/exp/nbf, and load test at expected peak QPS.
+MFA verification: Complete integration tests with external provider; document fallback if provider degrades.
+Monitoring: Centralized logs for auth decisions, 401/403 rates, and circuit-breakers; alerts on token validation failures >0.1% for 5 minutes. Exit criteria: Auth S2S flow demonstrably works across scholarship_api, scholarship_agent, scholarship_sage (positive and negative tests); P0 security issues = 0.
+Gate 2 – E2E workflows (deadline: Nov 17, 12:00 MST)
+
+Student journey: Register → Login (MFA) → Profile → Recommendations → Apply → Confirmation. Must succeed 10/10 runs in CI against production-like staging.
+Provider journey: Register → Create Scholarship → View Applicants → Update Status. Must succeed 10/10 runs.
+Notifications: Status change in scholarship_api triggers auto_com_center; emails/SMS render correct env-driven URLs and unsubscribe links; bounce/drop monitoring wired. Exit criteria: E2E pass rate 100% in staging, then 2 successful runs in production shadow mode; no P0/P1 defects open.
+Gate 3 – Performance and HA (deadline: Nov 18, 18:00 MST)
+
+SLOs: 99.9% uptime target; P95 <120ms for lightweight reads; P95 <250ms for write/compute flows. Confirm Reserved VM/Autoscale settings.
+Load tests: auth and API at projected 3x week-1 load. Error rate <0.5%, no Hot Path timeouts. Exit criteria: Meets SLOs under load with headroom. Runbook and scaling policies documented.
+Gate 4 – UAT and content readiness (deadline: Nov 19, 15:00 MST)
+
+UAT signoff: Student and provider flows approved by product/ops; legal/privacy checks complete; FERPA/COPPA posture reviewed; secrets validated in platform vault; audit logs present. Exit criteria: Go/No-Go board convenes at Nov 19, 17:00 MST.
+Critical path directives by application
+scholar_auth (owner: Auth DRI; you coordinate)
+
+Implement OAuth2 client credentials with RS256; publish /.well-known/openid-configuration and JWKS; enforce iss/aud/scope.
+RBAC: Include roles and permissions claims for student, provider, admin, service accounts. Deny-by-default authorization across consumers until scopes are present.
+CORS allowlist: Only student_pilot and provider_register.
+MFA: Complete provider integration tests; document fallback.
+Health: /health checks DB, SMTP/MFA provider, JWKS signer state.
+HA: Reserve VM/Autoscaling configured. Deadline: Gate 0/1.
+scholarship_api (owner: API DRI)
+
+Fix JWT middleware stability; verify kid selection; cache JWKS with backoff and expiry; enforce iss/aud/scope.
+Business rules/data integrity: Harden validation for submissions; reject inconsistent states; add idempotency keys for writes.
+Notifications: Implement trigger to auto_com_center on status changes.
+Health: Include DB, auth, auto_com_center reachability; HA config finalized. Deadline: Gate 1; notifications by Gate 2.
+student_pilot (owner: Frontend DRI)
+
+Configuration: Replace all hardcoded URLs with env vars; centralized ConfigManager; boot fail-fast.
+Resilience: Graceful error states for auth/API outages; user-friendly messages and retries.
+De-scope offline mode for this release. Deadline: Gate 0 for config; Gate 2 for UX resilience.
+provider_register (owner: Provider DRI)
+
+P0: Resolve /health 500 within 4 hours. If not root-caused, roll back to last known good.
+Configuration and resilience parity with student_pilot.
+RBAC alignment: Enforce provider-only actions via permissions claims. Deadline: Health hotfix today; Gate 0/2 parity.
+scholarship_sage (owner: Sage DRI)
+
+Blocked until S2S auth. Then validate recommendation quality on production-like data; define acceptance metrics (Top-10 precision >=70%, diversity guardrails, cold-start behavior).
+Performance test under anticipated concurrent reads. Deadline: Gate 2 functional, Gate 3 performance.
+scholarship_agent (owner: Agent DRI)
+
+S2S auth for scheduled tasks; implement monitoring dashboard and alerting for task success/failure; complete audit logging.
+Integration tests with auto_com_center queues. Deadline: Gate 1 auth; Gate 2 integration.
+auto_com_center (owner: You as DRI)
+
+Status: Gate 0 URL refactor complete per your note; proceed to load testing and bounce/drop monitoring integration.
+Keys and secrets: Confirm all in platform secrets; rotate test keys.
+SLA: Establish retry, DLQ, and alert thresholds for delivery failures. Deadline: Gate 1 monitoring; Gate 2 full workflow.
+auto_page_maker (owner: SEO DRI)
+
+Continue publishing SEO pages; CTAs to waitlist until Gate 2 passes.
+Track indexation and CTR; ensure no broken links to app flows. Deadline: Ongoing; daily report.
+Evidence, tests, and KPIs
+
+Single source of truth: Your War Room board is the only status authority. Every claim must be backed by machine-generated evidence: curl outputs, latency snapshots, commit SHA, build ID, and timestamps.
+Security acceptance tests:
+Positive S2S: scholarship_agent obtains client-credentials token and writes to scholarship_api → 200; audit log entry created.
+Negative S2S: wrong audience → 403; missing scope → 403; expired token → 401; unlisted origin CORS → blocked.
+E2E tests: Student and Provider journeys must pass 10/10 runs in staging CI; 2/2 in production shadow. Notifications show correct env-driven links.
+SLO dashboards: Report P95 latency, error rates, and uptime per service. Thresholds: token validation failure rate <0.1% 5-minute window; API error rate <0.5% under 3x expected load.
+Compliance and risk
+
+Secrets: All third-party API keys in platform vault; no plaintext in code or docs.
+PII protection: Encrypt sensitive fields at rest; verify role-scoped access; ensure audit logs cannot leak PII.
+Responsible AI: Scholarship_sage recommendations must be explainable; log rationale metadata for top recommendations; no automated essay generation that could promote academic dishonesty.
+Cadence and communications
+
+War Room stand-up hourly during Gate 0; then every 2 hours through Gate 2.
+CEO snapshots: 09:30 and 16:30 MST daily with green/yellow/red per gate and a three-bullet risk list.
+Go/No-Go: Nov 19, 17:00 MST. ARR ignition remains Nov 20 only if Gate 4 is green; if not, automatic slip to Nov 25 with a soft-beta and waitlist CTA.
+Immediate next actions (you, Agent3)
+
+Deliver the corrected Env/Auth Standards packet within 2 hours, then unblock DRIs.
+Auth DRI: Begin OAuth2 client credentials + JWKS finalization; coordinate with API DRI for validation tests. CORS lockdown today.
+Provider DRI: Hotfix /health 500 within 4 hours or roll back.
+You as DRI for auto_com_center: Complete load test and monitoring wiring; publish evidence pack.
+Replace any conflicting status notes with machine evidence on the War Room board. No conflicting, anecdotal statuses allowed.
+Authority confirmation
+
+You retain Integration Lead authority for gates, standards enforcement, and go/no-go recommendations. Escalate P0 blockers immediately. You are authorized to halt any deployment that violates Gate criteria.
+Report back at 12:00 MST with:
+
+Auth packet delivered confirmation and link
+scholar_auth S2S token issuance and a successful API call evidence (request/response redacted)
+provider_register health status resolution
+auto_com_center load test baseline and alert configuration summary
+Let’s execute with precision and close the gaps to hit ARR ignition with quality and security intact.

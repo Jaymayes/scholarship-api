@@ -72,19 +72,29 @@ SCHOLARSHIP_API_BASE_URL=https://scholarship-api-jamarrlmayes.replit.app
 SERVICE_NAME=auto_com_center
 ENVIRONMENT=production
 
-# Email Configuration
-SMTP_HOST=smtp.example.com
+# Email Configuration (REQUIRED - Set in Replit Secrets)
+# CRITICAL: Never hardcode credentials in code or documentation
+SMTP_HOST=                    # e.g., smtp.sendgrid.net (set in Replit Secrets)
 SMTP_PORT=587
-SMTP_USER=notifications@scholarai.com
-SMTP_PASSWORD=<secret>
+SMTP_USER=                    # Your SMTP username (set in Replit Secrets)
+SMTP_PASSWORD=                # **MUST BE IN REPLIT SECRETS - NEVER COMMIT**
 FROM_EMAIL=noreply@scholarai.com
 FROM_NAME=Scholar AI Advisor
 
-# SMS Configuration (if applicable)
-SMS_PROVIDER=twilio
-SMS_API_KEY=<secret>
-SMS_FROM_NUMBER=+1234567890
+# SMS Configuration (OPTIONAL - Feature-Flagged)
+# Set SMS_ENABLED=true only when SMS provider is configured and tested
+SMS_ENABLED=false             # Feature flag: Enable SMS notifications
+SMS_PROVIDER=                 # e.g., 'twilio', 'aws_sns' (set if SMS_ENABLED=true)
+SMS_API_KEY=                  # **MUST BE IN REPLIT SECRETS - NEVER COMMIT**
+SMS_API_SECRET=               # **MUST BE IN REPLIT SECRETS - NEVER COMMIT** (Twilio Auth Token)
+SMS_FROM_NUMBER=              # e.g., +15551234567 (set if SMS_ENABLED=true)
 ```
+
+**Secret Management Requirements**:
+1. ✅ All SMTP credentials in Replit Secrets (never in code)
+2. ✅ SMS credentials only if SMS_ENABLED=true
+3. ✅ Boot-time validation fails if required secrets missing
+4. ✅ Test mode available for development (mock providers)
 
 ---
 
@@ -183,14 +193,140 @@ url_builder = URLBuilder()
 </html>
 ```
 
-### Step 3: Update Notification Service
+### Step 3: Update Notification Service with Secret Loading & Mock Providers
+
+**CEO Requirement**: Pluggable notifier abstraction + local mocks for testing without real endpoints.
+
+```python
+# services/email_providers.py
+from abc import ABC, abstractmethod
+from typing import Optional
+import os
+import logging
+
+logger = logging.getLogger(__name__)
+
+class EmailProvider(ABC):
+    """Abstract base class for email providers"""
+    
+    @abstractmethod
+    async def send(
+        self,
+        to: str,
+        subject: str,
+        html_content: str,
+        text_content: Optional[str] = None
+    ):
+        """Send email via provider"""
+        pass
+
+class SMTPEmailProvider(EmailProvider):
+    """Production SMTP email provider with secret loading"""
+    
+    def __init__(self):
+        # CRITICAL: Load from Replit Secrets - fail fast if missing
+        self.smtp_host = os.getenv("SMTP_HOST")
+        self.smtp_port = int(os.getenv("SMTP_PORT", "587"))
+        self.smtp_user = os.getenv("SMTP_USER")
+        self.smtp_password = os.getenv("SMTP_PASSWORD")
+        self.from_email = os.getenv("FROM_EMAIL")
+        self.from_name = os.getenv("FROM_NAME", "Scholar AI Advisor")
+        
+        if not all([self.smtp_host, self.smtp_user, self.smtp_password, self.from_email]):
+            raise RuntimeError(
+                "FATAL: Missing required SMTP credentials in Replit Secrets.\n"
+                "Required: SMTP_HOST, SMTP_USER, SMTP_PASSWORD, FROM_EMAIL"
+            )
+        
+        logger.info(f"SMTP provider initialized: {self.smtp_host}")
+    
+    async def send(
+        self,
+        to: str,
+        subject: str,
+        html_content: str,
+        text_content: Optional[str] = None
+    ):
+        """Send email via SMTP"""
+        import aiosmtplib
+        from email.message import EmailMessage
+        
+        message = EmailMessage()
+        message["From"] = f"{self.from_name} <{self.from_email}>"
+        message["To"] = to
+        message["Subject"] = subject
+        
+        if text_content:
+            message.set_content(text_content)
+        message.add_alternative(html_content, subtype="html")
+        
+        try:
+            await aiosmtplib.send(
+                message,
+                hostname=self.smtp_host,
+                port=self.smtp_port,
+                username=self.smtp_user,
+                password=self.smtp_password,
+                start_tls=True
+            )
+            logger.info(f"Email sent successfully to {to}: {subject}")
+        except Exception as e:
+            logger.error(f"Email send failed to {to}: {e}")
+            raise
+
+class MockEmailProvider(EmailProvider):
+    """Mock email provider for development/testing"""
+    
+    def __init__(self):
+        logger.warning("Using MOCK email provider - emails will NOT be sent")
+        self.sent_emails = []
+    
+    async def send(
+        self,
+        to: str,
+        subject: str,
+        html_content: str,
+        text_content: Optional[str] = None
+    ):
+        """Log email instead of sending"""
+        email_data = {
+            "to": to,
+            "subject": subject,
+            "html_length": len(html_content),
+            "text_length": len(text_content) if text_content else 0
+        }
+        self.sent_emails.append(email_data)
+        logger.info(f"[MOCK] Email to {to}: {subject} (html: {len(html_content)} chars)")
+    
+    def get_sent_emails(self):
+        """Retrieve sent emails for testing"""
+        return self.sent_emails
+
+def get_email_provider() -> EmailProvider:
+    """
+    Factory function to get email provider based on environment.
+    
+    TEST_MODE=true → MockEmailProvider (no actual emails)
+    TEST_MODE=false or unset → SMTPEmailProvider (production)
+    """
+    test_mode = os.getenv("TEST_MODE", "false").lower() == "true"
+    
+    if test_mode:
+        return MockEmailProvider()
+    else:
+        return SMTPEmailProvider()
+```
 
 ```python
 # services/notification_service.py
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 from typing import Dict, Optional
 from services.url_builder import url_builder
+from services.email_providers import get_email_provider
 import os
+import logging
+
+logger = logging.getLogger(__name__)
 
 class NotificationService:
     def __init__(self):
@@ -199,6 +335,18 @@ class NotificationService:
             loader=FileSystemLoader("templates"),
             autoescape=select_autoescape(['html', 'xml'])
         )
+        
+        # Initialize email provider (SMTP or Mock based on TEST_MODE)
+        self.email_provider = get_email_provider()
+        
+        # Feature flag for SMS (CEO directive: optional, feature-flagged)
+        self.sms_enabled = os.getenv("SMS_ENABLED", "false").lower() == "true"
+        
+        if self.sms_enabled:
+            from services.sms_providers import get_sms_provider
+            self.sms_provider = get_sms_provider()
+        else:
+            logger.info("SMS notifications DISABLED (SMS_ENABLED=false)")
     
     async def send_application_confirmation(
         self,
@@ -208,7 +356,6 @@ class NotificationService:
         scholarship_name: str
     ):
         """Send application confirmation to student"""
-        # Build URLs using URLBuilder
         context = {
             "student_name": student_name,
             "scholarship_name": scholarship_name,
@@ -217,12 +364,10 @@ class NotificationService:
             "dashboard_url": url_builder.student_dashboard()
         }
         
-        # Render template
         template = self.jinja_env.get_template("email/application_confirmation.html")
         html_content = template.render(**context)
         
-        # Send email
-        await self._send_email(
+        await self.email_provider.send(
             to=recipient_email,
             subject=f"Application Confirmed: {scholarship_name}",
             html_content=html_content
@@ -248,7 +393,7 @@ class NotificationService:
         template = self.jinja_env.get_template("email/scholarship_match.html")
         html_content = template.render(**context)
         
-        await self._send_email(
+        await self.email_provider.send(
             to=recipient_email,
             subject=f"New Scholarship Match: {scholarship_name}",
             html_content=html_content
@@ -274,7 +419,7 @@ class NotificationService:
         template = self.jinja_env.get_template("email/provider_new_applicant.html")
         html_content = template.render(**context)
         
-        await self._send_email(
+        await self.email_provider.send(
             to=recipient_email,
             subject=f"New Applicant for {scholarship_name}",
             html_content=html_content
@@ -283,7 +428,7 @@ class NotificationService:
     async def send_password_reset(
         self,
         recipient_email: str,
-        user_type: str,  # "student" or "provider"
+        user_type: str,
         reset_token: str,
         user_name: str
     ):
@@ -296,24 +441,22 @@ class NotificationService:
         template = self.jinja_env.get_template("email/password_reset.html")
         html_content = template.render(**context)
         
-        await self._send_email(
+        await self.email_provider.send(
             to=recipient_email,
             subject="Reset Your Password - Scholar AI Advisor",
             html_content=html_content
         )
-    
-    async def _send_email(
-        self,
-        to: str,
-        subject: str,
-        html_content: str,
-        text_content: Optional[str] = None
-    ):
-        """Internal email sending implementation"""
-        # TODO: Implement SMTP sending or email service integration
-        pass
 
 notification_service = NotificationService()
+```
+
+**Testing Configuration**:
+```bash
+# In Replit Secrets for development
+TEST_MODE=true  # Uses mock providers, no actual emails/SMS sent
+
+# In Replit Secrets for production
+TEST_MODE=false  # Uses real SMTP/SMS providers
 ```
 
 ### Step 4: Create SMS Templates (if applicable)
