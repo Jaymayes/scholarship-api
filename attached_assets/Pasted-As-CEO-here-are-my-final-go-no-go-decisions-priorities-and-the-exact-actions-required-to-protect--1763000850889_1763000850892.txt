@@ -1,0 +1,74 @@
+As CEO, here are my final go/no-go decisions, priorities, and the exact actions required to protect the Nov 13–15 ARR ignition window and our 5-year $10M profitable ARR plan.
+
+Executive go/no-go decisions by application
+
+scholar_auth — GO-LIVE READY (Gate C approved)
+Decision: Approve Gate C based on delivered evidence package and performance headroom.
+Mandates:
+Complete role-naming migration Nov 14–20; change freeze outside window.
+Redis-backed rate limiting in Week 2 (Nov 18–22).
+SLO guardrails: P95 ≤120ms; error rate <1%; alert on P95 >100ms for 5 min, error >1% for 3 min.
+scholarship_api — GO-LIVE READY
+Decision: Change freeze for launch window. Provider callback integration is approved for production.
+Mandates: Keep HMAC service-to-service auth and idempotency enforcement; no new surface area until post-ARR checkpoint.
+provider_register — CONDITIONAL GO-LIVE, pending retest 18:00–19:00 UTC today
+Decision: Conditional launch allowed if Gate B retest passes with Read P95 ≤180ms and Mixed P95 ≤180ms. If Read P95 >180ms during retest, hold launch.
+Guardrails (if launched):
+Traffic cap: 100 concurrent provider users.
+Alerting: Rollback trigger if P95 >250ms sustained 10 minutes or error rate >1% for 5 minutes.
+Operational: ADMIN_EMAILS secret must be set before exposing admin audit UI.
+Remediation target: Bring Read P95 to ≤120ms in 7 days via query/index work and Redis caching.
+student_pilot — DELAYED (Legal hold)
+Decision: No public launch until ToS/Privacy/COPPA + FERPA sign-off. Dark launch allowed behind allow-list; minors blocked until parental consent workflow is live.
+ARR impact: B2C ignition deferred to Legal sign-off; keep credits pipeline staged for same-day enablement.
+auto_page_maker — GO-LIVE READY (scale)
+Decision: Authorize scale-up.
+Mandates: Quality guardrails (indexable pages to conversion rate floor), canonical/robots hygiene, weekly SEO quality audit, spam/duplication controls.
+KPIs: Organic sessions, activation rate, free→paid conversion, CAC (target: materially below paid), indexed pages with ≥X% CTR.
+auto_com_center — GO-LIVE (Private Beta only)
+Decision: Maintain Private Beta at current P95 (~231ms). No GA until P95 ≤120ms.
+Mandates: Performance workstream to hit ≤120ms within 14 days. Keep deliverability and monitoring live; no external scale-up yet.
+scholarship_agent — GO-LIVE READY (Observer Mode only; no sends)
+Decision: Observer Mode continues. Sends remain blocked until:
+auto_com_center P95 ≤120ms,
+scholar_auth Gate C confirmed (now done),
+Legal consent policy approval.
+Warm-up start date remains Dec 4 unless prerequisites clear earlier.
+scholarship_sage — GO-LIVE READY
+Decision: Approve. Owns KPI visibility for launch window.
+Mandates: Daily KPI rollup by 14:30 UTC; error-budget tracking; fairness/explainability telemetry surfaced to exec dashboard.
+Portfolio-level directives
+
+SLOs to enforce across all prod apps: 99.9% uptime; P95 ≤120ms for user-facing requests; error rate <1%.
+Monitoring and rollback: Confirm health checks, synthetic probes every 2 min, circuit breakers, and 1-command rollback on all apps.
+Security and compliance: Maintain MFA/SSO, RBAC least-privilege, immutable audit logs, TLS 1.3, and privacy-by-design (FERPA/COPPA/GDPR). No academic dishonesty features.
+Disaster recovery: Verify backups, PITR drills, and RTO/RPO targets are documented and tested.
+Change management: Change freeze on scholarship_api and scholar_auth during launch window; all others follow phased rollouts with canaries and rollback plans.
+ARR ignition plan and KPIs
+
+Conditional ARR window: Nov 13–15 remains on track if provider_register passes retest and Legal clears student_pilot.
+Current run rate: ~$522K ARR indicated; convert to realized ARR only upon go-lives and Legal clearance.
+KPI cadence:
+14:30 UTC daily: Portfolio dashboard with traffic, activation, conversion, ARPU, B2B GMV, and 3% platform fee accrual.
+Real-time alerts on P95, error rate, auth failures, and payment declines.
+Immediate priorities for Agent3 (today)
+
+Provider_register retest readiness (deadline: 17:30 UTC for prep; 18:00–19:00 UTC test window)
+Set ADMIN_EMAILS secret so audit UI access works at /admin/audit-logs.
+Confirm indexes and query plans on read paths; pre-warm caches if applicable.
+Ensure alert thresholds and rollback automation configured per guardrails.
+Scholar_auth post-approval tasks
+Schedule role-naming migration (Nov 14–20) and Redis rate limiting Week 2.
+Confirm SHA-256 evidence manifest is accessible; keep discovery/JWKS endpoints healthy.
+Evidence and reporting hygiene (all apps)
+Each app must have a status report in the mandated format with APP_BASE_URL at the top, live evidence links, and SHA-256 manifest.
+scholarship_sage to publish the 14:30 UTC KPI dashboard starting today.
+Decisions needed from you (fast confirmation requested)
+
+Confirm which application(s) Agent3 owns so I can issue app-specific execution orders in the exact status-report format the directive requires.
+Do you want me to generate the final CEO-formatted status packages for each app now, using the evidence you referenced, so teams can post them verbatim to the executive channel?
+Approve the provider_register conditional thresholds as stated, or adjust the Read P95 gate for today’s retest.
+Once you confirm Agent3’s app ownership and the above two choices, I will:
+
+Produce the exact status package(s) in the requested format with APP_BASE_URL headers and evidence links.
+Issue the final pre-retest checklist for provider_register and the 14:30 UTC portfolio KPI template for scholarship_sage.

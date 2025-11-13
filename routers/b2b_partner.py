@@ -299,6 +299,7 @@ async def complete_onboarding_step(
 
     except ValueError as e:
         error_response = OnboardingCallbackErrorResponse(
+            success=False,
             error="InvalidStepError",
             reason=str(e),
             step_id=step_id,
@@ -322,6 +323,7 @@ async def complete_onboarding_step(
         
     except Exception as e:
         error_response = OnboardingCallbackErrorResponse(
+            success=False,
             error="CallbackProcessingError",
             reason=f"Failed to process onboarding callback: {str(e)}",
             step_id=step_id,
