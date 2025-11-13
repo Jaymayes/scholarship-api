@@ -1,0 +1,84 @@
+As CEO, I’m issuing the following executive decisions, priorities, and gates to move the platform to green.
+
+Decisions and priorities
+
+Path: Foundation First (Path A). Execute Option C: ship the Auth/Env Standards packet now, then complete auto_com_center load testing and monitoring immediately after. No new features outside security, integration, and defect fixes until Gate 2.
+Token strategy (final):
+Browser/user sessions: RS256 JWT access tokens, 15-minute TTL, refresh tokens 14 days. No sensitive PII in claims. JTI + server-side revocation list enabled. JWKS served with Cache-Control and ETag; rotate keys on a 90-day cadence with 24-hour overlap.
+Service-to-service: Opaque tokens via OAuth2 client_credentials, 5-minute TTL, RFC 7662 introspection at scholar_auth. Scopes required. Deny-by-default RBAC enforced server-side.
+CORS: Exact-origin allowlists only (student_pilot, provider_register). No wildcards, no “Allow-Credentials: true” without explicit origins.
+Environment: Zero hardcoded URLs across all repos. Fail-fast boot validation in production when critical env is missing.
+Immediate actions (owners and deadlines)
+
+Ops: Grant Agent3 DRI write access to auto_com_center workspace and set secrets now.
+Set COMMAND_CENTER_URL=https://auto-com-center-jamarrlmayes.replit.app (immediate).
+Confirm all third-party keys (SendGrid/Twilio) are in Secrets, not code or .env in repo (immediate).
+scholar_auth (Auth DRI) — deadline Nov 14, 12:00 MST
+Implement OAuth2 client_credentials issuance + RFC 7662 introspection for opaque tokens (M2M).
+Ensure RS256 JWKS endpoint correct and cacheable; finalize MFA integration path; lock CORS.
+High availability: move to Reserved VM/autoscale tier. Health endpoint must include DB, email provider, and JWKS checks.
+Deliver evidence: postman collection, curl verification of token issuance + introspection, and load test artifact (P95 ≤ 120 ms under 200 rps for token introspection).
+scholarship_api (API DRI) — deadline Nov 15, 10:00 MST
+Replace/augment JWT middleware to support S2S opaque token introspection. Harden business-rule validation on submissions.
+Implement /health with DB and auth dependency checks.
+Wire event hooks to auto_com_center for notifications (status changes).
+Deliver evidence: integration test passing with scholar_auth; /health shows green for DB + auth; event hook demo.
+provider_register (Provider DRI) — hotfix window today, Nov 13
+Fix HTTP 500 on /health and remove hardcoded URLs; adopt env schema immediately.
+If root cause not found by 15:00 MST, roll back to last known good by 15:30 MST.
+Deliver evidence: /health=200, config diff, and E2E “Provider Journey” test passing in staging by tomorrow 10:00 MST.
+student_pilot (Frontend DRI) — deadline Nov 15, 10:00 MST
+Complete env refactor, error handling, graceful degradation. Offline mode: not required for web GA; plan separately if mobile is pursued.
+Deliver evidence: E2E “Student Journey” with mocks today; with real services as they come online.
+scholarship_sage (Relevance DRI) — deadline Nov 16, 12:00 MST
+Integrate via S2S opaque tokens; complete perf tests; provide top-K precision/recall on production-like data.
+Deliver evidence: perf report and accuracy metrics; P95 latency at expected scale.
+scholarship_agent (Automation DRI) — deadline Nov 16, 17:00 MST
+S2S auth, scheduled jobs, and admin monitoring with full auditability. Deliver failure dashboards and DLQ strategy.
+auto_com_center (Agent3 DRI) — start now
+Proceed with load testing and alert configuration while Ops sets COMMAND_CENTER_URL. Target: 200 rps, P95 ≤ 120 ms; bounce/drop monitoring; DLQ thresholds; alerting.
+Implement /orchestrator endpoints required by Agent Bridge (register, heartbeat, task callback, events) behind HS256 SHARED_SECRET until scholar_auth M2M is live; switch to S2S opaque tokens after Gate 1.
+Deliver evidence: k6 or artillery results, alert rules, and sample failure handling report.
+auto_page_maker (SEO) — live content push
+Begin content seeding now. Produce 50 high-quality landing pages by Nov 16 EOD, mapped to high-intent keywords. Submit sitemap to GSC. Report indexation and CTR weekly.
+Gates and acceptance criteria
+
+Gate 0 (Foundations) — Nov 14, 10:00 MST
+8/8 services return /health=200 with dependency checks.
+Zero hardcoded URLs in code; env validation on boot in production.
+CORS allowlists configured for all backends.
+Evidence packages posted and linked in the war-room doc.
+Gate 1 (Security and Reliability) — Nov 15, 18:00 MST
+scholar_auth M2M opaque token issuance + introspection live; MFA path verified.
+scholarship_api using introspection in S2S routes.
+Monitoring + alerting live for all critical paths; error budget <1% last 4 hours; P95 ≤ 120 ms on critical endpoints.
+Gate 2 (E2E Workflows) — Nov 17, 12:00 MST
+Student Journey and Provider Journey pass end-to-end in staging with real services; notifications firing via auto_com_center.
+Budgets and approvals
+
+Approved: Reserved VM/autoscale for scholar_auth and scholarship_api effective immediately.
+Approved: SendGrid and Twilio spend within existing budget lines. No plaintext credentials in repos; Secrets only.
+Approved: Minimal mock introspection for E2E testing today; MUST be disabled in production.
+Risk, mitigation, and timeline
+
+P0 risks: scholar_auth OAuth2 S2S and provider_register stability. Mitigation: hotfix/rollback on provider_register today; allocate senior engineer to Auth DRI for OAuth2/Introspection completion.
+Deadline discipline: If any Gate 0 item at risk by 08:00 MST tomorrow, escalate in war-room for resource reallocation.
+ARR alignment and KPIs
+
+Short-term ARR ignition requires: provider_register stable, scholarship_api secure, auto_com_center operational for lifecycle comms.
+KPIs for this 72-hour window:
+8/8 health checks green
+P95 ≤ 120 ms on auth, introspection, and API read endpoints
+Error rate <1%
+0 hardcoded URLs; 100% env-driven config
+auto_page_maker: 50 pages published; GSC sitemap submitted
+Direct answers to your asks
+
+Which to prioritize? Do both: finalize and distribute Auth/Env Standards immediately (done), then complete auto_com_center load testing and monitoring now.
+Should you proceed with load testing while we set COMMAND_CENTER_URL? Yes, proceed now. Ops will set COMMAND_CENTER_URL immediately.
+Workspace access? Granted in this directive. Ops to provide Agent3 DRI write access to auto_com_center immediately and confirm in the war-room channel.
+Next check-ins
+
+Hourly war-room updates until Gate 0.
+CEO snapshot at Nov 14, 09:30 MST with pass/fail per Gate 0 criteria and go/no-go recommendation.
+Execute.
