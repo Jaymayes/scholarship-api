@@ -1,0 +1,141 @@
+TO: Agent3 and Program Integrators
+FROM: CEO, Scholar AI Advisor
+DATE: November 13, 2025
+SUBJECT: Executive Decisions, Go/No-Go Gates, and Blocker Resolution Plan
+
+Prime directive alignment
+
+Objective: Hit ARR ignition on Nov 20 and sequence phased go-lives without compromising security, reliability, or student value. Organic growth via Auto Page Maker remains the CAC engine.
+Executive go/no-go decisions
+
+auto_page_maker
+Decision: GO-LIVE APPROVED (effective immediately).
+Conditions: Submit sitemap to Google Search Console today; daily indexation and crawl-error monitoring.
+KPIs: Indexed URLs, crawl errors, click-through rate, conversion to sign-ups from SEO pages.
+2. auto_com_center
+
+Decision: GO-LIVE CONDITIONAL APPROVAL for Nov 14, 2:00 PM MST.
+Conditions already met per your evidence: templates env-based; P95 45.33 ms at 200 rps; 0% errors; bounce/drop monitoring; secrets audited and stored.
+Final gate (must pass before production traffic flip):
+Canary: 30 minutes at 250 rps, P95 ≤120 ms, error rate <0.5%.
+Live webhook round-trip E2E from scholarship_api staging event → auto_com_center → email provider sandbox → delivery webhooks recorded.
+Hypercare: 24 hours post-cutover with on-call rotation.
+Critical path and deadlines (all times MST)
+A) scholar_auth (highest priority)
+
+Deadline: Nov 15, 12:00 PM
+Must-have deliverables:
+OAuth2 Client Credentials flow live for services (scholarship_agent, scholarship_sage, scholarship_api).
+JWTs with roles and scoped permissions embedded; standardized role names and backward-compat mapping.
+CORS allowlist locked to approved frontends only; fail-fast on unauthorized origins.
+MFA: end-to-end enrollment + challenge verified in staging with real session.
+HA config (Reserved VM/Autoscale) ready; rolling restart playbook drafted.
+Acceptance tests:
+OIDC discovery reachable; JWKS rotation tested.
+3 service clients receive tokens; each succeeds in token introspection and scope-constrained calls.
+3 user roles demonstrate least-privilege authorization across two apps.
+B) scholarship_api
+
+Deadline: Nov 17, 12:00 PM (contingent on scholar_auth)
+Must-have deliverables:
+Stable JWT validation under load (no intermittent signature failures).
+Data governance: enforce business-rule validations for submissions; clear error payloads.
+/health deep checks: DB connectivity, cache, auth provider reachability, dependency liveness.
+Event hooks: emit status-change events to auto_com_center (staging first).
+HA and autoscale configuration finalized.
+Acceptance tests:
+k6 load run: 300 rps for 15 min; P95 ≤120 ms; errors <1%.
+10 negative-validation test cases return correct 4xx with actionable messages.
+Health endpoint degrades when DB or auth is intentionally severed; alerts fire.
+C) student_pilot
+
+Deadline: Nov 18, 6:00 PM
+Must-have deliverables:
+Environment-only configuration for all URLs (confirmed complete per your note; run config linter to prove zero hardcoded URLs).
+Graceful error states for auth/API failures; clear retry/refresh prompts.
+Decision: Offline mode scope—defer unless mobile is confirmed for Q1; instrument local caching only for read-only views if trivial.
+Acceptance tests:
+E2E “Student Journey” in staging: Register → Login (MFA) → Profile → Recommendations → Apply → Confirmation.
+Frontend chaos tests: API 500s simulate user-friendly fallbacks.
+D) provider_register
+
+Deadline: Nov 18, 6:00 PM
+Must-have deliverables:
+Env-var refactor to zero hardcoded URLs (12 files identified) and central schema validation.
+Robust error handling; empty states and retries for transient failures.
+Ready for RBAC roles from scholar_auth (provider_admin, reviewer, super_admin).
+Acceptance tests:
+E2E “Provider Journey” in staging: Register → Create Scholarship → View Applicants → Update Status (events fired to auto_com_center).
+E) scholarship_sage
+
+Deadline: Nov 19, 12:00 PM
+Must-have deliverables:
+Switch tests from mock to real M2M tokens/scopes: students.read, scholarships.read.
+Re-run performance and accuracy suites on production-like data.
+Acceptance tests:
+P95 ≤120 ms, precision@10 ≥60% on real data; Responsible AI logs present with hashed student IDs only.
+F) scholarship_agent
+
+Deadline: Nov 19, 6:00 PM
+Must-have deliverables:
+S2S auth integration live; scheduled jobs out of “dry run.”
+Admin monitoring for job success/failure, retries with backoff; audit logs exportable.
+Acceptance tests:
+3 scheduled jobs execute in staging, trigger auto_com_center, and log audit trails; alerting on failure threshold.
+War-room schedule and ownership
+
+Daily standups: 9:00 AM and 4:00 PM. War-room open 8:00 AM–10:00 PM until Nov 21.
+Owners
+scholar_auth tiger team: Security Lead (D), Backend Lead (A), Agent3 (C), QA Lead (R).
+scholarship_api: API Lead (A), SRE Lead (R), QA Lead (R), Agent3 (C).
+Frontends (student_pilot, provider_register): Web Lead (A), UX Lead (C), QA Lead (R).
+scholarship_sage: Data/ML Lead (A), Agent3 (C), QA Lead (R).
+scholarship_agent: Agent3 (A), Backend Lead (C), QA Lead (R).
+auto_com_center: Messaging Lead (A), Agent3 (C), SRE Lead (R).
+auto_page_maker: SEO Lead (A), SRE Lead (R) for hypercare.
+Stop-ship criteria and rollback
+
+Any auth token validation flakiness in production-load replay.
+P95 >150 ms sustained for 10 minutes during canary.
+Error rate ≥1% on critical paths.
+Immediate rollback plan: blue/green with traffic shifter, 5-minute RTO; DB migrations reversible or gated.
+Security, compliance, and observability directives
+
+SOC 2 control mapping: access controls, log retention, change management—publish control checklist by Nov 18.
+Secrets: stored in Replit Secrets; rotation notes and schedule confirmed; least-privilege scopes enforced.
+Audit logs: centralized, immutable store; 30-day hot retention, 1-year cold.
+Monitoring/alerts by Nov 15:
+SLOs: 99.9% uptime; P95 ≤120 ms.
+Alerts: auth failures, 5xx spikes, event delivery failures, bounce rates, queue backlogs.
+Immediate unblockers and executive actions
+
+Ops: Confirm Agent3 write access to auto_com_center is active; if not, grant within 1 hour. Send confirmation in the 4:00 PM war-room.
+scholar_auth: Freeze all non-P0 features until OAuth2 CC, RBAC claims, CORS lockdown, and MFA E2E pass.
+SRE: Prepare k6 scripts and canary orchestrations for scholar_auth and scholarship_api by Nov 14 EOD.
+ARR ignition plan (Nov 20)
+
+B2C:
+Pricing: enforce 4x markup on AI services; track ARPU from credits.
+Funnel KPIs: SEO visits → sign-ups → MFA-completed logins → credit purchases; daily dashboard.
+B2B:
+Provider acquisition: 25 active providers by Dec 15; enforce 3% provider fee; invoice automation via scholarship_agent + auto_com_center.
+CAC:
+Auto Page Maker SEO: indexation ramp target—2,000+ URLs live now; 4-week CAC reduction target 20–30%.
+North-star weekly targets (starting Nov 20 week):
+Student paid conversions: +10% WoW
+Providers onboarded: +10 net new/week
+SLO adherence: ≥99.9% uptime, P95 ≤120 ms
+Requests to Agent3 (today)
+
+Provide the following by 9:00 PM MST:
+Scholar_auth CC token issuance proof for three service clients (ids redacted), scope lists, and a signed JWT sample with roles.
+Scholarship_api load-test plan and failing-case reproduction for JWT validation bug; proposed patch approach.
+auto_com_center canary script and exact rollback switch steps.
+Provide the following by tomorrow 9:00 AM MST:
+Student_pilot and provider_register error-state screenshots and copy text for user-facing failures.
+scholarship_sage test-result JSON for performance and accuracy using mock; ready to rerun with real tokens.
+Final notes
+
+We will not miss the Nov 20 ARR ignition. All dates above are firm. Escalate blockers immediately in the war-room; do not work around security fundamentals.
+Student value drives revenue: prioritize clarity, reliability, and ethical use in every flow.
+Acknowledge receipt and confirm owners/dates in the 4:00 PM MST war-room.
