@@ -85,6 +85,22 @@ class Settings(BaseSettings):
     jwt_algorithm: str = Field("HS256", alias="JWT_ALGORITHM")
     jwt_previous_secret_keys: str = Field("", alias="JWT_PREVIOUS_SECRET_KEYS")
     access_token_expire_minutes: int = Field(30, alias="ACCESS_TOKEN_EXPIRE_MINUTES", gt=0)
+    
+    # OAuth2/OIDC Configuration - scholar_auth JWKS validation (CEO Nov 13)
+    scholar_auth_jwks_url: str = Field(
+        "https://scholar-auth-jamarrlmayes.replit.app/.well-known/jwks.json",
+        alias="SCHOLAR_AUTH_JWKS_URL"
+    )
+    scholar_auth_issuer: str = Field(
+        "https://scholar-auth-jamarrlmayes.replit.app",
+        alias="SCHOLAR_AUTH_ISSUER"
+    )
+    jwks_cache_ttl_seconds: int = Field(300, alias="JWKS_CACHE_TTL_SECONDS", gt=0)  # 5 min fresh
+    jwks_cache_max_age: int = Field(3600, alias="JWKS_CACHE_MAX_AGE", gt=0)  # 1 hour stale-while-revalidate
+    jwks_fetch_timeout_seconds: int = Field(5, alias="JWKS_FETCH_TIMEOUT_SECONDS", gt=0)
+    jwks_retry_max_attempts: int = Field(3, alias="JWKS_RETRY_MAX_ATTEMPTS", gt=0)
+    jwks_retry_backoff_base: float = Field(0.5, alias="JWKS_RETRY_BACKOFF_BASE", gt=0)
+    jwt_clock_skew_leeway: int = Field(60, alias="JWT_CLOCK_SKEW_LEEWAY", gt=0)  # ±60s per CEO directive
 
     # Production security requirements - fix parsing issues with proper JSON parsing
     allowed_hosts: list[str] = Field(

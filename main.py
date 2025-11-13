@@ -169,6 +169,17 @@ async def lifespan(app: FastAPI):
     else:
         logger.warning("⚠️ Partial connection pool warmup - some latency may occur")
     
+    # CEO DIRECTIVE Nov 13: Prewarm JWKS cache for scholar_auth RS256 validation
+    logger.info("🔐 Prewarming JWKS cache for OAuth2/OIDC validation...")
+    from services.jwks_client import jwks_client
+    
+    try:
+        await jwks_client.prewarm()
+        logger.info("✅ JWKS cache prewarmed - RS256 token validation ready")
+    except Exception as e:
+        logger.error(f"❌ JWKS prewarm failed: {e}")
+        logger.warning("⚠️ Falling back to HS256-only validation (degraded mode)")
+    
     # Start Command Center registration in background (non-blocking)
     import asyncio
 
@@ -189,6 +200,11 @@ async def lifespan(app: FastAPI):
     # Shutdown
     logger.info("🔌 Shutting down Agent Bridge")
     await orchestrator_service.close()
+    
+    # Close JWKS client HTTP connections
+    logger.info("🔐 Closing JWKS client")
+    from services.jwks_client import jwks_client
+    await jwks_client.close()
 
 # Create FastAPI app with production-aware docs configuration
 app = FastAPI(

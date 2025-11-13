@@ -150,9 +150,18 @@ def create_access_token(data: dict[str, Any], expires_delta: timedelta | None = 
     
     return encoded_jwt
 
-def decode_token(token: str) -> TokenData | None:
-    """Decode and validate JWT with hardened security"""
+async def decode_token(token: str) -> TokenData | None:
+    """
+    Decode and validate JWT with hardened security
+    
+    Supports both:
+    - RS256 tokens from scholar_auth (via JWKS)
+    - HS256 tokens (legacy, for backward compatibility)
+    
+    CEO Directive: RS256 JWKS validation with clock skew tolerance
+    """
     from observability.metrics import metrics_service
+    from services.jwks_client import verify_rs256_token
     
     if not token or not isinstance(token, str) or len(token.strip()) == 0:
         metrics_service.record_token_operation("validate", "failure")
@@ -161,71 +170,97 @@ def decode_token(token: str) -> TokenData | None:
     # Security: Reject tokens with 'none' algorithm
     try:
         header = jwt.get_unverified_header(token)
-        if header.get('alg', '').lower() in ['none', 'null', '']:
+        alg = header.get('alg', '').upper()
+        
+        if alg in ['NONE', 'NULL', '']:
             return None
+        
+        # RS256 token from scholar_auth - validate with JWKS
+        if alg == 'RS256':
+            try:
+                payload = await verify_rs256_token(token)
+                if payload:
+                    user_id = payload.get("sub")
+                    roles = payload.get("roles", [])
+                    scopes = payload.get("scopes", [])
+                    
+                    # Ensure valid types
+                    if not user_id or not isinstance(user_id, str):
+                        return None
+                    if not isinstance(roles, list):
+                        roles = []
+                    if not isinstance(scopes, list):
+                        scopes = []
+                    
+                    metrics_service.record_token_operation("validate", "success")
+                    return TokenData(user_id=user_id, roles=roles, scopes=scopes)
+            except Exception as e:
+                import logging
+                logging.warning(f"RS256 validation failed: {type(e).__name__}: {e}")
+        
+        # HS256 token (legacy) - validate with shared secret
+        elif alg == 'HS256':
+            keys_to_try = [get_jwt_secret_key()] + get_jwt_previous_keys()
+
+            for secret_key in keys_to_try:
+                if not secret_key or len(secret_key.strip()) < 32:
+                    continue
+
+                try:
+                    # Build decode options
+                    decode_options = {
+                        "require_exp": True,
+                        "require_iat": True,
+                        "verify_exp": True,
+                        "verify_iat": True,
+                        "verify_signature": True
+                    }
+                    
+                    # Build decode kwargs
+                    decode_kwargs = {
+                        "algorithms": ["HS256"],
+                        "options": decode_options
+                    }
+                    
+                    # Add issuer and audience validation if configured
+                    if hasattr(settings, 'jwt_issuer') and settings.jwt_issuer:
+                        decode_kwargs["issuer"] = settings.jwt_issuer
+                    if hasattr(settings, 'jwt_audience') and settings.jwt_audience:
+                        decode_kwargs["audience"] = settings.jwt_audience
+                    
+                    # SECURITY: Pin algorithm, require all time claims
+                    payload = jwt.decode(token, secret_key, **decode_kwargs)
+
+                    # Extract and validate required fields
+                    user_id = payload.get("sub")
+                    if not user_id or not isinstance(user_id, str) or len(user_id.strip()) == 0:
+                        continue
+
+                    roles = payload.get("roles", [])
+                    scopes = payload.get("scopes", [])
+
+                    # Ensure roles and scopes are valid lists
+                    if not isinstance(roles, list) or not all(isinstance(r, str) for r in roles):
+                        roles = []
+                    if not isinstance(scopes, list) or not all(isinstance(s, str) for s in scopes):
+                        scopes = []
+
+                    metrics_service.record_token_operation("validate", "success")
+                    return TokenData(user_id=user_id, roles=roles, scopes=scopes)
+                except (JWTError, ValueError, KeyError, TypeError) as e:
+                    # Log security events
+                    import logging
+                    logging.warning(f"HS256 validation failed: {type(e).__name__}")
+                    continue
+        
     except Exception:
-        return None
+        pass
 
     # Security: Ensure proper token structure
     token_parts = token.split('.')
     if len(token_parts) != 3 or not all(part.strip() for part in token_parts):
+        metrics_service.record_token_operation("validate", "failure")
         return None
-
-    # Try current key first with strict validation
-    keys_to_try = [get_jwt_secret_key()] + get_jwt_previous_keys()
-
-    for secret_key in keys_to_try:
-        if not secret_key or len(secret_key.strip()) < 32:
-            continue
-
-        try:
-            # Build decode options
-            decode_options = {
-                "require_exp": True,
-                "require_iat": True,
-                "verify_exp": True,
-                "verify_iat": True,
-                "verify_signature": True
-            }
-            
-            # Build decode kwargs
-            decode_kwargs = {
-                "algorithms": [get_jwt_algorithm()],
-                "options": decode_options
-            }
-            
-            # Add issuer and audience validation if configured
-            if hasattr(settings, 'jwt_issuer') and settings.jwt_issuer:
-                decode_kwargs["issuer"] = settings.jwt_issuer
-            if hasattr(settings, 'jwt_audience') and settings.jwt_audience:
-                decode_kwargs["audience"] = settings.jwt_audience
-            
-            # SECURITY: Pin algorithm, require all time claims
-            payload = jwt.decode(token, secret_key, **decode_kwargs)
-
-            # Extract and validate required fields
-            user_id = payload.get("sub")
-            if not user_id or not isinstance(user_id, str) or len(user_id.strip()) == 0:
-                continue
-
-            # Note: issuer and audience are validated by jwt.decode if configured
-            
-            roles = payload.get("roles", [])
-            scopes = payload.get("scopes", [])
-
-            # Ensure roles and scopes are valid lists
-            if not isinstance(roles, list) or not all(isinstance(r, str) for r in roles):
-                roles = []
-            if not isinstance(scopes, list) or not all(isinstance(s, str) for s in scopes):
-                scopes = []
-
-            metrics_service.record_token_operation("validate", "success")
-            return TokenData(user_id=user_id, roles=roles, scopes=scopes)
-        except (JWTError, ValueError, KeyError, TypeError) as e:
-            # Log security events
-            import logging
-            logging.warning(f"JWT validation failed: {type(e).__name__}")
-            continue
 
     metrics_service.record_token_operation("validate", "failure")
     return None
@@ -235,7 +270,7 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials | None = De
     if not credentials:
         return None
 
-    token_data = decode_token(credentials.credentials)
+    token_data = await decode_token(credentials.credentials)
     if not token_data:
         return None
 

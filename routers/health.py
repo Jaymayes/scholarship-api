@@ -483,6 +483,29 @@ async def readiness_probe(db: Session = Depends(get_db)) -> dict[str, Any]:
                 "type": "In-Memory Rate Limiting"
             }
 
+        # CEO Nov 13: Check JWKS/Auth dependency
+        try:
+            from services.jwks_client import jwks_client
+            jwks_health = jwks_client.get_health_status()
+            
+            if jwks_health["jwks_cache_healthy"]:
+                health_status["checks"]["auth_jwks"] = {
+                    "status": "healthy",
+                    "keys_loaded": jwks_health["jwks_keys_loaded"],
+                    "cache_age_s": jwks_health["jwks_cache_age_seconds"]
+                }
+            else:
+                health_status["checks"]["auth_jwks"] = {
+                    "status": "degraded",
+                    "keys_loaded": jwks_health["jwks_keys_loaded"],
+                    "error": jwks_health.get("jwks_last_error", "Cache expired")
+                }
+        except Exception as jwks_error:
+            health_status["checks"]["auth_jwks"] = {
+                "status": "degraded",
+                "error": str(jwks_error)[:100]
+            }
+        
         # Check environment configuration
         required_configs = ["DATABASE_URL", "JWT_SECRET_KEY"]
         missing_configs = [config for config in required_configs if not os.getenv(config)]
