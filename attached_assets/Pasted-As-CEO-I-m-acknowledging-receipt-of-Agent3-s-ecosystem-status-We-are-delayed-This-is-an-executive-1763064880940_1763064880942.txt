@@ -1,0 +1,146 @@
+As CEO, I’m acknowledging receipt of Agent3’s ecosystem status. We are delayed. This is an executive directive to recover the schedule, protect our SLOs, and preserve ARR ignition.
+
+Executive stance and decision
+
+Go-to-market: staged. We will go live with Auto Page Maker immediately to accelerate SEO/CAC reduction. All other apps remain behind a controlled rollout until security and integration gates pass.
+Scope freeze: effective now through cutover. No net-new features, only work directly tied to Section IV compliance, security, and E2E stability.
+Accountability: Agent3 is appointed Program Integrator through Nov 20 with authority to coordinate cross-app changes, enforce config standards, and block deployments that violate the gates below.
+Critical path priorities (must be completed in order)
+
+Auth hardening and service-to-service authentication (scholar_auth is P0)
+
+Implement OAuth 2.1/OIDC:
+Users: Authorization Code + PKCE. MFA required on high-risk actions; verify end-to-end with the external provider.
+Services: Client Credentials Grant for scholarship_api, scholarship_sage, scholarship_agent, auto_com_center.
+RBAC: finalize role model and claims
+Roles: student, provider_admin, reviewer, super_admin, service
+Token content: sub, iss, aud, iat, exp, jti, roles, scopes
+Token TTL: 15m access, 24h refresh (user); 10m access (service). Refresh tokens not used for services.
+JWKS endpoint with key rotation every 30 days; cache control and kid support.
+CORS lockdown: explicit allowlist of frontends only (student_pilot, provider_register). Wildcards prohibited.
+Secrets: rotate all client_id/client_secret; store only in secrets manager; no secrets in code or logs.
+Deliverables (today EOD):
+RBAC matrix (roles → permissions per app)
+OIDC discovery (.well-known) online and validated
+Service client registrations issued and tested
+MFA smoke tests recorded
+Token validation stability (scholarship_api is P0)
+
+Fix intermittent JWT validation failures under load:
+JWKS caching with backoff and jitter
+Leeway for clock skew (+/- 60s)
+Strict aud/iss checks and kid pinning; deny on unknown kid
+Concurrency-safe validator; pre-warmed caches on deploy
+Expand /health to include DB connectivity, JWKS reachability, and dependency checks.
+Data governance enforcement: server-side validations for application submissions; ACID boundaries; unique constraints; idempotency keys for submissions.
+Deliverables (Nov 14, 12:00 PM MST):
+Passing load test report (P95 < 120 ms, 0% auth failures over 10k RPS burst scaled to environment)
+Updated OpenAPI with security schemes and validation errors documented
+Health check returning dependency status
+Configuration standardization (student_pilot, provider_register, auto_com_center; P0)
+
+Remove all hardcoded URLs. Adopt standardized env schema:
+AUTH_BASE_URL, SCHOLARSHIP_API_BASE_URL, SAGE_API_BASE_URL, COM_CENTER_BASE_URL, STUDENT_PILOT_BASE_URL, PROVIDER_REGISTER_BASE_URL
+Provide a shared config module used by all frontends/services.
+Deliverables (Nov 14, 3:00 PM MST):
+Repo diffs showing removal of literals
+Runtime config check endpoint or build-time validation
+PRs merged and redeployed to staging
+Notifications and templates (auto_com_center; P0)
+
+Templating: replace hardcoded links with env-driven URLs; locale-aware and provider-specific variants.
+Observability: add delivery telemetry (accepted, delivered, bounced, dropped); alerting thresholds.
+Load testing to projected peak with 2x headroom.
+Secrets posture review (SendGrid/Twilio keys).
+Deliverables (Nov 14, 6:00 PM MST):
+Load test results and bounce handling runbook
+Template catalog with variable map and test renders
+E2E journeys (student and provider; P0)
+
+Student Journey: Register → Login (MFA) → Profile → Recommendations (scholarship_sage) → Apply → Confirmation (auto_com_center)
+Provider Journey: Register → Create Scholarship → View Applicants → Update Status → Notifications
+Criteria: 100% pass for 100 runs; zero P0 defects; no PII leakage in logs.
+Deliverables (Nov 15, 12:00 PM MST):
+Automated E2E suite results and videos
+Triage log closed for all blockers
+Performance and quality gates (scholarship_sage; P0)
+
+Accuracy validation against production-like dataset; document offline evaluation metrics (precision@10, coverage, diversity).
+Performance: P95 inference latency target <= 120 ms at projected QPS + 30% margin.
+Deliverables (Nov 15, 3:00 PM MST):
+Evaluation report with acceptance thresholds met
+Load test graphs and capacity plan
+Staged rollout plan and dates
+
+Nov 13
+Immediate: Deploy auto_page_maker to production. Enable sitemaps, robots.txt, canonical tags, and indexable pages. Measure crawl and indexation daily.
+Auth war-room begins; CORS lockdown; issue service credentials.
+Nov 14
+scholarship_api validator fix + health checks; config standardization; auto_com_center templates and load testing.
+Decision checkpoint 1 (5:00 PM MST): Go/No-Go for production cut of scholar_auth and scholarship_api.
+Nov 15
+E2E journeys pass; scholarship_sage performance gates.
+Decision checkpoint 2 (4:00 PM MST): Canary enablement
+student_pilot/provider_register to 10% internal users; monitor 12 hours.
+Nov 16
+Scale to 50%; monitor error budget consumption and latencies.
+Nov 17
+100% rollout if error budget intact and SLOs met.
+ARR ignition window remains Nov 20 contingent on above.
+Go-live gates and acceptance criteria (must meet all)
+
+Security
+MFA end-to-end verified; RBAC enforced at API; least privilege confirmed.
+S2S auth with client credentials; no wildcard CORS; all secrets rotated and vaulted.
+Audit logging active for auth events, data changes, and admin actions; exportable for SOC 2.
+Reliability and performance
+SLOs: 99.9% availability; P95 latency <= 120 ms at forecast load; zero auth validation errors in load tests; passing health checks.
+DR: RPO <= 15 minutes, RTO <= 60 minutes; backup/restore tested.
+Data governance
+Integrity constraints enforced; PII encryption at rest; retention policies documented; FERPA/COPPA posture reviewed.
+Observability
+Centralized logs, traces, metrics; alerting on auth failures, 5xx spikes, queue backlogs, bounce rates.
+Documentation and runbooks
+OpenAPI/OIDC docs published; on-call runbooks; incident playbooks; configuration catalog; RBAC matrix.
+E2E quality
+Student and Provider journeys automated and green; zero P0/P1 defects open.
+Owner assignments
+
+Auth Lead (scholar_auth): RBAC, MFA, S2S auth, CORS lockdown, JWKS rotation.
+API Lead (scholarship_api): Validator stability, health checks, data governance constraints, OpenAPI.
+Frontend Lead (student_pilot, provider_register): Env standardization, error handling, UX graceful degradation, E2E harness.
+Messaging Lead (auto_com_center): Templates, load testing, deliverability observability, secrets audit.
+Reco Lead (scholarship_sage): Accuracy evals, latency optimization, capacity plan.
+Program Integrator (Agent3): Critical path orchestration, gate enforcement, cross-team unblock, daily reporting.
+Reporting cadence and contents
+
+Twice-daily checkpoints: 10:30 AM and 5:00 PM MST with a single-page dashboard including:
+SLOs: availability, P95, error rates (auth 401/403 mismatches, 5xx)
+Security: MFA pass %, token validation errors, secret rotation status
+E2E: pass rate, open defects by severity
+SEO: pages generated, indexed, CTR (once available)
+Risks/blockers with owner and ETA
+All app reports must use the mandated header with APPLICATION NAME and APP_BASE_URL. Include links to:
+Test evidence (functional, security, performance)
+OpenAPI/OIDC docs
+Runbooks and DR validation
+Audit log samples
+Risk controls and guardrails
+
+Feature flags: payments, provider admin bulk actions, and automated status updates remain off until gates are met.
+Rate limits and WAF rules enabled at the API edge.
+Privacy: no model training on user-submitted essays; bias checks documented for recommendations.
+Financial and KPI alignment
+
+Immediate CAC reduction: Auto Page Maker launch today is approved; prioritize high-intent scholarship pages first. Track impressions, clicks, and indexed pages. This supports our organic growth engine.
+Weekly KPIs (starting Nov 20): free→paid conversion, ARPU from credits, active providers, 3% platform fee run rate, and unit economics (blended CAC vs. LTV).
+Immediate actions required today (Nov 13)
+
+Auth Lead: deliver RBAC matrix, enable CC flow for services, lock CORS, and complete MFA integration tests by 6:00 PM MST.
+API Lead: deploy validator with JWKS caching and skew tolerance to staging; produce passing load test by 8:00 PM MST.
+Frontend Lead: open PRs removing all hardcoded URLs and wiring env schema by 3:00 PM MST.
+Messaging Lead: replace hardcoded links in templates; produce test renders for both student and provider flows by 5:00 PM MST.
+Program Integrator (Agent3): publish the unified dashboard by 12:30 PM MST and schedule Decision Checkpoint 1 at 5:00 PM MST.
+If any P0 is still open at Decision Checkpoint 1, we hold the production auth/API cut and continue in staging until the next window.
+
+Confirm receipt and post the first dashboard by 12:30 PM MST. Include each app’s header block and live links to evidence.
