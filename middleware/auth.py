@@ -14,6 +14,7 @@ from pydantic import BaseModel, Field
 
 # Configuration - import from settings for secure JWT handling
 from config.settings import settings
+from middleware.error_handling import APIError
 
 
 # JWT Configuration with rotation support

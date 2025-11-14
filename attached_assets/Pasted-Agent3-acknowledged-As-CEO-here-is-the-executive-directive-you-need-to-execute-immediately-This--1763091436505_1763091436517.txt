@@ -1,0 +1,101 @@
+Agent3, acknowledged. As CEO, here is the executive directive you need to execute immediately. This replaces prior guidance and sets the go/no-go criteria, owners, and deadlines required to protect ARR ignition and market credibility.
+
+Executive Summary
+
+Portfolio status: Delayed. We will hold ARR ignition for Nov 20 only if Gate 0 and Gate 1 pass on time.
+P0 blockers to remove in this order: (1) scholar_auth S2S auth + RBAC + CORS, (2) scholarship_api JWT validation stability + health checks, (3) auto_com_center canary at scale with delivery monitoring, (4) frontend env-var refactors + graceful error states, (5) E2E student and provider journeys.
+SLOs/Security: Maintain 99.9% uptime targets, P95 ≤ 120ms on public endpoints under test load, error rate < 0.5%, MFA enforced for privileged roles, audit logging on.
+Critical Decision Calls
+
+No bypassed auth in production. Any temporary auth bypass is permitted only in staging for controlled canaries with compensating controls (signed HMAC payloads, IP allowlists, and rate limits). Before production, restore standard auth.
+ARR ignition date remains Nov 20, contingent on passing Gate 0 by Nov 15, Gate 1 by Nov 17, and canary success on Nov 15-16. Miss any gate and ARR ignition slips 1 week.
+Access unblocking: Ops must grant Agent3 read/write access to all eight workspaces within 15 minutes. If not granted, Agent3 proceeds with DRI-led execution using the issued runbooks immediately.
+Gate Plan, Owners, Deadlines, Acceptance Criteria
+Gate 0: Identity and Inter-service Trust (Nov 15, 12:00 PM MST)
+Scope:
+
+scholar_auth: Client Credentials Grant for 8/8 M2M clients; RBAC scopes encoded in JWT; CORS locked to explicit allowlist; MFA enforced for provider/admin; HA configured (Reserved VM/Autoscale).
+scholarship_api: Stable JWT validation (JWKS caching, backoff, retry); /health includes DB + auth dependency checks.
+Owners:
+
+Security Lead (primary), Agent3 (program integrator), Ops (HA/CORS), API Lead (JWT integration).
+Acceptance criteria:
+
+8/8 M2M clients obtain tokens with correct scopes; run scripted proof with redacted tokens captured.
+CORS has no wildcard; origins are the 8 app URLs only.
+MFA enforced for provider/admin roles; evidence screenshots.
+scholarship_api validates tokens reliably under load (250 rps, 10 min): error rate < 0.5%, zero signature validation flaps.
+/health returns green and validates DB + scholar_auth dependency.
+Monitoring: dashboards created for auth success/failure rates, 5xx, latency; alerting on error rate > 1% for 5 min.
+Gate 1: Core API Reliability and Notifications (Nov 16-17)
+Scope:
+
+scholarship_api: Data integrity constraints enforced on submissions; event hooks implemented to auto_com_center for key lifecycle events; blue/green deploy config and rollback runbook.
+auto_com_center: Templates parameterized via env; secrets in secure store; delivery monitoring and bounce/drop alerts; load test at 250 rps for 30 min from external region.
+Owners:
+
+API Lead (data governance), Messaging Lead (auto_com_center), Agent3 (test orchestration), Ops (CI/CD and rollback).
+Acceptance criteria:
+
+scholarship_api passes functional and load tests at 300 rps sustained for 15 min: P95 ≤ 120ms, error rate < 0.5%.
+auto_com_center canary success (250 rps, 30 min): P95 ≤ 120ms, error rate < 0.5%; delivery success ≥ 99%, with bounce/drop alerts demonstrated.
+Rollback runbook validated: RTO ≤ 5 min, evidence of a simulated rollback.
+Audit logging verified for create/update status changes; no PII in logs.
+Gate 2: Frontend Readiness and E2E Journeys (Nov 17-18)
+Scope:
+
+student_pilot, provider_register: 0 hardcoded URLs; centralized env-driven config; graceful error states for API failures; accessibility checks on key flows.
+scholarship_sage: S2S auth to API; relevance validation against seeded dataset; baseline performance test.
+Owners:
+
+Frontend Leads (student_pilot, provider_register), Recommender Lead (scholarship_sage), Agent3 (E2E coordination).
+Acceptance criteria:
+
+Student Journey E2E: Register → MFA → Login → Profile → Recommendations → Apply → Confirmation completes with no manual intervention; test script and video evidence.
+Provider Journey E2E: Register → Create Scholarship → View Applicants → Update Status → Notifications triggered.
+Error states present and readable; user guidance provided; no stack traces shown to end users.
+scholarship_sage relevance test: ≥ 85% top-10 recommendation relevance on the validation set; P95 response ≤ 150ms at 100 rps.
+Gate 3: Go/No-Go and Staged Ramp (Nov 18-19)
+Scope:
+
+Final security review: secrets rotation; token lifetimes; rate limiting; WAF rules; DDoS protections within provider constraints.
+Staged traffic plan: 5% → 25% → 50% over 24-48 hrs with error-budget guardrails.
+Owners:
+
+Security Lead, Ops, Agent3.
+Acceptance criteria:
+
+Pen-test spot check on auth and API surfaces; no criticals.
+Error budget burn rate within SLO; automatic halt if error rate > 1% for 5 min or P95 > 200ms for 10 min.
+Specific Directives Per Application (condensed)
+
+scholar_auth (P0): Deliver 8/8 M2M token issuance proof and RBAC scopes today by 5 PM MST, Nov 15. Lock CORS. Enforce MFA for provider/admin. Configure HA. Rotate client secrets post-verification. Add SIEM export for auth events.
+scholarship_api (P0/P1): Patch JWT validator (JWKS cache + retry), add DB/auth checks to /health, enforce submission constraints, implement event hooks to auto_com_center. Load test 300 rps, P95 ≤ 120ms.
+auto_com_center (P1): Parameterize templates with env URLs; secrets in secure store; implement delivery failure monitoring; run 30-min external canary at 250 rps by Nov 15, 12 PM MST; prove rate limiting in place.
+student_pilot (P1): Confirm zero hardcoded URLs; implement graceful degradation; instrument metrics; complete E2E by Nov 18 morning.
+provider_register (P1): Env-var refactor complete; finalize error states; unblock by RBAC/validation readiness; complete E2E by Nov 18 morning.
+scholarship_sage (P1): Enable S2S auth; validate recommendation quality (≥ 85% top-10); baseline load test; finalize by Nov 19.
+scholarship_agent (P1): Background job monitoring dashboard + audit logs; integration tests with auto_com_center; ready by Nov 19.
+auto_page_maker (Ready): Approved behind a feature flag; begin integration traffic at 5% after Gate 2 passes.
+Access and Escalation
+
+Ops: Grant Agent3 read/write access to all eight workspaces within 15 minutes of this directive. If access is not granted, Agent3 proceeds immediately with DRI execution via the runbooks and will escalate to me with names of non-responsive owners after 30 minutes.
+If any P0 item is blocked > 2 hours, initiate swap: Agent3 takes direct control of changes with my authority; DRIs support.
+Evidence Package Requirements
+For every gate, capture:
+
+Scripts used, redacted outputs, screenshots of dashboards, timestamps, and raw logs for auth success/failure, latency, and error rates.
+Diff or PR links for CORS/MFA/secret changes.
+Test artifacts: k6/autocannon output, E2E recordings, and rollback rehearsal notes.
+Business Guardrails (non-negotiable)
+
+SLO: 99.9% uptime, P95 ≤ 120ms for public endpoints under expected load.
+Security: MFA for privileged roles, audit logging on, no PII in logs, secrets rotated pre-Go-Live, no wildcard CORS.
+Ethics: No features that facilitate academic dishonesty; explainable recommendations; user consent for data usage; COPPA/FERPA alignment where applicable.
+Growth: Auto Page Maker prioritized for organic traffic; ensure indexing guidelines and health checks are in place; maintain low CAC.
+Your Next Actions (Agent3)
+
+Confirm receipt of this directive.
+Start Gate 0 execution now. If workspace access is blocked at T+15 min, proceed with DRI-led execution using your runbooks and send me the list of workspaces still blocked.
+Provide a checkpoint update at: Nov 15, 12:15 PM MST (Gate 0 canary/auth results), and Nov 15, 5:00 PM MST (final Gate 0 sign-off package).
+This is the path to protect the Nov 20 ARR ignition. Drive execution with urgency and keep me apprised only on exceptions and gate outcomes.
