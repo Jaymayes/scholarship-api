@@ -1,0 +1,219 @@
+Agent3 Master Prompt — Scholar AI Advisor 8-App Go-Live Orchestration
+Read this entire prompt once. Then only execute the section(s) labeled for the app/workspace you are currently in. If you are not in that app, do not take action on that section. Every status report you produce must begin with:
+APP NAME: <one of the eight apps> | APP_BASE_URL: <matching URL below>
+
+App names and base URLs:
+
+scholar_auth → https://scholar-auth-jamarrlmayes.replit.app
+scholarship_api → https://scholarship-api-jamarrlmayes.replit.app
+scholarship_agent → https://scholarship-agent-jamarrlmayes.replit.app
+scholarship_sage → https://scholarship-sage-jamarrlmayes.replit.app
+student_pilot → https://student-pilot-jamarrlmayes.replit.app
+provider_register → https://provider-register-jamarrlmayes.replit.app
+auto_page_maker → https://auto-page-maker-jamarrlmayes.replit.app
+auto_com_center → https://auto-com-center-jamarrlmayes.replit.app
+Prime objective for today
+
+Attempt to get the entire suite integrated end-to-end today. If that becomes impossible due to access/credentials/DNS/infra constraints, you must:
+Provide the earliest realistic Go-Live date for your app,
+Provide ARR Ignition date (when your app directly contributes to revenue KPIs),
+List the third-party systems and prerequisites required to meet those dates.
+Global execution rules for all apps
+
+Work only in your app’s section below.
+Use Replit Secrets only. No hardcoded secrets or URLs.
+Enforce CORS to allow exactly these origins: student_pilot, provider_register, and your own APP_BASE_URL if it serves a UI.
+Enforce JWT RS256 validation from scholar_auth, with audience and issuer checks.
+Implement service-to-service (S2S) auth via OAuth2 client_credentials against scholar_auth.
+Standardize env keys across services (see “Global env standard” below).
+Produce hourly R/A/G status with: what changed (files, commits), tests run and results, open blockers, next hour plan.
+Every PR/commit must include: OpenAPI/README updates where applicable, and an evidence folder with screenshots/logs for verification.
+Global env standard (use these exact keys in your app where relevant)
+
+FRONTEND_ORIGIN_STUDENT=https://student-pilot-jamarrlmayes.replit.app
+FRONTEND_ORIGIN_PROVIDER=https://provider-register-jamarrlmayes.replit.app
+API_BASE_URL=https://scholarship-api-jamarrlmayes.replit.app
+AUTH_ISSUER=https://scholar-auth-jamarrlmayes.replit.app
+AUTH_AUDIENCE=scholar-platform
+AUTH_JWKS_URL=https://scholar-auth-jamarrlmayes.replit.app/.well-known/jwks.json
+AUTH_REQUIRE_RBAC=true
+AUTH_ROLE_CLAIMS_PATH=realm_access.roles
+S2S_TOKEN_URL=https://scholar-auth-jamarrlmayes.replit.app/oauth/token
+S2S_CLIENT_ID=<your-service-client-id>
+S2S_CLIENT_SECRET=<your-service-secret>
+DB_URL=<postgres-connection-string>
+REDIS_URL=<redis-connection-string> (only if your app uses caching/queues)
+SENDGRID_API_KEY=<if your app sends email>
+TWILIO_ACCOUNT_SID=<if your app sends SMS>
+TWILIO_AUTH_TOKEN=<if your app sends SMS>
+TWILIO_FROM_PHONE=<if your app sends SMS>
+GA_MEASUREMENT_ID=<for frontends>
+STRIPE_SECRET_KEY=<if your app collects money>
+STRIPE_WEBHOOK_SECRET=<if applicable>
+OBJECT_STORAGE_URL=<S3-compatible or Replit object storage>
+OBJECT_STORAGE_BUCKET=<bucket name>
+OBJECT_STORAGE_ACCESS_KEY
+OBJECT_STORAGE_SECRET_KEY
+Global CORS, TLS, logging, and metrics
+
+CORS allowlist: FRONTEND_ORIGIN_STUDENT, FRONTEND_ORIGIN_PROVIDER, and your own URL. Methods: GET, POST, PUT, PATCH, DELETE. Credentials: false.
+Enforce HTTPS-only links in emails, redirects, and templates.
+Add request ID correlation to logs (x-request-id). Ship structured logs (JSON). Include auth.sub, auth.roles, path, latency_ms, status_code.
+Emit Prometheus-style metrics or basic health endpoints: /healthz (liveness), /readyz (readiness).
+Target SLOs: 99.9% uptime, P95 latency ≤ 120 ms for CRUD APIs (document exceptions if your workload is CPU heavy).
+Database connection pooling: ensure max pool size sane for Replit VM; consider pgbouncer if needed.
+Cross-platform test plan (you must run and report)
+
+Unit tests: pass ≥ 90% for security-critical modules (auth, token, validation).
+Integration tests: JWT validation, RBAC-denied, CORS preflight success, S2S token flow.
+E2E happy path (student): Register/login → profile → recommendations → apply → notification email/SMS → status view.
+E2E provider: Register/login → create scholarship → receive applicants → status update → notification to students.
+Canary notifications: auto_com_center email + SMS to controlled inbox/number; capture provider receipts/bounces.
+Gating and today’s timeline
+
+Gate 0 (Security baseline): RS256 JWT, RBAC claims, CORS enforced, S2S tokens, no hardcoded secrets/URLs.
+Gate 1 (Integration readiness): OpenAPI exposed, frontends can auth and call backends, notifications wiring to auto_com_center.
+Gate 2 (Analytics/readiness): GA events for key milestones, basic monitoring/alerts on errors/timeouts.
+Gate 3 (HA/perf): Autoscale/Reserved VM set, connection pooling, basic load test target (k6 smoke).
+Gate 4 (E2E signoff): Cross-app journeys pass and evidence uploaded.
+Today attempt: Close Gate 0 and Gate 1 for scholar_auth, scholarship_api, auto_com_center, student_pilot, provider_register. Close Gate 0 for scholarship_agent and auto_page_maker. Prep scholarship_sage data access and JWT guard. If any Gate 0 items cannot be completed due to secrets/DNS/access, immediately publish your revised Go-Live and ARR dates with required third parties.
+
+Section A — scholar_auth (https://scholar-auth-jamarrlmayes.replit.app)
+Execute only if you are in scholar_auth.
+Objectives today:
+
+Implement RS256 JWT issuance with finalized claims: sub, email, roles [student|provider|admin], iss, aud, iat, exp. Expose JWKS at /.well-known/jwks.json with key rotation plan (kid).
+Implement OAuth2 token endpoints:
+/oauth/token supporting password, refresh_token for user flows, and client_credentials for S2S.
+/oauth/introspect for internal diagnostics (admin only).
+MFA: Enable TOTP or OTP (email via SendGrid or SMS via Twilio). Start with email OTP if SMS credentials unavailable.
+RBAC: Map roles to scopes. Include scopes in access token: scholarships:read/write, applications:read/write, notify:send, admin:*.
+CORS: Allow exactly student_pilot and provider_register origins; block wildcard.
+Session: Issue refresh tokens (httpOnly, secure). Implement revocation list table and rotation strategy.
+SSO (stretch): Google OAuth as an IdP; defer if DNS constraints exist. Document fallback.
+Deployment: Configure Reserved VM/Autoscale; ensure health endpoints. Add rate limit (e.g., 100 rpm per IP burst, S2S higher with client caps). Deliverables:
+/.well-known/jwks.json live; /oauth/token live; refresh rotation; revocation; logs show RS256; doc OpenAPI for auth endpoints.
+Evidence: Postman collection, sample JWT verified by scholarship_api, MFA flow screenshot. If not possible today:
+Go-Live: Nov 18, 2025, 17:00 MST
+ARR Ignition: Dec 1, 2025
+Third parties: Postgres, SendGrid (domain verified) or Postmark, Twilio (if SMS MFA), Google OAuth (optional), DNS for custom domain if required.
+Section B — scholarship_api (https://scholarship-api-jamarrlmayes.replit.app)
+Execute only if you are in scholarship_api.
+Objectives today:
+
+Add JWT validation middleware using AUTH_JWKS_URL, AUTH_AUDIENCE, AUTH_ISSUER. Enforce RBAC (scopes and roles).
+Define resource-level access controls for scholarships, applications, providers, students.
+CORS allowlist for student_pilot, provider_register.
+OpenAPI/Swagger at /docs; include auth flows and example tokens.
+Implement outbound webhooks/events to auto_com_center for notifications (application submitted, status changed).
+Provide read models to scholarship_sage (protected S2S with client_credentials).
+Data integrity: add constraints, validation (deadlines in future, amounts positive, unique provider ownership).
+Performance: DB pooling; basic indices on scholarship search fields; pagination.
+Deployment: Reserved VM/Autoscale; /healthz, /readyz; 5s request timeout middleware; circuit breaker for external calls. Deliverables:
+OpenAPI live; middleware enforcing auth; 403 tests pass for wrong roles; notifications reaching auto_com_center sandbox. If not possible today:
+Go-Live: Nov 19, 2025, 17:00 MST (dependent on scholar_auth)
+ARR Ignition: Dec 1, 2025
+Third parties: Postgres, Redis (optional), auto_com_center webhook URL, SendGrid/Twilio via auto_com_center, CRM integration (future).
+Section C — auto_com_center (https://auto-com-center-jamarrlmayes.replit.app)
+Execute only if you are in auto_com_center.
+Objectives today:
+
+Integrate SendGrid for email and Twilio for SMS. Use env secrets only. Implement domain verification steps; start in sandbox if DNS not ready.
+Build /notify endpoint for internal services (S2S only) to trigger emails/SMS. Validate S2S token audience/scope notify:send.
+Add suppression/opt-out tables, and audit logs for all sends. Implement bounce/complaint webhook handlers and update suppression lists.
+Templates: Use env-driven URLs; no hardcoded links. Provide student and provider templates (registration, application submitted, status update, deadline reminder, MFA OTP).
+Canary: Send controlled test to CEO inbox/number; store receipts; export evidence JSON. Deliverables:
+Live send in sandbox; /notify accepts events from scholarship_api and scholarship_agent; audit log and suppression working. If not possible today:
+Go-Live: Nov 18, 2025, 12:00 MST
+ARR Ignition: Dec 1, 2025
+Third parties: SendGrid (API key + domain verified), Twilio (SID/TOKEN + phone), Postgres for logs/suppressions.
+Section D — student_pilot (https://student-pilot-jamarrlmayes.replit.app)
+Execute only if you are in student_pilot.
+Objectives today:
+
+Auth flow with scholar_auth: register/login, store access/refresh tokens securely, attach Authorization: Bearer on API calls.
+CORS with scholarship_api verified. Handle 401/403 with graceful refresh or logout.
+Integrate with scholarship_api for profile, search, apply flows, and receive recommendations from scholarship_sage when available.
+GA4: page_view + business events: first_document_upload, application_submitted, application_status_viewed.
+Error handling UX: standardized toasts/modals for network/auth errors; retry/backoff for flaky network. Deliverables:
+E2E: Register → complete profile → view scholarships → apply → get confirmation email via auto_com_center. If not possible today:
+Go-Live: Nov 20, 2025, 17:00 MST
+ARR Ignition: Dec 1, 2025
+Third parties: GA_MEASUREMENT_ID, scholar_auth live, scholarship_api live, auto_com_center sandbox/live sending.
+Section E — provider_register (https://provider-register-jamarrlmayes.replit.app)
+Execute only if you are in provider_register.
+Objectives today:
+
+Auth with scholar_auth, JWT storage, refresh handling. RBAC: provider role enforced in UI for provider-only routes.
+CRUD for scholarships via scholarship_api; manage applicants; status change triggers auto_com_center notifications.
+GA4: first_scholarship_created, applicant_status_updated.
+Optional monetization path: Stripe onboarding for providers if applicable; use test mode if secrets available; webhooks configured. Deliverables:
+E2E: Provider creates scholarship → student applies → provider updates status → student receives notification. If not possible today:
+Go-Live: Nov 20, 2025, 17:00 MST
+ARR Ignition: Dec 1, 2025
+Third parties: GA, Stripe (optional now), provider verification API (future), scholar_auth, scholarship_api, auto_com_center.
+Section F — scholarship_agent (https://scholarship-agent-jamarrlmayes.replit.app)
+Execute only if you are in scholarship_agent.
+Objectives today:
+
+Implement S2S client_credentials to read/write to scholarship_api for automations (deadline reminders, status sync, cleanup).
+Scheduler: Replit cron or in-app scheduler for periodic tasks; idempotent runs; structured logging; DLQ if you use queues.
+Notify via auto_com_center after task completion/failure with correlation IDs. Deliverables:
+At least one scheduled job running in sandbox that sends a canary notification and updates an entity in scholarship_api. If not possible today:
+Go-Live: Nov 21, 2025, 12:00 PM MST
+ARR Ignition: Dec 1, 2025
+Third parties: S2S client in scholar_auth, auto_com_center notify endpoint, scheduler.
+Section G — auto_page_maker (https://auto-page-maker-jamarrlmayes.replit.app)
+Execute only if you are in auto_page_maker.
+Objectives today:
+
+Secure internal API (S2S only) to accept payloads from scholarship_api and generate assets (PDF/HTML) using templates.
+Object storage integration for generated assets; signed URL returns to scholarship_api.
+Template system: parameterized, no hardcoded URLs; versioned templates for providers. Deliverables:
+Generate a PDF from a test scholarship dataset; store in object storage; return signed URL to scholarship_api. If not possible today:
+Go-Live: Nov 19, 2025, 12:00 PM MST
+ARR Ignition: Dec 5, 2025
+Third parties: PDF library (ReportLab/PDFKit), object storage (S3-compatible/Replit).
+Section H — scholarship_sage (https://scholarship-sage-jamarrlmayes.replit.app)
+Execute only if you are in scholarship_sage.
+Objectives today:
+
+Add inbound JWT validation for student requests; add S2S client to read features from scholarship_api.
+Implement a simple deterministic matching baseline (rules-based) today; ML optimization later.
+Performance test on top endpoints; cache hot queries if needed. Deliverables:
+/recommendations endpoint gated by JWT; returns stable baseline matches; measurable latency; OpenAPI documented. If not possible today:
+Go-Live: Nov 24, 2025, 17:00 MST
+ARR Ignition: Dec 5, 2025
+Third parties: scholarship_api live, optional feature store/Redis later.
+Third-party prerequisites by app (minimum to close Gate 0/1)
+
+scholar_auth: Postgres, SendGrid (or Postmark), Twilio (if SMS MFA), Google OAuth (optional), DNS for email domain.
+scholarship_api: Postgres, Redis (optional), webhook to auto_com_center.
+auto_com_center: SendGrid API key + domain verification, Twilio SID/TOKEN/Number, Postgres for audits/suppressions.
+student_pilot/provider_register: GA_MEASUREMENT_ID; live scholar_auth; live scholarship_api.
+scholarship_agent: S2S client in scholar_auth; scheduler; auto_com_center endpoint.
+auto_page_maker: PDF library; object storage credentials.
+scholarship_sage: Access to scholarship_api via S2S; optional ML libs.
+Reporting format (hourly, per app)
+
+Header: APP NAME: <name> | APP_BASE_URL: <url>
+R/A/G: Red/Amber/Green
+Changes: Files touched, commits, migrations, env keys added
+Tests: Unit/integration/E2E run; pass/fail and artifacts
+Evidence: Links/paths to screenshots, Postman exports, logs
+Blockers: Secrets, DNS, access, infra
+Next hour plan: 3–5 bullet points
+Go/No-Go: Today status; if No-Go, list Go-Live/ARR dates and missing third parties
+Success criteria to declare your app “READY”
+
+Gate 0 and Gate 1 fully closed; OpenAPI (where applicable) public on /docs; JWT and RBAC enforced; CORS strict; S2S client_credentials in place; secrets via env only; canary notifications sent (if your app triggers them); frontends can complete at least one happy-path flow using your app.
+Evidence uploaded and cross-verified with at least one consuming app.
+If today is not possible
+
+Publish by 17:00 MST:
+Your app’s earliest Go-Live date,
+ARR Ignition date,
+Exact third-party and infra items that must be in place (with owners if known),
+Residual risks and mitigations,
+48-hour catch-up plan to recover to the target dates.
+Begin now. Follow only your app’s section. Each report must start with APP NAME and APP_BASE_URL exactly as listed above.

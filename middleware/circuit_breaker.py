@@ -214,8 +214,6 @@ def circuit_breaker(
         async def wrapper(*args, **kwargs):
             return await cb.call(func, *args, **kwargs)
         
-        # Attach circuit breaker instance for monitoring
-        wrapper.circuit_breaker = cb
         return wrapper
     
     return decorator

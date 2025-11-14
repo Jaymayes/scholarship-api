@@ -82,6 +82,7 @@ from routers.week4_global_expansion import router as week4_router
 from routers.applications import router as applications_router
 from routers.prompts import router as prompts_router
 from routers.evidence import router as evidence_router
+from routers.debug_routes import router as debug_routes_router
 from schemas.error_responses import ERROR_RESPONSES
 from utils.logger import setup_logger
 
@@ -297,6 +298,11 @@ app.add_middleware(BodySizeLimitMiddleware, max_size=settings.max_request_size_b
 app.add_middleware(RequestIDMiddleware)
 app.middleware("http")(trace_id_middleware)
 
+# 4.1 GATE 0: Resilience Patterns (Circuit Breaker + Request Timeout)
+# Prevents cascading failures and queue buildup per CEO directive
+from middleware.request_timeout import RequestTimeoutMiddleware
+app.add_middleware(RequestTimeoutMiddleware, timeout=5.0)
+
 # 4.5 CRITICAL SECURITY: API Rate Limiting Enforcement
 app.add_middleware(APIRateLimitMiddleware)  # Global API rate limiting enforcement
 
@@ -450,6 +456,7 @@ app.include_router(observability_api_router)  # New: Daily ops dashboards and KP
 
 # CEO DIRECTIVE 2025-11-12: Evidence API for executive review
 app.include_router(evidence_router, tags=["Evidence"])
+app.include_router(debug_routes_router, tags=["Diagnostics"])
 
 # Metrics already setup above - this was the wrong location causing route shadowing
 

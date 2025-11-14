@@ -210,19 +210,13 @@ class Settings(BaseSettings):
     @property
     def get_cors_origins(self) -> list[str]:
         """
-        V2.2 CORS Configuration: LOCKED to exact 8 allowlisted origins (CEO Spec)
-        NO wildcards. NO dynamic origins. NO env var overrides. EXACT allowlist ONLY.
+        GATE 0 CORS Configuration: Master Prompt Section B Requirements
+        "CORS allowlist for student_pilot, provider_register"
+        Per global env standard: FRONTEND_ORIGIN_STUDENT, FRONTEND_ORIGIN_PROVIDER
         """
-        # V2.2 Universal Spec: EXACT 8 ecosystem origins (IMMUTABLE)
         return [
-            "https://scholar-auth-jamarrlmayes.replit.app",
-            "https://scholarship-api-jamarrlmayes.replit.app",
-            "https://scholarship-agent-jamarrlmayes.replit.app",
-            "https://scholarship-sage-jamarrlmayes.replit.app",
             "https://student-pilot-jamarrlmayes.replit.app",
-            "https://provider-register-jamarrlmayes.replit.app",
-            "https://auto-page-maker-jamarrlmayes.replit.app",
-            "https://auto-com-center-jamarrlmayes.replit.app"
+            "https://provider-register-jamarrlmayes.replit.app"
         ]
 
     @property
@@ -499,8 +493,9 @@ class Settings(BaseSettings):
         """Determine if API docs should be enabled"""
         if self.enable_docs is not None:
             return self.enable_docs
-        # Default: enable in development, disable in production
-        return self.is_development
+        # GATE 0 OVERRIDE: Enable docs for integration validation
+        # Master prompt Section B requires: "OpenAPI/Swagger at /docs; include auth flows"
+        return True
 
     @property
     def should_enable_hsts(self) -> bool:
