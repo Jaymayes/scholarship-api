@@ -1,0 +1,90 @@
+Agent3 — Executive direction from the CEO of Scholar AI Advisor
+
+Decisions and scope, effective immediately
+
+Role: You are promoted to Program Integrator for the next 7 days to drive cross-app readiness to Go-Live. You coordinate deliverables and escalate blockers; DRIs remain accountable for implementation.
+Critical path: scholar_auth S2S auth + RBAC is P0. No other launches unblock until that passes acceptance.
+Evidence standard: I will only accept artifacts that (a) live in the app’s repo, (b) include timestamps, commands, and raw outputs, and (c) follow the required report header format. Any prior approvals without artifacts are rescinded.
+Target SLOs for go-live gates: 99.9% availability architecture, ≤120ms P95 at 250 rps, <0.5% error rate in canary, audited secrets, MFA/SSO verified, RBAC claims enforced, deep health checks, and audit logging. These align with our security posture and continuous hardening principles, including adaptive authentication, integrity monitoring of configurations like CORS, and continuous authorization monitoring to prevent OWASP API risks .
+Growth linkage: Auto Page Maker remains our CAC engine. Tie go-live to SEO activation and student “First Document Upload” to improve activation and conversion, consistent with our Playbook’s Year 2 focus and revised roadmap for value creation and ARR scaling .
+Access and escalation (1-hour SLA)
+
+Ops: Grant Agent3 read access to all eight Replit workspaces and dashboards within 60 minutes. If access is not granted, each DRI must push evidence to the repo and notify Agent3.
+If any workspace access remains blocked after 60 minutes, Agent3 is authorized to reassign evidence collection to the DRI with me as escalation.
+Per-app status, directives, and acceptance criteria
+
+APPLICATION NAME: scholar_auth
+APP_BASE_URL: https://scholar-auth-jamarrlmayes.replit.app
+Status: DELAYED
+Orders (Tiger Team: Security Lead A/DRI; Agent3 C/I):
+
+Deadline: Nov 15, 12:00 PM MST.
+Must pass: OAuth2 Client Credentials flow for all registered services; signed JWTs with role/permission claims (student, provider_admin, reviewer, super_admin); JWKS stability under load; MFA verified; CORS locked to approved origins; deep /health with DB and dependency reachability; autoscale or Reserved VM set per load profile; audit logging enabled.
+Load criteria: 30-min canary at 250 rps; P95 ≤120ms; error <0.5%.
+Evidence: cc-token issuance proof for each service (token + decoded claims), curl/jq traces for JWKS validation, CORS policy file, MFA provider callback logs, healthcheck JSON showing DB + auth checks, deployment profile consistent with Replit autoscale/reserved guidance .
+APPLICATION NAME: scholarship_api
+APP_BASE_URL: https://scholarship-api-jamarrlmayes.replit.app
+Status: DELAYED
+Orders (API Lead A/DRI; Agent3 C/I):
+
+Tonight 9:00 PM MST: Deliver “JWT validation failures” reproduction doc and patch plan (token caching, JWKS rotation/backoff, signature validation fallback). Include k6/JMeter plan for 300 rps sustained test and failing traces .
+Nov 17, 12:00 PM MST: Deep /health including DB pool, auth reachability, queue/outbound deps. Event hooks to auto_com_center for state changes. Strengthen business-rule validations.
+Load criteria: 30-min canary at 250 rps; P95 ≤120ms; error <0.5%.
+Evidence: k6 script, run logs, /health JSON, schema constraints, event hook delivery receipts.
+APPLICATION NAME: student_pilot
+APP_BASE_URL: https://student-pilot-jamarrlmayes.replit.app
+Status: DELAYED
+Orders (Frontend Lead A/DRI; Agent3 C/I):
+
+Nov 14, 2:00 PM MST: Remove all hardcoded URLs; centralize config via env; commit diff plus config schema.
+Nov 15, 6:00 PM MST: Graceful error states on Dashboard/Profile/Scholarships; preserve form state on save errors; accessibility verified. Provide screenshot bundle and test steps.
+Nov 18 EOD: E2E “Student Journey” using stubbed auth if needed; Offline mode decision memo (scope/deferral rationale).
+APPLICATION NAME: provider_register
+APP_BASE_URL: https://provider-register-jamarrlmayes.replit.app
+Status: DELAYED
+Orders (Frontend Lead A/DRI; Agent3 C/I):
+
+Nov 14, 2:00 PM MST: Env refactor to remove hardcoded URLs; shared error-state component integrated; screenshot bundle and checklist.
+Nov 18 EOD: “Provider Journey” E2E blocked by RBAC—prepare mock-based test until scholar_auth lands.
+APPLICATION NAME: scholarship_sage
+APP_BASE_URL: https://scholarship-sage-jamarrlmayes.replit.app
+Status: DELAYED
+Orders (Data/ML Lead A/DRI; Agent3 C/I):
+
+Ready to flip to M2M upon scholar_auth. Maintain Responsible AI logging with decision traceability, rationale and audit trails; provide evidence JSON and runbook for post-auth test reruns, aligned to explainability/accountability standards .
+Nov 19, 12:00 PM MST: Go-live contingent on scholar_auth. Performance P95 ≤120ms at target QPS; Accuracy target Precision@10 ≥60% on production-like dataset; evidence JSON.
+APPLICATION NAME: scholarship_agent
+APP_BASE_URL: https://scholarship-agent-jamarrlmayes.replit.app
+Status: DELAYED (pending deps)
+Orders (Agent3 A/DRI):
+
+Tonight 9:00 PM MST: Submit evidence package confirming S2S integration ready, scheduled jobs dry-run logs, admin monitoring dashboards, audit logs, and 100% env-driven config.
+Nov 19: Turn jobs on when scholar_auth + scholarship_api are green; link to auto_com_center webhook receipts.
+APPLICATION NAME: auto_page_maker
+APP_BASE_URL: https://auto-page-maker-jamarrlmayes.replit.app
+Status: GO-LIVE READY
+Orders (SEO Lead A/DRI; Agent3 C/I):
+
+Today: Submit property and sitemap in Google Search Console; daily dashboard for indexed URLs, CTR, and conversions from landing pages; health/sitemap checks. This is our low-CAC growth engine and must be monitored daily per Playbook targets for MAUs and activation .
+APPLICATION NAME: auto_com_center
+APP_BASE_URL: https://auto-com-center-jamarrlmayes.replit.app
+Status: DELAYED
+Orders (Messaging Lead A/DRI; Agent3 C/I):
+
+Clarification: Prior “conditions met” are rescinded—no evidence has been accepted.
+Nov 14, 2:00 PM MST: Deliver canary script and run: 30 min at 250 rps; P95 ≤120ms; error <0.5%; E2E webhook test plan executed (scholarship_api → auto_com_center → provider) with signed receipts; rollback procedure with RTO ≤5 minutes; secrets audit.
+Evidence: load-tests/canary, run output, docs/ROLLBACK_PROCEDURE.md, docs/E2E_WEBHOOK_TEST_PLAN.md, secrets inventory. Use Replit deployment patterns consistent with autoscale/reserved guidance for reliability and predictable cost/perf .
+Program cadence and KPIs
+
+War room checkpoints: 9:00 AM, 2:00 PM, 6:00 PM MST daily through Nov 20.
+KPI dashboard: per-service P95 latency, error rate, uptime, auth token issuance success rate, webhook delivery success, and SEO activation metrics; tie product ops to ARR ignition on Nov 20.
+Responsible AI and security: Maintain audit trails, revocable credentials, and human-on-the-loop gates for high-risk actions, in line with our platform governance model .
+Answers to your explicit questions
+
+Scope: You are Program Integrator. Coordinate across all 8 apps. DRIs remain accountable; you drive the integration schedule, evidence quality, and escalations.
+auto_com_center evidence mismatch: Rescinded. Treat as RED until artifacts are delivered and validated by 2:00 PM MST Nov 14.
+scholarship_api JWT bug ownership: API Lead fixes post your documented repro/patch plan tonight; do not wait on scholar_auth. You partner with API Lead to validate under load.
+Final reminder
+
+Student value is business value. The fastest route to ARR is a trustworthy, fast, and explainable experience that gets students matched and submitting high-quality applications. Keep SEO-driven student acquisition and first-doc-upload activation front and center while we land auth and reliability gates for go-live, consistent with the Playbook’s roadmap and KPIs .
+Acknowledge receipt and begin execution. I expect the 2:00 PM MST Nov 14 evidence bundles for auto_com_center, and the 9:00 PM MST tonight deliverables for scholarship_api and scholarship_agent.
