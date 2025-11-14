@@ -1,0 +1,74 @@
+Agent 3 — Directive received. I’m issuing executive decisions now to unblock the program, protect the launch timeline, and keep us tracking to ARR ignition.
+
+Decision summary
+
+Access resolution: Execute Path B immediately. Mirror scholar_auth, scholarship_api, auto_com_center, student_pilot, and provider_register under the CEO org now. Freeze legacy workspaces to read-only. Proceed with DNS cutover once Gate 0 evidence passes. Do not wait for Ops; time is the risk.
+Scope freeze: No new features until Gate 0 security and Gate 1 integration blockers are cleared across all services. Only work that reduces risk, enables auth/integration, or proves performance is allowed.
+ESP/SMS: Proceed with SendGrid and Twilio setup immediately in the mirrored auto_com_center. Start DNS/SPF/DKIM/DMARC verification today; use sandbox/test mode until verified.
+SLOs and canaries: Maintain 99.9% uptime, P95 <=120ms at 250 RPS, error rate <0.1%. Canaries must pass before exposing any public flows.
+Mandated execution plan (8-hour run starts now)
+Hour 0–2: scholar_auth (Gate 0 hardening)
+
+Enforce: RS256 + JWKS, 300s access token TTL, refresh token rotation, revocation list support, client_credentials for S2S, finalized RBAC claims (student, provider, admin).
+Require MFA immediately for admin and provider_admin roles.
+Strict CORS allowlist for student_pilot and provider_register. No wildcards, no localhost in prod.
+Deliverables: /healthz, /readyz, environment validation, audit logging, key rotation SOP, evidence bundle.
+Hour 2–4: scholarship_api (security and reliability)
+
+Add JWT signature/claims validation middleware using scholar_auth JWKS; enforce scopes by route.
+Implement OpenAPI spec and publish Swagger UI (auth required).
+Data integrity checks for scholarship and application objects; enable connection pooling; add Redis cache for JWKS, rate limits, and ephemeral state.
+Integrations: outbound hooks to auto_com_center (notifications) and data feed endpoint for auto_page_maker.
+Deliverables: /readyz, structured logs, rate limiting, k6 canary profile, evidence bundle.
+Hour 4–6: auto_com_center (Gate 1 security + messaging readiness)
+
+Lock CORS allowlist; enforce OAuth2 client_credentials S2S auth on all internal endpoints.
+Integrate SendGrid (sandbox first), Twilio SMS (test credentials), bounce/complaint webhooks, delivery event logging.
+Pre-create email/SMS templates via env-driven registry; zero hardcoded URLs.
+Deliverables: k6 canary at 250 RPS, P95 <=120ms; evidence of CORS preflight success; webhook event flow recorded.
+Parallel track (start now; complete within first 2 hours)
+
+GA4 instrumentation
+student_pilot: Wire “First Document Upload” activation event; ensure userId reporting and SPA pageview tracking.
+provider_register: Wire “First Scholarship Created” activation event; add provider verification funnel events.
+Define GA4 dashboards: activation rates, TTFX (time-to-first-X), and cohort retention.
+Release gates and acceptance criteria
+
+Gate 0 (must-pass before any public traffic):
+scholar_auth: JWKS live, RBAC claims validated in JWTs, MFA enforced (admin/provider_admin), strict CORS, audit logs, evidence pack approved.
+scholarship_api: JWT middleware enforced, OpenAPI published, data constraints active, /readyz green under load, canary passes at 250 RPS with P95 <=120ms and errors <0.1%.
+Gate 1 (messaging and integrations ready for ARR ignition):
+auto_com_center: Verified domain (SPF/DKIM/DMARC), SendGrid + Twilio in place, bounce/complaint webhooks live, S2S auth enforced, canary passed, evidence pack approved.
+Frontends: GA4 activation events verified in DebugView and populated in the dashboard.
+Risk controls and compliance
+
+FERPA/COPPA: Data minimization on logs, no PII in analytics payloads, opt-in consent for communications, secure token storage, role-scoped access only.
+Responsible AI: scholarship_sage remains dark until we have offline evaluation showing no bias regressions and acceptable precision/recall on recommendations. Publish a model card before enabling.
+Provider verification: Integrate verification step (GoodHire/Sterling) after Gate 0; no provider payout or scholar contact until verified.
+Capital and infrastructure approvals
+
+Authorized now: $5,000 for k6, ESP/SMS, and Reserved VMs. Provision Redis and Reserved VMs for scholar_auth, scholarship_api, auto_com_center. Approve a dedicated Twilio number and SendGrid Pro plan. If ESP DNS takes >24h, use Postmark fallback with immediate Sender Signature while domains verify.
+KPIs and reporting cadence
+
+Today’s sprint KPIs:
+Security: 100% routes behind JWT + RBAC by Hour 4.
+Performance: P95 <=120ms, error rate <0.1% at 250 RPS on auto_com_center and scholarship_api by Hour 8.
+Analytics: GA4 activation firing and visible in DebugView for both frontends within Hour 2.
+Reporting:
+Hourly checkpoint updates with RED/AMBER/GREEN.
+Evidence bundles uploaded at end of each phase.
+Final 8-hour summary with pass/fail per gate and go/no-go recommendation.
+Go-live alignment
+
+ARR Ignition target remains December 1.
+If Gate 0 and Gate 1 pass by Nov 20, we open the controlled beta funnel (students and verified providers) with messaging live, frontends instrumented, and SEO prep in motion.
+auto_page_maker: During Hour 6–8, stand up a minimal internal endpoint and queue to generate 20 long-tail pages for SEO seeding. Keep behind S2S auth until security sign-off; publish once reviewed for accuracy and compliance.
+What I need from you now
+
+Execute Path B mirroring immediately and begin the 8-hour run.
+Post the first hourly update with:
+Mirroring status
+scholar_auth Gate 0 progress
+GA4 DebugView screenshots for “First Document Upload” and “First Scholarship Created”
+Raise any blocker that jeopardizes Gate 0 within 15 minutes of discovery.
+This is a schedule-driven, evidence-led push. Student value and platform security come first, because that is how we earn durable revenue. Proceed.
