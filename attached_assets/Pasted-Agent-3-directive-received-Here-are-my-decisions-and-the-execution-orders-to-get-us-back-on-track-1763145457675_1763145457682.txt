@@ -1,0 +1,117 @@
+Agent 3 — directive received. Here are my decisions and the execution orders to get us back on track and protect Dec 1 ARR ignition.
+
+Executive decisions
+
+Access resolution (now): Option A approved. Ops must grant Agent3 edit access to these five workspaces within 30 minutes:
+scholar_auth
+scholarship_api
+auto_com_center
+student_pilot
+provider_register
+If access is not confirmed by T+30 minutes, Platform Lead executes the mirroring procedure you prepared and invites Agent3 immediately after creation. No third delay.
+
+Parallel progress (start immediately): Proceed with SendGrid/Twilio integration in auto_com_center now. Do not wait for access resolution.
+
+Path B is authorized: Execute the 8-hour sprint the moment access is granted. Hourly CEO updates required. Use RED/AMBER/GREEN and “evidence links + commit IDs” in each update.
+
+Budget authorization (cap/guardrails):
+
+ESP (SendGrid/Postmark/Mailgun): up to $1,500 MRR initial cap
+SMS (Twilio): up to $1,000 MRR initial cap
+Replit Reserved VMs and Autoscale: up to $1,500 MRR initial cap
+Redis/connection pooling add-on: up to $500 MRR
+Monitoring/alerting (Sentry/Logtail or equivalent): up to $500 MRR
+k6 cloud or equivalent load test credits: up to $500 one-time this sprint Any variance above caps requires my sign-off.
+5. Compliance and Responsible AI: Enforce FERPA/COPPA alignment, privacy-by-design, and zero tolerance for academic dishonesty enablement. All AI features must be explainable, with bias checks documented. Security risk acceptance requires my approval.
+
+8-hour execution plan and acceptance criteria
+Gate 0 must be closed today: Security, CORS, config, and M2M auth. Gate 1 integration begins immediately after.
+
+T+0 to T+2 — scholar_auth (blocker-breaker)
+
+Requirements:
+RS256 JWTs with /.well-known/jwks.json; key rotation SOP in repo
+Roles/scopes finalized: student, provider, admin (+ provider_admin if used)
+OAuth2 client_credentials for M2M; refresh + revocation strategy
+MFA enforced for admin/provider_admin (email/SMS OTP acceptable)
+Strict CORS (exact origin allowlist), rate limits, audit logs
+Health/readiness endpoints; error budget SLO hooks
+Evidence:
+Live JWKS; signed JWT validation from scholarship_api; audit log scrubs; Postman collection; OpenAPI doc exposed for auth endpoints
+T+2 to T+4 — scholarship_api (security + reliability)
+
+Requirements:
+JWT validation middleware (sig + exp + nbf + role/claims checks)
+CORS allowlist: student_pilot and provider_register only
+OpenAPI spec live; 401/403 paths standardized
+Triggers: webhooks or internal calls to auto_com_center; data feed to auto_page_maker defined
+Connection pooling tuned; Redis caching for hot reads
+Health/ready endpoints; request timeout middleware; circuit breaker on upstreams
+Evidence:
+Passing k6 smoke: 100 RPS, P95 < 300ms, error rate < 1%
+Sample end-to-end: student creates session → secure API hit → notification fired (canary path)
+T+4 to T+6 — auto_com_center (notifications)
+
+Requirements:
+SendGrid/Twilio integrated with verified domain/sender; bounce/complaint hooks
+S2S authorization (client_credentials) enforced
+Templates driven by env for deep links back to frontends
+Canary notification script (email + SMS) with runbook
+Evidence:
+Live test notifications to controlled inbox/number; signed request verification logged; webhook receipts stored
+T+4 to T+6 (parallel) — Env/config standardization
+
+Requirements:
+Eliminate hardcoded URLs; Replit Secrets only
+Shared .env schema published; per-service config check script
+Evidence:
+Config linter passes in all services; secrets checklists committed
+T+6 to T+8 — Frontend wiring and E2E smoke
+
+student_pilot:
+Login/registration via scholar_auth; secure JWT storage; attach Authorization header
+GA4 “first_document_upload” event wired
+Standardized error handling for 401/403/5xx
+provider_register:
+Provider auth; scholarship CRUD; attach JWT to API calls
+GA4 “first_scholarship_created” event wired
+Evidence:
+E2E happy-paths pass: Student journey (register → login → view scholarships → upload doc) and Provider journey (register → create scholarship → view applicant)
+GA4 DebugView screenshots and event payload samples
+System-wide Gate 0/1 acceptance criteria
+
+Gate 0 (must pass today before any go-live calls):
+Auth: RS256 JWTs, RBAC, MFA, M2M tokens functional; strict CORS; audit logs enabled
+Config: No hardcoded URLs; all secrets via env; health/ready endpoints live
+Security smoke: OWASP top issues mitigated at middleware level; rate limiting on public endpoints
+Gate 1 (start immediately after Gate 0):
+Notifications: auto_com_center receives and delivers canary emails/SMS from scholarship_api
+API docs: OpenAPI visible for scholar_auth and scholarship_api
+E2E: Student and Provider happy-paths pass in staging
+KPIs and reporting cadence
+
+Daily (until Dec 1):
+B2C activation: first_document_upload count, conversion from auth→upload
+B2B activation: first_scholarship_created count, time-to-first-listing
+Uptime P99.9; P95 latency target ~120ms on core read endpoints; error rate < 1%
+Hourly (during sprint):
+Status by service (R/A/G), last-commit IDs, evidence links, and blocker log
+ARR ignition readiness (Dec 1)
+
+B2C revenue path must be live by Dec 1:
+Student credit purchase flow via Stripe Checkout in student_pilot (minimal viable: single “credits” SKU, receipt webhook to scholarship_api)
+Analytics tracking for checkout_start and checkout_success
+B2B provider fee (3%) can trail by one week if needed:
+Stripe Connect onboarding for providers, KYC, fee configuration, payout schedule
+If risk/timeline conflicts arise, we launch B2C first on Dec 1 and enable B2B fee by Dec 8
+Risk controls and escalation
+
+If access isn’t granted by T+30: Platform Lead executes mirroring immediately; Agent3 proceeds in mirrored workspaces.
+Any P0 security regression (auth/CORS) halts deploys until resolved.
+Any service missing Gate 0 by end of sprint gets quarantined behind feature flags; other services continue.
+What I need from you now
+
+Confirm access grant completion within 30 minutes (Ops to post confirmation plus workspace URLs).
+Agent3: begin SendGrid/Twilio integration in auto_com_center immediately and post first canary results within the hour.
+Post hourly updates with: R/A/G, commit IDs, evidence links/screens, and any deviations from acceptance criteria.
+You have clear authority, budget, and acceptance criteria. Execute with urgency. My expectation is Gate 0 closure today, integration canaries firing, and E2E happy-paths passing in staging by end of sprint.
