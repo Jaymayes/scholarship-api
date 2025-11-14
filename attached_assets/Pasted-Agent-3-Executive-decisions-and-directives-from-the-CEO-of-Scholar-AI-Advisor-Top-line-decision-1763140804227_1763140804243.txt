@@ -1,0 +1,70 @@
+Agent 3 — Executive decisions and directives from the CEO of Scholar AI Advisor
+
+Top-line decision
+
+Path A is approved and mandated: Ops must grant you access to scholar_auth, scholarship_api, and auto_com_center within 15 minutes of this notice. If access is not confirmed at T+15, you are authorized to execute Path B (mirror under CEO org) immediately at T+16 with DNS cutover upon evidence passing Gate 0.
+Proceed now with auto_com_center Gate 1 hardening while the access clock runs. This aligns with our security-first posture and reduces downstream integration risk across services .
+Why this call
+
+Our critical blockers—centralized auth, CORS, config standardization, S2S auth, and unstarted E2E tests—are systemic and must be resolved before Go-Live. Industry guidance for agent-built microservices emphasizes architected security, resiliency patterns, and disciplined integration over ad-hoc builds, and explicitly calls out the architect-led role and strict secrets management to de-risk agent velocity .
+Gate 0 must bake in resilience: retries with backoff, circuit breakers, readiness health checks, and automated recovery, so we can hit our SLOs and avoid cascading failures under load .
+Immediate orders (effective now)
+
+Ops: Grant Agent 3 contributor access to the three workspaces (scholar_auth, scholarship_api, auto_com_center) within 15 minutes. If not possible, confirm “No-Access” and stand by for DNS cutover post-mirroring. Note: Replit’s publish/snapshot model means we will deliberately snapshot each Gate 0 pass; no hot-fixes to live instances outside republish cycles .
+Agent 3 (while the T+15 timer runs):
+auto_com_center: implement env-driven templates, strict allowlist CORS, S2S auth scaffolding, and ESP/SMS connector prep; begin bounces/complaints monitoring setup (evidence required).
+student_pilot and provider_register: wire GA4 “First Document Upload” activation event now. This is our B2C activation lever tied to student value creation and downstream monetization; our Playbook prioritizes Document Hub-led activation as an adoption driver .
+Gate 0 criteria (non-negotiable acceptance bars)
+
+scholar_auth
+RS256 JWTs via JWKS; 300s TTL; rotation SOP documented.
+RBAC claims for student, provider, admin (+ scopes) enforced.
+OAuth2 client_credentials for all internal services; no hardcoded secrets; Replit Secrets only.
+Strict CORS allowlist (exact-origin match).
+MFA enforced for privileged roles.
+Evidence: jwks.json, sample short-lived tokens, RBAC matrix, MFA enforcement proof, CORS test logs.
+Rationale: secure-by-default, secrets hygiene, and architected auth are mandatory for autonomous app ecosystems .
+scholarship_api
+JWT signature + claims validation; role/route authorization.
+Readiness probe (/readyz) that checks DB/Redis/JWKS; retries with backoff and circuit breakers on upstream dependencies, to contain fault cascades .
+Connection pooling tuned; Reserved VM/Autoscale prepared for load.
+Performance: sustained 250–300 RPS, P95 ≤ 120ms, error rate ≤ 0.5%.
+Evidence: k6 run ID and report, /readyz snapshots, config diffs.
+auto_com_center
+SendGrid + Twilio integrated; domain authentication (SPF, DKIM, DMARC) verified.
+S2S auth only; exact-origin CORS; env-based link generation back to frontends.
+Canary: 250 RPS for 30 minutes, errors ≤ 0.5%.
+Evidence: provider verification screenshots, canary run ID, bounce/complaint monitoring proof.
+Cross-platform hardening mandates (apply to all services)
+
+Config standardization: eliminate hardcoded URLs and credentials; single .env schema and secrets via Replit Secrets across apps .
+CORS: explicit allowlist for student_pilot and provider_register only; no wildcards.
+S2S auth: OAuth2 client_credentials with short-lived tokens; JWKS caching; clock-skew tolerance; audit logs.
+Resilience patterns: retries with exponential backoff, circuit breakers, bulkheads for pools, and health/readiness endpoints in every service .
+Testing: adopt the layered testing hierarchy and CI/CD-based continuous testing; integration then E2E must validate the core Student and Provider journeys before launch .
+Execution timeline (timeboxed)
+
+T+00: Access clock starts (15 minutes). Agent 3 proceeds with auto_com_center Gate 1 and student_pilot/provider_register analytics wiring.
+T+15:
+If access granted (Path A): 8-hour sequence begins immediately: Hour 0–2 scholar_auth; Hour 2–4 scholarship_api; Hour 4–6 auto_com_center; Hour 6–8 performance re-test + evidence packaging.
+If access denied (Path B): Mirror three workspaces under CEO org and execute the same 8-hour runbooks; prepare DNS cutover upon evidence pass. Note: vendor/platform limits and performance variability on Replit require disciplined resilience and may justify targeted off-platform augmentation for hot paths if we cannot meet SLOs under load .
+Nov 15, 10:30 AM MST: CEO Gate 0 Go/No-Go. If GREEN, proceed to Gate 1–2 integration/E2E the same day.
+KPIs and ARR alignment
+
+Readiness: Gate 0 pass (Y/N); P95 latency ≤ 120ms at 250–300 RPS; error ≤ 0.5%.
+B2C funnel: % of new users reaching First Document Upload; conversion to paid credits; match CTR uplift after Sage integration. Playbook data indicates Document Hub activation is our most reliable engagement lever—optimize around it .
+B2B funnel: verified providers, time-to-first-listing, scholarships live.
+Ops efficiency: zero hardcoded secrets; CORS violations = 0; incident-free publish cycles consistent with Replit’s snapshot model .
+Risk and compliance posture
+
+Responsible AI: bias mitigation, transparency, and appeal channels are strategic advantages and must be operationalized post-Gate 0 with monitoring dashboards and periodic audits .
+Security governance: we will scale agent velocity only with commensurate security controls and automated scanning; otherwise we scale risk faster than output .
+Reporting cadence and artifacts
+
+Hourly during Gate 0 execution: RED/AMBER/GREEN per service, k6 run IDs, /readyz snapshots, config diffs.
+Evidence packages per service posted at completion of each Gate.
+Direct answers to your requests
+
+Yes, proceed with auto_com_center hardening now while the access decision window runs.
+Ops must respond within 15 minutes. If access is not granted, you are authorized to execute mirroring immediately and proceed to DNS cutover on Gate 0 evidence pass.
+This plan aligns with our Prime Directive: ship a secure, resilient, low-CAC platform that maximizes student value and activates the B2C engine, while readying the B2B revenue lane. Execute with urgency and send the first hourly update as soon as the T+15 outcome is known.
