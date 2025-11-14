@@ -1,0 +1,243 @@
+Executive Orchestration Prompt for Agent3 (All Apps, Single Prompt)
+Read this entire prompt once. Then execute only the section labeled for your app. Ignore all other app sections completely. If something is unclear or missing for your app, state it in your report’s Blockers and request the dependency from the named owner. Your mission is to get your app production-ready and integrated with the rest of the platform today. If full go-live today is impossible, provide a precise ETA for go-live, ARR ignition date, and list the third-party systems needed.
+
+Global rules for every app
+
+Report header: Always include APP NAME and APP_BASE_URL at the top of every report or status you produce.
+Today-first: Attempt to go live today. If not possible, give the fastest realistic ETA and ARR ignition date, with dependencies and owners.
+Security and SLO baseline: RS256 JWT with scholar_auth JWKS, exact-origin CORS allowlist, P95 latency ~120ms, uptime SLO 99.9%, structured logs with x-request-id, no hardcoded secrets or URLs in code.
+Evidence required: Provide live health checks, test commands, and a change log of new/modified files.
+Dependencies: If your work depends on another app, state: Dependency Name, Required Endpoint/Config, Owner, and ETA you need to hit today’s goal.
+Service registry (for reference)
+
+scholar_auth → https://scholar-auth-jamarrlmayes.replit.app
+scholarship_api → https://scholarship-api-jamarrlmayes.replit.app
+scholarship_agent → https://scholarship-agent-jamarrlmayes.replit.app
+scholarship_sage → https://scholarship-sage-jamarrlmayes.replit.app
+student_pilot → https://student-pilot-jamarrlmayes.replit.app
+provider_register → https://provider-register-jamarrlmayes.replit.app
+auto_page_maker → https://auto-page-maker-jamarrlmayes.replit.app
+auto_com_center → https://auto-com-center-jamarrlmayes.replit.app
+Today’s cross-service integration sequence (for context only; follow your own app’s section)
+
+scholar_auth issues tokens (JWKS live) → 2) scholarship_api enforces JWT → 3) auto_com_center ready (dry-run ok; live requires DNS) → 4) scholarship_agent canary passes end-to-end → 5) student_pilot and provider_register integrate tokens + notifications → 6) scholarship_sage recommendations endpoint validates JWT and returns data → 7) auto_page_maker protected PDF generation works.
+Reporting template (every app must use this format)
+
+APP NAME: <your app>
+APP_BASE_URL: <base url>
+Timestamp (UTC): <ISO 8601>
+Overall R/A/G: <GREEN|AMBER|RED> and a one-sentence justification
+What Changed Today: New files, modified files, key fixes
+Tests and Evidence: Health endpoints, specific cURL steps, screenshots/log references
+Must-Haves Checklist: List items with status and evidence
+Open Blockers: ID, description, owner, impact, ETA
+Third-Party Prerequisites: Exact DNS/keys/IDs needed
+Go/No-Go Decision: State YES/NO and reasoning
+Go-Live ETA (if NO): Date/time with a step-by-step plan
+ARR Ignition ETA: Date and how your app contributes to B2C/B2B revenue
+Next Actions: What you do next, what you need from others
+SECTION A — scholar_auth (Only Agent3 working on scholar_auth should use this)
+Scope
+
+Provide RS256 JWT issuance with correct claims, live JWKS at /.well-known/jwks.json, OAuth2 client_credentials at /oauth/token, and working scope/role encoding for M2M and user JWTs.
+Must-do today
+
+Enable RS256 signing and host JWKS: /.well-known/jwks.json
+OAuth2 client_credentials: /oauth/token issuing tokens with scope claim included and aud=scholar-platform
+Fix scope emission in JWTs; include space-delimited scope and role claims aligned to the platform (examples: scholarships:read, scholarships:write, applications:read, notify:send, students:read, admin:*)
+Provision M2M clients for:
+scholarship_api, scholarship_agent, scholarship_sage, auto_page_maker, provider_register, auto_com_center
+Provide a test harness log showing all clients obtained tokens with expected scopes and TTL.
+Health checks: GET /healthz, GET /.well-known/jwks.json should respond with correct keys.
+Integration points to verify
+
+scholarship_api validates RS256 tokens using JWKS
+auto_com_center S2S authorization (client_credentials) on /api/notify
+scholarship_agent obtains token to call scholarship_api and auto_com_center
+student_pilot/provider_register browser JWT flow plan documented
+Third-party
+
+Email/MFA provider optional for today; prefer email-only OTP if implemented
+Go/No-Go
+
+GO if JWKS + token issuance + scope/roles are correct and tested against at least scholarship_api and auto_com_center
+If NO, ETA plus specific list of scopes/clients remaining
+SECTION B — scholarship_api (Only Agent3 working on scholarship_api should use this)
+Scope
+
+Public API and internal platform API with JWT protection, CORS, rate limiting, circuit breakers, openapi.json, swagger UI.
+Must-do today
+
+Enforce RS256 JWT using scholar_auth JWKS; temporary HS256 path is acceptable only with a feature flag that flips to RS256 when scholar_auth is live
+Exact-origin CORS: student_pilot and provider_register only
+Request timeout 5s, basic in-memory rate limiter
+Circuit breakers for DB and external services (auth, messaging)
+Serve /openapi.json and /docs (Swagger)
+Health endpoints: /healthz and /readyz
+Integration points
+
+Accept M2M tokens from scholarship_agent and scholarship_sage for scholarships:read and students:read
+Provide endpoints used by scholarship_agent jobs (deadlines, status)
+Third-party
+
+None mandatory today; DB already configured
+Go/No-Go
+
+GO if swagger is live, JWT enforcement on, CORS correct, and health checks pass
+SECTION C — auto_com_center (Only Agent3 working on auto_com_center should use this)
+Scope
+
+Centralized email/SMS notification service with S2S /api/notify, SendGrid/Twilio integrations, suppression, audit logs, strict templates.
+Must-do today
+
+Operate in DRY-RUN mode immediately
+Enforce exact-origin CORS (S2S preferred; browser calls blocked unless explicitly allowed)
+S2S /api/notify endpoint ready; accept OAuth2 client_credentials tokens with scope notify:send once scholar_auth is live
+Suppression/audit logging verified, webhooks ready for SendGrid/Twilio
+Evidence: CORS preflight allowed/denied tests; /healthz, /api/notify/status
+Third-party for live send
+
+SendGrid domain DNS verification (SPF, DKIM, DMARC)
+Twilio number already configured; sandbox sends acceptable
+Go/No-Go
+
+Conditional GO today for DRY-RUN. For live sends, DNS verification required.
+Provide ETA for flipping to live after DNS (typical 24–48h)
+SECTION D — student_pilot (Only Agent3 working on student_pilot should use this)
+Scope
+
+B2C student app. Auth-enabled UX, analytics, calling scholarship_api and scholarship_sage, and triggering notifications through auto_com_center via upstream services.
+Must-do today
+
+GA4 event wiring live (first_document_upload, application_submitted, application_status_viewed) with robust retry queue
+Auth feature-flag: integrate scholar_auth tokens when JWKS is live; otherwise operate in demo mode with clear limitations
+CORS and error handling; non-blocking analytics
+Evidence: /api/healthz, GA4 debug plan, zero hardcoded URLs in code
+Integration points
+
+scholarship_api for data (JWT)
+scholarship_sage recommendations (JWT)
+Notifications go via scholarship_agent → auto_com_center; do not call auto_com_center directly from the browser
+Third-party
+
+GA4 Measurement ID
+Optional: Postmark/SendGrid if you implement direct OTP; otherwise rely on scholar_auth
+Go/No-Go
+
+GO for demo mode today if JWT not ready; GO for production once scholar_auth and scholarship_api enforce JWT
+Provide ETA for production readiness
+SECTION E — provider_register (Only Agent3 working on provider_register should use this)
+Scope
+
+B2B provider portal. JWT/RBAC enforced, emits analytics events, and triggers notifications via auto_com_center (S2S through backend).
+Must-do today
+
+Implement/enable JWT middleware using scholar_auth JWKS
+GA4 events: first_scholarship_created, applicant_status_updated
+S2S client to auto_com_center with notify:send via OAuth2 (backend-to-backend)
+Evidence: curl tests for JWT-protected routes, GA4 verification steps
+Integration points
+
+scholarship_api for scholarship creation and application management
+auto_com_center via S2S /api/notify
+Third-party
+
+GA4 Measurement ID
+Go/No-Go
+
+NO-GO if JWT/RBAC not enforced. If blocked by JWKS, state ETA and steps remaining.
+SECTION F — scholarship_agent (Only Agent3 working on scholarship_agent should use this)
+Scope
+
+Autonomous jobs: canary notification, deadline reminders, status sync. S2S clients to scholarship_api and auto_com_center with correlation IDs.
+Must-do today
+
+Configure S2S OAuth2 client (client_credentials) to get tokens from scholar_auth with proper scope (scholarships:read, students:read, notify:send)
+Implement/start canary job on boot and every 30m. Canary target: auto_com_center (dry-run ok). Log correlationId across calls.
+Implement daily jobs: deadline reminders (10:00 UTC), status sync (03:00 UTC)
+Evidence: Logs of canary success showing S2S token acquisition, scholarship_api health check, and notify call (dry-run confirmation)
+Integration points
+
+scholar_auth /oauth/token
+scholarship_api endpoints (deadlines, status)
+auto_com_center /api/notify
+Third-party
+
+None required beyond internal services; email can be dry-run via auto_com_center until DNS verification completes
+Go/No-Go
+
+GO if canary runs and all S2S flows succeed (dry-run acceptable).
+If env not configured, provide exact env list and ETA; aim to go live within 60 minutes after credentials are set.
+SECTION G — auto_page_maker (Only Agent3 working on auto_page_maker should use this)
+Scope
+
+SEO engine and PDF asset generation, protected by JWT, with object storage for outputs.
+Must-do today
+
+Enforce RS256 JWT (feature-flag fallback allowed temporarily)
+POST /api/generate accepts scholarshipId, returns signed URL for generated PDF
+No hardcoded URLs; template-driven assets
+Evidence: cURL example with Authorization: Bearer <S2S_TOKEN> returning 200 and signed URL; latency target ~200ms
+Integration points
+
+scholar_auth for S2S token
+scholarship_api for scholarship data if needed by generator
+Third-party
+
+Object storage (configured), none additional required for Gate 0
+Go/No-Go
+
+GO if token validation functioning (or feature-flag fallback for same-day testing), endpoint returns signed URLs, and logs are structured.
+SECTION H — scholarship_sage (Only Agent3 working on scholarship_sage should use this)
+Scope
+
+Recommendations service with transparent reasons and measurable latency, JWT-gated.
+Must-do today
+
+POST/GET /api/recommendations requires RS256 JWT; enforce RBAC
+Deterministic rules-based scoring baseline (GPA, major, state, interests); return reasons and scoring decisions
+P95 latency close to 120ms; enable simple cache and correlationId logs
+Evidence: curl example with Authorization: Bearer <student_jwt>, example response including reasons, P95 metrics snapshot
+Integration points
+
+scholarship_api via S2S for student/scholarship data (scopes: students:read, scholarships:read)
+scholar_auth for JWT validation and S2S tokens
+Third-party
+
+None required today; Redis optional for latency
+Go/No-Go
+
+GO when JWT is validated and responses are correct with reasons; if JWT blocked by scholar_auth, document ETA and dependencies.
+Mandatory test commands every app must provide (adapt paths for your app)
+
+Health: Run: curl -i <APP_BASE_URL>/healthz
+Readiness: Run: curl -i <APP_BASE_URL>/readyz (if implemented)
+CORS preflight (if applicable): Run: curl -i -X OPTIONS -H "Origin: <allowed-origin>" <APP_BASE_URL>/<route>
+JWT enforcement: Run with and without Authorization header and show expected 401/403 vs 200
+OpenAPI (if applicable): Run: curl -i <APP_BASE_URL>/openapi.json and load <APP_BASE_URL>/docs in a browser
+ARR ignition guidance (for the app’s report)
+
+If you can go live today: ARR ignition can start when student_pilot + provider_register are both live with scholar_auth + scholarship_api + auto_com_center (dry-run acceptable initially for emails). Provide a date. Default target if blocked: Dec 1, 2025.
+B2C ARR depends primarily on student_pilot activation events and credit purchases; B2B ARR depends on provider_register usage and the 3% provider fee. State how your app enables these.
+Third-party systems checklist (only include those relevant to your app)
+
+SendGrid: Account + domain DNS (SPF, DKIM, DMARC) for live email
+Twilio: Number provisioned and webhook for delivery receipts
+Google Analytics 4: Measurement ID configured
+Stripe: Secret key + webhook secret (if/when payments are turned on)
+DNS/Cloud provider: Domain and records for any verified sending requirements
+Database: Managed Postgres (Neon) already available
+Redis: Optional for performance
+Deliverable
+
+Produce a single “FINAL SECTION REPORT” for your app using the template above. Start the report with:
+APP NAME: <your app>
+APP_BASE_URL: <base url>
+Success criteria for today
+
+At minimum, DRY-RUN or demo-mode integration for cross-app calls is operational today with evidence.
+If live mode is blocked by third-party or upstream dependencies (e.g., SendGrid DNS, scholar_auth JWKS), provide:
+A precise, short ETA (e.g., Nov 16, 2025, 12:00 MST) with stepwise plan
+ARR ignition date and dependencies
+The exact third-party actions required to remove the block
+Agent3, proceed now. Use only the section for your assigned app. Include your app name and APP_BASE_URL in all outputs and reports.
