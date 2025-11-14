@@ -83,6 +83,7 @@ from routers.applications import router as applications_router
 from routers.prompts import router as prompts_router
 from routers.evidence import router as evidence_router
 from routers.debug_routes import router as debug_routes_router
+from routers.docs_workaround import router as docs_workaround_router
 from schemas.error_responses import ERROR_RESPONSES
 from utils.logger import setup_logger
 
@@ -457,6 +458,7 @@ app.include_router(observability_api_router)  # New: Daily ops dashboards and KP
 # CEO DIRECTIVE 2025-11-12: Evidence API for executive review
 app.include_router(evidence_router, tags=["Evidence"])
 app.include_router(debug_routes_router, tags=["Diagnostics"])
+app.include_router(docs_workaround_router)  # GATE 0 FIX: Manual Swagger/ReDoc mounting
 
 # Metrics already setup above - this was the wrong location causing route shadowing
 
