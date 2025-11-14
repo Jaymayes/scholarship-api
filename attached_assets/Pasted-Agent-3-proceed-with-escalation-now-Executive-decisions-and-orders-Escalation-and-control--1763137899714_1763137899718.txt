@@ -1,0 +1,64 @@
+Agent 3 — proceed with escalation now.
+
+Executive decisions and orders
+
+Escalation and control
+Workspace access: SLA has been breached. Escalate immediately to Ops Director and Platform Lead. If access is not granted within 15 minutes of this message, take direct control and mirror the workspaces under the CEO org. Redirect DNS when ready; freeze legacy workspaces post-cutover.
+Authority: You and the Security Lead are authorized to provision, migrate, and reconfigure scholar_auth, scholarship_api, and auto_com_center immediately.
+2. Gate 0 critical path (hard deadline: Nov 15, 10:30 AM MST)
+
+scholar_auth (Owner: Security Lead, you drive; Due: Nov 15, 09:30 AM MST)
+
+Enforce MFA for admin/provider_admin now.
+Publish JWKS (RS256), 300s TTL; document and stage key-rotation SOP; include KID, overlapping rotation, and revocation procedure.
+Lock CORS allowlist to student_pilot and provider_register; block wildcards.
+Seed OAuth2 client-credentials for all services; finalize RBAC scopes (student, provider_admin, reviewer, super_admin).
+Evidence: JWKS endpoint, sample JWTs for 8/8 clients, RBAC claims map, MFA enforcement proof, CORS test log.
+scholarship_api (Owner: Platform Lead with you; Due: Nov 15, 10:30 AM MST)
+
+Infra remediation: move to Reserved VM/Autoscale; min 2, max 10 instances; health checks; enable keep-alive and HTTP/2; set GC/worker concurrency properly.
+Add connection pooling (e.g., pgbouncer or ORM pool, 20–50 connections per instance).
+Provision Redis for rate limiting and background ops; enable circuit breakers and request timeouts.
+JWT middleware with JWKS caching/auto-refresh; /readyz must expose auth_jwks status.
+k6 retest: 250–300 RPS, 10 min, success criteria P95 ≤ 120ms and error rate < 0.5%.
+Evidence: infra-as-config snapshot, pool/Redis configs, k6 run ID and summary, before/after latency chart, /readyz output.
+3. Gate 1 canary — auto_com_center (Owner: Platform Lead with you; Start: immediately after access)
+
+Run the 30-minute 250 RPS k6 Cloud canary you prepared. Keep the relaxed P95 target for this evidence run if needed, but we must retest to 120ms P95 by Nov 17.
+Provision and verify SendGrid and Twilio today.
+Approvals: Pre-approved. Proceed with account setup, API keys in secrets, domain verification (SPF, DKIM, DMARC), and SMS sender registration.
+Evidence: k6 run ID, ESP/SMS verification screenshots, bounce/complaint webhooks configured, signed domain records.
+4. Gate 2 frontends — unblock auth integration (Owner: Frontend Lead; Start: upon Gate 0 pass; Due: Nov 18, 12:00 PM MST)
+
+Integrate scholar_auth flows, secure token storage, 401/refresh handling.
+No hardcoded URLs (already completed) — keep the fail-fast production enforcement.
+Evidence: E2E happy-path recordings for Student and Provider journeys; telemetry events firing.
+5. Gate 3 scholarship_sage (Owner: Data/ML Lead; Due: Nov 18, 6:00 PM MST)
+
+Re-run accuracy with real M2M tokens post Gate 0; target ≥85%.
+Evidence: evaluation report, traceability logs, P95 confirm ≤150ms.
+Risk posture and ARR Nov 20
+
+Current status: Gate 0 red. ARR Ignition (Nov 20) remains achievable only if Gate 0 passes by the hard deadline above. If the k6 re-test on scholarship_api does not achieve P95 ≤120ms and error rate <0.5% by Nov 15, 10:30 AM MST, we will pivot to a constrained soft launch (B2C pilot + gated B2B provider onboarding) and defer full-scale traffic until remediation completes.
+Decision checkpoint: Nov 15, 12:30 PM MST. You will present pass/fail, evidence packets, and a go/no-go recommendation for full ARR ignition.
+Budgets and provisioning — approved
+
+k6 Cloud credits (as proposed).
+SendGrid, Twilio production accounts; domain verification today.
+Redis and Reserved VM/Autoscale upgrades for scholarship_api.
+If Replit autoscale proves insufficient, you are authorized to stage a parallel deployment on a secondary platform for the API and switch via DNS.
+Compliance and security directives
+
+FERPA/COPPA: Audit logs enabled across auth, API, and agent services; student identifiers hashed in logs; least-privilege scopes enforced.
+Key rotation SOP: Document and attach to evidence; include rotation cadence and emergency revoke.
+No wildcards in CORS; no black-box ML. Provide decision trace logs in scholarship_sage.
+Reporting cadence
+
+War room: Daily 9:00 AM MST with red/amber/green by gate.
+Hourly updates during Gate 0 until pass/fail.
+Evidence bundles: attach run IDs, screenshots, config diffs, and /readyz outputs to your existing evidence folders.
+Direct answers to your questions
+
+Escalation: Yes — escalate now. If access is not granted within 15 minutes, take direct control and proceed per the above.
+Next moves: Prioritize scholar_auth and scholarship_api Gate 0 items immediately; keep the auto_com_center canary running and deliver the report. Notify me the moment access is obtained or when you begin mirroring.
+Stay on the clock. I expect your first escalation confirmation in 15 minutes and the Gate 0 remediation start within the hour.
