@@ -7,10 +7,10 @@ Fixes QA issues with authentication bypass vulnerabilities
 from fastapi import Depends, HTTPException
 
 from config.settings import settings
-from middleware.auth import get_current_user
+from middleware.auth import User, get_current_user
 
 
-async def require_auth_unless_public() -> dict | None:
+async def require_auth_unless_public() -> User | None:
     """
     Require authentication unless PUBLIC_READ_ENDPOINTS is enabled
     Used as router-level dependency for consistent auth enforcement
@@ -22,7 +22,7 @@ async def require_auth_unless_public() -> dict | None:
     return Depends(get_current_user)
 
 
-async def get_auth_user_optional() -> dict | None:
+async def get_auth_user_optional() -> User | None:
     """
     Get authenticated user if available, otherwise return None
     Used for endpoints that benefit from user context but don't require auth

@@ -1,0 +1,120 @@
+Agent3, acknowledged. Acting as CEO, here are the executive decisions, gates, and deadlines you need to execute immediately. Use this as the single source of truth for the next 72 hours.
+
+Prime decision calls
+
+auto_com_center canary: Run it now. Start the 30‑minute/250 rps canary immediately. If it fails, you’ll have tonight to remediate and a second verification window tomorrow before the 2:00 PM MST deadline. Re-run the same canary tomorrow at 12:00 PM MST to capture the evidence bundle we owe.
+auto_com_center E2E webhook: Do not wait on scholarship_api staging. Proceed with manual event injection to validate auto_com_center → ESP → signed webhooks → receipt handling. If time permits, add a mocked scholarship_api event stream as a second test. Capture receipts and logs.
+scholar_auth S2S auth: Treat this as P0. Scopes, RBAC, and service-to-service authentication must pass Gate 0 tonight. No downstream app will be allowed to go live until this is green.
+Workspace access: Ops must grant Agent3 read access to all eight Replit workspaces within 30 minutes of this directive. If not delivered in 30 minutes, escalate to me and proceed by issuing evidence templates and assigning DRIs to capture artifacts in their repos.
+Go/No‑Go gates and acceptance criteria
+Gate 0: Authentication and service-to-service readiness (must pass by Nov 15, 12:00 PM MST)
+
+scholar_auth
+8/8 M2M clients must obtain JWTs via client_credentials with correct scopes.
+MFA: Enforced for provider and admin roles at next login; optional for students at sign-in this week, targeted enforce date after launch T+14 days.
+CORS: Explicit allowlist for student_pilot, provider_register, admin tools. No wildcards.
+HA: Deploy on reserved VM/autoscale profile; health check liveness/readiness exposed.
+scholarship_api
+Stable JWT validation under load: JWKS cache, backoff/rotation, signature validation with retries. Health endpoint checks DB and scholar_auth JWKS reachability.
+auto_com_center
+Canary evidence: 30 min @ 250 rps, P95 ≤ 120ms, error rate < 0.5%, plus E2E webhook receipts and failure alerting.
+Gate 1: Integration and UX resilience (must pass by Nov 17, 12:00 PM MST)
+
+student_pilot and provider_register fully env-driven; zero hardcoded URLs; graceful API error states.
+scholarship_agent jobs dry-run with audit logs; admin monitoring dashboard functional.
+scholarship_api → auto_com_center event path wired; retries and dead-letter queue defined.
+Gate 2: Performance and BI (must pass by Nov 19, 12:00 PM MST)
+
+scholarship_sage recommendation accuracy verified on production-like dataset; load test passes without degradation.
+BI dashboards wired for daily new users, conversion, ARPU, provider activation, CAC proxy metrics.
+Immediate execution plan and deadlines
+
+Tonight (execute now)
+auto_com_center
+Run canary now; publish raw output and summary by EOD.
+Execute E2E webhook via manual injection; capture receipts and signed verification logs.
+Confirm all third-party secrets stored in Replit Secrets and rotated notes documented.
+scholar_auth (P0)
+Resolve scope whitelist definitively; ensure every service scope used by the 8 clients is present.
+Confirm 8/8 M2M JWT issuance with correct aud/scope; attach curl scripts and tokens redacted headers.
+Lock down CORS to approved origins; attach config diff.
+Confirm reserved VM/autoscale setting and health endpoints; attach screenshots and config.
+scholarship_api
+Land patch plan for JWKS caching/backoff and signature validation; include k6 plan at 300 rps sustained.
+Nov 14, by 2:00 PM MST
+auto_com_center: Submit canary evidence bundle, E2E webhook receipts, rollback procedure (RTO ≤ 5 min), and secrets audit.
+student_pilot and provider_register: 100% env-driven config; attach ENV schema, grep proof of zero hardcoded URLs, and screenshots of error states.
+Nov 15, by 12:00 PM MST
+Gate 0 decision. If scholar_auth is not green, we hold the entire train.
+Nov 17, by 12:00 PM MST
+Gate 1 decision. Integration and UX resilience complete.
+Nov 19, by 12:00 PM MST
+Gate 2 decision. Performance and BI complete.
+ARR ignition target: Nov 20, contingent on passing all gates.
+Per‑application directives and reporting format
+For each app, produce the status report in the mandated header format with evidence links. Where evidence is “planned,” convert to “executed” with artifacts before the listed deadline.
+
+APPLICATION NAME: scholar_auth
+APP_BASE_URL: https://scholar-auth-jamarrlmayes.replit.app
+
+Status target: Gate 0 by Nov 15, 12:00 PM MST
+Must-haves: S2S scopes finalized; 8/8 client_credentials JWTs; RBAC claims embedded; CORS allowlist; MFA enforced for provider/admin; HA config.
+Evidence: curl token scripts + outputs, JWKS cache config, CORS config snippet, VM/autoscale screenshots, audit log sample.
+APPLICATION NAME: scholarship_api
+APP_BASE_URL: https://scholarship-api-jamarrlmayes.replit.app
+
+Status target: Gate 0 dependencies green; Gate 1 by Nov 17
+Must-haves: JWT validation stability (JWKS caching+retry), health check includes DB+JWKS; business rule validation tightened; event triggers to auto_com_center.
+Evidence: failing/passing traces, k6 script/results, /health extended checks output, validation test cases.
+APPLICATION NAME: student_pilot
+APP_BASE_URL: https://student-pilot-jamarrlmayes.replit.app
+
+Status target: Nov 14, 2:00 PM MST
+Must-haves: Zero hardcoded URLs; ENV schema; resilient error states; offline mode decision memo (defer unless mobile scope is confirmed).
+Evidence: grep proof, config docs, screenshots, E2E plan draft.
+APPLICATION NAME: provider_register
+APP_BASE_URL: https://provider-register-jamarrlmayes.replit.app
+
+Status target: Nov 14, 2:00 PM MST
+Must-haves: Env-only config; resilient error states; RBAC checks verified once scholar_auth lands.
+Evidence: grep proof, config docs, screenshots.
+APPLICATION NAME: scholarship_sage
+APP_BASE_URL: https://scholarship-sage-jamarrlmayes.replit.app
+
+Status target: Nov 19, 12:00 PM MST
+Must-haves: Perf test on recommendation engine; accuracy validation; S2S auth with scholar_auth.
+Evidence: load test results, accuracy report, token call proofs.
+APPLICATION NAME: scholarship_agent
+APP_BASE_URL: https://scholarship-agent-jamarrlmayes.replit.app
+
+Status target: Nov 17, 12:00 PM MST
+Must-haves: Complete env refactor properly (no type-assertion bypasses); scheduled job dry-runs; admin monitoring; audit logs; S2S auth.
+Evidence: code diff showing type-safe config validation, dry-run logs, monitoring dashboard screenshots, audit log samples.
+APPLICATION NAME: auto_page_maker
+APP_BASE_URL: https://auto-page-maker-jamarrlmayes.replit.app
+
+Status: GO‑LIVE READY
+Immediate actions: Submit property to GSC, upload sitemap, enable daily SEO dashboard (indexed URLs, CTR, conversions).
+Evidence: GSC property screenshot, sitemap accepted confirmation.
+APPLICATION NAME: auto_com_center
+APP_BASE_URL: https://auto-com-center-jamarrlmayes.replit.app
+
+Status target: Nov 14, 2:00 PM MST
+Must-haves: Canary run evidence; E2E webhook receipts; delivery failure monitoring; secrets audit; no hardcoded links (ENV-driven).
+Evidence: canary logs/summary, webhook receipts, alerting screenshots, secrets inventory.
+Operational guardrails and policies
+
+No “black box” behavior: All agents must produce audit logs for automated actions.
+Security: Rotate any secrets touched during testing; commit CORS and RBAC changes behind PRs with reviewer sign-off.
+Cost/scale: Use reserved VMs and connection pooling for scholar_auth and scholarship_api. Approve incremental spend to meet 99.9% uptime and ~120ms P95 targets.
+Rollback: Blue/green or canary with documented RTO ≤ 5 minutes for messaging and auth.
+Resource and escalation
+
+Ops: Grant Agent3 read access to all eight workspaces within 30 minutes. If blocked, escalate to me and concurrently have DRIs paste evidence into their repos following the required header format.
+Architect: On-call tonight for scholar_auth Gate 0 until 11:30 PM MST.
+War room cadence: 9:00 AM, 2:00 PM, 6:00 PM MST daily. Gate reviews on the times above.
+Answering your last open items
+
+Canary now vs. tomorrow: Run now, and re-run tomorrow at 12:00 PM MST for the formal evidence bundle.
+scholarship_agent env refactor: Approved 3 focused hours. Replace type assertions with validated config accessors; open a PR with tests. Deadline: Nov 14, 11:00 AM MST.
+Send me your first evidence bundle by EOD: auto_com_center canary output, scholar_auth 8/8 token issuance proof, and the updated CORS/MFA configs. If any gate slips, notify immediately with a revised timeline and the specific blocker owner.
