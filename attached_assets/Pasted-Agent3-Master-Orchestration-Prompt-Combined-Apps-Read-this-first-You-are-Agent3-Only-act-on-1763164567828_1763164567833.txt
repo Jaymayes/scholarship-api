@@ -1,0 +1,346 @@
+Agent3 Master Orchestration Prompt (Combined Apps)
+
+Read this first
+
+You are Agent3. Only act on the section that exactly matches your assigned app. Ignore all other sections.
+Output a single Executive Status Report for your app using the Report Template below.
+Goal: Get the app 100% ready and working with all other apps today. If you cannot ship today, you must provide:
+Precise Go-Live ETA
+ARR ignition date and how this app contributes
+Third-party systems that must be in place
+Every report must begin by naming the app and printing the base URL exactly as provided.
+Global standards (apply to every app)
+
+Security and auth
+RS256 JWT, JWKS fetch from scholar_auth
+Enforce scopes and roles on protected endpoints; no hardcoded tokens or secrets
+Reliability and SLOs
+99.9% uptime; P95 latency ≤ 120 ms (unless noted)
+Health endpoints: /healthz and /readyz return HTTP 200 when healthy/ready
+Correlation IDs on all logs and downstream HTTP calls
+Config discipline
+Zero hardcoded URLs; all service addresses via environment variables
+Fail fast if required env vars are missing
+Observability
+Structured logs with correlationId/requestId
+Minimal OpenAPI or endpoint docs exposed at /openapi.json or /docs if applicable
+Ethics and data protection
+No academic dishonesty features
+FERPA/COPPA-aware data handling; least privilege scopes
+Report Template (use verbatim for your output)
+
+EXECUTIVE STATUS REPORT — {APP NAME}
+
+APP_BASE_URL: {BASE URL}
+
+Timestamp (UTC): {ISO8601}
+
+Overall R/A/G: {Green|Amber|Red}
+
+Go/No-Go Decision: {GO|Conditional GO|NO-GO} with one-line reason
+
+What Changed Today:
+
+Bulleted list of new/modified files, fixes, and completed tasks
+Tests and Evidence:
+
+Health/readiness curl commands and expected results
+Auth enforcement curl examples (401 without token, 403 without scope, 200 with correct scope)
+Any performance checks and SLO status
+Must-Haves Checklist:
+
+Exact-origin CORS (where applicable)
+RS256 JWT + JWKS validation enforced
+Scopes enforced per endpoint
+Zero hardcoded URLs/secrets
+Correlation ID logging across downstream calls
+OpenAPI/endpoint docs (if applicable)
+Any app-specific must-haves (see your section)
+Required Environment Variables (exact names and example values)
+
+Open Blockers (ID, description, owner, impact, ETA)
+
+Third-Party Prerequisites (if any) with status and ETA
+
+Go-Live Plan (step-by-step, today)
+
+If not today: Go-Live ETA and ARR Ignition Date with rationale
+
+ARR Impact (how this app drives B2C and/or B2B revenue)
+
+Next Actions (you and others; owners + timing)
+
+Section A — scholar_auth
+APP NAME: scholar_auth
+APP_BASE_URL: https://scholar-auth-jamarrlmayes.replit.app
+
+Your objective today
+
+Issue RS256 JWTs with a working JWKS endpoint and a reliable OAuth2 token endpoint.
+Access tokens must include scope and roles (or provide a temporary permissions claim mapping each scope), to unblock downstream scope enforcement today.
+Provision S2S clients/scopes for all internal apps.
+Must-haves
+
+Endpoints:
+JWKS: /.well-known/jwks.json
+Token: /oauth/token (client_credentials, authorization_code+PKCE)
+Issuer (iss): https://scholar-auth-jamarrlmayes.replit.app
+Audience (aud): scholar-platform
+Token content (for M2M access tokens):
+scope (space-delimited, required today)
+roles (e.g., ["service"])
+exp/iAT/jti/iss/aud/sub
+Temporary fallback allowed only if scope cannot be added today: permissions: ["scholarships:read", ...]; document this in report and inform all teams to validate permissions until scope is fixed.
+Scopes to support:
+scholarships:read, scholarships:write, students:read, applications:read, applications:write, notify:send, assets:generate
+S2S clients (one per backend service):
+scholarship_api, scholarship_agent, scholarship_sage, auto_com_center, auto_page_maker, provider_register
+SLO: P95 token issuance ≤ 120 ms
+Required env vars
+
+RSA_PRIVATE_KEY, RSA_PUBLIC_KEY (or JWK set)
+AUTH_ISSUER=https://scholar-auth-jamarrlmayes.replit.app
+AUTH_AUDIENCE=scholar-platform
+DATABASE_URL (if used for client registry)
+OPTIONAL: REDIS_URL for rate limits
+Third-party prerequisites
+
+None mandatory; Postgres/Redis optional for today.
+Tests to run
+
+curl -i https://scholar-auth-jamarrlmayes.replit.app/.well-known/jwks.json → 200
+client_credentials test for each app; decode JWT and show scope present
+401 for invalid client, 400 for unknown or unauthorized scopes
+Go/no-go
+
+NO-GO if scope (or temporary permissions) is not present and documented. Conditional GO allowed with temporary permissions claim + downstream acknowledgment.
+Section B — scholarship_api
+APP NAME: scholarship_api
+APP_BASE_URL: https://scholarship-api-jamarrlmayes.replit.app
+
+Your objective today
+
+Enforce RS256 JWT and scope checks across core endpoints.
+Publish OpenAPI; CORS exact-origin for student_pilot and provider_register.
+Integrate with scholar_auth for S2S and user JWTs.
+Must-haves
+
+Core endpoints (JWT+scope):
+GET /api/v1/students/{id} (students:read)
+GET /api/v1/scholarships (scholarships:read)
+POST /api/v1/scholarships (scholarships:write)
+GET /api/v1/applications (applications:read)
+PATCH /api/v1/applications/{id} (applications:write)
+Health: /healthz, /readyz → 200
+OpenAPI: /openapi.json or /docs
+CORS allowlist: https://student-pilot-jamarrlmayes.replit.app, https://provider-register-jamarrlmayes.replit.app
+Global request timeout 5s; simple rate limit; zero hardcoded URLs
+Required env vars
+
+AUTH_JWKS_URL=https://scholar-auth-jamarrlmayes.replit.app/.well-known/jwks.json
+AUTH_ISSUER=https://scholar-auth-jamarrlmayes.replit.app
+AUTH_AUDIENCE=scholar-platform
+DATABASE_URL
+OPTIONAL: REDIS_URL
+Third-party prerequisites
+
+None mandatory for today.
+Tests
+
+401 no token; 403 token without required scope; 200 with correct scope
+CORS preflight from allowed and denied origins
+Section C — auto_com_center
+APP NAME: auto_com_center
+APP_BASE_URL: https://auto-com-center-jamarrlmayes.replit.app
+
+Your objective today
+
+Operate in DRY-RUN mode with a secure S2S /api/notify endpoint (notify:send scope).
+Exact-origin CORS for browser endpoints; server-to-server preferred.
+Email/SMS templates env-driven; suppression and audit logs function.
+Must-haves
+
+Endpoints:
+POST /api/notify (S2S only; requires notify:send scope)
+GET /api/notify/status (auth required)
+/healthz, /readyz → 200
+DRY_RUN=true default until DNS verification complete
+Templates with correlationId propagation
+CORS allowlist: only internal frontends if any browser exposure
+Required env vars
+
+AUTH_JWKS_URL, AUTH_ISSUER, AUTH_AUDIENCE
+DRY_RUN=true
+SENDGRID_API_KEY (live later), TWILIO_AUTH (live later)
+SUPPRESSION_DB_URL or DATABASE_URL
+Third-party prerequisites
+
+SendGrid domain authentication (SPF/DKIM/DMARC) for live send
+Twilio number for SMS
+Not mandatory for DRY-RUN today
+Tests
+
+Health/readiness 200
+POST /api/notify: 401 without token; 403 without notify:send; 200 in DRY-RUN with valid token
+Section D — student_pilot
+APP NAME: student_pilot
+APP_BASE_URL: https://student-pilot-jamarrlmayes.replit.app
+
+Your objective today
+
+Frontend ready with GA4 events, authenticated data fetch from scholarship_api, and recommendations from scholarship_sage.
+No hardcoded URLs; exact-origin CORS in backends.
+Must-haves
+
+GA4 events: first_document_upload, application_submitted, application_status_viewed
+Auth: Integrate with scholar_auth (PKCE); logout on 401/403
+Data:
+GET scholarships, applications from scholarship_api
+GET recommendations from scholarship_sage
+Feature flags to run in demo mode if auth is not fully available
+Required env vars
+
+VITE_API_BASE=https://scholarship-api-jamarrlmayes.replit.app
+VITE_SAGE_BASE=https://scholarship-sage-jamarrlmayes.replit.app
+VITE_AUTH_BASE=https://scholar-auth-jamarrlmayes.replit.app
+VITE_GA_MEASUREMENT_ID=G-XXXXXXX
+Third-party prerequisites
+
+GA4 property
+Tests
+
+Browser network: 401 without login; 200 after login
+GA4 DebugView shows events once per action
+Section E — provider_register
+APP NAME: provider_register
+APP_BASE_URL: https://provider-register-jamarrlmayes.replit.app
+
+Your objective today
+
+JWT-protected provider flows, GA4 events, and S2S notify to auto_com_center.
+Prepare Stripe onboarding for providers and 3% platform fee.
+Must-haves
+
+JWT RS256 via scholar_auth; RBAC for provider role
+GA4 events: first_scholarship_created, applicant_status_updated
+S2S client to auto_com_center (notify:send)
+Optional today but required for payments: Stripe Connect Express onboarding and application_fee_percent=3 for relevant charges
+Required env vars
+
+AUTH_JWKS_URL, AUTH_ISSUER, AUTH_AUDIENCE
+AUTO_COM_CENTER_BASE=https://auto-com-center-jamarrlmayes.replit.app
+STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET (if enabling today)
+VITE_GA_MEASUREMENT_ID
+Third-party prerequisites
+
+Stripe account and onboarding (live payments)
+GA4 property
+Tests
+
+401/403 for unauthorized; 200 on valid provider JWT
+POST to /api/notify in auto_com_center with proper JWT
+Section F — scholarship_agent
+APP NAME: scholarship_agent
+APP_BASE_URL: https://scholarship-agent-jamarrlmayes.replit.app
+
+You are here. Only use this section.
+
+Your objective today
+
+Run canary plus two daily jobs in production: deadline reminders and status sync.
+Authenticate via scholar_auth (client_credentials). Notify via auto_com_center. Read via scholarship_api.
+Strict environment-driven configuration; end-to-end correlation IDs.
+Must-haves
+
+Jobs:
+canary (on startup and every 30 minutes): token → health check scholarship_api → health check auto_com_center → send test notification (DRY-RUN acceptable)
+deadline-reminders (10:00 UTC daily): fetch scholarships + student timelines → send reminders
+status-sync (03:00 UTC daily): refresh stale applications
+Clients:
+scholar_auth client_credentials with token caching
+HTTP clients to scholarship_api and auto_com_center include correlationId
+Health/readiness endpoints
+Required env vars
+
+S2S_TOKEN_URL=https://scholar-auth-jamarrlmayes.replit.app/oauth/token
+S2S_CLIENT_ID=scholarship_agent
+S2S_CLIENT_SECRET=REDACTED
+SCHOLARSHIP_API_BASE_URL=https://scholarship-api-jamarrlmayes.replit.app
+AUTO_COM_CENTER_BASE_URL=https://auto-com-center-jamarrlmayes.replit.app
+CANARY_NOTIFICATION_EMAIL=ceo@scholaraiadvisor.test
+Scopes required
+
+scholarships:read, students:read, notify:send
+Third-party prerequisites
+
+None (internal-only dependencies)
+Tests
+
+curl -i https://scholarship-agent-jamarrlmayes.replit.app/healthz → 200
+curl -i https://scholarship-agent-jamarrlmayes.replit.app/readyz → 200
+Validate canary logs show token acquisition, service health checks, and notification (DRY-RUN)
+Go/no-go
+
+GO if canary executes successfully with evidence
+Conditional GO if only env secrets are missing; provide exact env list and ETA ≤ 60 minutes after provisioning
+Section G — auto_page_maker
+APP NAME: auto_page_maker
+APP_BASE_URL: https://auto-page-maker-jamarrlmayes.replit.app
+
+Your objective today
+
+JWT-protected POST /api/generate for scholarship assets and SEO pages; produce signed URLs.
+No hardcoded URLs; object storage configured; deterministic templates.
+Must-haves
+
+Endpoints:
+POST /api/generate (requires assets:generate and scholarships:read if fetching data)
+/healthz, /readyz → 200
+Security headers and correlationId logging
+SLO: P95 ≤ 200 ms if rendering heavy PDF; 120 ms for metadata-only ops
+Required env vars
+
+AUTH_JWKS_URL, AUTH_ISSUER, AUTH_AUDIENCE
+OBJECT_STORAGE_ENDPOINT, OBJECT_STORAGE_BUCKET, OBJECT_STORAGE_KEY, OBJECT_STORAGE_SECRET
+SCHOLARSHIP_API_BASE=https://scholarship-api-jamarrlmayes.replit.app
+Third-party prerequisites
+
+Object storage (e.g., S3-compatible). For today, any S3-compatible storage is acceptable.
+Tests
+
+401 without token; 403 missing assets:generate; 200 with correct scope; returns signed URL
+Section H — scholarship_sage
+APP NAME: scholarship_sage
+APP_BASE_URL: https://scholarship-sage-jamarrlmayes.replit.app
+
+Your objective today
+
+Deterministic recommendations API with transparent reasons; RS256 JWT + RBAC.
+S2S to scholarship_api for student and scholarship data.
+Must-haves
+
+Endpoint:
+GET /api/recommendations?studentId=... (students:read, scholarships:read)
+Deterministic scoring; reasons JSON returned with score components
+OpenAPI at /openapi.json
+Exact-origin CORS allowlist for student_pilot
+Required env vars
+
+AUTH_JWKS_URL, AUTH_ISSUER, AUTH_AUDIENCE
+SCHOLARSHIP_API_URL=https://scholarship-api-jamarrlmayes.replit.app
+S2S_TOKEN_URL, S2S_CLIENT_ID, S2S_CLIENT_SECRET (if doing S2S fetches)
+Third-party prerequisites
+
+None mandatory for today.
+Tests
+
+401/403 enforcement; 200 with correct scopes; latency within SLO
+ARR ignition guidance (for every app)
+
+If live today: Provide ARR ignition date within 7–14 days and describe exact revenue levers this app unlocks (B2C credit sales; B2B 3% provider fee; SEO-driven organic CAC reduction via auto_page_maker).
+If not live today: Provide a realistic ETA and the earliest date ARR can begin given upstream dependencies and third-party prerequisites.
+Deliverable
+
+Produce the Executive Status Report for your app now, using only your section and the Report Template. Begin your report by printing:
+APP NAME: {exact app name}
+APP_BASE_URL: {exact base URL from section header}
