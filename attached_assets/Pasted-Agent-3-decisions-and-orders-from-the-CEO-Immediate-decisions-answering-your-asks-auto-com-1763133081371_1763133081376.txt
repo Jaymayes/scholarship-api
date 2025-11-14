@@ -1,0 +1,96 @@
+Agent 3 — decisions and orders from the CEO
+
+Immediate decisions (answering your asks)
+
+auto_com_center canary: Go with Option A. Run the 30-minute k6 Cloud canary now at 250 RPS to bank evidence. Close the hardening gaps (env-based template URLs, delivery bounce/drop monitoring, secrets vault audit) within 24 hours. Follow-up SLO test at 120ms P95 by Nov 17, 6 PM MST.
+Workspace to open first: scholar_auth. Ops is ordered to grant you and Security Lead immediate access, with scholarship_api access in parallel. SLA: 15 minutes. If blocked >30 minutes, escalate; if blocked >2 hours, you take direct control.
+Config validation approach: Enforce fail-fast REQUIRED env vars in production/staging; optional in local dev. Implement a CI preflight that fails builds on missing keys and flags any hardcoded URLs. Ops will populate secrets across all environments today.
+48-hour critical path (no deviations)
+
+Identity and perimeter (tonight → Nov 15, 10:30 AM MST)
+scholar_auth
+
+Lock RBAC scopes for 4 roles (student, provider_admin, reviewer, super_admin).
+Ensure OAuth2 client credentials for all M2M services; JWKS published; 300s TTL; RS256; rotate keys plan documented.
+CORS: strict allowlist to student_pilot and provider_register (prod + staging URLs) only. No wildcards.
+MFA: enforce email OTP for all admin and provider_admin sessions at login and sensitive actions. Defer SSO/Google to Phase 1.1.
+HA: move to Reserved VM/Autoscale as approved; enable health checks and autoscaling policies; connection pooling verified.
+Evidence: tokens for 8/8 clients, RBAC claims, JWKS health, CORS test matrix, MFA flow video, HA config snapshot.
+scholarship_api
+
+JWT middleware: verify signatures/exp/scope; reject on missing/invalid claims; log with correlation IDs.
+JWKS caching with auto-refresh; exponential backoff on JWKS retrieval; circuit breaker logs.
+/readyz must display auth_jwks: healthy/unhealthy with last refresh timestamp and cache age. Fix the current null read.
+Run k6 Cloud: 300 RPS sustained for 10 minutes, 0.1% error budget, P95 ≤ 120ms target; bank full report.
+Evidence: load results, /readyz JSON, middleware unit tests, API OpenAPI spec link.
+2. Platform cross-cuts (Nov 15–16)
+
+CORS consistency: mirror allowlists across scholarship_sage, scholarship_agent, auto_page_maker, auto_com_center.
+Config standardization: promote REQUIRED keys to production/staging. Preflight CI check that fails on:
+Missing REQUIRED keys
+Hardcoded http(s):// patterns in code
+Unregistered service URLs
+Service-to-service auth: all internal calls via OAuth2 client credentials with least-privilege scopes. No shared secrets in code.
+Monitoring: centralize structured logging, 90-day retention, error rate SLO alerts, and bounce/drop alerts for auto_com_center.
+3. End-to-end journeys (Nov 16–18)
+
+student_pilot
+Integrate scholar_auth login + JWT storage/refresh; attach Authorization header automatically; preserve graceful degradation.
+E2E: Student Journey — login, scholarship recommendations, apply/submit.
+provider_register
+Integrate scholar_auth + scholarship_api CRUD; JWT in headers; error states done.
+E2E: Provider Journey — onboard, create scholarship, review applicants, send communications via auto_com_center.
+4. Growth engine and ARR ignition (Nov 17–22)
+
+auto_page_maker
+Minimal viable SEO pipeline: nightly generation of ≥500 pages (category, location, eligibility themes). Schema.org markup, canonical URLs, XML sitemaps, robots.txt. Publish to production domain.
+Accept only signed internal requests; S2S auth enforced.
+Evidence: Search Console property set; first indexing crawl requested; page performance sample with Core Web Vitals.
+Payments
+B2C credits: Stripe card purchase flow in student_pilot by Nov 22. Metrics: ARPU, conversion, refund pathway documented.
+B2B provider fee: interim invoicing (3% monthly) by Dec 1 to avoid blocking ARR if Stripe Connect is not ready. Stripe Connect plan delivered by Dec 8 for automated fee capture.
+Communications
+SendGrid domain verified; templates parameterized with env URLs; Twilio sender verified.
+Canary already running now; 120ms P95 follow-up by Nov 17.
+Gate criteria and owners
+
+Gate 0 (security foundations): scholar_auth + scholarship_api
+Owner: Security Lead (auth), API Lead (api). Due: Nov 15, 10:30 AM MST.
+Pass when: JWT middleware on api; JWKS cache healthy; 300 RPS canary complete; MFA on admin/provider; strict CORS; HA enabled.
+Gate 1 (performance + reliability): auto_com_center + api
+Owner: Platform Lead. Due: Nov 16, 6:00 PM MST.
+Pass when: P95 ≤ 120ms at 250 RPS for notifications; bounce/drop monitoring live; alerts wired; /readyz exposes dependency health.
+Gate 2 (frontend resilience): student_pilot + provider_register
+Owner: Frontend Lead. Due: Nov 18, 12:00 PM MST.
+Pass when: zero hardcoded URLs; full error states; JWT auth integrated; E2E happy-path recorded; analytics tracking enabled.
+Gate 3 (recommendations): scholarship_sage
+Owner: Data/ML Lead. Due: Nov 18, 6:00 PM MST.
+Pass when: S2S auth; recommendation P95 latency ≤ 150ms; ≥85% relevance on internal eval; logs with decision traces.
+Gate 4 (ARR ignition readiness): all apps
+Owner: Program Integrator (you). Due: Nov 20, 5:00 PM MST.
+Pass when: E2E student + provider journeys green in staging; Stripe B2C online; B2B invoicing ready; SEO pages live and indexed.
+Operational directives to Ops/Leads
+
+Ops: Grant Agent 3 + DRIs access to scholar_auth and scholarship_api immediately. Confirm in 15 minutes. If not, I will authorize Agent 3 to take control.
+Security Lead: Publish CORS allowlist and env key registry today. Enforce same across all services by Nov 16.
+API Lead: Fix /readyz JWKS status and run the 300 RPS test in k6 Cloud tonight. Deliver report link by morning stand-up.
+Platform Lead: Move auth, api, and auto_com_center to Reserved VM/Autoscale today. Validate connection pooling and liveness/readiness checks.
+Frontend Lead: Complete Gate 2 E2E with recorded runs once auth/api are green; wire analytics (GA4 or Mixpanel) with event taxonomy for funnel KPIs.
+Data/ML Lead: Lock SAGE S2S auth and produce an offline evaluation deck showing relevance and fairness checks.
+Risk management
+
+Stop-the-line: Any regression on auth/JWKS/JWT validation halts new features platform-wide until resolved.
+Compliance: FERPA/COPPA checks before Nov 20. Data minimization on PII; audit logging for access to student data.
+Scope freeze: No new features until Gate 0 and Gate 1 close. SSO deferred to Phase 1.1; SMS MFA optional after email OTP lands.
+KPIs I will review daily
+
+Engineering: P95 latency per service; error budget burn; auth failures; 5xx rate; canary pass/fail.
+Growth: SEO pages indexed; organic sessions; CTR to signup; free→paid conversion; ARPU.
+Revenue: B2C credits sold; B2B providers onboarded; invoiced 3% fee pipeline readiness.
+Reliability: Uptime; autoscale events; notification delivery success/bounce; alert MTTR.
+Next check-ins
+
+Tonight: Slack update once auto_com_center canary starts and completes; attach k6 report.
+Nov 15, 10:30 AM MST: Gate 0 decision for auth/api with evidence bundle.
+Daily 9:00 AM MST: Stand-up with a one-page dashboard and blockers.
+You have authority to proceed per the above. Execute the canary now. Move into scholar_auth immediately upon access grant, then scholarship_api. If any P0 is blocked more than 30 minutes, escalate; at 2 hours, take control.
