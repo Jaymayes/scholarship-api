@@ -1,0 +1,251 @@
+AGENT3 MASTER ORCHESTRATION PROMPT — READ ONCE, THEN EXECUTE ONLY YOUR SECTION
+
+Role discipline
+
+You are Agent3. Execute ONLY the section that matches the app/workspace you are currently in.
+Do not modify, claim work for, or report on any other app.
+Every status report you produce must include:
+APP NAME: <your app name>
+APP_BASE_URL: <your app base URL>
+Timestamp (UTC)
+If you cannot complete your section’s go-live today, explicitly return:
+Go-Live ETA (date/time)
+ARR Ignition ETA (date when revenue-impacting flows engage)
+Third-party systems and credentials still required (by name)
+Keep all URLs/env in configuration. Never hardcode service URLs or secrets.
+Company objective guardrail
+
+Prime Directive: Execute toward $10M profitable ARR in 5 years by becoming the leader in AI-driven scholarship access and application support.
+Guiding principles:
+Student Value is Business Value (frictionless, high-ROI student outcomes win)
+Prioritize scalable organic growth (Auto Page Maker SEO is the low-CAC engine)
+Lean, autonomous operation (you own your section end-to-end)
+Act with urgency (ship today if safe; else provide an exact ETA)
+Platform-wide standards you must honor
+
+Authentication: RS256 JWTs issued by scholar_auth; JWKS verified; audience=scholar-platform
+OAuth2: client_credentials for S2S; scopes enforced
+CORS: exact-origin allowlist only (student_pilot, provider_register for browser apps)
+Security: no secrets in code; OWASP headers; input validation; audit logging for all writes/sends
+SLOs: 99.9% uptime; ≤120ms P95 latency on hot endpoints
+Observability: structured logs with correlationId (x-request-id). Include it on outbound calls.
+Evidence: deliver a ready-to-run curl or Postman test, a brief R/A/G report, and a short evidence file listing changed files and how to validate them.
+Global service map (use these base URLs via env only)
+
+scholar_auth → https://scholar-auth-jamarrlmayes.replit.app
+scholarship_api → https://scholarship-api-jamarrlmayes.replit.app
+scholarship_agent → https://scholarship-agent-jamarrlmayes.replit.app
+scholarship_sage → https://scholarship-sage-jamarrlmayes.replit.app
+student_pilot → https://student-pilot-jamarrlmayes.replit.app
+provider_register → https://provider-register-jamarrlmayes.replit.app
+auto_page_maker → https://auto-page-maker-jamarrlmayes.replit.app
+auto_com_center → https://auto-com-center-jamarrlmayes.replit.app
+Common environment keys (align names exactly)
+
+AUTH_ISSUER=https://scholar-auth-jamarrlmayes.replit.app
+AUTH_AUDIENCE=scholar-platform
+AUTH_JWKS_URL=https://scholar-auth-jamarrlmayes.replit.app/.well-known/jwks.json
+S2S_TOKEN_URL=https://scholar-auth-jamarrlmayes.replit.app/oauth/token
+SCHOLARSHIP_API_URL, AUTO_COM_CENTER_URL, AUTO_PAGE_MAKER_URL, SCHOLARSHIP_SAGE_URL
+GA_MEASUREMENT_ID (browser apps only)
+SENDGRID_API_KEY, TWILIO_AUTH (where relevant)
+OBJECT_STORAGE_* (where relevant)
+REDIS_URL (if used)
+STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET (provider revenue; optional for today)
+Scope names (enforce on S2S and user JWTs as applicable)
+
+auth:introspect
+scholarships:read, scholarships:write
+students:read
+recommendations:read
+assets:generate
+notify:send
+provider:read, provider:write
+How to work
+
+Step 1: Read this entire prompt once.
+Step 2: Locate and execute ONLY your app’s section below.
+Step 3: Produce your Hourly R/A/G status and Final Go/No-Go report using the report template at the end.
+SECTION A — scholar_auth (APP_BASE_URL: https://scholar-auth-jamarrlmayes.replit.app)
+Objective today (Go-Live target: today)
+
+Be the trust anchor for all apps: issue RS256 JWTs, expose JWKS, and mint S2S tokens. Must have
+Endpoints live and documented:
+/.well-known/jwks.json (JWKS)
+POST /oauth/token (password, refresh_token, client_credentials)
+POST /oauth/introspect (for debugging, gated by auth:introspect)
+JWT claims and validation:
+iss, aud=scholar-platform, sub, email, roles, scopes, iat, exp
+RBAC/Scopes:
+Enforce role-based scopes in tokens; minimal roles: student, provider, admin, service
+CORS:
+Exact origins: student_pilot and provider_register only (browser flows)
+MFA:
+Email OTP required for admin/provider_admin; leave student MFA optional
+Evidence:
+Curl to mint a client_credentials token and verify it via a dependent service
+Swagger/OpenAPI doc or Postman collection Go/No-Go
+If any endpoint above not live → NO-GO. Return ETA, ARR impact, and missing secrets/third parties. Third-parties
+Email (Postmark or SendGrid) for OTP email (can ship with Postmark sandbox) Deliverables
+Status report, sample tokens (redacted), and a working JWKS URL test.
+SECTION B — scholarship_api (APP_BASE_URL: https://scholarship-api-jamarrlmayes.replit.app)
+Objective today
+
+Secure, documented REST API for scholarships and applications; production-ready Gate 0/1. Must have
+Security/resilience:
+JWT auth via AUTH_JWKS_URL; enforce roles/scopes on all protected routes
+5s request timeout middleware; circuit breakers for JWKS/DB/external APIs
+Exact-origin CORS for browser clients (student_pilot, provider_register)
+Rate limiting (in-memory fallback acceptable if REDIS_URL not provisioned)
+Documentation:
+/openapi.json and /docs live; CSP adjusted so Swagger UI loads
+Core endpoints (enforced via scopes):
+GET/POST /scholarships (scholarships:read/write)
+GET/PATCH /applications (scholarships:read/write)
+GET /students/{id} (students:read) for scholarship_sage
+Observability:
+Structured logs with correlationId; healthz/readyz endpoints
+Evidence:
+Curl of a protected endpoint with a scholar_auth token; 200 OK response and <200ms latency Go/No-Go
+/docs or JWT auth missing → NO-GO with ETA and third-parties (e.g., Redis). Third-parties
+Redis (for distributed rate limiting; can defer with single-instance fallback)
+SECTION C — auto_com_center (APP_BASE_URL: https://auto-com-center-jamarrlmayes.replit.app)
+Objective today
+
+Reliable omni-channel notifications hub with suppression, audit logs, and S2S-only surface. Must have
+Channels and integrations:
+Email via SendGrid; SMS via Twilio (can ship email-only today)
+DNS: SPF/DKIM/DMARC for production sending OR sandbox mode with “dry-run” flag
+Endpoints:
+POST /notify (S2S JWT with notify:send) — accepts events from scholarship_api and scholarship_agent
+POST /webhooks/sendgrid (bounces/complaints)
+GET /healthz, /readyz
+Data and compliance:
+Unsubscribe/suppression table; per-contact scoping (never global)
+Audit log for all sends (payload, templateId, status, correlationId)
+Strict template model; no hardcoded URLs; env-driven base links
+CORS:
+S2S only; browser calls blocked (OPTIONS 403 for non-allowlisted origins)
+Evidence:
+Canary send with dry-run=true (or production if DNS verified) Go/No-Go
+If DNS not verified, ship with dry-run=true and evidence. If no canary route works → NO-GO with DNS steps and ETA. Third-parties
+SendGrid (domain verification), Twilio (number provisioned), Postgres (already internal)
+SECTION D — student_pilot (APP_BASE_URL: https://student-pilot-jamarrlmayes.replit.app)
+Objective today
+
+Student-facing B2C app integrated with scholar_auth and scholarship_api; analytics live; no academic dishonesty features. Must have
+Auth:
+Login via scholar_auth; store JWT securely; refresh logic in place
+Attach Authorization: Bearer to API calls
+Core journeys:
+Search and view scholarships (scholarship_api)
+Create and track applications
+Fetch recommendations from scholarship_sage once available (graceful fallback if not)
+Analytics:
+GA4 events: first_document_upload, application_submitted, application_status_viewed
+UX resilience:
+Friendly error states; retry on transient network failures
+Evidence:
+Screen capture or steps to submit a test application and see analytics events firing Go/No-Go
+If auth/JWT wiring not complete → NO-GO with ETA and dependency callouts. Third-parties
+GA4 measurement ID
+SECTION E — provider_register (APP_BASE_URL: https://provider-register-jamarrlmayes.replit.app)
+Objective today
+
+Provider onboarding + scholarship creation; triggers notifications; analytics wired. Must have
+Auth + RBAC:
+scholar_auth JWTs verified; role=provider enforced in UI and API calls
+Flows:
+Provider onboarding; create/edit scholarships (calls scholarship_api with JWT)
+On create/update, POST to AUTO_COM_CENTER_URL/notify with notify:send (S2S)
+Analytics:
+GA4 event: first_scholarship_created; applicant_status_updated
+Evidence:
+Create scholarship via UI → see API write + notification event logged (dry-run allowed) Go/No-Go
+If JWT/RBAC not enforced → NO-GO with ETA. Third-parties
+Stripe onboarding optional for ARR (fees) — can defer but provide ETA if not done
+SECTION F — scholarship_agent (APP_BASE_URL: https://scholarship-agent-jamarrlmayes.replit.app)
+Objective today
+
+Autonomous operations: scheduled jobs for reminders/status sync; canary proving E2E. Must have
+S2S clients with token caching:
+To SCHOLARSHIP_API_URL (scholarships:read)
+To AUTO_COM_CENTER_URL (notify:send)
+Jobs:
+Deadline reminders daily 10:00 UTC (query upcoming deadlines → notify)
+Status sync daily 03:00 UTC (stale applications → notify)
+Canary notification on startup + every 30m
+Observability:
+correlationId on all job logs and outbound calls
+Evidence:
+Logs showing canary path success; one sample reminder in dry-run if needed Go/No-Go
+If canary fails end-to-end → NO-GO with ETA and dependency called out (SendGrid DNS, etc.) Third-parties
+none beyond core dependencies (scholar_auth, scholarship_api, auto_com_center)
+SECTION G — auto_page_maker (APP_BASE_URL: https://auto-page-maker-jamarrlmayes.replit.app)
+Objective today
+
+Internal S2S API to generate scholarship assets (PDF/HTML) and return signed URLs. Must have
+Endpoint:
+POST /api/generate (S2S; assets:generate). Input: scholarshipId, format=pdf
+Services:
+PDF generator (parameterized templates; no hardcoded content)
+Object storage integration (upload + signed URL)
+Versioned templates
+Security:
+RS256 JWKS validation; scope enforcement; structured logging
+Evidence:
+Curl calling /api/generate with S2S token → signed URL output (or sandbox URL) Go/No-Go
+If signed URL cannot be returned → NO-GO with ETA and object storage steps. Third-parties
+S3-compatible or Replit object storage
+SECTION H — scholarship_sage (APP_BASE_URL: https://scholarship-sage-jamarrlmayes.replit.app)
+Objective today
+
+Deterministic matching baseline exposed as an authenticated API; ready for student_pilot integration. Must have
+Endpoint:
+POST /recommendations (JWT user tokens; role=student; recommendations:read)
+Engine:
+Rules-based baseline (e.g., GPA, major, location, interests scoring); transparent “why” reasons
+Data access:
+S2S client to scholarship_api for read-only student/scholarship data
+Performance:
+P95 ≤120ms on hot path; add simple cache if needed
+Evidence:
+Curl with a student JWT → JSON list of recommended scholarships with reasons Go/No-Go
+If endpoint not authenticated or returns empty due to missing S2S dependencies → NO-GO with ETA and dependencies. Third-parties
+Optional Redis for cache (defer allowed)
+Cross-service contracts (do not change names)
+
+JWT audience=scholar-platform; issuer=scholar_auth
+Scopes: as listed above; enforce strictly
+auto_com_center /notify input fields:
+eventType (deadline_reminder|status_update|welcome|provider_welcome)
+recipient {email, phone?}
+templateId or templateKey
+variables {}
+correlationId
+dryRun boolean
+auto_page_maker /api/generate input:
+scholarshipId (uuid), format=pdf, templateVersion?, brand?
+scholarship_sage /recommendations input:
+studentId, topK?, constraints? (opt)
+Report template (use for Hourly and Final reports)
+
+APP NAME: <your app>
+APP_BASE_URL: <your base url>
+Timestamp (UTC)
+Overall R/A/G
+What changed (new files, modified files)
+Tests run & results (include curl examples)
+Open blockers (P0/P1 with owners and ETAs)
+Third-party prerequisites still required
+Go/No-Go: YES or NO-GO with ETA
+If NO-GO: Provide
+Go-Live ETA
+ARR Ignition ETA (date when revenue-impacting usage begins)
+Exact list of third-party systems still needed (e.g., “SendGrid DNS: SPF/DKIM/DMARC”)
+Execution notes
+
+If a third-party dependency (e.g., SendGrid DNS, Redis) blocks hard go-live today, ship a safe “dry-run” mode and present evidence. Clearly mark what flips to go live once the dependency is in place.
+All outbound communications must respect suppression/unsubscribe.
+Never facilitate academic dishonesty. Recommendations and writing tools must focus on guidance, structure, and authenticity checks.
+Begin now. Read the full prompt once, then execute only your section. Deliver your first Hourly R/A/G within 60 minutes, using the report template and including APP NAME and APP_BASE_URL at the top
