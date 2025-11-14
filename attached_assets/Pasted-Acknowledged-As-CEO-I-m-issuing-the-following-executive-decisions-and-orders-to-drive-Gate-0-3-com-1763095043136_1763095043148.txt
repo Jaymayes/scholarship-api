@@ -1,0 +1,108 @@
+Acknowledged. As CEO, I’m issuing the following executive decisions and orders to drive Gate 0–3 completion and protect ARR ignition.
+
+Executive Decisions (effective immediately)
+
+Access and Authority
+Ops: Grant Agent3 read/write access to all eight workspaces within 15 minutes of this notice. If not completed, Agent3 is authorized to take direct control of P0 repos after a 2-hour block.
+DRIs: Security Lead (scholar_auth), API Lead (scholarship_api), Messaging Lead (auto_com_center), Frontend Lead (student_pilot, provider_register), Data/ML Lead (scholarship_sage).
+Budget Approvals
+k6 Cloud canary: Approved up to $1,500 for 72 hours of testing.
+Reserved VM/Autoscale (auth, api): Approved immediately.
+Email/SMS provider scale-up credits (SendGrid/Twilio): Approved up to $2,500 for first 30 days.
+Product Scope Decisions
+student_pilot offline mode: Defer to post-launch (Phase 1.1). Provide a read-only “queue and sync” fallback for spotty connectivity; no hard offline cache at launch.
+RBAC minimum viable scope at launch: student, provider_admin, reviewer, super_admin. Expand granular scopes post-launch.
+Go/No-Go Guardrails
+SLA: 99.9% availability, P95 ≤120ms core paths (auth, api); scholarship_sage ≤150ms P95 at 100 RPS.
+Security: MFA enforced for privileged roles; CORS explicit allowlist only; 8/8 M2M clients issuing tokens; audit logging on all state changes.
+Canary gates: auto_com_center must achieve P95 ≤250ms and ≤0.5% errors at 250 RPS for 30 minutes from external worker.
+Re-baselined Gate Timeline and Acceptance Criteria
+
+Gate 0 (Nov 15, 12:00 PM MST): scholar_auth + scholarship_api
+scholar_auth
+8/8 M2M token issuance validated with signed JWTs (roles/scopes embedded).
+RBAC claims present and verified for student, provider_admin, reviewer, super_admin.
+CORS: explicit allowlist for all eight apps; no wildcards.
+MFA: enforced for provider_admin, reviewer, super_admin; evidence of successful/failed MFA flows.
+HA: Reserved VM/Autoscale configured; health checks green.
+scholarship_api
+JWT validator stable under 300 RPS, 10 min; error rate ≤0.5%.
+/health and /readyz include DB and JWKS dependency checks.
+Structured error responses; backoff/retry for auth dependency timeouts.
+Gate 1 (Nov 16–17): scholarship_api + auto_com_center reliability
+auto_com_center
+Templates refactored to env-based URLs; zero hardcoded links.
+Canary: 30 min at 250 RPS, external runner; P95 ≤250ms; ≤0.5% errors.
+Delivery monitoring: bounces/drops alerts; provider API keys verified in secrets vault.
+scholarship_api
+Event hooks to trigger auto_com_center on status changes; idempotent and audited.
+Gate 2 (Nov 17–18): Frontends + scholarship_sage E2E
+student_pilot, provider_register
+Zero hardcoded URLs; env-driven config only.
+Graceful error states implemented; full Student Journey and Provider Journey E2E pass.
+scholarship_sage
+S2S auth with real data; Precision@10 ≥85% on production-like fixture; P95 ≤150ms at 100 RPS.
+Gate 3 (Nov 18–19): Security review + staged ramp
+Pen-test/abuse tests complete; secrets rotation done; incident runbooks in place.
+Ramp plan: 5% → 20% → 50% → 100% traffic, with automated rollback.
+Orders to Resolve Current Blockers (ownership and due times)
+
+scholar_auth (Security Lead; Agent3 if access not granted in 2 hrs)
+Finish M2M database-backed client seeding; confirm “Client” model via DB adapter.
+Produce token proofs for 8/8 clients with redacted samples and claims screenshots.
+Lockdown CORS; enforce MFA for privileged roles; upload HA config.
+Due: Nov 15, 10:30 AM MST (buffer before Gate 0).
+scholarship_api (API Lead; Agent3 to run tests)
+Patch JWKS caching and retry; ensure signature validation under load is stable.
+Implement event hooks to auto_com_center; extend /health to show auth/DB.
+Run 300 RPS/10-min test; provide latency/error charts.
+Due: Nov 15, 10:30 AM MST.
+auto_com_center (Messaging Lead)
+Refactor templates to env URLs; configure bounce/drop monitoring; secrets audit.
+Prepare k6 canary scripts (Agent3 provided); run 30-minute external canary.
+Due: Nov 16, 10:00 AM MST (start canary window).
+student_pilot, provider_register (Frontend Lead)
+Complete env refactor, error states, and E2E flows; accessibility checklist.
+Due: Nov 18, 12:00 PM MST.
+scholarship_sage (Data/ML Lead)
+Validate real-data relevance ≥85% top-10; keep P95 ≤150ms at 100 RPS.
+Due: Nov 18, 12:00 PM MST.
+Evidence Package Requirements
+
+Every app must submit evidence with this header:
+APPLICATION NAME: [App]
+APP_BASE_URL: [URL]
+Contents per gate:
+Test artifacts: scripts, logs, charts; redacted tokens; screenshots.
+Config diffs: CORS, MFA, env schema, autoscale.
+Monitoring: dashboards links, alert rules.
+Security: audit log samples for state changes; secrets inventory (redacted).
+Delivery cadence:
+Gate 0 Checkpoint 1: Nov 15, 12:15 PM MST
+Gate 0 Final: Nov 15, 5:00 PM MST
+Daily 9:00 AM MST stand-up summaries through Nov 20
+Risk Management and Contingencies
+
+If M2M seeding lags: temporary static client allowlist for 8 service IDs with short-lived secrets and forced rotation every 24 hours. Decommission once DB adapter verified.
+If auto_com_center P95 fails in cloud canary: scale workers + queue backpressure; fall back to rate-limited batches at 150 RPS with SLA ≥99% delivery in 5 minutes; re-run canary post-scale-up.
+If scholarship_sage relevance <85% with real data by Nov 18: lower rec set to top-5 with diversity filter; display confidence badges; ship with “improving” label and roll daily model updates.
+KPI Alignment and ARR Plan
+
+B2C funnel
+Target conversion free→paid: 3.0% at launch, ARPU $7.50/mo via credits.
+Auto Page Maker: ramp to 3k indexed pages in 14 days; SEO traffic ≥8k sessions/mo.
+B2B provider fees
+40 active providers by end of Q1; 3% fee live; first payments integrated by Dec 15.
+CAC
+80% organic acquisition via Auto Page Maker; paid channels capped at 20% of weekly new users.
+Profitability
+Maintain 4x AI service markup and 3% provider fee to cover ops + margin; monitor compute/utilization daily.
+Immediate Next Steps for Agent3 (confirming your plan, plus CEO directives)
+
+Proceed with the hybrid approach:
+Continue provider_register and student_pilot Gate 2 error states/E2E immediately.
+Upon access grant (Ops now executing): switch to Gate 0 P0 items on scholar_auth and scholarship_api.
+Prepare and run auto_com_center canary via external runner once Messaging Lead signals ready.
+Upload Gate 0 runbooks and evidence bundles to each repo.
+Send a checkpoint email at Nov 15, 12:15 PM MST with pass/fail per acceptance criteria and links to artifacts.
+I will personally review Gate 0 evidence at 5:00 PM MST on Nov 15. If P0 items are not green by then, I will reallocate ownership and budget in real time to hit Nov 20 ARR ignition. Stay on the hybrid track, execute with urgency, and escalate any blocker exceeding 30 minutes.
