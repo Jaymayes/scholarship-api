@@ -1,0 +1,60 @@
+Agent 3, received. Here are my executive decisions and orders to move the program from RED to GREEN and protect ARR ignition.
+
+CEO decisions (effective immediately)
+
+Critical path choice: Access or mirror
+Grant access path: Ops must grant you and the named DRIs edit/deploy access to scholar_auth, scholarship_api, and auto_com_center within 30 minutes of this order. If access is granted, execute Sequential Workspace Execution immediately.
+Direct control path (fallback): If access is not granted by T+30 minutes, you are authorized to mirror the three workspaces under the CEO org, execute Gate 0 in the mirrored environments, and cut over DNS when evidence meets go-live bars. The “isolation” constraint on Replit microservices is known and expected in our operating model; we solve via rigorous orchestration and crisp contracts, not wishful coupling .
+Scope freeze: No net-new features across the suite until Gate 0/1 bars pass. All work is security, performance, integration, or test only.
+Budget approvals: Approved up to $1,500 for k6 Cloud credits and up to $2,500 for ESP/SMS onboarding and domain verification. Reserve VM and Redis spend approved as required to meet performance SLOs. Follow the deployment readiness playbook for Replit Reserved VM/Autoscale and Secrets hygiene .
+Non‑negotiable Gate 0 go-live bars
+
+scholar_auth
+RS256 JWTs via JWKS; 300s TTL; RBAC claims for student, provider, admin; M2M client_credentials for all internal services; MFA enforced for admin/provider_admin; strict CORS allowlist; no hardcoded secrets. Evidence: sample tokens, JWKS, role matrix, MFA proof, CORS test log. Replit Secrets for all credentials; no inline keys .
+scholarship_api
+JWT signature + claims validation middleware; role/route authorization; strict CORS; connection pooling; Redis for caching/rate-limit; Reserved VM or Autoscale enabled; /readyz with DB/Redis/JWKS checks; OpenAPI served. Performance test: 250–300 RPS for 10 minutes, P95 ≤120ms, error rate ≤0.5% under k6. Evidence: config diffs, run ID, charts, /readyz snapshot. If synchronous hotspots persist, apply retry/backoff and circuit-breakers on client paths to prevent cascading failures .
+auto_com_center
+SendGrid (email) and Twilio (SMS) integrated; domain verification (SPF, DKIM, DMARC); service-to-service auth; webhook/trigger endpoint online. Canary: 250 RPS for 30 minutes with ≤0.5% errors. Evidence: provider dashboards, verification screenshots, run ID.
+Gate 1–2 bars (unblock the funnels with minimum viable integrations)
+
+student_pilot and provider_register
+Eliminate hardcoded URLs; env-driven configs only. Auth flow live against scholar_auth; attach JWT to all API calls; standardized error handling; GA4 events wired for “First Document Upload” as the activation North Star event. This metric drives our product and growth engine per the Playbook V2.0; instrument it now for attribution and funnel analysis .
+scholarship_agent
+M2M auth to scholarship_api; structured logging; alerting for background failures; notification triggers to auto_com_center.
+Risk, compliance, and Responsible AI requirements
+
+No “black box” services for critical decisions. Maintain explainability and audit trails for auth, matching, and automated actions, with human-on-the-loop approval gates for high-risk changes .
+Bias and fairness: Document data sources and add fairness checks to recommendation logic before broad release; monitor for disparate impact as we scale .
+Secrets and S2S security: All secrets in Replit Secrets; enforce service identity and authorization consistently across apps .
+Execution plan and ownership
+
+If access granted in 30 minutes (preferred path)
+Hour 0–2: scholar_auth hardening (MFA, JWKS, RBAC, CORS, M2M). Security Lead with Agent 3 support.
+Hour 2–4: scholarship_api security/perf (JWT middleware, pooling, Redis, /readyz, Autoscale/Reserved VM). Platform Lead with Agent 3.
+Hour 4–6: auto_com_center integrations (SendGrid/Twilio, triggers, S2S auth) and 30-minute canary. Platform Lead.
+Hour 6–8: k6 retest on scholarship_api; finalize evidence packages for Gate 0 decision.
+If access is not granted by T+30 minutes (fallback path)
+Mirror scholar_auth, scholarship_api, auto_com_center under CEO org; replay the same sequence; cut over DNS when Gate 0 evidence passes; freeze legacy apps post-cutover. Follow the Replit deployment readiness checklist for custom domains and Reserved VM rollouts .
+Testing and acceptance
+
+Apply the testing hierarchy: unit, integration, system/E2E. No go-live until E2E Student and Provider journeys pass with signed evidence and defects triaged. Use the tools and cadence outlined in the testing guide to prevent regressions and ensure cross-service reliability at speed .
+Go/no‑go and dates
+
+Gate 0 decision window: Nov 15, 10:30 AM MST. Status must be GREEN with evidence on scholar_auth, scholarship_api, and auto_com_center.
+ARR ignition plan (kept, but gated): If Gate 0 passes on Nov 15, proceed to Gate 2 frontends and controlled B2C soft-launch; provider onboarding opens to a limited cohort after Gate 1 passes. This sequencing aligns with our low-CAC SEO-led growth thesis and five-year ARR track in the Playbook V2.0 .
+KPIs tied to this directive
+
+Platform readiness: Gate 0 pass (Y/N), P95 latency ≤120ms at 250–300 RPS, error rate ≤0.5% on core APIs.
+B2C funnel instrumentation: % of new sign-ups reaching “First Document Upload,” conversion to paid credits (ARPU baseline), support for SEO landing flow from Auto Page Maker .
+B2B ramp signals: # providers with verified accounts and at least one listed scholarship; average time-to-first-listing.
+Reporting cadence
+
+During Gate 0 execution: Hourly updates with RED/AMBER/GREEN by service and a single rolling risk log. Include k6 run IDs, /readyz snapshots, and config diffs each hour.
+Post Gate 0: Twice-daily until Gate 2 passes; daily thereafter.
+Final notes to unblock you
+
+You are authorized to:
+Proceed on either path above based on the T+30 minute outcome.
+Freeze any work that competes with Gate 0/1 security and performance.
+Reject any change that introduces new secrets in code or expands CORS beyond the allowlist.
+If the platform cannot meet performance bars on Replit after remediation, return with a quantified cost/performance comparison and a migration proposal; our Replit strategy anticipates either Autoscale/Reserved VM tuning or, if necessary, a targeted migration of hot paths to more robust infrastructure as load grows .
