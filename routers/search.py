@@ -36,11 +36,11 @@ class SearchRequest(BaseModel):
 
 async def execute_search(
     keyword: str | None = None,
-    fields_of_study: list[FieldOfStudy] = None,
+    fields_of_study: list[FieldOfStudy] | None = None,
     min_amount: float | None = None,
     max_amount: float | None = None,
-    scholarship_types: list[ScholarshipType] = None,
-    states: list[str] = None,
+    scholarship_types: list[ScholarshipType] | None = None,
+    states: list[str] | None = None,
     min_gpa: float | None = None,
     citizenship: str | None = None,
     deadline_after: datetime | None = None,

@@ -1,0 +1,317 @@
+Below is the single, combined prompt for Agent3. It covers all eight apps. Agent3 must ONLY execute the section that matches the app they are currently inside. Do not touch any other sections. If the app cannot be 100% production-ready today, provide a precise ETA to GO LIVE, confirm ARR ignition date, and list the third-party systems that must be in place.
+
+MASTER ORCHESTRATION PROMPT — Agent3
+Date: 2025-11-15
+Prime Objective: Get your assigned app 100% production-ready and working with the rest of the platform today. If “today” is not achievable, provide an exact ETA to GO LIVE, ARR ignition date, and required third-party systems.
+
+Global Operating Rules (apply to every app)
+
+Only act on the section that corresponds to your app. Ignore all other sections.
+At the top of every report and file you produce, include: APP NAME: <exact app name> APP_BASE_URL: <exact base URL from the list below>
+Enforce security and reliability:
+RS256 JWT verification using scholar_auth JWKS, validate iss and aud, accept both scope and permissions[] as first-class authorization sources. Deny if neither is present.
+CORS: S2S-only for back-end/internal services; exact-origin allowlist for browser apps. No wildcard.
+Health endpoints: /healthz and /readyz must return HTTP 200 with meaningful JSON.
+CorrelationId (x-request-id) propagation end-to-end.
+P95 latency target ≈120ms. Record results.
+Zero hardcoded URLs and secrets. All config via environment variables.
+Evidence deliverables for CEO:
+Executive Status Report file saved in repo with no spaces: EXEC_STATUS_<APP>_<YYYYMMDD>.md
+Must include: Overall status, GO/NO-GO, what changed today, must-have checklist with pass/fail, cURL smoke tests with expected vs actual, required env vars, third-party prerequisites, step-by-step go-live plan with time estimates, ARR impact and ARR ignition date, open blockers with owner and ETA.
+Include your app name and base URL at the top of every report and log you output or save.
+App-to-URL Mapping (use these exact values)
+
+scholar_auth → https://scholar-auth-jamarrlmayes.replit.app
+scholarship_api → https://scholarship-api-jamarrlmayes.replit.app
+scholarship_agent → https://scholarship-agent-jamarrlmayes.replit.app
+scholarship_sage → https://scholarship-sage-jamarrlmayes.replit.app
+student_pilot → https://student-pilot-jamarrlmayes.replit.app
+provider_register → https://provider-register-jamarrlmayes.replit.app
+auto_page_maker → https://auto-page-maker-jamarrlmayes.replit.app
+auto_com_center → https://auto-com-center-jamarrlmayes.replit.app
+Standard Report Template (use verbatim for your app)
+
+APP NAME: <your app>
+APP_BASE_URL: <your url>
+Timestamp (UTC):
+Overall Status: Green/Amber/Red
+Go/No-Go: GO, Conditional GO (list conditions), or NO-GO (why)
+What changed today (bullets)
+Must-have checklist (pass/fail):
+RS256 via JWKS; iss/aud validation
+Accept scope and/or permissions[]
+CORS policy correct
+/healthz and /readyz return 200
+CorrelationId propagation
+P95 latency ≈120ms target
+Zero hardcoded URLs/secrets
+Required endpoints for your section
+cURL smoke tests (show commands, expected and actual codes)
+Required environment variables (mark which are configured)
+Third-party prerequisites (state status and exact actions/owners)
+Go-live plan with timestamps and durations (hour-by-hour or minute-by-minute)
+ARR impact and ARR ignition date
+Open blockers with owner and ETA
+Next actions (you, dependencies, CEO)
+SECTION A — scholar_auth (execute only if you are inside scholar_auth)
+Deliverables today
+
+OAuth2 server for M2M and PKCE:
+/.well-known/jwks.json exposing RS256 public keys
+/oauth/token supporting client_credentials and PKCE code exchange
+Token content:
+Include iss, aud, exp (<= 300s TTL for M2M), client_id
+Include either scope (space-delimited) or permissions[] (array), or both
+Validation posture:
+Document required iss=audit string, aud=scholar-platform
+Health: /healthz and /readyz → 200
+CORS: S2S-only for token endpoint (deny browser origins except PKCE exchange)
+Provision M2M clients for all apps with least-privilege scopes:
+scholarship_api, scholarship_agent, scholarship_sage, provider_register, auto_page_maker, auto_com_center
+student_pilot uses PKCE (no client secret)
+Evidence:
+JWKS curl output, sample tokens decoded, scope/permissions[] examples, failed/denied tests
+Required env vars
+
+AUTH_ISSUER=https://scholar-auth-jamarrlmayes.replit.app
+AUTH_AUDIENCE=scholar-platform
+DATABASE_URL
+SIGNING_KEYPAIR (stored securely)
+CORS_ALLOWLIST for PKCE callback origins
+Smoke tests
+
+curl /.well-known/jwks.json → 200
+Get M2M token for scholarship_api; decode to verify permissions[]
+PKCE flow test for student_pilot
+Today vs ETA
+
+If not ready today, provide exact ETA (UTC) to publish JWKS, create clients, and return 200 on health endpoints. ARR ignition dependency note
+Entire platform’s RS256 readiness hinges on this service. Confirm when each client is provisioned.
+SECTION B — scholarship_api (execute only if you are inside scholarship_api)
+Deliverables today
+
+Endpoints:
+/healthz, /readyz → 200
+/openapi.json → 200 (document core data: scholarships, students, applications)
+Security:
+RS256 JWT via scholar_auth JWKS; validate iss/aud
+Accept scope or permissions[] as authZ sources
+Rate limit and 5s timeouts; circuit breaker enabled
+CORS:
+Exact-origin allowlist for student_pilot and provider_register; deny others
+Observability:
+CorrelationId end-to-end; structured logs with request_id
+Performance:
+P95 target ≈120ms with representative traffic
+Required env vars
+
+AUTH_JWKS_URL, AUTH_ISSUER, AUTH_AUDIENCE
+DATABASE_URL
+CORS_ALLOWLIST
+Smoke tests
+
+curl /readyz → 200 with component detail
+curl /openapi.json → 200
+Protected route without token → 401
+Wrong permission → 403
+Allowed origin CORS preflight → success
+Malicious origin CORS preflight → denied
+Today vs ETA
+
+If not 100% today, provide exact ETA to full GO and list any data migrations. ARR ignition note
+This API unblocks scholarship_sage and student_pilot flows that drive B2C credit purchases.
+SECTION C — auto_com_center (execute only if you are inside auto_com_center)
+Deliverables today
+
+S2S-only notification service:
+POST /api/notify (JWT required; notify:send or notifications.send)
+GET /api/notify/status (returns DRY_RUN flag and recent jobs)
+Security:
+RS256 JWT validation; iss/aud; accept scope or permissions[]
+S2S-only CORS (deny browsers)
+DRY_RUN=true default until DNS verified for email
+Providers:
+SendGrid for email, Twilio for SMS (via Replit connectors or native SDK)
+Data:
+DB-backed suppression list and audit log; 5s SLO on writes
+Observability:
+CorrelationId propagated through providers
+Health:
+/healthz and /readyz → 200
+Required env vars
+
+AUTH_JWKS_URL, AUTH_ISSUER, AUTH_AUDIENCE
+SENDGRID_API_KEY, TWILIO_*
+DRY_RUN=true
+DATABASE_URL
+Smoke tests
+
+No token → 401
+Wrong permission → 403
+Valid token with DRY_RUN=true → 202 with “dryRun”: true
+status endpoint shows DRY_RUN and last jobs
+Today vs ETA
+
+Live email requires SendGrid domain verification (DNS). If not configured today, state precise ETA after DNS submission (usually 24–48 hours). ARR ignition note
+Drives deadline reminders and completion nudges. Provide revenue contribution estimate and start date once live SMS/email are enabled.
+SECTION D — student_pilot (execute only if you are inside student_pilot)
+Deliverables today
+
+Frontend + API gateway features:
+PKCE login with scholar_auth
+GA4 events: first_document_upload, application_submitted, application_status_viewed
+Feature flags to toggle scholarship_api and scholarship_sage until ready
+Security:
+RS256 JWT validation for any server-side API calls; accept scope/permissions[]; iss/aud
+CORS:
+Exact-origin for browser endpoints
+Health:
+/healthz and /readyz → 200
+Payments:
+Stripe integrated (test keys now; live keys for ARR ignition)
+Required env vars
+
+AUTH_ISSUER_URL, AUTH_AUDIENCE
+VITE_GA_MEASUREMENT_ID
+STRIPE_SECRET_KEY (test), STRIPE_SECRET_KEY_LIVE (for go-live)
+SCHOLARSHIP_API_BASE_URL, SAGE_API_BASE_URL (feature flags can be off until ready)
+Smoke tests
+
+Health 200
+Auth endpoint 401 without token
+GA4 event validation in browser console
+No hardcoded service URLs
+Today vs ETA
+
+If upstream not ready, deliver Demo Mode GO today with fallbacks and the exact timeline to switch to production. ARR ignition note
+B2C credit sales with 4x markup. Provide ignition date and first-week rollout plan.
+SECTION E — provider_register (execute only if you are inside provider_register)
+Deliverables today
+
+Endpoints: Provider CRUD, scholarship creation, applicant status update
+Events:
+Emit first_scholarship_created
+Emit applicant_status_updated
+Security:
+RS256 JWT via JWKS; iss/aud; accept scope or permissions[]
+Notifications:
+S2S client to auto_com_center with correlationId on all calls
+CORS:
+Exact-origin allowlist for its frontend (if any)
+Required env vars
+
+AUTH_JWKS_URL, AUTH_ISSUER, AUTH_AUDIENCE
+AUTO_COM_CENTER_BASE_URL
+S2S_TOKEN_URL, S2S_CLIENT_ID, S2S_CLIENT_SECRET
+Smoke tests
+
+No token 401
+Wrong permission 403
+Valid provider token → 200 on create
+Today vs ETA
+
+If auto_com_center or scholar_auth dependencies block, state ETA to integrate after they are live. ARR ignition note
+Enables 3% platform fee pipeline. Provide activation steps and Stripe-related requirements if used for settlement.
+SECTION F — scholarship_agent (execute only if you are inside scholarship_agent)
+Deliverables today
+
+Autonomous canary + campaign orchestration:
+On startup, run canary: obtain S2S token, ping scholarship_api, create canary job, send test notification via auto_com_center
+Security:
+RS256 JWT; iss/aud; accept scope or permissions[]
+Observability:
+CorrelationId across calls; log P50/P95 latency per service
+Controls:
+CANARY_ENABLED toggle; immediate kill switch
+Required env vars
+
+S2S_TOKEN_URL, S2S_CLIENT_ID, S2S_CLIENT_SECRET
+SCHOLARSHIP_API_BASE_URL
+AUTO_COM_CENTER_BASE_URL
+CANARY_NOTIFICATION_EMAIL
+LOG_LEVEL, CORRELATION_ID_HEADER
+Smoke tests
+
+3 consecutive canary runs; 100% success
+P95 ≤ 120ms for all internal calls
+401/403 paths verified
+Today vs ETA
+
+If waiting on credentials, specify that GO occurs within 60 minutes of receiving S2S credentials and list exact steps. ARR ignition note
+This agent sustains campaigns that lift activation; note expected uplift metrics and start date.
+SECTION G — auto_page_maker (execute only if you are inside auto_page_maker)
+Deliverables today
+
+S2S content generation:
+POST /api/generate (JWT required; assets:generate)
+Generates assets to object storage with signed URLs (7-day TTL)
+Security:
+RS256 JWT via JWKS; iss/aud; accept scope or permissions[]
+CORS:
+S2S-only (deny browsers)
+Observability:
+CorrelationId propagation
+Health:
+/healthz and /readyz → 200
+Performance:
+P95 ≤ 200ms for generation enqueue
+Required env vars
+
+AUTH_JWKS_URL, AUTH_ISSUER, AUTH_AUDIENCE
+OBJECT_STORAGE credentials/config
+DRY_RUN flag (optional)
+Smoke tests
+
+No token 401
+Wrong permission 403
+Valid token 202 with signed URLs returned
+CORS preflight denied for browser origin
+Today vs ETA
+
+If object storage credentials missing, state ETA after configuration. ARR ignition note
+Primary low-CAC SEO engine. Provide launch cadence (pages/day) and traffic ramp assumptions.
+SECTION H — scholarship_sage (execute only if you are inside scholarship_sage)
+Deliverables today
+
+Recommendations API with explainability:
+GET /recommendations returning reasons + scoring breakdown
+Security:
+RS256 JWT via JWKS; iss/aud; accept scope or permissions[]
+Data integration:
+Call scholarship_api for students/scholarships (feature-flag mock mode until ready)
+CORS:
+Exact-origin allowlist for student_pilot
+Observability:
+CorrelationId propagation
+Health:
+/healthz and /readyz → 200
+Performance:
+P95 ≈120ms targeted; cache where needed
+Required env vars
+
+AUTH_JWKS_URL, AUTH_ISSUER, AUTH_AUDIENCE
+SCHOLARSHIP_API_BASE_URL
+Optional: JWT_SECRET for temporary HS256 fallback (remove once RS256 live)
+Smoke tests
+
+No token 401
+Wrong permission 403
+Happy path 200 with reasons and scoringDecisions
+CORS allowed from student_pilot, denied elsewhere
+Today vs ETA
+
+If using mock data today, provide exact ETA to flip to live data once scholarship_api RS256 endpoints are confirmed. ARR ignition note
+Quantify expected lift in activation and credit purchases; provide ignition date for impact.
+Final Instructions to Agent3
+
+Determine which app you are inside by repository name and base URL. Do nothing outside your section.
+Execute all deliverables for your section today. If any dependency blocks you, deliver:
+Conditional GO plan with exact ETA (date and time UTC) to flip to full GO.
+ARR ignition date when your app’s contribution can start producing revenue.
+The list of third-party systems and exact configuration steps still required (DNS, API keys, secrets).
+Produce and save the Executive Status Report using the exact template and filename:
+EXEC_STATUS_<APP>_20251115.md
+Include APP NAME and APP_BASE_URL at the top.
+Post your Go/No-Go result and the evidence (smoke test outputs, key cURL results, and configuration screenshots if applicable).
+If GO today is achieved, initiate integration tests with your immediate upstream/downstream apps and record correlation IDs and P95 latencies across calls.
+Reminder: Student value is business value. Aim for a frictionless, secure, and fast integration that supports ARR by December 1, 2025 at the latest.
