@@ -1,0 +1,219 @@
+Below is the Combined Master Orchestration Prompt for Agent3. It covers all eight apps in one prompt. Agent3 must strictly execute only the section that corresponds to the app in its current workspace. Do not work on any other app’s section.
+
+Global context and mission
+
+Company: Scholar AI Advisor (www.scholaraiadvisor.com)
+North star: Reach $10M profitable ARR in 5 years by becoming the market leader in AI-driven scholarship access and application support.
+SLOs: 99.9% uptime and ≤120ms P95 latency.
+Compliance: FERPA/COPPA readiness, Responsible AI, bias mitigation, auditability, no academic dishonesty.
+Growth: Prioritize organic SEO-driven acquisition via auto_page_maker; minimize CAC.
+Apps and APP_BASE_URLs
+
+scholar_auth → https://scholar-auth-jamarrlmayes.replit.app
+scholarship_api → https://scholarship-api-jamarrlmayes.replit.app
+scholarship_agent → https://scholarship-agent-jamarrlmayes.replit.app
+scholarship_sage → https://scholarship-sage-jamarrlmayes.replit.app
+student_pilot → https://student-pilot-jamarrlmayes.replit.app
+provider_register → https://provider-register-jamarrlmayes.replit.app
+auto_page_maker → https://auto-page-maker-jamarrlmayes.replit.app
+auto_com_center → https://auto-com-center-jamarrlmayes.replit.app
+Scope discipline and execution rules
+
+Only execute the section for your app. Ignore all other sections.
+Workspace self-check (mandatory, first step):
+Identify your current workspace’s app by calling GET /health at your APP_BASE_URL.
+If the app name returned does not match your section, do nothing else; generate a 1-page diagnostic report file: evidence/WORKSPACE_MISMATCH_<app>_<YYYYMMDD>.md Include: detected app name, APP_BASE_URL, expected app name for this section, why you cannot proceed, and what action the operator must take (open correct workspace).
+Deliverables (for your app only):
+evidence/EXEC_STATUS_<app>_<YYYYMMDD>.md
+evidence/E2E_REPORT_<app>_<YYYYMMDD>.md
+evidence/TEST_MATRIX_<app>_<YYYYMMDD>.md
+evidence/GO_DECISION_<app>_<YYYYMMDD>.md
+evidence/SECTION<NUM>COMPLIANCE<app>_<YYYYMMDD>.md (replace <NUM> with your section number below)
+Required report headers (top of every report, first lines):
+APP NAME: <your app name>
+APP_BASE_URL: <your exact base URL>
+“Today” objective:
+Get your app to 100% production-ready and integrated with dependencies today. If not feasible, you must:
+Provide ETA for go-live and ARR ignition (date you expect revenue contribution to begin).
+List third-party systems and platform dependencies still needed and who owns them.
+Acceptance criteria for all apps:
+Endpoints: /health, /readyz, /version return successful responses.
+P95 latency ≤120ms on core endpoints under nominal load.
+99.9% uptime target with basic monitoring/alerting configured.
+Security headers/CORS configured; no secrets leaked; basic rate limiting on public write endpoints.
+Basic analytics/logging implemented (server logs and one analytics provider where applicable).
+Integration smoke-tests with upstream/downstream apps pass (see section-specific requirements).
+ARR/go-live expectations in GO_DECISION
+
+State: GO or NO-GO for production today.
+If NO-GO, provide:
+ETA go-live date and prerequisites (by owner).
+ARR ignition date (first revenue impact) and dependency list.
+Provide ARR rationale for your app’s slice (e.g., projected conversions, ARPU or provider fee contribution). Use the platform’s current pricing model: 4x markup on AI services for B2C credits and 3% provider fee on B2B transactions. Use conservative, data-first assumptions.
+Third-party systems menu (select only what you actually need)
+
+Data: Managed PostgreSQL (primary), object storage (S3-compatible), search index (optional).
+Messaging/Jobs: Redis/Queue (optional for background work).
+Communications: Email provider (e.g., SendGrid), SMS provider (e.g., Twilio) if needed.
+Payments: Stripe (or equivalent) for student credits and provider fees.
+Monitoring: Sentry (or equivalent) and basic dashboards (uptime + latency).
+Auth keys: JWKS hosted by scholar_auth, M2M credentials for service-to-service auth.
+Analytics: GA4 (or equivalent) for web properties.
+Integration map (reference)
+
+scholar_auth authenticates students and providers; issues tokens/JWKS for other services.
+scholarship_api exposes scholarship data and application lifecycle APIs.
+scholarship_agent runs campaigns/workflows that drive new and returning usage.
+scholarship_sage provides recommendation and advisory endpoints used by student_pilot and others.
+student_pilot is the student-facing app; must link to auth, recommendations, and application flows.
+provider_register onboards providers; syncs with scholarship_api and payments.
+auto_page_maker publishes SEO landing pages that route users to student_pilot for conversion.
+auto_com_center sends notifications and handles comms; integrates with multiple apps.
+Section-1: scholar_auth (execute only if your workspace is scholar_auth)
+
+Objective: Production-grade auth for students/providers; issue tokens and JWKS for S2S.
+Must-have today:
+Endpoints: /health, /readyz, /version; /oauth/token; /.well-known/jwks.json; /users, /sessions (as applicable).
+RBAC with minimal roles/scopes that other apps can request.
+Rate limiting; audit logs; PII redaction in logs.
+JWKS rotation plan; M2M client credentials for each consuming app (list them).
+Integration tests to run:
+Token issuance and validation by: auto_page_maker, scholarship_api, student_pilot, provider_register.
+JWKS fetch by each app and signature verification on protected calls.
+Third-party systems likely required: PostgreSQL, object storage (optional), Sentry, GA4 (optional for web), none for payments.
+Deliverables: EXEC_STATUS, TEST_MATRIX, E2E_REPORT, GO_DECISION, SECTION1_COMPLIANCE.
+Section-2: scholarship_api (execute only if your workspace is scholarship_api)
+
+Objective: Canonical scholarship catalog + application lifecycle APIs.
+Must-have today:
+Endpoints: /health, /readyz, /version; /api/v1/scholarships (list, detail, filters, pagination); /api/v1/applications (create/update/status).
+Public read (scholarship listing/detail) with safe limits; write operations authenticated.
+Indexing/filters for amount, deadline, categories.
+Integration tests to run:
+auto_page_maker consumes list/detail for SEO pages.
+student_pilot calls detail + application flows.
+provider_register writes/updates scholarships; events propagate.
+Third-party systems: PostgreSQL, Sentry; Stripe only if charging providers here (otherwise via provider_register).
+Deliverables: EXEC_STATUS, TEST_MATRIX, E2E_REPORT, GO_DECISION, SECTION2_COMPLIANCE.
+Section-3: scholarship_agent (execute only if your workspace is scholarship_agent)
+
+Objective: Autonomous marketing campaigns and engagement workflows.
+Must-have today:
+Jobs: canary/heartbeat, deadline_reminders, status_sync (or equivalent).
+Endpoints: /health, /readyz, /version; POST /api/jobs/run (manual trigger).
+DRY_RUN mode toggle; idempotent job execution.
+Integration tests to run:
+Pull scholarships from scholarship_api for campaigns.
+Send email/SMS via auto_com_center or direct provider.
+Attribute conversions to student_pilot signups; ensure UTM/link tracking.
+Third-party systems: Queue/Redis (if used), SendGrid/Twilio, Sentry.
+Deliverables: EXEC_STATUS, TEST_MATRIX, E2E_REPORT, GO_DECISION, SECTION3_COMPLIANCE.
+Section-4: scholarship_sage (execute only if your workspace is scholarship_sage)
+
+Objective: Recommendations and advisory for scholarships.
+Must-have today:
+Endpoints: /health, /readyz, /version; GET /api/v1/recommendations?student_id=...; optional POST /api/v1/advice.
+Deterministic parameters; auditability; content safety filters.
+Integration tests to run:
+student_pilot invokes recommendations.
+scholarship_api detail enrichment optional.
+Third-party systems: LLM provider (if used), feature flags, Sentry.
+Deliverables: EXEC_STATUS, TEST_MATRIX, E2E_REPORT, GO_DECISION, SECTION4_COMPLIANCE.
+Section-5: student_pilot (execute only if your workspace is student_pilot)
+
+Objective: Student-facing experience to discover, apply, and purchase credits.
+Must-have today:
+Endpoints: /health, /readyz, /version; web routes for discovery, scholarship detail pages, and an “Apply” flow.
+Auth via scholar_auth; recommendations via scholarship_sage; application APIs via scholarship_api.
+Checkout for credits (if in-scope here) using Stripe or redirect to payment microservice.
+SEO-friendly pages must link into this app for conversions.
+Integration tests to run:
+Login/logout, profile; recommendation panel; apply button handoff to scholarship_api; credit purchase flow.
+Deep link from auto_page_maker pages to the correct detail page with UTM attribution.
+Third-party systems: Stripe (for credits), GA4, Sentry.
+Deliverables: EXEC_STATUS, TEST_MATRIX, E2E_REPORT, GO_DECISION, SECTION5_COMPLIANCE.
+Section-6: provider_register (execute only if your workspace is provider_register)
+
+Objective: Provider onboarding, listing management, and monetization.
+Must-have today:
+Endpoints: /health, /readyz, /version; provider signup/login; create/update scholarship; billing setup.
+Synced integration with scholarship_api for CRUD; webhook or polling for status.
+Provider fee capture (3%) via Stripe Connect or equivalent.
+Integration tests to run:
+Provider publishes a scholarship; scholarship_api reflects it; auto_page_maker indexes it; student_pilot displays it; revenue events recorded.
+Third-party systems: Stripe Connect, Sentry, GA4 (optional).
+Deliverables: EXEC_STATUS, TEST_MATRIX, E2E_REPORT, GO_DECISION, SECTION6_COMPLIANCE.
+Section-7: auto_page_maker (execute only if your workspace is auto_page_maker)
+
+Objective: SEO landing page engine to drive organic student acquisition at very low CAC.
+Must-have today:
+Endpoints: /health, /readyz, /version; SSR page routes for scholarship listings, categories, locations, amounts; detail pages must link into student_pilot application flow.
+SEO artifacts: /sitemap.xml (reference all key pages), /robots.txt (allow crawl and point to sitemap), canonical tags, JSON-LD (Organization, WebSite, BreadcrumbList; add FinancialProduct/Scholarship type if used).
+Performance: ≤120ms P95 TTFB for generated pages. Proper caching headers.
+Ensure each page includes clear CTAs to student_pilot with UTM tracking.
+Integration tests to run:
+Pull data from scholarship_api for page generation.
+Confirm deep links into student_pilot are valid and tracked.
+Verify pages are crawlable, mobile-friendly, and not blocked by robots or CSP.
+Third-party systems: GA4, Sentry, object storage (optional), CDN (optional).
+Deliverables: EXEC_STATUS, TEST_MATRIX, E2E_REPORT, GO_DECISION, SECTION7_COMPLIANCE.
+Section-8: auto_com_center (execute only if your workspace is auto_com_center)
+
+Objective: Centralized outbound communications (email/SMS/push) with templates and webhooks.
+Must-have today:
+Endpoints: /health, /readyz, /version; POST /api/v1/send (templated), webhooks for delivery/status events.
+Templates for core events: welcome, application status, deadline reminders.
+Rate limits, suppression lists, audit logs.
+Integration tests to run:
+scholarship_agent triggers sends; student_pilot and scholarship_api receive status callbacks if required (e.g., confirmation emails).
+Third-party systems: SendGrid/Twilio, Sentry; object storage for templates (optional).
+Deliverables: EXEC_STATUS, TEST_MATRIX, E2E_REPORT, GO_DECISION, SECTION8_COMPLIANCE.
+Reporting content requirements (apply to your app only)
+
+EXEC_STATUS_<app>_<YYYYMMDD>.md
+Header with APP NAME and APP_BASE_URL.
+Current status, version, environment, known risks with owners, blockers with owners.
+Dependency matrix (other apps + third-party systems + readiness).
+KPI snapshot (latency, uptime projection, conversion proxy where relevant).
+“Today plan” checklist and time-bound milestones.
+TEST_MATRIX_<app>_<YYYYMMDD>.md
+Enumerate test categories: health, security headers, CORS, auth (if applicable), core endpoints, performance, integration, SEO (if applicable).
+For each test: preconditions, steps, expected results, pass/fail.
+E2E_REPORT_<app>_<YYYYMMDD>.md
+Document E2E flows that touch your app, including request/response samples and timings.
+Include SEO verifications if your app serves web pages (sitemap, robots, canonical, JSON-LD).
+GO_DECISION_<app>_<YYYYMMDD>.md
+GO or NO-GO for production today.
+If NO-GO: precise ETA for go-live and ARR ignition; list unmet prerequisites and third-party systems required, with owners and dates.
+If GO: cutover plan, rollback plan, on-call for first 72 hours.
+SECTION<NUM>COMPLIANCE<app>_<YYYYMMDD>.md
+Map each section requirement to evidence (file, endpoint, log snippet).
+Security, privacy, and Responsible AI notes.
+SLO evidence: recent latency samples, uptime approach, alert thresholds.
+Execution start (what you do now)
+
+Run workspace self-check:
+Call GET /health at your APP_BASE_URL.
+If app name doesn’t match your section, stop and produce WORKSPACE_MISMATCH report only.
+If matched, implement/verify all section requirements for your app.
+Produce all five required deliverables with the exact file names defined above, including the mandated header.
+If you cannot reach 100% production readiness today, update GO_DECISION with:
+NO-GO, earliest ETA date/time, ARR ignition date, and explicit third-party/platform dependencies with owners.
+Integration smoke-tests:
+Validate upstream/downstream handoffs noted in your section.
+Record URLs, request/response examples, and timings in E2E_REPORT.
+Finalize:
+Confirm /health, /readyz, /version respond successfully.
+Confirm security headers, CORS, and rate limiting are in place (where applicable).
+Confirm analytics and logging are active.
+Publish final GO_DECISION.
+Important naming and formatting rules
+
+No spaces in filenames. Use underscores.
+Include today’s date in YYYYMMDD format.
+The first two lines of every report must be: APP NAME: <your app name> APP_BASE_URL: <your base URL>
+Decision cadence and escalation
+
+If any dependency is blocking “today,” choose NO-GO and provide the exact action plan, owners, and dates. Do not wait.
+Act with urgency but do not violate scope discipline.
+End of prompt. Execute only your section.
