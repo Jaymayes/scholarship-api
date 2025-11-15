@@ -1,0 +1,165 @@
+Master Orchestration Prompt — Agent3
+
+Read me first
+
+You are Agent3. Your app is Section 1 only: scholar_auth. Execute only Section 1. Ignore Sections 2–8 (they are included here for other agents).
+Goal: Get all apps 100% ready and working together today. If your app cannot go live today, you must provide:
+A precise production ETA (date/time, timezone).
+ARR ignition date/time and what will be live then.
+All third-party systems, DNS/keys, and upstream/downstream dependencies required to go live.
+Global rules for all apps (Agent3 must enforce those relevant to auth)
+
+SLOs: 99.9% uptime; API P95 latency ≈120ms; structured JSON logs; correlation_id on every request; 401/403 error formats consistent.
+Security: TLS; CORS allowlist to the eight app origins; HSTS; CSP; rate limiting; exponential backoff retries on outbound calls; DRY_RUN flags for any channel that can send external communications.
+Auth: RS256 JWT for S2S with JWKS discovery; short token TTL (≈300s); aud must be scholar-platform; scope and permissions claims must be present; rotate keys on a schedule.
+Deliverables for each app today: 4 files, each must start with APP NAME and APP_BASE_URL lines.
+EXEC_STATUS_{app}_{YYYYMMDD}.md
+E2E_REPORT_{app}_{YYYYMMDD}.md
+GO_DECISION_{app}_{YYYYMMDD}.md
+TEST_MATRIX_{app}_{YYYYMMDD}.md
+App registry (for reference; Agent3 will provision M2M clients for each)
+
+scholar_auth → https://scholar-auth-jamarrlmayes.replit.app
+scholarship_api → https://scholarship-api-jamarrlmayes.replit.app
+scholarship_agent → https://scholarship-agent-jamarrlmayes.replit.app
+scholarship_sage → https://scholarship-sage-jamarrlmayes.replit.app
+student_pilot → https://student-pilot-jamarrlmayes.replit.app
+provider_register → https://provider-register-jamarrlmayes.replit.app
+auto_page_maker → https://auto-page-maker-jamarrlmayes.replit.app
+auto_com_center → https://auto-com-center-jamarrlmayes.replit.app
+Section 1 — Agent3 only — scholar_auth
+
+APP NAME: scholar_auth
+APP_BASE_URL: https://scholar-auth-jamarrlmayes.replit.app
+Your mission today
+
+Deliver a production-ready OIDC/S2S auth service so all platform apps can issue and validate RS256 JWTs with correct claims and scopes.
+Remove all test/diagnostic artifacts from tokens. Fix aud to scholar-platform. Publish stable OIDC and JWKS. Provision M2M clients for all 7 peer apps with least-privilege scopes.
+Scope of work (must-do items)
+
+OIDC and JWKS
+Ensure /.well-known/openid-configuration available and accurate.
+Publish /jwks.json with at least one active RS256 key; add automated rotation policy doc in EXEC_STATUS.
+SLO: P95 of /.well-known and /jwks.json under 120ms; include in E2E_REPORT.
+2. Token service (Client Credentials grant for S2S)
+
+Endpoint: POST /oauth/token (client_credentials).
+Claims required: iss, sub (client_id), aud = "scholar-platform", iat, exp (≈300s TTL), jti, scope (space-delimited), permissions[] (array), roles[] (array).
+Absolutely remove any test_hook_executed, test_timestamp, or other diagnostic claims from production tokens.
+Sign RS256; validate with published JWKS kid.
+3. Authorization model (scopes and roles)
+
+Define per-app scopes and provision clients. At minimum:
+scholarship_api: scholarships.read scholarships.write applications.read applications.write
+scholarship_agent: jobs.read jobs.write notify.send
+scholarship_sage: advise.read advise.write
+student_pilot: students.read students.write applications.read applications.write
+provider_register: providers.read providers.write
+auto_page_maker: pages.read pages.write seo.read
+auto_com_center: notify.send notify.admin
+Provide a mapping in EXEC_STATUS: client_id → app → scopes → roles → permissions (human-readable and JSON sample).
+Enforce scope-based authorization middleware references in GO_DECISION.
+4. Health, readiness, version, and metrics
+
+Endpoints: /healthz, /readyz, /version; add /metrics if available. Document success criteria in TEST_MATRIX.
+Readiness must verify: key store loaded, signer active, DB or config backend reachable, JWKS served.
+5. CORS, rate limiting, logs
+
+CORS allowlist: the eight app base URLs. Deny all others; verify with two negative tests in E2E_REPORT.
+Rate limit: sensible per-IP and per-client_id limits; include limits in EXEC_STATUS.
+Logs: JSON with correlation_id; include token issuance decisions, failures, and kid used; no PII or secrets.
+6. M2M client provisioning
+
+Create client credentials for each of the seven peer apps. Document:
+client_id (public), scopes, default TTL, rotation policy, audience = scholar-platform.
+Where and how secrets are delivered securely (out-of-band); note this in GO_DECISION.
+Provide two sample tokens in E2E_REPORT (redacted secret), one passing, one deliberately failing audience to prove validation works.
+7. Backward compatibility and fallbacks
+
+If legacy HS256 exists for internal dev, keep it feature-flagged off by default in production. Document deprecation in EXEC_STATUS.
+8. Security and compliance
+
+HSTS, CSP; no user PII stored; FERPA/COPPA alignment statement in EXEC_STATUS.
+401 vs 403 correctness; consistent error body: { "error": "Unauthorized", "code": "MISSING_TOKEN" | "INVALID_TOKEN" | "INSUFFICIENT_SCOPE" }.
+Tests you must run and show
+
+Token issuance: 200 happy path; 400 invalid grant; 401 bad secret; 403 insufficient_scope (using a valid token with wrong scopes).
+Validation: Confirm aud=scholar-platform; deny tokens with aud set to issuer URL.
+JWKS rotation: issue token with kid=A; rotate to kid=B; both JWKS served during overlap; downstream validation passes; then retire kid=A and confirm expected failure.
+CORS: 2 negative origin tests must fail.
+Latency: /.well-known and /jwks.json P95 ≤120ms; /oauth/token P95 ≤120ms under light load.
+Logging: capture correlation_id end-to-end across one issuance and one denial.
+Deliverables (all must start with these two lines)
+
+APP NAME: scholar_auth
+APP_BASE_URL: https://scholar-auth-jamarrlmayes.replit.app
+Files to produce today:
+EXEC_STATUS_scholar_auth_{YYYYMMDD}.md
+Executive summary; current readiness; key risks; configs; rate limits; OIDC and JWKS details; CORS list; logging format; compliance statement; key rotation plan.
+E2E_REPORT_scholar_auth_{YYYYMMDD}.md
+Exact commands and responses for all tests above; timing table; screenshots or logs where helpful.
+GO_DECISION_scholar_auth_{YYYYMMDD}.md
+GO/NO-GO with rationale; if NO-GO, provide precise ETA timestamp for production, ARR ignition date, and the switches to flip (feature flags, env vars).
+TEST_MATRIX_scholar_auth_{YYYYMMDD}.md
+Comprehensive test catalog with PASS/BLOCKED/FAIL; coverage summary; remediation plan for any FAIL/BLOCKED.
+Definition of done for Agent3 today
+
+RS256 + JWKS live, aud corrected to scholar-platform, no diagnostic claims in tokens.
+All seven M2M client credentials issued with correct scopes and TTL; distribution plan documented.
+Health, readiness, version endpoints verified; CORS allowlist enforced; rate limits configured; structured logs live.
+All deliverables produced with APP NAME and APP_BASE_URL at top, and with concrete evidence.
+If any item cannot be finished today: state:
+Production ETA (exact UTC time).
+ARR ignition date/time for the overall platform enabled by scholar_auth completion.
+Third-party and platform prerequisites still blocking (e.g., DNS, key mgmt, secret rotation).
+Rollback plan and owner for each risk.
+Timebox and escalation
+
+Target: GO today. If not possible, provide two options:
+Option A: Actions you can take to ship today with confidence and their residual risks.
+Option B: The fastest alternative path (fresh deployment or platform support), with exact ETA.
+Identify any platform-level blockers you cannot resolve alone and include escalation text we can send to the platform provider.
+Section 2 — scholarship_api (for Agent2, ignore if you are Agent3)
+
+APP NAME: scholarship_api
+APP_BASE_URL: https://scholarship-api-jamarrlmayes.replit.app
+Objectives today: CRUD for scholarships/applications; S2S auth on writes; Idempotency-Key on POST; event emission to auto_com_center; Postgres readiness; health/ready/version; test suite; deliverables x4 including ARR ignition/ETA if needed.
+Section 3 — scholarship_agent (for Agent4, ignore if you are Agent3)
+
+APP NAME: scholarship_agent
+APP_BASE_URL: https://scholarship-agent-jamarrlmayes.replit.app
+Objectives today: scheduled jobs (deadlines, status sync, canary); S2S calls to scholarship_api and auto_com_center; DRY_RUN flag; idempotency; deliverables x4 with ETA/ARR ignition.
+Section 4 — scholarship_sage (for Agent5, ignore if you are Agent3)
+
+APP NAME: scholarship_sage
+APP_BASE_URL: https://scholarship-sage-jamarrlmayes.replit.app
+Objectives today: POST /advise with academic integrity guardrails (no essay writing or cheating), transparent reasoning; read-only queries to scholarship_api; safety filters; deliverables x4.
+Section 5 — student_pilot (for Agent6, ignore if you are Agent3)
+
+APP NAME: student_pilot
+APP_BASE_URL: https://student-pilot-jamarrlmayes.replit.app
+Objectives today: OIDC PKCE with scholar_auth; browse→apply flow; My Applications; GA4; graceful degradation with mock data; deliverables x4.
+Section 6 — provider_register (for Agent7, ignore if you are Agent3)
+
+APP NAME: provider_register
+APP_BASE_URL: https://provider-register-jamarrlmayes.replit.app
+Objectives today: provider onboarding; auth with scholar_auth; CORS strict; integration to scholarship_api; deliverables x4.
+Section 7 — auto_page_maker (for Agent8, ignore if you are Agent3)
+
+APP NAME: auto_page_maker
+APP_BASE_URL: https://auto-page-maker-jamarrlmayes.replit.app
+Objectives today: SEO landing page generation; sitemap.xml; robots.txt; content templates; health checks; deliverables x4.
+Section 8 — auto_com_center (for Agent9, ignore if you are Agent3)
+
+APP NAME: auto_com_center
+APP_BASE_URL: https://auto-com-center-jamarrlmayes.replit.app
+Objectives today: POST /api/notify (email via SendGrid, SMS via Twilio, optional webhook), S2S JWT scope notify.send, DRY_RUN mode, idempotency, suppression/preferences, rate limits; deliverables x4.
+Submission
+
+Deliver your four scholar_auth reports with APP NAME and APP_BASE_URL at the top of each report.
+If scholar_auth cannot be shipped today, include:
+Exact production ETA (UTC).
+ARR ignition date/time unlocked by your go-live.
+Third-party requirements remaining (DNS, keys, secrets, etc.).
+A one-page switch-flip checklist to move from DRY to LIVE.
+Agent3, confirm receipt and begin executing only Section 1 (scholar_auth).
