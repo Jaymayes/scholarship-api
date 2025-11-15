@@ -1,0 +1,299 @@
+Master Orchestration Prompt — Agent3 (Run-Anywhere, Single-Workspace Safe)
+
+Read first, then execute only your app’s section. Do not modify, rename, or execute instructions for any other app. Your goal is to get your app production-ready today and integrated with the rest of the platform. If “today” is not possible, you must produce a precise ETA, ARR ignition date/time, and list of third-party systems required.
+
+Company context
+
+Company: Scholar AI Advisor
+Domain: www.scholaraiadvisor.com
+Prime objective: Achieve market readiness for all 8 apps, enabling ARR ignition as fast as safely possible, with an ultimate 5-year target of $10M profitable ARR.
+SLOs: 99.9% uptime, ~120ms P95 latency for APIs, secure-by-default, compliant with FERPA/COPPA.
+Global rules for Agent3 (applies to every app)
+
+Workspace verification (mandatory):
+Determine your current app by reading local repo indicators (package.json name, README, existing evidence/* files, env files, or distinctive source directory names) and, if reachable, by calling GET /health on the app’s base URL.
+If your current workspace does not match the section you are about to execute, do not proceed. Instead, produce a Workspace Mismatch Report (see “If you are in the wrong workspace” below).
+2. Execute only your section:
+
+Each section below maps 1:1 to a single app. You must execute only the section that corresponds to your current workspace/app.
+Your section contains everything required to achieve production readiness, integration, and go/no-go decisioning.
+3. Deliverables (create all of these in an evidence/ folder):
+
+EXEC_STATUS_<app>_<UTC_YYYYMMDD>.md
+E2E_REPORT_<app>_<UTC_YYYYMMDD>.md
+TEST_MATRIX_<app>_<UTC_YYYYMMDD>.md
+GO_DECISION_<app>_<UTC_YYYYMMDD>.md
+SECTION<Number>COMPLIANCE<app>_<UTC_YYYYMMDD>.md Notes:
+Every report must start with two header lines: APP NAME: <your_app_name> APP_BASE_URL: <your_app_base_url>
+Use UTC date stamp as shown. Do not include spaces in filenames.
+If you create any additional artifacts (postman collection, .env.sample, fixtures), reference them in your reports and place them under evidence/ or scripts/ accordingly.
+4. “Ready today” requirement:
+
+If your app can be made production-ready today, output a GO in GO_DECISION with the exact UTC go-live window and ARR ignition assumptions.
+If not, output NO-GO with a precise ETA (UTC date/time), the specific blockers, exact third-party systems needed, and the earliest credible ARR ignition date/time once dependencies are in place.
+5. Common platform standards (must be implemented or verified in your app):
+
+Health and metadata endpoints:
+GET /health → 200 OK with summary checks
+GET /readyz → 200 OK only if all critical dependencies are healthy
+GET /version → version, git SHA, build time
+Observability:
+Structured logs with request-id, user-id (when present), job-id (for background jobs)
+Error tracking (Sentry or equivalent) wired
+Basic APM metrics (latency, error rate, throughput) available
+AuthN/Z:
+RS256 JWT validation against scholar_auth JWKS
+Enforce audience=scholar-platform and scopes appropriate to your endpoints
+Config:
+DRY_RUN=true/false supported. In DRY_RUN, external side effects are disabled, DB mutations avoided, and outbound messages replaced with logs or no-ops while still measuring end-to-end latency.
+Provide .env.sample documenting all required env vars
+Performance:
+Target ~120ms P95 latency for APIs and 99.9% uptime. Optimize critical paths and document P95 in E2E_REPORT.
+6. ARR instrumentation and reporting:
+
+In GO_DECISION, include:
+Whether app is production-ready today (Y/N)
+Go-live window or ETA (UTC)
+ARR ignition date/time (UTC) and first-90-days ARR estimate
+Assumptions used (e.g., conversion rate, ARPU, provider fee volume)
+3rd-party systems required and status (e.g., SendGrid, Twilio, S3/R2, Stripe if applicable, Sentry, GA/Tag Manager, Uptime monitoring)
+Use conservative, data-first assumptions and cite where those numbers come from (internal tests, historicals, or industry benchmarks).
+7. Integration expectations (all apps must align to these):
+
+Auth: Tokens issued by scholar_auth (RS256). Each app enforces scopes and audience.
+Scholarship data system-of-record: scholarship_api
+Background jobs and reminders: scholarship_agent
+Recommendations/advice: scholarship_sage
+Student UX: student_pilot
+Provider onboarding/management: provider_register
+SEO/organic growth: auto_page_maker
+Messaging/notifications: auto_com_center
+Third-party baseline (as applicable)
+
+Email: SendGrid (or SES). ENV: SENDGRID_API_KEY
+SMS: Twilio. ENV: TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN
+Storage/CDN: S3 or Cloudflare R2. ENV: STORAGE_BUCKET, STORAGE_REGION, STORAGE_KEY_ID, STORAGE_SECRET
+Error tracking: SENTRY_DSN
+Analytics: GA4 or GTM. ENV: GA_MEASUREMENT_ID or GTM_CONTAINER_ID
+Cache/queue: REDIS_URL (if used)
+DB: DATABASE_URL (ensure TLS)
+Uptime: UptimeRobot/Pingdom; create monitors for /health and /readyz
+Feature flags (optional): simple ENV toggles or provider per app section
+App index (canonical base URLs)
+
+scholar_auth → https://scholar-auth-jamarrlmayes.replit.app
+scholarship_api → https://scholarship-api-jamarrlmayes.replit.app
+scholarship_agent → https://scholarship-agent-jamarrlmayes.replit.app
+scholarship_sage → https://scholarship-sage-jamarrlmayes.replit.app
+student_pilot → https://student-pilot-jamarrlmayes.replit.app
+provider_register → https://provider-register-jamarrlmayes.replit.app
+auto_page_maker → https://auto-page-maker-jamarrlmayes.replit.app
+auto_com_center → https://auto-com-center-jamarrlmayes.replit.app
+SECTION-1 — scholar_auth (Identity and Access)
+Only execute if your current workspace is scholar_auth.
+
+Objectives:
+Provide RS256 JWT issuance, JWKS publication, scopes/roles framework, and M2M client credentials for the platform.
+Enforce audience=scholar-platform and correct aud in tokens.
+Must-have endpoints:
+POST /oauth/token (password, refresh_token, client_credentials)
+GET /.well-known/jwks.json
+GET /health, /readyz, /version
+Scopes to provision (at minimum):
+scholarships.read/write, applications.read/write, providers.read/write, jobs.read/write, notify.send, users.read, users.write
+Actions:
+Verify aud claim = scholar-platform (not issuer URL). Fix and redeploy if incorrect.
+Create M2M clients for each service:
+scholarship_agent: scopes=scholarships.read, applications.read, jobs.read, jobs.write, notify.send
+scholarship_api: scopes=scholarships.read/write, applications.read/write, providers.read/write
+auto_com_center: scopes=notify.send
+student_pilot and provider_register: first-party web clients with proper callbacks
+Provide .env.sample with AUTH_ISSUER_URL, AUTH_JWKS_URL, AUTH_AUDIENCE=scholar-platform
+Tests:
+JWKS rotation, TTL, scope enforcement, P95 latency measurement, 401/403 handling
+Deliverables: All 5 reports in evidence/, with APP NAME and APP_BASE_URL at top.
+Ready today? If not, provide ETA and ARR ignition impact due to auth availability.
+SECTION-2 — scholarship_api (Data and Business APIs)
+Only execute if your current workspace is scholarship_api.
+
+Objectives:
+System of record for scholarships, applications, providers, and related queries.
+Serve low-latency, secure endpoints for B2C and B2B flows.
+Must-have endpoints (examples):
+GET /api/v1/scholarships (filters: deadline_before/after, merit/need-based, GPA, location; pagination)
+GET /api/v1/applications (filters: status, updated_before/after; pagination)
+POST /api/v1/applications (create), PATCH /api/v1/applications/:id (update status)
+GET /health, /readyz, /version
+Requirements:
+RS256 JWT validation (aud=scholar-platform), scope checks
+CORS allowlist for all frontends
+Performance P95 ~120ms; return total count headers for pagination
+Tests:
+Token validation, scopes, error codes, filters, pagination, cold-start latency
+Deliverables: All 5 reports in evidence/.
+Ready today? If not, provide ETA, dependencies, ARR ignition linkage to search/apply flows.
+SECTION-3 — scholarship_agent (Background Jobs and Orchestration)
+Only execute if your current workspace is scholarship_agent.
+
+Objectives:
+Automate reminders, status synchronization, and canary notifications.
+Jobs (implement, DRY_RUN-aware, idempotent):
+deadline_reminders: query scholarship_api for upcoming deadlines (30/14/7/1 days), send reminders via auto_com_center
+status_sync: pull stale/pending applications and nudge providers via auto_com_center
+canary_notification: periodic end-to-end test message for observability
+Endpoints:
+POST /api/jobs/run → run {job: "deadline_reminders" | "status_sync" | "canary_notification"} manually
+GET /health, /readyz, /version
+Integration:
+Auth via scholar_auth (client_credentials, token caching)
+Reads: scholarship_api (scholarships/applications)
+Sends: auto_com_center (notify)
+Config:
+DRY_RUN=true prevents external messages and DB mutations; log intended actions, collect latencies
+Tests:
+Success and DRY_RUN paths, scope enforcement, backoff/retry, idempotency
+Deliverables: All 5 reports in evidence/.
+Ready today? If not, ETA, ARR ignition window, and required M2M credentials and messaging providers.
+SECTION-4 — scholarship_sage (Recommendations/Advisory)
+Only execute if your current workspace is scholarship_sage.
+
+Objectives:
+Provide recommendation or advisory endpoints for students (e.g., GET /api/v1/recommendations?student_id=...)
+Safety: bias mitigation, transparent scoring/explanations, no academic dishonesty
+Endpoints:
+GET /api/v1/recommendations
+POST /api/v1/advice (if advisory is in scope)
+GET /health, /readyz, /version
+Integration:
+Read from scholarship_api, enforce auth; optional caching for performance
+Tests:
+P95 under ~120ms for cached paths, explainability payloads, guardrails
+Deliverables: All 5 reports in evidence/.
+Ready today? If not, ETA and ARR impact on B2C conversion.
+SECTION-5 — student_pilot (Student App)
+Only execute if your current workspace is student_pilot.
+
+Objectives:
+Student onboarding, search, recommendations, and apply flow
+Integration:
+Auth against scholar_auth, data from scholarship_api, guidance from scholarship_sage, messaging via auto_com_center
+UX and telemetry:
+Instrument funnels (landing → sign-up → search → recommendation → apply)
+GA/GTM events, error/speed metrics, SSR or pre-render for key pages if applicable
+Tests:
+E2E: signup → discover → apply; token refresh; failure paths
+Deliverables: All 5 reports in evidence/.
+Ready today? If not, ETA and ARR ignition based on live traffic from auto_page_maker.
+SECTION-6 — provider_register (Provider Portal)
+Only execute if your current workspace is provider_register.
+
+Objectives:
+Provider onboarding, program listing management, application status updates
+Integration:
+Auth via scholar_auth, CRUD via scholarship_api, messaging via auto_com_center
+Features:
+Provider verification, compliance prompts, publish/unpublish programs
+Tests:
+Status updates propagate to student_pilot via scholarship_api, secure role checks
+Deliverables: All 5 reports in evidence/.
+Ready today? If not, ETA and ARR ignition from provider-side activity and 3% fee pipeline.
+SECTION-7 — auto_page_maker (SEO Growth Engine)
+Only execute if your current workspace is auto_page_maker.
+
+Objectives:
+Generate and serve SEO-optimized scholarship pages at scale
+Requirements:
+sitemap.xml, robots.txt, canonical tags, schema.org markup, fast TTFB
+Optional pre-rendering/static generation and cache-control
+Integration:
+Content sourced from scholarship_api; link-out to student_pilot deep pages
+Tests:
+Lighthouse/SEO checks, crawlability, correct canonicalization and breadcrumbs
+Deliverables: All 5 reports in evidence/.
+Ready today? If not, ETA and ARR ignition for organic channel.
+SECTION-8 — auto_com_center (Communications Hub)
+Only execute if your current workspace is auto_com_center.
+
+Objectives:
+Centralized email/SMS/webhook dispatch with templating and rate limits
+Endpoints:
+POST /api/notify {channel, to, template_id|content, data} enforcing auth scope=notify.send
+GET /health, /readyz, /version
+Integration:
+Receives requests from scholarship_agent, student_pilot, provider_register, scholarship_api events (optional)
+DRY_RUN honors no external sends; logs only
+Third party:
+SendGrid, Twilio configured and tested; sandbox flags for DRY_RUN
+Tests:
+Template rendering, internationalization (if any), bounce/complaint handling
+Deliverables: All 5 reports in evidence/.
+Ready today? If not, ETA, ARR ignition alignment with reminders/nudges.
+GO_DECISION structure (mandatory content for every app)
+
+Header: APP NAME: <app> APP_BASE_URL: <url>
+Decision: GO or NO-GO today
+If GO:
+Production cutover window (UTC)
+ARR ignition date/time (UTC)
+First-90-days ARR estimate and assumptions
+Post-launch watch items and rollback criteria
+If NO-GO:
+Exact blockers (internal/external)
+Minimal work to remove blockers
+ETA to GO (UTC) and ARR ignition date/time (UTC)
+Third-party dependencies required (names, accounts/keys, status)
+TEST_MATRIX structure (minimum)
+
+Auth paths: valid token, expired token, wrong audience, missing scopes
+Functional paths: success and error cases per endpoint/job
+Performance: P50/P95 latencies
+Reliability: retries/backoff, idempotency where relevant
+Security: basic injection checks, PII data handling
+Integration: upstream/downstream mock and live checks
+E2E_REPORT structure (minimum)
+
+End-to-end scenarios that traverse at least the primary dependencies for your app
+Screenshots or logs references (if applicable)
+Latency and error-rate snapshots
+DRY_RUN demonstration if not in production mode
+Evidence links to scripts/test data
+EXEC_STATUS structure (minimum)
+
+Current status summary
+What works vs what’s blocked
+Risk register with severity and mitigation
+Open issues with owners (if known)
+Next steps with time estimates
+SECTION<Number>_COMPLIANCE structure (minimum)
+
+Checklist mapped to this prompt’s requirements for your section
+Pass/Fail with notes, and links to code or tests
+Gaps with ETA to close
+Environment variables (baseline for all apps; include in .env.sample)
+
+APP_ENV, APP_BASE_URL
+AUTH_ISSUER_URL, AUTH_JWKS_URL, AUTH_AUDIENCE=scholar-platform
+M2M_CLIENT_ID, M2M_CLIENT_SECRET (for services calling others)
+DATABASE_URL (if used), REDIS_URL (if used)
+SENTRY_DSN (if used), GA_MEASUREMENT_ID or GTM_CONTAINER_ID (web apps)
+SENDGRID_API_KEY (if applicable), TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN (if applicable)
+STORAGE_BUCKET, STORAGE_REGION, STORAGE_KEY_ID, STORAGE_SECRET (if applicable)
+DRY_RUN=true|false
+LOG_LEVEL=info|debug
+If you are in the wrong workspace (mandatory behavior)
+
+Do not try to execute another app’s section.
+Create evidence/WORKSPACE_MISMATCH_<detected_app>_<UTC_YYYYMMDD>.md with:
+Detected app name and base URL
+Which section the user asked to run vs the correct section for this workspace
+Evidence you used (e.g., repo files, existing evidence names, /health response)
+Clear next steps: “Open <correct app URL> and paste this same prompt; execute SECTION-<Number> there.”
+Status of current workspace (if deliverables here are complete, say so)
+Example wording is acceptable: “Workspace Mismatch Detected — current: auto_com_center; requested: scholarship_agent; per rules, execute only SECTION-8 here. To run SECTION-3, open https://scholarship-agent-jamarrlmayes.replit.app and paste this prompt.”
+Execution now
+
+Verify your workspace and identify your app.
+Execute only your SECTION instructions end-to-end.
+Produce all 5 deliverables in evidence/, each starting with: APP NAME: <your_app_name> APP_BASE_URL: <your_app_base_url>
+If GO today is not credible, provide precise ETA, ARR ignition, and third-party systems needed.
+Keep logs concise, decisions data-first, and move with urgency.
