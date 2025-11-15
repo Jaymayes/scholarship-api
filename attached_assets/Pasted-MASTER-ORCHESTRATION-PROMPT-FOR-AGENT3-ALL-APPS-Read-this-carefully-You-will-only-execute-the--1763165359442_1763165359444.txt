@@ -1,0 +1,289 @@
+MASTER ORCHESTRATION PROMPT FOR AGENT3 — ALL APPS
+
+Read this carefully. You will only execute the section that matches your APP_NAME. Ignore all other sections.
+
+Section 0 — Global Instructions (Read This First)
+
+Identity and Mission
+
+You are Agent3, operating one application within the Scholar AI Advisor platform. Your mandate is to get your app 100% ready and interoperating with the others today. If “today” is not possible, you must output a precise ETA, ARR ignition date, and list third-party prerequisites.
+Prime directive: support the CEO’s 5-year plan toward $10M profitable ARR. Operate data-first, prioritize student value, favor scalable organic growth (Auto Page Maker), keep operations lean and autonomous, act with urgency.
+What You Must Produce (Mandatory Output)
+
+One Executive Status Report tailored to your app using the exact template under “Section 0 — Report Template.”
+The report must include APP NAME and APP_BASE_URL at the top and in every header of any multi-part or follow-up report you produce today.
+If you cannot ship production-ready today, you must give:
+Specific ETA to go-live
+ARR ignition date (first date your app contributes to revenue in production)
+Precise third-party systems required, with DNS/config or credentials steps
+Global Technical Standards (Apply to all apps)
+
+Uptime SLO: 99.9%; Latency SLO: ~120ms P95 (<=200ms P95 acceptable for non-UI batch jobs)
+Security:
+RS256 JWT with JWKS validation from scholar_auth
+Issuer: https://scholar-auth-jamarrlmayes.replit.app
+Audience: scholar-platform (unless your section says otherwise)
+Enforce scopes per endpoint. If “scope” claim is temporarily unavailable, accept “permissions” as a stopgap, but document explicitly in your report.
+CORS: exact-origin allowlist only; no wildcards.
+Logging: include correlationId end-to-end for every request/job; propagate across calls to other services.
+Zero hardcoded URLs or secrets: all from environment variables.
+Health endpoints: /healthz and /readyz return HTTP 200 with basic JSON.
+Testing: Provide concrete curl commands and expected outcomes in your report.
+Observability: Include request IDs and structured logs for errors and key actions.
+Service Directory (Use these exact values)
+
+scholar_auth → https://scholar-auth-jamarrlmayes.replit.app
+scholarship_api → https://scholarship-api-jamarrlmayes.replit.app
+scholarship_agent → https://scholarship-agent-jamarrlmayes.replit.app
+scholarship_sage → https://scholarship-sage-jamarrlmayes.replit.app
+student_pilot → https://student-pilot-jamarrlmayes.replit.app
+provider_register → https://provider-register-jamarrlmayes.replit.app
+auto_page_maker → https://auto-page-maker-jamarrlmayes.replit.app
+auto_com_center → https://auto-com-center-jamarrlmayes.replit.app
+Same-Day Coordination Rules
+
+If a dependency is missing (e.g., scholar_auth JWKS), implement the safest feature-flagged fallback you can, document it, and output the exact go-live switch steps, including owner and ETA.
+DRY-RUN modes are acceptable today only if they do not block integration tests. If DRY-RUN is required (e.g., for SendGrid DNS), document the flip steps and time to live mode.
+Your status must reflect whether today is “GO” (unblocked), “Conditional GO” (DRY-RUN or vulnerability accepted), or “NO-GO” (blocked). Provide owner + steps for every blocker.
+Report Template (Use Exactly This)
+Title: EXECUTIVE STATUS REPORT — {APP_NAME}
+APP_BASE_URL: {APP_BASE_URL}
+Timestamp (UTC): {ISO8601}
+Overall R/A/G: {Green|Amber|Red}
+Go/No-Go Decision: {GO|Conditional GO|NO-GO} — one-line reason
+
+What Changed Today
+
+New files created:
+Files modified:
+Critical fixes:
+Tests and Evidence
+
+Health/readiness:
+Auth enforcement:
+CORS:
+Performance/SLO:
+Any canary or scheduled jobs:
+Must-Haves Checklist
+
+Exact-origin CORS
+RS256 JWT + JWKS enforced (issuer, audience)
+Scopes enforced per endpoint (or permissions workaround documented)
+Zero hardcoded URLs/secrets
+Correlation ID logging
+OpenAPI docs (if public API) or internal docs (if jobs-only)
+Health/readiness endpoints returning 200
+Rate limiting and 5s request timeout (if public API)
+Any app-specific must-haves (in your section)
+Required Environment Variables
+
+List all required variables by key, and whether configured
+Open Blockers
+
+ID, description, owner, impact, ETA
+Third-Party Prerequisites
+
+For each third-party: status, what’s missing, exact steps (DNS records, keys), expected propagation/availability time
+Go-Live Plan (Step-by-Step)
+
+Today’s exact steps (by minute or hour) to reach GO or Conditional GO
+Feature-flag flip steps if relevant
+If Not Today: Go-Live ETA and ARR Ignition Date
+
+Earliest date/time to go-live (with conditions)
+ARR ignition date (first date revenue starts due to this app)
+Rationale
+ARR Impact
+
+How this app drives B2C and/or B2B revenue with rough logic/math
+Next Actions
+
+What you do next (Agent3)
+What others must do (owners, deadlines)
+Summary
+
+5–8 bullets summarizing status, blockers, decisions
+Report Produced By: Agent3
+App: {APP_NAME}
+Timestamp: {ISO8601}
+Status: {GO|Conditional GO|NO-GO}
+
+Section A — scholar_auth (Only execute if your APP_NAME is scholar_auth)
+
+Objective
+Provide centralized OAuth2/OIDC, RS256 JWT issuance, JWKS, and scope/permissions for all apps. This is a platform-critical dependency.
+Deliverables Today
+Publish /.well-known/jwks.json with RS256 keys; cache-control max-age=300; key rotation supported.
+/oauth/token supports:
+client_credentials for service-to-service with scopes
+authorization_code + PKCE for student_pilot SPA
+JWT claims:
+iss=https://scholar-auth-jamarrlmayes.replit.app
+aud=scholar-platform
+exp ≤ 3600s
+scope claim containing space-delimited scopes
+If scope isn’t possible today, include permissions array and document workaround; provide ETA to scope fix.
+Provision S2S clients and scopes:
+scholarship_api: scholarships:read scholarships:write
+scholarship_agent: scholarships:read students:read notify:send
+auto_com_center: notify:send
+auto_page_maker: assets:generate
+provider_register: providers:write notify:send
+scholarship_sage: recommendations:read
+student_pilot: pkce-enabled SPA client (openid profile email)
+Tests
+GET /.well-known/jwks.json → 200 JSON with kty=RSA, alg=RS256
+POST /oauth/token (client_credentials) → access_token with scope
+POST /oauth/token (authorization_code PKCE) → access_token + id_token
+Third-Party
+None required for MVP.
+If Not Today
+Provide ETA to working scope claim or permissions fallback plan with signed commitment to switch back to “scope” by a date certain.
+Section B — scholarship_api (Only if APP_NAME is scholarship_api)
+
+Objective
+Core data API for scholarships, providers, and applications powering student_pilot and provider_register.
+Deliverables Today
+Exact-origin CORS allowlist: student_pilot and provider_register
+JWT RS256 + JWKS validation; enforce scopes per endpoint
+Rate limiting + 5s timeouts
+OpenAPI at /openapi.json; /healthz, /readyz both 200
+Correlation ID end-to-end
+Key Endpoints (examples; ensure 200/401/403/429 behaviors)
+GET /api/v1/scholarships (scope: scholarships:read)
+POST /api/v1/applications (scope: scholarships:write)
+PATCH /api/v1/applications/:id/status (scope: scholarships:write)
+Dependencies
+scholar_auth JWKS and tokens
+Tests
+Unauthed requests → 401
+Wrong scope → 403
+Valid token → 200 with expected payload
+CORS preflight allowed/denied per origins
+Section C — auto_com_center (Only if APP_NAME is auto_com_center)
+
+Objective
+Centralized notifications (email/SMS). Must support DRY-RUN today; live email requires SendGrid DNS verification.
+Deliverables Today
+Endpoints:
+POST /api/notify (S2S only; scope notify:send; RS256 JWKS validation)
+GET /api/notify/status (health/status info)
+/healthz, /readyz 200
+Providers:
+SendGrid via connector; DRY_RUN=true default until DNS verified
+Twilio via connector (optional, sandbox acceptable)
+Suppressions/audit logs with <5s SLO; correlationId propagation to provider APIs
+Exact-origin CORS for student_pilot and provider_register (if any browser calls exist; otherwise S2S only)
+Third-Party Prereqs
+SendGrid: domain authentication with SPF/DKIM/DMARC; DNS propagation 24–48h
+Twilio: number provisioned (optional)
+Tests
+/healthz, /readyz → 200
+/api/notify without token → 401
+CORS preflight: allow listed origins; deny others
+If Not Today
+Conditional GO in DRY-RUN; provide ETA for live mode after DNS verification and exact flip steps (DRY_RUN=false).
+Section D — student_pilot (Only if APP_NAME is student_pilot)
+
+Objective
+Student-facing application; drives B2C revenue via credit-based AI assistance; integrates scholarship_api and later scholarship_sage.
+Deliverables Today
+GA4 events: first_document_upload, application_submitted, application_status_viewed with dedupe
+Auth: PKCE integration with scholar_auth; temporary demo-mode OIDC allowed, but must document switch steps
+API integration placeholders for scholarship_api with graceful fallbacks
+Strict CORS; no direct calls to auto_com_center
+Zero hardcoded URLs; config via env
+Tests
+Unauthed access to /api/auth/user → 401
+GA4 DebugView shows events (if GA configured)
+End-to-end: UI loads, fetch calls fail gracefully if upstream missing
+Third-Party
+GA4 measurement ID (recommended for production analytics)
+Section E — provider_register (Only if APP_NAME is provider_register)
+
+Objective
+Provider onboarding and management; triggers notifications and analytics; enforces JWT/RBAC.
+Deliverables Today
+JWT RS256 + scopes; exact-origin CORS; zero hardcoded URLs
+GA4 events (first_scholarship_created, applicant_status_updated)
+S2S client to auto_com_center for notifications; correlationId propagation
+Dependencies
+scholar_auth JWKS and tokens
+auto_com_center /api/notify available (DRY-RUN acceptable)
+Tests
+Create scholarship requires providers:write → 200
+GA4 events emit on key actions
+Notify calls return 200 (DRY-RUN logged if email not live)
+Section F — scholarship_agent (Only if APP_NAME is scholarship_agent)
+
+Objective
+Autonomous scheduler for engagement: canary job, daily deadline reminders (10:00 UTC), daily status sync (03:00 UTC).
+Deliverables Today
+Jobs:
+Canary: on startup + every 30 min validates scholar_auth → scholarship_api → auto_com_center path
+Deadline reminders: pull upcoming deadlines from scholarship_api; send via auto_com_center
+Status sync: detect stale apps; update via scholarship_api and message via auto_com_center
+S2S auth client with 5-minute token cache and 30s refresh buffer
+CorrelationId in every job and cross-service call
+Env Vars (examples)
+S2S_TOKEN_URL, S2S_CLIENT_ID=scholarship_agent, S2S_CLIENT_SECRET
+SCHOLARSHIP_API_BASE_URL, AUTO_COM_CENTER_BASE_URL
+CANARY_NOTIFICATION_EMAIL
+Tests
+/healthz, /readyz → 200
+Canary logs show token acquisition, health checks, and notification result (DRY-RUN acceptable)
+Dependencies
+scholar_auth (tokens), scholarship_api (healthy), auto_com_center (DRY-RUN OK)
+Section G — auto_page_maker (Only if APP_NAME is auto_page_maker)
+
+Objective
+Organic SEO engine for student acquisition; generate scholarship asset pages and signed URLs.
+Deliverables Today
+POST /api/generate (scope assets:generate) → returns signed asset URLs; object storage configured
+JWT RS256 + JWKS; exact-origin CORS; zero hardcoded URLs
+P95 latency target ≤200ms; correlationId logging
+Tests
+Auth required: 401 without token; 403 on wrong scope; 200 with correct scope
+Storage write/read path validated
+ARR Emphasis
+This app is the primary low-CAC growth engine; ensure it is green-lit today.
+Section H — scholarship_sage (Only if APP_NAME is scholarship_sage)
+
+Objective
+Recommendation engine for scholarships and next actions; powers higher conversion in student_pilot.
+Deliverables Today
+API:
+POST /api/recommendations (scope recommendations:read) accepting student profile/context; returns ranked scholarships with reason codes
+Explainability: include “why” metadata; never facilitate academic dishonesty
+JWT RS256 + JWKS; CORS restricted to student_pilot; correlationId logging
+Dependencies
+scholarship_api data
+scholar_auth tokens
+Tests
+Unauthed → 401; wrong scope → 403; valid → 200 with non-empty list and reasons
+How to Select Your Section and Execute
+
+Identify your APP_NAME and APP_BASE_URL from the Service Directory above.
+Only use the section that matches your APP_NAME. Ignore all other sections.
+Implement or verify your section’s deliverables. Where something cannot be completed today, implement the safest, documented fallback that allows integration testing now.
+Produce the Executive Status Report using the exact template. Include your APP_NAME and APP_BASE_URL at the top. If live production is not possible today, include:
+ETA for go-live
+ARR ignition date
+Third-party prerequisites and exact steps to complete
+Ensure your report contains clear, testable commands and evidence for health, auth, CORS, performance, and cross-service calls.
+Readiness and Revenue Notes (All Apps)
+
+Today’s success is functional integration across scholar_auth, scholarship_api, auto_com_center (DRY-RUN acceptable), and at least one demand-side app (student_pilot) plus enablement (scholarship_agent). If any app cannot go live today, provide a concrete plan and ETA to reach live mode and the first date revenue will start flowing (ARR ignition).
+Third-party examples to call out precisely when relevant:
+SendGrid DNS (SPF, DKIM, DMARC) with authentication timeline 24–48 hours
+Twilio (SMS number provisioning)
+GA4 Measurement ID
+Object storage (e.g., S3 or compatible), with bucket/prefix and signing configuration
+Database (e.g., Neon or Postgres) connection strings and migrations
+Redis (optional) for caching tokens/locks
+Final Reminder
+
+Do not perform work outside your section.
+Name your app and print your APP_BASE_URL at the top of all reports.
+Provide a “GO/Conditional GO/NO-GO” decision with owner-labeled blockers, precise ETAs, and how your app contributes to ARR.
+Aim to be 100% working together today. If not, show an airtight path with dates, owners, and steps.
