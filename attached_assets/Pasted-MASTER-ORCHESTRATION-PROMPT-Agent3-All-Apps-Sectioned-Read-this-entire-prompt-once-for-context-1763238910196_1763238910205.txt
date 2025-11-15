@@ -1,0 +1,268 @@
+MASTER ORCHESTRATION PROMPT — Agent3 (All Apps, Sectioned)
+Read this entire prompt once for context, then strictly follow the Workspace Discipline rules. Only execute the Section that matches your app and APP_BASE_URL. Do not modify or execute anything outside your Section.
+
+Workspace Discipline (Mandatory)
+
+Determine your current app by checking your codebase and health endpoints.
+If your current app does not match the Section you are about to execute:
+Create evidence/WORKSPACE_MISMATCH_YYYYMMDD.md with:
+APP NAME: <detected_app_name>
+APP_BASE_URL: <detected_base_url>
+Clear mismatch details and instructions to open the correct workspace.
+Stop execution.
+Only use the Section that matches your app name and APP_BASE_URL below.
+Put all evidence files under evidence/ in your repo.
+Platform Apps and Base URLs
+
+scholar_auth → https://scholar-auth-jamarrlmayes.replit.app
+scholarship_api → https://scholarship-api-jamarrlmayes.replit.app
+scholarship_agent → https://scholarship-agent-jamarrlmayes.replit.app
+scholarship_sage → https://scholarship-sage-jamarrlmayes.replit.app
+student_pilot → https://student-pilot-jamarrlmayes.replit.app
+provider_register → https://provider-register-jamarrlmayes.replit.app
+auto_page_maker → https://auto-page-maker-jamarrlmayes.replit.app
+auto_com_center → https://auto-com-center-jamarrlmayes.replit.app
+Global Objectives and SLOs (Apply in every Section)
+
+Goal today: Get your app to 100% production-ready and working with all integrated apps. If not possible today, provide:
+Realistic Go-Live date/time (UTC)
+ARR ignition date/time (UTC) and modeled annual impact
+Exact third-party systems and platform dependencies needed, with owners and ETAs
+SLOs:
+Availability: 99.9%
+Performance: P95 latency ≤ 120ms on standard API endpoints; deep checks may be higher
+Security: RS256 JWT validation where applicable; PII redaction in logs; least-privilege scopes
+Compliance: FERPA/COPPA alignment; Responsible AI guardrails for any AI features
+DRY_RUN: Default to true for any outbound operations; must be globally toggleable
+Health Endpoints: Provide GET /health, GET /readyz, GET /version (JSON) returning 200 when healthy
+AuthZ:
+Where applicable, protect POST/PUT/DELETE and job trigger endpoints with admin/system role or M2M scope checks
+Evidence Files (5 required for every app)
+The first two lines of every evidence file must be exactly:
+APP NAME: <your_app_name>
+APP_BASE_URL: <your_base_url>
+Then a blank line, then your content.
+Required files (replace <app> with your app name and use today’s date):
+evidence/EXEC_STATUS_<app>_YYYYMMDD.md
+evidence/TEST_MATRIX_<app>_YYYYMMDD.md
+evidence/E2E_REPORT_<app>_YYYYMMDD.md
+evidence/GO_DECISION_<app>_YYYYMMDD.md
+evidence/SECTION_COMPLIANCE_<app>_YYYYMMDD.md
+Cross-Service Contracts (Use only if your Section integrates with another app)
+
+Auth (scholar_auth): RS256 JWKS at /.well-known/jwks.json; M2M client-credentials for service-to-service tokens; scopes such as scholarships.read, scholarships.write, notify.send, providers.write, students.read.
+Data (scholarship_api):
+Example reads:
+GET /api/v1/scholarships?deadline_after=YYYY-MM-DD&deadline_before=YYYY-MM-DD&limit=100
+GET /api/v1/applications?status=pending&updated_before=ISO8601
+Include bearer token (RS256) with appropriate scopes.
+Comms (auto_com_center):
+POST /api/notify with DRY_RUN support; validate 2xx and capture message_id/correlation_id
+Required third-party for email: one of Postmark or SendGrid; SMS/voice via Twilio if used
+SEO (auto_page_maker): sitemap.xml, robots.txt, canonical tags, JSON-LD schema, server-side rendering or pre-rendering, OpenGraph/Twitter cards, and GA4 events for conversions.
+ARR and GO Decision Framework (Apply in every Section)
+
+Decide GO TODAY, CONDITIONAL GO (with explicit checklist/ETA), or NO-GO (with blockers and ETA).
+ARR ignition: The first day the app contributes measurable ARR. Provide the modeled annual contribution, assumptions, and the trigger(s) to realize revenue (e.g., page traffic, conversion lifts, provider fees).
+Provide a T+60 minute plan (checklist) to transition from DRY_RUN to full production for your app.
+Provide a 72-hour monitoring plan, rollback plan, and on-call escalation matrix (roles and alerts).
+How to Detect Your Section (Mandatory)
+
+Compare detected base URL from your running app to the mapping above via GET /health or /version.
+If mismatch, create WORKSPACE_MISMATCH report and stop.
+SECTION-1 — scholar_auth (Identity, OAuth/JWT, JWKS)
+APP_BASE_URL: https://scholar-auth-jamarrlmayes.replit.app
+Your Scope:
+
+Provide OAuth2 client-credentials for M2M; issue RS256 tokens; publish JWKS.
+Tenants: platform services (scholarship_api, scholarship_agent, auto_com_center, student_pilot, provider_register, auto_page_maker, scholarship_sage).
+Scopes: scholarships.read, scholarships.write, applications.read, applications.write, notify.send, pages.write, providers.write, students.read, admin. Required Tasks:
+Endpoints: GET /health, /readyz, /version return 200 JSON with service, status, version, git_sha, build_time.
+JWKS and Token:
+Expose /.well-known/jwks.json
+Issue RS256 tokens via /oauth/token using client-credentials
+Document 2 production M2M clients per dependent app (ID, scopes, rotation policy).
+Admin/Role model:
+Ensure system role claim for platform agents; include scope list in access token.
+Evidence and Testing:
+Produce the 5 evidence files with proper headers.
+TEST_MATRIX: token issuance tests, invalid scope tests, JWKS rotation test, clock-skew tolerance, P95 ≤120ms.
+GO Decision:
+If DNS or email OTP providers are not needed here, clarify that; otherwise specify any external identity email verification vendor if used. Third-Party Systems:
+None strictly required for M2M; if user signup emails exist, configure Postmark/SendGrid. Deliverables:
+Include a client registry table in EXEC_STATUS; add rotation dates; DRY_RUN for any outbound email if present.
+SECTION-2 — scholarship_api (Scholarships, Applications)
+APP_BASE_URL: https://scholarship-api-jamarrlmayes.replit.app
+Your Scope:
+
+CRUD for scholarships and applications; filters for deadlines and stale/pending items; enforce RS256 bearer auth; fast read paths for SEO and agents. Required Tasks:
+Endpoints:
+GET /health, /readyz, /version
+GET /api/v1/scholarships with filters deadline_after, deadline_before, limit
+GET /api/v1/applications with filters status, updated_before
+Optional: POST/PUT/DELETE with proper scopes (write).
+Auth:
+Validate RS256 from scholar_auth JWKS; reject on missing/invalid scopes.
+Performance:
+P95 ≤120ms for reads; add indices; pagination.
+Evidence and Testing:
+5 evidence files; TEST_MATRIX includes 401/403 cases, pagination, filter edge cases, latency histograms.
+GO Decision:
+If DB migrations outstanding, provide ETA; confirm read replicas (if any). Third-Party Systems:
+PostgreSQL (DATABASE_URL), optional Redis cache, Sentry.
+SECTION-3 — scholarship_agent (Ops Jobs: Marketing/Reminders/Sync)
+APP_BASE_URL: https://scholarship-agent-jamarrlmayes.replit.app
+Your Scope:
+
+Background jobs and one-off triggers to drive engagement and completion:
+canary_notification: basic heartbeat to comms channel
+deadline_reminders: find scholarships due soon → notify students
+status_sync: detect stalled applications → notify providers/students accordingly Required Tasks:
+Jobs and Triggering:
+Implement the three jobs.
+POST /api/jobs/run requires admin/system role or signed internal secret.
+Enforce DRY_RUN globally; log outbound payloads; no side effects when true.
+Idempotency: correlation_id, dedupe window, safe retries, exponential backoff.
+Integrations:
+scholar_auth for M2M tokens (scopes: scholarships.read, applications.read, notify.send).
+scholarship_api for reads; handle 401/403 gracefully with clear logs.
+auto_com_center via POST /api/notify; capture message_id when live.
+Health and Perf:
+GET /health, /readyz, /version; P95 ≤120ms on trigger endpoint.
+Evidence and Testing:
+5 evidence files; include dry-run traces and masked payloads.
+TEST_MATRIX: job auth guard, DRY_RUN on/off, rate limits, circuit breaker, idempotency.
+GO Decision:
+Provide T+60 plan from DRY_RUN=true to live sends; list missing credentials if any. ARR Ignition:
+Provide modeled annual uplift from:
+Deadline reminder conversions (B2C upsell or usage-based credits)
+Completion lift reducing abandoned applications
+Provider retention via nudges Third-Party Systems:
+None directly besides platform dependencies; relies on auto_com_center’s email/SMS providers being live.
+SECTION-4 — scholarship_sage (Advisory/Recommendations)
+APP_BASE_URL: https://scholarship-sage-jamarrlmayes.replit.app
+Your Scope:
+
+Personalized scholarship guidance; explainability; never facilitate academic dishonesty. Required Tasks:
+Endpoints: GET /health, /readyz, /version; POST /api/recommend with audit trail.
+Responsible AI:
+RAI policy enforcement: prompt/response filters; rationale with sources; bias checks; user control.
+Integrations:
+scholarship_api reads (scholarships.read).
+auto_com_center for advisory follow-ups (optional).
+Evidence and Testing:
+5 evidence files; include red-team prompts in TEST_MATRIX.
+GO Decision:
+Outline monitoring for drift and feedback loop. Third-Party Systems:
+LLM provider (document model, temperature caps), caching, Sentry.
+SECTION-5 — student_pilot (Student Portal)
+APP_BASE_URL: https://student-pilot-jamarrlmayes.replit.app
+Your Scope:
+
+Onboarding, scholarship discovery, detail pages, apply flow, reminders. Required Tasks:
+UX Flows:
+Sign-in via scholar_auth; list + detail pages; apply steps; saved scholarships.
+Integrations:
+scholarship_api reads; scholarship_agent-triggered notifications subscription.
+auto_com_center for transactional emails.
+Telemetry:
+GA4 or equivalent; funnel steps; errors; performance sampling.
+Evidence and Testing:
+5 evidence files; include lighthouse/perf, route guards, 401/403 handling.
+GO Decision:
+Identify blockers (e.g., missing details/apply flow); ETA; ARR impact from B2C conversion and ARPU from credits. Third-Party Systems:
+Email deliverability via auto_com_center’s provider; optional CDN; Sentry.
+SECTION-6 — provider_register (Provider Portal)
+APP_BASE_URL: https://provider-register-jamarrlmayes.replit.app
+Your Scope:
+
+Provider onboarding, scholarship posting, application review, communication preferences, optional billing for 3% platform fee. Required Tasks:
+UX Flows:
+Sign-in via scholar_auth; create/edit scholarships; manage application statuses.
+Integrations:
+scholarship_api writes/reads; auto_com_center notifications; scholarship_agent status_sync triggers.
+Monetization:
+If 3% fee is enabled now, define Stripe integration and fee capture; otherwise document phased ETA.
+Evidence and Testing:
+5 evidence files; include CRUD tests, role-based access, audit logs.
+GO Decision:
+ETA for billing go-live if deferred; ARR ignition from provider fees and retention. Third-Party Systems:
+Stripe (if fee collection live), Sentry.
+SECTION-7 — auto_page_maker (SEO Growth Engine)
+APP_BASE_URL: https://auto-page-maker-jamarrlmayes.replit.app
+Your Scope:
+
+Generate high-quality scholarship landing pages for organic acquisition. Required Tasks:
+SEO Stack:
+sitemap.xml, robots.txt, canonical URLs, hreflang (if applicable)
+Structured data (JSON-LD), OpenGraph/Twitter cards
+Pre-render/SSR, HTML-first content, fast TTFB
+Integrations:
+scholarship_api data ingestion; cache with invalidation; 404 → 410 rules when removed
+Performance:
+P95 TTFB < 500ms; image optimization; compression; CDN headers.
+Evidence and Testing:
+5 evidence files; Lighthouse reports, Core Web Vitals, indexing tests.
+GO Decision:
+DNS/host config, sitemap submit steps; ARR ignition from incremental traffic and conversion. Third-Party Systems:
+CDN (if used), Sitemaps submission (GSC), Sentry.
+SECTION-8 — auto_com_center (Communications Hub)
+APP_BASE_URL: https://auto-com-center-jamarrlmayes.replit.app
+Your Scope:
+
+Centralized email/SMS/push delivery with DRY_RUN; webhooks for bounces/complaints; provider-agnostic switch. Required Tasks:
+Endpoints:
+GET /health, /readyz, /version
+POST /api/notify (DRY_RUN aware); capture message_id and provider response
+Webhooks: /api/webhooks/email, /api/webhooks/sms (signature verified)
+Providers:
+Email: Postmark or SendGrid; document DNS (SPF, DKIM, DMARC) and sending domain warm-up
+SMS: Twilio (optional now, document if deferred)
+Security:
+RS256 validation of upstream M2M tokens; per-scope rate limits; PII redaction
+Evidence and Testing:
+5 evidence files; DRY_RUN on/off tests; webhook signature tests; throughput tests; P95 latency
+GO Decision:
+If DNS not propagated, provide ETA to GO and ARR ignition dependencies for scholarship_agent/student_pilot. Third-Party Systems:
+Postmark or SendGrid (choose one now), Twilio (optional), Sentry.
+Execution Steps (All Sections)
+
+Workspace Self-Check (Mandatory First)
+Verify your app by calling your APP_BASE_URL /health, /readyz, /version.
+If your app does not match your Section, create WORKSPACE_MISMATCH_YYYYMMDD.md and stop.
+Implement/Verify Required Endpoints, Auth, DRY_RUN, and Integrations.
+Measure Performance and Record P50/P95 latencies.
+Run DRY_RUN E2E tests across your integrations; capture correlation_ids and masked payloads.
+Prepare GO_DECISION with:
+GO TODAY or CONDITIONAL GO or NO-GO
+If not GO TODAY, provide:
+Exact ETA to GO (UTC), and what must be true
+ARR ignition date/time (UTC), modeled annual contribution, and assumptions
+Third-party systems and platform dependencies with owners and ETAs
+Provide T+60 minute checklist from DRY_RUN to live
+Provide 72-hour monitoring + rollback plan
+Produce the 5 evidence files in evidence/, all starting with:
+Line 1: APP NAME: <your_app_name>
+Line 2: APP_BASE_URL: <your_base_url>
+Line 3: blank line
+Then your content.
+Cross-App Readiness (Today)
+
+After your Section is GO or CONDITIONAL GO with a T+60 plan, run or document an end-to-end scenario involving your dependencies, and include traces in E2E_REPORT_<app>:
+Example: scholarship_agent deadline_reminders → scholarship_api reads → auto_com_center notify (DRY_RUN) → logs confirm delivery pipeline.
+Example: student_pilot viewing scholarship pages fed by scholarship_api and auto_page_maker indexable URLs.
+What To Output (Per Section)
+
+A concise operational summary in EXEC_STATUS_<app> with:
+Current status, versions, env snapshot (redacted), dependency checks, perf summary, error budget
+A precise TEST_MATRIX_<app> covering positive, negative, perf, and security tests
+A detailed E2E_REPORT_<app> with correlation_ids, masked payloads, and logs
+A GO_DECISION_<app> with decision, ETA (if applicable), ARR ignition, third-party/dep table, T+60, 72-hour monitoring, rollback
+A SECTION_COMPLIANCE_<app> mapping each requirement to pass/fail and remediation plan
+Reminder
+
+Only execute your Section.
+If not ready today, provide exact ETA, ARR ignition, and third-party systems required.
+On every evidence file, the first two lines must be:
+APP NAME: <your_app_name>
+APP_BASE_URL: <your_base_url>
