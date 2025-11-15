@@ -1,0 +1,196 @@
+Master Orchestration Prompt for Agent3 (All Apps Combined) — Execute ONLY Your App’s Section
+
+Read this carefully. You will see requirements for all eight apps. You must only act on the section that matches the app workspace you are currently in. Do not modify or create deliverables for any other app.
+
+Global Objectives (Apply to your app only)
+
+Goal: Get your app 100% production-ready and integrated with the rest of the platform TODAY. If that’s not possible, deliver:
+Earliest ETA to go live (UTC, precise date/time)
+ARR ignition date (UTC) with a quantified contribution rationale
+Third-party and cross-app dependencies, owners, and exact actions required
+SLOs: 99.9% uptime, ≤120ms P95 API latency (or TTFB ≤120ms for SSR pages)
+Responsible AI: No academic dishonesty features. Bias mitigation, explainability (where relevant), transparency, PII redaction.
+Platform App Directory (For your cross-app integrations and CORS allowlist)
+
+scholar_auth → https://scholar-auth-jamarrlmayes.replit.app
+scholarship_api → https://scholarship-api-jamarrlmayes.replit.app
+scholarship_agent → https://scholarship-agent-jamarrlmayes.replit.app
+scholarship_sage → https://scholarship-sage-jamarrlmayes.replit.app
+student_pilot → https://student-pilot-jamarrlmayes.replit.app
+provider_register → https://provider-register-jamarrlmayes.replit.app
+auto_page_maker → https://auto-page-maker-jamarrlmayes.replit.app
+auto_com_center → https://auto-com-center-jamarrlmayes.replit.app
+Workspace Self-Check (Mandatory First Step for your app)
+
+Identify your app and base URL:
+Detect app from environment/config and print summary.
+Verify GET /health returns 200 and includes app name and version.
+Evidence inventory:
+Count existing evidence files for your app in evidence/ to avoid duplication.
+Output the Self-Check summary before executing tasks:
+Detected App, APP_BASE_URL, Section Match status, Health Status, Version.
+Required Deliverables (Produce for your app only; overwrite or create fresh)
+
+File naming (no spaces): evidence/EXEC_STATUS_<app>_<YYYYMMDD>.md
+The first two lines of EVERY report must be EXACTLY: APP NAME: <app> APP_BASE_URL: <base_url>
+Required set (5 files):
+EXEC_STATUS_<app>_<YYYYMMDD>.md
+Current health, version, environment, uptime snapshot
+SLO verification (P95 latency and uptime approach)
+Security posture (CORS exact-origin, rate limits, CSP, PII redaction, secrets)
+Observability (health probes, logs, correlation IDs, error tracking)
+E2E_REPORT_<app>_<YYYYMMDD>.md
+End-to-end flows tested with timestamps and sample I/O
+Cross-app calls validated (list each endpoint hit)
+Performance measurements (cold/warm), caching behavior (if applicable)
+TEST_MATRIX_<app>_<YYYYMMDD>.md
+Comprehensive test catalog: must-have endpoints, security checks, rate limits, error cases, webhooks (if any)
+Pass/fail with notes and remediation items
+GO_DECISION_<app>_<YYYYMMDD>.md
+Decision: GO, CONDITIONAL GO (DRY_RUN), or NO-GO
+If not GO today: earliest ETA (UTC), ARR ignition date (UTC), full blocker list (owner, action, ETA)
+Risk matrix and rollback plan
+SECTIONXCOMPLIANCE_<app>_<YYYYMMDD>.md (replace X with your section number)
+Map each “Must-Have Today” requirement to evidence (endpoint outputs, logs, or screenshots/IDs)
+Note any gaps, severity, and exact remediation plan/time
+Common Technical Must-Haves (Implement/verify on your app)
+
+Health endpoints:
+GET /health → 200 OK with {status, app, version}
+GET /readyz or /.well-known/ready → 200 OK with deep checks
+GET /version → 200 OK with standalone JSON {version, git_sha, build_time}
+CORS: Exact-origin allowlist to only the eight platform origins shown above (no wildcards).
+Rate limiting on public endpoints; document limits in TEST_MATRIX.
+Logging: Structured JSON, correlation/request IDs, PII redaction, no secret leakage.
+Security headers: CSP, HSTS (HTTPS only), X-Frame-Options, etc.
+Idempotency for write operations and outbound webhooks/notifications.
+Latency: Measure and report P50/P95 for critical endpoints; ensure ≤120ms P95 target (or document gap with ETA).
+GO/NO-GO Decisioning
+
+GO TODAY if all must-haves and cross-app integrations pass.
+CONDITIONAL GO (DRY_RUN) if external credentials/DNS are pending but internal flows are safe to test.
+NO-GO if critical user flows are broken; include precise ETA, ARR ignition date, third-party requirements.
+Always include the app’s self-identification header in the GO_DECISION report and summarize ARR impact with conservative assumptions.
+Per-App Execution Sections (Pick your section only; ignore all others)
+SECTION-1 — scholar_auth (Auth and OIDC)
+
+Must-Have Today:
+/.well-known/openid-configuration and /.well-known/jwks.json live
+Token endpoint for OAuth2/OIDC (Auth Code + PKCE for users; Client Credentials for S2S)
+Scopes: students.read/write, applications.read/write, providers.read/write, system.admin
+RS256 signing via JWKS; publish 1 active key; rotation runbook (30-day)
+Health endpoints implemented; CORS exact-origin; rate limits on token endpoint
+Integrations to validate:
+scholarship_api validates RS256 JWT via JWKS URL
+scholarship_agent, auto_com_center, provider_register obtain S2S tokens
+Third-party: none mandatory; email provider optional for verification notices
+ARR ignition: Enables paid flows indirectly by unblocking secure S2S and user auth
+Deliverables: Include sample curl for token acquisition and JWT claims
+SECTION-2 — scholarship_api (Scholarship data and applications)
+
+Must-Have Today:
+GET /api/v1/scholarships with robust filters + pagination (public, rate-limited)
+GET /api/v1/scholarships/{id} (public, rate-limited)
+POST /api/v1/applications (auth: students/applications.write), PATCH status (auth)
+Emit events to auto_com_center on important state changes (idempotent)
+Health endpoints, CORS exact-origin, rate limits, audit logs with correlation IDs
+Integrations to validate:
+RS256 JWT validation against scholar_auth
+auto_page_maker reads public GET endpoints for SSR
+student_pilot reads detail; writes applications (auth)
+auto_com_center receives event notifications
+Third-party: PostgreSQL; optional Redis; Sentry optional
+ARR ignition: Core data engine enabling B2C and B2B funnels
+SECTION-3 — scholarship_agent (Autonomous marketing and ops jobs)
+
+Must-Have Today:
+Implement jobs: canary_notification, deadline_reminders, status_sync
+Global DRY_RUN toggle enforced
+Manual trigger: POST /api/jobs/run with RBAC (admin/system scope)
+Idempotent sends; backoff/retry; structured logs with correlation IDs
+Health endpoints
+Integrations to validate:
+S2S client-credentials with scholar_auth
+Reads scholarship_api; posts to auto_com_center /api/notify
+Third-party: PostgreSQL; Sentry optional
+ARR ignition: +conversion uplift via reminders/status sync; quantify in GO_DECISION
+SECTION-4 — scholarship_sage (Recommendations and advisory)
+
+Must-Have Today:
+GET /api/v1/recommendations with deterministic scoring params
+Explainability: reasons per recommendation; weights visible
+RS256 JWT verification (feature-flag allowed if scholar_auth pending)
+Health endpoints; CORS exact-origin
+Integrations to validate:
+Reads scholarship_api (S2S when available)
+Consumed by student_pilot for recommendations
+Third-party: none mandatory
+ARR ignition: Increases engagement and free→paid conversion
+SECTION-5 — student_pilot (Student app)
+
+Must-Have Today:
+Scholarship listing and detail pages
+Apply flow calls scholarship_api (auth required); show application status
+Login via scholar_auth (fallback to temporary auth only if documented)
+Credits purchase flow (Stripe test okay if prod not ready); meter AI usage; send notifications via auto_com_center
+Health endpoints; CSP and rate limits; GA4 tracking optional but recommended
+Integrations to validate:
+Reads scholarship_api; posts applications
+Auth via scholar_auth
+Outbound notifications via auto_com_center
+Third-party: Stripe (credits), GA4 optional, Sentry optional
+ARR ignition: B2C credit sales; provide conservative ARPU, conversion, MAU assumptions
+SECTION-6 — provider_register (Provider app)
+
+Must-Have Today:
+Provider OIDC login via scholar_auth
+Create/Update/Publish/Unpublish scholarships (writes to scholarship_api)
+Real-time status UI; emit events to auto_com_center
+Health endpoints; CORS exact-origin; rate limits; audit logs
+Integrations to validate:
+Writes to scholarship_api (JWT required)
+Outbound to auto_com_center for provider events
+Third-party: Stripe Connect (future for payouts), Sentry optional
+ARR ignition: 3% provider fee; show conservative provider-count × disbursement model
+SECTION-7 — auto_page_maker (SEO engine)
+
+Must-Have Today:
+SSR listings and detail pages; crawlable without JS
+/sitemap.xml and /robots.txt; canonical tags and JSON-LD (Organization, WebSite, BreadcrumbList, FinancialProduct)
+CTAs link to student_pilot with UTM tracking
+Health endpoints; standalone /version returns JSON (not HTML)
+Performance: TTFB ≤120ms with caching headers
+Integrations to validate:
+Reads public scholarship_api endpoints
+Deep links into student_pilot
+Third-party: GA4 optional; Sentry optional
+ARR ignition: Organic growth; estimate traffic→signup→paid funnel
+SECTION-8 — auto_com_center (Notifications)
+
+Must-Have Today:
+POST /api/notify (or /api/v1/send) to send email/SMS with DRY_RUN mode
+Templates: welcome, application_status, deadline_reminder
+Rate limits, suppression lists, audit logs with correlation IDs
+Webhooks for SendGrid/Twilio configured (document DNS/SPF/DKIM/DMARC for email)
+Health endpoints; public /readyz and standalone /version JSON
+Integrations to validate:
+Receives events from scholarship_api, provider_register, student_pilot, scholarship_agent
+Third-party: SendGrid (SPF/DKIM/DMARC), Twilio (numbers)
+ARR ignition: Improves activation and conversion; quantify in GO_DECISION
+Execution Rules
+
+Timebox: Strive for GO TODAY. If any part cannot be completed today, explicitly switch to CONDITIONAL GO (DRY_RUN) or NO-GO with:
+Blocker list (each with: dependency, owner, exact action, ETA)
+Earliest ETA to full GO (UTC, precise timestamp)
+ARR ignition date (UTC) and expected contribution band with assumptions
+Cross-App Contracts: In E2E_REPORT and SECTIONXCOMPLIANCE, show exact URLs invoked, payload schemas, and sample correlation IDs.
+Performance Evidence: Include simple latency measurements (curl with time_total or app logs). Report P50 and P95 where feasible.
+Rollback: In GO_DECISION, include a 3-step rollback plan and health-check gating.
+Final Output Requirements (Your app only)
+
+Print the Workspace Self-Check summary.
+Then generate/update the 5 deliverables with the exact two-line header at the top of each: APP NAME: <your_app_name> APP_BASE_URL: <your_app_base_url>
+Conclude with a short GO/CONDITIONAL/NO-GO summary inline, including:
+Today’s status
+If not GO: earliest ETA to GO (UTC), ARR ignition date, third-party and internal dependencies with owners and actions
+Remember: Only execute the section matching your current app workspace. Ignore all other sections.
