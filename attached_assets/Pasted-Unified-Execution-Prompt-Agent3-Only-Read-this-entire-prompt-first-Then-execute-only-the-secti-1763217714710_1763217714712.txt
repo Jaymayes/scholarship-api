@@ -1,0 +1,258 @@
+Unified Execution Prompt — Agent3 Only
+
+Read this entire prompt first. Then execute only the section explicitly labeled for your app.
+
+Identity and scope
+
+You are Agent3.
+Your app: auto_com_center
+APP_BASE_URL: https://auto-com-center-jamarrlmayes.replit.app
+You must ignore all instructions not explicitly tagged for auto_com_center.
+Goal: get auto_com_center 100% production-ready and integrated with the platform today. If full production is not possible today, ship a complete DRY_RUN integration today, then provide:
+A precise go-live ETA with date/time
+ARR ignition date and quantified contribution
+The third-party systems and configuration that must be in place
+Apps in this orchestration (for context; do not act on these unless explicitly referenced under auto_com_center)
+
+scholar_auth → https://scholar-auth-jamarrlmayes.replit.app
+scholarship_api → https://scholarship-api-jamarrlmayes.replit.app
+scholarship_agent → https://scholarship-agent-jamarrlmayes.replit.app
+scholarship_sage → https://scholarship-sage-jamarrlmayes.replit.app
+student_pilot → https://student-pilot-jamarrlmayes.replit.app
+provider_register → https://provider-register-jamarrlmayes.replit.app
+auto_page_maker → https://auto-page-maker-jamarrlmayes.replit.app
+auto_com_center → https://auto-com-center-jamarrlmayes.replit.app (THIS IS YOUR ONLY SCOPE)
+Agent3 section — auto_com_center only
+
+Mission
+
+Deliver a secure, reliable, low-latency, multi-channel notification service that other apps can call via authenticated APIs.
+Required channels: Email (must), SMS (should), webhook callbacks (optional if time-boxed).
+Operate in DRY_RUN=true for safe integration tests today. If you can satisfy all readiness gates, flip to DRY_RUN=false for production. If not, deliver DRY_RUN today plus a precise cutover plan and ETA.
+Hard requirements to achieve today
+
+Security and auth
+Enforce JWT Bearer auth on all write operations with scholar_auth as issuer.
+Validate aud=scholar-platform, exp, nbf, signature via RS256 JWKS.
+Scope: notify:send required for POST /api/notify.
+CORS: exact-origin allowlist for the seven first-party apps (no wildcard).
+TLS-only, HSTS, no-referrer-when-downgrade, X-Frame-Options: DENY, X-Content-Type-Options: nosniff, a basic CSP.
+Reliability and performance
+Health endpoints: GET /health (liveness 200), GET /.well-known/ready (readiness 200 only when dependencies OK).
+P95 latency target: ~120ms for accepted requests that don’t wait on external providers (queue-based).
+99.9% uptime target baseline: app must start cleanly and fail closed.
+Idempotency: accept Idempotency-Key header to avoid duplicate sends.
+DRY_RUN safety
+DRY_RUN=true must accept, validate, enqueue, and log requests but never send to external providers.
+Response still returns 202 Accepted with synthetic message_id and dry_run=true flag.
+Observability
+Structured JSON logs; correlation_id in request, propagated to provider calls; redact PII payload fields.
+Audit log event for each request (who, what, when, result, channel, template_id, recipient hash).
+Optional: GET /metrics Prometheus compatible; at minimum expose request_count, error_count, p95_ms.
+Functional
+POST /api/notify (single recipient)
+POST /api/notify/batch (multiple recipients with per-item results)
+GET /api/templates (list) and GET /api/templates/{id} (fetch) for discovery
+Template rendering with variable substitution and basic validation
+Suppression rules: global suppress list; channel-level suppress; do-not-contact enforcement
+Provider adapter interface; implement Email (SendGrid or Postmark) and stub SMS (Twilio) if time permits
+Documentation and contract
+OpenAPI JSON at /openapi.json with security scheme, request/response models, error codes.
+Minimal README covering env vars, routes, scopes, and integration examples.
+Third-party prerequisites and configuration
+
+Email provider (choose and document one for production; both are acceptable)
+SendGrid: API key, verified domain, SPF/DKIM/DMARC complete
+or Postmark: API token, verified sender domain
+SMS provider (Twilio recommended)
+Twilio Account SID, Auth Token, From number (A2P 10DLC registration may be needed later; not blocking DRY_RUN)
+Monitoring
+Error tracking (Sentry or equivalent DSN)
+Uptime checks (Pingdom/UptimeRobot) hitting GET /health
+Identity and access
+scholar_auth JWKS URL and token endpoint for validation
+M2M client in scholar_auth with scope notify:send issued to caller apps
+Environment variables (define explicitly)
+
+APP_NAME=auto_com_center
+APP_BASE_URL=https://auto-com-center-jamarrlmayes.replit.app
+PORT= (default 5000 unless constrained by host)
+DRY_RUN=true (flip to false on production cutover)
+AUTH_ISSUER=https://scholar-auth-jamarrlmayes.replit.app/oidc
+AUTH_AUDIENCE=scholar-platform
+AUTH_JWKS_URL=https://scholar-auth-jamarrlmayes.replit.app/oidc/jwks.json
+ALLOWED_SCOPES=notify:send
+CORS_ALLOWED_ORIGINS=comma-separated list of the seven first-party app base URLs
+FROM_EMAIL=notifications@scholaraiadvisor.com (or your verified sender)
+SENDGRID_API_KEY= or POSTMARK_API_TOKEN=
+TWILIO_ACCOUNT_SID= (optional for today)
+TWILIO_AUTH_TOKEN= (optional for today)
+TWILIO_FROM_NUMBER= (optional for today)
+RATE_LIMIT_RPM=600 (adjust as needed)
+QUEUE_CONCURRENCY=5 (worker concurrency)
+LOG_LEVEL=info
+SENTRY_DSN= (optional)
+SUPPRESSION_LIST_PATH=/data/suppressions.json (or DB table)
+GA4_MEASUREMENT_ID= (optional; do not block)
+API contract you must expose today
+
+POST /api/notify
+Security: Bearer JWT (RS256), scope notify:send
+Body:
+event_type (string, required)
+channels (array: ["email","sms"], default: ["email"])
+recipient: { email, phone, user_id? }
+template_id (string, required for channel)
+variables (object)
+metadata (object)
+idempotency_key (string, optional)
+Responses:
+202 Accepted: { message_id, status:"accepted", dry_run:boolean, correlation_id }
+400, 401, 403, 409 (suppressed), 422 (validation), 429, 500/502
+POST /api/notify/batch
+Same fields, items=[], return array of per-item results; accept up to 100 items
+GET /api/templates and GET /api/templates/{id}
+Security: optional; read-only with Bearer if sensitive metadata present
+GET /health (200 OK) and GET /.well-known/ready (200 when providers, secrets available)
+GET /openapi.json (public)
+Test matrix to execute today (include evidence in your reports)
+
+Auth enforcement
+Unauthenticated POST /api/notify → 401 with code=MISSING_TOKEN
+Authenticated with wrong scope → 403 with code=INSUFFICIENT_SCOPE
+Authenticated with aud != scholar-platform → 401 with code=INVALID_AUDIENCE
+CORS
+Preflight from allowed origin → 204 (or 200) with exact-origin allow headers
+Preflight from disallowed origin → blocked
+DRY_RUN behavior
+DRY_RUN=true → 202 with dry_run=true; no external provider calls
+DRY_RUN=false with provider keys missing → /.well-known/ready must return non-200; keep service in safe state
+Functional
+Email send with valid template → 202
+Suppressed recipient → 409 code=SUPPRESSED
+Unknown template → 400 code=TEMPLATE_NOT_FOUND
+Idempotency: same idempotency_key → second call returns 200/202 with status=duplicate or same message_id
+Batch send 3 recipients → 202 with 3 result entries
+Reliability and performance
+50 requests at 5 rps → p95 <= 120ms (in DRY_RUN)
+Log includes correlation_id; no PII in logs
+Observability
+Verify audit entry for each test; ensure redaction of email/phone (hash or masked)
+Integration tests you must run today in DRY_RUN
+
+From scholarship_agent → POST /api/notify with reminders payload
+From student_pilot → POST /api/notify with signup/confirmation payload
+From provider_register → POST /api/notify with provider welcome payload
+From scholarship_api → webhook-callback test (optional): accept POST /api/webhooks/test if implemented
+All calls must carry valid M2M tokens issued by scholar_auth (or if scholar_auth is not yet live, generate signed test JWTs using the expected JWK locally and note this deviation clearly in your reports)
+Deliverables you must produce today (file names, required content)
+
+Always include at the top of every report:
+APP NAME: auto_com_center
+APP_BASE_URL: https://auto-com-center-jamarrlmayes.replit.app
+EXEC_STATUS_auto_com_center_YYYYMMDD.md
+Summary: current readiness vs goals
+SLO snapshot: availability, p50/p95 latency in DRY_RUN
+Security: headers, CORS allowlist, auth verdict
+Dependency status: scholar_auth, SendGrid/Postmark, Twilio, monitoring
+Checklist (PASS/FAIL with notes)
+JWT validation (issuer, audience, signature)
+Scope enforcement (notify:send)
+CORS exact-origin only
+DRY_RUN safety
+Health + readiness endpoints
+Idempotency
+Suppressions
+Structured logging + PII redaction
+OpenAPI availability
+Rate limiting
+Blockers and owner
+Decision recommendation preview (GO/Conditional/NO-GO)
+2. E2E_REPORT_auto_com_center_YYYYMMDD.md
+
+Test plan, environment, and assumptions
+Exact cURL commands used (redact secrets), expected vs actual
+Evidence snippets: representative responses, headers, and logs (redacted)
+Performance table: p50, p95, error rate across key routes
+Security validation results (auth/CORS/headers)
+Integration results per caller app (scholarship_agent, student_pilot, provider_register, scholarship_api)
+Defects list with severity and ETA
+3. GO_DECISION_auto_com_center_YYYYMMDD.md
+
+Final decision: GO, CONDITIONAL GO (DRY_RUN today; live on date/time), or NO-GO
+If not full GO today, provide:
+Production cutover ETA (date/time, timezone)
+Preconditions checklist for cutover
+DNS: SPF/DKIM/DMARC verified for sender domain
+Provider credentials present and tested (sendgrid/postmark, twilio)
+scholar_auth M2M clients provisioned for all calling services
+Step-by-step plan (T+0, T+10, T+20, T+60)
+Rollback plan
+Monitoring plan (what to watch, thresholds, actions)
+ARR ignition plan
+Channels and events that create revenue lift (examples: signup confirmations, deadline nudges, onboarding)
+Expected conversion uplift assumptions and volumes
+Start date for ARR impact and conservative annualized contribution range
+Risk register and mitigations
+Exact CORS allowlist you must configure
+
+https://scholar-auth-jamarrlmayes.replit.app
+https://scholarship-api-jamarrlmayes.replit.app
+https://scholarship-agent-jamarrlmayes.replit.app
+https://scholarship-sage-jamarrlmayes.replit.app
+https://student-pilot-jamarrlmayes.replit.app
+https://provider-register-jamarrlmayes.replit.app
+https://auto-page-maker-jamarrlmayes.replit.app
+https://auto-com-center-jamarrlmayes.replit.app
+Add http://localhost:3000 for local dev only if NODE_ENV=development
+How to obtain and use tokens in tests (document this in your reports)
+
+Token endpoint
+POST https://scholar-auth-jamarrlmayes.replit.app/oidc/token
+Body (x-www-form-urlencoded):
+grant_type=client_credentials
+client_id=<caller-service-id> (e.g., scholarship-agent-service)
+client_secret=<secret>
+scope=notify:send
+Use token in Authorization: Bearer <token>
+If scholar_auth is not live: clearly note the deviation and provide sample JWT construction parameters (iss, aud=scholar-platform, scope=notify:send) and verify RS256 signature locally against the platform JWK you specify
+Cutover rules
+
+DRY_RUN=true is mandatory until all of the following are true:
+Sender domain DNS is fully verified (SPF, DKIM, DMARC)
+At least one canary message delivered end-to-end to an internal inbox/phone number
+Error rate < 1% across 100 accepted DRY_RUN requests
+p95 <= 150ms in DRY_RUN
+When all are true, schedule a 60-minute production cutover window:
+T+0: flip DRY_RUN=false, send 1 canary
+T+10: send 10 canaries, observe metrics
+T+20: allow production traffic from scholarship_agent (10% sampling)
+T+40: ramp to 50%; T+60: 100% if no regressions
+Rollback:
+If 5xx > 0.5% or provider errors sustained 5+ minutes, set DRY_RUN=true immediately and investigate
+If full GO is not possible today
+
+You must still deliver a DRY_RUN GO today and provide:
+The earliest production go-live date/time (consider DNS verification SLAs of 24–48 hours if using SendGrid/Postmark)
+A quantified ARR ignition plan with a conservative range and the assumptions driving it
+A list of third-party systems that must be in place:
+Email provider (SendGrid or Postmark) with DNS verification complete
+SMS provider (Twilio) if SMS is in scope for Day 1
+scholar_auth M2M clients and scopes provisioned for all caller apps
+Monitoring/alerting active
+Reporting discipline
+
+Put APP NAME and APP_BASE_URL at the top of every report, exactly:
+APP NAME: auto_com_center
+APP_BASE_URL: https://auto-com-center-jamarrlmayes.replit.app
+Use the date suffix YYYYMMDD in all filenames.
+Keep evidence redacted for PII. Summarize secrets as <REDACTED>.
+Close each report with a clear “Next actions” list with owners and timestamps.
+Success criteria for today
+
+Minimum: DRY_RUN GO achieved; all integration tests pass from scholarship_agent, student_pilot, provider_register; clear production ETA with a cutover plan.
+Stretch: Full production GO (DRY_RUN=false) with DNS verified and real messages delivered to internal recipients.
+Executive decision ready: GO_DECISION_auto_com_center_YYYYMMDD.md with ARR ignition plan and risk mitigations.
+Reminder
+
+You are Agent3. Execute only the auto_com_center section above. Do not modify or act on any other app. If you need dependencies (e.g., scholar_auth credentials, SendGrid DNS), document them precisely in your reports with owners and timestamps.
