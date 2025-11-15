@@ -1,0 +1,288 @@
+Below is the Master Execution Prompt for Agent3. It covers all eight apps in one document. Agent3 must strictly execute only the section that matches its detected app and APP_BASE_URL. This prompt is designed to get every app 100% production-ready and integrated today; if that is not possible, Agent3 must provide an exact ETA, ARR ignition date, and list the third-party systems required to go live.
+
+MASTER EXECUTION PROMPT — Agent3 (Multi-App, Single-Section Discipline)
+
+A. Mission and constraints
+
+Goal: Get your assigned app 100% production-ready and working with all other apps today. If that is not possible, provide an exact ETA, ARR ignition date, and required third-party systems.
+Output everything in clear, auditable artifacts and reports. Every report must begin with the two-line header specified below.
+Follow “Single-Section Discipline”: Only execute the section for your app. Do not modify, write, or claim status for any other app.
+B. App routing (base URLs)
+
+scholar_auth → https://scholar-auth-jamarrlmayes.replit.app
+scholarship_api → https://scholarship-api-jamarrlmayes.replit.app
+scholarship_agent → https://scholarship-agent-jamarrlmayes.replit.app
+scholarship_sage → https://scholarship-sage-jamarrlmayes.replit.app
+student_pilot → https://student-pilot-jamarrlmayes.replit.app
+provider_register → https://provider-register-jamarrlmayes.replit.app
+auto_page_maker → https://auto-page-maker-jamarrlmayes.replit.app
+auto_com_center → https://auto-com-center-jamarrlmayes.replit.app
+C. Single-Section Discipline (how to decide which section to run)
+
+Detect current app and base URL from either environment or live health endpoint:
+Call GET {APP_BASE_URL}/health or GET /health if running locally.
+Parse “app” and “version” fields to identify the current service.
+Match your detected app to the correct section in this prompt (SECTION-1 through SECTION-8).
+Execute only that section’s requirements. Ignore all other sections.
+If detection fails or mismatches, halt and produce a one-page INCIDENT note explaining the mismatch and your recommended fix.
+D. Required evidence files and header format
+Create these five files in an evidence/ folder. Use today’s date in YYYYMMDD.
+
+evidence/EXEC_STATUS_<app>_YYYYMMDD.md
+evidence/TEST_MATRIX_<app>_YYYYMMDD.md
+evidence/E2E_REPORT_<app>_YYYYMMDD.md
+evidence/GO_DECISION_<app>_YYYYMMDD.md
+evidence/SECTION_COMPLIANCE_<app>_YYYYMMDD.md
+Header required at the top of every file (first two lines only, no markdown syntax for the header):
+APP NAME: <app>
+APP_BASE_URL: <url>
+
+E. Health, SLOs, and security (universal acceptance criteria)
+
+Health endpoints required:
+GET /health → 200 JSON with {app, status, version}
+GET /readyz → 200 JSON deep checks across dependencies (DB, tokens, queues, third-parties)
+GET /version → 200 JSON {app, version, build_time, git_sha}
+Global SLOs:
+Availability: 99.9% target
+Performance: API P95 latency ≤120ms; page TTFB ≤500ms for user-facing apps
+Security and compliance:
+CORS: exact-origin allowlist for platform apps only (no wildcards)
+Rate limiting: minimally 100 req/15 min per IP for public endpoints
+Security headers: CSP, HSTS, X-Frame-Options, X-Content-Type-Options, etc.
+Logging: PII redaction, JSON structured logs with correlation_id
+Responsible AI: no academic dishonesty features; bias mitigation and explainability where applicable
+Regulatory: FERPA/COPPA alignment (collect minimal student data, protect under-13 if applicable)
+F. GO/NO-GO decision rules (what to write in GO_DECISION)
+
+If GO today:
+State “GO TODAY” and list proof: passing endpoints, passing test matrix, integrations validated, SLOs met, security posture verified.
+Include ARR ignition date and modeled revenue contribution with assumptions.
+If NO-GO today:
+State “NO-GO” with a precise cause, proposed fix, ETA (UTC timestamp), and named owners.
+Provide ARR ignition date and modeled revenue once dependencies are delivered.
+List all third-party systems and config needed (credentials, DNS/edge, providers like SendGrid/Twilio/Stripe, etc.).
+Create an incident note if infrastructure blocks traffic (e.g., edge auth gating) and attach example configs and acceptance criteria.
+G. Integration tests (what to prove in E2E_REPORT)
+
+Validate JWT/OIDC flows (where applicable).
+Prove read/write to scholarship_api where required.
+Prove notifications emitted via auto_com_center where required (if DRY_RUN, show masked payloads and message_id capture).
+Prove deep links from SEO pages (auto_page_maker) into student_pilot are correct and tracked.
+Record timings (P50, P95) and error handling (401/403/5xx) outcomes.
+H. Monitoring and rollback (include in EXEC_STATUS and E2E_REPORT)
+
+72-hour monitoring plan with thresholds: uptime, error rate, P95 latency, token refresh failures, circuit breaker trips.
+Alert channels and escalation path.
+Rollback triggers and exact steps to revert.
+I. ARR ignition model (include in GO_DECISION)
+
+Provide your app’s ARR ignition date (UTC).
+Provide a conservative Year-1 ARR estimate with explicit levers and assumptions (conversion rates, ARPU, provider counts, fee take-rates).
+Tie your KPIs to platform goals: $10M profitable ARR in 5 years, low CAC via SEO, 4x AI markup, 3% provider fee.
+J. SECTION-1 — scholar_auth (Identity, OAuth/OIDC, JWKS)
+Only execute this section if your detected app is “scholar_auth” with APP_BASE_URL: https://scholar-auth-jamarrlmayes.replit.app
+Required endpoints
+
+/.well-known/jwks.json → 200 JSON RS256 keyset
+/oauth/token (client_credentials) → 200 JSON access_token; scopes issued per client
+/oauth/authorize (if user-flow used) → 200 HTML/redirect
+/introspect or /userinfo (if implemented) → 200 JSON
+/health, /readyz, /version → 200 JSON
+Required clients and scopes (document in EXEC_STATUS)
+
+M2M clients for each app with exact scopes:
+scholarship_api: scholarships.read, scholarships.write, applications.read, applications.write
+scholarship_agent: scholarships.read, applications.read, notify.send
+auto_com_center: notify.send
+student_pilot: profile.read, profile.write, applications.write
+provider_register: provider.read, provider.write, scholarships.write
+auto_page_maker: public.read
+scholarship_sage: recommendations.read, scholarships.read
+Token lifetime and rotation policy; JWKS rotation procedure and test.
+Acceptance criteria
+
+P95 token issuance ≤120ms
+RS256 signing; no HS256 in production
+CORS locked to platform origins only
+Evidence: TEST_MATRIX shows token issuance, scope enforcement, JWKS rotation, failure cases.
+If NO-GO
+
+Provide ETA for JWKS, client provisioning, and cutover steps.
+List third parties (email provider, SES/Postmark optional) and status.
+K. SECTION-2 — scholarship_api (Data plane: scholarships and applications)
+Only execute this section if your detected app is “scholarship_api” with APP_BASE_URL: https://scholarship-api-jamarrlmayes.replit.app
+Required endpoints
+
+Public GET (SEO-friendly reads): GET /api/v1/scholarships with filters (deadline, amount, field_of_study, state, text search), pagination.
+Protected reads/writes: GET/POST/PATCH /api/v1/scholarships, /api/v1/applications with RS256 JWT validation and scope checks.
+/health, /readyz, /version → 200 JSON
+Data store and indices
+
+PostgreSQL healthy; indices on deadline, amount, field_of_study, status, updated_at.
+Pagination guardrails and parameter validation.
+Acceptance criteria
+
+P95 read latency ≤120ms; cold start acceptable up to 150ms
+401/403 coverage in tests
+Public endpoints safe for SEO pages; no PII leakage.
+If NO-GO
+
+Provide ETA and DB/index changes required; auth/JWKS blocking items; list third parties (DB, Sentry/observability).
+L. SECTION-3 — scholarship_agent (Autonomous marketing and lifecycle jobs)
+Only execute this section if your detected app is “scholarship_agent” with APP_BASE_URL: https://scholarship-agent-jamarrlmayes.replit.app
+Jobs to implement and verify
+
+canary_notification: heartbeat to communications channel
+deadline_reminders: detect upcoming deadlines → notify students
+status_sync: detect stalled applications → notify providers and students
+Operational controls
+
+DRY_RUN global flag; masked payload logging
+Idempotency: correlation_id, deduplication, retries with exponential backoff
+Auth: M2M token from scholar_auth; read from scholarship_api; send notifications via auto_com_center
+Endpoints
+
+POST /api/jobs/run (admin/system role) → 202 accepted, returns job_id
+/health, /readyz, /version → 200 JSON
+Acceptance criteria
+
+P95 trigger latency ≤120ms
+End-to-end job runs demonstrated in E2E_REPORT with sample traces.
+If NO-GO
+
+Provide exact missing credentials/URLs and ETA; list third parties (none direct; comms delegated to auto_com_center).
+M. SECTION-4 — scholarship_sage (Recommendations engine)
+Only execute this section if your detected app is “scholarship_sage” with APP_BASE_URL: https://scholarship-sage-jamarrlmayes.replit.app
+Core capability
+
+Deterministic, explainable scoring (not a black box).
+POST /api/recommend or GET /api/v1/recommendations → 200 JSON includes scores, rationales, sources.
+Integrations
+
+Reads from scholarship_api with M2M token (feature-flag until auth ready).
+Optional notifications via auto_com_center for “new matches” nudges.
+Acceptance criteria
+
+P95 ≤120ms uncached; ≤10ms cached
+Explainability: include feature weights and rationale per match.
+Responsible AI: bias checks, user controls (e.g., adjust weighting).
+If NO-GO
+
+Provide ETA tied to scholar_auth tokens and scholarship_api readiness.
+N. SECTION-5 — student_pilot (Student portal)
+Only execute this section if your detected app is “student_pilot” with APP_BASE_URL: https://student-pilot-jamarrlmayes.replit.app
+Required user flows
+
+Sign-in via scholar_auth; store session securely.
+Discover: search/browse scholarships via scholarship_api.
+Detail page: /scholarships/:id/:slug must exist and show rich info.
+Apply flow: “Apply” CTA → create/update application via scholarship_api; handle profile completeness gating.
+Shortlist/save, reminders enrollment.
+Performance and tracking
+
+TTFB ≤500ms; FCP ≤1000ms; TTI ≤2000ms
+GA4 or equivalent event tracking; hash or anonymize IDs.
+Acceptance criteria
+
+E2E tests cover: login, discover, detail, apply, confirmation.
+Fix any critical blockers (e.g., missing detail pages or apply button).
+If NO-GO
+
+Provide ETA to restore apply flow and fix critical pages; list third parties (auth, GA4 optional).
+O. SECTION-6 — provider_register (Provider onboarding and management)
+Only execute this section if your detected app is “provider_register” with APP_BASE_URL: https://provider-register-jamarrlmayes.replit.app
+Required flows
+
+Sign-in via scholar_auth
+Create/edit scholarships (full CRUD) via scholarship_api
+Manage application statuses; emit events to scholarship_agent where applicable
+Monetization
+
+Prepare 3% platform fee flow (Stripe Connect plan and environment scaffolding, even if activation is future-dated)
+Acceptance criteria
+
+E2E flows: sign-in → create scholarship → edit → update status → notification trigger (DRY_RUN acceptable)
+JWT/RBAC middleware validated; scopes enforced.
+If NO-GO
+
+Provide ETA for tokens, notification endpoints, and fee activation; third-party list (Stripe timeline acceptable if after MVP).
+P. SECTION-7 — auto_page_maker (SEO engine)
+Only execute this section if your detected app is “auto_page_maker” with APP_BASE_URL: https://auto-page-maker-jamarrlmayes.replit.app
+SEO stack
+
+sitemap.xml and robots.txt live and valid
+Canonical tags, JSON-LD, OpenGraph/Twitter meta
+SSR and HTML-first content; fast TTFB
+Deep links into student_pilot with UTM tracking
+Integrations
+
+Read from scholarship_api for content
+Exact-origin CORS; no PII on SEO pages
+Acceptance criteria
+
+P95 TTFB ≤500ms; crawlable without JS
+E2E report links a sample of 10 URLs validated with status 200 and correct tags.
+If NO-GO
+
+Provide ETA and missing pieces (CDN headers, SSR issues); third parties (GA4 optional).
+Q. SECTION-8 — auto_com_center (Communications hub: email/SMS/push)
+Only execute this section if your detected app is “auto_com_center” with APP_BASE_URL: https://auto-com-center-jamarrlmayes.replit.app
+Endpoints
+
+POST /api/notify → accepts messages for email/SMS; returns message_id
+/health, /readyz, /version → 200 JSON
+Providers
+
+Email: SendGrid or Postmark (pick one and document)
+SMS: Twilio (optional if only email at MVP)
+Circuit breaker and retry logic; DRY_RUN support
+Known platform constraint to test immediately
+
+Replit may enforce infrastructure-level authentication and/or path allowlisting that blocks certain health or custom endpoints.
+If GET /readyz, /.well-known/ready, or /version return 401/404 at the public URL while working on localhost, classify as “platform edge interception.”
+Required action if blocked:
+Attempt to switch Replit deployment “Access” to Public. Retest /readyz.
+If not possible, deploy an external edge proxy (Nginx/Cloudflare/ALB) that allowlists the required paths before app auth. Include concrete config examples in an INCIDENT note and in GO_DECISION.
+Clearly list which endpoints must be publicly reachable (e.g., /health, /readyz, /version, POST /api/notify if used by other platform services).
+Acceptance criteria
+
+POST /api/notify tested end-to-end with DRY_RUN=true: masked payloads, 200 OK, message_id captured.
+Provider credentials set; bounce/blocked handling documented.
+Security: authentication required for /api/notify (M2M token); exact-origin CORS.
+If NO-GO
+
+Provide ETA and name the blocking layer (Replit edge). Include incident documentation:
+Reproduction steps, curl outputs, screenshots (if possible)
+Edge config samples (Nginx/Cloudflare/ALB)
+Acceptance criteria for green-lighting production
+R. Timeboxing and prioritization
+
+If you hit any blocker, run a 90-minute timebox:
+Prove whether it’s code or platform.
+Produce an INCIDENT note with evidence and next steps.
+Decide GO/NO-GO, provide ETA and ARR ignition date if NO-GO.
+Prioritize production readiness: health endpoints, security, integrations, and SLOs first. Do not gold-plate.
+S. Final outputs (what to deliver at the end)
+
+Five evidence files with the exact two-line header in each file.
+GO_DECISION with one of: GO TODAY, CONDITIONAL GO (with specific preconditions), or NO-GO (with ETA and required systems).
+Executive summary with:
+Current status against acceptance criteria
+Exact ETA (UTC) if anything remains
+ARR ignition date and modeled annual contribution with assumptions
+Third-party systems required (by name) and their status
+Monitoring plan and rollback triggers
+T. Example headers (copy exactly)
+
+At the top of each evidence file, first two lines must be: APP NAME: scholarship_agent APP_BASE_URL: https://scholarship-agent-jamarrlmayes.replit.app
+Replace the app name and URL with your own section’s values.
+U. Success definition for “100% ready and working together today”
+
+Your health endpoints return 200 at the public URL.
+Your required integrations complete successfully (or DRY_RUN with documented production switch steps).
+Your security posture is locked down (CORS, rate limits, headers, PII redaction).
+Your SLOs are met (P95 latency and availability).
+Your GO_DECISION is GO TODAY (or CONDITIONAL GO with a short, dated ETA and precise conditions).
+You provided ARR ignition date and quantified contribution.
+Agent3, begin now. Detect your app and execute only your matching section. If you cannot achieve GO TODAY, produce a precise ETA, ARR ignition plan, and enumerate third-party systems and configuration required to go live.
