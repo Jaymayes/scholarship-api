@@ -1,0 +1,232 @@
+Below is the combined Master Orchestration Prompt for all eight apps. Agent3 must only execute SECTION-3 — scholarship_agent. Ignore all other sections except for cross-service tests that call your dependencies via their public APIs.
+
+Master Orchestration Prompt — Platform Go-Ready Execution
+
+Role and mission
+
+You are an autonomous implementation agent executing your assigned app’s section to get the platform production-ready and integrated today.
+Target: Make your app 100% operational and integrated with peer services today. If not possible, provide precise ETA to go live, ARR ignition date, and a list of third-party systems that must be in place.
+Global rules (applies to all sections)
+
+Execute only the section that maps to your app. For Agent3, that is SECTION-3 — scholarship_agent.
+Deliverables: Produce four reports today and place them under evidence/ in your repository:
+evidence/EXEC_STATUS_<app>_<YYYYMMDD>.md
+evidence/E2E_REPORT_<app>_<YYYYMMDD>.md
+evidence/GO_DECISION_<app>_<YYYYMMDD>.md
+evidence/TEST_MATRIX_<app>_<YYYYMMDD>.md
+First two lines at top of every report:
+APP NAME: <app>
+APP_BASE_URL: <base URL from mapping below>
+Timebox: If any blocker prevents full go-live today, you must:
+Document a NO-GO with a precise ETA window to GO (date and time in UTC)
+Provide an ARR ignition date and revenue contribution rationale
+List third-party systems and secrets still needed, with owners and ETAs
+SLO/Security standards:
+Health: /health (liveness), /ready(z) (readiness), /version
+Performance: ≤120ms P95 for health endpoints; document perf for business endpoints
+Auth: RS256 JWT validation where applicable. No hard-coded secrets. Rate limiting on public endpoints.
+Responsible AI: No academic dishonesty enablement. Transparent reasoning where applicable.
+DRY_RUN mode: If any dependent service or third-party system is not ready, enable DRY_RUN and capture complete evidence and logs.
+App mapping (name → APP_BASE_URL)
+
+scholar_auth → https://scholar-auth-jamarrlmayes.replit.app
+scholarship_api → https://scholarship-api-jamarrlmayes.replit.app
+scholarship_agent → https://scholarship-agent-jamarrlmayes.replit.app
+scholarship_sage → https://scholarship-sage-jamarrlmayes.replit.app
+student_pilot → https://student-pilot-jamarrlmayes.replit.app
+provider_register → https://provider-register-jamarrlmayes.replit.app
+auto_page_maker → https://auto-page-maker-jamarrlmayes.replit.app
+auto_com_center → https://auto-com-center-jamarrlmayes.replit.app
+Section-1 — scholar_auth (execute only if you are the scholar_auth agent)
+
+Objective: Platform identity and access. Provide OIDC (PKCE for B2C) and M2M credentials for S2S.
+Must-have endpoints:
+GET /.well-known/openid-configuration
+GET /.well-known/jwks.json
+POST /oauth/token (client_credentials)
+POST /oauth/authorize and /oauth/token (PKCE)
+GET /health, /readyz, /version
+Outputs today:
+Provision 7 M2M clients (audience: scholar-platform) for: scholarship_api, scholarship_agent, scholarship_sage, student_pilot, provider_register, auto_page_maker, auto_com_center.
+PKCE working for student_pilot and provider_register.
+Third-party systems: None required beyond your runtime and persistent storage for clients.
+Reports: Create 4 reports with APP NAME and APP_BASE_URL headers.
+Section-2 — scholarship_api (execute only if you are the scholarship_api agent)
+
+Objective: Core data plane for scholarships and applications.
+Must-have endpoints:
+GET /v1/scholarships, GET /v1/scholarships/{id}
+POST /v1/scholarships, PATCH /v1/scholarships/{id}
+GET /v1/applications, POST /v1/applications
+POST /v1/events (emit to auto_com_center)
+GET /readyz, GET /health, GET /version
+Optional SEO: GET /v1/seo/feeds/scholarships.ndjson
+Auth: RS256, iss = scholar_auth, aud = scholar-platform.
+Dependencies: scholar_auth (JWKS/M2M), auto_com_center (events).
+Reports: Create 4 reports with headers.
+Section-3 — scholarship_agent (Agent3: execute this section only)
+APP NAME: scholarship_agent
+APP_BASE_URL: https://scholarship-agent-jamarrlmayes.replit.app
+
+Your mission today
+
+Make the autonomous marketing and ops agent fully operational, orchestrating:
+deadline_reminders: notify students 30/14/7/1 days pre-deadline
+status_sync: nudge providers on stale applications
+canary_notification: end-to-end integration validation across dependencies
+Run at least one live DRY_RUN job end-to-end; if prod send is unsafe, capture complete evidence and set a precise GO time.
+Required capabilities
+
+Scheduling and execution:
+CRON-based schedules; ability to run on startup and at fixed intervals
+Manual trigger endpoint:
+POST /api/jobs/run { "job": "deadline_reminders" | "status_sync" | "canary_notification", "dryRun": true|false }
+Health:
+GET /health (liveness)
+GET /ready (readiness checks all dependencies and secrets)
+GET /version
+Integrations:
+M2M token from scholar_auth using client_credentials flow (iss: scholar_auth; aud: scholar-platform)
+Read data from scholarship_api:
+scholarships.read: GET /v1/scholarships?filters=deadline_window
+applications.read: GET /v1/applications?filters=stale
+Emit notifications via auto_com_center:
+POST https://auto-com-center-jamarrlmayes.replit.app/api/notify
+Include idempotency key, correlationId, and channel preferences when provided
+Trigger auto_page_maker refresh (optional hook):
+POST https://auto-page-maker-jamarrlmayes.replit.app/api/admin/rebuild-pages (authorized)
+Safety and observability:
+DRY_RUN mode toggled per request; never send live messages without GO_DECISION = GO
+Rate limiting per job execution to protect downstreams
+Structured logs with correlationId; capture request/response status for dependencies
+Circuit breaker on downstream failures (auto_com_center, scholarship_api, auto_page_maker)
+Retries with exponential backoff for transient errors
+Configuration you must validate:
+AUTH_ISSUER = https://scholar-auth-jamarrlmayes.replit.app
+AUTH_AUDIENCE = scholar-platform
+S2S_CLIENT_ID / S2S_CLIENT_SECRET for scholarship_agent
+AUTO_COM_CENTER_URL = https://auto-com-center-jamarrlmayes.replit.app
+SCHOLARSHIP_API_URL = https://scholarship-api-jamarrlmayes.replit.app
+Optional: AUTO_PAGE_MAKER_URL = https://auto-page-maker-jamarrlmayes.replit.app
+DRY_RUN_DEFAULT = true
+Third-party systems required for you: None directly. SendGrid/Twilio are owned by auto_com_center; you only call its /api/notify. Use Sentry or equivalent for error reporting if available.
+What to deliver today
+
+evidence/EXEC_STATUS_scholarship_agent_<YYYYMMDD>.md
+Headers: APP NAME and APP_BASE_URL as first two lines
+Current feature checklist with pass/fail for each required capability above
+Dependency matrix: scholar_auth, scholarship_api, auto_com_center, auto_page_maker (optional)
+Secrets present/missing; exact env var names; verification steps
+Performance snapshot: job startup latency, outbound call P50/P95 if available
+evidence/E2E_REPORT_scholarship_agent_<YYYYMMDD>.md
+Runbook of one dry-run execution for each job with timestamps and correlationIds
+cURL examples used for manual trigger; include representative request/response status codes
+Evidence excerpts (redact tokens) proving calls to scholarship_api and auto_com_center
+evidence/GO_DECISION_scholarship_agent_<YYYYMMDD>.md
+GO or NO-GO for production sends today
+If GO:
+Exact GO window with timezone and UTC
+Safeguards enabled (rate limits, batch sizes, circuit breaker thresholds)
+First jobs schedule and expected volumes
+ARR ignition date and rationale (e.g., uplift from timely reminders and provider nudges)
+If NO-GO:
+Blockers with owners and ETAs
+Minimal path-to-GO checklist with timestamps
+ARR ignition date based on ETA
+evidence/TEST_MATRIX_scholarship_agent_<YYYYMMDD>.md
+Test catalog covering: auth, dependency readiness, job scheduling, DRY_RUN behavior, notifications emission, error handling, rate limiting, idempotency
+Mark critical tests executed today; include results and evidence references
+Acceptance criteria for “100% ready today”
+
+/health, /ready, /version return expected payloads; /ready verifies secrets and dependency reachability
+POST /api/jobs/run supports dryRun=true and exercises all dependencies successfully
+At least one full DRY_RUN of canary_notification produces a logged notification request to auto_com_center with 2xx response
+deadline_reminders and status_sync produce deterministic selection queries against scholarship_api (dry run OK)
+All four reports exist under evidence/, begin with APP NAME and APP_BASE_URL lines, and contain a clear GO or NO-GO decision with times and ARR plan
+If today is not possible
+
+Provide:
+Production GO ETA (date + time UTC)
+ARR ignition date
+Explicit third-party or platform dependencies missing (e.g., M2M credentials from scholar_auth, auto_com_center readiness)
+A 60-minute validation plan once dependencies are delivered (T+0 to T+60 timeline)
+Section-4 — scholarship_sage (execute only if you are the scholarship_sage agent)
+
+Objective: Responsible AI advisor for students/providers; refuse academic dishonesty; provide transparent guidance.
+Endpoint:
+POST /v1/advise { role: "student"|"provider", question, context } → { advice, sources, safety_flags }
+Safety:
+Refuse writing essays or completing assignments; guide ethically
+Provide explainability traces; log safety decisions
+Health: /health, /readyz, /version
+Dependencies: scholar_auth (M2M), optional scholarship_api for context
+Reports: 4 files with headers.
+Section-5 — student_pilot (execute only if you are the student_pilot agent)
+
+Objective: B2C app for students to browse/apply to scholarships.
+Must-have user flow: Login (PKCE) → Browse → Detail → Apply → Confirmation → Notifications opt-in
+Endpoints/UI:
+Integrate scholarship_api (GET/POST), auto_com_center (opt-in), GA4 tracking if available
+Reports: 4 files with headers; include E2E screenshots/links if applicable.
+Section-6 — provider_register (execute only if you are the provider_register agent)
+
+Objective: B2B portal for providers to create and manage scholarships and review applicants.
+Flows:
+Login via scholar_auth (PKCE)
+Create → publish → edit scholarship (scholarship_api)
+View applicants and update statuses; nudge via auto_com_center
+Optional: Stripe Connect preparation for payouts and fee capture
+Reports: 4 files with headers.
+Section-7 — auto_page_maker (execute only if you are the auto_page_maker agent)
+
+Objective: SEO growth engine for scalable landing pages and asset generation.
+Requirements:
+sitemap.xml, robots.txt, SEO pages with semantic URLs and rich metadata
+Admin rebuild endpoint POST /api/admin/rebuild-pages (authenticated)
+Optional: Pull SEO feed GET /v1/seo/feeds/scholarships.ndjson from scholarship_api, or documented shared-DB approach
+Health: /healthz, /readyz, /version
+Reports: 4 files with headers; include performance TTFB metrics.
+Section-8 — auto_com_center (execute only if you are the auto_com_center agent)
+
+Objective: Centralized outbound communications (email/SMS/push).
+Endpoint:
+POST /api/notify { event_type, recipient, channels[], template_id, params, dryRun } → per-channel dispatch with audit log
+Capabilities:
+Channels: Email (SendGrid), SMS (Twilio) in DRY_RUN or LIVE
+Queue and exponential backoff, rate limits, user preferences/opt-outs, audit logging
+Health: /health, /api/health, /readyz, /version
+Dependencies:
+SendGrid API key, Twilio SID/token, verified domains/numbers
+scholar_auth M2M for S2S verification if required
+Reports: 4 files with headers; include DRY_RUN evidence if LIVE is not available today.
+Cross-service integration checklist (run only the parts relevant to your section)
+
+scholar_auth: JWKS reachable; M2M issued for all 7 peer apps; PKCE live
+scholarship_api: CRUD and search working; applications endpoints ready; events → auto_com_center reachable
+scholarship_agent: Jobs visible, DRY_RUN works; dependencies verified; canary job passes
+scholarship_sage: Advice endpoint safe and explainable; blocks academic dishonesty
+student_pilot: Full E2E browse→detail→apply→confirm; notifications opt-in works
+provider_register: Create→publish→edit scholarship; view applicants; nudges to providers
+auto_page_maker: SEO pages live; rebuild hook wired; sitemap/robots ready
+auto_com_center: /api/notify working in DRY_RUN or LIVE; audit logs; preferences enforced
+ARR ignition guidance (all sections)
+
+If GO today:
+Provide ARR ignition date and the first two measurable revenue levers tied to your app
+Example for Agent3: deadline_reminders uplift in conversion; status_sync improves completion rate; quantify weekly impact and roll to annualized ARR
+If NO-GO:
+Provide ETA and ignition date; quantify the delay’s revenue impact per day until GO
+Execution notes for Agent3 (you must complete these now)
+
+Validate secrets via /ready and log missing envs
+Acquire an M2M token from scholar_auth (document cURL)
+Fetch a minimal candidate set from scholarship_api to exercise selection logic
+POST a DRY_RUN notification to auto_com_center with correlationId and idempotency key; capture 2xx evidence
+Produce all four reports under evidence/ with the required headers:
+APP NAME: scholarship_agent
+APP_BASE_URL: https://scholarship-agent-jamarrlmayes.replit.app
+If not production-safe today, publish GO_DECISION with:
+GO window in UTC (e.g., 2025-11-16 17:00–18:00 UTC)
+ARR ignition date and model
+Third-party/platform dependencies list with owners and ETAs
+End of Master Orchestration Prompt for Agent3. Only execute SECTION-3 — scholarship_agent.
