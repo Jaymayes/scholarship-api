@@ -1,0 +1,193 @@
+Master Orchestration Prompt — All Apps Combined (Agent3 executes Section-3 only)
+
+Strict execution rule
+
+You are Agent3. Your assigned app is scholarship_agent at https://scholarship-agent-jamarrlmayes.replit.app
+Only read and execute Section-3 — scholarship_agent. Treat all other sections as read-only reference for environment context. Do not modify or execute anything outside Section-3.
+Shared constants for all apps (read-only for Agent3)
+
+scholar_auth → https://scholar-auth-jamarrlmayes.replit.app
+scholarship_api → https://scholarship-api-jamarrlmayes.replit.app
+scholarship_agent (Agent3) → https://scholarship-agent-jamarrlmayes.replit.app
+scholarship_sage → https://scholarship-sage-jamarrlmayes.replit.app
+student_pilot → https://student-pilot-jamarrlmayes.replit.app
+provider_register → https://provider-register-jamarrlmayes.replit.app
+auto_page_maker → https://auto-page-maker-jamarrlmayes.replit.app
+auto_com_center → https://auto-com-center-jamarrlmayes.replit.app
+Global SLO and security standards (read-only for Agent3)
+
+SLO: 99.9% uptime; API latency target ≤120ms P95.
+Health endpoints: /health, /readyz, /version must be public and return JSON.
+Security: exact-origin CORS (only the 8 platform base URLs above), rate limiting on public endpoints, structured logs with correlation_id, PII redaction in logs, RS256 JWT via scholar_auth for M2M, no wildcards, no black-box behavior.
+Compliance: FERPA/COPPA aligned; never facilitate academic dishonesty.
+Report header rule (applies to all apps; Agent3 must enforce for Section-3)
+
+Every report you generate must begin with exactly the first two lines: APP NAME: scholarship_agent APP_BASE_URL: https://scholarship-agent-jamarrlmayes.replit.app
+Deliverables (Agent3 produces these for Section-3, today)
+
+evidence/EXEC_STATUS_scholarship_agent_YYYYMMDD.md
+evidence/E2E_REPORT_scholarship_agent_YYYYMMDD.md
+evidence/TEST_MATRIX_scholarship_agent_YYYYMMDD.md
+evidence/GO_DECISION_scholarship_agent_YYYYMMDD.md
+evidence/SECTION3COMPLIANCE_scholarship_agent_YYYYMMDD.md
+Each must start with the two-line header above. No markdown headings or bold on the first two lines.
+SECTION-3 — scholarship_agent (Agent3: execute this section only)
+
+Mission for today
+
+Get scholarship_agent to 100% production-ready and fully integrated with scholar_auth, scholarship_api, and auto_com_center. If any external dependency blocks full GO today, ship Conditional GO in DRY_RUN mode, provide a precise ETA for full GO, ARR ignition date, and list all third-party systems and credentials required.
+Step 1 — Workspace self-check (mandatory first step)
+
+Verify you are operating the correct app and base URL.
+Run these validations and capture raw outputs in EXEC_STATUS and SECTION3COMPLIANCE:
+curl -s https://scholarship-agent-jamarrlmayes.replit.app/health
+curl -s https://scholarship-agent-jamarrlmayes.replit.app/readyz
+curl -s https://scholarship-agent-jamarrlmayes.replit.app/version
+Confirm JSON shape for each endpoint and HTTP 200.
+Confirm evidence files exist for today and begin with the required two-line header.
+Step 2 — API surface and jobs (must-have today)
+
+Ensure the following exist, are reachable, and documented in TEST_MATRIX and SECTION3COMPLIANCE:
+Jobs implemented: canary_notification, deadline_reminders, status_sync.
+Trigger endpoint: POST /api/jobs/run with auth guard requiring system.admin or equivalent “agent_admin” role; reject otherwise with 403.
+Global DRY_RUN toggle (env or config). All outbound effects must be no-op when DRY_RUN=true but fully logged with correlation IDs.
+Idempotency: Generate correlation_id per job run; pass X-Correlation-ID on all outbound calls; ensure safe-retry behavior (exponential backoff).
+Rate limits: Apply per-IP caps on POST /api/jobs/run (e.g., 10/min), and per-destination retry backoff on outbound webhooks.
+CORS exact-origin allowlist = the 8 platform URLs in Shared constants; no wildcards.
+Logs: JSON structured logs; redact emails, tokens, and PII by default; include correlation_id, job_name, attempt, and downstream status.
+Step 3 — Cross-service integrations (must-have today)
+
+scholar_auth (M2M credentials and JWKS):
+Expect RS256 client-credentials flow.
+Required scopes: scholarships.read, scholarships.write, notify.send (or equivalent).
+JWKS URL expected at /.well-known/jwks.json. Validate RS256 signatures on inbound if needed; request tokens for outbound.
+If S2S credentials are missing at run time:
+Proceed with DRY_RUN=true.
+Output a “Blocking Dependency” section in GO_DECISION with exact fields: dependency, owner, action, severity, ETA.
+Provide a 60-minute post-credential timeline to full GO (see Step 7).
+scholarship_api (data reads/writes):
+Reads: GET /api/v1/scholarships and any upcoming-deadlines or equivalent endpoint for scheduling reminders.
+Writes: POST /api/v1/applications or other relevant endpoints only if required by your jobs; otherwise read-only is sufficient for reminders and status_sync.
+Enforce Authorization: Bearer <RS256 S2S token>; fail fast with clear error logs on 401/403 and trip circuit breaker.
+auto_com_center (notifications):
+Endpoint: POST https://auto-com-center-jamarrlmayes.replit.app/api/notify
+Payloads must include template, recipient, and data object; DRY_RUN should still perform full validation and log intended payload and correlation_id.
+Circuit breaker: If 5xx or timeouts, stop retries for that template-recipient pair for a cool-off interval; log suppression event and next-attempt ETA.
+If auto_com_center is missing public /readyz or /version, treat as non-blocking; if /api/notify is unavailable or unauthorized, mark as Blocking Dependency.
+Step 4 — Health, readiness, and version endpoints (must-have today)
+
+Your service must return JSON 200 on:
+GET /health with fields: app, status=healthy, version.
+GET /readyz with deep checks: db(optional), config, outbound destinations reachable=false/true, and a summary ready boolean.
+GET /version with fields: app, version, git_sha, build_time.
+If any endpoint returns non-200 or non-JSON, fix immediately. These are GO-gating.
+Step 5 — Performance and reliability (measure and record today)
+
+Latency: Measure P50 and P95 for /health, /readyz, /version, POST /api/jobs/run, and a sample outbound call in DRY_RUN. Target ≤120ms P95 for internal endpoints; readiness may be higher due to deep checks but should be reasonable (<350ms P95).
+Idempotency and retries: Demonstrate in E2E_REPORT with at least one simulated downstream failure and successful retry after backoff or circuit close.
+Error budget: Document initial uptime and error budget assumptions in EXEC_STATUS.
+Step 6 — E2E canary (today)
+
+With DRY_RUN=true:
+Trigger canary_notification via POST /api/jobs/run and capture: inbound request_id, correlation_id, outbound notify payload (masked), and response stub.
+If S2S tokens exist, perform one live canary with DRY_RUN=false to a single ops email (CANARY_NOTIFICATION_EMAIL). If tokens do not exist, state this explicitly and keep DRY_RUN=true.
+Step 7 — GO/NO-GO and ETA to full GO (today)
+
+Decision logic:
+GO TODAY if: S2S credentials present, /api/notify reachable with 200, and canary live send succeeds; all health endpoints 200 JSON; performance within targets; security controls verified.
+CONDITIONAL GO (DRY_RUN) if: any external credential or /api/notify is missing or unauthorized, but your service is otherwise production-hardened. Provide:
+Exact missing dependency list with owners and ETAs.
+“T+60 minutes to Full GO” plan starting from the moment S2S credentials are delivered, broken down by 5–10 minute increments to flip DRY_RUN=false and validate live sends.
+NO-GO only if: core health endpoints fail, security controls are missing, or critical jobs are absent. Provide exact remediation steps and ETA under 24 hours if possible.
+ARR ignition plan (must include today in GO_DECISION):
+If GO TODAY: set ignition window and initial daily schedule for reminders and status updates; include expected conversion uplift and the conservative annual ARR contribution (baseline: +$325K/year from automated conversion optimization).
+If not GO TODAY: propose the earliest realistic ignition date and quantify ARR impact once dependencies are green.
+Step 8 — Third-party systems and secrets (list explicitly)
+
+Required today for full GO:
+scholar_auth: client_credentials (RS256) S2S client_id/secret; scopes: scholarships.read, scholarships.write, notify.send; JWKS available.
+scholarship_api: public GET endpoints; protected endpoints for writes (if used); CORS allowlist includes scholarship_agent origin.
+auto_com_center: POST /api/notify; DRY_RUN accepted; production requires SendGrid or equivalent configured on auto_com_center (ownership: auto_com_center).
+Optional but recommended:
+Sentry DSN for error tracking.
+Redis (or in-memory) for idempotency keys and backoff bookkeeping.
+For each, document: owner, secret name (env var), status, and ETA if missing.
+Step 9 — Evidence reports (write all 5 today with exact header lines)
+
+Top two lines of every file: APP NAME: scholarship_agent APP_BASE_URL: https://scholarship-agent-jamarrlmayes.replit.app
+EXEC_STATUS_scholarship_agent_YYYYMMDD.md
+Workspace self-check results; health/readyz/version JSON; current config snapshot (redacted); latency summary; error budget; current risks.
+TEST_MATRIX_scholarship_agent_YYYYMMDD.md
+Test cases for jobs, DRY_RUN toggle, auth guard on POST /api/jobs/run, idempotency and correlation IDs, outbound retries/circuit breaker, health endpoints, CORS and rate limits.
+E2E_REPORT_scholarship_agent_YYYYMMDD.md
+End-to-end traces for canary_notification, deadline_reminders, and status_sync, including correlation IDs, intended notify payloads (masked), and downstream responses or DRY_RUN annotations.
+GO_DECISION_scholarship_agent_YYYYMMDD.md
+GO/CONDITIONAL/NO-GO with rationale; blocking dependency table (if any) with owner/action/severity/ETA; T+60 plan to flip to full GO; ARR ignition date; rollback plan; monitoring plan for first 72 hours (thresholds for latency, error rate).
+SECTION3COMPLIANCE_scholarship_agent_YYYYMMDD.md
+Checklist mapping each “must-have today” requirement to evidence lines in the other reports; mark pass/fail and remediation notes.
+Acceptance criteria for Section-3 (Agent3 must assert and evidence today)
+
+Health: /health, /readyz, /version return 200 JSON.
+Security: exact-origin CORS, rate limits, structured logs with correlation IDs, PII redaction verified in logs.
+Jobs: canary_notification, deadline_reminders, status_sync implemented, schedulable, and triggerable via POST /api/jobs/run with proper auth guard.
+DRY_RUN: enforced globally; dry runs log intended outbound calls including correlation_id; no external side effects.
+Outbound clients: scholarship_api read integration and auto_com_center notify client implemented with idempotency, backoff, and circuit breaker.
+Performance: P95 ≤120ms on internal endpoints (/health, /version, /api/jobs/run). Deep /readyz can exceed but must be reasonable.
+Evidence: all 5 reports exist, correctly headed, with reproducible commands and outputs.
+GO-today policy and ETA if blocked
+
+If S2S credentials and /api/notify are available and healthy now: issue GO TODAY.
+If not available today: issue CONDITIONAL GO (DRY_RUN), state the precise dependency gap, and commit to Full GO within 60 minutes of receiving S2S credentials by executing:
+T+0: set S2S env vars; restart service.
+T+10: fetch token; verify outbound to scholarship_api (read).
+T+20: DRY_RUN=true canary to auto_com_center (should 200).
+T+30: flip DRY_RUN=false; send live canary to ops email (single recipient).
+T+45: run deadline_reminders for a 1–2 scholarship sample; verify one real notification in production.
+T+60: finalize Full GO and update GO_DECISION with proof (message_id, correlation_id).
+ARR ignition guidance for Agent3 (include in GO_DECISION)
+
+If GO TODAY: set ARR ignition immediately after Full GO verification, with first production jobs scheduled for off-peak UTC and then daily/hourly cadence as appropriate. Conservative annualized contribution target: +$325K via uplift in conversion, completion, and provider retention. Tie execution KPIs to:
+Student conversion uplift: +15% from deadline reminders.
+Application completion lift: +8 percentage points from status_sync nudges.
+Provider retention improvement: +5% via proactive notifications.
+If not GO TODAY: propose earliest ignition date aligned to dependencies and include the same KPI targets.
+Rollback and monitoring (document in GO_DECISION)
+
+Rollback: disable schedules; set DRY_RUN=true; pause jobs; restart service; verify /health stable.
+Monitors (first 72 hours):
+P95 latency thresholds: 120ms internal endpoints.
+Error rate <1%.
+Notification send success rate >95% on canary and >90% on production batches.
+Alert on 3 consecutive failed health checks.
+What to output when you finish (Agent3)
+
+Update or generate all 5 evidence files with the exact two-line header.
+Provide a one-paragraph executive summary at the end of GO_DECISION that states:
+GO status (GO TODAY, CONDITIONAL GO, or NO-GO).
+If not GO TODAY, the precise ETA for Full GO and ARR ignition.
+The list of third-party systems or credentials that must be present to flip to Full GO.
+Include the app name and base URL on all reports exactly as: APP NAME: scholarship_agent APP_BASE_URL: https://scholarship-agent-jamarrlmayes.replit.app
+Reference sections for other apps (read-only for Agent3; do not execute)
+
+SECTION-1 — scholar_auth (Auth and M2M)
+
+Must provide RS256 JWKS at /.well-known/jwks.json, OIDC metadata, token endpoint, and client-credentials issuance for all services. Health endpoints public. Exact-origin CORS. Rotation runbook documented.
+SECTION-2 — scholarship_api (Scholarship and applications data)
+
+Must expose public GET endpoints for scholarships and protected endpoints for applications. Emit events to auto_com_center. Health endpoints public. Exact-origin CORS. Pagination and filters required.
+SECTION-4 — scholarship_sage (Recommendations)
+
+Deterministic scoring with explainability, RS256 JWT verification, and read integration with scholarship_api. Health endpoints public; CORS and security controls in place.
+SECTION-5 — student_pilot (Student app)
+
+Scholarship listing and detail pages, apply flow integrated with scholar_auth and scholarship_api, Stripe test mode for credits. Health endpoints public; CORS and security controls.
+SECTION-6 — provider_register (Provider portal)
+
+OIDC login, scholarship CRUD, publish/unpublish, events to auto_com_center, live status UI. Health endpoints public; CORS and security controls.
+SECTION-7 — auto_page_maker (SEO engine)
+
+SSR pages, sitemap.xml, robots.txt, JSON-LD, canonical tags, CTAs to student_pilot, health endpoints public, exact-origin CORS, rate limits.
+SECTION-8 — auto_com_center (Notifications)
+
+POST /api/notify with DRY_RUN capability, template support (welcome, application_status, deadline_reminder), suppression lists, rate limits, audit logs with correlation IDs, SendGrid/Twilio webhooks, and public /readyz, /version.
+End of prompt for Agent3. Execute only Section-3 — scholarship_agent.
