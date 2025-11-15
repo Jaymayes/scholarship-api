@@ -41,19 +41,40 @@ class Token(BaseModel):
     token_type: str
 
 class JWTPayload(BaseModel):
-    """JWT payload structure"""
+    """
+    JWT payload structure
+    
+    Supports both standard OAuth2 scope and permissions-based authorization:
+    - scope (str): Space-delimited scopes (OAuth2 standard)
+    - scopes (list[str]): Array of scopes (alternative format)
+    - permissions (list[str]): Permission array fallback (when scope is missing)
+    
+    Per Master Orchestration Prompt: "If JWT scope claim is missing, 
+    immediately enforce permissions array as a first-class authorization source."
+    """
     sub: str = Field(..., description="Subject (user ID)")
     exp: int = Field(..., description="Expiration timestamp")
     roles: list[str] = Field(default=[], description="User roles")
-    scopes: list[str] = Field(default=[], description="User scopes")
+    scopes: list[str] = Field(default=[], description="User scopes (array format)")
+    scope: str | None = Field(None, description="Space-delimited scopes (OAuth2 standard)")
+    permissions: list[str] = Field(default=[], description="Permissions array (fallback when scope missing)")
     iat: int | None = Field(None, description="Issued at timestamp")
     iss: str | None = Field(None, description="Issuer")
     aud: str | None = Field(None, description="Audience")
 
 class TokenData(BaseModel):
+    """
+    Decoded token data with normalized authorization claims
+    
+    scopes field contains the effective authorization list derived from:
+    1. scope string (if present, authoritative)
+    2. scopes array (merged with scope string)
+    3. permissions array (fallback when scope/scopes missing)
+    """
     user_id: str = Field(..., description="User identifier")
     roles: list[str] = Field(default=[], description="User roles")
-    scopes: list[str] = Field(default=[], description="User scopes")
+    scopes: list[str] = Field(default=[], description="Effective scopes/permissions (normalized)")
+    permissions: list[str] = Field(default=[], description="Raw permissions from token (for audit)")
 
 class User(BaseModel):
     user_id: str
@@ -115,6 +136,74 @@ def authenticate_user(username: str, password: str) -> User | None:
 
     return User(**user_data)
 
+def _extract_authorization_claims(payload: dict[str, Any]) -> tuple[list[str], list[str], str]:
+    """
+    Extract and normalize authorization claims from JWT payload.
+    
+    Per Master Orchestration Prompt SECTION B:
+    "If JWT scope claim is missing, immediately enforce permissions array 
+    as a first-class authorization source."
+    
+    Priority order:
+    1. scope (str) - OAuth2 standard, space-delimited, authoritative
+    2. scopes (list[str]) - Array format, merged with scope
+    3. permissions (list[str]) - Fallback when scope/scopes missing
+    
+    Args:
+        payload: Decoded JWT payload dict
+        
+    Returns:
+        tuple of (effective_scopes: list[str], raw_permissions: list[str], auth_source: str)
+        where auth_source is "scope", "scopes", "permissions", or "none" for metrics
+    """
+    import logging
+    
+    # Extract raw claims
+    scope_string = payload.get("scope")  # OAuth2 standard (space-delimited)
+    scopes_array = payload.get("scopes", [])  # Array format
+    permissions_array = payload.get("permissions", [])  # Fallback
+    
+    effective_scopes = []
+    auth_source = "none"
+    
+    # Priority 1: Parse scope string (authoritative if present)
+    if scope_string and isinstance(scope_string, str):
+        scope_list = [s.strip() for s in scope_string.split() if s.strip()]
+        if scope_list:
+            effective_scopes.extend(scope_list)
+            auth_source = "scope"
+    
+    # Priority 2: Merge scopes array
+    if isinstance(scopes_array, list):
+        valid_scopes = [s for s in scopes_array if isinstance(s, str) and s.strip()]
+        if valid_scopes:
+            effective_scopes.extend(valid_scopes)
+            if auth_source == "none":
+                auth_source = "scopes"
+    
+    # Priority 3: Fallback to permissions array (only if no scope data)
+    if not effective_scopes and isinstance(permissions_array, list):
+        valid_perms = [p for p in permissions_array if isinstance(p, str) and p.strip()]
+        if valid_perms:
+            effective_scopes.extend(valid_perms)
+            auth_source = "permissions"
+            logging.info(f"JWT auth fallback: Using permissions[] array ({len(valid_perms)} permissions)")
+    
+    # Normalize: deduplicate while preserving order
+    seen = set()
+    normalized_scopes = []
+    for s in effective_scopes:
+        if s not in seen:
+            seen.add(s)
+            normalized_scopes.append(s)
+    
+    # Extract raw permissions for audit trail
+    raw_permissions = []
+    if isinstance(permissions_array, list):
+        raw_permissions = [p for p in permissions_array if isinstance(p, str)]
+    
+    return normalized_scopes, raw_permissions, auth_source
+
 def create_access_token(data: dict[str, Any], expires_delta: timedelta | None = None) -> str:
     """Create a JWT access token with properly typed payload"""
     from observability.metrics import metrics_service
@@ -131,7 +220,8 @@ def create_access_token(data: dict[str, Any], expires_delta: timedelta | None = 
         "exp": int(expire.timestamp()),
         "iat": int(now.timestamp()),
         "roles": data.get("roles", []),
-        "scopes": data.get("scopes", [])
+        "scopes": data.get("scopes", []),
+        "permissions": data.get("permissions", [])  # Include permissions if provided
     }
     
     # Add issuer and audience if configured (required for validation)
@@ -183,18 +273,33 @@ async def decode_token(token: str) -> TokenData | None:
                 if payload:
                     user_id = payload.get("sub")
                     roles = payload.get("roles", [])
-                    scopes = payload.get("scopes", [])
                     
                     # Ensure valid types
                     if not user_id or not isinstance(user_id, str):
                         return None
                     if not isinstance(roles, list):
                         roles = []
-                    if not isinstance(scopes, list):
-                        scopes = []
+                    
+                    # Extract authorization claims (scope, scopes, or permissions)
+                    effective_scopes, raw_permissions, auth_source = _extract_authorization_claims(payload)
+                    
+                    # Deny if no authorization source found (per Master Orchestration Prompt)
+                    if not effective_scopes:
+                        import logging
+                        logging.warning(f"RS256 token missing all authorization claims (scope, scopes, permissions)")
+                        return None
+                    
+                    # Track permissions fallback usage for monitoring
+                    if auth_source == "permissions":
+                        metrics_service.record_token_operation("validate_permissions_fallback", "success")
                     
                     metrics_service.record_token_operation("validate", "success")
-                    return TokenData(user_id=user_id, roles=roles, scopes=scopes)
+                    return TokenData(
+                        user_id=user_id, 
+                        roles=roles, 
+                        scopes=effective_scopes,
+                        permissions=raw_permissions
+                    )
             except Exception as e:
                 import logging
                 logging.warning(f"RS256 validation failed: {type(e).__name__}: {e}")
@@ -238,16 +343,31 @@ async def decode_token(token: str) -> TokenData | None:
                         continue
 
                     roles = payload.get("roles", [])
-                    scopes = payload.get("scopes", [])
 
-                    # Ensure roles and scopes are valid lists
+                    # Ensure roles are valid lists
                     if not isinstance(roles, list) or not all(isinstance(r, str) for r in roles):
                         roles = []
-                    if not isinstance(scopes, list) or not all(isinstance(s, str) for s in scopes):
-                        scopes = []
+                    
+                    # Extract authorization claims (scope, scopes, or permissions)
+                    effective_scopes, raw_permissions, auth_source = _extract_authorization_claims(payload)
+                    
+                    # Deny if no authorization source found (per Master Orchestration Prompt)
+                    if not effective_scopes:
+                        import logging
+                        logging.warning(f"HS256 token missing all authorization claims (scope, scopes, permissions)")
+                        continue
+                    
+                    # Track permissions fallback usage for monitoring
+                    if auth_source == "permissions":
+                        metrics_service.record_token_operation("validate_permissions_fallback", "success")
 
                     metrics_service.record_token_operation("validate", "success")
-                    return TokenData(user_id=user_id, roles=roles, scopes=scopes)
+                    return TokenData(
+                        user_id=user_id, 
+                        roles=roles, 
+                        scopes=effective_scopes,
+                        permissions=raw_permissions
+                    )
                 except (JWTError, ValueError, KeyError, TypeError) as e:
                     # Log security events
                     import logging

@@ -1,0 +1,197 @@
+Below is your consolidated, single prompt for Agent3. It contains global rules and one clearly labeled section per app. Agent3 must only execute and respond using the section that exactly matches their APP_NAME, and must put the APP_NAME and APP_BASE_URL in the header of every report.
+
+MASTER ORCHESTRATION PROMPT — Agent3, Multi-App Execution
+Read me first — mandate and rules
+
+Your role: Agent3 is the implementation owner for one app in the Scholar AI Advisor ecosystem. You are not the CEO. You must complete production-readiness tasks and produce an Executive Status Report.
+Scope discipline: Only execute the section that matches your APP_NAME below. Ignore every other app’s section.
+Output discipline: Every report you produce must begin with:
+APP NAME: <your app name here>
+APP_BASE_URL: <your base url here>
+Today goal: Achieve 100% production readiness and working cross-app integration today. If today is not possible, provide: (a) exact ETA to go live, (b) ARR ignition date, and (c) which third-party systems must be in place.
+Evidence: Provide concrete tests (cURL examples), health/readiness proof, and explicit Go/No-Go.
+Security/SLO guardrails (apply to all apps):
+RS256 JWT verification against scholar_auth JWKS; issuer and audience validated.
+If JWT scope claim is missing, immediately enforce permissions array as a first-class authorization source.
+Exact-origin CORS; no wildcards. No browser CORS for S2S-only services.
+120ms P95 latency target; 99.9% uptime SLO; correlationId propagation.
+Zero hardcoded URLs or secrets; use environment variables only.
+Token and scopes (platform standard):
+Token TTL: 300s for M2M.
+Scopes: scholarships:read, scholarships:write, students:read, students:write, applications:read, applications:write, recommendations:read, notify:send, assets:generate.
+Workaround: Use permissions array for RBAC if scope string is absent in JWT.
+Dependencies and ordering:
+scholar_auth must publish JWKS and issue tokens for all clients.
+All other services must verify RS256 JWTs from scholar_auth and accept the permissions array.
+auto_com_center DRY_RUN mode is acceptable for same-day go-live. Live sending requires SendGrid DNS verification (24–48h).
+Third-party systems likely needed: SendGrid (domain verified) for email; Twilio for SMS; Stripe for payments; GA4 for analytics; Postgres for data; Optional Redis for caching.
+Required report template (use verbatim for your app)
+
+Title: EXECUTIVE STATUS REPORT — <APP_NAME>
+APP_BASE_URL: <URL>
+Timestamp (UTC): <ISO8601>
+Overall R/A/G:
+Go/No-Go Decision:
+What Changed Today: [files created/modified, critical fixes]
+Tests and Evidence: [healthz/readyz; auth; CORS; S2S; perf]
+Must-Haves Checklist: [pass/fail by item]
+Required Environment Variables: [names + status; no secrets printed]
+Open Blockers: [ID, description, owner, ETA]
+Third-Party Prerequisites: [which, why, status]
+Go-Live Plan (Step-by-Step): [hour-by-hour to GO]
+If Not Today: [Go-Live ETA, ARR Ignition Date]
+ARR Impact: [B2C/B2B levers; math]
+Next Actions: [you; others; deadlines]
+Summary: [1–3 bullets]
+App directory with base URLs
+
+scholar_auth → https://scholar-auth-jamarrlmayes.replit.app
+scholarship_api → https://scholarship-api-jamarrlmayes.replit.app
+scholarship_agent → https://scholarship-agent-jamarrlmayes.replit.app
+scholarship_sage → https://scholarship-sage-jamarrlmayes.replit.app
+student_pilot → https://student-pilot-jamarrlmayes.replit.app
+provider_register → https://provider-register-jamarrlmayes.replit.app
+auto_page_maker → https://auto-page-maker-jamarrlmayes.replit.app
+auto_com_center → https://auto-com-center-jamarrlmayes.replit.app
+SECTION A — scholar_auth (execute only if your APP_NAME is scholar_auth)
+
+Objective today: Publish stable RS256 JWKS; issue client_credentials and PKCE tokens; ensure permissions array populated from scopes; provision all M2M clients.
+Deliverables:
+/.well-known/jwks.json serves RS256 public keys with cache-control.
+/oidc/token (or /oauth/token) for client_credentials and PKCE.
+Token content:
+Required: iss, aud, sub, exp, iat, client_id, roles, permissions[]
+Nice-to-have: scope string; if missing, permissions[] is authoritative.
+M2M clients provisioned for all services with least-privilege scopes.
+TTL: 300s; RS256 signing; correlationId in logs.
+Tests (examples):
+curl -s https://scholar-auth-jamarrlmayes.replit.app/.well-known/jwks.json
+Client credentials token flow for each client_id; decode JWT; verify permissions[].
+Required ENV:
+OIDC signing keypair; ISSUER; AUDIENCE; DATABASE_URL.
+Go/No-Go:
+GO if JWKS live + tokens issued for all 8 clients + permissions[] reliable.
+Third-party: None required to go live.
+If not today: ETA ≤ 4 hours. ARR ignition: immediately unblocks platform auth and paid flows.
+SECTION B — scholarship_api (execute only if your APP_NAME is scholarship_api)
+
+Objective today: Enforce RS256 JWT + permissions[]; exact-origin CORS for student_pilot and provider_register; OpenAPI docs; rate limits; core endpoints live.
+Deliverables:
+/healthz and /readyz return 200 JSON.
+/openapi.json and /docs enabled.
+Enforce issuer+audience; accept permissions[]; deny if neither scope nor permissions.
+Endpoints protected by least-privilege permissions; 5s timeouts; circuit breakers.
+Tests:
+No token → 401; invalid → 401; valid with permissions → 200.
+CORS preflight from student_pilot and provider_register allowed; others denied.
+Required ENV:
+AUTH_JWKS_URL, AUTH_ISSUER, AUTH_AUDIENCE, DB conn, RATE_LIMIT, TIMEOUT_MS.
+Go/No-Go:
+GO if RS256 + permissions[] enforced and CORS exact-origin configured.
+Third-party: None for API go-live.
+If not today: ETA ≤ 2 hours after scholar_auth JWKS. ARR ignition: Decouple backends to power B2C/B2B flows as soon as student_pilot/provider_register are live.
+SECTION C — auto_com_center (execute only if your APP_NAME is auto_com_center)
+
+Objective today: S2S /api/notify with permissions-based RBAC; DRY_RUN=true default; integrations for SendGrid and Twilio wired but optional for live.
+Deliverables:
+POST /api/notify (requires notify:send permission).
+GET /api/notify/status; /healthz; /readyz.
+Suppression/audit logs with correlationId.
+CORS: S2S only; exact-origin if any browser hits are required; default deny.
+Tests:
+Health 200; No token 401; Wrong permission 403; Valid token 200 DRY_RUN accepted.
+Required ENV:
+AUTH_JWKS_URL/ISSUER/AUDIENCE, SENDGRID_API_KEY, TWILIO credentials, DRY_RUN.
+Go/No-Go:
+GO today in DRY_RUN. Live email requires SendGrid DNS verification (24–48h). Live SMS requires Twilio number registration (same day if already provisioned).
+Third-party: SendGrid (DNS), Twilio (number/A2P if needed).
+If not today: DRY_RUN must be GO. ETA for live: 24–48h DNS.
+SECTION D — student_pilot (execute only if your APP_NAME is student_pilot)
+
+Objective today: PKCE auth with scholar_auth; GA4 events; integration toggles for scholarship_api and scholarship_sage; zero hardcoded URLs; exact-origin CORS.
+Deliverables:
+GA4 events: first_document_upload, application_submitted, application_status_viewed (deduped/retry).
+Auth: PKCE to scholar_auth; local demo mode allowed but prepare to flip to Section A.
+API calls: feature flags for scholarship_api and scholarship_sage.
+Tests:
+GA4 send; Auth redirect flow; API fallbacks visible; CORS OK.
+Required ENV:
+AUTH_ISSUER, AUTH_AUDIENCE, CLIENT_ID, REDIRECT_URI, GA4_MEASUREMENT_ID/API_SECRET.
+Go/No-Go:
+Demo mode GO today; production GO requires scholar_auth + scholarship_api ready.
+Third-party: GA4; Stripe for credit purchases (if payments go live).
+If not today: ETA 1 business day after Section A+B done. ARR ignition when Stripe enabled and recommendations live.
+SECTION E — provider_register (execute only if your APP_NAME is provider_register)
+
+Objective today: JWT/RBAC enforcement; GA4 events; S2S client to auto_com_center; exact-origin CORS; zero hardcoded URLs.
+Deliverables:
+Events: first_scholarship_created, applicant_status_updated.
+S2S notify calls to auto_com_center with correlationId.
+Browser CORS exact-origins; form protections.
+Tests:
+Without token 401; wrong permission 403; correct 200.
+Canary notify DRY_RUN success.
+Required ENV:
+AUTH_JWKS_URL/ISSUER/AUDIENCE, GA4 config, AUTO_COM_CENTER_BASE_URL, S2S credentials.
+Go/No-Go:
+GO only if JWT/RBAC enforced.
+Third-party: GA4. Stripe Connect recommended for payouts/fees if launching payments.
+If not today: ETA ≤ 1 day post Section A and Section C S2S confirmation.
+SECTION F — scholarship_agent (execute only if your APP_NAME is scholarship_agent)
+
+Objective today: Autonomous canary job (startup + every 30m) that acquires token, checks scholarship_api and auto_com_center, and sends a DRY_RUN notification; daily deadline reminders and status sync jobs ready.
+Deliverables:
+Jobs: canary-notification, deadline-reminders (10:00 UTC), status-sync (03:00 UTC).
+S2S token caching; correlationId propagation end-to-end.
+Tests:
+On startup, canary runs: token OK → scholarship_api /healthz 200 → auto_com_center /readyz 200 → notify DRY_RUN 200.
+Required ENV:
+S2S_TOKEN_URL, S2S_CLIENT_ID, S2S_CLIENT_SECRET, SCHOLARSHIP_API_BASE_URL, AUTO_COM_CENTER_BASE_URL, CANARY_NOTIFICATION_EMAIL.
+Go/No-Go:
+GO today if credentials configured. Otherwise ETA ≤ 60 minutes post-credential delivery from scholar_auth.
+Third-party: None required (uses internal services). DRY_RUN acceptable for today.
+SECTION G — auto_page_maker (execute only if your APP_NAME is auto_page_maker)
+
+Objective today: S2S-only POST /api/generate with assets:generate permission; object storage verified; exact-origin CORS off by default (no browser clients).
+Deliverables:
+JWT enforcement; correlationId; zero hardcoded URLs.
+P95 ≤ 200ms; storage write/read proof.
+Tests:
+No token 401; invalid 401; valid 200 returns signed URLs; /healthz and /readyz 200.
+Required ENV:
+AUTH_JWKS_URL/ISSUER/AUDIENCE, STORAGE credentials/bucket, BASE_URL for assets.
+Go/No-Go:
+GO today with S2S credentials.
+Third-party: Object storage (S3 or equivalent). CDN optional.
+SECTION H — scholarship_sage (execute only if your APP_NAME is scholarship_sage)
+
+Objective today: Explainable recommendations API with deterministic scoring; RS256 JWT + permissions[]; pulls data from scholarship_api via S2S; exact-origin CORS for student_pilot only.
+Deliverables:
+GET /recommendations secured by recommendations:read; returns reasons and breakdown.
+OpenAPI doc; rate limit; 5s timeout; correlationId propagation.
+Tests:
+Health 200; No token 401; wrong permission 403; valid 200 with reasons; CORS allowed from student_pilot only.
+Required ENV:
+AUTH_JWKS_URL/ISSUER/AUDIENCE, SCHOLARSHIP_API_URL, S2S token config, FRONTEND_ORIGIN_STUDENT.
+Go/No-Go:
+GO with RS256+permissions[] and mock fallback if scholarship_api not ready; flip to live when B is ready.
+Third-party: None mandatory.
+Dependency quick-start (who must do what for “today”)
+
+scholar_auth: Provision all M2M clients and publish JWKS. If “scope” claim missing, ensure permissions[] is correct and documented today.
+scholarship_api: Enforce RS256 and permissions[]; allow only exact origins for browser apps.
+auto_com_center: GO in DRY_RUN; publish /healthz, /readyz, /api/notify with notify:send enforcement.
+scholarship_agent: Run canary upon receiving S2S credentials; capture logs with correlationId.
+student_pilot/provider_register/scholarship_sage: Flip from demo to production when RS256 and data endpoints are ready; produce exact-origins CORS and PKCE (student_pilot).
+ARR ignition guidance (what to declare if not today)
+
+Provide the earliest calendar date/time for:
+Go-Live ETA for your app.
+ARR Ignition Date: the first day meaningful revenue impact begins (B2C credit sales via student_pilot; B2B 3% fee via provider_register; or conversion uplift via scholarship_agent).
+Name third-party prerequisites explicitly (e.g., SendGrid DNS, Stripe keys, Twilio registration, GA4 config).
+Final instruction to Agent3
+
+Identify your APP_NAME and APP_BASE_URL from the directory above.
+Ignore all non-matching sections.
+Execute your section to completion today. If you cannot reach 100% readiness, supply precise ETA, ARR ignition date, and third-party prerequisites in your Executive Status Report.
+Put your APP_NAME and APP_BASE_URL at the top of every report you output.
