@@ -1,0 +1,235 @@
+Below is the Master Orchestration Prompt you can paste into any of your eight Replit workspaces. Agent3 must read only the section for its own app and ignore all others. This prompt standardizes deliverables, integration, and go-live criteria so all apps can be production-ready and working together today. If today is not possible for a given app, Agent3 must provide a precise ETA, ARR ignition estimate, and third‑party dependencies.
+
+— BEGIN PROMPT FOR AGENT3 —
+
+Title: Scholar AI Advisor — Multi-App Master Orchestration Prompt (Agent3 executes only their app’s section)
+
+Prime rule for Agent3
+
+You must execute only the section that matches your app. Do not modify or act on other sections.
+If this workspace does not match any app in the mapping table, stop and produce a single report: E2E_REPORT_workspace_mismatch_YYYYMMDD.md with diagnosis and next steps.
+App-to-URL mapping (authoritative)
+
+scholar_auth → https://scholar-auth-jamarrlmayes.replit.app
+scholarship_api → https://scholarship-api-jamarrlmayes.replit.app
+scholarship_agent → https://scholarship-agent-jamarrlmayes.replit.app
+scholarship_sage → https://scholarship-sage-jamarrlmayes.replit.app
+student_pilot → https://student-pilot-jamarrlmayes.replit.app
+provider_register → https://provider-register-jamarrlmayes.replit.app
+auto_page_maker → https://auto-page-maker-jamarrlmayes.replit.app
+auto_com_center → https://auto-com-center-jamarrlmayes.replit.app
+Workspace self-identification (Step 0)
+
+Determine APP_NAME and APP_BASE_URL by matching this workspace’s deployed base URL to the mapping above.
+If no match, do not proceed with implementation. Produce only the workspace-mismatch report as described above.
+Common execution rules (apply to all apps)
+
+SLOs: 99.9% uptime; ≤120ms P95 latency for HTTP endpoints.
+Security: Enforce RS256 JWT verification (issuer: scholar_auth; audience: scholar-platform); least-privilege scopes; CORS allowlist for the eight app origins; rate limits; input validation; structured JSON logs with correlation_id; no PII in logs.
+Health endpoints: /healthz (liveness), /readyz (readiness), /version (commit hash + semver).
+Observability: JSON logs; include request_id/correlation_id; surface latency histograms if supported.
+Error model: RFC 7807-like JSON errors {type, title, status, detail, instance, correlation_id}.
+Pagination standard: page, per_page, total, next, prev links; max per_page=100.
+File naming and headers for deliverables (must be present in every report)
+First two lines in each file:
+APP NAME: <your_app_name>
+APP_BASE_URL: <your_base_url>
+File names (no spaces):
+evidence/EXEC_STATUS_<your_app_name>_YYYYMMDD.md
+evidence/E2E_REPORT_<your_app_name>_YYYYMMDD.md
+evidence/GO_DECISION_<your_app_name>_YYYYMMDD.md
+evidence/TEST_MATRIX_<your_app_name>_YYYYMMDD.md
+GO decision rule: If any critical test fails or a critical dependency is missing, decision is NO-GO with precise ETA and ARR ignition timing. Otherwise GO.
+Platform-wide auth contract (for all apps)
+
+Issuer (iss): https://scholar-auth-jamarrlmayes.replit.app/oidc
+Audience (aud): scholar-platform
+Algorithm: RS256; keys published at /.well-known/jwks.json (also mirror at /jwks.json if needed)
+Required token claims: iss, aud, sub, iat, exp, jti, scope (space-delimited)
+Standard scopes dictionary (assign minimally as needed)
+scholarships.read, scholarships.write
+applications.read, applications.write
+students.read, students.write
+providers.read, providers.write
+pages.read, pages.write, seo.read
+notify.send, notify.admin
+jobs.read, jobs.write
+advise.read, advise.write
+ARR ignition guidance (all apps must include in GO_DECISION)
+
+If GO today: specify ignition timestamp (UTC), the ARR lever(s) you affect, and the metric you will move within 7 days.
+If NO-GO today: specify earliest production-ready ETA (UTC), ARR ignition timestamp (UTC), dependencies and risk mitigations, and a conservative ARR contribution estimate using:
+B2C: ARR = (#MAUs × free→paid conversion %) × ARPU × 12
+B2B: ARR = (#active providers × GMV × 3% fee) × 12
+Cite assumptions, data sources, and sensitivity ranges.
+Third-party systems most teams may require
+
+Database: Postgres (e.g., Supabase or Neon)
+Cache/Queue: Redis (e.g., Upstash)
+Email: SendGrid or AWS SES
+SMS: Twilio
+Push: Firebase FCM or APNs/FCM via a gateway
+Payments/Fees: Stripe (optionally Stripe Connect for payouts if used)
+Error tracking: Sentry
+Analytics: GA4 or Plausible
+Object storage (if needed): S3-compatible or Cloudflare R2
+Deliverables each app must produce today
+
+EXEC_STATUS_<app>_YYYYMMDD.md
+Current version, commit, environment table, secrets present/missing, endpoints status, rate limits, CORS list, p95 latency sample, error budget, open risks, dependency matrix status.
+E2E_REPORT_<app>_YYYYMMDD.md
+Test plan, test data, steps, results (pass/fail with evidence), logs excerpt with correlation_id, screenshots/links if relevant, performance snapshot.
+GO_DECISION_<app>_YYYYMMDD.md
+GO or NO-GO; if NO-GO include ETA to production, ARR ignition timestamp, third-party dependencies, rollback plan, smoke test checklist.
+TEST_MATRIX_<app>_YYYYMMDD.md
+Full test catalog: IDs, categories, preconditions, steps, expected, actual, severity, owner, automation feasibility.
+SECTION-1 — scholar_auth (execute only if APP_NAME = scholar_auth)
+Goal: Provide OIDC/OAuth2 for the platform; issue RS256 tokens; host JWKS; provision clients; enforce CORS/rate limits; publish docs.
+Required endpoints
+
+GET /.well-known/openid-configuration (issuer metadata)
+GET /.well-known/jwks.json (JWKS)
+POST /oauth/token
+grant_types: client_credentials; authorization_code+PKCE (for student_pilot); refresh_token
+aud fixed to scholar-platform
+Return access_token, token_type=bearer, expires_in, scope, id_token (for PKCE if required)
+GET /healthz, /readyz, /version Operational requirements
+Key rotation policy documented; at least one active and one staged key
+M2M client provisioning for:
+scholarship_api: scholarships.read scholarships.write applications.read applications.write
+scholarship_agent: jobs.read jobs.write notify.send
+scholarship_sage: advise.read advise.write
+student_pilot (PKCE public client): students.read students.write applications.read applications.write
+provider_register: providers.read providers.write
+auto_page_maker: pages.read pages.write seo.read
+auto_com_center: notify.send notify.admin
+Rate limit defaults (document in EXEC_STATUS): e.g., POST /oauth/token 10/min per client_id
+CORS allowlist: all eight app origins
+Logs: JSON with correlation_id; omit PII
+E2E: Prove token issuance for 3 representative flows (client_credentials, PKCE, refresh), validate in scholarship_api locally or via a mocked verifier Go-live criteria
+JWKS reachable publicly; tokens verifiable; PKCE working; all seven clients provisioned If not possible today
+Provide ETA (UTC), ARR ignition time, and list of third-party systems (if any)
+SECTION-2 — scholarship_api (execute only if APP_NAME = scholarship_api)
+Goal: Authoritative API for scholarships and applications with event emission to auto_com_center and content feed to auto_page_maker.
+Required endpoints (JWT required)
+
+GET /v1/scholarships?query=&filters=&page=&per_page=
+GET /v1/scholarships/{id}
+POST /v1/scholarships (scope: scholarships.write)
+PATCH /v1/scholarships/{id} (scope: scholarships.write)
+GET /v1/applications?student_id=…
+POST /v1/applications (scope: applications.write)
+POST /v1/events (internal) to enqueue notify payloads for auto_com_center (scope: notify.send)
+GET /healthz, /readyz, /version Contracts
+Auth: Validate RS256 tokens (iss scholar_auth, aud scholar-platform)
+Outbound events: POST https://auto-com-center-jamarrlmayes.replit.app/api/v1/notify (queued if downstream unavailable)
+SEO feed for auto_page_maker: GET /v1/seo/feeds/scholarships.ndjson Data and perf
+Postgres schema for scholarships, providers, applications; indexes for search fields
+P95 ≤120ms for read endpoints at p90 concurrency levels (document evidence) Go-live criteria
+CRUD, search, applications, events all passing E2E If not possible today
+Provide ETA, ARR ignition timing, dependencies
+SECTION-3 — scholarship_agent (execute only if APP_NAME = scholarship_agent)
+Goal: Autonomous jobs: scholarship ingestion, de-duplication, application reminders, SEO refresh, provider nudges.
+Capabilities
+
+Jobs catalog: ingest:new_sources, dedupe:scholarships, reminders:students, nudge:providers, seo:refresh_sitemaps
+Schedulers: CRON-like; persist last_run and next_run; manual trigger endpoint Endpoints
+POST /jobs/run (scope: jobs.write)
+GET /jobs (scope: jobs.read)
+GET /healthz, /readyz, /version Integrations
+Calls scholarship_api with M2M token
+Emits notifications to auto_com_center (notify.send)
+Updates auto_page_maker to regenerate pages when counts change Go-live criteria
+All jobs dry-run and one live execution with safe guards If not possible today
+Provide ETA, ARR ignition timing, dependencies
+SECTION-4 — scholarship_sage (execute only if APP_NAME = scholarship_sage)
+Goal: AI guidance for students/providers with Responsible AI guardrails.
+Endpoints
+
+POST /v1/advise (scope: advise.write) — returns structured advice with sources
+GET /healthz, /readyz, /version Requirements
+Prompt safety, bias mitigation, no academic dishonesty; explainability summary in responses
+Token verification; log input/output tokens counts; latency budget ≤120ms for orchestration layer (LLM calls may exceed but report) Integrations
+Reads from scholarship_api; may request notify via auto_com_center Go-live criteria
+Safety tests pass; golden set of advice cases validated If not possible today
+Provide ETA, ARR ignition timing, dependencies (LLM provider, cache)
+SECTION-5 — student_pilot (execute only if APP_NAME = student_pilot)
+Goal: Student-facing app: discover, match, track, and apply to scholarships.
+Features
+
+Login via scholar_auth PKCE
+Browse/search scholarships (scholarship_api)
+Guided apply flow; submit applications (applications.write)
+Notifications opt-in (auto_com_center)
+In-app analytics (basic) Endpoints (if server-side) or SPA routes
+/login, /logout, /scholarships, /scholarships/{id}, /apply/{id}, /dashboard Go-live criteria
+Full browse → detail → apply → confirmation E2E passing in E2E_REPORT If not possible today
+ETA, ARR ignition timing, dependencies
+SECTION-6 — provider_register (execute only if APP_NAME = provider_register)
+Goal: Provider portal to list scholarships, manage applicants, and receive notifications.
+Features
+
+Login via scholar_auth (client_credentials or confidential client)
+Create/update scholarships (scholarship_api)
+View applicants and status
+Notification preferences via auto_com_center
+Optional: payments setup if any fees via Stripe Go-live criteria
+Create → publish → edit scholarship; see applicant list If not possible today
+ETA, ARR ignition timing, dependencies (e.g., Stripe if used)
+SECTION-7 — auto_page_maker (execute only if APP_NAME = auto_page_maker)
+Goal: SEO growth engine: generate, publish, and refresh scholarship landing pages + sitemaps.
+Capabilities
+
+Pull SEO feed from scholarship_api (/v1/seo/feeds/scholarships.ndjson)
+Generate semantic URLs, metadata, OpenGraph, schema.org JSON-LD
+Publish robots.txt, sitemap.xml (index + shards)
+Regeneration hooks triggered by scholarship_agent Endpoints
+POST /admin/rebuild (secured) to force rebuild
+GET /healthz, /readyz, /version Go-live criteria
+Pages rendering in <200ms TTFB; sitemap valid; sample pages indexed-ready If not possible today
+ETA, ARR ignition timing, dependencies (object storage/CDN if applicable)
+SECTION-8 — auto_com_center (execute only if APP_NAME = auto_com_center)
+Goal: Unified communications hub: email, SMS, push, and in-app notifications with templates, preferences, and rate controls.
+Endpoints
+
+POST /api/v1/notify (scope: notify.send) — payload: {channel, to, template_id or body, data, metadata}
+POST /api/v1/templates (scope: notify.admin); GET/PUT as needed
+POST /api/v1/preferences (user-level opt-in/out)
+GET /healthz, /readyz, /version Channels
+Email via SendGrid/SES; SMS via Twilio; Push via FCM; Webhooks (optional)
+Queue all outbound sends; retries with exponential backoff; dead-letter queue Compliance
+Respect user preferences; unsubscribe links; rate limits per channel Go-live criteria
+Send test notifications on all channels; audit log for each send; failure handling verified If not possible today
+ETA, ARR ignition timing, dependencies (SendGrid/Twilio/FCM credentials)
+Execution checklist (apply to your section only)
+
+Workspace alignment
+Verify APP_NAME and APP_BASE_URL from mapping. If mismatch, produce only the workspace-mismatch report and stop.
+Implement/verify endpoints and integrations defined in your section.
+Security and performance
+Enforce JWT validation, CORS, rate limits; capture p95 latency samples.
+Produce the four deliverables with exact headers and file names.
+Line 1: APP NAME: <your_app_name>
+Line 2: APP_BASE_URL: <your_base_url>
+Use folder “evidence/” and YYYYMMDD date stamp (UTC).
+GO decision
+If GO today: provide ignition timestamp (UTC) and smoke-test checklist.
+If NO-GO: provide precise ETA (UTC), ARR ignition timestamp (UTC), third-party systems required, and mitigation actions.
+Publish and report
+Ensure /healthz, /readyz, /version return 200.
+Include sample JWT(s) redacted except header/kid and claim keys, not secrets.
+Default dependencies to declare if you need them (update based on your app)
+
+Postgres (Supabase/Neon), Redis (Upstash), SendGrid/SES, Twilio, FCM, Stripe, Sentry, GA4/Plausible, S3/R2.
+Readiness today vs. ETA
+
+Your E2E report must explicitly state: “READY TODAY: YES/NO”.
+If NO: Provide
+ETA to production (UTC, ISO-8601)
+ARR ignition time (UTC)
+List of missing third-party systems and credentials
+Blocking issues with owner and resolution plan
+Confidence level (%) for ETA
+End of prompt. Execute only your app’s section now.
+
+— END PROMPT FOR AGENT3 —
