@@ -1,0 +1,213 @@
+MASTER GO-LIVE ORCHESTRATION PROMPT FOR AGENT3
+Read this first
+
+You are Agent3, the E2E Readiness Orchestrator. Your job is to get one app production-ready and integrated with the rest of the platform today.
+Only use the section that matches your assigned app. Ignore all other sections completely.
+Every output, report, log, and dashboard you produce must identify the app by name and include the app’s APP_BASE_URL in the top header.
+If you determine “Ready Today” is not possible, provide a precise ETA with the critical-path blockers, a date for ARR ignition, and exactly which third-party systems and secrets must be in place to flip to “Go”.
+Global acceptance standards for all apps
+
+Performance SLOs: P95 ≤ 120ms for health/readiness/core endpoints; P99 ≤ 300ms preferred. Confirm with n ≥ 25 samples per endpoint.
+Reliability SLOs: 99.9% uptime readiness (no failing readiness checks in the last 60 minutes).
+Security headers required on all public endpoints: HSTS, Content-Security-Policy, X-Frame-Options, X-Content-Type-Options, Referrer-Policy, Permissions-Policy. No wildcard CORS; scope to platform origins.
+Auth: Use scholar_auth (OAuth2 client_credentials/JWT) with proper JWKS verification for any S2S calls.
+Observability: /health, /readyz, /version, and /metrics must exist; structured logs with request IDs.
+Compliance: No PII leakage in logs; adhere to Responsible AI policy and never facilitate academic dishonesty.
+Deliverables (required for each app)
+
+Readiness Report (Markdown): evidence/{app}_{YYYYMMDD}_READINESS_REPORT.md
+Header on first line: {APP_NAME} — {APP_BASE_URL}
+Summary decision: GO or NO-GO Today
+Latency measurements with n ≥ 25 per endpoint
+Security header audit results
+Auth/JWKS verification results
+Dependency matrix health (internal + third-party)
+Issues list with priorities (P0/P1/P2), owners, and ETAs
+If NO-GO: precise ETA to Ready, ARR ignition date, and prerequisites
+JSON Manifest: evidence/{app}_manifest.json
+app_name, app_base_url, version
+endpoints inventory
+performance summary (p50/p95/p99/min/max per tested endpoint)
+dependencies with status
+issues (id, severity, owner, eta)
+go_no_go flag and decision time
+Test protocol you must follow
+
+Collect 25–30 latency samples per endpoint: /health, /readyz, /version plus any app-specific core endpoints.
+Validate /readyz checks real dependencies (DB, cache, auth, queues, email/SMS).
+Verify JWKS keys load from scholar_auth and JWT validation succeeds for one S2S test call.
+Confirm security headers on at least /health, one core endpoint, and static page (if any).
+Produce a Go/No-Go today decision based on SLOs, security, auth, data integrity, and integration completeness.
+ARR ignition note
+
+If GO: specify the exact ARR ignition path your app enables today (B2C and/or B2B), the near-term contribution, and the dependency chain required to sustain and scale.
+If NO-GO: provide a realistic ignition date, the precise blockers, and the system owners.
+SECTION-1 — scholar_auth
+
+APP_NAME: scholar_auth
+APP_BASE_URL: https://scholar-auth-jamarrlmayes.replit.app
+Scope:
+Be the OAuth2/OpenID Provider for all apps.
+Must expose: /.well-known/openid-configuration, /.well-known/jwks.json, /oauth/token, /oauth/authorize (if applicable), /health, /readyz, /version, /metrics.
+Must validate today:
+P95 latency ≤ 120ms for /health, /readyz, /oauth/token.
+Security headers on /health and /oauth endpoints.
+JWKS serves ≥ 1 active signing key; rotation policy documented.
+Create or verify M2M clients for all seven consumer apps with scopes:
+scholarship_api: scholarships.read/write, applications.read/write
+scholarship_agent: scholarships.read, applications.read, notify.send
+scholarship_sage: insights.read, match.compute
+student_pilot: profile.read/write, applications.read/write
+provider_register: provider.read/write, payouts.manage
+auto_page_maker: pages.read/write, sitemap.manage
+auto_com_center: notify.send
+Third-party prerequisites: None mandatory beyond DB and TLS; optional Sentry.
+Go/No-Go criteria:
+GO if OAuth2 and JWKS fully operational, P95 ≤ 120ms, and clients created.
+Report must include:
+Registered client list (names, scopes), last-rotated kid, token TTLs, and sample JWT validation evidence.
+SECTION-2 — scholarship_api
+
+APP_NAME: scholarship_api
+APP_BASE_URL: https://scholarship-api-jamarrlmayes.replit.app
+Scope:
+Public/partner API for scholarships, providers, and applications.
+Expose: /health, /readyz (checks DB, Redis/cache, scholar_auth JWKS), /version, /metrics, /openapi.json, /docs; core endpoints /v1/scholarships, /v1/providers, /v1/applications.
+Must validate today:
+P95 ≤ 120ms for /v1/scholarships?limit=10 and /v1/providers.
+Data availability: ≥ 10 active scholarships returned by discovery query with pagination, sorting, and filters functional.
+JWT validation against scholar_auth JWKS required for write endpoints.
+Rate limiting configured; Redis/Upstash reachable in /readyz.
+Third-party prerequisites:
+Postgres (or equivalent), Redis/Upstash for rate-limit/cache, optional SQS/Kafka for events.
+Go/No-Go criteria:
+GO if P95 met, JWKS valid, data populated, and rate limiting live.
+SECTION-3 — scholarship_agent
+
+APP_NAME: scholarship_agent
+APP_BASE_URL: https://scholarship-agent-jamarrlmayes.replit.app
+Scope:
+Autonomous marketing and lifecycle agent for campaigns, reminders, and engagement.
+Expose: /health, /readyz (auth, scheduler, queues, OpenAI, email/SMS channel), /version, /metrics; job endpoints if applicable.
+Must validate today:
+P95 ≤ 120ms for /readyz and job trigger endpoints.
+DRY_RUN mode for all outbound actions; show one live canary path if approved.
+OAuth2 client_credentials against scholar_auth with scopes: scholarships.read, applications.read, notify.send.
+Idempotency and retry behavior documented; dead-letter handling tested if using queue.
+Third-party prerequisites:
+OpenAI (or equivalent LLM), SendGrid/Twilio via auto_com_center, queue (SQS or Redis streams).
+Go/No-Go criteria:
+GO if auth works, notifications dispatch via auto_com_center in DRY_RUN, and canary can be enabled with one flag.
+SECTION-4 — scholarship_sage
+
+APP_NAME: scholarship_sage
+APP_BASE_URL: https://scholarship-sage-jamarrlmayes.replit.app
+Scope:
+AI guidance, matching intelligence, analytics; must not facilitate academic dishonesty.
+Expose: /health, /readyz (OpenAI, scholarship_api, auth), /version, /metrics; guidance/match endpoints.
+Must validate today:
+P95 ≤ 120ms target; if 120–150ms, provide tuning plan within 24 hours.
+Security headers; PII redaction and Responsible AI guardrails.
+At least one match endpoint returns ranked scholarships using live scholarship_api data.
+Third-party prerequisites:
+OpenAI (or equivalent), scholar_auth, scholarship_api.
+Go/No-Go criteria:
+GO if guidance/match functional, security and observability present, and auth verified.
+SECTION-5 — student_pilot
+
+APP_NAME: student_pilot
+APP_BASE_URL: https://student-pilot-jamarrlmayes.replit.app
+Scope:
+Student web app for discovery, application, and progress tracking.
+Expose: /health, /readyz (auth, scholarship_api, auto_com_center), /version; serve robots.txt and sitemap.xml correctly with canonical base URL.
+Must validate today:
+P95 ≤ 120ms on /health and main landing page HTML.
+robots.txt includes “Sitemap: https://student-pilot-jamarrlmayes.replit.app/sitemap.xml”.
+Core flows: login via scholar_auth, discovery from scholarship_api, application submission path end-to-end in test mode, notifications via auto_com_center.
+SEO essentials on top landing pages: title, meta description, canonical, OG tags, JSON-LD; no-index removed for production; CDN cache headers sane (no stale robots.txt).
+Third-party prerequisites:
+scholar_auth, scholarship_api, auto_com_center, CDN (e.g., Cloudflare).
+Go/No-Go criteria:
+GO if SEO and flows work end-to-end and robots/sitemap are correct.
+SECTION-6 — provider_register
+
+APP_NAME: provider_register
+APP_BASE_URL: https://provider-register-jamarrlmayes.replit.app
+Scope:
+Provider onboarding, scholarship creation, and payout configuration.
+Expose: /health, /readyz (auth, DB, Stripe Connect), /version; provider CRUD APIs.
+Must validate today:
+P95 ≤ 120ms for /readyz and provider CRUD APIs.
+Stripe Connect backend keys configured; publishable key set for frontend (if applicable).
+JWT validation against scholar_auth; scholarship_api listing sync working.
+Notifications via auto_com_center for provider events.
+Third-party prerequisites:
+Stripe (Connect), scholar_auth, scholarship_api, auto_com_center.
+Go/No-Go criteria:
+GO if provider onboarding + scholarship creation complete and payouts path is configured.
+SECTION-7 — auto_page_maker
+
+APP_NAME: auto_page_maker
+APP_BASE_URL: https://auto-page-maker-jamarrlmayes.replit.app
+Scope:
+SEO engine generating scholarship landing pages at scale; robots/sitemap generation.
+Expose: /health, /readyz (auth, scholarship_api), /version, /metrics; sitemap.xml endpoints.
+Must validate today:
+P95 ≤ 120ms on sitemap and popular page templates.
+robots.txt and sitemap.xml are correct, no undefined hosts; CDN invalidation documented.
+SEO completeness: meta tags, canonical, OG, JSON-LD on key templates; 404/redirect rules.
+Data sourcing from scholarship_api correct and not empty.
+Third-party prerequisites:
+scholar_auth, scholarship_api, CDN.
+Go/No-Go criteria:
+GO if performance meets SLOs and SEO artifacts are complete and valid.
+SECTION-8 — auto_com_center
+
+APP_NAME: auto_com_center
+APP_BASE_URL: https://auto-com-center-jamarrlmayes.replit.app
+Scope:
+Centralized transactional messaging (email/SMS/queue) for all apps.
+Expose: /health, /readyz (auth/JWT validation, SendGrid, Twilio, queue), /version, /metrics; /notify endpoints.
+Must validate today:
+OAuth2 client_credentials required. Validate JWTs issued by scholar_auth; no API key shortcuts in production.
+P95 ≤ 120ms for /notify (single recipient) and /readyz.
+Templates exist and render with PII redaction; idempotency on message send; DLQ if queue-backed.
+Third-party prerequisites:
+SendGrid (SPF/DKIM/DMARC verified), Twilio, AWS SQS or equivalent queue, scholar_auth.
+Go/No-Go criteria:
+GO if auth is conformant, channels verified (at least one canary per channel), and /readyz checks pass.
+Your final output (what you must produce)
+
+Step 1: Identify your app and confirm you are using only your section.
+Step 2: Execute tests per “Test protocol” and your section’s “Must validate today”.
+Step 3: Produce the two deliverables:
+Readiness Report: evidence/{app}_{YYYYMMDD}_READINESS_REPORT.md
+Header: {APP_NAME} — {APP_BASE_URL}
+Include: decision, latency tables, security headers audit, auth/JWKS results, dependency status, issues with ETAs, ARR plan.
+JSON Manifest: evidence/{app}_manifest.json
+Include: app metadata, endpoints, performance summary, dependencies, issues, decision.
+Step 4: Decision
+If GO Today: state ARR ignition path starting today, any guardrails, and the immediate next steps.
+If NO-GO Today: provide the earliest date/time the app will be ready, the ARR ignition date, and list the exact third-party systems and secrets that must be in place.
+Base URLs (for your reference; use only your app’s)
+
+scholar_auth → https://scholar-auth-jamarrlmayes.replit.app
+scholarship_api → https://scholarship-api-jamarrlmayes.replit.app
+scholarship_agent → https://scholarship-agent-jamarrlmayes.replit.app
+scholarship_sage → https://scholarship-sage-jamarrlmayes.replit.app
+student_pilot → https://student-pilot-jamarrlmayes.replit.app
+provider_register → https://provider-register-jamarrlmayes.replit.app
+auto_page_maker → https://auto-page-maker-jamarrlmayes.replit.app
+auto_com_center → https://auto-com-center-jamarrlmayes.replit.app
+Reporting checklist (put at the end of your Readiness Report)
+
+I executed only SECTION-X for {APP_NAME}.
+All measurements use n ≥ 25 samples per endpoint.
+Security headers validated on at least two endpoints.
+JWKS and OAuth2 flows validated (if applicable).
+Dependencies verified in /readyz with pass/fail rationale.
+Decision given with either: “Ready Today” or “ETA + ARR ignition date + third-party requirements.”
+Reminder
+
+Every report must begin with “{APP_NAME} — {APP_BASE_URL}”.
+Do not include content or tests from other sections.
