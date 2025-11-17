@@ -1,0 +1,184 @@
+MASTER ORCHESTRATION PROMPT (All Apps)
+Use this single prompt across all eight apps. Each agent must execute ONLY the section that matches its app. If your app does not match a section below, do nothing except return a “Workspace Mismatch” note with the correct section and APP_BASE_URL.
+
+App-to-URL directory (authoritative)
+
+SECTION-1 scholar_auth — APP_BASE_URL=https://scholar-auth-jamarrlmayes.replit.app
+SECTION-2 scholarship_api — APP_BASE_URL=https://scholarship-api-jamarrlmayes.replit.app
+SECTION-3 scholarship_agent — APP_BASE_URL=https://scholarship-agent-jamarrlmayes.replit.app
+SECTION-4 scholarship_sage — APP_BASE_URL=https://scholarship-sage-jamarrlmayes.replit.app
+SECTION-5 student_pilot — APP_BASE_URL=https://student-pilot-jamarrlmayes.replit.app
+SECTION-6 provider_register — APP_BASE_URL=https://provider-register-jamarrlmayes.replit.app
+SECTION-7 auto_page_maker — APP_BASE_URL=https://auto-page-maker-jamarrlmayes.replit.app
+SECTION-8 auto_com_center — APP_BASE_URL=https://auto-com-center-jamarrlmayes.replit.app
+Global execution rules (apply to all agents, but only act on your section)
+
+Identity gate: Before doing anything, verify your app identity with one of the following:
+GET /health or /version must include your app name, or
+The configured APP_BASE_URL must exactly match the URL listed above for your section.
+If mismatch, stop immediately. Output “Workspace Mismatch” with the expected section and APP_BASE_URL. Make no changes.
+Report branding mandate: On every report or artifact, the very first line must be “<app_name> — <APP_BASE_URL>”.
+SLO targets to validate: 99.9% uptime; ≤120ms P95 latency on health/readiness/version endpoints.
+Security checklist: Enforce and verify HSTS, CSP, X-Frame-Options, X-Content-Type-Options, Referrer-Policy, Permissions-Policy on public endpoints. No wildcard CORS; allow-list only platform origins if applicable.
+OAuth2/JWT: Use client_credentials against scholar_auth. Validate JWT signatures via JWKS. Enforce iss/aud/exp/nbf/scope. No API keys in production paths.
+Dependencies to check (as applicable): scholar_auth (OAuth2), scholarship_api (data), auto_com_center (notifications), PostgreSQL (DB), Redis/SQS (optional job queue), OpenAI API (content), SendGrid/Twilio (delegated via auto_com_center).
+Evidence requirement: Performance sampling n≥25 per endpoint. Include min, p50, p95, p99, max. List raw samples or a summarized vector.
+Outputs required (both):
+Markdown readiness report: evidence/<app>_YYYYMMDD_READINESS_REPORT.md
+JSON manifest: evidence/<app>_manifest.json
+Filenames must have no spaces or quotes.
+Both files must be internally consistent (same decisions, ETAs, blockers).
+Decision and ETA: If not 100% ready today, provide:
+NO-GO TODAY
+Earliest Ready Date/Time (UTC) to START generating revenue
+Exact third-party systems that must be in place and what is missing
+Responsible AI: No functionality that facilitates academic dishonesty. PII redaction in logs. Transparent decisioning. Honor FERPA/COPPA where relevant.
+SECTION-3 (Execute this section ONLY if you are scholarship_agent)
+App: scholarship_agent — APP_BASE_URL=https://scholarship-agent-jamarrlmayes.replit.app
+Purpose: Autonomous marketing and lifecycle orchestration across B2C (students) and B2B (providers). Drives engagement nudges, deadline reminders, and lifecycle communications via auto_com_center, using data from scholarship_api and identities/tokens from scholar_auth.
+
+A. Identity gate (must pass or stop)
+
+Call GET /health or /version on your running service.
+Confirm the response contains “scholarship_agent” and APP_BASE_URL=https://scholarship-agent-jamarrlmayes.replit.app.
+If not, stop and output: “Workspace Mismatch. Expected SECTION-3 scholarship_agent — https://scholarship-agent-jamarrlmayes.replit.app”.
+B. Readiness test plan (run in this order)
+
+Endpoint inventory and performance SLOs
+Endpoints to test: /health, /readyz, /version, /metrics (if present), /api/health (if present).
+For each endpoint:
+Collect at least 25 sequential latency samples.
+Compute and record min, p50, p95, p99, max. P95 target ≤120ms.
+Note any outliers and hypothesize causes (e.g., cold start, GC, database calls in health route).
+Output: Table of results plus a one-paragraph analysis on SLO compliance and any remediation needed.
+2. Security headers and CORS audit
+
+For /health and one API endpoint (e.g., /api/health or /api/campaigns if it exists), verify:
+strict-transport-security (>= 31536000; includeSubDomains)
+content-security-policy (no wildcards; frame-ancestors 'none')
+x-frame-options (DENY)
+x-content-type-options (nosniff)
+referrer-policy (strict-origin-when-cross-origin or stricter)
+permissions-policy (disable camera, microphone, geolocation, payment)
+Confirm CORS does not use a wildcard and, if applicable, lists only Scholar AI Advisor platform origins.
+3. OAuth2/JWT functional test with scholar_auth
+
+OIDC discovery: GET /.well-known/openid-configuration (or /oidc/.well-known/openid-configuration if that’s your path) at scholar_auth.
+JWKS: GET the jwks_uri from the discovery document.
+Acquire token (client_credentials):
+POST to scholar_auth token endpoint using client_id=scholarship_agent and the configured secret.
+Scopes required: scholarship.read, notify.send, agent.tasks.
+Validate the JWT (signature, iss, aud, exp, nbf, scope).
+Output: Success/failure with the exact error if any. If missing client credentials or 500 error from scholar_auth, mark as P0 with ETA and owner.
+4. scholarship_api integration test
+
+With a valid Bearer token, call scholarship_api to fetch scholarships:
+GET /v1/scholarships (or current catalog endpoint).
+Verify pagination (limit/offset), filters (e.g., category, deadline, amount), and at least one result set.
+Output: Success/failure, response time, count of returned items. If 404 or auth error, mark as P0, owner=scholarship_api team, with ETA.
+5. auto_com_center notification test
+
+With a valid Bearer token, send a test notification:
+POST /api/notify body:
+channel: email
+recipient: a test address you control or a sink configured by auto_com_center
+template: reminder
+data: scholarship_name, deadline
+Output: Status code, message_id/trace_id. If blocked by OAuth, mark dependency on scholar_auth credentials. If auto_com_center refuses the request, log the exact error and mark as P0 or P1 based on impact.
+6. /readyz dependency coverage
+
+Ensure /readyz includes checks for:
+Database (required)
+Redis/SQS (optional but recommended for queued jobs)
+OpenAI (if used)
+scholar_auth (token acquisition probe)
+scholarship_api (catalog read probe)
+auto_com_center (simple health probe or dry-run notify)
+Output: /readyz JSON sample with status and responseTime per dependency. If any missing, create a P2 issue to add coverage.
+7. Job orchestration sanity checks
+
+Enumerate any scheduled or triggerable jobs (e.g., canary_notification, deadline_reminders, status_sync).
+Confirm they run in DRY_RUN mode if production keys are not ready, and flip to live mode only when OAuth2 and dependencies pass.
+Output: Job list, schedules, DRY_RUN status, dependencies needed, and expected ARR impact by job.
+8. Responsible AI and compliance
+
+Confirm safeguards prevent essay ghostwriting or academic dishonesty.
+Verify PII redaction in logs and token secrets are never logged.
+Note any FERPA/COPPA considerations (e.g., if minors are involved, ensure parental consent; otherwise note 18+ target).
+C. Deliverables (must produce both, consistent and branded)
+
+Markdown report at evidence/scholarship_agent_YYYYMMDD_READINESS_REPORT.md
+First line: “scholarship_agent — https://scholarship-agent-jamarrlmayes.replit.app”
+Contents:
+GO/NO-GO TODAY decision
+Performance results (n≥25 per endpoint) with min, p50, p95, p99, max
+Security headers + CORS audit
+OAuth2/JWT test results with scholar_auth (passing or exact error)
+scholarship_api data test results
+auto_com_center notification test results
+/readyz dependency matrix with pass/fail and rationale
+Issues list with severity (P0/P1/P2/P3), owner, ETA, success metric
+Third-party prerequisites to start revenue (what systems, what configuration)
+“Earliest Ready to Start Revenue” date/time (UTC) if NO-GO TODAY
+ARR ignition plan: which campaigns/jobs will generate revenue, expected ARPU/fee impacts, and time-to-first-revenue
+First 24 hours runbook (what to monitor, alert thresholds, rollback criteria)
+Responsible AI compliance notes
+2. JSON manifest at evidence/scholarship_agent_manifest.json
+
+Must include:
+app_name and app_base_url
+decision (GO or NO-GO TODAY), decision_timestamp (UTC)
+ready_eta (UTC) to start generating revenue if NO-GO TODAY
+third_party_prerequisites array with explicit items and owners
+endpoints with performance summary (min, p50, p95, p99, max, sample_size)
+dependencies with status and gaps
+security_headers compliance summary
+oauth2_readiness (discovery, jwks, token_acquisition, jwt_validation, scopes)
+issues array with id, severity, title, owner, eta_date, remediation, success_metric
+kpis to publish (operational and revenue proxies)
+arr_analysis (paths, potential impact, at-risk if delayed)
+D. Decision logic and escalation
+
+If every check passes and integrations are functional:
+Decision: GO TODAY
+Enable live mode (disable DRY_RUN) and outline ARR ignition within 24 hours.
+If any P0 blocker exists (examples: OAuth2 500 from scholar_auth, scholarship_api 4xx/5xx, auto_com_center auth failure, P95 > 120ms on core endpoints):
+Decision: NO-GO TODAY
+Provide earliest ready date/time (UTC) to START generating revenue.
+List exact third-party systems that must be in place, the error observed, the owner, and the ETA.
+Provide mitigation steps to hit earliest possible date.
+E. Required third-party systems to list explicitly (if missing or failing)
+
+scholar_auth: OIDC discovery; JWKS; client_credentials flow; scopes: scholarship.read, notify.send, agent.tasks; registered client_id=scholarship_agent with client_secret set.
+scholarship_api: Read endpoints for scholarship catalog with pagination and filters; OAuth2 bearer token validation.
+auto_com_center: Notification API ready for email/SMS; OAuth2 bearer token validation; SendGrid/Twilio DNS verified (handled inside auto_com_center).
+Infrastructure: PostgreSQL reachable; Redis/SQS optional but recommended; OpenAI API key valid.
+F. Output formatting reminders
+
+Always begin both the Markdown report and JSON manifest with the exact app name and APP_BASE_URL specified above.
+Ensure the Markdown report and JSON manifest reflect the same decision, ETA, issues, and metrics.
+Use no spaces or quotes in filenames. Place them under an evidence/ folder.
+SECTION-1 scholar_auth (Do NOT execute if you are not scholar_auth)
+
+Identity, OAuth2/OIDC provider readiness, JWKS, token issuance performance. Produce the same two deliverables with scholar_auth — https://scholar-auth-jamarrlmayes.replit.app at the top. Validate client registration for each downstream app and publish scopes matrix.
+SECTION-2 scholarship_api (Do NOT execute if you are not scholarship_api)
+
+Identity, catalog endpoints, pagination/filters, OAuth2 enforcement. Produce the same two deliverables with scholarship_api — https://scholarship-api-jamarrlmayes.replit.app at the top. Include sample payloads, latency, and error budget.
+SECTION-4 scholarship_sage (Do NOT execute if you are not scholarship_sage)
+
+Identity, student advisory flows, dependency checks (scholarship_api, auto_com_center, scholar_auth), security, and SLOs. Produce the same two deliverables with scholarship_sage — https://scholarship-sage-jamarrlmayes.replit.app.
+SECTION-5 student_pilot (Do NOT execute if you are not student_pilot)
+
+Identity, onboarding funnel, AI credit purchase hooks, dependency checks, security, and SLOs. Produce the two deliverables with student_pilot — https://student-pilot-jamarrlmayes.replit.app.
+SECTION-6 provider_register (Do NOT execute if you are not provider_register)
+
+Identity, provider onboarding and listing creation, dependency checks, security, and SLOs. Produce the two deliverables with provider_register — https://provider-register-jamarrlmayes.replit.app.
+SECTION-7 auto_page_maker (Do NOT execute if you are not auto_page_maker)
+
+Identity, SEO page generation, site map, indexing health, dependency checks, security, and SLOs. Produce the two deliverables with auto_page_maker — https://auto-page-maker-jamarrlmayes.replit.app.
+SECTION-8 auto_com_center (Do NOT execute if you are not auto_com_center)
+
+Identity, notification APIs, OAuth2 bearer validation, SendGrid/Twilio configuration, security, and SLOs. Produce the two deliverables with auto_com_center — https://auto-com-center-jamarrlmayes.replit.app.
+Agent3, your scope is SECTION-3 only. Execute with urgency and precision:
+
+Either deliver GO TODAY with live revenue ignition steps, or return NO-GO TODAY with the earliest Ready-to-Start-Revenue timestamp (UTC) and a precise list of third-party requirements and owners.
