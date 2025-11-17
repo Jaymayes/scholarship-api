@@ -1,0 +1,144 @@
+Below is your combined Master Go-Live Orchestration Prompt. It contains sections for all eight apps. Agent3 must only execute SECTION-3 (scholarship_agent). All other sections exist for cross-app context and dependency clarity only.
+
+MASTER GO-LIVE ORCHESTRATION PROMPT (FOR ALL APPS — EXECUTION SCOPED PER SECTION)
+Executive framing (applies to all sections; Agent3 should read but only act within SECTION-3)
+
+Prime directive: Get the platform production-ready so we can begin generating revenue immediately. If a same-day GO is not possible for your app, provide a precise ETA-to-revenue and list required third-party systems and upstream service prerequisites.
+SLO guardrails: 99.9% uptime targets; ≤120ms P95 latency for public and service endpoints; security headers enforced; OAuth2 client_credentials between services; JWT signature validation via scholar_auth JWKS. No API-key shortcuts in production.
+Responsible AI and Ethics: No facilitation of academic dishonesty; bias/PII guardrails enforced; explainability and transparency preserved.
+Global service map (read-only; do not change)
+
+scholar_auth — https://scholar-auth-jamarrlmayes.replit.app
+scholarship_api — https://scholarship-api-jamarrlmayes.replit.app
+scholarship_agent — https://scholarship-agent-jamarrlmayes.replit.app
+scholarship_sage — https://scholarship-sage-jamarrlmayes.replit.app
+student_pilot — https://student-pilot-jamarrlmayes.replit.app
+provider_register — https://provider-register-jamarrlmayes.replit.app
+auto_page_maker — https://auto-page-maker-jamarrlmayes.replit.app
+auto_com_center — https://auto-com-center-jamarrlmayes.replit.app
+Required outputs (applies to all sections; Agent3 must produce these for SECTION-3 only)
+
+Create two files in evidence/:
+evidence/{app_name}_{YYYYMMDD}_READINESS_REPORT.md
+evidence/{app_name}_manifest.json
+The first line of every report must be: {app_name} — {APP_BASE_URL} Example for Agent3: scholarship_agent — https://scholarship-agent-jamarrlmayes.replit.app
+Reports must contain:
+GO/NO-GO decision for today; if NO-GO, provide an exact ETA datetime to start generating revenue, plus third-party prerequisites.
+Latency measurements per endpoint with n ≥ 25 samples, reporting p50/p95/p99/min/max.
+Security headers audit (HSTS, CSP, X-Frame-Options, X-Content-Type-Options, Referrer-Policy, Permissions-Policy). CORS must be origin-scoped (no wildcards).
+OAuth2/JWT verification: client_credentials flow to scholar_auth; validate JWT iss/aud/exp/nbf/scope; validate signature via scholar_auth JWKS (no API-key shortcuts in production).
+Dependencies in /readyz with PASS/FAIL and rationale.
+Issues list with severity (P0/P1/P2/P3), owner, ETA, and mitigation.
+ARR ignition section: earliest date/time the app contributes to revenue, path-to-revenue it enables (B2C and/or B2B), and immediate risks to conversion/ARPU/provider fee capture.
+A “REPORTING CHECKLIST” at the end confirming all bullets above.
+JSON manifest must include: app_name, app_base_url, version (if known), endpoints inventory, performance summary, dependencies status, issues with severity and ETA, go_no_go flag, decision_timestamp, arr_ready_eta (datetime), third_party_prerequisites.
+SECTION-1 (scholar_auth) — DO NOT EXECUTE IF YOU ARE AGENT3
+
+Scope: OIDC provider; must expose /.well-known/openid-configuration and /.well-known/jwks.json; issue and validate client_credentials and authorization_code flows.
+Blocking rule for all apps: No production traffic without OAuth2+JWKS validation.
+SECTION-2 (scholarship_api) — DO NOT EXECUTE IF YOU ARE AGENT3
+
+Scope: Public catalog + write APIs for scholarships, providers, applications; strictly JWT-protected writes; distributed rate limiting via Redis; pagination/filtering; OpenAPI spec accuracy.
+SECTION-3 (scholarship_agent) — YOU ARE AGENT3; EXECUTE THIS SECTION ONLY
+Identity and scope
+
+You are Agent3 working on scholarship_agent — https://scholarship-agent-jamarrlmayes.replit.app
+Mission today: Achieve a production GO decision, or provide a precise ETA-to-revenue if NO-GO. Your app orchestrates growth and operations by:
+Consuming data from scholarship_api for campaign/content generation and internal automations.
+Calling auto_com_center for notifications (email/SMS/DM).
+Using scholar_auth for OAuth2 client_credentials to authenticate S2S calls.
+Emitting telemetry to support KPI tracking for the CEO dashboard.
+Deliverables (files and headers)
+
+evidence/scholarship_agent_{YYYYMMDD}_READINESS_REPORT.md
+First line: scholarship_agent — https://scholarship-agent-jamarrlmayes.replit.app
+evidence/scholarship_agent_manifest.json
+Acceptance criteria for “100% ready and working together”
+
+Performance SLOs
+For each endpoint and worker trigger you expose (e.g., /health, /readyz, /version, any /api/* endpoints), capture n ≥ 25 samples.
+Report p50/p95/p99/min/max. P95 must be ≤120ms. If above, list concrete fixes with ETAs and expected post-fix P95.
+Security posture
+Enforce the six security headers on at least two endpoints. Document policies (HSTS max-age, CSP defaults, frame deny, nosniff, referrer policy, permissions policy).
+CORS must be origin-allowlisted to the platform’s web apps (student_pilot, provider_register, auto_page_maker, scholarship_sage).
+OAuth2/JWT compliance (no exceptions in production)
+Use client_credentials with scholar_auth:
+Token URL: discover from https://scholar-auth-jamarrlmayes.replit.app/.well-known/openid-configuration
+Validate JWT signature via scholar_auth JWKS.
+Validate iss, aud, exp, nbf, scope. Deny if invalid or missing.
+Required scopes for Agent3:
+scholarship.read for catalog reads from scholarship_api
+notify.send for calls to auto_com_center
+agent.tasks for internal task orchestration endpoints
+Dependency health checks (/readyz)
+Must enumerate and validate:
+scholar_auth (OIDC and JWKS reachable; token acquisition success)
+scholarship_api (read endpoints responding with data; handle pagination)
+auto_com_center (notification endpoint reachable; 200/202 response within SLO)
+Database/queue/cache if used (e.g., PostgreSQL, Redis/SQS)
+/readyz must show PASS/FAIL per dependency with error messages on FAIL.
+Observability and runbooks
+Log correlation IDs; include token kid and jti in debug-only logs (no PII).
+Emit 4xx/5xx counters, latency histograms, and dependency error rates.
+Provide a “First 24 Hours” runbook in the report: what to watch, alert thresholds, rollback conditions.
+Responsible AI and compliance
+If you generate messaging or content, enforce anti-cheating safeguards; no ghostwriting for graded work.
+Redact PII where not required; never store access tokens in logs.
+End-to-end integration tests (document them in the report)
+
+OAuth2 test: Acquire client_credentials token from scholar_auth. Validate token locally (signature + claims).
+Data test: Call scholarship_api to fetch at least 10 scholarships; confirm pagination and filter work.
+Notification test: Call auto_com_center POST /api/notify with a test payload; verify 200/202 and trace ID returned.
+If you have scheduled tasks or webhooks, simulate one end-to-end invocation and show the result.
+Go/No-Go decision and ETA to revenue
+
+If all acceptance criteria pass: GO TODAY. Provide “ARR ignition date” (UTC) and which revenue paths are enabled:
+B2C: Student engagement nudges, deadline reminders, activation flows driving AI credit purchases (ARPU uplift).
+B2B: Provider lifecycle communications to accelerate listings and disbursements (3% fee velocity).
+If any P0 remains: NO-GO TODAY. Provide:
+Exact ETA datetime for readiness to start generating revenue.
+Third-party prerequisites (e.g., scholar_auth OAuth2, JWKS rotation policy; Redis; Twilio/SendGrid DNS; SQS; CDN).
+Risk statement quantifying ARR at risk if ETA slips.
+Standard issues list format
+
+For each issue: ID, severity (P0/P1/P2/P3), owner, impact, fix plan, ETA, measurable success metric (e.g., P95 ≤ 120ms).
+KPIs to publish in your report (for CEO dashboard alignment)
+
+Messaging success rate (auto_com_center responses 2xx %)
+Scholarship fetch success rate (from scholarship_api)
+Token acquisition success rate (scholar_auth)
+Median and P95 end-to-end “orchestrate-and-notify” latency
+Early revenue proxies:
+B2C: activation-to-credit-purchase conversion uplift attributable to notifications
+B2B: time-to-first-listing for a new provider after onboarding notifications
+SECTION-4 (scholarship_sage) — DO NOT EXECUTE IF YOU ARE AGENT3
+
+Scope: Guidance, matching, analytics; requires OpenAI and scholarship_api; strict guardrails; /readyz and /version required.
+SECTION-5 (student_pilot) — DO NOT EXECUTE IF YOU ARE AGENT3
+
+Scope: Student funnel; SEO alignment with auto_page_maker; OIDC auth; fast catalog queries; credit purchases.
+SECTION-6 (provider_register) — DO NOT EXECUTE IF YOU ARE AGENT3
+
+Scope: Provider onboarding; Stripe Connect; authenticated listing creation; notifications via auto_com_center.
+SECTION-7 (auto_page_maker) — DO NOT EXECUTE IF YOU ARE AGENT3
+
+Scope: SEO pages; robots.txt, sitemap.xml correctness; CDN; Google Search Console integration; fast page render.
+SECTION-8 (auto_com_center) — DO NOT EXECUTE IF YOU ARE AGENT3
+
+Scope: Transactional messaging; must validate JWT from scholar_auth; Twilio/SendGrid configured with DNS; SQS/DLQ health.
+Formatting and compliance checklist (Agent3 must include this at the end of the SECTION-3 report)
+
+Executed only SECTION-3 for scholarship_agent.
+Report begins with “scholarship_agent — https://scholarship-agent-jamarrlmayes.replit.app”.
+n ≥ 25 samples per endpoint with p50/p95/p99/min/max reported.
+Security headers validated on 2+ endpoints.
+OAuth2/JWKS validated end-to-end (no API-key shortcuts).
+/readyz dependency matrix with pass/fail rationale.
+GO/NO-GO decision with precise ETA-to-revenue and third-party prerequisites.
+ARR ignition date/time provided and revenue paths described.
+Important reminders for Agent3
+
+Do not modify or claim work for other sections.
+If a dependency blocks you, state the exact blocker, the owner, and the fastest viable workaround that does not violate security/compliance guardrails.
+If you must use DRY_RUN modes for non-critical paths, explicitly state what remains blocked for revenue and the precise action needed to flip to production.
+Begin now. Produce your two deliverables for SECTION-3 only, with the mandated header line and the reporting checklist. If GO is not achievable today, provide the earliest ETA when scholarship_agent will be ready to start generating revenue and list the third-party systems and upstream services that must be in place.
