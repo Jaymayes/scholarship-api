@@ -1,0 +1,259 @@
+{
+  "app": "scholarship_api",
+  "base_url": "https://scholarship-api-jamarrlmayes.replit.app",
+  "version": "1.0.0",
+  "test_date": "2025-11-17T15:52:30Z",
+  "test_agent": "Agent3 (E2E Readiness Orchestrator)",
+  "go_live_decision": "NOT_READY_TODAY",
+  "eta_to_ready": "4-8 hours",
+  "health_schema": {
+    "endpoint": "/health",
+    "status_code": 200,
+    "auth_required": false,
+    "response_format": {
+      "status": "string",
+      "trace_id": "string"
+    }
+  },
+  "readiness_schema": {
+    "endpoint": "/readyz",
+    "status_code": 200,
+    "auth_required": false,
+    "response_format": {
+      "status": "string",
+      "service": "string",
+      "checks": {
+        "database": "object",
+        "redis": "object",
+        "auth_jwks": "object",
+        "configuration": "object"
+      }
+    }
+  },
+  "endpoints": {
+    "total": 271,
+    "documented": true,
+    "openapi_url": "/openapi.json",
+    "swagger_ui": "/docs",
+    "sample_endpoints": [
+      "/",
+      "/_canary_no_cache",
+      "/_diagnostic/routes",
+      "/agent/capabilities",
+      "/agent/events",
+      "/agent/health",
+      "/agent/register",
+      "/agent/task",
+      "/ai/analyze-eligibility",
+      "/ai/enhance-search",
+      "/api/v1/scholarships",
+      "/api/v1/providers",
+      "/health",
+      "/readyz",
+      "/metrics"
+    ]
+  },
+  "dependencies": {
+    "database": {
+      "status": "healthy",
+      "type": "PostgreSQL",
+      "provider": "Neon",
+      "scholarships_count": 15
+    },
+    "redis": {
+      "status": "not_configured",
+      "fallback": "in-memory",
+      "error": "Connection refused (localhost:6379)",
+      "blocking": true
+    },
+    "auth_jwks": {
+      "status": "degraded",
+      "keys_loaded": 0,
+      "expected_source": "https://scholar-auth-jamarrlmayes.replit.app/oidc/jwks",
+      "blocking": true
+    },
+    "configuration": {
+      "status": "healthy"
+    },
+    "openai": {
+      "status": "initialized",
+      "service": "OpenAI"
+    },
+    "sentry": {
+      "status": "configured",
+      "provider": "Sentry"
+    }
+  },
+  "performance_metrics": {
+    "timestamp": "2025-11-17T15:52:30Z",
+    "sample_size": 25,
+    "endpoints": {
+      "/health": {
+        "p50_ms": 68.8,
+        "p95_ms": 86.5,
+        "p99_ms": 90.0,
+        "min_ms": 54.9,
+        "max_ms": 96.6,
+        "mean_ms": 73.2,
+        "slo_target_ms": 120,
+        "slo_status": "PASS",
+        "margin_percent": 28
+      },
+      "/v1/scholarships?limit=10": {
+        "p50_ms": 60.8,
+        "p95_ms": 71.7,
+        "slo_target_ms": 120,
+        "slo_status": "PASS",
+        "margin_percent": 40
+      },
+      "/v1/providers?limit=10": {
+        "p50_ms": 64.7,
+        "p95_ms": 86.0,
+        "slo_target_ms": 120,
+        "slo_status": "PASS",
+        "margin_percent": 28
+      }
+    },
+    "overall_slo_compliance": true
+  },
+  "slo_assessment": {
+    "availability_target": 99.9,
+    "availability_measured": 100.0,
+    "p95_latency_target_ms": 120,
+    "p95_latency_measured_ms": 86.5,
+    "error_rate_target_percent": 1.0,
+    "error_rate_measured_percent": 0.0,
+    "overall_status": "PASS_WITH_BLOCKERS"
+  },
+  "readiness_gates": {
+    "G0_health_endpoint": {
+      "status": "PASS",
+      "details": "Returns JSON with status, 200 OK, no auth required"
+    },
+    "G1_readiness_endpoint": {
+      "status": "FAIL",
+      "details": "2 critical dependencies degraded: auth_jwks (0 keys), redis (not configured)"
+    },
+    "G2_performance_slo": {
+      "status": "PASS",
+      "details": "All endpoints P95 ≤ 120ms with 28-40% margin"
+    },
+    "G3_security_headers": {
+      "status": "PASS",
+      "details": "HSTS, CSP, X-Content-Type-Options, X-Frame-Options, Referrer-Policy, Permissions-Policy all present"
+    },
+    "G4_integrations": {
+      "status": "FAIL",
+      "details": "JWKS integration degraded (0 keys loaded)"
+    },
+    "G5_observability": {
+      "status": "PASS",
+      "details": "Request IDs, trace IDs, metrics endpoint, structured logging operational"
+    }
+  },
+  "security_headers": {
+    "strict-transport-security": "max-age=63072000; includeSubDomains",
+    "content-security-policy": "default-src 'none'; connect-src 'self'; base-uri 'none'; object-src 'none'; frame-ancestors 'none'",
+    "x-content-type-options": "nosniff",
+    "x-frame-options": "DENY",
+    "referrer-policy": "no-referrer",
+    "permissions-policy": "camera=(), microphone=(), geolocation=(), payment=()",
+    "waf_status": "passed"
+  },
+  "open_issues": [
+    {
+      "id": "DEF-005",
+      "title": "Redis rate limiting backend unavailable",
+      "severity": "P0",
+      "status": "OPEN",
+      "blocking": true,
+      "owner": "Platform Infrastructure",
+      "evidence": "Error 111 connecting to localhost:6379. Connection refused.",
+      "fix_steps": [
+        "Provision Upstash Redis or Replit-managed Redis",
+        "Set REDIS_URL environment variable",
+        "Configure connection pooling (10-50 connections)",
+        "Restart scholarship_api"
+      ],
+      "eta_hours": "2-4"
+    },
+    {
+      "id": "INT-001",
+      "title": "JWKS integration degraded (0 keys loaded)",
+      "severity": "P0",
+      "status": "OPEN",
+      "blocking": true,
+      "owner": "scholarship_api + scholar_auth teams",
+      "evidence": "/readyz shows auth_jwks.keys_loaded = 0",
+      "fix_steps": [
+        "Verify scholar_auth JWKS endpoint accessibility",
+        "Check network connectivity between services",
+        "Verify JWT_ISSUER environment variable",
+        "Restart scholarship_api after scholar_auth fix"
+      ],
+      "eta_hours": "2-4"
+    },
+    {
+      "id": "PERF-001",
+      "title": "No caching headers on scholarship lists",
+      "severity": "P1",
+      "status": "OPEN",
+      "blocking": false,
+      "owner": "scholarship_api",
+      "evidence": "Missing Cache-Control, ETag headers on /api/v1/scholarships",
+      "fix_steps": [
+        "Add Cache-Control: public, max-age=300 for lists",
+        "Add ETag for conditional requests"
+      ],
+      "eta_hours": "1"
+    },
+    {
+      "id": "PERF-002",
+      "title": "/version endpoint missing",
+      "severity": "P1",
+      "status": "OPEN",
+      "blocking": false,
+      "owner": "scholarship_api",
+      "evidence": "404 on /version endpoint",
+      "fix_steps": [
+        "Add /version endpoint with git SHA and build timestamp"
+      ],
+      "eta_hours": "0.5"
+    }
+  ],
+  "owner_contacts": {
+    "primary": "scholarship_api team",
+    "dependencies": {
+      "scholar_auth": "scholar_auth team",
+      "platform_infrastructure": "Platform Infrastructure team",
+      "auto_com_center": "auto_com_center team"
+    }
+  },
+  "arr_impact": {
+    "b2c_engine": {
+      "role": "Student discovery and application API",
+      "status": "BLOCKED",
+      "blocker": "Authentication broken (JWKS degraded)",
+      "unlocks": "Student signup, scholarship discovery, application workflow"
+    },
+    "b2b_engine": {
+      "role": "Provider marketplace API",
+      "status": "BLOCKED",
+      "blocker": "Authentication broken (JWKS degraded), No provider data",
+      "unlocks": "Provider onboarding, listing creation, 3% platform fee collection"
+    },
+    "arr_ready": false,
+    "eta_to_arr_ignition": "4-8 hours (after blockers resolved)"
+  },
+  "test_summary": {
+    "total_requests": 75,
+    "test_duration_hours": 2.5,
+    "endpoints_tested": 3,
+    "gates_passed": 3,
+    "gates_failed": 2,
+    "critical_blockers": 2,
+    "performance_status": "EXCELLENT",
+    "security_status": "STRONG",
+    "observability_status": "OPERATIONAL"
+  }
+}

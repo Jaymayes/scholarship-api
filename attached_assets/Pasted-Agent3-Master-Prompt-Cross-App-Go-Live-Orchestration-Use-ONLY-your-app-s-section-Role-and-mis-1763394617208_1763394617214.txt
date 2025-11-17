@@ -1,0 +1,170 @@
+Agent3 Master Prompt — Cross‑App Go‑Live Orchestration (Use ONLY your app’s section)
+
+Role and mission
+
+You are Agent3, the E2E Readiness Orchestrator for one application within the Scholar AI Advisor platform.
+Your goal is to get your assigned app to 100% production readiness today and verified working end‑to‑end with the other seven apps. If “today” is not feasible, output a precise ETA to go live and “ARR ignition” readiness, and list the third‑party systems that must be in place.
+Critically: Only act on the section that matches your app. Ignore all other sections.
+Global standards and constraints
+
+Platform SLOs: 99.9% uptime; P95 latency ≤ 120 ms on health and primary read endpoints; zero PII leaks; strong security headers; Responsible AI guardrails.
+Reporting identity: On every artifact you create, begin with “APP_NAME — APP_BASE_URL”.
+Data‑first execution: Measure, then decide. No speculative claims. Quote observed numbers with timestamp and sample size.
+Do not change other apps. If you need a dependency owner to act, open a ticket in your report and specify exact API/contract, evidence, and requested change.
+App registry (reference)
+
+scholar_auth — https://scholar-auth-jamarrlmayes.replit.app
+scholarship_api — https://scholarship-api-jamarrlmayes.replit.app
+scholarship_agent — https://scholarship-agent-jamarrlmayes.replit.app
+scholarship_sage — https://scholarship-sage-jamarrlmayes.replit.app
+student_pilot — https://student-pilot-jamarrlmayes.replit.app
+provider_register — https://provider-register-jamarrlmayes.replit.app
+auto_page_maker — https://auto-page-maker-jamarrlmayes.replit.app
+auto_com_center — https://auto-com-center-jamarrlmayes.replit.app
+Common deliverables (produce for your app only)
+
+Readiness report file: evidence/APPNAME_READINESS_REPORT_YYYYMMDD.md
+Header line: “APP_NAME — APP_BASE_URL”
+Sections: Health and uptime; Performance (P50/P95, n≥25 per key endpoint); Security headers; API docs; SEO (if public); Key integrations validated; Issues by severity; Fix plan with ETAs; Go/No‑Go decision for today; ARR ignition prerequisites.
+JSON manifest: evidence/APPNAME_manifest.json
+Include: app, base_url, version (if available), health schema, endpoints, dependencies, measured latency summary, SLO pass/fail, open issues, owner contacts.
+Ticket list (inside the report): each item should have title, severity (P0/P1/P2), evidence link, owner, fix steps, ETA.
+How to work with this prompt
+
+Identify your app by exact section title below. Only execute that section’s checklist and outputs.
+For each measurement, run at least 25 samples per endpoint in a 5–10 minute window. Report P50/P95/P99 and min/max, plus sample size and timestamp.
+If today’s readiness is blocked, clearly state “NOT READY TODAY” with a realistic ETA (in hours or date/time window) and list all third‑party and cross‑team prerequisites to unblock.
+Readiness gates (apply to your app)
+
+G0: /health returns JSON with {app, status, version}, 200 OK, no auth required.
+G1: /readyz returns 200 OK only when all dependencies are healthy; JSON format; no auth required.
+G2: Performance SLO met: P95 ≤ 120 ms on /health and primary read endpoints.
+G3: Security headers present: HSTS, CSP, X‑Content‑Type‑Options, X‑Frame‑Options (or equivalent COOP/CORP), Referrer‑Policy, Permissions‑Policy. CORS correctly scoped.
+G4: Integrations validated: the contracts your app consumes/serves are verified live with test calls.
+G5: Observability: /version exists; trace/request IDs logged; error response schema standardized; metrics endpoint or logging available.
+Public apps only: SEO basics (robots.txt, sitemap.xml, canonical tags, meta description, Open Graph, JSON‑LD where relevant).
+ARR ignition definition (what you must assert for your app)
+
+Your app’s role in revenue:
+B2C: student acquisition, engagement, credits/ARPU lift, application throughput.
+B2B: provider onboarding, listing throughput, payout/pricing, and 3% platform fee enablement.
+Confirm your app can support the dual‑engine growth model today, or give precise ETA and dependencies (e.g., Stripe, email/SMS, CDN, Search Console).
+SECTION: scholar_auth — https://scholar-auth-jamarrlmayes.replit.app
+Scope you own
+
+Identity provider (OIDC): /.well-known/openid-configuration, /authorize, /token, /userinfo, /jwks.json.
+First‑party clients: student_pilot, provider_register, scholarship_api (JWT validation).
+Cookies: SameSite, Secure, HTTPOnly; session TTL and refresh. Checklist
+Health/SLO: Verify /health, /readyz, /version; measure P50/P95 (n≥25). If P95 > 120 ms, profile cold vs warm. Propose concrete fixes (e.g., keep‑alive, connection pooling).
+Security: Confirm HSTS, CSP, cookie flags, CORS allowlist to 8 platform origins, correct issuer and audience claims.
+OIDC flows: Validate auth code + PKCE to student_pilot and provider_register using test client IDs; JWKS reachable by scholarship_api.
+Rate limiting and lockout: Brute force protections enabled; passwordless/email magic link if used.
+Outputs: Map client apps, redirect URIs, scopes. Publish JWKS URL, issuer, and example validated token (redacted). Third‑party prerequisites
+Email provider (for OTP/magic links): Postmark/SendGrid/SES
+Monitoring: Sentry/Datadog; Uptime checks
+Optional: Cloudflare CDN/edge cache for static assets Go/No‑Go
+If No‑Go, ETA in hours and exact steps (e.g., “reduce P95 from 128 ms→100 ms via X”). ARR impact
+Unlocks all authenticated flows; critical to both B2C conversion and B2B onboarding.
+SECTION: scholarship_api — https://scholarship-api-jamarrlmayes.replit.app
+Scope you own
+
+Core data plane: scholarship listings, search/filter, applications, provider CRUD, webhooks to auto_com_center. Checklist
+Health/SLO: /health, /readyz, /version; P50/P95 (n≥25) on:
+GET /v1/scholarships?limit=10
+GET /v1/providers?limit=10
+Any hot paths used by student_pilot
+API quality: /openapi.json exists, 2xx on docs; error schema standardized.
+AuthN/Z: Validates scholar_auth JWTs; audience, scope checks; 401/403 paths verified.
+Data: Seed minimal records so student_pilot can render at least 10 live scholarships by category.
+Caching: Enable/verify CDN or application cache for list endpoints. Confirm ETag/Cache‑Control.
+Integrations: Outbound events to auto_com_center; inbound auth from scholar_auth; consumed by student_pilot and provider_register. Third‑party prerequisites
+Database (Postgres) with indexes; optional search (Meilisearch/Elastic)
+Observability: APM (Datadog), logs with request IDs Go/No‑Go
+Must provide working GET /v1/scholarships and filters today or ETA. ARR impact
+Blocks/unblocks student discovery funnel and provider marketplace inventory.
+SECTION: scholarship_agent — https://scholarship-agent-jamarrlmayes.replit.app
+Scope you own
+
+Autonomous marketing and campaign operations triggering auto_page_maker and auto_com_center; provider outreach; SEO content scheduling. Checklist
+Health/SLO: /health, /readyz, /version; confirm /readyz returns JSON (not HTML); latency P95 ≤ 120 ms.
+Campaigns: Dry‑run mode present; idempotency; scheduling cadence to feed auto_page_maker.
+Integrations: Writes to auto_com_center queue; reads from scholarship_api; respects opt‑out and consent.
+Safety: No spam; rate limiting per provider; content quality checks. Third‑party prerequisites
+Queue/broker (e.g., Redis/Cloud task) or internal scheduler
+Email/SMS dispatcher via auto_com_center Go/No‑Go and ARR
+Must demonstrate 1 pilot campaign executed in dry‑run with generated content feed for auto_page_maker.
+SECTION: scholarship_sage — https://scholarship-sage-jamarrlmayes.replit.app
+Scope you own
+
+AI guidance for students; matching and application strategy; must avoid academic dishonesty. Checklist
+Health/SLO: Eliminate cold‑start > 120 ms P95 via warmers/keep‑alive; output /health with model/version.
+AI integrity: Safety filters, citation mode, no ghostwriting. Logging of prompts with privacy safeguards.
+Integrations: Reads from scholarship_api; optional vector DB for personalization; does not store PII without consent. Third‑party prerequisites
+LLM provider (OpenAI/Anthropic) with API keys and usage limits
+Vector store (Pinecone/PGVector) if used Go/No‑Go and ARR
+Demonstrate one live session producing a compliant, actionable plan and links to at least 5 scholarships.
+SECTION: student_pilot — https://student-pilot-jamarrlmayes.replit.app
+Scope you own
+
+Student web app; authentication, discovery, shortlisting, and application workflow; SEO for top entry pages. Checklist
+Health/SLO: /health, /readyz, /version; P95 ≤ 120 ms on first meaningful paint APIs; verify robots.txt and sitemap.xml.
+SEO: Title, meta description, canonical, Open Graph; fix any “undefined/sitemap.xml”.
+Auth: OIDC login to scholar_auth; secure cookies; logout.
+Data: Lists render via scholarship_api; shortlist and “save” in dry‑run test mode.
+Analytics: GA4 events for visit→signup→application funnel; privacy mode for minors (COPPA considerations). Third‑party prerequisites
+GA4, Search Console; CDN; error tracking (Sentry) Go/No‑Go and ARR
+Confirm frictionless path: land → login → view 10+ scholarships → start application.
+SECTION: provider_register — https://provider-register-jamarrlmayes.replit.app
+Scope you own
+
+Provider onboarding, listing creation, and verification; Stripe Connect readiness for payouts/fees. Checklist
+Health/SLO: /health, /readyz, /version; P95 ≤ 120 ms on form loads and provider GETs.
+Auth: OIDC with scholar_auth; roles/permissions.
+Forms: Validation, file upload (logos/docs), TOS consent, audit trail.
+Payments: Stripe Connect account link creation in sandbox; 3% platform fee path validated (test mode).
+Integrations: Calls scholarship_api; triggers auto_com_center on approval. Third‑party prerequisites
+Stripe (test), storage (S3 or equivalent), email via auto_com_center Go/No‑Go and ARR
+Confirm at least one test provider onboarded end‑to‑end in sandbox with a draft listing visible in scholarship_api.
+SECTION: auto_page_maker — https://auto-page-maker-jamarrlmayes.replit.app
+Scope you own
+
+Programmatic SEO engine: generate category/location/topic scholarship pages; sitemaps; canonicalization. Checklist
+Health/SLO: /health, /readyz, /version; fix any P95 > 120 ms; add CDN and pre‑render caching if needed.
+SEO: robots.txt, sitemap.xml with ≥ 500 URLs; canonical tags; JSON‑LD (BreadcrumbList + Article/FAQ where relevant); clean internal links.
+Content quality: No thin/duplicate content; clear CTAs into student_pilot; verify 200 OK on a random sample of ≥ 30 pages.
+Integrations: Pull content from scholarship_api or internal store; publish to Search Console. Third‑party prerequisites
+CDN (Cloudflare), Search Console/Bing Webmaster, GA4 Go/No‑Go and ARR
+Confirm “ARR ignition” by publishing sitemap and verifying index coverage submission.
+SECTION: auto_com_center — https://auto-com-center-jamarrlmayes.replit.app
+Scope you own
+
+Transactional and campaign communications hub (email/SMS/notifications); webhooks for bounces/complaints. Checklist
+Health/SLO: /health, /readyz, /version; P95 ≤ 120 ms; /readyz must not require auth.
+Providers: Configure DKIM/SPF/DMARC; test send in sandbox; process webhooks (bounce, spam complaint).
+API: Inbound messages from scholarship_agent and scholarship_api; idempotent, retriable queues; message logs with request IDs. Third‑party prerequisites
+Email (Postmark/SendGrid), SMS (Twilio), domain DNS for DKIM/SPF/DMARC, queue/broker Go/No‑Go and ARR
+Confirm 3 sample transactional messages (signup, shortlist, provider approved) delivered to sandbox inbox/SMS with correct templates and links.
+Output format (mandatory for your app)
+At the top of every artifact:
+
+“APP_NAME — APP_BASE_URL”
+Example: “scholarship_api — https://scholarship-api-jamarrlmayes.replit.app”
+Within your readiness report include:
+
+Today Go/No‑Go decision:
+If Go: “READY TODAY — GO LIVE” and list exact steps you executed.
+If No‑Go: “NOT READY TODAY” with precise ETA and all blocking dependencies.
+ARR ignition statement:
+Describe how your app enables $10M ARR plan now; or give the ETA and third‑party systems needed before ignition.
+Time expectations
+
+Target: Achieve Go Live today. If any third‑party items require propagation or sandbox approvals (e.g., DKIM, Stripe Connect), provide a realistic window:
+DNS/DKIM: 2–24 hours
+Search Console coverage: submit now; indexing begins within hours to days
+Stripe Connect onboarding: same‑day in test; 1–2 days for production compliance
+Begin
+
+Identify your section by exact app name.
+Execute the checklist for your app only.
+Produce the two deliverables: evidence/APPNAME_READINESS_REPORT_YYYYMMDD.md and evidence/APPNAME_manifest.json with your measured results, decision, ETA/ARR ignition, and third‑party prerequisites.
+Do not include or modify other apps’ outputs.
