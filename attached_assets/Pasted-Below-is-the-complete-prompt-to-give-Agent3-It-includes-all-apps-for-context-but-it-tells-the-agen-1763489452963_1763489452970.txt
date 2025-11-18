@@ -1,0 +1,207 @@
+Below is the complete prompt to give Agent3. It includes all apps for context, but it tells the agent to execute only the section for their app. You can reuse the same prompt for all agents; each will follow the “FOR: <app> (AgentX)” section that applies to them.
+
+BEGIN PROMPT FOR ALL AGENTS (Agent3 will only execute the scholarship_agent section)
+
+Important identity and scoping rules
+
+You are Agent3.
+You must only read and execute the section labeled: FOR: scholarship_agent (Agent3).
+Ignore all other app sections. Do not run tests for any other app.
+Your sole mission: run a full end-to-end (E2E) test on your app, including both frontend and backend, identify every bug/error, and produce a comprehensive report. Do not make any code or configuration changes.
+If you determine the app cannot be 100% production-ready today, you must estimate the time to be ready to start generating revenue (assumed “start” if the source said “stop”) and list the third-party systems and credentials that must be in place.
+Global app directory (for cross-app references only; each Agent must stay within their section)
+
+scholar_auth (Agent1) → https://scholar-auth-jamarrlmayes.replit.app
+scholarship_api (Agent2) → https://scholarship-api-jamarrlmayes.replit.app
+scholarship_agent (Agent3) → https://scholarship-agent-jamarrlmayes.replit.app
+scholarship_sage (Agent4) → https://scholarship-sage-jamarrlmayes.replit.app
+student_pilot (Agent5) → https://student-pilot-jamarrlmayes.replit.app
+provider_register (Agent6) → https://provider-register-jamarrlmayes.replit.app
+auto_page_maker (Agent7) → https://auto-page-maker-jamarrlmayes.replit.app
+auto_com_center (Agent8) → https://auto-com-center-jamarrlmayes.replit.app
+Unified reporting requirements (apply to every agent)
+
+Every output, log, and report must begin with the app name and its APP_BASE_URL in the exact format: [APP_NAME] — [APP_BASE_URL] Example for Agent3: scholarship_agent — https://scholarship-agent-jamarrlmayes.replit.app
+Deliverables you must produce at the end:
+Executive summary: readiness verdict (Ready Today / Not Ready), and single-sentence reason.
+E2E Test Plan: what you tested (frontend, backend, integrations), with explicit scenarios and coverage.
+Test Execution Log: timestamped step-by-step actions, endpoints, payloads, responses, UI paths, screenshots or HAR references where applicable.
+Defect Register: for every bug/error, include severity (Critical/High/Medium/Low), exact steps to reproduce, expected vs actual, environment, request/response, stack traces or console logs, and suspected root cause. No code changes—just the suspected cause and proposed fix approach.
+Integration Compatibility Matrix: which upstream/downstream apps you exercised, data passed between them, and results.
+Non-functional results: performance (p95 latency target ~120ms), basic reliability checks (no crashes under normal usage), and basic security checks (auth/session, CORS, headers).
+Third-party readiness checklist: enumerate all required external systems, their purpose, and whether they are configured and reachable; list missing keys/webhooks and blockers.
+Revenue start ETA: if not ready today, provide the estimate (in hours/days) to be ready to start generating revenue and list the critical-path fixes and external dependencies. Provide reasoning tied to defect severities and scope.
+E2E quality bar (applies to every agent)
+
+No Critical or High severity defects open.
+p95 API latency close to ~120ms on main user flows; note any higher latencies and their endpoints.
+No broken visual or functional flows on primary happy paths.
+Authentication, session handling, and CORS function correctly.
+Traceability: every defect has reproducible steps and captured evidence.
+Data handling and safety constraints
+
+Do not modify source code or persistent configuration.
+Use temporary test data where writes are necessary. Clearly namespace test data with prefix E2E_TEST_ and clean up if deletion endpoints exist. If not, note cleanup gaps in the Defect Register.
+Do not expose secrets in the report. Redact tokens except last 6 characters.
+Use only publicly reachable endpoints and UIs unless credentials are explicitly provided. If credentials are absent for a required flow, document the gap and block.
+Cross-app dependencies (for context; each agent tests only their app’s interactions)
+
+scholar_auth: account creation, login, tokens, session, CSRF, OAuth/OIDC if applicable.
+scholarship_api: listing/search/filtering of scholarships; CRUD where applicable; pagination, sorting, and relevance.
+scholarship_agent: marketing and growth orchestration; campaign lifecycle, content generation, channel dispatch (email/SMS), conversion tracking.
+scholarship_sage: AI guidance, drafting essays and guidance; LLM usage and costs.
+student_pilot: student dashboard, scholarship discovery, application progress, notifications.
+provider_register: provider onboarding, verification, listing creation, fee assessments.
+auto_page_maker: SEO landing pages at scale, sitemaps, UTM links, internal linking.
+auto_com_center: email/SMS/webhook delivery; bounce/complaint handling; templating; throttling.
+Acceptance: You must explicitly state “Ready Today” or “Not Ready” and provide exact blockers.
+
+FOR: scholarship_agent (Agent3)
+
+Identify yourself and your base URL on all outputs: scholarship_agent — https://scholarship-agent-jamarrlmayes.replit.app
+Mission
+
+Perform a complete E2E test of scholarship_agent, covering both frontend and backend and its integrations with:
+scholar_auth for signup/login/session.
+auto_page_maker for landing page creation and UTM-bearing links.
+auto_com_center for campaign delivery (email/SMS/webhooks).
+scholarship_api for scholarship content retrieval to power messages/pages.
+student_pilot for conversion tracking (new student signups, returning users).
+Do not change code or settings. Discover, test, and report.
+Step 1 — Service discovery and health
+
+Probe:
+GET / (frontend availability; record HTTP status, load time, console errors).
+GET /health or /status (record JSON and HTTP status if present).
+GET /docs or /openapi.json (capture existence and endpoints).
+GET /metrics if available (note key counters and timings).
+Validate:
+TLS/HTTPS works; no mixed content.
+CORS policy allows intended clients and blocks others properly.
+Security headers: Content-Security-Policy, X-Frame-Options, X-Content-Type-Options, Referrer-Policy, Permissions-Policy present and sane.
+Rate limiting headers (if present) and behavior under a small burst test (e.g., 10–20 requests quickly). Note observed p95 latency.
+Step 2 — Authentication and session (via scholar_auth)
+
+From the scholarship_agent UI, trigger any flow that requires auth and confirm redirect and return to app.
+Validate:
+New user journey using a unique test email: E2E_TEST_agent3_<timestamp>@example.com (avoid real providers).
+Session established via secure cookies or Authorization header; flags include Secure, HttpOnly, SameSite=Lax/Strict as appropriate.
+Token refresh works; expired token behavior shows proper 401/refresh path.
+If interactive login is blocked by missing credentials, document the gap and continue with anonymous flows, noting reduced coverage.
+Step 3 — Campaign lifecycle (core of scholarship_agent)
+
+Attempt end-to-end campaign creation:
+Create a campaign: name, objective (student signups, provider leads), target segment, budget, start/end, channels (email/SMS/web).
+Add content: leverage scholarship_api for scholarship data (titles, deadlines) and/or scholarship_sage for copy suggestions if integrated.
+Create or select landing page through auto_page_maker with UTM parameters (utm_source=scholarship_agent, utm_campaign=<campaign_id>, utm_medium=email/sms).
+Configure delivery via auto_com_center: templates, sender identity, throttling, suppression rules.
+Execute a dry-run/preview if supported; confirm personalization tokens render (first name, scholarship name, deadline).
+Launch a limited test send to the test email/number (if test channel exists) or use a sandbox mode. If not available, document the limitation.
+Step 4 — Distribution and tracking (auto_com_center, scholar_auth, student_pilot)
+
+Verify messages queued and dispatched:
+Inspect any outbox/logs in auto_com_center: message status, provider message IDs, error/bounce logs.
+Confirm webhooks configured (delivered, bounced, complained). If webhooks not set up, note required endpoints and secrets.
+Click-through journey:
+From a sent message (or preview link), follow UTM-bearing link to auto_page_maker landing page. Confirm page loads and UTM parameters persist through redirects.
+Convert: sign up or sign in via scholar_auth. Confirm that the UTM parameters are captured in the session or analytics.
+Land in student_pilot; ensure conversion is attributed back to scholarship_agent campaign (verify analytics or internal reporting if provided).
+Step 5 — Analytics and ROI computation
+
+Validate campaign analytics:
+Impressions, sends, deliveries, opens, clicks, conversions, cost, revenue/ARPU assumptions, and ROI.
+Cross-check a sample of events with any analytics provider (e.g., GA4/PostHog) if present; verify event names, parameters, and UTM capture.
+Confirm attribution window logic (e.g., 7-day click, 1-day view) and uniqueness logic (idempotency).
+Step 6 — Error handling, retries, idempotency
+
+Induce safe, controlled failures:
+Temporarily call an endpoint with invalid parameters to verify descriptive errors (4xx/5xx with correlation ID).
+Trigger a duplicate send with the same idempotency key and confirm the system does not double-send.
+Network blip simulation: quickly retry a failed call and check exponential backoff or retry policies.
+Record how the system surfaces errors in UI and logs.
+Step 7 — Frontend quality checks
+
+Load key pages: dashboard, campaign creation/edit, audience selection, template editor, analytics.
+Check for:
+JS console errors/warnings, missing assets, broken routes.
+Responsive design on mobile viewport and desktop.
+Accessibility spot-checks (tab order, focus states, alt text on key interactive elements).
+Lighthouse or basic perf metrics; note any large bundles or render-blocking issues.
+Step 8 — Performance sampling
+
+For 3–5 hot endpoints (campaign create, list, send/queue, analytics fetch):
+Send 10 requests each with modest concurrency (≤5).
+Capture average, p95 latency; note any error rates, timeouts, or spikes.
+Record caching headers (ETag/Last-Modified/Cache-Control) and server timing if available.
+Step 9 — Security and compliance basics
+
+Confirm JWT signature validation (if visible via JWKS discovery) or session integrity.
+Verify CSRF protection on state-changing operations (POST/PUT/DELETE).
+Confirm PII in transit only over HTTPS and not exposed in URLs beyond necessary UTM.
+Check that API keys or LLM keys are not exposed in client code.
+Note any data retention logs and whether suppression/unsubscribe flows work to satisfy CAN-SPAM/CASL and COPPA/FERPA awareness where applicable.
+Bug/defect severity rubric
+
+Critical: prevents primary revenue-generating flow or causes data loss or security breach.
+High: major feature broken with no feasible workaround.
+Medium: functionality works with degraded UX or a workaround.
+Low: cosmetic or minor usability/performance nit.
+Third-party systems to verify or call out (mark Present/Configured/Working vs Missing)
+
+Payments and monetization: Stripe (subscriptions, metered usage, 3% provider fee), webhook endpoints and signing secret.
+Email: SendGrid/Postmark/AWS SES; sender domains authenticated (SPF/DKIM/DMARC), suppression lists, bounce/complaint webhooks.
+SMS: Twilio; messaging service SID, compliance settings, status callbacks.
+Analytics and attribution: GA4 and/or PostHog; UTM capture, conversion events, funnels.
+Error monitoring/observability: Sentry/Datadog/Logtail; release version tagging, alerting.
+Caching/search: Redis for queues/caching; Algolia/OpenSearch for scholarship indexing if used.
+LLM/AI: OpenAI/Azure/OpenRouter keys; rate limits; cost guardrails; model fallbacks.
+Storage/hosting/CDN: S3/Replit/Vercel/Cloudflare configs; public asset caching and invalidation; sitemap submission for auto_page_maker.
+Webhooks: Confirm endpoints, secrets, and retry policies across providers.
+Readiness decision and ETA
+
+If zero Critical/High defects remain and p95 latency is near target, declare Ready Today.
+Otherwise, provide:
+A prioritized fix list with severity and scope.
+A realistic engineering ETA per item and a total to reach “Ready to start generating revenue.”
+Any external dependencies (e.g., “Stripe webhooks not configured; requires dashboard access”).
+A rollback/hold recommendation if revenue exposure would risk brand or compliance.
+Output formatting requirements
+
+Title every artifact and section with: scholarship_agent — https://scholarship-agent-jamarrlmayes.replit.app
+Provide:
+Environment: base URL above, date/time UTC, any build/version identifiers visible in headers.
+For each test: endpoint, method, request body (redacted), response status/body (truncated if large), timing, correlation/request ID if available.
+For UI: exact navigation path, screenshots or console log excerpts (text).
+End with the final verdict line: Final Verdict: Ready Today | Not Ready — [one-sentence justification] Revenue Start ETA (if Not Ready): [hours/days] and critical blockers list.
+Stop here. Do not execute other app sections below.
+
+FOR: scholar_auth (Agent1) — ignore if you are not Agent1
+
+Run full E2E on auth flows: signup, login, email verification, password reset, session/cookie flags, OIDC/JWT, CSRF, CORS.
+Cross-app: validate token acceptance by scholarship_agent, student_pilot, provider_register.
+FOR: scholarship_api (Agent2) — ignore if you are not Agent2
+
+E2E on scholarship catalog: ingestion, CRUD, search, filters, pagination, SEO fields.
+Cross-app: ensure scholarship_agent and student_pilot can query with expected latency.
+FOR: scholarship_agent (Agent3) — this is your active section (see full instructions above)
+
+FOR: scholarship_sage (Agent4) — ignore if you are not Agent4
+
+E2E on AI guidance: prompt input, response streaming, guardrails, cost tracking, content export to student_pilot and scholarship_agent.
+FOR: student_pilot (Agent5) — ignore if you are not Agent5
+
+E2E on student dashboard: onboarding, scholarship discovery, application tracking, notifications, payments if any.
+FOR: provider_register (Agent6) — ignore if you are not Agent6
+
+E2E on provider onboarding: KYC/verification, listing creation, fees, payout configuration.
+FOR: auto_page_maker (Agent7) — ignore if you are not Agent7
+
+E2E on page generation: template rendering, sitemap, canonical tags, UTM passthrough, internal links to student_pilot.
+FOR: auto_com_center (Agent8) — ignore if you are not Agent8
+
+E2E on messaging: templates, sends, throttling, bounces/complaints webhooks, suppression, deliverability metrics, link tracking with UTM.
+END PROMPT FOR ALL AGENTS
+
+Notes from CEO
+
+The bar is 100% functional alignment across apps. If “Ready Today” isn’t feasible, your ETA must be grounded in defect counts and severities plus third-party setup status. Prioritize the critical revenue paths (student acquisition via scholarship_agent and organic SEO via auto_page_maker) in your analysis.
