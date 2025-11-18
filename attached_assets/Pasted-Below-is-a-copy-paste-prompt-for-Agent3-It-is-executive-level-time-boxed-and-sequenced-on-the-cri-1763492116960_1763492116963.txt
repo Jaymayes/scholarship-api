@@ -1,0 +1,115 @@
+Below is a copy‑paste prompt for Agent3. It is executive‑level, time‑boxed, and sequenced on the critical path so we can reach “apps 100% ready and working together” as fast as possible. If you cannot complete all scope today, you must provide a precise ETA and a rollback/contingency plan.
+
+Prompt for Agent3 (Principal Engineer + Release Captain)
+
+Role and mandate
+
+You are Agent3, acting as Principal Engineer and Release Captain for scholarship_api and its integrations. Your mandate is to drive the platform to production‑ready today, or provide a precise ETA and a mitigation plan to unblock revenue.
+North Star: Achieve a production‑ready release that enables student discovery (search), scholarship detail views, and authenticated sessions that can scale, monitor, and be verified via CI/CD. This ties directly to our ARR plan by unblocking core user value that converts and powers B2B partner flows, per the company playbook’s focus on activation and platform operations to grow ARR efficiently .
+Context from the E2E test (today)
+
+Readiness: Not production‑ready. Two P0 blockers; several P1 issues.
+P0 blockers:
+auth_jwks degraded (0 keys loaded) → JWT validation broken.
+/version endpoint missing → deployment verification and observability broken.
+P1 issues: 3) /api/v1/search returns empty → core search nonfunctional. 4) Redis connection refused → rate‑limiting falls back to in‑memory (non‑prod). 5) Scholarship detail fields null due to name/title mismatch → UI cannot render details.
+Performance/Security: Latency well under SLO; security headers/TLS strong; DB healthy. We must preserve these strengths.
+Success criteria (acceptance tests you must pass before release)
+
+Authentication and keys
+JWKS auto‑loads ≥1 valid signing key from scholar_auth; /readyz returns status “ok,” keys_loaded ≥1.
+Valid JWTs are accepted; invalid/expired/revoked tokens are rejected with correct status codes.
+Observability
+Implement /version returning: semantic version, git SHA, build timestamp, environment. CI/CD health checks pass against it.
+Core functionality
+/api/v1/search returns relevant results for realistic queries (e.g., “engineering,” “first‑gen,” “STEM”), with pagination and non‑empty payloads.
+Scholarship detail endpoint returns non‑null fields (title, provider, deadline, award_amount, eligibility) consistent with list schema.
+Resilience and rate limiting
+Redis‑backed rate limiting active and healthy; fallback only if Redis is unavailable, with exponential backoff + retries and circuit‑breaker semantics per resilient microservice guidance .
+Non‑functional
+P95 latency ≤120ms on /health, /search, and scholarship detail (10‑minute rolling sample).
+Security headers unchanged; TLS 1.3 enforced end‑to‑end per zero‑trust guidance (no secrets in code; keys via environment) .
+CI/CD and tests
+CI pipeline green with unit/integration/E2E layers, and a smoke test suite that gates deploys, aligning to modern DevOps testing practices .
+Execution plan (do these in order)
+
+P0: Fix JWKS integration (highest priority)
+
+Verify JWKS_URL env var is correct and reachable from scholarship_api runtime.
+Implement robust JWKS fetch with retries (exponential backoff: 100ms→1.6s, jitter) and cache/refresh on TTL; trip a circuit breaker if repeated failures occur to protect request path .
+Add telemetry: metrics for keys_loaded, last_refresh_timestamp, jwks_fetch_failures.
+Validate with an end‑to‑end JWT issuance from scholar_auth → call a protected endpoint.
+P0: Implement /version
+
+Add GET /version returning version, git SHA, build time, environment.
+Wire CI/CD health check to assert /version returns SHA that matches the deployed artifact.
+P1: Restore search functionality
+
+Investigate query path for /api/v1/search: data source, query builder, filters, default limits, and mapping layer.
+Add unit tests for query parsing; add integration test with seeded fixtures; confirm non‑empty results and relevance ranking.
+Expose pagination (page, per_page) and return total_count for UX.
+P1: Provision and wire Redis for rate limiting
+
+Provision managed Redis (e.g., Upstash/AWS). Set REDIS_URL via secrets (no plaintext in source) per Replit Secrets guidance for inter‑service credentials .
+Enable connection health checks; add retry/backoff; log clear events when falling back to in‑memory and raise an alert.
+P1: Fix scholarship detail field contract
+
+Align list and detail schema: standardize on title vs name and ensure provider, deadline, award fields are populated consistently.
+Add contract tests to prevent regressions.
+Hardening and guardrails
+
+Add 429 responses for rate limits; verify headers (Retry‑After) and safe degradation.
+Ensure all sensitive config via environment; confirm no secrets committed.
+Validate security posture remains intact (headers + TLS) per security framework .
+Tests you must add/run
+
+Unit: JWKS loader, search query parsing, schema mappers.
+Integration: scholar_auth → JWT → protected endpoints; DB → search; Redis rate limiter online/offline.
+System/E2E: Unauthenticated pages, login, search, detail, error paths; run as part of CI and again post‑deploy, consistent with STLC and layered testing best practices .
+Observability, CI/CD, and release process
+
+Metrics: auth success/fail, JWKS refresh metrics, search queries/success rate, Redis availability, P50/P95 latency.
+Alerts: auth failure spike, Redis down, search zero‑results anomaly, latency SLO breach.
+CI gates: unit + integration + smoke E2E must pass; /version must match SHA; health checks green.
+Release: deploy to staging; run smoke; canary (5–10% traffic/5–10 min); full rollout; monitor for 30–60 minutes.
+Reporting cadence to CEO
+
+Every 60 minutes post a short update: status vs plan, blockers, decisions needed, and any scope risks.
+On completion, deliver: changelog, defect fixes, test run links, final readiness decision, and rollback plan.
+Timeline and decision gates
+
+If you start immediately:
+P0 critical path (JWKS + /version): 3–5 hours.
+Full P0+P1 readiness (including search, Redis, field contract): 8–12 hours total.
+Today feasibility:
+If team bandwidth is ≥2 engineer equivalents for the next 8–10 hours, target “ready today.”
+If bandwidth is 1 engineer or environment provisioning is delayed, commit to “ready within 1–2 business days,” and schedule a timeboxed release window tomorrow.
+If “ready today” is not achievable, you must deliver by end of day:
+A precise ETA window (e.g., tomorrow 2–6 PM local).
+A contingency plan to ship P0 fixes today and open an A/B or waitlist that captures interested users, preserving near‑term revenue intent.
+Risk and rollback plan
+
+Rollback criteria: auth failure rate >2% sustained, search success rate <90% after canary, Redis unavailable >10 minutes with error rates rising.
+Rollback method: immediate revert to last known good build; invalidate cache; rotate keys only if auth compromise suspected; post‑mortem within 24 hours.
+Fallbacks: if Redis fails, maintain degraded rate limiting but gate traffic behind modest request ceilings; if search degrades, surface curated fallback results and message users that advanced filters are temporarily limited, applying resilience patterns to avoid cascading failures .
+Revenue‑unlock alignment
+
+Fixing authentication + search + detail unblocks student discovery and application flow, our primary value driver for conversion and B2B partner satisfaction per the playbook’s growth engine and operational KPIs .
+Confirm that analytics events for search impressions, details viewed, and saved scholarships are firing, as these are leading indicators of activation that drive monetization later in funnel.
+Decision request from CEO
+
+Execute the above plan immediately. If you cannot deliver production‑ready today, respond with:
+Exact ETA (date/time window).
+Remaining scope by item with estimated hours.
+Any external dependencies (e.g., Redis provisioning) blocking you and your mitigation.
+The minimal “P0‑only” deployment you can ship today and what it enables for users.
+Notes and references you must observe
+
+Use environment secrets, not code‑embedded credentials; secure service‑to‑service traffic; implement retry/backoff and circuit breaker protections in network paths to avoid cascading failures in distributed services .
+Maintain zero‑trust security posture (TLS 1.3, proper key/session management) and do not regress our current security headers .
+Keep CI/CD green and fast; treat the pipeline as a product with reliable automated gates for quality .
+Align outcomes to our strategic plan: production reliability and speed directly support our ARR roadmap and partner trust, which are explicit priorities in our current playbook .
+CEO ETA and release decision
+
+If you begin now, I expect P0 fixes within 3–5 hours and full readiness in 8–12 hours. If today’s window is insufficient, the firm ETA is 1–2 business days to “fully ready,” with P0 shipped today and P1 by tomorrow. Provide your hour‑by‑hour plan and confirm the deployment window.
+I will run the final E2E smoke and acceptance tests once you report readiness.

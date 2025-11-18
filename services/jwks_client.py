@@ -193,12 +193,21 @@ class JWKSClient:
         - If cache is stale but within max_age, return stale + trigger background refresh
         - If cache is expired (>max_age), block and refresh
         
+        Lazy initialization: If cache is empty (first use), trigger prewarm
+        
         Args:
             kid: Key ID from JWT header
         
         Returns:
             RSA key object or None if key not found
         """
+        # Lazy initialization - prewarm on first use if cache is empty
+        if not self._keys and self._cache_timestamp == 0:
+            logger.info("🔐 LAZY INIT: JWKS cache empty - triggering first-time prewarm")
+            await self._refresh_keys()
+            if not self._keys:
+                logger.error(f"LAZY INIT FAILED: No keys loaded from {self.jwks_url}")
+        
         # Fast path: fresh cache
         if self._is_cache_fresh():
             return self._keys.get(kid)

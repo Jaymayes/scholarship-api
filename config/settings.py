@@ -88,7 +88,7 @@ class Settings(BaseSettings):
     
     # OAuth2/OIDC Configuration - scholar_auth JWKS validation (CEO Nov 13)
     scholar_auth_jwks_url: str = Field(
-        "https://scholar-auth-jamarrlmayes.replit.app/.well-known/jwks.json",
+        "https://scholar-auth-jamarrlmayes.replit.app/oidc/jwks",
         alias="SCHOLAR_AUTH_JWKS_URL"
     )
     scholar_auth_issuer: str = Field(

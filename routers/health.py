@@ -486,6 +486,15 @@ async def readiness_probe(db: Session = Depends(get_db)) -> dict[str, Any]:
         # CEO Nov 13: Check JWKS/Auth dependency
         try:
             from services.jwks_client import jwks_client
+            
+            # Trigger lazy prewarm if cache is empty (first-time initialization)
+            if not jwks_client._keys and jwks_client._cache_timestamp == 0:
+                logger.info("🔐 READYZ: Triggering JWKS prewarm (first health check)")
+                try:
+                    await jwks_client.prewarm()
+                except Exception as prewarm_error:
+                    logger.error(f"JWKS prewarm failed in readyz: {prewarm_error}")
+            
             jwks_health = jwks_client.get_health_status()
             
             if jwks_health["jwks_cache_healthy"]:
