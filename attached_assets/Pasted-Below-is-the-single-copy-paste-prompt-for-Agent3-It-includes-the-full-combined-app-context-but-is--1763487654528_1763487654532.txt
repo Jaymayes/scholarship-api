@@ -1,0 +1,158 @@
+Below is the single, copy-paste prompt for Agent3. It includes the full combined-app context but is explicitly scoped so Agent3 will only execute SECTION-3 for scholarship_agent. Paste this into the Agent running inside the scholarship_agent workspace.
+
+MASTER INTEGRATION PROMPT (Combined Apps) — SECTION-3 Only For Agent3
+
+Read me first (critical scope rule)
+
+You are Agent3. Your responsibility is SECTION-3 for scholarship_agent only.
+Ignore every instruction that is not explicitly labeled “SECTION-3 — scholarship_agent”.
+Before doing anything: run the Identity Gate. If the gate fails, output exactly the mismatch message and make no changes.
+App inventory (for global context; do not act on these unless your section says so)
+
+scholar_auth → https://scholar-auth-jamarrlmayes.replit.app
+scholarship_api → https://scholarship-api-jamarrlmayes.replit.app
+scholarship_agent → https://scholarship-agent-jamarrlmayes.replit.app
+scholarship_sage → https://scholarship-sage-jamarrlmayes.replit.app
+student_pilot → https://student-pilot-jamarrlmayes.replit.app
+provider_register → https://provider-register-jamarrlmayes.replit.app
+auto_page_maker → https://auto-page-maker-jamarrlmayes.replit.app
+auto_com_center → https://auto-com-center-jamarrlmayes.replit.app
+Global SLOs and principles to honor
+
+Performance SLO: 99.9% uptime, ~120ms P95 latency or better per public endpoint.
+Responsible AI: bias mitigation, transparency, no academic dishonesty enablement.
+Security and privacy: FERPA/COPPA aware. Principle of least privilege.
+Growth priority: SEO-first (Auto Page Maker) and low CAC integrations.
+Reporting requirement: Every report you generate must self-identify with “scholarship_agent — https://scholarship-agent-jamarrlmayes.replit.app” on line 1.
+SECTION-3 — scholarship_agent (Agent3 executes only this section)
+
+0. Identity Gate (mandatory; first step)
+
+Expected App: scholarship_agent
+Expected APP_BASE_URL: https://scholarship-agent-jamarrlmayes.replit.app
+Verification actions (read-only checks):
+Confirm current workspace app identity via environment and/or /health and /version endpoints.
+Confirm that internal config or environment clearly indicates scholarship_agent (not any other app).
+If mismatch, stop immediately and output exactly: Workspace Mismatch — Expected SECTION-3 (scholarship_agent — https://scholarship-agent-jamarrlmayes.replit.app). No changes made.
+If it matches, continue.
+Deliverables (produce both; overwrite if they exist)
+evidence/scholarship_agent_YYYYMMDD_READINESS_REPORT.md
+First line must be: scholarship_agent — https://scholarship-agent-jamarrlmayes.replit.app
+Include sections A–I below in order, with all metrics, proofs, and links.
+evidence/scholarship_agent_manifest.json
+Strictly valid JSON. Include all fields specified in step 8.
+2. Environment, config, and metadata capture (A)
+
+Record app_name, app_version, git commit/short SHA (if available), deploy timestamp, runtime, region (if applicable).
+Record APP_BASE_URL, all public endpoints, and internal config knobs.
+Record DRY_RUN flag presence and current value. If no DRY_RUN exists, create a documented toggle in the report instructing how to emulate dry-run behavior.
+Record data stores and external dependencies referenced by this app (hostnames/URLs only; do not print secrets).
+3. Endpoint health and performance validation (B)
+
+Enumerate all public endpoints this app exposes (at least: /health, /readyz, /version, and any operational endpoints that power scholarship discovery/orchestration).
+For each endpoint:
+Make at least 25 sample calls in a controlled burst and a spaced cadence (e.g., 5x5).
+Record min, p50, p95, p99, max latency and HTTP status distribution.
+Confirm P95 ≤ 120ms. If any exceed, classify as P0/P1 and include a mitigation plan with owners and ETA.
+Record error_rate (5xx and 4xx separately).
+Add a latency table and a one-paragraph interpretation of bottlenecks.
+4. Security, CORS, and headers (C)
+
+Confirm standard security headers present on /version and /readyz: Strict-Transport-Security, X-Content-Type-Options, X-Frame-Options, Content-Security-Policy, Referrer-Policy, Permissions-Policy.
+Confirm CORS allowlist includes only platform origins (exactly these 8):
+https://scholar-auth-jamarrlmayes.replit.app
+https://scholarship-api-jamarrlmayes.replit.app
+https://scholarship-agent-jamarrlmayes.replit.app
+https://scholarship-sage-jamarrlmayes.replit.app
+https://student-pilot-jamarrlmayes.replit.app
+https://provider-register-jamarrlmayes.replit.app
+https://auto-page-maker-jamarrlmayes.replit.app
+https://auto-com-center-jamarrlmayes.replit.app
+If wildcard or non-platform origins are found, mark P0 and provide exact remediation steps.
+5. OAuth2/JWT readiness with scholar_auth (D)
+
+Discovery and JWKS:
+Retrieve OIDC discovery from scholar_auth and confirm jwks_uri, token_endpoint, issuer.
+Client credentials:
+Confirm configured client_id for scholarship_agent and verify that a CLIENT_SECRET is provisioned and usable.
+Attempt a client_credentials token request for scopes needed by scholarship_agent (minimum: scholarship.read, notify.send, agent.tasks). Do not print secrets; only record success/failure and token TTL.
+JWT validation:
+Verify audience, issuer, signature (via JWKS), and expiry checks work in scholarship_agent’s middleware or call path.
+If CLIENT_SECRET or any scope is missing, mark P0 blocker and capture exact remediation, owner, and ETA.
+6. Core platform integrations (E, F)
+
+scholarship_api integration (read):
+Identify endpoints this agent calls (e.g., /opportunities/search, /opportunities/{id}, or equivalents).
+In DRY_RUN mode: exercise representative queries, record latencies (min/p50/p95), status codes, and payload validation. Confirm P95 ≤ 120ms end-to-end.
+Validate error handling for 4xx/5xx paths. Include sample trace IDs (if available).
+auto_com_center integration (notify):
+In DRY_RUN mode: attempt to enqueue or send a canary notification with a test topic or sandbox channel. Record response, latency, and idempotency key usage.
+Confirm no production notifications are sent during DRY_RUN.
+scholar_auth integration:
+Confirm the token is attached properly to outbound requests and rotated before expiry.
+If DRY_RUN passes, document flip-to-live criteria and a minimal canary sending plan.
+7. Job orchestration and schedules (H)
+
+Enumerate all recurring or event-driven jobs scholarship_agent owns (e.g., scholarship refresh, ranking/eligibility scoring, follow-up reminders).
+For each job:
+Document purpose, schedule (cron or interval), timeout, retry/backoff policy, idempotency strategy, and DRY_RUN behavior.
+Execute a single DRY_RUN cycle per job and capture logs/evidence confirming no side effects in production systems.
+Define the exact condition to flip DRY_RUN=false and begin live operations (e.g., after OAuth client is provisioned and post-canary results <0.5% error rate for 30 minutes).
+8. Manifest JSON contents (I)
+
+Create evidence/scholarship_agent_manifest.json with the following fields:
+app_name, app_base_url, version
+endpoints: array of objects with path, method(s), min, p50, p95, p99, max, error_rate
+dependencies: array with name, type (http/db/cache/queue), url or host (no secrets), status, p95_latency
+security_headers: list present on /version and /readyz
+cors_allowlist: the exact 8 platform origins
+oauth2: discovery_url, jwks_url, issuer, token_endpoint, client_id_present (bool), client_secret_present (bool), scopes_required, token_ttl_seconds (if obtained), status
+jobs: array with name, schedule, retry_policy, idempotency_key_strategy, dry_run_validated (bool)
+issues: array with id, severity (P0–P3), component, description, owner, eta_utc, acceptance_criteria
+kpis: p95_latency_all_endpoints, uptime_target, error_rate_target, daily_job_success_rate_target
+go_no_go: decision (“GO TODAY” or “NO-GO TODAY”), decision_timestamp_utc, ready_eta_utc (if NO-GO), revenue_start_eta_utc (when this app can begin contributing ARR), rationale
+third_party_prerequisites: list of prerequisites with name, why_needed, owner, status
+arr_ignition_plan: 3-5 concrete steps this app will run in first 72 hours live to generate revenue (e.g., deadline reminders, nudges, curated opportunity bundles), with projected ARR impact assumptions
+9. Responsible AI and compliance checklist
+
+Document training/call boundaries: ensure no generation that assists in academic dishonesty.
+Bias mitigation: describe any fairness checks in ranking/matching logic (e.g., avoid proxy discrimination features).
+Data handling: describe PII fields, retention settings, and access controls.
+Include a one-paragraph statement on how student value is prioritized in scholarship matching and communications.
+10. GO/NO-GO decision and ETA
+
+If all blockers are resolved, set decision to “GO TODAY” and describe the activation plan (flip DRY_RUN, canary size/period, scale-up plan).
+If not, set decision to “NO-GO TODAY” and provide:
+exact ready_eta_utc (in ISO format within 24–72 hours unless a hard external dependency pushes later);
+revenue_start_eta_utc (when the app can begin to start generating revenue);
+the precise list of third-party systems and provisions still required (e.g., scholar_auth client secret, scopes, email provider key, Sentry DSN, monitoring checks).
+11. Third-party prerequisites (explicitly enumerate)
+
+scholar_auth (critical): client_id + client_secret for scholarship_agent; scopes: scholarship.read, notify.send, agent.tasks; discovery well-formed.
+scholarship_api: stable read endpoints accessible with valid bearer token.
+auto_com_center: channel/topic configured for scholarship notifications; sandbox topic for DRY_RUN.
+Infrastructure and observability: database (if needed), OpenAI API key (if used), error logging (e.g., Sentry), uptime monitoring, and rate-limit protection/CDN (if applicable).
+For each prerequisite: status, owner, ETA, and unblock steps.
+12. Output quality and naming
+
+All reports must self-identify as “scholarship_agent — https://scholarship-agent-jamarrlmayes.replit.app” on line 1.
+Use precise timestamps in UTC. Use ISO 8601 format.
+Do not print secrets anywhere. Mask tokens and secrets.
+Keep report actionable: every issue must have owner, ETA, and acceptance criteria.
+13. Success criteria for “100% ready today”
+
+Identity gate passes.
+All public endpoints p95 ≤ 120ms; error_rate ≤ 0.5%.
+Security headers validated; CORS restricted to 8 platform origins.
+OAuth2 client_credentials functional with required scopes.
+DRY_RUN validations passed for all jobs and integrations.
+Flip-to-live plan written with canary guardrails.
+Go/No-Go decision given; if NO-GO, provide specific ETA and third-party requirements to enable revenue start.
+Execution notes
+
+Make no code changes that alter behavior beyond read-only tests and DRY_RUN exercises; if a toggle is required, describe it in the report and request approval.
+If any step cannot be performed due to environment constraints, explicitly note it in both the report and manifest with the exact missing prerequisite and ETA.
+End of SECTION-3 — scholarship_agent instructions
+
+Reminder: If the Identity Gate fails, immediately output exactly:
+Workspace Mismatch — Expected SECTION-3 (scholarship_agent — https://scholarship-agent-jamarrlmayes.replit.app). No changes made.
