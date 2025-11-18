@@ -1,0 +1,162 @@
+Below is the unified, multi-app Master Orchestration Prompt. It is written for Agent3 and contains sections for all apps. Agent3 must only execute SECTION-3. All other sections are included for reference and alignment across the platform.
+
+Paste this entire prompt into the Agent running inside the scholarship_agent workspace only.
+
+GLOBAL DIRECTIVES (apply to all sections, but Agent3 must only act on SECTION-3)
+
+Mission: Achieve 100% readiness for inter-app operation today. If not possible, output a precise NO-GO with a single-blocker list, owner(s), and a concrete ready_eta_utc when this app will be ready to start generating revenue. If the user’s original text “stop generating revenue” was intentional, include both interpretations and clarify which is applicable with evidence.
+Output identity on every report and artifact: The first two lines must be exactly: scholarship_agent — https://scholarship-agent-jamarrlmayes.replit.app APP_BASE_URL: https://scholarship-agent-jamarrlmayes.replit.app
+SLOs to enforce: 99.9% uptime SLO; ≤ 120ms P95 latency target; A-grade baseline security headers; no P0 security issues; Responsible AI posture enforced.
+Definitions
+GO TODAY: All critical paths pass (auth, core APIs, required integrations), SLOs met, security OK, revenue path operational.
+NO-GO: Any P0 blocker. Provide ready_eta_utc and list third-party systems and upstream apps required for GO.
+Evidence and artifacts
+All generated reports must begin with the exact app name and base URL as specified above.
+Required artifacts for SECTION-3:
+evidence/scholarship_agent_YYYYMMDD_READINESS_REPORT.md
+evidence/scholarship_agent_manifest.json
+Optional if needed: evidence/scholarship_agent_YYYYMMDD_INTEGRATION_TEST_ADDENDUM.md
+Mask all secrets. Show last 4 chars only where necessary.
+Logging discipline: Keep console output concise. Place detailed logs and measurements inside the evidence files.
+Strict scope control: Only modify or test code and environment for your app/section. Do not make changes in other workspaces.
+If any mandatory check cannot be performed (e.g., missing credentials), mark as P0 and produce the ETA with required owners and third-party systems.
+SECTION MAP (for cross-app awareness; DO NOT execute outside your section)
+
+SECTION-1: scholar_auth → https://scholar-auth-jamarrlmayes.replit.app
+SECTION-2: scholarship_api → https://scholarship-api-jamarrlmayes.replit.app
+SECTION-3: scholarship_agent → https://scholarship-agent-jamarrlmayes.replit.app [YOU ARE HERE]
+SECTION-4: scholarship_sage → https://scholarship-sage-jamarrlmayes.replit.app
+SECTION-5: student_pilot → https://student-pilot-jamarrlmayes.replit.app
+SECTION-6: provider_register → https://provider-register-jamarrlmayes.replit.app
+SECTION-7: auto_page_maker → https://auto-page-maker-jamarrlmayes.replit.app
+SECTION-8: auto_com_center → https://auto-com-center-jamarrlmayes.replit.app
+SECTION-3: scholarship_agent — EXECUTE THESE STEPS ONLY
+0) Identity Gate (MANDATORY — stop on mismatch)
+
+Read APP_BASE_URL env var and call GET /health and GET /version on localhost.
+Confirm:
+app or agent_id == "scholarship_agent"
+APP_BASE_URL == "https://scholarship-agent-jamarrlmayes.replit.app"
+If mismatch, stop immediately and output exactly: Workspace Mismatch — Expected SECTION-3 (scholarship_agent — https://scholarship-agent-jamarrlmayes.replit.app). No changes made.
+If match, proceed.
+Self-identification and artifact headers
+All evidence files must begin with: scholarship_agent — https://scholarship-agent-jamarrlmayes.replit.app APP_BASE_URL: https://scholarship-agent-jamarrlmayes.replit.app
+Include version (from /version if present), timestamp (UTC), git commit (if available).
+2. Baseline health, version, and configuration integrity
+
+Verify /health returns status healthy and list dependencies discovered at runtime.
+Verify /version includes app and optional app_base_url; if not, record as minor issue.
+Enumerate required env vars for this app. Confirm each is present and valid:
+OIDC/OAuth client_id and client_secret provisioned by scholar_auth for scholarship_agent redirect URIs.
+SCHOLARSHIP_API_BASE_URL points to scholarship_api.
+COMMAND_CENTER_URL for auto_com_center if used for status signaling.
+Any QUEUE/CRON config, DB URL, and AI provider keys (if used).
+Log missing/invalid env vars as P0 or P1 as appropriate.
+3. Security posture and compliance checks
+
+HTTP security headers: Check for HSTS, X-Content-Type-Options, X-Frame-Options/Frame-ancestors, Referrer-Policy, Content-Security-Policy (report-only acceptable short-term), Permissions-Policy.
+Authentication/Authorization:
+Validate OIDC client integration to scholar_auth: discovery/JWKS fetch, token validation path, and redirect URI alignment.
+Ensure scopes are least-privilege.
+Privacy and regulatory posture:
+Identify if this app processes student PII. Map minimal data fields processed and stored.
+Note FERPA/COPPA considerations, data retention, and logging minimization.
+Output PASS/FAIL with concrete remediation steps.
+4. Performance and reliability verification
+
+Measure P50/P95 latency over a representative set of internal routes (use an internal route list or auto-discover routes from router). Target ≤ 120ms P95.
+Confirm 99.9% uptime target path: health checks, liveness/readiness probes, recovery playbook (restart policy).
+DB connection pool and timeout sanity. Detect N+1 patterns if obvious.
+Output summary table with endpoints tested, samples, P50/P95.
+5. Core job orchestration and DRY_RUN validation
+
+Identify all scheduled/background jobs for scholarship_agent. Include (if present):
+canary_notification
+deadline_reminders
+status_sync
+For each job:
+Describe trigger mechanism (cron, queue, webhook).
+Run DRY_RUN simulations end-to-end with representative payloads.
+Confirm idempotency, failure handling, and alerting paths.
+Record logs in the evidence addendum if verbose.
+6. Cross-app integration tests (in DRY_RUN where appropriate)
+
+scholar_auth (SECTION-1):
+Verify OIDC discovery, JWKS fetch, and a full auth handshake in DRY_RUN or through a test client.
+Confirm client_id/client_secret exist and redirect URIs use this app’s APP_BASE_URL.
+scholarship_api (SECTION-2):
+Test healthy connectivity to scholarship_api base URL.
+Perform a sample scholarships query in DRY_RUN or via public endpoints; validate JSON schema and error handling.
+scholarship_sage (SECTION-4):
+If scholarship_agent calls sage for advice/explanations, test a small round-trip (DRY_RUN), record latency and correctness sanity.
+student_pilot (SECTION-5):
+Verify event flow from scholarship_agent is consumable by student_pilot (e.g., notifications, task states). If only outbound webhooks or polling, test handshake in DRY_RUN.
+provider_register (SECTION-6):
+Validate that provider lifecycle events (onboarded/approved) are handled by scholarship_agent automations, if applicable. DRY_RUN an event.
+auto_page_maker (SECTION-7):
+Confirm SEO-driven discovery events do not break agent flows (e.g., incoming leads → tasks/jobs). Validate any expected webhook contracts in DRY_RUN.
+auto_com_center (SECTION-8):
+If scholarship_agent reports status/metrics to Command Center, test heartbeat/status update in DRY_RUN. Confirm 2xx response and schema alignment.
+7. Revenue-readiness checks for this app
+
+B2C/B2B relevance:
+Identify how scholarship_agent enables value capture (e.g., provider lifecycle automations, reminders that drive conversions, status syncing that unlocks paid usage).
+Confirm pricing/usage events and metrics are emitted where applicable (even if billing is centralized elsewhere).
+Validate this app’s contribution to ARR: what must be live for revenue impact today? What’s blocked?
+If a payment or email system is required downstream for value realization, list it explicitly.
+8. Responsible AI and content safety
+
+If this app invokes AI:
+Confirm prompt templates, bias mitigation steps, and Red Team guardrails exist.
+Logging: store only non-sensitive excerpts where necessary; ensure prompt/response PII minimization.
+Explainability: ensure outputs include rationale or links to sources where feasible.
+9. Readiness Matrix and SLO scorecard
+
+Summarize PASS/FAIL for:
+Identity Gate, Security, Performance, Job Orchestration, Cross-App Integrations, Revenue-Readiness, Responsible AI
+Provide SLO scorecard: headers, auth, latency, error rate, dependency health.
+10. GO/NO-GO decision for today
+
+If GO TODAY:
+Provide a 3-step launch plan and rollback plan.
+If NO-GO:
+Provide a tight blocker list (P0 only), explicit owners (e.g., scholar_auth, scholarship_api), and a specific ready_eta_utc when scholarship_agent will be fully revenue-ready.
+Enumerate third-party systems that must be active, configured, or provisioned (e.g., OIDC client secret from scholar_auth, email provider such as Postmark/SendGrid, observability such as Sentry/Datadog, queue/cron infra, DB).
+Include an interim DRY_RUN plan to validate infra while waiting.
+11. Deliverables (MANDATORY)
+
+evidence/scholarship_agent_YYYYMMDD_READINESS_REPORT.md
+Header lines with app name and APP_BASE_URL (see above)
+Sections aligned to steps 2–10 with explicit PASS/FAIL and evidence snippets
+evidence/scholarship_agent_manifest.json
+Fields: { "app": "scholarship_agent", "app_base_url": "https://scholarship-agent-jamarrlmayes.replit.app", "version": "<from /version or git>", "go_nogo": "GO" | "NO-GO", "ready_eta_utc": "<ISO8601 or null>", "slo": {"uptime_target": "99.9%", "latency_p95_ms": <measured or null>}, "security": {"headers_grade": "A/B/C", "notes": "..."}, "dependencies": { "scholar_auth": {"status": "OK|BLOCKED", "notes": "..."}, "scholarship_api": {"status": "OK|BLOCKED", "notes": "..."}, "scholarship_sage": {"status": "OK|N/A", "notes": "..."}, "student_pilot": {"status": "OK|N/A", "notes": "..."}, "provider_register": {"status": "OK|N/A", "notes": "..."}, "auto_page_maker": {"status": "OK|N/A", "notes": "..."}, "auto_com_center": {"status": "OK|N/A", "notes": "..."} }, "required_third_parties": [ {"name": "OIDC client (scholar_auth)", "status": "OK|BLOCKED", "owner": "SECTION-1", "notes": "..."}, {"name": "Email provider (Postmark/SendGrid)", "status": "OK|BLOCKED", "owner": "Platform", "notes": "..."}, {"name": "Observability (Sentry/Datadog)", "status": "OK|BLOCKED", "owner": "Platform", "notes": "..."}, {"name": "Queue/Cron infra", "status": "OK|BLOCKED", "owner": "DevOps", "notes": "..."} ], "revenue_readiness": {"summary": "...", "b2c_path": "...", "b2b_path": "..."}, "risks": [{"id": "P0-001", "desc": "...", "owner": "...", "eta_utc": "..."}] }
+Optional: evidence/scholarship_agent_YYYYMMDD_INTEGRATION_TEST_ADDENDUM.md for verbose logs.
+12. Final console output (keep concise)
+
+Print:
+GO TODAY or NO-GO
+ready_eta_utc (if NO-GO)
+A one-line summary of the top blocker
+Paths to the two artifacts above
+STRICT DO-NOT-TOUCH RULE (for Agent3)
+
+Do not modify code, configuration, or files for any app except SECTION-3 (scholarship_agent).
+If you detect you are in any of these workspaces:
+scholar_auth, scholarship_api, scholarship_sage, student_pilot, provider_register, auto_page_maker, auto_com_center
+Immediately stop per Identity Gate and output the exact mismatch message as specified in Step 0.
+REFERENCE SECTIONS (for cross-app context only — DO NOT EXECUTE)
+
+SECTION-1 (scholar_auth): OIDC provider; must mint client_id/client_secret for each relying app, including scholarship_agent. Ensure JWKS endpoint, discovery, and redirect URIs configured.
+SECTION-2 (scholarship_api): Core data/API for scholarships, providers, etc. Must be reachable, with stable schemas and acceptable latency.
+SECTION-4 (scholarship_sage): AI knowledge layer; used for explanations or essay guidance. Ensure safe prompts and PII minimization.
+SECTION-5 (student_pilot): Student-facing flows; consumes outputs/status from scholarship_agent.
+SECTION-6 (provider_register): Provider onboarding lifecycle events; may trigger scholarship_agent automations.
+SECTION-7 (auto_page_maker): SEO-driven lead engine; ensure webhooks/ingress don’t break agent flows.
+SECTION-8 (auto_com_center): Command Center for orchestration/telemetry; scholarship_agent may report heartbeat/status here.
+Reminders for Agent3
+
+Student Value is Business Value: Validate that reminder/status-sync flows measurably reduce friction for students and providers.
+Prioritize Organic Growth: Confirm no regressions to SEO→agent conversion paths (as applicable).
+Maintain Lean & Autonomous Operation: Implement DRY_RUN where credentials are pending to validate end-to-end logic safely.
+Act with Urgency: If GO is blocked today, produce a concrete, short ETA and name the exact owners and third-party systems required.
+End of Master Orchestration Prompt for Agent3 (scholarship_agent).
