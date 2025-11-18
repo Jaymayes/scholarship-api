@@ -1,0 +1,205 @@
+Below is the single, combined orchestration prompt. It contains sections for all eight apps so the whole platform can align. However, Agent3 must only act on the Section labeled SECTION-3 — scholarship_agent and must ignore all other sections. Follow the identity gate rules precisely.
+
+MASTER ORCHESTRATION PROMPT (For All Apps; Agent3 executes only SECTION-3)
+
+Platform mapping (read-only context for all agents)
+
+scholar_auth → https://scholar-auth-jamarrlmayes.replit.app
+scholarship_api → https://scholarship-api-jamarrlmayes.replit.app
+scholarship_agent (Agent3) → https://scholarship-agent-jamarrlmayes.replit.app
+scholarship_sage → https://scholarship-sage-jamarrlmayes.replit.app
+student_pilot → https://student-pilot-jamarrlmayes.replit.app
+provider_register → https://provider-register-jamarrlmayes.replit.app
+auto_page_maker → https://auto-page-maker-jamarrlmayes.replit.app
+auto_com_center → https://auto-com-center-jamarrlmayes.replit.app
+Identity Gate (required for every agent before anything else)
+
+You must verify you are in the correct workspace for your app/section.
+If you are not in the correct workspace for your section, stop immediately and output exactly: Workspace Mismatch — Expected SECTION-3 (scholarship_agent — https://scholarship-agent-jamarrlmayes.replit.app). No changes made.
+Agent3 only executes SECTION-3 below. Ignore every other section in this prompt.
+
+SECTION-3 — scholarship_agent (Agent3 executes this section only)
+
+Mission
+
+Get scholarship_agent 100% production-ready today and fully integrated with scholar_auth, scholarship_api, and auto_com_center.
+If 100% ready today is not possible, compute a precise ready_eta_utc and list the third-party/platform systems that must be in place for the app to start generating revenue.
+Strict identity gate for Agent3
+
+Expected app: scholarship_agent
+Expected APP_BASE_URL: https://scholarship-agent-jamarrlmayes.replit.app
+If mismatch: stop and output exactly: Workspace Mismatch — Expected SECTION-3 (scholarship_agent — https://scholarship-agent-jamarrlmayes.replit.app). No changes made.
+Deliverables (Agent3 must produce both)
+
+Markdown Readiness Report
+Path: evidence/scholarship_agent_YYYYMMDD_READINESS_REPORT.md (UTC date)
+First line must be exactly: scholarship_agent — https://scholarship-agent-jamarrlmayes.replit.app
+Contents must include:
+Identity Gate result and evidence
+Endpoint inventory and performance results (see Test Plan B)
+Security headers and CORS audit (see Test Plan C)
+OAuth2/JWT discovery and token acquisition details (see Test Plan D)
+Integration verification with scholarship_api and auto_com_center (see Test Plan E and F)
+/readyz dependency matrix with baseline latencies (see Test Plan G)
+Job orchestration, schedules, DRY_RUN behavior, and flip-to-live conditions (see Test Plan H)
+Responsible AI and compliance practices (see Test Plan I)
+Issues register: id, severity (P0–P3), owner, impact, remediation steps, ETA, and clear success metric
+GO/NO-GO decision, decision_timestamp_utc, ready_eta_utc, KPI and ARR ignition plan
+CEO sign-off checklist as checkboxes [ ] / [x]
+2. JSON Manifest
+
+Path: evidence/scholarship_agent_manifest.json
+Required fields:
+app_name, app_base_url, version
+endpoints[]: path, sample_size, min_ms, p50_ms, p95_ms, p99_ms, max_ms, error_rate_pct
+dependencies[]: name, status, latency_ms, note
+security_headers[]: header, value, verified
+cors_allowlist[]: full list of allowed origins (all 8 app URLs only; no wildcard)
+oauth2: discovery_url, jwks_uri, scopes[], token_acquisition.status, notes
+jobs[]: name, schedule, dry_run, status
+issues[]: id, severity, owner, impact, remediation, eta_utc, success_metric
+kpis: p95_latency_ms_target=120, uptime_target_pct=99.9, error_rate_target_pct=0.5
+go_no_go: decision, decision_timestamp_utc, ready_eta_utc
+third_party_prerequisites[]: system, requirement, owner, status
+arr_ignition_plan: text with 72-hour plan and revenue assumptions
+Readiness Test Plan (Agent3 executes A–I)
+A) Identity Gate
+
+Confirm app reports itself as scholarship_agent and base URL equals https://scholarship-agent-jamarrlmayes.replit.app.
+If mismatch: stop with the exact mismatch message stated above (no changes made).
+B) Endpoint Inventory and Performance
+
+Inventory the publicly exposed operational endpoints at minimum:
+/health
+/readyz
+/version
+/api/system/info (or equivalent system-info endpoint if named differently)
+/canary (if present; else specify an equivalent lightweight status endpoint)
+For each endpoint: collect at least 25 samples (n≥25) from the deployed APP_BASE_URL.
+Compute min, p50, p95, p99, max latency (ms) and error_rate_pct.
+Pass criteria:
+All p95 ≤ 120ms
+error_rate_pct ≤ 0.5%
+Record all metrics in both the Markdown report and the JSON manifest.
+C) Security Headers and CORS Audit
+
+Verify on at least /readyz and /version:
+Strict-Transport-Security: max-age=31536000; includeSubDomains
+Content-Security-Policy: strict; frame-ancestors 'none' or equivalent restrictive policy
+X-Frame-Options: DENY
+X-Content-Type-Options: nosniff
+Referrer-Policy: strict-origin-when-cross-origin
+Permissions-Policy: camera=(); microphone=(); geolocation=(); payment=()
+CORS verification:
+No wildcard (*) anywhere.
+Allowlist must include only these platform origins: https://scholar-auth-jamarrlmayes.replit.app https://scholarship-api-jamarrlmayes.replit.app https://scholarship-agent-jamarrlmayes.replit.app https://scholarship-sage-jamarrlmayes.replit.app https://student-pilot-jamarrlmayes.replit.app https://provider-register-jamarrlmayes.replit.app https://auto-page-maker-jamarrlmayes.replit.app https://auto-com-center-jamarrlmayes.replit.app
+Document results and any remediations with ETA.
+D) OAuth2/JWT with scholar_auth (critical for revenue)
+
+Use discovery URL from scholar_auth: https://scholar-auth-jamarrlmayes.replit.app/.well-known/openid-configuration
+Required scopes for scholarship_agent:
+scholarship.read
+notify.send
+agent.tasks
+Client details:
+client_id: scholarship_agent
+client_secret: must be provisioned in secrets store; if missing, open a P0 issue and request provisioning; document exact secret key name expected in environment.
+Implement or validate client_credentials grant and token acquisition; do not log secrets or full tokens (log only first 6 and last 4 characters).
+Validate JWT using scholar_auth JWKS; verify aud, iss, sub, exp; document verification steps.
+Pass criteria:
+Token acquisition returns HTTP 200 and produces valid access token.
+JWKS validation path works and is enforced at runtime.
+If blocked (e.g., missing client_secret), record as P0, define owner=scholar_auth team, and compute ready_eta_utc based on realistic provisioning + deploy time.
+E) Integration: scholarship_api (data source)
+
+Base URL: https://scholarship-api-jamarrlmayes.replit.app
+All calls must include the OAuth2 bearer token from D.
+Prove round-trip by executing at least one read operation (e.g., fetch scholarships list or filters used by Agent3 job logic).
+Pass criteria:
+At least one authenticated data retrieval succeeds with HTTP 200.
+Latency and error rate within targets; add to dependency matrix.
+F) Integration: auto_com_center (all external messaging must route through here)
+
+Base URL: https://auto-com-center-jamarrlmayes.replit.app
+Endpoint to use: POST /api/notify
+Payload must include correlation_id and must not include secrets or full tokens.
+No direct vendor calls from scholarship_agent; all communications go through auto_com_center.
+Prove at least one canary notification end-to-end in DRY_RUN mode, then flip to live per flip conditions in H.
+Pass criteria:
+At least one authenticated POST /api/notify returns HTTP 200 in DRY_RUN.
+Log includes correlation_id and redacted tokens.
+G) /readyz Dependency Matrix
+
+At minimum, check and list:
+PostgreSQL or primary DB (if used by this app)
+Redis or cache (if used; note if optional)
+OpenAI or LLM provider (if applicable)
+scholar_auth
+scholarship_api
+auto_com_center
+For each dependency record: status (PASS/WARN/FAIL), baseline latency, and a short note.
+Include this matrix in both the Markdown report and JSON manifest.
+H) Job Orchestration and Schedules
+
+Enumerate and validate these jobs at minimum:
+canary_notification — every 30 minutes and on startup
+deadline_reminders — daily at 10:00 UTC
+status_sync — daily at 03:00 UTC
+Implement and document a DRY_RUN flag; default should be true until all integrations pass D–F.
+Flip-to-live conditions:
+OAuth2 token acquisition OK
+scholarship_api reachable with auth
+auto_com_center reachable with auth
+Validate correlation IDs, idempotency, retry/backoff policy, and circuit breaker for outbound calls.
+Record job status in both deliverables.
+I) Responsible AI and Compliance
+
+No academic dishonesty. Provide guidance, not ghostwriting.
+Redact PII in logs; verify access control boundaries.
+Note FERPA/COPPA considerations; default to 18+ unless verified parental consent flow exists.
+Document any prompts, filters, and safety rails in the report.
+Decision, ETA, and Revenue Prerequisites
+
+Based on A–I results, declare:
+GO TODAY or NO-GO TODAY
+decision_timestamp_utc
+If NO-GO: ready_eta_utc (specific UTC timestamp when we can start generating revenue) and why
+List the third-party/platform systems required before revenue can start:
+scholar_auth: discovery, JWKS, client_id, client_secret, scopes
+scholarship_api: authenticated read access
+auto_com_center: authenticated notify access
+Infrastructure: database, cache (if used), OpenAI/LLM (if used)
+Compute an ARR ignition plan for the first 72 hours after GO:
+Expected volume assumptions and conversion improvements
+B2C and B2B impact and annualized ARR uplift
+Leading KPIs to watch (conversion, engagement, churn)
+Reporting, naming, and redaction rules
+
+All generated reports must begin with: scholarship_agent — https://scholarship-agent-jamarrlmayes.replit.app
+Place files under evidence/ with UTC date stamps in filenames.
+Do not log secrets or full tokens. Redact tokens to first 6 and last 4 characters.
+Confirm all metrics and results in both deliverables and keep numbers consistent.
+CEO sign-off checklist (include as checkboxes in Markdown report)
+
+ Identity Gate: scholarship_agent and APP_BASE_URL verified
+ Performance: n≥25 per endpoint; all p95 ≤ 120ms; error_rate ≤ 0.5%
+ Security Headers: 6 headers verified on /readyz and /version
+ CORS: restricted to the 8 platform origins; no wildcard
+ OAuth2/JWT: client_credentials works; token and JWKS verification in place
+ scholarship_api integration: at least one authenticated read OK
+ auto_com_center integration: DRY_RUN canary notify OK
+ /readyz dependency matrix complete with latencies
+ Jobs: schedules defined; DRY_RUN validated; flip-to-live conditions stated
+ Issues list with severities, owners, ETAs, and success metrics
+ Decision provided: GO/NO-GO with decision_timestamp_utc and ready_eta_utc
+ Third-party prerequisites enumerated
+ 72-hour ARR ignition plan included
+Stop conditions and guardrails
+
+If the identity gate fails, output the exact mismatch message and make no changes.
+If any P0 issue blocks OAuth2 token acquisition, set decision to NO-GO TODAY, compute ready_eta_utc (earliest realistic timestamp), and list the blocking prerequisites and owners.
+Reminder to Agent3
+
+You are Agent3. You must only execute SECTION-3 — scholarship_agent. Ignore all other sections in this prompt.
+You must have the app name and base APP_BASE_URL at the top of every report you produce: scholarship_agent — https://scholarship-agent-jamarrlmayes.replit.app
+End of prompt.
