@@ -1,0 +1,69 @@
+Acknowledged. Strong pivot under time pressure. Here’s the executive decision and marching orders to keep Gate 0 on track and protect our SLOs.
+
+Decision
+
+Accept lazy JWKS initialization now. Defer lifespan/startup-hook root-cause to Platform as an infra ticket post–Gate 0. Security risk is low; first-hit latency only.
+Ship /version immediately via republish to align the published deployment with the current app routes.
+Why this aligns to our 5-year plan
+
+Minimizes CAC and downtime risk by unblocking feature delivery and SEO velocity; avoids burning cycles on infra idiosyncrasies.
+Preserves SLOs for reliability and trust, which directly support B2C conversions and B2B adoption.
+Directives and Deliverables
+
+Republish and Verify (Owner: Platform Lead; ETA: 60 minutes)
+Republish the current build so /version is live.
+Smoke tests (single terminal script):
+GET /version → returns {version, git_sha, build_time, schema_version}
+GET /readyz → checks.auth_jwks reflects current cache state
+Protected endpoint with invalid token → 401 within p95 < 200ms after JWKS warm
+Acceptance criteria:
+/version returns 200 with correct payload
+First protected request triggers JWKS load and subsequent protected requests show jwks_cache_hit = true in logs/metrics
+No startup hook errors; p95 latency unchanged vs prior baseline
+2. Observability and Safety Nets (Owner: Backend; ETA: 2 hours)
+
+Metrics:
+auth.jwks_init_ms, auth.jwks_cache_hits, auth.jwt_verify_fail_count, auth.jwks_refresh_errors
+Logging:
+Single-line info on first JWKS fetch; warn on refresh failure; no noisy logs each request
+Health:
+/readyz includes fields: {jwks: {warm: bool, last_init_ms, last_refresh_at}}
+Prewarm workaround:
+External synthetic call to a protected endpoint on deploy to ensure warm cache without relying on lifespan hooks
+3. Defect Resolution Document (Owner: Engineering Manager; ETA: same day)
+
+Executive summary: impact, decision, rationale
+Root cause: Replit/uvicorn startup path bypassing lifespan and on_event in this environment
+Risk assessment: low security risk; first-request latency; mitigations in place
+Workaround implemented: lazy init + synthetic prewarm
+Permanent fix options (post–Gate 0):
+Explicit uvicorn CLI with lifespan=on in run command, or containerize with standard ASGI startup
+Replace on_event with lifespan only after deployment path guarantees execution
+Runbook: how to verify, recover, and roll back
+4. /version Endpoint Hardening (Owner: Backend; ETA: 1 hour)
+
+Include: semantic version, git SHA, build_time (UTC), schema_version, environment
+Add to release checklist: verify /version matches current SHA prior to traffic shift
+5. Gate 0 Status Update (Owner: Program Ops; ETA: same day)
+
+P0-1 JWKS: Resolved via lazy init + prewarm; infra ticket queued post–Gate 0
+P0-2 /version: Implemented in code; pending republish; smoke tests planned
+SLO posture: 99.9% uptime unaffected; JWT verification p95 unchanged after warm
+Next-up priorities: highest user-impact P1 defects; ensure SEO Auto Page Maker remains unblocked
+6. Post–Gate 0 Infra Ticket (Owner: Platform; ETA to create: today)
+
+Scope: Standardize startup via explicit uvicorn entrypoint or container; ensure lifespan execution; add CI/CD step to fail build if /version in live != SHA in artifact
+Risk Controls (immediate)
+
+Thread-safe JWKS singleton with lock and exponential backoff on fetch
+Reasonable cache TTL and clock-skew tolerance (±5 min)
+Rate limiting for auth endpoints to avoid abuse-triggered spam of JWKS fetch on cold start scenarios
+Go/No-Go
+
+Go, contingent on successful republish and smoke test results within 60 minutes.
+Tell me when you’re ready to republish. Once complete, send:
+
+/version response payload
+/readyz snippet (jwks section)
+Latency from the first two protected endpoint calls (cold vs warm) and logs showing jwks_cache_hit flip to true
+After that, proceed to produce the defect document and Gate 0 status, then move immediately to the top two P1 defects.
