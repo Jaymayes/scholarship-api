@@ -1,0 +1,46 @@
+GO DECISION: APPROVED FOR IMMEDIATE REPUBLISH
+
+Rationale and guardrails
+
+Operational fit: The change package (lazy JWKS init, /version endpoint, observability, cache + circuit breaker) aligns with resilience best practices and should reduce cold-start auth overhead without raising risk. Use of a circuit breaker for downstream calls is consistent with fault-tolerance patterns we expect in production-grade services .
+Deployment model: Replit requires a manual “Publish” to create a new immutable snapshot; production remains unchanged until that UI action occurs. This is the correct release control point for a human-on-the-loop approval gate, which we are exercising now .
+Execute now with the following runbook
+
+Publish
+In Replit, click Publish to create the new deployment snapshot. Replit’s snapshot model ensures a clean, deliberate release boundary .
+2. Smoke tests (30s)
+
+Run ./smoke_tests_post_republish.sh as prepared.
+Acceptance criteria: All 6 tests pass, including:
+/version returns HTTP 200 with version/service/env
+/readyz: keys_loaded transitions from 0 pre-warm to ≥1 post-warm
+Protected endpoint: 401 on both cold and warm paths; warm P95 ≤120ms
+3. Evidence to return to CEO (paste outputs)
+
+/version JSON payload
+/readyz auth_jwks section (post-warm)
+Cold vs warm latency and computed delta
+Monitoring window (hypercare: 60 minutes)
+
+Watch Replit deployment analytics for:
+HTTP status mix and request durations (P95 target ≤120ms)
+Error rate ≤0.5%
+Logs: scan production logs for auth/JWKS errors and regression signatures (via Replit deployment dashboard) .
+Automatic rollback triggers (no debate, act immediately)
+
+Error rate >0.5% for 5 consecutive minutes
+P95 >120ms sustained for 10 minutes after warm-up Note: Replit’s immutable snapshot model enables safe, fast reversions by republishing the prior snapshot from deployment history; this is an intended strength of the platform’s publish paradigm .
+Post-validation priorities (start immediately after green smoke tests)
+
+P1-1: Add Cache-Control headers for static and computed-cacheable responses (quick win for latency and cost).
+P1-2: Finalize and expose OpenAPI schema on /docs to improve developer velocity and partner onboarding.
+Governance and ethics checkpoint
+
+Today’s action is a human-on-the-loop approval gate for a production configuration change. Continue to maintain explicit approval, override, and monitoring controls for any future autonomous publish steps to preserve explainability and accountability in our operations .
+Strategic tie-back to 5-year plan
+
+Reliability and latency directly support student trust and B2B partner integrations. This republish strengthens our platform SLOs (99.9% uptime, ≤120ms P95) and underpins scalable, low-CAC growth by keeping the service fast and predictable under organic demand.
+Confirmation request
+
+Proceed to Publish now.
+After smoke tests complete, paste the three evidence items here. If all green, I will issue the GO for P1 work immediately and set the next 7-day reliability target with specific KPIs.
