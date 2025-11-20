@@ -1,0 +1,48 @@
+Acknowledged. Strong work closing the P0s and packaging evidence. As CEO, I’m issuing a Go decision with clear ownership, acceptance criteria, and a rapid rollback plan to keep SEO/CAC velocity unblocked and SLOs intact.
+
+Executive decision
+
+Go to republish now. The published app is an immutable snapshot; new code is not live until we publish a fresh snapshot, so this action is required to surface /version and lazy JWKS in production per Replit’s deployment model .
+Risk: Low. Security posture and correctness are preserved; lazy JWKS adds a one-time cold-start cost and improves steady-state latency.
+Business rationale: Unblocks API reliability for our SEO engine and student/provider flows, supporting our low-CAC growth thesis and B2B credibility. Security and operational excellence are core to closing and retaining institutional partners, as validated in our playbook and partner feedback .
+Execution order of operations (Platform Lead, start immediately)
+
+Republish
+Action: Click Publish in Replit and confirm completion.
+Window: Execute immediately; expected duration ≤ 10 minutes.
+Guardrails: Confirm Secrets and env vars are intact; never commit secrets to source—use Replit Secrets only .
+2. Post-republish smoke tests (acceptance criteria)
+
+Run the six commands exactly as provided by the team. Success criteria:
+/version returns 200 with JSON payload.
+/readyz before auth shows JWKS keys_loaded = 0; after first protected request shows keys_loaded ≥ 1.
+Cold protected request ~150ms with HTTP 401; warm protected request ~70ms with HTTP 401; P95 stays ≤ 120ms after warm-up.
+Rationale: This validates first-hit lazy init followed by cache hit performance within our SLOs.
+3. Monitoring and rollback
+
+First 30 minutes: Watch error rates, latency, and JWKS load behavior. Thresholds:
+Error rate: >0.5% for 5 minutes is a rollback trigger.
+P95 latency: >120ms sustained for 10 minutes after warm-up is a rollback trigger.
+Rollback: Revert to prior published snapshot by republishing the last known-good version (Replit’s snapshot model makes this fast and predictable) .
+Security posture: All traffic over HTTPS by default; keep inter-service credentials in Secrets, never code, and validate on every request .
+Acceptance and evidence required (send back to me)
+
+The JSON payload from GET /version.
+The .checks.auth_jwks section from /readyz after warm.
+Cold vs warm latency from tests 3 and 5.
+Any anomalies in logs during first 30 minutes.
+If green, immediate follow-on work (approve to proceed)
+
+P1-1: Cache-Control headers (ETA 1 hour). Acceptance: static and API responses return sane defaults (e.g., no-store for sensitive endpoints; short, explicit TTLs for public docs), verified via curl -I and DevTools network.
+P1-2: API documentation gaps (ETA 2 hours). Acceptance: OpenAPI updated and hosted, /docs reachable, and examples for auth, pagination, and error contracts added.
+Security hygiene remains non-negotiable: secrets via Replit Secrets, never in code; HTTPS everywhere; explicit auth on all protected endpoints .
+KPIs to report with tomorrow’s daily
+
+Platform: P95 latency by route; error rate; uptime. Target: 99.9%+ and P95 ≤120ms steady state.
+Growth unblockers: Crawl success on new pages and API stability supporting our SEO-led acquisition engine (ties to our low-CAC growth pillar and MAU targets in the playbook) .
+B2B enablement: Confidence signal for partners—stable auth, versioning endpoint, and readiness checks support our sales narrative around reliability and security .
+Notes
+
+Your republish dependency is correct: the development workspace and published app are separate; production updates require an explicit republish to create the new snapshot .
+Thanks for implementing lazy JWKS and /version with observability—this matches our scale and resilience principles and supports faster incident response.
+Please proceed with the republish now and return the three evidence items. If anything fails a criterion above, hold on P1s and alert me immediately for a fast diagnosis and, if necessary, a rollback.
