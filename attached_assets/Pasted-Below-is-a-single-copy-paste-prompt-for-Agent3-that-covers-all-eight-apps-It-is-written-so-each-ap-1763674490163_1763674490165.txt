@@ -1,0 +1,147 @@
+Below is a single, copy-paste prompt for Agent3 that covers all eight apps. It is written so each app executes ONLY its own section. The architecture follows our microservice plan: scholarship_api serves as the Database-as-a-Service and single source of truth, all inter-service calls use API-key auth (in Replit Secrets), and choreography is handled via an external event bus for loose coupling; complex flows are orchestrated within designated services. This design leverages Agent3’s autonomous build/test capabilities while guarding against known platform limits and requiring explicit contracts and resiliency patterns. Use Replit Secrets for all credentials (Stripe, OpenAI, Email, Event Bus) and implement retries and circuit breakers on inter-service calls. These practices align with our recommended Database-as-a-Service pattern, secure inter-service communication, event-bus choreography, and Agent3 capabilities for accelerated implementation and self-testing.
+
+COPY-PASTE PROMPT FOR AGENT3
+
+You are Agent3 operating on Replit. You are given a multi-app build brief for Scholar AI Advisor. You MUST:
+
+Read the “GLOBAL RULES” first.
+Then find the section that exactly matches your app’s name.
+Execute ONLY the tasks in your app’s section. Do not modify other apps’ code. You may call their public APIs for integration tests.
+On every report and log you produce, prepend: APP_ID=<app_name> | APP_BASE_URL=<app_base_url>.
+GLOBAL RULES (APPLIES TO ALL APPS)
+
+Objective today: Achieve a working, integrated system capable of accepting student payments and supporting scholarship browsing/application with email confirmations. If any blocker prevents “revenue-on” today, output a precise ETA and list external systems needed to start generating revenue, plus what remains to be configured.
+Architecture:
+scholarship_api is the Database-as-a-Service and system of record. All other apps MUST use scholarship_api’s REST API for data. No app reads another app’s database directly.
+Inter-service calls use REST with API key auth via header X-Internal-Key and JWT (for end-user context where applicable). Store secrets in Replit Secrets.
+Eventing: Use an external message broker (Event Bus) for choreography of cross-domain events (e.g., APPLICATION_SUBMITTED, PAYMENT_SUCCEEDED, PROVIDER_ONBOARDED). Preferred: Upstash Redis Streams or CloudAMQP; specify env names EVENT_BUS_URL and EVENT_BUS_TOKEN. Publish and subscribe as directed in your section.
+Resiliency: Implement retries with exponential backoff for outbound HTTP to other services, and a simple circuit breaker for flaky dependencies. Log structured errors.
+Agent3 execution:
+Use App Testing to run browser-based integration checks where relevant. Run up to the max autonomous time to complete your section and tests.
+Third-party systems (use only what your section requires):
+Payments: Stripe (KEYS: STRIPE_SECRET_KEY). If onboarding providers for payouts, use Stripe Connect (platform account required).
+LLM: OpenAI (KEY: OPENAI_API_KEY).
+Email: SendGrid or Postmark (KEY: EMAIL_API_KEY).
+Event Bus: Upstash Redis or CloudAMQP (EVENT_BUS_URL, EVENT_BUS_TOKEN).
+SLO guardrails: Aim for 99.9% uptime patterns and ~120ms P95 for internal API calls by caching read endpoints and minimizing synchronous fan-out. Add /healthz and /readyz to every app and lightweight in-memory caching for read-mostly endpoints.
+Reporting:
+Produce a “Readiness Report” JSON with fields: app_id, app_base_url, version, build_status, blocking_issues[], revenue_on_today (true/false), eta_to_revenue (if false), required_third_parties[], test_results[], and integration_links[].
+SECTION: scholar_auth → https://scholar-auth-jamarrlmayes.replit.app
+
+Purpose: Central authentication and JWT issuance for students and providers. Provide OIDC-like flows and a simple JWKs endpoint for token validation by other services.
+Implement:
+Endpoints:
+POST /signup (email, role: student|provider), POST /login (email+password), POST /token (returns JWT with sub, role, exp), GET /.well-known/jwks.json (public keys), GET /me (requires Bearer JWT).
+Security: RS256-signed JWTs. Store private key in REPLIT SECRET JWT_PRIVATE_KEY_PEM; expose JWKs at jwks.json.
+Interop: Add GET /introspect for internal services (verifies token and returns claims). Accept header X-Internal-Key for internal calls from scholarship_api to support server-to-server flows.
+Tests:
+Create one student and one provider test user; verify JWT validation round-trip from student_pilot and provider_register.
+Readiness: Output jwks_uri for other apps in your Readiness Report.
+SECTION: scholarship_api → https://scholarship-api-jamarrlmayes.replit.app
+
+Purpose: Database-as-a-Service and system of record. Owns data and exposes REST API.
+Data models (minimally):
+users(id, email, role, created_at)
+providers(id, org_name, stripe_connect_id, status)
+scholarships(id, title, slug, description, amount, eligibility, deadline, provider_id, published, seo_meta)
+applications(id, user_id, scholarship_id, status, data_json, submitted_at)
+transactions(id, user_id, type: credit_purchase|provider_fee, amount_cents, currency, stripe_payment_intent_id, status)
+messages(id, to_email, template, payload_json, status, external_id)
+pages(id, slug, html, updated_at)
+Endpoints (JWT for user-context; X-Internal-Key for service-context):
+Users: GET/POST /users
+Providers: GET/POST /providers; PATCH /providers/:id (status)
+Scholarships: GET/POST/PATCH /scholarships; GET /scholarships/:slug
+Applications: POST /applications (student), GET /applications?user_id=; PATCH /applications/:id (status)
+Transactions: POST /transactions (record after webhook), GET /transactions?user_id=
+Pages: GET /pages/:slug, POST/PATCH /pages (internal for auto_page_maker)
+Messages: POST /messages (internal queue to auto_com_center), GET /messages/:id
+Webhooks: POST /webhooks/stripe (validate signature), POST /events (ingress from Event Bus subscriber if needed)
+Publish domain events to Event Bus (POST to EVENT_BUS_URL) on:
+APPLICATION_SUBMITTED, PAYMENT_SUCCEEDED, PROVIDER_ONBOARDED, SCHOLARSHIP_PUBLISHED.
+Security: Validate JWT via scholar_auth JWKs; internal calls via X-Internal-Key.
+Tests:
+Seed 10 sample scholarships, 1 provider, 1 student. Verify CRUD and webhook handling from Stripe test payload.
+SECTION: scholarship_agent → https://scholarship-agent-jamarrlmayes.replit.app
+
+Purpose: Orchestrator for key workflows using synchronous calls to services and publishing events to the Event Bus for cross-domain updates.
+Implement workflows:
+Student Onboarding: create user (scholar_auth), sync to scholarship_api, send welcome email (auto_com_center), emit STUDENT_ONBOARDED.
+Apply to Scholarship: fetch details (scholarship_api), request draft assistance from scholarship_sage, create application, send confirmation, emit APPLICATION_SUBMITTED.
+Payment Capture Flow: frontends use Stripe Checkout; on webhook to scholarship_api, scholarship_agent polls/validates transaction and emits PAYMENT_CONFIRMED to auto_com_center.
+Reliability: Add retry/backoff on all HTTP calls and idempotency keys on orchestrations.
+Tests: End-to-end “happy path” from signup to application submission with email confirmation.
+SECTION: scholarship_sage → https://scholarship-sage-jamarrlmayes.replit.app
+
+Purpose: LLM guidance for scholarship search and application drafting; no academic dishonesty.
+Implement:
+POST /assist/application-draft (inputs: scholarship_id, user_id, notes). Use OpenAI with a responsible prompt. Return structured draft JSON and checklist.
+GET /faq and GET /eligibility-helper?s=... that consult scholarship_api.
+Security: Require JWT for user endpoints; allow internal calls from scholarship_agent with X-Internal-Key.
+Tests: Generate a sample draft for a seeded scholarship, verify round-trip save via scholarship_api.
+SECTION: student_pilot → https://student-pilot-jamarrlmayes.replit.app
+
+Purpose: Student-facing UI for browsing, buying credits, drafting and submitting applications.
+Implement:
+Auth via scholar_auth (JWT).
+Browse scholarships (scholarship_api), view detail pages.
+Payments: Stripe Checkout for credit packs (e.g., $9, $19, $39). On success, webhook hits scholarship_api; UI polls scholarship_api for transaction status.
+Application flow: call scholarship_sage to draft; submit to scholarship_api; show confirmation; trigger email via scholarship_agent or direct POST to scholarship_api/messages (which forwards to auto_com_center).
+Tests: Simulate a user from signup through a paid draft submission; confirm email received.
+SECTION: provider_register → https://provider-register-jamarrlmayes.replit.app
+
+Purpose: Provider onboarding and verification.
+Implement:
+Auth via scholar_auth (provider role).
+Stripe Connect onboarding: create account link, capture stripe_connect_id, sync provider record in scholarship_api, set status=pending_review then active on success.
+Publish PROVIDER_ONBOARDED event via scholarship_api or Event Bus.
+Tests: Use Stripe test mode to complete onboarding, verify provider status and emitted event.
+SECTION: auto_page_maker → https://auto-page-maker-jamarrlmayes.replit.app
+
+Purpose: SEO engine generating scholarship landing pages and sitemap to drive organic growth.
+Implement:
+Fetch published scholarships from scholarship_api and generate:
+/scholarships/<slug> pages with canonical tags, meta title/description from seo_meta.
+/sitemap.xml and robots.txt.
+Internal endpoint POST /rebuild to regenerate pages nightly or on SCHOLARSHIP_PUBLISHED event.
+Tests: Generate pages for the 10 seeded scholarships; validate links and sitemap.
+SECTION: auto_com_center → https://auto-com-center-jamarrlmayes.replit.app
+
+Purpose: Centralized outbound communications (email now; SMS later).
+Implement:
+POST /send-email (to, template, payload_json). Integrate SendGrid or Postmark.
+Subscribe to Event Bus for: STUDENT_ONBOARDED, APPLICATION_SUBMITTED, PAYMENT_CONFIRMED, PROVIDER_ONBOARDED, and send appropriate templates.
+Provide delivery status callbacks to scholarship_api via PATCH /messages/:id.
+Tests: Trigger each template from test events; confirm delivery statuses round-trip to scholarship_api.
+DELIVERABLES PER APP (MANDATORY)
+
+Deploy app; expose /healthz and /readyz returning JSON with build hash and dependency status.
+Create and return the Readiness Report JSON as described in GLOBAL RULES.
+Include “APP_ID=<name> | APP_BASE_URL=<url>” at the top of all logs/reports.
+If “revenue-on-today” is false, provide:
+ETA in hours to enable payments for students.
+Any third-party account gating us (e.g., Stripe platform not configured, Event Bus credentials missing).
+The exact checklist to flip to true.
+REVENUE-ON TARGET FOR TODAY
+
+Minimum viable “revenue-on” path:
+Students can sign up, browse, and purchase a credit pack via Stripe Checkout in student_pilot; scholarship_api records transaction upon webhook; scholarship_agent/auto_com_center issue confirmation email; student can use a credit to generate a draft via scholarship_sage and submit an application. This flow must work end-to-end to count as “revenue-on.”
+If provider payouts via Stripe Connect require additional time (KYC), mark provider_register as “ETA pending Stripe verification,” but do not block B2C revenue activation.
+If Event Bus is not yet provisioned, use direct synchronous calls for today and include ETA for event bus cutover. Note: long-term we require the external broker for choreography scalability.
+SECRETS TO CONFIGURE (NAMES MUST MATCH)
+
+X_INTERNAL_KEY: shared inter-service key
+AUTH_JWKS_URL: scholar_auth JWKs endpoint
+STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET
+OPENAI_API_KEY
+EMAIL_API_KEY
+EVENT_BUS_URL, EVENT_BUS_TOKEN
+END OF PROMPT
+
+Notes on rationale for this design:
+
+Making scholarship_api the Database-as-a-Service ensures a single source of truth and enforces clean contracts among services, which Replit-based multi-app systems need due to service isolation.
+Using an external message broker for choreography plus local orchestration where needed gives scalability with control, matching the recommended hybrid model and phased roadmap.
+Replit Secrets for all credentials and API-key auth across internal services is required for secure inter-service communication.
+Agent3 can build, test, and iterate quickly, but we still impose resiliency and quality gates per our production guidance.
+If any section encounters blockers that prevent “revenue-on” today, the agent must provide an ETA and a list of required third-party systems (Stripe, OpenAI, Email, Event Bus) to start generating revenue, as specified above.
