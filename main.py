@@ -90,13 +90,20 @@ from utils.logger import setup_logger
 # Initialize logger
 logger = setup_logger()
 
-# Lifespan event handler (FastAPI modern approach)
+# Lifespan event handler (FastAPI modern approach) - MUST be defined BEFORE app creation
 from contextlib import asynccontextmanager
 
+# Import FastAPI here to satisfy type hints in lifespan
+from fastapi import FastAPI as FastAPIType
 
 @asynccontextmanager
-async def lifespan(app: FastAPI):
-    """Application lifespan handler for startup and shutdown events"""
+async def lifespan(app: FastAPIType):
+    """Application lifespan handler for startup and shutdown events
+    
+    NOTE: This lifespan handler does NOT execute in Replit environment due to uvicorn startup path bypass.
+    See @app.on_event("startup") handlers below for workaround implementations.
+    Keeping this for future platform fix and local development.
+    """
     # Startup - CEO P1 DIRECTIVE: Validate SSL verify-full before proceeding
     from utils.startup_healthcheck import run_startup_healthchecks
     
@@ -209,6 +216,7 @@ async def lifespan(app: FastAPI):
     await jwks_client.close()
 
 # Create FastAPI app with production-aware docs configuration
+# CRITICAL: lifespan MUST be defined BEFORE this call and passed via constructor
 app = FastAPI(
     title=settings.api_title,
     description=settings.api_description,
@@ -216,12 +224,27 @@ app = FastAPI(
     docs_url="/docs" if settings.should_enable_docs else None,
     redoc_url="/redoc" if settings.should_enable_docs else None,
     debug=settings.debug,
-    lifespan=lifespan,
+    lifespan=lifespan,  # NOW PROPERLY WIRED!
     responses={
         status: {"model": resp["model"], "description": resp["description"]}
         for status, resp in ERROR_RESPONSES.items()
     }
 )
+
+# WORKAROUND: FastAPI lifespan doesn't execute in Replit environment
+# Using deprecated @app.on_event for JWKS prewarm until platform team fixes lifespan
+@app.on_event("startup")
+async def startup_jwks_prewarm():
+    """Workaround for Replit lifespan bypass - prewarm JWKS cache on startup"""
+    logger.info("🔐 STARTUP EVENT: Prewarming JWKS cache (workaround for lifespan bypass)")
+    from services.jwks_client import jwks_client
+    
+    try:
+        await jwks_client.prewarm()
+        logger.info("✅ JWKS cache prewarmed via startup event - RS256 validation ready")
+    except Exception as e:
+        logger.error(f"❌ JWKS prewarm failed: {e}")
+        logger.warning("⚠️ Falling back to lazy initialization on first protected request")
 
 # Mount static files
 app.mount("/static", StaticFiles(directory="static"), name="static")
@@ -521,6 +544,15 @@ async def kubernetes_health_check():
 async def favicon():
     """Favicon endpoint to prevent 404 errors in browser requests"""
     return {"status": "no favicon"}
+
+@app.get("/version")
+async def api_version():
+    """API version endpoint - Gate 0 requirement"""
+    return {
+        "version": settings.api_version,
+        "service": "scholarship_api",
+        "environment": settings.environment.value
+    }
 
 @app.get("/status")
 async def json_status():

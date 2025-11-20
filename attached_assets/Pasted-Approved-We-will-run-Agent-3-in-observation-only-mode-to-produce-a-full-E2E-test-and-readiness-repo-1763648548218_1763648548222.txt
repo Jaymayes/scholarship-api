@@ -1,0 +1,39 @@
+Approved. We will run Agent 3 in observation-only mode to produce a full E2E test and readiness report. Before execution, I need the app’s Replit workspace URL and base URL(s) so we can validate both the workspace preview and any published deployment. Please also grant read-only access to logs and, if applicable, a test database.
+
+Operating guidance to Agent 3 (aligned to Replit specifics)
+
+Environment and startup
+Inspect .replit and Workflows to ensure all processes (frontend and backend) can be started in parallel where needed; use a workflow for full‑stack apps so both servers run concurrently and stream output to the Console . Validate that deployment.run is defined separately from dev run commands in the [deployment] table to mirror production behavior .
+Note Replit’s snapshot publishing model: the live app is a snapshot of the workspace; file writes on the published app are not persistent. Avoid relying on the live filesystem; verify persistence via a database instead .
+If a published deployment exists, identify the deployment type (Autoscale vs Reserved VM) and account for cold‑start latency with Autoscale during performance observations .
+Tooling
+Use the Replit Console, browser devtools, and curl to exercise the API endpoints from within the workspace for fast iteration and reproducible traces .
+If the app uses Replit SQL or Replit DB, confirm secrets are configured (no hard-coded credentials) and that CRUD changes reflect correctly in the database .
+Scope and methodology
+Frontend: validate auth, navigation, forms, inputs, client-side validation, and error handling (network failures, invalid inputs).
+Backend: enumerate API endpoints, validate status codes and response schemas, enforce authZ rules, exercise negative cases (401/403/404/409/422/429/500), and confirm data integrity across CRUD.
+Integration: simulate realistic end-to-end student workflows and provider flows; verify seamless data flow and log correctness across layers.
+Non-functional: perform a latency smoke check, observe cold starts (if Autoscale), inspect logs for runtime errors, and verify deployment configuration conformance to production settings .
+Deliverable
+
+You’ll receive a structured E2E report with executive summary, categorized defect list with reproduction steps and evidence, and a readiness assessment (Ready for Production | Ready with Minor Issues | Not Ready – Critical Fixes Required).
+What I need from you to proceed today
+
+Replit workspace URL and, if published, the live deployment URL.
+Any feature flags or environment variables (keys only).
+Test accounts with roles and any seed data.
+If applicable, read-only database credentials to validate persistence paths.
+Downloadable report template
+
+I’ve prepared a fillable template that Agent 3 will populate during testing: Download the E2E report template
+Acceptance criteria for sign-off
+
+100% pass on primary user journeys (student and provider funnels).
+0 Critical and ≤2 High severity defects outstanding; all medium/low issues documented with workarounds.
+No leaked secrets; all persistence via database, not filesystem, per Replit best practices .
+Deployment commands validated in .replit [deployment] and Workflows configured for multi-process startup where applicable .
+Notes on Replit constraints (for realistic expectations)
+
+Live apps are immutable snapshots; any code change requires republishing a new snapshot, which is intentional and atomic for stability .
+Autoscale deployments can exhibit cold-start latency on the first request; testers will separate cold-start effects from steady-state performance in observations .
+Once you share access details, I’ll authorize Agent 3 to execute the plan and return the completed report with evidence within one business day (assuming a standard full‑stack scope).
