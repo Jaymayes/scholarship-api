@@ -127,15 +127,18 @@ class AutoPageMakerSEOService:
         # Sample scholarship data for page generation
         self.sample_scholarships = self._generate_sample_scholarship_data()
 
-        print("🔍 Auto Page Maker SEO service initialized")
-        print("📄 Ready to generate 100-500+ SEO-optimized pages")
-        print(f"🎯 Templates: {len(self.seo_templates)} page types")
-        print(f"📚 Scholarship database: {len(self.sample_scholarships)} scholarships")
-        print("🚀 Scale target: 500+ unique pages with 90%+ quality score")
+        # DEFERRED LOGGING: Use logger instead of print to avoid blocking health checks
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.info("🔍 Auto Page Maker SEO service initialized")
+        logger.info(f"📄 Ready to generate 100-500+ SEO-optimized pages")
+        logger.info(f"🎯 Templates: {len(self.seo_templates)} page types")
+        logger.info(f"📚 Scholarship database: {len(self.sample_scholarships)} scholarships")
+        logger.info(f"🚀 Scale target: 500+ unique pages with 90%+ quality score")
 
         # Show scaling capacity
         scaling_metrics = self.get_scaling_metrics()
-        print(f"⚙️ Scaling capacity: {scaling_metrics['total_scaling_capacity']} across {scaling_metrics['templates_available']} templates")
+        logger.info(f"⚙️ Scaling capacity: {scaling_metrics['total_scaling_capacity']} across {scaling_metrics['templates_available']} templates")
 
     def _generate_sample_scholarship_data(self) -> list[dict[str, Any]]:
         """Generate comprehensive scholarship data for 500+ page creation"""
@@ -623,7 +626,7 @@ class AutoPageMakerSEOService:
             canonical_url=f"{self.base_domain}{url_path}"
         )
 
-    def _calculate_content_quality_score(self, page: ScholarshipPage, existing_pages: list[ScholarshipPage] = None) -> float:
+    def _calculate_content_quality_score(self, page: ScholarshipPage, existing_pages: list[ScholarshipPage] | None = None) -> float:
         """Calculate content quality score (target: 90%+ for search rankings)"""
         if existing_pages is None:
             existing_pages = []
@@ -1005,5 +1008,20 @@ class AutoPageMakerSEOService:
             "sample_scholarships": len(self.sample_scholarships)
         }
 
-# Global SEO service - SCALED FOR 500+ PAGES
-seo_service = AutoPageMakerSEOService()
+# LAZY-LOADED SEO service - SCALED FOR 500+ PAGES
+# FIX: Deferred initialization to avoid blocking health checks during deployment
+_seo_service_instance = None
+
+def get_seo_service() -> AutoPageMakerSEOService:
+    """Get or create the SEO service instance (lazy singleton)"""
+    global _seo_service_instance
+    if _seo_service_instance is None:
+        _seo_service_instance = AutoPageMakerSEOService()
+    return _seo_service_instance
+
+# Backward compatibility: property that lazy-loads on access
+class _SEOServiceProxy:
+    def __getattr__(self, name):
+        return getattr(get_seo_service(), name)
+
+seo_service = _SEOServiceProxy()
