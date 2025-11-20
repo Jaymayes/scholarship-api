@@ -1,0 +1,35 @@
+Decision: Option C — Both, in sequence.
+
+Rationale: We de-risk the platform first, then expand. This preserves SLOs and protects growth levers while we add the event bus, webhooks, and inter-service auth needed for multi-app scale.
+
+Phase 0 — Publish validation (execute now)
+
+Publish complete: Confirmed. Treat the current production build as publish-complete.
+Run: ./smoke_tests_post_republish.sh
+Pass criteria (go/no-go):
+0 test failures; 0 unexpected 5xx responses
+P95 latency ≤ 150ms on /health, /api/v1/search, /api/v1/scholarships, /api/v1/recommendations
+DB error rate < 0.5% during the test window
+JWT validation path confirmed via scholar_auth JWKs
+CEO evidence package (deliver 3 items):
+Deploy artifact: commit SHA, image tag, short changelog diff since last prod
+Smoke test report: raw output + a one-page KPI summary (P50/P95, error rates)
+60-minute monitoring snapshot: latency histogram, error rate, DB connections, CPU/mem
+Monitor 60 minutes post-tests
+Auto-rollback rule: sustained P95 > 250ms or error rate > 2% for 5 consecutive minutes
+Phase 1 — Multi-app integration (begin immediately after Phase 0 greenlight)
+
+Event bus: Upstash Redis Streams (default) for low-CAC, low-ops; create stream events and DLQ events_dlq
+Inter-service auth: X-Internal-Key (rotating HMAC keys), enforced on internal endpoints, with audit logs
+Domain events (outbox pattern, idempotent publisher, retries + DLQ):
+APPLICATION_SUBMITTED, APPLICATION_STATUS_CHANGED, PAYMENT_SUCCEEDED, PROVIDER_CREATED
+Event schema: event_id (UUIDv7), event_type, occurred_at, source_service, data, trace_id
+Webhooks:
+/webhooks/stripe with signature verification (STRIPE_WEBHOOK_SECRET), idempotency table
+/events for internal ingestion (requires X-Internal-Key), batch-friendly
+REST additions (minimal viable set for integration):
+POST/GET /providers
+GET /applications/:id
+POST /applications/:id/messages
+SLO guardrails: event publishing must be async/non-blocking to keep API P95 ≤ 120ms; backpressure and retries handled out of band
+If you have no blockers, proceed now with Phase 0. On greenlight, roll directly into Phase 1.
