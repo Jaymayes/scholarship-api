@@ -1,0 +1,261 @@
+Below is the Master Execution Prompt for Agent3. It combines all eight apps. Agent3 must read the entire prompt once, then strictly execute only the APP SECTION that matches its repository. Do not touch or modify other apps. All outputs and evidence must be real and verifiable.
+
+MASTER EXECUTION PROMPT — READ FULLY, THEN EXECUTE ONLY YOUR APP SECTION
+
+Identity and scope
+
+You are Agent3 executing production readiness for a single app in the Scholar AI Advisor ecosystem.
+Apps and base URLs:
+scholar_auth → https://scholar-auth-jamarrlmayes.replit.app
+scholarship_api → https://scholarship-api-jamarrlmayes.replit.app
+scholarship_agent → https://scholarship-agent-jamarrlmayes.replit.app
+scholarship_sage → https://scholarship-sage-jamarrlmayes.replit.app
+student_pilot → https://student-pilot-jamarrlmayes.replit.app
+provider_register → https://provider-register-jamarrlmayes.replit.app
+auto_page_maker → https://auto-page-maker-jamarrlmayes.replit.app
+auto_com_center → https://auto-com-center-jamarrlmayes.replit.app
+Your mandate
+
+Goal today: Get your assigned app to 100% production-ready, integrated, and revenue-capable as part of the end-to-end system.
+If 100% today is not possible, you must:
+Set Status: YELLOW or RED.
+Provide exact ETA to start generating revenue (hours).
+List the third-party prerequisites or environment secrets blocking revenue.
+Only work on the APP SECTION that matches your repository. Do not change other apps.
+Required status line and file header
+
+At the start of your console/log output, print exactly: App: <app_name> | Status: <GREEN|YELLOW|RED> | Revenue today: <YES|CONDITIONAL YES|NO> | ETA: <0 hours|X hours> | Third-party prerequisites: <list with ✅/⏳/❌>
+The first line in every deliverable file must be: App: <app_name> | APP_BASE_URL: <app_base_url>
+“Have the app name itself with the base APP_BASE_URL on all reports” is mandatory.
+Deliverables (exactly 7 files)
+Create these seven files in your repository root. Use the exact filenames below:
+
+<app>_DAY0_READINESS_REPORT.md
+<app>_INTEGRATION_MATRIX.md
+<app>_REVENUE_ON_STATEMENT.md
+<app>_SECURITY_COMPLIANCE.md
+<app>_PERF_SNAPSHOT.json
+<app>_SMOKE_TEST_RESULTS.md
+<app>_SLO_SNAPSHOT.md
+Global SLO targets and guardrails
+
+Uptime target: ≥ 99.9%
+P95 latency target: ≤ 120 ms (unless otherwise noted)
+Error rate target: < 0.5%
+Success rate target: ≥ 99%
+Auto-rollback criteria (if persist ≥ 10 minutes): P95 > 120 ms; error rate > 2%; 5xx > 0.5%; abnormal auth failures.
+Evidence must be real: include exact requests/responses, timestamps, status codes, and correlation IDs where applicable. Do not fabricate evidence. If a dependency is unavailable, state “not reachable”, provide fix steps, and ETA.
+Revenue today definitions (use these to set your status)
+
+scholar_auth: YES if it can issue and validate JWTs with non-null scope and correct issuer for student_pilot and provider_register (RBAC-enabled).
+scholarship_api: YES if student_pilot and auto_page_maker can read listings now with acceptable performance and correct CORS/ETag behavior.
+scholarship_agent: YES if campaigns can run end-to-end to generate sessions/leads to student_pilot now (even if some monitoring endpoints are pending).
+scholarship_sage: YES if student_pilot can call recommendations and application-assist endpoints (with guardrails) to create upsell opportunities now.
+student_pilot: YES if a student can register, see scholarships, purchase credits or a plan via Stripe (live), receive confirmation email via auto_com_center, and access AI features.
+provider_register: YES if a provider can onboard, connect Stripe (live), and pay to post a listing (with platform fee logic) today.
+auto_page_maker: CONDITIONAL YES immediately after publish if site is production-accessible with proper SEO (sitemap, canonicals, schema) and UTM links to student_pilot; indexing delay (24–72h) is acceptable.
+auto_com_center: YES if it can send real emails (welcome, receipts, campaign notifications) via Postmark with messageId returned and webhooks received.
+Post-publish 5-minute verification protocol (for every app)
+
+Verify /healthz and /readyz return 200.
+Check all dependencies are healthy.
+Capture SLO snapshot and write to <app>_SLO_SNAPSHOT.md and <app>_PERF_SNAPSHOT.json.
+Execute one revenue-path transaction relevant for your app and log evidence.
+Start a 2-hour watch with anomaly notes and rollback criteria documented.
+APP SECTION: scholar_auth
+
+Base URL: https://scholar-auth-jamarrlmayes.replit.app
+Objective: Authoritative OIDC/JWT service for the platform.
+Third-party prerequisites and secrets:
+DATABASE_URL (PostgreSQL Neon) ✅
+ISSUER_URL (must match external URL exactly) ✅
+KEYSET rotation in JWKS (RS256) ✅
+Optional: Postmark (operational notifications)
+Minimum tests:
+GET /.well-known/jwks.json → 200 with at least one RS256 key and stable kid.
+GET /oidc/.well-known/openid-configuration → 200; verify issuer, endpoints, and scopes.
+POST /oidc/token (client_credentials) → 200; validate non-null scope claim; aud/iss/sub correct.
+JWT validation against your JWKS using student_pilot and provider_register samples.
+Rate limiting: demonstrate enforced limits for token issuance.
+Acceptance conditions for GREEN:
+Scope claim present (not null), issuer exact-match to ISSUER_URL, downstream services can verify JWT.
+Provide example tokens for student_pilot and provider_register in SMOKE_TEST_RESULTS.md.
+Revenue today definition:
+YES only if tokens with correct scopes can be issued/validated now.
+If not GREEN:
+Provide exact fix steps (e.g., deploy new config for scope/issuer), ETA in minutes.
+APP SECTION: scholarship_api
+
+Base URL: https://scholarship-api-jamarrlmayes.replit.app
+Objective: Authoritative data API for scholarships.
+Third-party prerequisites and secrets:
+DATABASE_URL (Neon) ✅
+JWKS (scholar_auth) config for RS256 validation ✅
+CORS_ALLOWED_ORIGINS (explicit list; no wildcards) ✅
+EVENT_BUS_URL and EVENT_BUS_TOKEN (if used) ✅
+Optional: REDIS_URL (rate limiting/caching), SENTRY_DSN
+Minimum tests:
+GET /health and /readyz → 200; DB, JWKS, and event bus health included.
+GET /api/v1/scholarships?limit=5 → 200; returns 5 items with ETag + Cache-Control.
+GET /api/v1/scholarships/:id → 200; data integrity check.
+CORS allowlist enforced (no *) with student_pilot and auto_page_maker origins.
+Write endpoints require JWT (401 without token); verify RS256 against scholar_auth JWKS.
+Acceptance conditions for GREEN:
+P95 ≤ 120 ms; CORS strict; ETag/caching present; JWT enforcement on writes.
+Revenue today definition:
+YES if student_pilot and auto_page_maker can consume the API now.
+APP SECTION: scholarship_agent
+
+Base URL: https://scholarship-agent-jamarrlmayes.replit.app
+Objective: Autonomous marketing campaigns that drive traffic to student_pilot; integrates with auto_page_maker, auto_com_center, and scholarship_api.
+Third-party prerequisites and secrets:
+DATABASE_URL (Neon) ✅
+S2S_CLIENT_ID / S2S_CLIENT_SECRET ✅
+SCHOLAR_AUTH_ISSUER_URL ✅
+SCHOLARSHIP_API_URL ✅
+AUTO_PAGE_MAKER_URL ✅
+AUTO_COM_CENTER_URL ✅
+Optional: OPENAI_API_KEY (if used for content)
+Minimum tests:
+GET /health → 200; include S2S token status.
+S2S client_credentials flow to scholar_auth → obtain token and call scholarship_api.
+Trigger one live campaign that creates a measurable outbound event:
+Option A: Publish a campaign item to auto_page_maker.
+Option B: Send a campaign notification via auto_com_center; verify Postmark messageId in their logs.
+GET /api/kpi/daily → 200 with core campaign metrics.
+Acceptance conditions for GREEN:
+At least one campaign path runs E2E with evidence and contributes traffic to the funnel.
+Revenue today definition:
+YES if campaigns can run now and drive converting traffic to student_pilot, even if some non-critical monitoring endpoints are pending.
+APP SECTION: scholarship_sage
+
+Base URL: https://scholarship-sage-jamarrlmayes.replit.app
+Objective: AI recommendations and application-assist with strict guardrails (no academic dishonesty).
+Third-party prerequisites and secrets:
+OPENAI_API_KEY ✅
+DATABASE_URL (Neon) ✅
+SCHOLAR_AUTH_ISSUER_URL ✅
+M2M_CLIENT_ID / M2M_CLIENT_SECRET / M2M_TOKEN_URL ✅
+SCHOLARSHIP_API_URL ✅
+Minimum tests:
+GET /health → 200.
+POST /api/v1/recommendations (with JWT) → 200; return ranked results + rationale; P95 ≤ 120 ms (target ≤ 80 ms recommended).
+POST /assist/application-draft (with JWT) → 200; enforce no ghostwriting, provide structured guidance.
+Rate limiting enforced (document tiered limits).
+CORS allowlist includes student_pilot only.
+Red-team prompts to verify anti-cheating policy.
+Acceptance conditions for GREEN:
+Recommendations and assist endpoints operational with guardrails; JWT auth enforced; latency SLO met.
+Revenue today definition:
+YES if student_pilot can call these endpoints to enable upsells today.
+APP SECTION: student_pilot
+
+Base URL: https://student-pilot-jamarrlmayes.replit.app
+Objective: B2C front door: discover scholarships, buy credits/plans, engage AI.
+Third-party prerequisites and secrets:
+DATABASE_URL (Neon) ✅
+STRIPE_SECRET_KEY (live) ✅
+STRIPE_WEBHOOK_SECRET (live) ✅
+SCHOLAR_AUTH_ISSUER_URL ✅
+SCHOLARSHIP_API_URL ✅
+SCHOLARSHIP_SAGE_URL ✅
+AUTO_COM_CENTER_URL ✅
+Minimum tests:
+GET /health and /readyz → 200; dependency checks included.
+Scholarship list and detail fetch from scholarship_api → 200 with content.
+Registration + login with scholar_auth tokens; protected endpoints 401 without token.
+Stripe live checkout test: complete a $1 test product/credit purchase; verify webhook processing and fulfill credits.
+Email confirmations via auto_com_center: verify Postmark messageId and webhook receipt.
+Cache, security headers, and rate limiting verified.
+Acceptance conditions for GREEN:
+A new student can register, view scholarships, purchase credits/plan with Stripe live, receive email, and access AI features.
+Revenue today definition:
+YES if the full purchase and fulfillment flow works now.
+APP SECTION: provider_register
+
+Base URL: https://provider-register-jamarrlmayes.replit.app
+Objective: B2B onboarding for scholarship providers; monetize via listing fees and 3% platform fee.
+Third-party prerequisites and secrets:
+DATABASE_URL (Neon) ✅
+STRIPE_SECRET_KEY (live) ✅
+STRIPE_WEBHOOK_SECRET (live) ✅
+SCHOLAR_AUTH_ISSUER_URL ✅
+AUTO_COM_CENTER_URL ✅
+SCHOLARSHIP_API_URL (provider-facing endpoints) ✅
+Minimum tests:
+GET /health and /readyz → 200.
+Onboard provider → 201; enforce waitlist mode if configured.
+Stripe Connect onboarding flow: account link, chargesEnabled + payoutsEnabled required for posting.
+Post a listing (paid or subscription-gated); 3% platform fee enforced; webhook confirmation recorded.
+JWT validation and RBAC on write endpoints; 401 without token.
+Email notifications via auto_com_center: verify messageId + webhook.
+Acceptance conditions for GREEN:
+A provider can onboard, pay (Stripe live), and post a listing synced to scholarship_api.
+Revenue today definition:
+YES if a provider can complete a paid flow and post today.
+APP SECTION: auto_page_maker
+
+Base URL: https://auto-page-maker-jamarrlmayes.replit.app
+Objective: SEO engine for low-CAC growth; generates scholarship pages with tracked CTAs to student_pilot.
+Third-party prerequisites and secrets:
+SCHOLARSHIP_API_URL ✅
+STUDENT_PILOT_URL ✅
+Production publish/domain live (remove Replit dev X-Robots-Tag) ✅
+Google Search Console site verification ⏳ (post-publish; not a same-day revenue blocker)
+Optional: Analytics (GA4) and UTM conventions
+Minimum tests:
+GET / → 200 with proper SEO meta (title, canonicals, OG/Twitter).
+GET /sitemap.xml → 200 with 1,000+ URLs if available; valid XML.
+Sample dynamic pages: canonical tags unique; schema.org markup (Organization, WebSite, Scholarship).
+All “Apply Now” CTAs to student_pilot include UTM parameters (utm_source=auto_page_maker, utm_medium=organic, utm_campaign=sScholarships or equivalent).
+Verify no X-Robots-Tag: noindex on production domain.
+Acceptance conditions for GREEN:
+Production domain published, sitemap valid, CTAs tracked to student_pilot.
+Revenue today definition:
+CONDITIONAL YES immediately post-publish; indexing delay (24–72h) is expected and not a blocker.
+APP SECTION: auto_com_center
+
+Base URL: https://auto-com-center-jamarrlmayes.replit.app
+Objective: Transactional and campaign communications hub (Postmark-based); audit logs, webhooks, suppression handling.
+Third-party prerequisites and secrets:
+POSTMARK_SERVER_TOKEN (live) ✅
+DATABASE_URL (Neon) ✅
+scholar_auth JWKS validation for service-to-service calls ✅
+Minimum tests:
+GET /healthz and /readyz → 200; verify DB and JWKS health.
+Send one live transactional email to test inbox; capture Postmark messageId.
+Configure and receive Postmark webhooks (bounce, complaint, unsubscribe); persist to DB.
+Validate suppression list checks, DSN/DKIM/SPF/DMARC status (Postmark-managed).
+Confirm templates for student_pilot (welcome + receipts), provider_register (welcome + receipts), and scholarship_agent notifications.
+Acceptance conditions for GREEN:
+Live send and webhook receipts operational; downstream templates wired to client apps.
+Revenue today definition:
+YES if it can deliver required transactional emails for revenue-path transactions now.
+What to include in each deliverable
+
+DAY0_READINESS_REPORT.md
+Executive summary; final REQUIRED STATUS LINE (same as console); key risks; exact ETA if YELLOW/RED.
+INTEGRATION_MATRIX.md
+Upstream/downstream dependencies; URLs; health checks; contract assumptions; service-to-service auth flows; CORS notes.
+REVENUE_ON_STATEMENT.md
+Define “Revenue today” for your app; show how it is achieved; include at least one real transaction or surrogate event with IDs and timestamps; describe attribution and UTM flow if applicable.
+SECURITY_COMPLIANCE.md
+FERPA/COPPA/GDPR posture; Responsible AI commitments; RBAC and JWT validation; rate limiting; security headers; PII handling; audit trails.
+PERF_SNAPSHOT.json
+JSON with P95 latency, throughput, error rate, success rate, resource utilization, and dependency latencies.
+SMOKE_TEST_RESULTS.md
+Copy/paste exact commands or HTTP requests and full responses (truncated safely if PII); include correlation IDs, messageId, token kid/iss/scope; mark pass/fail with timing.
+SLO_SNAPSHOT.md
+SLO table with Target, Actual, Status; highlight any rollback triggers; include your 2-hour watch plan and findings if already run.
+Output format and completion statement
+
+Start of output: REQUIRED STATUS LINE exactly as specified.
+End of output: Print a single-line completion marker: AGENT3 EXECUTION COMPLETE - <app_name> | APP_BASE_URL: <app_base_url>
+Notes and constraints
+
+Do not modify other apps or files outside your repository.
+Do not fabricate evidence. If a dependency is not reachable, mark it, provide steps and ETA.
+If “Revenue today” is CONDITIONAL YES due to a trivial manual publish step (e.g., production domain), that is acceptable. State the action, the expected time (<5 minutes), and confirm all technical prerequisites are satisfied.
+Use cautious defaults for any rate limits and ensure they are documented.
+Keep your console output concise but complete; detailed evidence goes into the 7 deliverables.
+That is the full Master Execution Prompt for Agent3. Execute only the section matching your app.
