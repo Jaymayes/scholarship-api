@@ -1,0 +1,290 @@
+Below is the full, multi-app master prompt for Agent3. It includes sections for every app in the ecosystem. Agent3 must ONLY execute the section labeled for their assigned app. By default, Agent3 is assigned to scholarship_agent. If your orchestration assigns Agent3 to a different app, update AGENT3_ASSIGNED_APP accordingly before execution.
+
+Master Prompt: Comprehensive Go-Live and Testing Strategy for Scholar AI Advisor Ecosystem
+
+Global execution rules for Agent3
+
+Your assigned app: AGENT3_ASSIGNED_APP = scholarship_agent (change only if your orchestrator assigns Agent3 differently).
+Use only the section labeled with your assigned app’s name.
+All outputs and reports must include the app name and the base APP_BASE_URL in the header and footer, for example: Report for scholarship_agent | https://scholarship-agent-jamarrlmayes.replit.app
+Objective: Get your app 100% production-ready and integrated with the ecosystem today. If today is not possible, provide an exact ETA to readiness for revenue generation, and list the specific third-party systems and approvals that must be in place to go live.
+SLOs to honor across the platform: 99.9% uptime, ~120ms P95 latency for core endpoints, and error rate < 0.5% under expected load.
+Data-first execution: Collect and show metrics for each decision (response times, error rates, throughput, resource usage). Where metrics are unavailable, implement temporary instrumentation or produce explicit assumptions and a plan to replace assumptions with measured data within 48 hours.
+Shared ecosystem configuration (reference only; do not act on other apps)
+
+scholar_auth → https://scholar-auth-jamarrlmayes.replit.app
+scholarship_api → https://scholarship-api-jamarrlmayes.replit.app
+scholarship_agent → https://scholarship-agent-jamarrlmayes.replit.app
+scholarship_sage → https://scholarship-sage-jamarrlmayes.replit.app
+student_pilot → https://student-pilot-jamarrlmayes.replit.app
+provider_register → https://provider-register-jamarrlmayes.replit.app
+auto_page_maker → https://auto-page-maker-jamarrlmayes.replit.app
+auto_com_center → https://auto-com-center-jamarrlmayes.replit.app
+Global acceptance criteria for “100% ready and working together”
+
+Security and auth: OAuth/JWT flows validated end to end via scholar_auth; role-based access enforced; secrets properly managed.
+Payments live for revenue: B2C credits purchase working in student_pilot with receipts; B2B 3% provider platform fee captured in provider_register; refunds and dispute flows documented.
+Discoverability: auto_page_maker pages generated, indexed, and linked to student_pilot conversion paths.
+Data/API: scholarship_api stable schemas, versioned, and rate-limited; all consumers updated; P95 latency ~120ms; pagination and filtering verified.
+Engagement and comms: auto_com_center sending transactional emails/messages for sign-ups, purchases, provider onboarding, and application milestones.
+Guidance: scholarship_sage essay/QA workflows integrated with student_pilot.
+Marketing ops: scholarship_agent campaigns configured for both student and provider funnels, with UTMs and attribution visible in analytics.
+Observability: health checks and dashboards for uptime, latency, error rate; alerting configured for SLO breaches.
+Compliance: FERPA/COPPA posture reviewed; privacy policy and consent capture present where needed; deletion/export flows planned.
+Testing methodologies to apply within your app section (Load, Stress, Regression)
+
+Load testing: Validate performance under expected traffic with P95 ≤ 120ms, error rate < 0.5%, resource usage within safe thresholds.
+Stress testing: Identify breaking points, failure modes, and recovery behavior (e.g., 3x–5x peak traffic, dependency failures).
+Regression testing: Confirm no critical regressions in authentication, API contracts, payments, notifications, and UI/UX flows tied to your app’s scope.
+Reporting requirements (for your app’s section only)
+
+Executive Summary with Pass/Fail.
+Test Scope and Environment details.
+Results Analysis with metrics, graphs or summarized tables, and SLA comparisons.
+Defects list with severity, root cause hypothesis, and fix plan.
+Actionable Recommendations with owners and deadlines.
+Include header and footer: Report for [APP_NAME] | [APP_BASE_URL]
+Time-bound plan to finish today
+
+Hour 0–1: Environment and secrets audit; health checks; baseline smoke tests.
+Hour 1–3: Load and regression testing on critical user journeys; fix P1 defects immediately.
+Hour 3–5: Stress testing; resilience checks; error budgets; implement quick mitigations.
+Hour 5–7: Cross-app integration validation; payment capture tests; comms verification.
+Hour 7–8: Final sign-off; dashboards, alerts, and runbooks; go-live checklist completion.
+If any critical dependency blocks exist, produce a precise ETA, required third-party systems, and interim mitigation plan.
+SECTION: scholar_auth
+
+APP_NAME: scholar_auth
+APP_BASE_URL: https://scholar-auth-jamarrlmayes.replit.app
+Purpose: Centralized authentication and authorization for all apps; token issuance and validation; role/permissions management.
+Critical user journeys:
+Student sign-up/login/password reset.
+Provider sign-up/login/KYB pre-check handoff to provider_register.
+Token issuance (JWT) and verification by all dependent apps.
+Dependencies:
+Database for users, sessions, and refresh tokens.
+Email provider for verification and password reset (e.g., SendGrid/SES).
+Optional: CAPTCHA/anti-bot.
+Third-party systems needed to be revenue-ready:
+Email provider (transactional).
+Secret management, monitoring, and error tracking.
+Readiness checklist:
+OAuth/JWT flows passing; JWKs endpoint exposed; token TTLs set.
+Password policies, brute-force protection, MFA optional.
+Signed-in states verified across student_pilot, provider_register.
+Testing:
+Load: 95th percentile login ≤ 120ms, reset ≤ 180ms.
+Stress: Spike 5x logins; lockout and throttling verified; recovery.
+Regression: All auth endpoints, token refresh, email flows.
+Go-live risks:
+Email deliverability; ensure domain and DKIM configured.
+Reporting: Use the required report header/footer.
+SECTION: scholarship_api
+
+APP_NAME: scholarship_api
+APP_BASE_URL: https://scholarship-api-jamarrlmayes.replit.app
+Purpose: Core API for scholarship listings, search, eligibility filters, application metadata; consumed by student_pilot, scholarship_sage, auto_page_maker.
+Critical user journeys:
+Query scholarships with filters/pagination.
+Provider listing creation/updates from provider_register.
+Dependencies:
+Database; optional search engine cache; rate limiter.
+Third-party systems for revenue-readiness:
+Analytics for query attribution; monitoring/alerting.
+Readiness checklist:
+Versioned endpoints; schema docs; rate limits; CORS configured.
+P95 query latency ≤ 120ms; indexes tuned; cache headers set.
+Testing:
+Load: expected QPS with filters; ensure error rate < 0.5%.
+Stress: 5x QPS; forced cache misses; DB failover simulation.
+Regression: Filters, pagination, provider write operations.
+Reporting: Use the required report header/footer.
+SECTION: scholarship_agent (AGENT3 ASSIGNED APP)
+
+APP_NAME: scholarship_agent
+APP_BASE_URL: https://scholarship-agent-jamarrlmayes.replit.app
+You are Agent3. Execute ONLY this section.
+Mission and role in revenue
+Mission: Operate autonomous marketing and acquisition campaigns that feed:
+B2C funnel: Acquire students into student_pilot; drive credit purchases and essay assistance usage via scholarship_sage; route traffic from auto_page_maker.
+B2B funnel: Acquire providers into provider_register to publish scholarships and enable the 3% platform fee.
+KPI alignment:
+B2C: New student sign-ups/day, free→paid conversion rate, ARPU from credits.
+B2B: New providers onboarded/day, activated providers (live listings), gross volume for 3% fee.
+CAC: Prioritize organic/SEO, leverage auto_page_maker. Paid channels only if LTV:CAC ≥ 3:1 with <= 30-day payback.
+Performance: Landing pages must load fast; campaign links must resolve to the correct routes in student_pilot and provider_register.
+2. Critical user journeys to test end-to-end
+
+Student acquisition:
+Campaign link → auto_page_maker SEO page → student_pilot onboarding → scholar_auth sign-up → scholarship_api search → scholarship_sage essay guidance → student_pilot purchase credits → auto_com_center receipt and onboarding flow.
+Provider acquisition:
+Campaign link → provider_register sign-up → scholar_auth auth → provider listing creation → scholarship_api listing available → auto_com_center automated welcome + verification.
+3. Dependencies and required third-party systems
+
+Mandatory now:
+Analytics/Attribution: UTM tracking end to end (e.g., first-party analytics, or GA4/PostHog). Events: page_view, signup_started, signup_completed, credit_purchase, provider_signup, provider_listed.
+Email/SMS: via auto_com_center integration; ensure templates exist for student welcome, purchase receipt, provider welcome, listing live.
+Monitoring/Error tracking: dashboards and alerts on link errors, 404s, and redirect loops.
+Optional but recommended:
+A/B testing framework for landing pages.
+Link management/shortening with click metrics.
+4. Readiness checklist for “100% today”
+
+Routing and links:
+All live campaign links resolve to student_pilot and provider_register with correct UTM parameters.
+Auto redirect rules for mobile/desktop if needed.
+Content and SEO:
+auto_page_maker is generating pages for top scholarship categories and long-tail queries; internal links to student_pilot flows validated.
+Robots, sitemap, and canonical tags are correct; no noindex on core pages.
+Compliance:
+Privacy banner/consent for analytics where required; opt-out honored.
+Performance:
+Landing pages and redirects P95 ≤ 120ms to first byte from our edge; largest contentful paint within acceptable bounds.
+Reporting and dashboards:
+Realtime acquisition dashboard with KPIs for B2C/B2B funnels.
+Daily cohort report on free→paid conversion; provider activation funnel.
+Operability:
+Runbook with escalation paths for broken links, conversion drop, or deliverability issues.
+5. Testing plan (execute now)
+
+Load testing (normal campaigns):
+Simulate expected daily clicks spread across top 10 campaign URLs, with realistic think times.
+KPIs: P95 redirect ≤ 120ms; 98% of clicks reach destination without error; 100% of UTMs captured in analytics; downstream signup conversion ≥ baseline or declared target.
+Stress testing (surge campaigns):
+3x–5x normal click volume within 15 minutes.
+Observe for rate limits, 429s, or CDN throttling. Confirm graceful degradation and rapid recovery once surge subsides.
+Regression testing:
+Validate all existing campaign links, UTMs, landing pages, email triggers, and attribution mapping.
+Confirm that newly added campaigns do not break prior flows.
+6. Cross-app integration tasks to complete today
+
+With auto_page_maker:
+Validate top 50 SEO pages exist, are linked to live campaigns, and contain CTAs to student_pilot/provider_register.
+With student_pilot and scholar_auth:
+Verify sign-up completion rate from campaign source ≥ baseline target; ensure tokens flow properly; ensure post-signup journey to purchase credits is one click away.
+With provider_register and scholarship_api:
+Provider campaign links pre-fill referral source; track provider_signup and provider_listed events; verify new listings appear via scholarship_api within minutes.
+With auto_com_center:
+Confirm event-triggered messages fire for sign-ups and purchases; verify delivery and open rates.
+7. Deliverables due today from Agent3
+
+Acquisition Readiness Report (include header/footer):
+Executive summary with Go/No-Go.
+Updated list of active campaigns, target audiences, and URLs.
+Metrics snapshot: click→signup, signup→purchase, provider_signup→listing, with UTMs.
+Issues and fixes applied today; remaining risks with owners and deadlines.
+Testing Results Report (include header/footer):
+Load, stress, and regression test outputs and comparisons vs SLOs/SLA.
+Root cause analysis for any failures; remediation plan.
+8. If not possible today
+
+Provide exact ETA (date and time, with timezone) to achieve revenue-ready state.
+List blocking items and third-party systems or approvals required to go live, for example:
+Analytics consent banner configuration and legal approval.
+Email/SMS sender verification and domain alignment (SPF/DKIM/DMARC).
+A/B framework flagging and initial experiments approval.
+Provide a stopgap plan to start generating revenue with partial capability, e.g., run a subset of campaigns pointing directly to student_pilot without A/B testing, while tracking foundational metrics.
+SECTION: scholarship_sage
+
+APP_NAME: scholarship_sage
+APP_BASE_URL: https://scholarship-sage-jamarrlmayes.replit.app
+Purpose: AI coaching for essays and application materials; integrates with student_pilot and scholarship_api.
+Critical user journeys:
+Student opens guidance session from a scholarship detail → drafts → saves → exports/submits.
+Dependencies:
+AI runtime; content safety; data storage; auth tokens; analytics.
+Third-party systems:
+Model hosting or API; logging/monitoring; content safety filters.
+Readiness checklist:
+Guardrails to avoid academic dishonesty; transparency notices; consent.
+Save/resume flows; export; rate limits.
+Testing:
+Load: concurrent sessions; P95 response ≤ 120ms for tool interactions where applicable; longer generation steps still bounded with user feedback.
+Stress: 3x concurrent sessions; backpressure and graceful degradation.
+Regression: session recovery, autosave, export.
+SECTION: student_pilot
+
+APP_NAME: student_pilot
+APP_BASE_URL: https://student-pilot-jamarrlmayes.replit.app
+Purpose: Student-facing hub for discovery, guidance, credits purchase, and application tracking.
+Critical user journeys:
+Discover scholarships from scholarship_api; start guidance in scholarship_sage; purchase credits; receive notifications.
+Dependencies:
+scholar_auth; scholarship_api; scholarship_sage; payments; auto_com_center.
+Third-party systems (revenue-critical):
+Payment processor (e.g., Stripe/PayPal); tax configuration; receipts.
+Email/SMS for transactional comms.
+Readiness checklist:
+End-to-end purchase flow; ledger for credits; invoices/receipts; refund path; analytics of conversion funnel.
+Testing:
+Load: browse, add credits, purchase; P95 ≤ 120ms on API calls; payment success ≥ 98%.
+Stress: flash sale simulation; payment webhooks resiliency.
+Regression: cart, checkout, receipts, credit balance.
+SECTION: provider_register
+
+APP_NAME: provider_register
+APP_BASE_URL: https://provider-register-jamarrlmayes.replit.app
+Purpose: Provider onboarding, verification, and scholarship listing management; captures 3% platform fee.
+Critical user journeys:
+Provider sign-up; KYB; create/update listing; pay fees; listing appears in scholarship_api.
+Dependencies:
+scholar_auth; scholarship_api; payments; auto_com_center.
+Third-party systems (revenue-critical):
+Payment processor with KYB/KYC; invoice and payout setup.
+Readiness checklist:
+Fee capture path tested; listing publish flow integrated; communications automated.
+Testing:
+Load: provider onboarding; listing edits; payment success.
+Stress: surge of listing creation; webhook retries.
+Regression: KYB, fee capture, publish.
+SECTION: auto_page_maker
+
+APP_NAME: auto_page_maker
+APP_BASE_URL: https://auto-page-maker-jamarrlmayes.replit.app
+Purpose: SEO engine generating programmatic pages that drive organic traffic to student_pilot and provider_register.
+Critical user journeys:
+Crawl, index, and navigate to conversion pages with UTMs intact.
+Dependencies:
+scholarship_api; site maps; CDN.
+Third-party systems:
+Search console verification; CDN caching; analytics.
+Readiness checklist:
+Indexable pages; canonical and schema.org metadata; no broken links.
+Testing:
+Load: generate and serve pages at scale; P95 ≤ 120ms TTFB.
+Stress: pre-render cache warm; CDN purge/refill.
+Regression: sitemap updates; link integrity.
+SECTION: auto_com_center
+
+APP_NAME: auto_com_center
+APP_BASE_URL: https://auto-com-center-jamarrlmayes.replit.app
+Purpose: Centralized communications for transactional and lifecycle messaging across student and provider funnels.
+Critical user journeys:
+Account confirmations, purchase receipts, provider welcomes, status updates.
+Dependencies:
+scholar_auth for tokens; events from student_pilot/provider_register; templates.
+Third-party systems:
+Email/SMS provider; sender identity and domain authentication.
+Readiness checklist:
+Templates live; dynamic data mappings; deliverability verified; unsub/opt-out compliance.
+Testing:
+Load: expected notification volume; queue health; P95 dispatch times.
+Stress: burst of purchase receipts; retry policies; dead-letter queues.
+Regression: template rendering; link tracking; localization if used.
+Execution instructions to finish today (Agent3 on scholarship_agent)
+
+Start with a live audit:
+Validate every campaign URL for HTTP 200, correct redirects, and UTM capture in analytics.
+Confirm top SEO pages link to correct funnels and are indexed.
+Run the test plans above:
+Load and stress test clicks; verify downstream conversions to sign-ups and purchases/providers listings.
+Fix blockers immediately:
+Broken links, mis-tagged UTMs, missing events, or failed email triggers.
+Produce both required reports with the exact header/footer format:
+Report for scholarship_agent | https://scholarship-agent-jamarrlmayes.replit.app
+If any third-party system prevents go-live:
+State the precise blocker (e.g., analytics consent banner pending legal approval, email sender domain not verified).
+Provide the earliest possible ETA and a minimal viable campaign plan to start revenue with what’s already functional.
+Final note to Agent3
+
+Do not take actions for other apps. If you discover defects outside scholarship_agent, log them in your report with owners and severities, then proceed with your deliverables. Your success metric today is an unequivocal Go decision for revenue-capable campaigns or a precise ETA with a dependency list to clear the path.
