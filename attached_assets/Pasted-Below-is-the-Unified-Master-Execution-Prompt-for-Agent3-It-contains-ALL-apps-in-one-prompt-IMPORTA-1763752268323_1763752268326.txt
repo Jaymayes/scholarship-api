@@ -1,0 +1,384 @@
+Below is the Unified Master Execution Prompt for Agent3. It contains ALL apps in one prompt. IMPORTANT: Each Agent3 instance must only execute the section that matches its app name and base URL. Do not touch other sections. The goal is to get each app 100% ready and working together today. If 100% readiness is not possible today, you must provide a realistic ETA in hours and list any third-party systems or secrets required to start revenue.
+
+UNIFIED MASTER EXECUTION PROMPT FOR AGENT3
+Scope discipline and identification
+
+You must act ONLY on the section labeled for your app.
+Identify your app section by exact match on APP_NAME and APP_BASE_URL from the mapping below.
+Never modify or execute instructions for other apps.
+App name to APP_BASE_URL mapping
+
+scholar_auth → https://scholar-auth-jamarrlmayes.replit.app
+scholarship_api → https://scholarship-api-jamarrlmayes.replit.app
+scholarship_agent → https://scholarship-agent-jamarrlmayes.replit.app
+scholarship_sage → https://scholarship-sage-jamarrlmayes.replit.app
+student_pilot → https://student-pilot-jamarrlmayes.replit.app
+provider_register → https://provider-register-jamarrlmayes.replit.app
+auto_page_maker → https://auto-page-maker-jamarrlmayes.replit.app
+auto_com_center → https://auto-com-center-jamarrlmayes.replit.app
+Global guardrails (apply to all apps)
+
+Report headers: The first line of every report you create must be exactly: App: {APP_NAME} | APP_BASE_URL: {APP_BASE_URL}
+Required deliverables (create/update all 7 in your repo root):
+{app}_GO_LIVE_READINESS_REPORT.md
+{app}_DAY0_READINESS_REPORT.md
+{app}_INTEGRATION_MATRIX.md
+{app}_SECURITY_COMPLIANCE.md
+{app}_PERF_SNAPSHOT.json
+{app}_SMOKE_TEST_RESULTS.md
+{app}_SLO_SNAPSHOT.md
+Health and readiness endpoints: Implement GET /health and GET /ready (or aliases /healthz, /readyz) returning 200 with dependency checks.
+Security baselines:
+JWT RS256 verification against scholar_auth JWKS for bearer tokens (unless explicitly public).
+x-api-key required for internal service-to-service endpoints where noted.
+Rate limiting and strict CORS allowlist (no wildcards in production).
+No PII logging; redact tokens/IDs; apply least-privilege RBAC.
+SLOs: 99.9% uptime target, P95 latency ≤ 120ms, error rate < 0.5%, success rate ≥ 99%.
+Responsible AI: No academic dishonesty; guidance-only for writing assistance.
+Revenue readiness: If 100% production today is not possible, provide ETA (in hours) and list missing third-party systems/secrets.
+Final status line: At the end of your main Go-Live report, append a single-line final status: App: {APP_NAME} | APP_BASE_URL: {APP_BASE_URL} | Status: {GREEN|YELLOW|RED} | Revenue today: {YES|CONDITIONAL YES|NO} | ETA to start revenue: {N hours} | Third-party prerequisites: {comma-separated with checkmarks for present, empty boxes for missing} | Blockers: {none or short list}
+Console echo: Also print the Final status line to console/logs exactly once.
+Integration topology (shared understanding)
+
+scholar_auth: Identity and JWT/JWKS authority for the platform.
+scholarship_api: Single source of truth for scholarships, applications, profiles, credits/transactions. All other apps should not directly access each other’s databases.
+scholarship_sage: AI recommendations and application guidance (guidance-only).
+student_pilot: B2C student portal; browse/apply; purchase credits via Stripe.
+provider_register: B2B onboarding for providers; Stripe Connect with 3% platform fee.
+auto_page_maker: SEO engine; static landing pages with CTAs into student_pilot.
+scholarship_agent: Growth/marketing automations; campaigns; posts events to scholarship_api; coordinates auto_page_maker and auto_com_center.
+auto_com_center: Communications hub; transactional email via Postmark; optional SMS via Twilio.
+Shared third-party systems (as relevant)
+
+Postgres (DATABASE_URL), Redis (optional), S3/Blob storage (optional)
+scholar_auth JWKS URL for JWT
+Postmark (POSTMARK_SERVER_TOKEN) and optional Twilio for SMS
+Stripe (STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET; and Connect for provider_register)
+OpenAI (OPENAI_API_KEY) for scholarship_sage
+GA4 for auto_page_maker analytics
+Sentry (optional)
+Production domain/publish step where relevant
+BEGIN SECTION: scholar_auth
+Mission
+
+Provide platform-wide identity. Support OIDC and REST adapters for password-based flows where needed. Expose JWKS for RS256 token verification.
+Readiness definition (revenue impact)
+
+Revenue today: YES when OIDC + RW REST endpoints are live and JWKS is accessible, enabling student_pilot and provider_register to authenticate buyers/providers.
+Required endpoints
+
+GET /.well-known/jwks.json or /oidc/jwks
+OIDC endpoints as implemented already
+REST adapters:
+POST /auth/register {email, password, role}
+POST /auth/login {email, password}
+POST /auth/refresh {refresh_token} (rotation with revocation)
+POST /auth/verify-email {token} (full-token storage, single-use)
+POST /auth/introspect {token}
+GET /health, GET /ready (ready should check DB, JWKS, email webhook)
+Security and policies
+
+JWT RS256 signing; short-lived access tokens; refresh rotation with SHA-256 storage
+Rate limit: register 5/hr/IP, login 10/hr/IP, verify 10/hr/IP, refresh 100/hr/IP, introspect 1000/hr/IP
+Enforce RBAC scopes: admin, student, provider; no wildcard scopes
+Email verification event: call auto_com_center with x-api-key
+Integration tests (minimum)
+
+Register/login/refresh/introspect flow passes
+Verify-email flow sends/consumes token once
+JWKS reachable from scholarship_api, student_pilot, provider_register
+Third-party prerequisites and secrets
+
+DATABASE_URL [required]
+POSTMARK_SERVER_TOKEN [required for email verification via auto_com_center or direct]
+JWT signing keys [required]
+Optional: Sentry DSN
+Output
+
+Create/update all 7 required deliverables with the mandated header line
+Append Final status line and print it once to console/logs END SECTION: scholar_auth
+BEGIN SECTION: scholarship_api
+Mission
+
+Be the single DaaS for scholarships, applications, profiles, credits/transactions. No cross-app DB access.
+Readiness definition (revenue impact)
+
+Revenue today: YES when student_pilot can read scholarships and write applications/transactions; provider_register can onboard providers; auto_page_maker can read lists for landing pages.
+API endpoints (prefix /api/v1)
+
+Scholarships: GET (filters/pagination), GET by id, POST, PUT, PATCH, DELETE
+Providers: CRUD provider profiles
+Students: GET/PUT student profile, favorites, saved items
+Applications: start, submit, list by student, status transitions
+Transactions/Credits: purchase, balances, consume credits
+Health: GET /health, GET /ready
+OpenAPI: GET /openapi.json; Swagger UI: GET /docs
+Security
+
+Bearer JWT (RS256 via scholar_auth JWKS)
+Role-based access: admin/provider/student
+x-api-key for internal service-to-service (e.g., scholarship_agent events, auto_page_maker backfills)
+Idempotency-Key support for POST/PUT; retry-friendly design
+Integration tests (minimum)
+
+Provider creates scholarship; student lists and views detail
+Student starts and submits application; visible by student and provider
+Credits purchase and consumption path exposed
+Third-party prerequisites and secrets
+
+DATABASE_URL [required]
+AUTH_JWKS_URL [required]
+INTERNAL_API_KEY [required for internal endpoints]
+Optional: REDIS_URL, SENTRY_DSN
+Output
+
+Create/update all 7 deliverables
+Include short client snippets (Python/JS) in INTEGRATION_MATRIX for common calls
+Final status line END SECTION: scholarship_api
+BEGIN SECTION: scholarship_agent
+Mission
+
+Orchestrate campaigns and growth automations to drive organic traffic and conversions through auto_page_maker and auto_com_center, with event logging to scholarship_api.
+Readiness definition (revenue impact)
+
+Revenue today: YES when campaign triggers can create content/pages via auto_page_maker and send notifications via auto_com_center, with tracked clicks leading to student_pilot.
+Required endpoints
+
+POST /campaigns/run {id}
+POST /imports/run {source}
+GET /health, GET /ready
+Core behaviors
+
+Publish campaign assets to auto_page_maker via internal x-api-key endpoint(s)
+Send campaign emails via auto_com_center (Postmark)
+Log campaign events to scholarship_api (x-api-key)
+Attach UTM tags that attribute to auto_page_maker → student_pilot flows
+Security and limits
+
+JWT validation for operator endpoints
+x-api-key for internal service calls
+Rate limiting; CORS allowlist
+Integration tests (minimum)
+
+Run a test campaign that publishes one page and sends a test mail
+Verify UTM-tracked link resolves to student_pilot
+Confirm event POST to scholarship_api
+Third-party prerequisites and secrets
+
+INTERNAL_API_KEY [required]
+AUTO_PAGE_MAKER_BASE_URL [required]
+AUTO_COM_CENTER_BASE_URL [required]
+SCHOLARSHIP_API_BASE_URL [required]
+POSTMARK_SERVER_TOKEN [required]
+AUTH_JWKS_URL [required]
+Output
+
+7 deliverables + Final status line END SECTION: scholarship_agent
+BEGIN SECTION: scholarship_sage
+Mission
+
+Provide AI-powered scholarship recommendations and guidance-only application assistance (no ghostwriting).
+Readiness definition (revenue impact)
+
+Revenue today: YES when recommendations and guidance endpoints are live with OPENAI_API_KEY, feeding higher conversion into student_pilot.
+Required endpoints
+
+POST /api/v1/recommendations {student_context} → ranked list with rationale
+POST /assist/application-guidance {prompt} → outline, tips, feedback only; no full essays
+GET /health, GET /ready
+Security
+
+JWT RS256 via scholar_auth JWKS
+PII redaction in logs
+Rate limiting tiers (e.g., 100-300 requests/15min per user/role)
+Integration tests (minimum)
+
+Given a valid JWT, return top 5 recommendations with rationale
+Guidance endpoint returns outlines/checklists, never full essays
+Third-party prerequisites and secrets
+
+OPENAI_API_KEY [required]
+AUTH_JWKS_URL [required]
+SCHOLARSHIP_API_BASE_URL [required]
+INTERNAL_API_KEY [required if calling internal endpoints]
+DATABASE_URL [if storing telemetry]
+Output
+
+7 deliverables + Final status line END SECTION: scholarship_sage
+BEGIN SECTION: student_pilot
+Mission
+
+B2C student portal. Browse → detail → purchase credits (Stripe) → submit applications → receive confirmations.
+Readiness definition (revenue impact)
+
+Revenue today: YES when Stripe test/live mode is configured and end-to-end flow works: login → browse → detail → purchase credits → submit application.
+Functional requirements
+
+Integrate with scholar_auth for auth (OIDC/JWT)
+Read scholarships from scholarship_api
+Submit applications to scholarship_api
+Stripe Checkout for credit purchases (test and live)
+Send transactional emails via auto_com_center (welcome, receipts, confirmations)
+UTM tracking and analytics from auto_page_maker
+Health and endpoints
+
+GET /health, GET /ready
+Billing endpoints: create checkout session, webhook handler
+Application endpoints: submit and status fetch
+Security
+
+JWT RS256 validation
+Rate limiting, CORS allowlist
+Secure Stripe webhook signature verification
+Integration tests (minimum)
+
+End-to-end: login → browse → detail → purchase (test) → submit → visible via scholarship_api
+Email confirmation routed via auto_com_center
+Third-party prerequisites and secrets
+
+AUTH_JWKS_URL [required]
+SCHOLARSHIP_API_BASE_URL [required]
+STRIPE_SECRET_KEY [required]
+STRIPE_WEBHOOK_SECRET [required]
+AUTO_COM_CENTER_BASE_URL [recommended]
+DATABASE_URL [required]
+OPENAI_API_KEY [optional if using sage inline]
+Output
+
+7 deliverables + Final status line END SECTION: student_pilot
+BEGIN SECTION: provider_register
+Mission
+
+B2B onboarding for scholarship providers. Collect profiles, connect Stripe Connect accounts, enforce 3% platform fee.
+Readiness definition (revenue impact)
+
+Revenue today: YES when providers can onboard and link Stripe Connect so transactions incur the 3% platform fee.
+Functional requirements
+
+Provider signup/login via scholar_auth
+Provider profile create/update (via scholarship_api where applicable)
+Stripe Connect onboarding flow with platform fee = 3%
+Transactional emails via auto_com_center
+Health and endpoints
+
+GET /health, GET /ready
+POST /connect/create-account, onboarding link, webhook handler
+Security
+
+JWT RS256 validation
+Rate limiting, CORS allowlist
+Stripe webhook signature verification
+Integration tests (minimum)
+
+Provider registers, completes Stripe Connect onboarding
+Provider creates scholarship (via scholarship_api)
+3% platform fee visible in test transactions
+Third-party prerequisites and secrets
+
+AUTH_JWKS_URL [required]
+SCHOLARSHIP_API_BASE_URL [required]
+STRIPE_SECRET_KEY [required]
+STRIPE_WEBHOOK_SECRET [required]
+AUTO_COM_CENTER_BASE_URL [recommended]
+DATABASE_URL [required]
+Output
+
+7 deliverables + Final status line END SECTION: provider_register
+BEGIN SECTION: auto_page_maker
+Mission
+
+Organic SEO engine: generate static landing pages, publish sitemap.xml, use canonical tags and structured data, drive traffic to student_pilot.
+Readiness definition (revenue impact)
+
+Revenue today: CONDITIONAL YES — content is live immediately post-publish; indexing typically 24–72 hours. Revenue is “YES” if production is published today with CTAs into student_pilot.
+Functional requirements
+
+Scheduled job pulls scholarships from scholarship_api
+Generate pages with canonical URLs; JSON-LD (Organization/WebSite/Scholarship)
+Publish sitemap.xml and robots.txt
+CTAs with UTM tags to student_pilot; GA4 analytics
+Rebuild triggers protected by x-api-key
+Health and endpoints
+
+GET /health, GET /ready
+GET /sitemap.xml, GET /pages/:slug
+POST /internal/rebuild (x-api-key)
+Security and performance
+
+Rate limiting for dynamic routes; crawler-friendly headers
+Integration tests (minimum)
+
+Verify sitemap.xml has entries; pages resolve with canonical + structured data
+Links include UTM tags to student_pilot
+Third-party prerequisites and secrets
+
+SCHOLARSHIP_API_BASE_URL [required]
+INTERNAL_API_KEY [required for rebuild]
+GA4 measurement ID [recommended]
+AUTH_JWKS_URL [optional if protecting public pages]
+DATABASE_URL [optional if using cache/store]
+Output
+
+7 deliverables + Final status line END SECTION: auto_page_maker
+BEGIN SECTION: auto_com_center
+Mission
+
+Transactional communications hub. Deliver emails via Postmark; optional SMS via Twilio. Serve all apps.
+Readiness definition (revenue impact)
+
+Revenue today: YES when email templates and send endpoint work for receipts, verifications, and notifications that unblock purchases and onboarding.
+Required endpoints
+
+POST /events/email or /api/send {template, to, variables}
+GET /api/messages/:id/status
+GET /health, GET /ready
+Optional Phase 2: POST /events/sms with Twilio
+Security
+
+JWT RS256 validation (service-to-service)
+Postmark webhook signature verification
+Rate limiting, CORS allowlist
+x-api-key for internal triggers if required
+Templates (minimum)
+
+welcome/verification
+receipt (student and provider)
+provider_welcome
+campaign_notification
+application_submitted
+password_reset
+Integration tests (minimum)
+
+Test send for each template using Postmark in live/test mode
+Status retrieval confirms delivery
+Third-party prerequisites and secrets
+
+POSTMARK_SERVER_TOKEN [required]
+DATABASE_URL [recommended for audit logs]
+AUTH_JWKS_URL [required]
+TWILIO credentials [optional for SMS]
+Output
+
+7 deliverables + Final status line END SECTION: auto_com_center
+Execution protocol for all sections
+
+Step 1: Identify your section by APP_NAME + APP_BASE_URL; ignore others.
+Step 2: Validate environment and dependencies; create a short DEP_CHECK block in your Go-Live report.
+Step 3: Implement/verify endpoints, security, SLO targets, and data contracts required by your section.
+Step 4: Run smoke tests and write results to {app}_SMOKE_TEST_RESULTS.md.
+Step 5: Produce performance snapshot and SLO snapshot.
+Step 6: Update INTEGRATION_MATRIX with upstream/downstream dependencies, env vars, data contracts, client examples (if API), and event flows.
+Step 7: Revenue readiness assessment. If not GREEN today:
+Provide ETA to start revenue in hours.
+List third-party prerequisites and secrets still required.
+Document concrete blockers and a mitigation plan.
+Step 8: Append Final status line to your {app}_GO_LIVE_READINESS_REPORT.md and print it once to console/logs.
+Revenue evaluation rubric (use in your Go-Live report)
+
+GREEN: All revenue-critical flows working end-to-end today. “Revenue today: YES.”
+YELLOW: Revenue possible with a short manual step or near-term publish; or dependent on indexing delay. “Revenue today: CONDITIONAL YES.” Provide ETA.
+RED: Not revenue-capable today; list blockers and third-party prerequisites. Provide ETA.
+Reminder on report headers
+
+The first line of every deliverable must be: App: {APP_NAME} | APP_BASE_URL: {APP_BASE_URL}
+End of Unified Master Execution Prompt for Agent3
