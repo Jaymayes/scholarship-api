@@ -1,0 +1,237 @@
+MASTER EXECUTION PROMPT FOR AGENT3
+Read this entire prompt first. Then execute only the APP SECTION that matches the app you are currently working in. Do not perform work from any other APP SECTION. Every deliverable you produce must begin with a two-field header line that names your app and base URL exactly:
+App: <app_name> | APP_BASE_URL: <base_url>
+
+Executive context (read-only; do not output this section):
+
+You are an implementation agent executing one app’s workstream in a coordinated, same-day launch across eight apps. The CEO’s goal is to get all apps 100% production-ready and working together today. If you cannot get your app to revenue today, you must provide an honest ETA and list the third-party systems needed to go live.
+Status line you must output at the end of your run (single line): App: <app_name> | Status: <GREEN|YELLOW|RED> | Revenue today: <YES|NO|CONDITIONAL YES> | ETA: <number + units or 0 hours> | Third-party prerequisites: <comma-separated list with ✅/⏳/❌>
+SLOs you must validate or snapshot: Uptime ≥99.9% P95 latency ≤120ms Error rate <0.5% Auth/Success rate ≥99%
+Security/Compliance: FERPA/COPPA/GDPR alignment No ghostwriting or academic dishonesty enablement Bias mitigation, rate limiting, audit logs on access to PII
+Clarification of intent: “Ready to stop generating revenue” is interpreted as “ready to start generating revenue.” If not viable today, provide ETA-to-revenue and prerequisites.
+Global rules (apply to all APP SECTIONs):
+
+Only execute your app’s section. If you can’t determine your app, stop and output: “Unable to determine app. No actions taken.”
+Put the header line “App: <app_name> | APP_BASE_URL: <base_url>” at the top of every report you create.
+Create all required deliverables in your repository root as text/markdown/json files using the exact filenames provided.
+Do not claim GREEN unless you validated with either successful smoke tests against the live base URL or you clearly state what is mocked and why.
+If a human “Publish” action or credentials are required, stop, print the precise steps and credentials names, and provide a realistic ETA from the moment those are provided.
+After completing deliverables, print the single-line status (exact format) and then list the deliverables you created with file sizes if available.
+Post-publish 5-minute verification protocol (execute whenever the app is published or restarted to production):
+Health endpoints return 200
+Critical dependency checks pass (DB/JWKS/Webhooks/API keys)
+SLO snapshot captured
+First revenue-path transaction or event is traced end-to-end
+Begin a 2-hour watch and note any anomalies
+Rollback criteria you must declare in your reports:
+P95 latency >120ms sustained >10 minutes
+Error rate >2%
+Auth failures spike or 5xx rate >0.5% sustained
+Payment error rate >2% (if applicable) If any trigger, recommend rollback with clear steps.
+APP SECTION: scholar_auth
+APP_BASE_URL: https://scholar-auth-jamarrlmayes.replit.app
+Your mission:
+
+Provide secure OIDC + JWKS for all apps, ensure RS256 token issuance, discovery and introspection working in production today. Deliverables to create:
+scholar_auth_DAY0_READINESS_REPORT.md
+scholar_auth_INTEGRATION_MATRIX.md
+scholar_auth_REVENUE_ON_STATEMENT.md
+scholar_auth_SECURITY_COMPLIANCE.md
+scholar_auth_PERF_SNAPSHOT.json
+scholar_auth_SMOKE_TEST_RESULTS.md
+scholar_auth_SLO_SNAPSHOT.md Minimum tests (document exact requests/responses in SMOKE_TEST_RESULTS):
+GET /.well-known/openid-configuration → 200 JSON
+GET /.well-known/jwks.json → 200 JSON with ≥1 RS256 key
+POST /oauth/token using client_credentials for service accounts → 200 with access_token; aud/iss/sub claims correct
+Token validation with at least student_pilot and scholarship_api (2 consumers)
+Optional: POST /oauth/introspect if supported; otherwise document why not Third-party prerequisites:
+Neon/PostgreSQL (✅/⏳)
+Email provider (Postmark) for account flows (⏳ optional day-2)
+Replit Secrets present (list all required) Revenue definition for this app:
+No direct billing; it unblocks all revenue. Mark Revenue today: YES if scholar_auth can issue and validate tokens for student_pilot and provider_register flows now. If not GREEN today:
+Provide ETA to GREEN, list missing secrets/configs, and exact click-path steps to publish.
+APP SECTION: scholarship_api
+APP_BASE_URL: https://scholarship-api-jamarrlmayes.replit.app
+Your mission:
+
+Serve public scholarship data fast, cached, and correct. Enforce write/auth rules via RS256 JWT. Deliverables to create:
+scholarship_api_DAY0_READINESS_REPORT.md
+scholarship_api_INTEGRATION_MATRIX.md
+scholarship_api_REVENUE_ON_STATEMENT.md
+scholarship_api_SECURITY_COMPLIANCE.md
+scholarship_api_PERF_SNAPSHOT.json
+scholarship_api_SMOKE_TEST_RESULTS.md
+scholarship_api_SLO_SNAPSHOT.md Minimum tests:
+GET /health → 200
+GET /readyz → 200 with dependency checks
+GET /api/v1/scholarships?limit=5 → 200 array with ETag + Cache-Control
+GET /api/v1/scholarships/:id → 200 expected record
+CORS allowlist enforced (no wildcard in production)
+Auth-required write endpoints return 401 without JWT and 2xx with valid JWT Third-party prerequisites:
+Neon/PostgreSQL (required)
+Sentry or equivalent monitoring (recommended)
+Event bus (if present) documented Revenue definition for this app:
+Data foundation for B2C/B2B. Revenue today: YES if endpoints are live and used by student_pilot/auto_page_maker now.
+APP SECTION: scholarship_agent
+APP_BASE_URL: https://scholarship-agent-jamarrlmayes.replit.app
+Your mission:
+
+Orchestrate campaigns and growth automations; integrate S2S with auth, API, and comm center. Deliverables to create:
+scholarship_agent_DAY0_READINESS_REPORT.md
+scholarship_agent_INTEGRATION_MATRIX.md
+scholarship_agent_REVENUE_ON_STATEMENT.md
+scholarship_agent_SECURITY_COMPLIANCE.md
+scholarship_agent_PERF_SNAPSHOT.json
+scholarship_agent_SMOKE_TEST_RESULTS.md
+scholarship_agent_SLO_SNAPSHOT.md
+scholarship_agent_APP_LAUNCH_ETA.md (only if not GREEN)
+scholarship_agent_GO_LIVE_REPORT.md (post-publish, after 2-hour watch) Minimum tests:
+GET /health → 200, includes S2S auth status
+GET /api/kpi/daily → 200 JSON with key KPIs present
+GET /api/fleet/status → 200 with app health roll-up (if implemented); if not, document honest status and ETA
+S2S client_credentials token exchange with scholar_auth
+Outbound call to scholarship_api with valid token
+Outbound call to auto_com_center in DRY_RUN=false mode (one test message to a sandbox) Third-party prerequisites:
+scholar_auth ISSUER_URL, S2S_CLIENT_ID, S2S_CLIENT_SECRET (required)
+Postmark API key (via auto_com_center) reachable Revenue definition:
+Revenue today: CONDITIONAL YES if campaigns can run and produce traffic/leads that convert downstream even while some routes operate in fallback; otherwise NO with ETA.
+APP SECTION: scholarship_sage
+APP_BASE_URL: https://scholarship-sage-jamarrlmayes.replit.app
+Your mission:
+
+Provide AI matching and guidance; ensure Responsible AI constraints and non-cheating policies. Deliverables to create:
+scholarship_sage_DAY0_READINESS_REPORT.md
+scholarship_sage_INTEGRATION_MATRIX.md
+scholarship_sage_REVENUE_ON_STATEMENT.md
+scholarship_sage_SECURITY_COMPLIANCE.md
+scholarship_sage_PERF_SNAPSHOT.json
+scholarship_sage_SMOKE_TEST_RESULTS.md
+scholarship_sage_SLO_SNAPSHOT.md Minimum tests:
+GET /health → 200
+POST /api/recommendations (with JWT) → 200 list of scholarships with rationales
+Red-team prompt: detects ghostwriting/cheating and blocks with policy
+Rate limit works, CORS/allowed origins correct Third-party prerequisites:
+OPENAI_API_KEY (or equivalent LLM provider)
+scholar_auth JWKS reachable Revenue definition:
+Revenue today: YES if student_pilot can invoke recommendations and upsell credits or plans.
+APP SECTION: student_pilot
+APP_BASE_URL: https://student-pilot-jamarrlmayes.replit.app
+Your mission:
+
+B2C funnel: registration → profile → matches → credits → checkout → messaging. Deliverables to create:
+student_pilot_DAY0_READINESS_REPORT.md
+student_pilot_INTEGRATION_MATRIX.md
+student_pilot_REVENUE_ON_STATEMENT.md
+student_pilot_SECURITY_COMPLIANCE.md
+student_pilot_PERF_SNAPSHOT.json
+student_pilot_SMOKE_TEST_RESULTS.md
+student_pilot_SLO_SNAPSHOT.md
+student_pilot_GO_LIVE_REPORT.md (post-publish) Minimum tests:
+GET /api/health → 200
+GET /api/scholarships → non-empty list via scholarship_api
+GET /api/matches unauthenticated → 401
+End-to-end test: register → buy credits (Stripe test → live) → receive welcome email via auto_com_center
+Webhooks: Stripe payment_intent.succeeded processes correctly; idempotency keys enforced Third-party prerequisites:
+Stripe LIVE: STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET
+scholar_auth (JWT), scholarship_api, auto_com_center Revenue definition:
+Revenue today: YES if checkout can accept at least one $1–$10 live purchase and ledger updates.
+APP SECTION: provider_register
+APP_BASE_URL: https://provider-register-jamarrlmayes.replit.app
+Your mission:
+
+B2B onboarding and pay-to-post with Stripe; enforce 3% platform fee. Deliverables to create:
+provider_register_DAY0_READINESS_REPORT.md
+provider_register_INTEGRATION_MATRIX.md
+provider_register_REVENUE_ON_STATEMENT.md
+provider_register_SECURITY_COMPLIANCE.md
+provider_register_PERF_SNAPSHOT.json
+provider_register_APP_SMOKE_TEST_RESULTS.md
+provider_register_APP_SLO_SNAPSHOT.md
+provider_register_APP_LAUNCH_ETA.md (only if not GREEN)
+provider_register_APP_GO_LIVE_REPORT.md (post-publish) Minimum tests:
+Signup flow, email verification via auto_com_center (or document if deferred)
+Stripe Connect or standard charges configured (test and live)
+Posting workflow blocked without payment; allowed with active plan
+Fee disclosure in UI and receipts Third-party prerequisites:
+Stripe LIVE keys: STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET
+scholar_auth, auto_com_center Revenue definition:
+Revenue today: CONDITIONAL YES in test mode; YES in live within 1–2 hours after keys are set and a $1 live test executes.
+APP SECTION: auto_page_maker
+APP_BASE_URL: https://auto-page-maker-jamarrlmayes.replit.app
+Your mission:
+
+SEO growth engine: generate indexable scholarship pages with correct metadata and sitemaps. Deliverables to create:
+auto_page_maker_DAY0_READINESS_REPORT.md
+auto_page_maker_INTEGRATION_MATRIX.md
+auto_page_maker_REVENUE_ON_STATEMENT.md
+auto_page_maker_SECURITY_COMPLIANCE.md
+auto_page_maker_PERF_SNAPSHOT.json
+auto_page_maker_SMOKE_TEST_RESULTS.md
+auto_page_maker_SLO_SNAPSHOT.md Minimum tests:
+GET / → 200 with meta title/description, canonical, schema.org JSON-LD
+GET /sitemap.xml → 200 with ≥100 URLs (or honest count)
+Check for X-Robots-Tag: noindex headers; if present on dev domains, document that production publish removes them and provide publish steps
+200s for key landing pages; no 5xx; Lighthouse SEO ≥90 (document metrics) Third-party prerequisites:
+Published production domain (Replit publish or equivalent) to avoid noindex proxies
+scholarship_api connectivity for fresh content Revenue definition:
+Revenue today: YES if pages are indexable post-publish and feed traffic to student_pilot; otherwise provide ETA and publish steps.
+APP SECTION: auto_com_center
+APP_BASE_URL: https://auto-com-center-jamarrlmayes.replit.app
+Your mission:
+
+Centralized communications (email first), compliant and observable. Deliverables to create:
+auto_com_center_DAY0_READINESS_REPORT.md
+auto_com_center_INTEGRATION_MATRIX.md
+auto_com_center_REVENUE_ON_STATEMENT.md
+auto_com_center_SECURITY_COMPLIANCE.md
+auto_com_center_PERF_SNAPSHOT.json
+auto_com_center_SMOKE_TEST_RESULTS.md
+auto_com_center_SLO_SNAPSHOT.md Minimum tests:
+GET /healthz and /readyz → 200
+Postmark live API key configured; send a production test to a seed inbox
+Webhooks for bounces/complaints/unsubscribes enforced; suppression list effective
+DKIM/SPF/DMARC validated (via Postmark-managed domains or DNS) Third-party prerequisites:
+Postmark API key (live)
+scholar_auth JWKS
+Neon/PostgreSQL for logs and metrics if used Revenue definition:
+Revenue today: YES if welcome/onboarding and receipt emails are successfully delivered for student_pilot and provider_register flows.
+Integration and report standards (all apps must follow):
+In every report’s first line, include:
+App: <app_name> | APP_BASE_URL: <base_url>
+In INTEGRATION_MATRIX.md, document:
+
+Upstream dependencies with health checks
+Downstream consumers and contracts
+Secrets required and their status: ✅ present / ⏳ missing / ❌ unknown In REVENUE_ON_STATEMENT.md, declare:
+“Revenue today: YES/NO/CONDITIONAL YES”
+Exact first-transaction plan (what, where, and how measured)
+Pricing and markup adherence (4x AI markup, 3% provider fee where applicable) In SECURITY_COMPLIANCE.md, include:
+FERPA/COPPA/GDPR checklists
+PII minimization
+Logging redaction and data retention policy In PERF_SNAPSHOT.json:
+p50, p95, p99 latency per critical endpoint
+Error rates
+Uptime window and source of truth In SMOKE_TEST_RESULTS.md:
+For each test: request, expected, actual, pass/fail In SLO_SNAPSHOT.md:
+Compare actuals vs targets and declare PASS/FAIL per SLO In APP_LAUNCH_ETA.md (only if not GREEN):
+Honest blocker list, missing third parties/secrets, precise human steps to resolve, and ETA from the moment prerequisites are provided In GO_LIVE_REPORT.md (post-publish, after 2-hour watch):
+What worked, anomalies, KPI snapshots, SLO adherence, any rollback triggers hit/missed, go/no-go recommendation
+Completion protocol (all apps):
+
+After you finish, print the single-line status exactly in this format: App: <app_name> | Status: <GREEN|YELLOW|RED> | Revenue today: <YES|NO|CONDITIONAL YES> | ETA: <number + units or 0 hours> | Third-party prerequisites: <comma-separated list with ✅/⏳/❌>
+Then list the deliverables you created: <filename> (<size>) on each line, or “size N/A” if unknown
+If you need a human “Publish” or live keys, explicitly state: “Awaiting: Publish action” and/or the exact secret names required, with the minimal step-by-step to go live.
+App directory-to-section mapping guidance (to help you choose your section):
+
+If your repo/package name or environment mentions one of: scholar_auth, scholarship_api, scholarship_agent, scholarship_sage, student_pilot, provider_register, auto_page_maker, auto_com_center then execute that exact APP SECTION. If ambiguous, stop and output: “Unable to determine app. No actions taken.”
+Base URLs (for report headers and tests):
+
+scholar_auth → https://scholar-auth-jamarrlmayes.replit.app
+scholarship_api → https://scholarship-api-jamarrlmayes.replit.app
+scholarship_agent → https://scholarship-agent-jamarrlmayes.replit.app
+scholarship_sage → https://scholarship-sage-jamarrlmayes.replit.app
+student_pilot → https://student-pilot-jamarrlmayes.replit.app
+provider_register → https://provider-register-jamarrlmayes.replit.app
+auto_page_maker → https://auto-page-maker-jamarrlmayes.replit.app
+auto_com_center → https://auto-com-center-jamarrlmayes.replit.app
+Begin. Execute only your APP SECTION.
