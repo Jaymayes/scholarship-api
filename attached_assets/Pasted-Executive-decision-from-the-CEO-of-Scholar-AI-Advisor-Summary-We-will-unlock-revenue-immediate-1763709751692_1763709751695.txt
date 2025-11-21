@@ -1,0 +1,78 @@
+Executive decision from the CEO of Scholar AI Advisor
+
+Summary
+
+We will unlock revenue immediately, eliminate context switching, and enforce a single source of truth for release readiness across all eight apps.
+Priority order is set to maximize low-CAC growth and near-term cash: publish the student dashboard, fix SEO engine blockers, then scale B2B onboarding. This aligns with our Playbook’s emphasis on SEO-led MAU expansion and hybrid monetization on the path to $10M ARR .
+What I decided and why
+
+Publish student_pilot now: It’s the shortest path to revenue this hour. If production is one manual “Publish” away, do it now and run smoke tests immediately after. This turns on B2C credit sales and validates the end-to-end funnel quickly, consistent with our data-first operating model.
+Fix auto_page_maker P0 defects next: Our most valuable growth lever is organic SEO (low CAC). Any production blockers or missing canonical/schema/sitemap work directly hurt MAU and conversion. Fixes here compound every day we delay, consistent with the Playbook’s SEO-first acquisition plan and MAU targets .
+Go-live provider_register with Stripe: Turn on B2B provider monetization (subscriptions or “pay to post”), ensuring we are capturing our 3% platform fee and validating pricing and conversion in-market. This accelerates the dual-engine growth model (B2C + B2B) in the Playbook .
+Harden universal security and readiness gates: All apps must enforce JWT, secrets management, and observability. Replit Secrets is the required mechanism for credentials; all inter-app traffic must be HTTPS by default; resilient patterns (retries/circuit breakers) are mandatory for Day-0 stability . We will require standardized metrics/logs/traces for every service to support our SLOs and data-first decisions .
+Immediate 48-hour plan with owners and acceptance criteria
+
+Revenue-on switch: student_pilot (Day 0)
+Action: Human operator clicks Publish. Agent verifies within 5 minutes.
+Acceptance criteria:
+Health and readiness endpoints return 200 with dependency checks.
+GET /scholarships returns the expected dataset with ETag/Cache-Control.
+P95 latency ≤120ms on key reads; 401 on protected routes.
+KPI to capture: first paid student event; baseline conversion from session→register→profile completion→credit purchase.
+2. Fix SEO engine: auto_page_maker (Day 0–1)
+
+Actions:
+Resolve all P0/P1 defects.
+Add canonical tags, schema.org, OpenGraph/Twitter cards; generate and auto-update sitemap.xml; ensure Apply Now routes to student_pilot.
+Programmatic page generation for top-value scholarships from scholarship_api.
+Acceptance criteria:
+Lighthouse SEO score ≥90 on 5 generated pages.
+Sitemap indexed; pages retrievable; links functionally drive to student_pilot.
+KPI to capture: organic sessions/day, CTR from scholarship pages to dashboard, free→register conversion from SEO traffic. This is our low-CAC acquisition engine per the Playbook’s Year 1–2 plan .
+3. Monetize providers: provider_register (Day 1–2)
+
+Actions:
+Stripe live keys configured; “Pay to Post” and/or subscription flows working end-to-end.
+On successful payment, auto-provision provider role via scholar_auth and grant permissions.
+Provider analytics (views/clicks) wired via scholarship_api.
+Acceptance criteria:
+Live $1 test transaction posts a scholarship and triggers receipt email.
+3% platform fee and tax handling verified in Stripe reports.
+KPI to capture: providers onboarded, conversion to first post, revenue/day from provider fees.
+4. Comms hub: auto_com_center (Day 1–2)
+
+Actions:
+Confirm Postmark/Twilio keys in secrets; enforce RS256 JWT validation.
+Webhooks configured for bounce/complaint; suppression list enforced.
+Acceptance criteria:
+POST /send returns messageId; delivery tracked; unsubscribe blocks subsequent sends.
+P95 ≤120ms on send and status endpoints; standardized error body.
+KPI to capture: delivery rate ≥98%, complaint rate ≤0.1%.
+Cross-cutting executive mandates (effective immediately)
+
+Source-of-truth release gates:
+Each repo must include “Production Status Report: [APP_NAME]” with exactly the four sections required in the Master Prompt (Current Status %, Integration Check, Revenue Readiness with time-to-MVP, Third-Party Dependencies with detected/missing keys). No “done” without this artifact.
+All claims of production readiness must be backed by automated smoke output and SLO metrics snapshots checked into the repo.
+Universal Standards enforcement:
+CORS restricted to ecosystem domains; RS256 JWT on all protected endpoints; public-only for landing and auth routes; standardized JSON error schema.
+Environment variables audited for DATABASE_URL, OPENAI_API_KEY, STRIPE_KEY, SENDGRID/POSTMARK keys; any missing secrets block release. Use Replit Secrets for all credentials and never commit plaintext keys; all inter-app comms are HTTPS on Replit by default .
+Observability: expose metrics endpoints; aggregate metrics/logs/traces; wire alerts for SLO breach (e.g., P95 >120ms, error rate >0.5%) to trigger automatic investigation per our Sense-Plan-Act loop .
+Security and compliance:
+FERPA/COPPA/GDPR guardrails apply globally; no ghostwriting or academic dishonesty. Responsible AI and bias mitigation are non-negotiable.
+Rate limiting and circuit breaker policies documented and enforced for Day-0 resiliency on all external calls (auth, email, Stripe) .
+KPIs I will review daily (executive dashboard)
+
+B2C: sessions from SEO, registration rate, profile completion, free→paid conversion, ARPU from credits.
+B2B: new providers onboarded, scholarships posted, revenue from 3% platform fee.
+System: P95 latency by app, error rates, deliverability rate, bounce/complaint trends.
+CAC: tracked by channel with SEO as primary; paid channels off until SEO baselines stabilize, consistent with our growth philosophy and Playbook pacing .
+On the reported “completions” and cross-app confusion
+
+I will not accept self-reported “100% complete” without the four-section Production Status Report and verifiable smoke/SLO artifacts in-repo. This is how we end context switching and thrash.
+Create a single “Release Board” listing all eight apps with RAG status, owner, next milestone, and ETA to MVP revenue. Update it daily from the reports.
+What I need from you now
+
+Confirm you can click Publish for student_pilot within the next hour. If yes, do it now and ping Agent3 to verify smoke and SLOs immediately after.
+Grant Agent3 access to the auto_page_maker repository to begin P0 SEO fixes as priority 1 after the publish.
+Ensure Stripe live keys are available via secrets for provider_register; schedule a $1 live test at T+24h.
+If you prefer a different sequence, say so—but by default, we proceed exactly as above to align with our 5-year objective of $10M profitable ARR and market leadership via SEO-led, low-CAC growth and a dual B2C/B2B engine .
