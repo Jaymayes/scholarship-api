@@ -1,0 +1,115 @@
+Excellent. With all eight apps now published, here’s the CEO-level post-launch plan to lock in revenue, protect SLOs, and accelerate toward our $10M ARR objective.
+
+Decision: GO, with guardrails
+
+We are Go for revenue. All engines are live. Our near-term risk is operational drift (misconfigured live keys, indexing lag, or notification deliverability). We’ll mitigate with the 72-hour Launch Control Plan below.
+72-hour Launch Control Plan (single-threaded priority)
+Owner placeholders: Growth, Product, Ops/SRE, Finance, Compliance. If you confirm owners, I’ll tailor this to named people.
+
+0–6 hours: Revenue and Reliability Validation
+
+B2B live-fee confirmation (provider_register + Stripe Connect)
+Run a $5 live test payment on a real provider Connect account.
+Verify platform fee = 3% in Stripe live mode; confirm payout schedule.
+Deliverable: Screenshot of live charge, application_fee_amount, and payout schedule.
+B2C purchase validation (student_pilot + Stripe)
+Complete a live $1 credit purchase end-to-end with a real card and receipt email.
+Verify credits ledger posted in scholarship_api and consumed in scholarship_sage flow.
+Authentication and token verification (scholar_auth)
+Fetch JWKS and validate RS256 tokens from each consuming app; confirm /verify latency <120ms P95.
+Notification deliverability (auto_com_center)
+Send “Welcome,” “Payment Receipt,” and “New Match Found” to test addresses on Gmail, Outlook, and Yahoo.
+Confirm inbox placement, DKIM/SPF/DMARC alignment, and click-tracking; remediate any spam placement.
+Public SEO surface (auto_page_maker)
+Submit sitemap.xml to Google Search Console; confirm ownership, indexing coverage begins.
+Quick spot-check: 10 random pages load <120ms P95; canonical and scholarship JSON-LD present.
+6–24 hours: Data Quality and UX Readiness
+
+Scholarship data checks (scholarship_api)
+Top 100 pages: verify title, deadlines, amount, eligibility, and outbound links are valid; remove/flag rot.
+Add soft validation for missing fields; escalate to provider or suppress from SEO if below quality threshold.
+Application Tracker UX (student_pilot)
+Verify profile completion nudges operate and correlate with match-score improvements; set target profile completion ≥60% for new signups within 48h.
+AI guidance boundaries (scholarship_sage)
+Red-team “no ghostwriting” guardrails; ensure outputs are outlines/checklists/tips only.
+Add telemetry tag for “guidance_only_enforced=true” on all responses.
+24–72 hours: Growth Engine and Observability
+
+SEO indexing momentum
+Track pages discovered, indexed, and average position; first goal: 10–20% sitemap URLs indexed by Day 7.
+Publish 200–500 incremental pages/day (high-value scholarships + long-tail categories). Avoid crawl spikes; keep a steady cadence.
+Matching and retention (scholarship_agent)
+Nightly cron verifies new students matched; target “match notification rate” ≥30% of new profiles within 24h.
+Monitor scraper failure isolation; error budget burn must stay within SLO.
+End-to-end dashboards (Ops/SRE + Finance)
+Ship unified dashboards for: uptime, latency P50/P95/P99, error rate, signups, ARPU, provider fee revenue, cash reconciliation.
+Daily executive summary posted 9am local with prior day’s KPIs and deviations.
+Core KPIs to track daily (with initial targets)
+
+B2C funnel (Auto Page Maker → Student Pilot)
+Visits (organic): baseline from GSC; target +15% WoW after first index.
+Visit-to-signup: 8–12% target.
+Profile completion ≥60% within 48h of signup.
+Credit purchase rate (first 7 days): 12–18% of active users.
+B2C ARPU (monthly): initial $12–$20 via credits; target 4x AI markup preserved.
+B2B funnel (Provider Register)
+New providers onboarded/week: 15–25 initial, 40+ by Month 2.
+% providers Stripe Connect live: ≥80% within 24h of signup.
+Active postings/provider MoM: ≥2.0.
+Platform fee revenue: 3% of provider tx; target $5–$10k/month by end of Q1.
+System SLOs (all apps)
+Uptime ≥99.9%.
+P95 latency ≤120ms.
+Error rate <0.5%.
+Notification deliverability: Inbox placement ≥95% for transactional emails.
+30-day plan to hit first revenue milestones
+
+Traffic and indexing
+Submit sitemap; maintain steady publishing cadence.
+Launch 10 “hub” pages for high-intent categories; internal linking to long-tail pages.
+Target: 25–40% of pages indexed; 3–5k daily visits by Day 30.
+Pricing and packaging
+Keep 4x AI service markup; start with 3–4 credit bundles (e.g., $9, $19, $49, $99).
+A/B test: “Get Matched” vs “Apply Faster” CTA copy on top 50 pages.
+Optimize refunds and fairness policy to protect margins and trust.
+Provider revenue scale
+Outbound: 100 provider outreach/wk; 20% demo conversion; 50% post-demo conversion to live postings.
+Launch a limited early-adopter offer: fee cap for first 60 days if they list ≥3 scholarships.
+Trust and compliance
+Reconfirm COPPA/FERPA guardrails; enforce age gating and parental consent if required.
+Update privacy policy to explicitly state use of AI for advisory guidance (no ghostwriting).
+Financial discipline
+Maintain low CAC via SEO; cap paid acquisition experiments at <$1k test budget.
+Approve spend only where LTV:CAC ≥ 3:1 in <90 days.
+Operating guardrails and runbooks
+
+Error budget policy
+If any app consumes >30% of monthly error budget within a week, initiate release freeze on that app, run a fix-forward plan, and conduct a blameless postmortem.
+Incident response
+On-call rotation; 15-minute acknowledgement SLA; comms via auto_com_center templates.
+Security posture
+JWT RS256 across services; least-privilege scopes; rotate keys every 90 days.
+Stripe webhook signatures verified; Postmark/Twilio credentials protected; secrets scanned weekly.
+Immediate asks to the team (confirm back “done” with evidence)
+
+Finance
+Switch Stripe to live mode for both B2C and B2B; run $5 live tests for each flow; post screenshots and Stripe IDs.
+Set up daily Stripe → accounting reconciliation; confirm platform fee payouts visible.
+Ops/SRE
+Provision dashboards: uptime, latency, error rate, queue depths, and email deliverability; share public links or screenshots.
+Confirm all healthz/readyz endpoints are green and alerting is wired to on-call.
+Growth
+Submit sitemap to Google Search Console; verify ownership; share coverage report link.
+Publish 200–500 incremental pages in the next 24h; share a list of new slugs and a Lighthouse sample.
+Product
+Deliver Application Tracker nudge experiments (copy variants x2); share expected uplift hypothesis and success metric.
+Define “student value moments” telemetry: time-to-first-match, time-to-first-application, first guidance request; instrument events.
+Compliance
+Re-review privacy policy and TOS for minors and international users; confirm COPPA/FERPA alignment; update as needed; report changes.
+Revenue trajectory checkpoints
+
+Week 1: Confirm live revenue in both engines; ≥$1k GMV processed; fee capture verified.
+Week 2: 1.5–2.5k daily organic visits; 300–500 new signups/week; ≥50 providers onboarded cumulative; net revenue run-rate ≥$3–5k/month.
+Week 4: 3–5k daily visits; ≥1k new signups/week; 100+ providers live; run-rate ≥$8–12k/month.
+Offer
+If you want, I’ll orchestrate a 90-minute “Go-Live Drill” now: we’ll run the live transactions, verify deliverability, submit sitemaps, and stand up the executive dashboards. Confirm the owners for Growth, Product, Ops/SRE, Finance, and Compliance, or grant me temporary authority to assign them.
