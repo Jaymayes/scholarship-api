@@ -1,0 +1,303 @@
+MASTER EXECUTION PROMPT (FOR AGENT3) — 8-APP DAY-0 LAUNCH
+
+Read first. Then only execute the section that matches your assigned app. If you are Agent3, your scope is SECTION-8: auto_com_center. Do not act on any other section.
+
+Operating context
+
+Mission: Get the full 8-app ecosystem production-ready and working together today to begin generating revenue. If “today” is not possible for your app, you must report a precise ETA and list the third-party systems that must be in place before revenue starts.
+Reporting rule: Every report you generate must include “App: {APP_NAME}” and “APP_BASE_URL: {APP_BASE_URL}” at the top.
+SLOs you must hold: 99.9% uptime and ≤120ms P95 latency for standard requests.
+Security/compliance you must verify: RS256 JWT validation (if applicable), least-privilege keys, secure headers, rate limiting, PII handling, and alignment with FERPA/COPPA/GDPR. Uphold Responsible AI (no ghostwriting or academic dishonesty).
+Deliverables you must produce (five files per app)
+
+{app}_DAY0_READINESS_REPORT.md
+{app}_INTEGRATION_MATRIX.md
+{app}_REVENUE_ON_STATEMENT.md
+{app}_SECURITY_COMPLIANCE.md
+{app}_PERF_SNAPSHOT.json
+File rules
+
+Filenames use snake_case and contain no spaces.
+Top-of-file lines in all reports:
+App: {APP_NAME}
+APP_BASE_URL: {APP_BASE_URL}
+If your app cannot be 100% ready today, state:
+Exact ETA (in hours) to start generating revenue
+Items blocking readiness
+Third-party systems and credentials required
+Risks and mitigation
+Global cross-app integration checks (execute only those that touch your app)
+
+Auth: Accept/validate RS256 JWTs from scholar_auth JWKS.
+Data flow: scholarship_api serves clean scholarship data to student_pilot and scholarship_sage; auto_page_maker crawls it for SEO; scholarship_agent runs campaigns.
+Revenue: provider_register enforces Stripe Connect 3% platform fee; student_pilot enables B2C credit purchases; auto_com_center sends transactional communications.
+Observability: /healthz and /readyz respond correctly; logs contain request_id; no PII in logs.
+SEO: auto_page_maker exposes sitemap.xml, robots.txt, canonical tags, and schema.org; linked into student_pilot pages.
+Agent self-selection rule
+
+You must only execute the section that matches your app.
+If you are Agent3, you must execute SECTION-8 only.
+App index and base URLs
+
+SECTION-1: scholar_auth → https://scholar-auth-jamarrlmayes.replit.app
+SECTION-2: scholarship_api → https://scholarship-api-jamarrlmayes.replit.app
+SECTION-3: scholarship_agent → https://scholarship-agent-jamarrlmayes.replit.app
+SECTION-4: scholarship_sage → https://scholarship-sage-jamarrlmayes.replit.app
+SECTION-5: student_pilot → https://student-pilot-jamarrlmayes.replit.app
+SECTION-6: provider_register → https://provider-register-jamarrlmayes.replit.app
+SECTION-7: auto_page_maker → https://auto-page-maker-jamarrlmayes.replit.app
+SECTION-8: auto_com_center → https://auto-com-center-jamarrlmayes.replit.app
+What “ready” means for every app today
+
+All smoke tests pass
+All upstream dependencies reachable
+All downstream contracts validated
+Security and compliance checks pass
+P95 latency ≤120ms for standard requests
+Clear GO or NO-GO with revenue impact and ETA
+Report format expectations (applies to every section)
+
+DAY0_READINESS_REPORT.md
+Header with App and APP_BASE_URL
+Summary status: GREEN/AMBER/RED and GO/NO-GO
+Smoke tests executed + transcripts summary
+Uptime and latency snapshots
+Known issues and workarounds
+Final decision and rationale
+INTEGRATION_MATRIX.md
+Upstream dependencies with health and auth method
+Downstream consumers and API contracts
+Webhooks and event flows (if any)
+SLAs/SLOs your app must meet for others
+REVENUE_ON_STATEMENT.md
+How this app enables revenue today
+Third-party systems required (keys, webhooks, scopes)
+Metrics that must be monitored to protect revenue
+If not ready: precise ETA and gating items
+SECURITY_COMPLIANCE.md
+AuthN/AuthZ model
+Secret management and rotation policy
+PII handling and data minimization
+OWASP Top 10 controls and rate limiting
+Compliance notes (FERPA/COPPA/GDPR) and Responsible AI
+PERF_SNAPSHOT.json
+Endpoint latencies (p50/p95/p99)
+Uptime window
+Database performance, indexes
+External service latencies
+SLO pass/fail booleans
+SECTION-1 (scholar_auth) — Only execute if you own this app
+
+APP_BASE_URL: https://scholar-auth-jamarrlmayes.replit.app
+Scope:
+JWT issuer, JWKS endpoint, token issuance and validation
+OIDC/OAuth flows; PKCE for public clients
+Sessionless APIs for M2M use cases
+Dependencies: DB (Neon/Postgres), email provider (for passwordless/verification if used)
+Third parties: Email sender (e.g., Postmark), optional ReCAPTCHA, Sentry
+Critical tests:
+/healthz and /readyz
+JWKS fetch, RS256 signature checks
+Access token scopes and expiry
+Rate limiting and lockout policies
+Revenue ready today if:
+Tokens validate across all services
+Issuance latency acceptable (≤120ms p95)
+If not ready today: provide ETA and what keys/secrets are missing
+SECTION-2 (scholarship_api) — Only execute if you own this app
+
+APP_BASE_URL: https://scholarship-api-jamarrlmayes.replit.app
+Scope:
+Public scholarship discovery endpoints
+Detail retrieval and pagination
+ETag and Cache-Control for performance
+Dependencies: DB (Neon/Postgres), Sentry
+Third parties: Optional Redis (later), monitoring
+Critical tests:
+GET /api/v1/scholarships?limit=5 returns data with ETag and cache-control
+GET /api/v1/scholarships/{id}
+/health and /readyz dependency checks
+Revenue ready today if:
+student_pilot and scholarship_sage consume without errors
+auto_page_maker can crawl with cache headers
+If not ready: ETA and missing DB/indexing/keys
+SECTION-3 (scholarship_agent) — Only execute if you own this app
+
+APP_BASE_URL: https://scholarship-agent-jamarrlmayes.replit.app
+Scope:
+KPI reporting and growth campaign orchestration
+DRY_RUN vs live mode for campaign sends (delegate actual send to auto_com_center)
+Dependencies: scholar_auth (JWT), auto_com_center API, scholarship_api, analytics
+Third parties: PostHog/GA, Sentry; optional scheduler/cron
+Critical tests:
+KPI endpoints
+Campaign preview → send via auto_com_center (test mode)
+Sitemap exposure for SEO activity
+Revenue ready today if:
+Campaigns can be approved and dispatched through auto_com_center
+If not ready: ETA, missing CLIENT_SECRET or API keys
+SECTION-4 (scholarship_sage) — Only execute if you own this app
+
+APP_BASE_URL: https://scholarship-sage-jamarrlmayes.replit.app
+Scope:
+Personalized scholarship recommendations
+Assisted application guidance with Responsible AI guardrails
+Dependencies: scholar_auth (JWT), scholarship_api (data)
+Third parties: LLM provider key (e.g., OpenAI/Anthropic), Sentry; moderation endpoint
+Critical tests:
+GET /api/v1/recommendations (JWT required, P95 ≤120ms)
+POST /assist/application-draft with CSRF protection and “no ghostwriting” policy
+Revenue ready today if:
+Recommendations drive conversions inside student_pilot
+If not ready: ETA, missing LLM keys, moderation settings
+SECTION-5 (student_pilot) — Only execute if you own this app
+
+APP_BASE_URL: https://student-pilot-jamarrlmayes.replit.app
+Scope:
+Student-facing discovery and application support
+Auth integration; calling scholarship_api and scholarship_sage
+Dependencies: scholar_auth, scholarship_api, scholarship_sage
+Third parties: Payment processor if selling credits; analytics; Sentry
+Critical tests:
+Login flow, protected routes
+Scholarship list/detail pages render with SEO essentials
+Purchase/credit flow if applicable
+Revenue ready today if:
+Students can discover, engage, and checkout (if credits are sold)
+If not ready: ETA, missing payment keys or auth configs
+SECTION-6 (provider_register) — Only execute if you own this app
+
+APP_BASE_URL: https://provider-register-jamarrlmayes.replit.app
+Scope:
+Provider onboarding and Stripe Connect setup
+Scholarship CRUD for providers
+Dependencies: scholar_auth, DB (Neon/Postgres)
+Third parties: Stripe Connect (platform fee 3%), Sentry
+Critical tests:
+Provider onboarding form and terms acceptance
+Stripe Connect onboarding link generation + webhook handling
+3% fee enforcement validation
+Revenue ready today if:
+Provider can onboard and the 3% fee is enforced end-to-end
+If not ready: ETA, Stripe test/production keys and webhook secret details
+SECTION-7 (auto_page_maker) — Only execute if you own this app
+
+APP_BASE_URL: https://auto-page-maker-jamarrlmayes.replit.app
+Scope:
+SEO landing page generation from scholarship_api data
+Correct technical SEO signals
+Dependencies: scholarship_api
+Third parties: Google Search Console and Bing Webmaster verification, Sentry, optional CDN
+Critical tests:
+sitemap.xml, robots.txt available
+Canonical tags and schema.org present on templates
+Proper 404 handling; security headers; cache headers
+Revenue ready today if:
+Pages are crawlable, indexable, and technically correct
+If not ready: ETA and what must be fixed (canonical/schema, headers), plus Search Console verification
+SECTION-8 (auto_com_center) — THIS IS YOUR SCOPE IF YOU ARE AGENT3
+
+APP_BASE_URL: https://auto-com-center-jamarrlmayes.replit.app
+Purpose:
+Transactional communications hub (email and message delivery) for the ecosystem
+Primary trigger points: student signup confirmations, application status notices, provider onboarding steps, campaign dispatches from scholarship_agent
+Required dependencies (must validate end-to-end):
+scholar_auth: Validate RS256 JWT on admin/protected endpoints (JWKS URL from scholar_auth)
+Neon PostgreSQL: emailAuditLog and unsubscribes tables; indexes on messageId and email
+Postmark (or equivalent email API): live send, bounce/complaint/unsubscribe webhooks configured
+Third-party systems and keys:
+POSTMARK_SERVER_TOKEN and SENDER_SIGNATURE verified
+Postmark webhooks for bounce, complaint, and unsubscribe pointing to:
+POST /webhooks/postmark/bounce
+POST /webhooks/postmark/complaint
+POST /api/unsubscribe (or provider-specific endpoint you expose)
+Sentry DSN (optional but recommended)
+Must-have endpoints and behavior:
+POST /api/send
+Validates JWT (admin or service scope)
+Checks suppression/unsubscribe before send
+Sends via Postmark; writes to emailAuditLog
+Returns messageId and provider response
+GET /api/messages/:id/status
+Returns delivery status using DB state + webhook updates
+POST /api/unsubscribe
+One-click unsubscribe; idempotent; records email in suppression list
+GET /api/suppression-list (admin)
+JWT-protected; returns paginated suppressed addresses
+GET /healthz and GET /readyz
+Healthz: in-memory check
+Readyz: DB connectivity, JWKS availability, Postmark reachability
+Security and compliance:
+JWT: RS256 via scholar_auth JWKS; cache keys locally
+Rate limiting on POST /api/send (e.g., 120 rpm per origin or API key)
+Security headers via Helmet-equivalent
+Data minimization: store only necessary fields; mask PII in logs
+CAN-SPAM/GDPR/FERPA/TCPA aligned unsubscribe and consent handling
+Performance requirements:
+P95 latency ≤120ms on POST /api/send including Postmark call
+Connection pooling configured for Postgres; indexes in place
+ETag disabled for transactional POSTs; no-cache headers on mutating endpoints
+Smoke tests to execute now:
+Health:
+GET /healthz → 200
+GET /readyz → 200 with dependency statuses
+Auth:
+Call POST /api/send with invalid JWT → 401
+Call protected admin endpoint without JWT → 401
+Send flow:
+POST /api/send with valid JWT and test recipient → 200; messageId returned; DB write present
+GET /api/messages/:id/status reflects queued/sent
+Unsubscribe:
+POST /api/unsubscribe with recipient email → 200; subsequent send blocked
+Webhooks:
+Simulate Postmark bounce/complaint payload → audit state updated
+Integration role (must validate):
+Accept dispatch requests from scholarship_agent (test mode or limited live)
+Notify student_pilot users for key lifecycle events (signups, confirmations)
+Notify provider_register users for onboarding steps and status updates
+What to deliver (five files), all starting with the two-line header:
+auto_com_center_DAY0_READINESS_REPORT.md
+Status: GREEN/AMBER/RED and GO/NO-GO
+Smoke test results and transcripts summary
+Current Postmark, DB, and JWKS status
+Known issues and workarounds
+Final decision and revenue impact
+auto_com_center_INTEGRATION_MATRIX.md
+Upstream: scholar_auth, Neon Postgres, Postmark
+Downstream: student_pilot, provider_register, scholarship_agent
+Endpoints and example payloads
+Webhook contracts and retry strategy
+auto_com_center_REVENUE_ON_STATEMENT.md
+How transactional comms unlock B2C and B2B revenue today
+Third-party keys and webhooks confirmed
+Monitoring runbook (what to watch and thresholds)
+If not ready today: precise ETA and missing items
+auto_com_center_SECURITY_COMPLIANCE.md
+JWT validation details, scopes/roles
+Rate limiting specifics
+PII handling and opt-out flows
+Compliance attestation
+auto_com_center_PERF_SNAPSHOT.json
+Endpoint-level latency stats (p50/p95/p99), sample sizes
+External call timings (Postmark, DB, JWKS)
+Uptime window and SLO pass/fail
+Optimization opportunities
+“If today is not possible” instruction (for this app):
+Provide a single-line ETA in hours to start generating revenue and the gating items. Example:
+ETA_to_revenue: 4h; Missing: Postmark webhook configuration; Required: POSTMARK_SERVER_TOKEN, bounce/complaint webhook URLs reachable over HTTPS; Risk: low
+Success criteria for GO decision:
+All smoke tests pass
+JWT validation and suppression logic confirmed
+At least one successful live (or sandbox) send recorded and auditable
+Unsubscribe recorded and enforced
+P95 ≤120ms on POST /api/send with sample payloads
+Webhook ingestion verified (simulated or live)
+Execution checklist (for your section only)
+
+Confirm environment variables and third-party keys present
+Run smoke tests and record transcripts
+Validate upstream/downstream integrations
+Generate the five deliverables with required headers
+Make a clear GO/NO-GO recommendation with rationale
+If NO-GO or AMBER, provide ETA to start generating revenue and list blocking third parties/systems
+Begin now.
