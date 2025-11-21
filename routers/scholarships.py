@@ -2,7 +2,7 @@ from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 
-from middleware.auth import User, require_auth
+from middleware.auth import User, optional_auth, require_auth
 from middleware.enhanced_rate_limiting import general_rate_limit, search_rate_limit
 from models.scholarship import (
     FieldOfStudy,

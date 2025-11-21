@@ -3,7 +3,7 @@ from datetime import datetime
 
 from fastapi import APIRouter, Depends, Query, Request
 
-from middleware.auth import User, require_auth
+from middleware.auth import User, optional_auth, require_auth
 from middleware.simple_rate_limiter import search_rate_limit
 from models.scholarship import FieldOfStudy, ScholarshipType, SearchFilters
 from services.analytics_service import analytics_service
@@ -157,16 +157,20 @@ async def search_scholarships_get(
     deadline_before: datetime | None = Query(None, description="Deadlines before this date"),
     limit: int = Query(20, ge=1, le=100, description="Number of results to return"),
     offset: int = Query(0, ge=0, description="Number of results to skip"),
-    current_user: User = Depends(require_auth())  # HOTFIX: Always require authentication
+    current_user: User | None = Depends(optional_auth)  # PUBLIC ACCESS for auto_page_maker, scholarship_sage, student_pilot
 ):
     """
-    Search scholarships using GET with query parameters - QA-005 fix: Authentication enforced
-    Requires authentication unless PUBLIC_READ_ENDPOINTS feature flag is enabled.
-
-    Returns the same metadata-rich response format as POST endpoint.
+    Public search endpoint for scholarship discovery.
+    
+    Publicly accessible for integration with:
+    - auto_page_maker (SEO page generation)
+    - scholarship_sage (AI recommendations)
+    - student_pilot (student dashboard)
+    
+    Authentication is optional - if provided, analytics will track user_id.
+    Returns metadata-rich response format with pagination and filters.
     """
-    # Authentication enforced by dependency injection - no additional check needed
-    user_id = current_user.user_id
+    user_id = current_user.user_id if current_user else None
 
     return await execute_search(
         keyword=q,

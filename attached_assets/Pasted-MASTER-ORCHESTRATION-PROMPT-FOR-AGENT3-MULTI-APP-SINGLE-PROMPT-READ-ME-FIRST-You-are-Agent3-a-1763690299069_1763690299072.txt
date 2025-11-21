@@ -1,0 +1,211 @@
+MASTER ORCHESTRATION PROMPT FOR AGENT3 (MULTI-APP, SINGLE-PROMPT)
+READ ME FIRST
+
+You are Agent3 assigned to exactly one application in the Scholar AI Advisor ecosystem.
+Only read and execute the section labeled FOR: <your app>. Ignore every other section.
+On every status update, log, PR comment, or artifact you produce, start with: App: <APP_NAME> | Base URL: <APP_BASE_URL>
+Goal today: get your app production-ready, integrated with the other apps, and contributing to revenue. If completion today is not possible, you must return:
+an ETA to be ready to start generating revenue (or resume, if already earning), and
+the exact third-party systems and credentials still required, with owners and unblock steps.
+GLOBAL OPERATING RULES (APPLY TO ALL APPS)
+
+SLOs: 99.9% uptime, <=120ms P95 latency, zero PII leaks, Responsible AI guardrails enforced.
+Security: HTTPS only, least-privilege keys, rotate secrets used today, implement /healthz and /readyz, and rate-limit public endpoints.
+Observability: expose a metrics endpoint and basic logs; ensure error-rate and latency can be tracked. Use existing platform tools; if missing, report the gap with an ETA.
+Interop: use the base URLs provided below; do not hardcode anything else. Use feature flags for any non-trivial change.
+Delivery today: ship a working, integrated path that allows student discovery and application support, and provider onboarding and listing. Non-critical enhancements can be deferred, but you must document them in your report with ETA.
+Blockers: if a dependency is missing, implement a safe fallback (stub/mock, queue, or cached response) and report exactly what is needed to remove the fallback.
+SERVICE DIRECTORY (FOR REFERENCE; ONLY USE YOUR SECTION)
+
+scholar_auth → https://scholar-auth-jamarrlmayes.replit.app
+scholarship_api → https://scholarship-api-jamarrlmayes.replit.app
+scholarship_agent → https://scholarship-agent-jamarrlmayes.replit.app
+scholarship_sage → https://scholarship-sage-jamarrlmayes.replit.app
+student_pilot → https://student-pilot-jamarrlmayes.replit.app
+provider_register → https://provider-register-jamarrlmayes.replit.app
+auto_page_maker → https://auto-page-maker-jamarrlmayes.replit.app
+auto_com_center → https://auto-com-center-jamarrlmayes.replit.app
+THIRD-PARTY SYSTEMS (ONLY USE WHAT YOUR SECTION CALLS FOR)
+
+Payments: Stripe (Stripe Secret Key, Connect onboarding, Webhook secret)
+Email: Postmark (server token), or equivalent transactional email
+Messaging (optional): Twilio or equivalent
+Monitoring/Errors: Sentry or equivalent
+Caching/Queue (optional): Upstash Redis or equivalent
+Analytics: GA4 or privacy-preserving equivalent for funnel measurement
+REPORTING TEMPLATE (USE THIS HEADER ON ALL OUTPUT)
+
+App: <APP_NAME> | Base URL: <APP_BASE_URL>
+Status: Green/Yellow/Red
+Today’s Deliverables: …
+Verification Evidence (URLs, curl, screenshots): …
+Remaining Gaps and ETAs: …
+Third-Party Dependencies Outstanding: …
+Go/No-Go: Go/No-Go + reason
+FOR: scholar_auth | APP_BASE_URL=https://scholar-auth-jamarrlmayes.replit.app
+mandate
+
+Provide centralized auth for students and providers.
+Expose OIDC discovery, token issuance, JWKS, and simple roles/claims.
+Enforce Responsible AI consent and opt-in tracking flags in tokens.
+deliver today
+
+Live endpoints: /.well-known/openid-configuration, /.well-known/jwks.json, /oauth/token, /healthz, /readyz.
+Issue access tokens with roles (student/provider/admin) and scopes needed by other apps.
+Publish a minimal integration guide with example curl for token retrieval and JWKS verification.
+Latency: <=120ms P95 on JWKS and config; token endpoint <=300ms P95.
+integration points to validate
+
+student_pilot and scholarship_sage must validate JWTs from scholar_auth.
+provider_register must request tokens for provider onboarding flows.
+scholarship_api should accept and validate tokens where needed.
+if not done today
+
+Return ETA and what is missing (e.g., Postmark for MFA emails, rate-limiter, Sentry DSN).
+Provide temporary static keys and a JWKS URL that won’t rotate during the interim.
+FOR: scholarship_api | APP_BASE_URL=https://scholarship-api-jamarrlmayes.replit.app
+mandate
+
+Provide scholarship discovery, search, and detail retrieval APIs.
+Serve content to auto_page_maker and scholarship_sage.
+Expose health and readiness endpoints; implement basic caching and rate limits.
+deliver today
+
+Live endpoints: GET /api/v1/search?q=, GET /api/v1/scholarships/:id, /healthz, /readyz.
+Caching: server-side or CDN cache with short TTLs on scholarship details.
+Input validation and pagination; 429 on abuse.
+Minimal OpenAPI spec and example curl to fetch one scholarship by ID.
+integration points to validate
+
+auto_page_maker uses scholarship_api to build SEO pages.
+scholarship_sage uses search/detail for recommendations.
+student_pilot surfaces results returned by scholarship_api.
+if not done today
+
+Provide ETA and prerequisites (e.g., DB migrations, Upstash cache, Sentry).
+FOR: scholarship_agent | APP_BASE_URL=https://scholarship-agent-jamarrlmayes.replit.app
+mandate
+
+Run autonomous marketing campaigns to acquire students and providers.
+Feed auto_page_maker with topics and keywords; schedule publishing.
+Report daily KPIs to CEO: visits, signups, CAC proxy, conversions.
+deliver today
+
+Integrate with auto_page_maker to request at least 50 SEO pages on high-intent keywords.
+Pull top scholarships from scholarship_api for content seeding.
+Publish a campaign plan and a live dashboard endpoint (simple JSON) with today’s numbers.
+integration points to validate
+
+auto_page_maker page creation jobs receive inputs and return URLs.
+student_pilot captures signups; track attribution UTM.
+if not done today
+
+Provide ETA and any needed API keys (e.g., GA4, webhook URL for tracking).
+FOR: scholarship_sage | APP_BASE_URL=https://scholarship-sage-jamarrlmayes.replit.app
+mandate
+
+Deliver AI-driven matching and application guidance without enabling academic dishonesty.
+Use scholarship_api for data; honor scholar_auth roles/claims.
+deliver today
+
+Live endpoints: POST /assist/match and/or /assist/application-draft; GET /faq; /healthz; /readyz.
+Bias and safety checks enabled; emit guidance, not ghostwriting.
+Idempotency on assist calls; retries with backoff; log prompts safely (PII scrubbed).
+Return example curl commands for both endpoints.
+integration points to validate
+
+Accept student JWTs from scholar_auth.
+Read scholarship details from scholarship_api.
+Display results in student_pilot; optionally send messages via auto_com_center.
+if not done today
+
+Provide ETA and any missing model keys, safety layer, or caching layer.
+FOR: student_pilot | APP_BASE_URL=https://student-pilot-jamarrlmayes.replit.app
+mandate
+
+Student experience hub: login, discover, match, and manage applications.
+Convert free users to paid credits where applicable.
+deliver today
+
+Auth with scholar_auth; show scholarship_api search; call scholarship_sage for guidance.
+Surface a minimal application-tracker UI and an upgrade-to-credits CTA if applicable.
+Add /healthz and /readyz; basic analytics event for signup and first search.
+integration points to validate
+
+JWT flow with scholar_auth.
+Read from scholarship_api; call scholarship_sage; optionally log comms via auto_com_center.
+if not done today
+
+Provide ETA and any blocking third-party (e.g., GA4, email verification).
+FOR: provider_register | APP_BASE_URL=https://provider-register-jamarrlmayes.replit.app
+mandate
+
+Onboard scholarship providers; collect program data; connect payments (3% platform fee).
+Push listings to scholarship_api (or emit event/webhook).
+deliver today
+
+Provider onboarding form with scholar_auth provider role.
+Stripe Connect onboarding with webhook handler; store provider profile minimally.
+Expose POST /providers and webhook endpoint; /healthz and /readyz.
+Send a minimal provider listing payload to scholarship_api or return a documented stub if API write is not yet available.
+integration points to validate
+
+JWT validation via scholar_auth.
+Stripe Connect webhooks working end-to-end.
+Listing data sent to scholarship_api for discovery (or queued).
+if not done today
+
+Provide ETA and missing Stripe keys/webhook secret; specify data handoff method to scholarship_api.
+FOR: auto_page_maker | APP_BASE_URL=https://auto-page-maker-jamarrlmayes.replit.app
+mandate
+
+Generate scalable SEO pages that load fast, render scholarship details, and self-update.
+Keep CAC low via organic acquisition.
+deliver today
+
+Accept page generation jobs from scholarship_agent and build pages using scholarship_api data.
+Ensure robots, sitemap, canonical, and no broken links; expose /sitemap.xml and /healthz and /readyz.
+Publish at least 50 pages with valid schema.org where possible; return list of URLs.
+integration points to validate
+
+Read scholarship details from scholarship_api.
+Accept inputs from scholarship_agent; export generated URLs to scholarship_agent for KPI tracking.
+if not done today
+
+Provide ETA and any missing cache/CDN or metadata templates.
+FOR: auto_com_center | APP_BASE_URL=https://auto-com-center-jamarrlmayes.replit.app
+mandate
+
+Centralize outbound comms (email/SMS/in-app) for students and providers.
+Provide templating, opt-in/opt-out, and delivery reports.
+deliver today
+
+Email delivery via Postmark (or equivalent) with one student onboarding template and one provider onboarding template.
+Expose POST /messages/send; GET /messages/:id/status; /healthz; /readyz.
+Basic rate-limit per recipient and suppression list.
+integration points to validate
+
+student_pilot triggers student welcome message.
+provider_register triggers provider welcome/completion messages.
+scholarship_agent can trigger campaign drips (optional today).
+if not done today
+
+Provide ETA and missing Postmark/Twilio credentials; document required templates.
+END-OF-DAY DELIVERABLES (ALL APPS)
+
+Readiness Report using the reporting template (include App and APP_BASE_URL line).
+Live endpoint list with example curl commands and expected responses.
+Integration test evidence: at least one end-to-end call chain that crosses into or out of your app.
+If “not today,” provide an ETA and third-party dependency list with owners and exact secrets or configs required to start generating revenue.
+EXECUTION TIMELINE (TODAY, SUGGESTED)
+
+T+0 to T+60: Harden auth/health/metrics, confirm base endpoints live.
+T+60 to T+150: Wire the 1–2 critical integrations your app must support.
+T+150 to T+210: Ship verification artifacts (curl, screenshots, OpenAPI/JSON).
+T+210 to T+270: Resolve blockers via stubs/fallbacks; log exact third-party needs if any.
+T+270 to T+300: Final Readiness Report with Go/No-Go. If No-Go, include ETA and dependency list.
+REMINDERS
+
+Only execute your section. Do not modify or assume control of other services.
+Always begin every output with: App: <APP_NAME> | Base URL: <APP_BASE_URL>
+If an external dependency is missing, use a safe fallback and report what is needed to remove it.
