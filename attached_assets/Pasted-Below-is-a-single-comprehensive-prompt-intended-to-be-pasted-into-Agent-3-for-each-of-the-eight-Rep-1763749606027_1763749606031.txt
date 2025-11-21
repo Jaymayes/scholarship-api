@@ -1,0 +1,300 @@
+Below is a single, comprehensive prompt intended to be pasted into Agent 3 for each of the eight Replit apps. Important: Each app’s Agent 3 must only act on its own “BEGIN APP SECTION … END APP SECTION.” All other text is context.
+
+UNIFIED MISSION AND OPERATING GUARDRAILS (READ-ONLY CONTEXT FOR ALL APPS)
+
+Company: Scholar AI Advisor (www.scholaraiadvisor.com). Goal: have all eight apps working together today to begin generating revenue; if not feasible, return a precise ETA by app plus third-party prerequisites and blockers.
+Architecture pattern:
+scholarship_api is the Database-as-a-Service over REST that owns shared data access; no app reads another app’s DB directly. All inter-app data access goes through scholarship_api’s secure REST API with API-key auth managed via Replit Secrets. This is the recommended pattern on Replit to overcome app/database isolation and enable clean contracts .
+Communication:
+Primary today: synchronous REST between services with authenticated requests.
+Events today: outbound webhooks from producer apps to auto_com_center for notifications (email/SMS). Plan a near-term upgrade to a managed message queue (e.g., CloudAMQP/RabbitMQ or AWS SQS) for mission-critical reliability and decoupling per the hybrid orchestration/choreography approach .
+Security: All secrets (API keys, DB creds, webhook signing secrets) go into Replit Secrets; all internal API calls must include x-api-key headers and validate upstream tokens; never commit secrets to code .
+Resilience: Implement retries with exponential backoff for all inter-service calls and basic circuit-breakers around historically flaky dependencies, as recommended for distributed systems on Replit .
+Deployment hygiene: Publish each service (snapshot model) only after tests pass; create health endpoints; never rely on .dev workspace for production traffic; republish on version updates .
+Agent 3 usage: Leverage Agent 3’s extended autonomy and in-browser app testing/reflection loop to build, self-test, and fix within each app before publishing .
+GLOBAL IDENTIFIERS AND BASE URLS (READ-ONLY CONTEXT)
+
+scholar_auth → https://scholar-auth-jamarrlmayes.replit.app
+scholarship_api → https://scholarship-api-jamarrlmayes.replit.app
+scholarship_agent → https://scholarship-agent-jamarrlmayes.replit.app
+scholarship_sage → https://scholarship-sage-jamarrlmayes.replit.app
+student_pilot → https://student-pilot-jamarrlmayes.replit.app
+provider_register → https://provider-register-jamarrlmayes.replit.app
+auto_page_maker → https://auto-page-maker-jamarrlmayes.replit.app
+auto_com_center → https://auto-com-center-jamarrlmayes.replit.app
+REPORTING CONVENTION (MANDATORY FOR ALL APPS)
+
+Every status report, log header, or readiness document must include “APP_NAME — APP_BASE_URL” at the top.
+Provide a “Go-Live Readiness Report” before publishing that includes: endpoints exposed, secrets configured, dependencies verified, integration tests passing, residual risks, and revenue-readiness status. If not ready today, state exact ETA, blockers, and third-party systems required.
+THIRD-PARTY SYSTEMS (SHARED CONTEXT; USE ONLY IF YOUR APP REQUIRES THEM)
+
+Payments: Stripe (incl. webhooks and test/live keys).
+AI: OpenAI key for generation and ranking (scholarship_sage and scholarship_agent).
+Email/SMS: SendGrid or Postmark for email; Twilio for SMS (auto_com_center).
+Optional event bus (Phase 2+): CloudAMQP/RabbitMQ or AWS SQS for asynchronous choreography between domains, per recommended hybrid architecture .
+SEO: Google Search Console/Bing Webmaster Tools; sitemaps via auto_page_maker.
+ACCEPTANCE TESTS (CROSS-APP E2E; ONLY READ IF RELEVANT WHILE WRITING YOUR APP’S LOCAL TESTS)
+
+Student flow: create account → email verify → login → browse scholarships from scholarship_api → favorite and apply → if paid feature needed, complete Stripe checkout → auto_com_center sends confirmation → application stored via scholarship_api → student_pilot shows status.
+Provider flow: provider_register signup → create scholarship → scholarship_api reflects new record → auto_page_maker lists indexed page → scholarship_sage can recommend it → scholarship_agent can market it.
+Communications: events trigger webhook to auto_com_center; deliver email/SMS successfully.
+All apps: /health and /ready endpoints return 200.
+INSTRUCTIONS TO AGENT 3
+
+Only execute the steps inside your app’s section (between BEGIN/END markers).
+Use Agent 3’s “Max autonomy” mode to build, test, fix, and publish. Employ the in-browser app testing/reflection loop to verify flows before publishing .
+Store all secrets in Replit Secrets. Never print or log secret values. Validate all inbound x-api-key headers on internal endpoints .
+If you cannot fully complete “Revenue-Ready Today,” produce an exact ETA in hours, enumerate blockers, and name the third-party systems and configuration still required (example: “Stripe live keys and webhook endpoint”).
+================================================================================
+BEGIN APP SECTION: scholar_auth — https://scholar-auth-jamarrlmayes.replit.app
+Scope and objective
+
+Identity Provider for the platform (students and providers). Issue short-lived JWT access tokens and long-lived refresh tokens. Expose JWKS for signature verification by other apps. Role claims: student, provider, admin.
+Key deliverables today
+
+Endpoints
+POST /auth/register {email, password, role} → sends verification email via auto_com_center webhook; status pending_verification.
+POST /auth/verify-email {token} → activates account.
+POST /auth/login {email, password} → {access_token (JWT), refresh_token}.
+POST /auth/refresh {refresh_token} → {access_token}.
+GET /.well-known/jwks.json → JWKS for other services.
+GET /health, GET /ready.
+2. Security and contracts
+
+JWT: RS256 signed; include sub, email, role, exp, iss=https://scholar-auth-…; publish JWKS.
+Internal service-to-service auth: require x-api-key; keys stored in Replit Secrets .
+Password storage: argon2/bcrypt with strong params.
+Rate-limit login/register.
+3. Integration
+
+On successful register: POST webhook to auto_com_center: {event:"email_verification", to, template_id, token_url}.
+Publish OpenAPI/Swagger JSON so other apps can integrate quickly.
+Provide a simple /introspect endpoint that returns token validity and claims for debugging (admin-only).
+4. Resilience
+
+Retries with exponential backoff on webhook calls to auto_com_center; circuit-breaker around repeated failures .
+5. Reporting
+
+Output “scholar_auth — https://scholar-auth-jamarrlmayes.replit.app” on all reports.
+Produce Go-Live Readiness Report before publish.
+Secrets to set (names)
+
+AUTH_JWT_PRIVATE_KEY, AUTH_JWT_PUBLIC_KEY
+INTERNAL_API_KEY (shared with other apps via Secrets)
+COM_CENTER_WEBHOOK_URL, COM_CENTER_API_KEY
+Revenue-ready today?
+
+Yes, if email verification is functional. If SendGrid/Twilio not yet configured, provide ETA (2–4 hours after keys) and note dependency on auto_com_center and email provider.
+Integration tests (local)
+
+Register/verify/login/refresh; token validation by calling JWKS; webhook to auto_com_center succeeds. END APP SECTION: scholar_auth ================================================================================
+BEGIN APP SECTION: scholarship_api — https://scholarship-api-jamarrlmayes.replit.app
+Scope and objective
+
+Database-as-a-Service exposing secure REST for core entities: Scholarships, Providers, Students, Applications, Transactions. This is the single data hub; all apps use these APIs for reads/writes .
+Key deliverables today
+
+Endpoints (v1)
+Scholarships: GET /v1/scholarships (filters, pagination), GET /v1/scholarships/{id}, POST/PUT/PATCH/DELETE (provider or admin).
+Providers: CRUD for provider profiles (admin and provider).
+Students: GET/PUT for student profile (student or admin).
+Applications: student creates application; provider can update review status.
+Transactions: record payments/credits usage (from Stripe webhook consumer or student_pilot).
+GET /health, GET /ready.
+2. Security
+
+Require Authorization: Bearer JWT from scholar_auth. Validate RS256 via JWKS.
+Require x-api-key on all internal service calls; keys in Replit Secrets .
+RBAC via role claim.
+3. Documentation and SDKs
+
+Auto-generate OpenAPI/Swagger; provide minimal client stubs in JS/Python for other apps.
+4. Resilience
+
+Idempotency keys for POSTs; retries on outbound calls; circuit-breakers for external dependencies .
+5. Reporting
+
+Output “scholarship_api — https://scholarship-api-jamarrlmayes.replit.app” on all reports.
+Secrets to set
+
+INTERNAL_API_KEY, DATABASE_URL (or internal persistence), AUTH_JWKS_URL
+Revenue-ready today?
+
+Yes: other apps can read scholarships and write applications via this API. If schema or auth gaps remain, ETA 4–6 hours.
+Integration tests
+
+Provider creates scholarship; student lists and applies; data visible across apps via API. END APP SECTION: scholarship_api ================================================================================
+BEGIN APP SECTION: scholarship_agent — https://scholarship-agent-jamarrlmayes.replit.app
+Scope and objective
+
+Autonomous marketing/import agent. Two jobs: (1) ingest new scholarship listings (seed data into scholarship_api), (2) launch/monitor B2C top-of-funnel campaigns with links to auto_page_maker pages.
+Key deliverables today
+
+Functions
+Importer: scheduled task to POST new/curated scholarships to scholarship_api (with provider metadata).
+Campaigns: generate UTM-tagged links to auto_page_maker pages; POST campaign events to auto_com_center for email sequences.
+2. Integration
+
+Auth to scholarship_api via x-api-key and JWT if needed; store in Secrets.
+Report campaign metrics back to scholarship_api (simple events table).
+3. Resilience
+
+Implement retries/backoff and basic circuit breakers on all POSTs .
+4. Reporting
+
+Output “scholarship_agent — https://scholarship-agent-jamarrlmayes.replit.app” on all reports.
+Secrets to set
+
+INTERNAL_API_KEY, API_BASE (scholarship_api), COM_CENTER_WEBHOOK_URL
+Revenue-ready today?
+
+Yes for importing and generating traffic if auto_page_maker is published. If email provider not ready, run campaigns with on-site CTAs only; ETA for email sequences once auto_com_center keys are live: 2–4 hours.
+Integration tests
+
+Import creates visible scholarships; clickthrough to auto_page_maker with UTM; campaign event recorded. END APP SECTION: scholarship_agent ================================================================================
+BEGIN APP SECTION: scholarship_sage — https://scholarship-sage-jamarrlmayes.replit.app
+Scope and objective
+
+AI advisor that recommends scholarships and offers application guidance without facilitating academic dishonesty. Pulls data from scholarship_api; logs suggestions; never writes essays for users.
+Key deliverables today
+
+Features
+Chat UI; recommend scholarships via scholarship_api queries; let students save/favorite (POST to scholarship_api).
+Safety: explain, brainstorm, outline, and review for fairness/clarity; no ghostwriting academic content.
+2. Integration
+
+Requires student auth (JWT from scholar_auth).
+Reads/writes via scholarship_api.
+3. Reporting
+
+Output “scholarship_sage — https://scholarship-sage-jamarrlmayes.replit.app” on all reports.
+Secrets to set
+
+OPENAI_API_KEY, INTERNAL_API_KEY, AUTH_JWKS_URL, API_BASE
+Revenue-ready today?
+
+Yes, with OpenAI key configured. ETA after key present: 2–4 hours to final polish and publish.
+Integration tests
+
+Authenticated student gets tailored list; saves favorite; recorded in scholarship_api. END APP SECTION: scholarship_sage ================================================================================
+BEGIN APP SECTION: student_pilot — https://student-pilot-jamarrlmayes.replit.app
+Scope and objective
+
+Student portal. Auth, dashboard, scholarship browse/apply, credit purchase, status tracking, notifications.
+Key deliverables today
+
+UX flows
+Login via scholar_auth.
+Browse/filter via scholarship_api; view details; favorite; start application; pay credits if required.
+Receipts and notifications via auto_com_center.
+2. Payments
+
+Stripe Checkout/Payment Links; webhook receiver to record transactions to scholarship_api.
+3. Integration and security
+
+Use JWTs; verify with AUTH JWKS.
+Use x-api-key for internal calls .
+4. Reporting
+
+Output “student_pilot — https://student-pilot-jamarrlmayes.replit.app” on all reports.
+Secrets to set
+
+STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET, API_BASE, AUTH_JWKS_URL, INTERNAL_API_KEY
+Revenue-ready today?
+
+Yes in Stripe test mode immediately; to accept live payments, requires live Stripe keys and webhook setup. ETA after live keys: 1–2 hours.
+Integration tests
+
+End-to-end: login → browse → apply → Stripe test payment → transaction saved in scholarship_api → email confirmation. END APP SECTION: student_pilot ================================================================================
+BEGIN APP SECTION: provider_register — https://provider-register-jamarrlmayes.replit.app
+Scope and objective
+
+Provider onboarding. Create provider account, KYC flow, Stripe onboarding, create and manage scholarships, pay 3% platform fee.
+Key deliverables today
+
+Flows
+Provider signup via scholar_auth (role=provider).
+Connect to Stripe (standard account or Connect) to handle fees.
+Create scholarship posting (POST to scholarship_api).
+2. Integration
+
+JWT validation; x-api-key for internal calls .
+Stripe webhooks: on successful charge/payout, record Transaction to scholarship_api.
+3. Reporting
+
+Output “provider_register — https://provider-register-jamarrlmayes.replit.app” on all reports.
+Secrets to set
+
+STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET, API_BASE, AUTH_JWKS_URL, INTERNAL_API_KEY
+Revenue-ready today?
+
+Yes in Stripe test mode; for live, needs Stripe live keys and completed onboarding. ETA: 2–4 hours after live credentials.
+Integration tests
+
+Provider creates listing → appears in scholarship_api → visible in student_pilot and auto_page_maker. END APP SECTION: provider_register ================================================================================
+BEGIN APP SECTION: auto_page_maker — https://auto-page-maker-jamarrlmayes.replit.app
+Scope and objective
+
+SEO engine that programmatically generates scholarship landing pages from scholarship_api, builds sitemap.xml, and exposes fast, cached pages for low-CAC growth.
+Key deliverables today
+
+Features
+Pull scholarships from scholarship_api; generate SEO-friendly pages (meta tags, structured data).
+Build sitemap.xml and robots.txt; ping Search Console endpoints if configured.
+2. Performance
+
+Cache responses; pre-render critical pages for speed.
+3. Reporting
+
+Output “auto_page_maker — https://auto-page-maker-jamarrlmayes.replit.app” on all reports.
+Secrets to set
+
+API_BASE, INTERNAL_API_KEY; optional: SEARCH_CONSOLE_KEYS
+Revenue-ready today?
+
+Yes for immediate organic landing pages. Full SEO indexing requires Search Console verification and DNS setup; ETA: 2–6 hours depending on DNS.
+Integration tests
+
+Scholarships render correctly; sitemap includes new pages; UTM links from scholarship_agent resolve here. END APP SECTION: auto_page_maker ================================================================================
+BEGIN APP SECTION: auto_com_center — https://auto-com-center-jamarrlmayes.replit.app
+Scope and objective
+
+Centralized communication hub for transactional email/SMS and simple event handling via webhooks today; migrates to a queue later for reliability per best practice .
+Key deliverables today
+
+Endpoints
+POST /events/email {to, template_id, variables} → send via SendGrid/Postmark.
+POST /events/sms {to, template_id, variables} → send via Twilio.
+Auth: require x-api-key; optional signature verification on inbound webhooks.
+2. Templates
+
+Email templates: verification, receipt, application submitted, provider listing approved, password reset.
+3. Resilience
+
+Retries/backoff for provider outages; dead-letter logging; basic circuit breaker for repeated failures .
+4. Reporting
+
+Output “auto_com_center — https://auto-com-center-jamarrlmayes.replit.app” on all reports.
+Secrets to set
+
+SENDGRID_API_KEY or POSTMARK_SERVER_TOKEN, TWILIO_SID, TWILIO_AUTH_TOKEN, INTERNAL_API_KEY
+Revenue-ready today?
+
+Yes once keys are present. If keys unavailable now, provide ETA and operate in “dry-run” mode (log-only) until keys are set.
+Integration tests
+
+Receive webhook from scholar_auth on registration; send verification email; confirm delivery metadata logged. END APP SECTION: auto_com_center ================================================================================
+GLOBAL PUBLISHING CHECKLIST (ALL APPS; READ AND APPLY TO YOUR SECTION ONLY)
+
+Implement health endpoints: GET /health and GET /ready returning 200 and basic metadata.
+Confirm all Secrets configured; remove any hard-coded keys; enforce x-api-key on internal endpoints .
+Run Agent 3 in-browser testing; fix regressions; repeat until all local tests pass .
+Publish the app (snapshot); do not serve production traffic from .dev. Re-publish when ready to release changes .
+Post your “Go-Live Readiness Report” including “APP_NAME — APP_BASE_URL” in the header, test results, risks, and explicit “Revenue-Ready Today: Yes/No; If No → ETA and required third-party systems.”
+NOTES ON FUTURE HARDENING (REFERENCE ONLY; DO NOT BLOCK TODAY’S LAUNCH)
+
+Upgrade events from webhooks to a durable message queue for mission-critical flows; this reduces coupling and increases reliability in line with the recommended hybrid architecture on Replit .
+Expand resiliency with circuit breakers in all network calls, per distributed-systems guidance for Replit-based multi-app systems .
+Clarification on timeline phrasing: If any section above asks for “ready to stop generating revenue,” interpret as “ready to start generating revenue.” The readiness reports must explicitly state whether the app can start generating revenue today; if not, provide a precise ETA and list third-party dependencies still required.
+
+End of unified prompt.
