@@ -1,0 +1,321 @@
+AGENT3 MASTER EXECUTION PROMPT
+Read this entire prompt first. Then execute only the APP SECTION that matches the repository you’re currently in. Do not execute any other app’s section. The goal is to get your app 100% production‑ready and working with the rest of the ecosystem today. If that is not possible, you must provide a precise ETA to start generating revenue and list the third‑party systems that must be in place to unlock revenue.
+
+Global rules for all apps
+
+Strict scope: Execute only your app’s section. Ignore every other section.
+Reporting header on every file: The first line in every deliverable must be: App: {APP_NAME} | APP_BASE_URL: {APP_BASE_URL}
+Where to write files: Project root. No subfolders. No spaces in filenames.
+Required deliverables (7 files, exact names):
+{app}_DAY0_READINESS_REPORT.md
+{app}_INTEGRATION_MATRIX.md
+{app}_REVENUE_ON_STATEMENT.md
+{app}_SECURITY_COMPLIANCE.md
+{app}_PERF_SNAPSHOT.json
+{app}_SMOKE_TEST_RESULTS.md
+{app}_SLO_SNAPSHOT.md
+Status line (required, single line, print to console and include at bottom of DAY0_READINESS_REPORT.md): App: {app} | Status: {GREEN|YELLOW|RED} | Revenue today: {YES|CONDITIONAL YES|NO} | ETA: {# hours or 0 hours} | Third-party prerequisites: {list with ✅ or ⏳ or ❌}
+SLO targets for all production endpoints:
+Uptime ≥ 99.9%
+P95 latency ≤ 120 ms
+Error rate < 0.5%
+Success rate ≥ 99%
+Revenue today definitions:
+YES: All critical revenue paths are live, tested end‑to‑end, and can transact today.
+CONDITIONAL YES: A trivial manual action (e.g., “Publish” click) or non‑critical lag (e.g., search indexing) stands between now and revenue.
+NO: A missing dependency or defect blocks revenue. Provide exact ETA in hours and a list of third‑party prerequisites.
+Evidence rules:
+Run live tests. Don’t fabricate results.
+List each test you executed, its result (status code, latency), and any IDs/timestamps you received.
+If you can’t reach a dependency, mark it ⏳ or ❌ and state the next action.
+Rollback criteria (apply to all apps unless overridden below):
+Auto‑rollback if any of the following persist >10 minutes:
+P95 latency > 120 ms
+Error rate > 2%
+5xx > 0.5%
+Auth failures spike abnormally
+Post‑publish 5‑minute verification protocol (document in SMOKE_TEST_RESULTS.md and SLO_SNAPSHOT.md):
+/healthz and /readyz return 200
+Dependencies healthy (DB/JWKS/keys/3rd parties)
+Capture SLO snapshot
+Execute one revenue‑path transaction and capture IDs
+Begin 2‑hour watch with anomaly notes
+App registry (use these APP_BASE_URL values)
+
+scholar_auth → https://scholar-auth-jamarrlmayes.replit.app
+scholarship_api → https://scholarship-api-jamarrlmayes.replit.app
+scholarship_agent → https://scholarship-agent-jamarrlmayes.replit.app
+scholarship_sage → https://scholarship-sage-jamarrlmayes.replit.app
+student_pilot → https://student-pilot-jamarrlmayes.replit.app
+provider_register → https://provider-register-jamarrlmayes.replit.app
+auto_page_maker → https://auto-page-maker-jamarrlmayes.replit.app
+auto_com_center → https://auto-com-center-jamarrlmayes.replit.app
+APP SECTION: scholar_auth
+Only execute this section if you are in the scholar_auth repository.
+
+Objective
+
+Provide OIDC-compliant authentication for all apps with RS256 JWTs and JWKS discovery.
+Be production‑ready today. If not, provide ETA to start generating revenue for dependent apps.
+Minimum tests to run and document
+
+GET /health and GET /readyz → 200 with dependency health
+GET /.well-known/jwks.json → 200 returns at least one RS256 key
+GET /oidc/.well-known/openid-configuration → 200 RFC 8414 compliant
+POST /oidc/token (auth code + PKCE and client_credentials) → 200
+Verify JWT signature and claims: iss, aud, sub, iat, exp, scope (non‑null)
+POST /oidc/token/introspection → 200 with meaningful result
+Protected endpoint: 401 without token, 200 with valid token
+Rate limiting verified (document thresholds and behavior)
+Third‑party prerequisites
+
+Neon/PostgreSQL DATABASE_URL ✅
+Replit Secrets (all required keys) ✅
+JWKS cache headers configured (ETag/Cache‑Control) ✅
+Optional: Postmark for auth emails (not revenue‑blocking)
+Revenue today definition (auth)
+
+Revenue today: YES if scholar_auth can issue and validate tokens for student_pilot and provider_register now.
+If any blocking drift (e.g., scope null, issuer mismatch), provide ETA in minutes/hours and exact fix steps.
+Deliverables
+
+Create and complete the 7 required files with the mandated header line.
+End with required status line.
+APP SECTION: scholarship_api
+Only execute this section if you are in the scholarship_api repository.
+
+Objective
+
+Serve fast, secure scholarship data to downstream apps.
+Be production‑ready today.
+Minimum tests
+
+GET /health and GET /readyz → 200 with DB and event bus health
+GET /api/v1/scholarships?limit=5 → 200 with 5 results, ETag + Cache‑Control present
+GET /api/v1/scholarships/:id → 200 with correct record
+CORS allowlist enforced (no wildcards)
+Write endpoints require JWT (401 without token); validate RS256 via scholar_auth JWKS
+Third‑party prerequisites
+
+DATABASE_URL (Neon) ✅
+JWT validation config (issuer, JWKS URI) ✅
+SENTRY_DSN ✅
+EVENT_BUS_URL + EVENT_BUS_TOKEN ✅
+Optional: REDIS_URL for rate limiting/caching
+Revenue today definition
+
+YES if student_pilot and auto_page_maker can consume the API now to drive traffic and conversion.
+Deliverables
+
+Produce all 7 required files with mandated header and the required status line.
+APP SECTION: scholarship_agent
+Only execute this section if you are in the scholarship_agent repository.
+
+Objective
+
+Run autonomous scholarship acquisition and outreach campaigns that feed student_pilot and auto_page_maker.
+Be production‑ready today. If not, specify ETA and dependencies.
+Minimum tests
+
+GET /health → 200; include S2S token status for scholarship_api and auto_com_center
+S2S client_credentials flow succeeds against scholar_auth (or current auth authority)
+Outbound call to scholarship_api succeeds with valid token
+Outbound call to auto_com_center for transactional email (dry‑run and live) works
+KPIs endpoint (e.g., GET /api/kpi/daily) returns JSON with core metrics
+If a fleet/monitoring endpoint exists, verify it returns 200 with expected payload
+Third‑party prerequisites
+
+scholar_auth issuer + JWKS (or temporary S2S secret) ✅
+Neon/PostgreSQL ✅
+OpenAI API key (if used for content) ✅
+auto_com_center API ✅
+Revenue today definition
+
+YES if campaigns can run and produce traffic/leads that convert in student_pilot today.
+If AUTH issuer mismatch blocks protected routes, document degraded‑mode capability, ETA to fix, and whether revenue can still flow.
+Deliverables
+
+Produce all 7 required files with mandated header and required status line.
+APP SECTION: scholarship_sage
+Only execute this section if you are in the scholarship_sage repository.
+
+Objective
+
+Provide AI‑driven recommendations and application guidance with strict Responsible AI controls.
+Minimum tests
+
+GET /health → 200
+POST /api/v1/recommendations (with JWT) → 200 with top‑N list, include latency and match rationale
+POST /assist/application-draft (with JWT) → 200; enforce no‑ghostwriting policy; show guidance only
+Rate limits enforced (document per‑IP and per‑user thresholds)
+CORS allowlist matches student_pilot origin
+Red‑team prompt(s) to verify no cheating/ghostwriting; ensure safe responses
+Third‑party prerequisites
+
+OPENAI_API_KEY ✅
+scholar_auth JWKS / M2M OAuth2 credentials ✅
+DATABASE_URL (Neon) ✅
+scholarship_api base URL ✅
+Revenue today definition
+
+YES if student_pilot can call recommendations and guidance to upsell credits or plans today.
+Deliverables
+
+Produce all 7 required files with mandated header and required status line.
+APP SECTION: student_pilot
+Only execute this section if you are in the student_pilot repository.
+
+Objective
+
+Convert student traffic to paid users and credits, orchestrating flows across the ecosystem.
+Minimum tests
+
+GET /health and GET /readyz → 200
+End‑to‑end checkout with Stripe (test and live keys). Verify webhook receives payment success
+JWT validation using scholar_auth (RS256) on protected actions
+Integration with scholarship_api (list + detail views return non‑empty data)
+Integration with scholarship_sage (recommendations callable)
+Integration with auto_com_center (welcome + receipt emails)
+Confirm public prod domain is published (no X‑Robots‑Tag: noindex)
+Third‑party prerequisites
+
+DATABASE_URL (Neon) ✅
+STRIPE_SECRET_KEY + STRIPE_WEBHOOK_SECRET (live) ✅
+scholar_auth JWKS ✅
+OPENAI_API_KEY (if used) ✅
+auto_com_center API ✅
+scholarship_api base URL ✅
+Revenue today definition
+
+YES if Stripe live purchase for credits/plan completes, webhooks succeed, and emails are delivered.
+CONDITIONAL YES if a “Publish” click is the only blocker.
+Deliverables
+
+Produce all 7 required files with mandated header and required status line.
+APP SECTION: provider_register
+Only execute this section if you are in the provider_register repository.
+
+Objective
+
+Onboard scholarship providers, accept payments/fees, and enforce the 3% platform fee.
+Minimum tests
+
+GET /health and GET /readyz → 200
+Provider onboarding flow → 201 Created
+Stripe Connect: account linking + charge flow (test and live). Verify 3% platform fee in live mode with a $1 test
+JWT validation via scholar_auth; RBAC enforced
+Payment gating: unpaid providers cannot post
+Security headers present and PII protected
+Email notifications via auto_com_center
+Third‑party prerequisites
+
+STRIPE_SECRET_KEY (live) ✅
+STRIPE_WEBHOOK_SECRET (live) ✅
+scholar_auth JWKS ✅
+DATABASE_URL (Neon) ✅
+auto_com_center API ✅
+scholarship_api base URL ✅
+Revenue today definition
+
+YES if a provider can pay and post today with 3% fee recorded.
+If Stripe live mode not configured, provide ETA in hours after key setup.
+Deliverables
+
+Produce all 7 required files with mandated header and required status line.
+APP SECTION: auto_page_maker
+Only execute this section if you are in the auto_page_maker repository.
+
+Objective
+
+Generate SEO‑optimized scholarship pages that drive organic traffic into student_pilot.
+Minimum tests
+
+GET / → 200 with SEO tags (title, meta, canonical, OpenGraph, Twitter cards)
+GET /sitemap.xml → 200 with at least 1000 scholarship URLs
+Dynamic per‑page canonical URLs verified
+Schema.org markup present (Organization, WebSite, Scholarship)
+Links to student_pilot “Apply Now” with correct UTM params
+Confirm production domain (no X‑Robots‑Tag: noindex). If on dev domain, publish to production
+CORS and security headers validated
+Third‑party prerequisites
+
+Production domain published (Replit “Publish”) ✅
+Google Search Console access ⏳ (submit sitemap)
+scholarship_api base URL ✅
+student_pilot URL for CTAs ✅
+Revenue today definition
+
+CONDITIONAL YES: After publish, revenue can begin; organic indexing typically takes 24–72 hours. You must still mark revenue path as enabled if publishing is the only blocker.
+Deliverables
+
+Produce all 7 required files with mandated header and required status line.
+APP SECTION: auto_com_center
+Only execute this section if you are in the auto_com_center repository.
+
+Objective
+
+Provide reliable transactional and lifecycle communications across the platform.
+Minimum tests
+
+GET /healthz and GET /readyz → 200
+Send live email via Postmark; capture messageId
+Configure and validate Postmark webhooks (bounce/complaint/unsubscribe); verify suppression list handling
+Validate DKIM/SPF/DMARC (Postmark‑managed domains)
+Confirm integrations:
+student_pilot: welcome, receipt emails
+provider_register: provider welcome, receipt
+scholarship_agent: campaign notifications (if used)
+Persistence: emailAuditLog and unsubscribes in DB
+Third‑party prerequisites
+
+POSTMARK_SERVER_TOKEN (live) ✅
+scholar_auth JWKS (if protected endpoints) ✅
+DATABASE_URL (Neon) ✅
+Revenue today definition
+
+YES if welcome/onboarding and receipt emails deliver for student_pilot and provider_register flows.
+Deliverables
+
+Produce all 7 required files with mandated header and required status line.
+What to include in every deliverable
+
+{app}_DAY0_READINESS_REPORT.md
+Executive summary (GREEN/YELLOW/RED), key blockers, immediate actions
+Production vs dev parity notes
+Environment variables and current values present/missing (redact secrets)
+Data‑first readiness assessment mapped to SLOs
+{app}_INTEGRATION_MATRIX.md
+Upstream dependencies (by name, URL, auth mode), downstream consumers
+Endpoints exposed/consumed, error handling strategies, timeouts/retries
+Event flows (if any) and schema
+{app}_REVENUE_ON_STATEMENT.md
+Define “Revenue today” for this app and how it maps to B2C/B2B
+Live test evidence (IDs, timestamps), conversion paths unblocked
+If NO/Conditional, exact steps and ETA to start generating revenue
+{app}_SECURITY_COMPLIANCE.md
+OWASP coverage, headers, auth model, rate limiting, PII handling
+FERPA/COPPA/GDPR alignment; Responsible AI commitments (if applicable)
+Logging/monitoring, secrets management
+{app}_PERF_SNAPSHOT.json
+Latest health/readyz latencies, P95 per critical endpoint, error rates
+Dependency latency and error stats
+{app}_SMOKE_TEST_RESULTS.md
+Each test, request/response summaries, status/latency, any IDs
+Post‑publish 5‑minute protocol results
+{app}_SLO_SNAPSHOT.md
+Compare targets vs actuals
+2‑hour watch plan and rollback criteria satisfaction
+Status color guidance
+
+GREEN: All required tests pass; all dependencies configured; revenue today = YES (or Conditional YES with only trivial manual publish/indexing).
+YELLOW: Mostly ready; minor drift or a single dependency not yet in live mode; provide ETA in hours to revenue.
+RED: Blocking defects or multiple missing systems; provide precise remediation plan and ETA.
+Final required console output
+After creating all deliverables, print exactly one final status line:
+App: {app} | Status: {GREEN|YELLOW|RED} | Revenue today: {YES|CONDITIONAL YES|NO} | ETA: {# hours or 0 hours} | Third-party prerequisites: {System1 (✅/⏳/❌), System2 (✅/⏳/❌), ...}
+
+Reminder
+
+You must include the first‑line header “App: {name} | APP_BASE_URL: {url}” in every report you create.
+You must execute only your app’s section.
+If today is not possible, provide the exact ETA to start generating revenue and list the third‑party systems that must be in place.
