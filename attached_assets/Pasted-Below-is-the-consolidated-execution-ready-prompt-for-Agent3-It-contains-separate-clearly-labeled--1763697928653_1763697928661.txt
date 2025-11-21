@@ -1,0 +1,211 @@
+Below is the consolidated, execution-ready prompt for Agent3. It contains separate, clearly labeled sections for each app. Agent3 must only act on the section that matches the app it is currently responsible for. For every report, the agent must begin by naming the app and including APP_BASE_URL exactly as shown in that section.
+
+GLOBAL OPERATING RULES (apply to all apps; do not edit other apps)
+
+Read only your app’s section below and execute that section end-to-end.
+You must include “App: <name> | APP_BASE_URL: <base-url>” at the top of every report and status output.
+Definition of Done (Day-0 “Revenue-On” readiness):
+Health endpoints live: /healthz and /readyz return 200 with dependency checks.
+Auth integrated via scholar_auth (RS256 JWT, JWKS validation) where applicable.
+Core endpoints for your app are live, tested with curl, and return correct JSON.
+Security: no PII leakage, rate-limiting on public write endpoints, CORS scoped, secrets in env, no stack traces in 4xx/5xx.
+Performance: P95 latency at or under ~120ms for core endpoints where feasible.
+Compliance: FERPA/COPPA/GDPR principles; Responsible AI where applicable (no ghostwriting).
+Observability: logs with PII redaction, basic metrics counters, structured error responses.
+If you cannot finish today, produce: (1) reason, (2) exact ETA (hours), (3) the third-party systems or secrets missing, (4) the specific steps to close.
+Standard third-party systems you may need:
+Neon PostgreSQL (DATABASE_URL), Upstash Redis (optional), Sentry DSN (optional).
+Postmark API (email), Stripe (payments), OpenAI (scholarship_sage).
+GA4 (analytics) optional.
+Reporting cadence today:
+T+0: Start log with “App: <name> | APP_BASE_URL: <base> | Starting Day-0 readiness”.
+After each successful test suite: emit a short checkpoint report.
+End-of-day: emit a Readiness Report + Go/No-Go decision. If No-Go, include ETA and third-party needs.
+APP SECTIONS (Agent3: only use your app’s section)
+
+scholar_auth → APP_BASE_URL: https://scholar-auth-jamarrlmayes.replit.app
+Objective: Serve as the OIDC and JWT authority for all apps. Day-0 means OIDC live, JWKS live, token and introspection live, and M2M clients issued for each dependent app.
+Mandatory endpoints and checks:
+/.well-known/openid-configuration (discovery document)
+/.well-known/jwks.json (RS256 public keys)
+/oidc/token supports grant_type=client_credentials and authorization_code
+/oidc/token/introspection (RFC 7662)
+/healthz, /readyz with dependency checks (DB, keys loaded)
+Scopes/roles (min set for Day-0):
+Roles: student, provider, admin, service
+Scopes: read:scholarships, write:scholarships, messaging.send, provider.write, billing.read, billing.write, recommendations.read, application.draft.create
+Deliverables Today:
+Provision M2M client credentials for: scholarship_api, scholarship_agent, scholarship_sage, student_pilot, provider_register, auto_page_maker, auto_com_center.
+Publish a short Client Registry in your report showing client_id → allowed scopes.
+Smoke tests to run and paste results in report:
+GET /.well-known/openid-configuration
+GET /.well-known/jwks.json
+POST /oidc/token (client_credentials) with one service client
+POST /oidc/token/introspection on issued token
+If blocked today, report: which secrets or key rotations are missing and ETA to issue M2M credentials to all apps.
+2. scholarship_api → APP_BASE_URL: https://scholarship-api-jamarrlmayes.replit.app
+
+Objective: Public read endpoints for scholarships to power SEO and student discovery; low-latency JSON for other services.
+Mandatory endpoints and checks:
+GET /api/v1/scholarships?limit=&offset= (public read, paginated; ETag + Cache-Control)
+GET /api/v1/scholarships/{id} (public read; ETag + Cache-Control)
+Optional now, add soon: GET /api/v1/search (public read or token-based; if not today, provide ETA)
+/healthz, /readyz with DB and cache checks
+CORS: allow auto_page_maker and student_pilot origins
+Rate limiting: 600 rpm per IP (in-memory acceptable for Day-0)
+Deliverables Today:
+Confirm ETag and Cache-Control: public, max-age=1800 for reads.
+Document contract (response schemas) in report.
+Smoke tests to run and paste results:
+GET /api/v1/scholarships?limit=5
+GET /api/v1/scholarships/{id}
+GET /readyz
+If blocked: list DB/Redis/Sentry configuration needed, and ETA.
+3. scholarship_agent → APP_BASE_URL: https://scholarship-agent-jamarrlmayes.replit.app
+
+Objective: Operate marketing automation, source content from scholarship_api, request page builds from auto_page_maker, and report KPIs.
+Mandatory endpoints and checks:
+GET /api/health (or /healthz) returns status and enabled capabilities
+GET /api/kpi/daily returns JSON with visits, signups, conversions, CAC proxy, organic %, MRR/ARR contribution, SEO pages live
+GET /sitemap.xml returns URLs of published content (ensure >=50 URLs if possible today)
+Integration tasks:
+Configure S2S OAuth2 via scholar_auth for calls to scholarship_api (if S2S_CLIENT_SECRET missing, run DRY_RUN and report dependency).
+Trigger auto_page_maker to build pages. If /internal/rebuild is not available, include an ETA request and the API contract you expect (method, headers, payload).
+Deliverables Today:
+KPI Dashboard live and returns JSON.
+Sitemap present and valid.
+If <50 pages, generate plan to reach 50 today (number of jobs, expected pages/hour) with ETA.
+Smoke tests to run and paste results:
+GET /api/kpi/daily
+GET /sitemap.xml
+If blocked: state missing S2S_CLIENT_SECRET or rebuild endpoint and provide ETA.
+4. scholarship_sage → APP_BASE_URL: https://scholarship-sage-jamarrlmayes.replit.app
+
+Objective: Responsible AI assistant for scholarship matching and application guidance (no ghostwriting).
+Mandatory endpoints and checks:
+GET /api/v1/recommendations (auth required via scholar_auth; supports limit)
+POST /assist/application-draft (auth required; idempotency via Idempotency-Key; enforce guardrails)
+GET /faq and GET /eligibility-helper (public)
+/healthz, /readyz including OpenAI key check
+Guardrails:
+No academic dishonesty; provide guidance only, require student authorship.
+Safety filters and confidence scores; human-handoff flag when confidence <0.7.
+Integrations:
+Reads from scholarship_api (if M2M not ready, temporarily use mock but report ETA for switching to live).
+Deliverables Today:
+Document scope/role checks, idempotency behavior, and moderation steps in the report.
+Smoke tests to run and paste results:
+GET /readyz
+GET /api/v1/recommendations (with JWT)
+POST /assist/application-draft (with JWT and Idempotency-Key)
+If blocked: specify missing OpenAI key or M2M credentials from scholar_auth and ETA.
+5. student_pilot → APP_BASE_URL: https://student-pilot-jamarrlmayes.replit.app
+
+Objective: Student-facing experience for discovery, matching, applications, and credit purchase readiness.
+Mandatory endpoints and checks:
+GET /api/scholarships and GET /api/scholarships/:id (backed by scholarship_api)
+GET /api/matches (auth required; backed by scholarship_sage)
+POST /api/applications (auth required; stores or forwards to workflow)
+/healthz, /readyz
+Integrations:
+scholar_auth for JWT (primary), fallback forbidden in production.
+auto_com_center for welcome/verification emails (optional today; include ETA if missing).
+Stripe (if credits model is live today; otherwise provide ETA for credit purchase flow and 4x markup logic where applicable).
+Deliverables Today:
+Ensure production snapshot is current; if not, publish and verify scholarship list returns data.
+Document cache headers and error handling policy.
+Smoke tests to run and paste results:
+GET /api/scholarships (expect non-empty)
+GET /api/scholarships/:id
+GET /readyz
+If blocked: state deployment publish action or missing secrets; provide ETA.
+6. provider_register → APP_BASE_URL: https://provider-register-jamarrlmayes.replit.app
+
+Objective: Onboard providers with Stripe Connect; enforce 3% platform fee; expose provider CRUD for inter-service calls.
+Mandatory endpoints and checks:
+POST /api/providers (create/update provider; auth via scholar_auth)
+GET /api/providers/:id (auth via scholar_auth)
+Stripe Connect onboarding endpoints and webhook handlers for account.updated and charge.succeeded
+Enforce destination charges with 3% application_fee_amount
+/healthz, /readyz must validate Stripe API connectivity and DB
+Security:
+Inter-service auth: X-Internal-Key for internal-only routes (if used).
+No PII exposure in logs.
+Deliverables Today:
+Live end-to-end Stripe Connect test in test mode (or live $1 test if approved). If not executed, provide an exact test plan and ETA.
+Document legal disclosure for 3% fee reference you enforce.
+Smoke tests to run and paste results:
+GET /readyz
+POST /api/providers with minimal payload (auth), then GET same id
+If blocked: list Stripe keys and webhook secret requirements; provide ETA.
+7. auto_page_maker → APP_BASE_URL: https://auto-page-maker-jamarrlmayes.replit.app
+
+Objective: Generate SEO pages at scale from scholarship_api; maintain sitemap and canonical tags; expose rebuild interface for internal triggers.
+Mandatory endpoints and checks:
+GET /sitemap.xml includes >=50 URLs today if feasible; otherwise produce ETA.
+GET /healthz, /readyz
+POST /internal/rebuild with X-Internal-Key and Idempotency-Key (if not present today, define and commit the API contract and return ETA)
+SEO requirements:
+schema.org markup, canonical URLs, robots.txt, and indexable HTML.
+Avoid duplication; use ETag or content hashing for changed_only rebuilds.
+Deliverables Today:
+Execute a batch page build from scholarship_api (limit and paging).
+Document rebuild contract and rate limits in the report.
+Smoke tests to run and paste results:
+GET /sitemap.xml (count URLs)
+GET /readyz
+If blocked: list missing X-Internal-Key, rate-limit store, or scholarship_api contract gaps; provide ETA.
+8. auto_com_center → APP_BASE_URL: https://auto-com-center-jamarrlmayes.replit.app
+
+Objective: Transactional messaging with Postmark; unsubscribe compliance; suppression enforcement; secure admin-only suppression listing.
+Mandatory endpoints and checks:
+POST /api/send (JSON; enforces suppression; persists to DB; provider=Postmark)
+GET /api/messages/:id/status (DB-backed)
+POST /api/unsubscribe (HTML success page; persists opt-out)
+GET /api/suppression-list (ADMIN AUTH REQUIRED; do not expose raw PII)
+/healthz, /readyz
+Security and compliance:
+CAN-SPAM/GDPR/FERPA alignment; admin auth on suppression listing; base64 or masked emails.
+Deliverables Today:
+Run end-to-end: send → status → unsubscribe → block re-send → verify admin-only suppression list.
+Document templates and required vars.
+Smoke tests to run and paste results:
+POST /api/send (welcome template)
+GET /api/messages/:id/status
+POST /api/unsubscribe (expect HTML)
+POST /api/send to unsubscribed address (expect suppressed)
+GET /api/suppression-list without auth (expect 401)
+If blocked: list Postmark token, DB connectivity, or auth middleware needs; provide ETA.
+REPORTING TEMPLATE (use this exact structure in every app’s final output)
+
+First line: App: <name> | APP_BASE_URL: <url>
+Status: GREEN (Go) or YELLOW (Conditional Go) or RED (No-Go)
+What was verified today (bullets; include the exact endpoints and success criteria)
+Smoke test transcript (copy-paste curl command(s) and abbreviated JSON or status)
+Security and compliance notes (auth, rate limits, PII handling)
+Performance snapshot (rough P95, any caching headers)
+Integration status (which upstream/downstream systems are live and proven)
+Revenue-On readiness statement (is this app enabling revenue flow today? if not, why)
+If not GREEN: ETA in hours to reach GREEN + exact third-party systems or secrets required
+BASE URL DIRECTORY (for reference only; do not act outside your section)
+
+scholar_auth → https://scholar-auth-jamarrlmayes.replit.app
+scholarship_api → https://scholarship-api-jamarrlmayes.replit.app
+scholarship_agent → https://scholarship-agent-jamarrlmayes.replit.app
+scholarship_sage → https://scholarship-sage-jamarrlmayes.replit.app
+student_pilot → https://student-pilot-jamarrlmayes.replit.app
+provider_register → https://provider-register-jamarrlmayes.replit.app
+auto_page_maker → https://auto-page-maker-jamarrlmayes.replit.app
+auto_com_center → https://auto-com-center-jamarrlmayes.replit.app
+EXECUTION ORDER AND DEADLINE (today)
+
+Start immediately. For your app, follow this order:
+Health: implement/verify /healthz and /readyz with dependency checks.
+Auth: wire up scholar_auth JWT verification (where applicable).
+Core endpoints: verify required endpoints above; add missing ones if fast.
+Security: ensure admin-only or internal-only endpoints are protected.
+Performance: verify P95 ~120ms on critical routes where feasible.
+Smoke tests: run and paste results into your report.
+Final report: emit the Reporting Template with Go/No-Go decision.
+If anything blocks you from finishing today, stop after step 3 and produce a precise ETA and list of third-party systems or secrets needed to be “Revenue-On.”
+Remember: Only work on your app’s section. Name your app and include APP_BASE_URL on every report. Act with urgency toward enabling revenue today.
