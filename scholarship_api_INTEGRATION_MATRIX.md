@@ -241,6 +241,155 @@ ETag: "<hash>"
 
 ---
 
+## CLIENT CODE SNIPPETS
+
+### Python Client (using requests)
+
+```python
+import requests
+
+BASE_URL = "https://scholarship-api-jamarrlmayes.replit.app"
+
+# List scholarships (public endpoint)
+def list_scholarships(limit=10, category=None):
+    params = {"limit": limit}
+    if category:
+        params["category"] = category
+    
+    response = requests.get(f"{BASE_URL}/api/v1/scholarships", params=params)
+    response.raise_for_status()
+    return response.json()
+
+# Get scholarship details (public endpoint)
+def get_scholarship(scholarship_id):
+    response = requests.get(f"{BASE_URL}/api/v1/scholarships/{scholarship_id}")
+    response.raise_for_status()
+    return response.json()
+
+# Start application (protected endpoint - requires JWT)
+def start_application(scholarship_id, access_token):
+    headers = {
+        "Authorization": f"Bearer {access_token}",
+        "Content-Type": "application/json"
+    }
+    payload = {
+        "scholarship_id": scholarship_id,
+        "student_id": "user-123"  # From JWT claims
+    }
+    
+    response = requests.post(
+        f"{BASE_URL}/api/v1/applications/start",
+        headers=headers,
+        json=payload
+    )
+    response.raise_for_status()
+    return response.json()
+
+# Example usage
+if __name__ == "__main__":
+    # Public access - no auth required
+    scholarships = list_scholarships(limit=5, category="STEM")
+    print(f"Found {len(scholarships.get('scholarships', []))} scholarships")
+    
+    # Protected access - requires JWT from scholar_auth
+    # access_token = get_token_from_scholar_auth()
+    # application = start_application("scholarship-id-123", access_token)
+```
+
+### JavaScript/TypeScript Client (using fetch)
+
+```typescript
+const BASE_URL = "https://scholarship-api-jamarrlmayes.replit.app";
+
+// List scholarships (public endpoint)
+async function listScholarships(limit: number = 10, category?: string) {
+  const params = new URLSearchParams({ limit: limit.toString() });
+  if (category) {
+    params.append("category", category);
+  }
+  
+  const response = await fetch(`${BASE_URL}/api/v1/scholarships?${params}`);
+  if (!response.ok) {
+    throw new Error(`HTTP error! status: ${response.status}`);
+  }
+  return await response.json();
+}
+
+// Get scholarship details (public endpoint)
+async function getScholarship(scholarshipId: string) {
+  const response = await fetch(`${BASE_URL}/api/v1/scholarships/${scholarshipId}`);
+  if (!response.ok) {
+    throw new Error(`HTTP error! status: ${response.status}`);
+  }
+  return await response.json();
+}
+
+// Start application (protected endpoint - requires JWT)
+async function startApplication(scholarshipId: string, accessToken: string) {
+  const response = await fetch(`${BASE_URL}/api/v1/applications/start`, {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${accessToken}`,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      scholarship_id: scholarshipId,
+      student_id: "user-123"  // From JWT claims
+    })
+  });
+  
+  if (!response.ok) {
+    throw new Error(`HTTP error! status: ${response.status}`);
+  }
+  return await response.json();
+}
+
+// Example usage
+async function main() {
+  try {
+    // Public access - no auth required
+    const data = await listScholarships(5, "STEM");
+    console.log(`Found ${data.scholarships?.length || 0} scholarships`);
+    
+    // Protected access - requires JWT from scholar_auth
+    // const accessToken = await getTokenFromScholarAuth();
+    // const application = await startApplication("scholarship-id-123", accessToken);
+  } catch (error) {
+    console.error("Error:", error);
+  }
+}
+```
+
+### cURL Examples
+
+```bash
+# List scholarships (public)
+curl -X GET "https://scholarship-api-jamarrlmayes.replit.app/api/v1/scholarships?limit=5&category=STEM"
+
+# Get scholarship details (public)
+curl -X GET "https://scholarship-api-jamarrlmayes.replit.app/api/v1/scholarships/scholarship-id-123"
+
+# Start application (protected - requires JWT)
+curl -X POST "https://scholarship-api-jamarrlmayes.replit.app/api/v1/applications/start" \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"scholarship_id": "scholarship-id-123", "student_id": "user-123"}'
+
+# Health check
+curl -X GET "https://scholarship-api-jamarrlmayes.replit.app/health"
+```
+
+### Integration Notes
+
+- **Public endpoints** (GET scholarships): No authentication required, rate limited to 600 rpm
+- **Protected endpoints** (POST applications): RS256 JWT from scholar_auth required in Authorization header
+- **Error handling**: All errors return JSON with `detail`, `request_id`, and `status_code` fields
+- **Rate limiting**: Public endpoints limited to 600 rpm; authenticated endpoints have higher limits
+- **Caching**: List endpoints return ETag and Cache-Control headers for efficient caching
+- **Idempotency**: POST/PUT operations support `Idempotency-Key` header for safe retries
+
+---
+
 ## INTEGRATION HEALTH SUMMARY
 
 **Upstream Dependencies**: 4/4 HEALTHY ✅  
@@ -254,4 +403,5 @@ ETag: "<hash>"
 ---
 
 **Report Prepared By**: Agent3  
-**Timestamp**: 2025-11-21 06:52 UTC
+**Timestamp**: 2025-11-21 06:52 UTC  
+**Updated**: 2025-11-21 (Added client code snippets per master prompt requirements)
