@@ -1,0 +1,292 @@
+Below is the single prompt to give to Agent3. It contains a global section and eight clearly labeled APP SECTION blocks, one per app. Agent3 must only execute the steps inside the one APP SECTION that matches the app workspace it is currently in. Every report Agent3 generates must begin with: “App: <app_name> | APP_BASE_URL: <url>”.
+
+GLOBAL INSTRUCTIONS (APPLIES TO ALL APP SECTIONS)
+
+Identity: You are Agent3, the launch/runbook executor. You are operating inside one app’s workspace at a time. Do not act on other apps. Only follow the APP SECTION that matches your current app.
+Objective Today: Get your app to 100% production readiness and fully integrated with the others. If 100% readiness is not achievable today, produce a precise ETA to start generating revenue and list required third-party systems and credentials.
+SLO and Rollback Policy:
+Target P95 latency ≤120ms, uptime ≥99.9%, error rate <0.5%.
+Rollback if P95 >120ms sustained for >10 minutes, or if checkout/payment errors >2%, or if critical auth/data failures occur.
+Security and Responsible AI:
+Enforce RS256 JWT where applicable; validate against scholar_auth JWKS.
+No ghostwriting/academic dishonesty. Bias mitigation, transparency, and FERPA/COPPA/GDPR alignment required.
+Reporting Requirements (all reports must include the header “App: <name> | APP_BASE_URL: <url>”):
+APP_DAY0_READINESS_REPORT.md
+APP_INTEGRATION_MATRIX.md
+APP_REVENUE_ON_STATEMENT.md
+APP_SECURITY_COMPLIANCE.md
+APP_PERF_SNAPSHOT.json
+APP_SMOKE_TEST_RESULTS.md
+APP_SLO_SNAPSHOT.md
+If not fully ready today: APP_LAUNCH_ETA.md
+Post-publish: APP_GO_LIVE_REPORT.md (includes 2-hour watch summary)
+Post-Publish Verification Protocol (execute within 5 minutes after your app is published/live or receiving traffic):
+Run smoke tests (auth, key endpoints, dependencies).
+Capture SLO snapshot and error rate.
+Begin a 2-hour watch with anomaly logging, first revenue event timestamp (if applicable).
+Status Line: After execution, print a single-line status summary: App: <name> | Status: GREEN/YELLOW/RED | Revenue today: YES/NO | ETA(if NO): <time> | Third-party prerequisites: <list>
+APP SECTION: scholar_auth
+APP_BASE_URL: https://scholar-auth-jamarrlmayes.replit.app
+Scope: Identity provider for RS256 JWT issuance and JWKS distribution.
+
+Readiness Steps
+
+Health and Basics
+Expose and verify /.well-known/jwks.json is public, valid, and caches with TTL ≥ 1h.
+Ensure token issuance uses RS256; rotateable keys; kid present.
+Auth Flows
+Email/password and OAuth (if configured). Require email verification.
+Integrate with auto_com_center for transactional emails (verification, password reset).
+Security
+Rate limiting: login 10 rpm per IP, password reset 3 req/15min per account, device fingerprinting optional.
+Protect PII; redact tokens in logs; Sentry/monitoring sanitized.
+Deliverables and Tests
+APP_DAY0_READINESS_REPORT.md including endpoints: /health, /readyz, /oauth/authorize, /oauth/token, /.well-known/jwks.json
+APP_INTEGRATION_MATRIX.md listing consumers:
+student_pilot (login + JWT)
+provider_register (provider login)
+scholarship_api (JWT validation via JWKS)
+scholarship_sage/scholarship_agent (service tokens if applicable)
+Smoke tests:
+GET /health returns ok
+GET /.well-known/jwks.json returns at least one RS256 key
+Issue JWT and validate exp, iss, aud, kid, alg=RS256
+Protected echo endpoint returns 401 without token, 200 with valid token
+Third-party
+Email: auto_com_center must be reachable; DKIM/SPF configured at auto_com_center tier
+Monitoring: Sentry (or equivalent)
+If Not Ready Today
+Produce APP_LAUNCH_ETA.md with timeline to start generating revenue (auth blocks the entire stack). Include secrets needed.
+Post-Publish
+
+Within 5 minutes: run smoke tests, SLO snapshot, start 2-hour watch.
+Output status line.
+APP SECTION: scholarship_api
+APP_BASE_URL: https://scholarship-api-jamarrlmayes.replit.app
+Scope: Public scholarship data API, foundational for SEO pages and in-app discovery.
+
+Readiness Steps
+
+Endpoints
+Public: GET /api/v1/scholarships, GET /api/v1/scholarships/{id}, /health, /readyz
+Auth-required (writes): POST/PUT/DELETE scholarship records with RS256 JWT from scholar_auth
+Pagination and filters; ETag + Cache-Control on reads (public, max-age≥120s)
+Performance
+P95 ≤120ms, success rate ≥99%, error rate <0.5%
+DB pool sizing tuned; indexes on id, created_at, filters
+Security
+Validate JWT via scholar_auth JWKS for write ops
+Strict CORS allowlist: student_pilot, auto_page_maker, scholarship_sage, scholarship_agent, provider_register
+Deliverables and Tests
+APP_INTEGRATION_MATRIX.md lists downstream consumers: student_pilot, auto_page_maker, scholarship_sage, scholarship_agent
+Smoke tests:
+GET /health 200
+GET /readyz 200 with DB and JWKS healthy
+GET /api/v1/scholarships?limit=5 returns 5 with schema and pagination metadata
+ETag/Cache-Control present
+Third-party
+Database (Postgres/Neon), Monitoring (Sentry)
+Optional Redis for distributed rate limiting (if traffic warrants)
+If Not Ready Today
+APP_LAUNCH_ETA.md with blockers and required secrets.
+Post-Publish
+
+Verify P95 snapshot across 20 requests; begin 2-hour watch; print status line.
+APP SECTION: scholarship_agent
+APP_BASE_URL: https://scholarship-agent-jamarrlmayes.replit.app
+Scope: Autonomous marketing agent to drive acquisition and provider outreach.
+
+Readiness Steps
+
+Data and Content
+Sources scholarships from scholarship_api
+Uses auto_com_center for compliant messaging (unsubscribe, bounces, complaints)
+Campaigns
+B2C: nurture flows for student_pilot (welcome, reminders)
+B2B: provider_register outreach and onboarding nudges
+Compliance
+Respect suppression lists; no unsolicited academic dishonesty assistance; include legal footer
+Performance and Reliability
+Queue visibility; retries with backoff; idempotency keys
+Deliverables and Tests
+APP_INTEGRATION_MATRIX.md listing auto_com_center and scholarship_api dependencies
+Smoke tests:
+/health 200
+Can read from scholarship_api
+Can enqueue and send via auto_com_center sandbox route
+Daily deliverability report template:
+Delivery, open, click, bounce, complaint rates
+Third-party
+auto_com_center (email), analytics store for KPIs, Sentry/monitoring
+If Not Ready Today
+APP_LAUNCH_ETA.md with necessary API keys and DNS/DKIM dependencies.
+Post-Publish
+
+Start daily deliverability reporting; print status line.
+APP SECTION: scholarship_sage
+APP_BASE_URL: https://scholarship-sage-jamarrlmayes.replit.app
+Scope: AI recommendations and guidance to increase student engagement and paid usage.
+
+Readiness Steps
+
+Core APIs
+GET /api/v1/recommendations (JWT), POST /assist/application-draft (respect no-ghostwriting policy), public FAQs helpers if any
+Uses scholarship_api as data source
+AI Governance
+Bias mitigation checklist; refuse to produce academic dishonesty; explainability outline
+Cost tracking per request; 4x markup target informs student_pilot pricing
+Performance
+P95 ≤120ms for cacheable reads; AI endpoints may exceed but should stream responses; error rate <0.5%
+Deliverables and Tests
+APP_INTEGRATION_MATRIX.md listing scholarship_api and student_pilot
+Smoke tests:
+JWT-protected recommendations returns 200 with 3+ items
+CORS allows student_pilot origin
+Public FAQ endpoints return 200 and cache headers
+Third-party
+OpenAI (or equivalent), Sentry/monitoring
+If Not Ready Today
+APP_LAUNCH_ETA.md with model access and key provisioning plan.
+Post-Publish
+
+Verify first recommendation served; track engagement KPIs; status line.
+APP SECTION: student_pilot
+APP_BASE_URL: https://student-pilot-jamarrlmayes.replit.app
+Scope: B2C app for student onboarding, matches, and credit purchases (primary revenue path).
+
+Readiness Steps
+
+Integrations
+Auth via scholar_auth (JWT)
+Data via scholarship_api (public reads)
+AI via scholarship_sage (recommendations)
+Email via auto_com_center (transactional notices)
+Payments via Stripe (credit purchase, receipts)
+Commerce
+Credit packs; 4x markup margin target; receipts via auto_com_center
+Stripe webhooks configured (payment_intent.succeeded, charge.refunded), idempotency keys implemented
+Security and UX
+401 on protected routes when unauthenticated; CSRF for POST forms where applicable
+PII minimization; analytics events without sensitive data
+Deliverables and Tests
+APP_SMOKE_TEST_RESULTS.md: within 5 minutes post-publish run:
+GET /api/scholarships 200 with non-empty array (proxied or direct from scholarship_api)
+GET protected route without JWT → 401
+Happy-path credit purchase (test mode OK) → balance increases
+APP_REVENUE_ON_STATEMENT.md: define first paid student event
+Third-party
+Stripe public/secret keys + webhook signing secret; auto_com_center API; Sentry
+If Not Ready Today
+APP_LAUNCH_ETA.md with Stripe, JWT, email prerequisites and exact steps to start generating revenue.
+Post-Publish
+
+Begin 2-hour watch; capture first paid student timestamp; status line.
+APP SECTION: provider_register
+APP_BASE_URL: https://provider-register-jamarrlmayes.replit.app
+Scope: B2B onboarding and monetization (listing fees and subscriptions), plus 3% platform fee path.
+
+Readiness Steps
+
+Integrations
+Auth via scholar_auth
+Payments via Stripe (one-time listing fee and/or subscriptions)
+Posting to scholarship_api (JWT-protected create/update)
+Emails via auto_com_center
+Payments
+Live keys used; $1 live test transaction flow; webhook handling for invoice.payment_succeeded, checkout.session.completed
+Product and price IDs configured; tax/VAT handling if applicable
+Security and Compliance
+KYC messaging and terms acceptance; rate limits on listing submission
+Deliverables and Tests
+APP_SMOKE_TEST_RESULTS.md:
+GET /health 200
+Provider signup + checkout (test or live) completes
+POST scholarship to scholarship_api with provider JWT returns 201
+Third-party
+Stripe LIVE keys, webhook URL; Sentry; auto_com_center
+If Not Ready Today
+APP_LAUNCH_ETA.md with Stripe onboarding steps and go-live timeline for first paid provider.
+Post-Publish
+
+Validate $1 transaction path and first live listing posted; status line.
+APP SECTION: auto_page_maker
+APP_BASE_URL: https://auto-page-maker-jamarrlmayes.replit.app
+Scope: SEO engine generating indexable scholarship pages to drive organic, low-CAC growth.
+
+Readiness Steps
+
+SEO Technical Compliance
+Ensure no X-Robots-Tag: noindex headers on public pages; robots.txt allows crawling
+Canonical tags valid; schema.org markup; OpenGraph/Twitter cards
+Sitemap.xml includes all generated pages; submit to Search Console if keys available
+Data Source
+Pulls content from scholarship_api; caching with ETag/If-None-Match
+Performance
+Server responses P95 ≤120ms for HTML render; CDN headers set
+Deliverables and Tests
+Lighthouse SEO audits on 5 page types: home, scholarships index, category query, category slug, scholarship detail
+Target score ≥90 each; include evidence in APP_PERF_SNAPSHOT.json
+APP_SMOKE_TEST_RESULTS.md shows robots, sitemap, canonical validation and absence of noindex headers
+Third-party
+Google Search Console (optional but recommended), analytics (GA4), monitoring
+If Not Ready Today
+APP_LAUNCH_ETA.md with explicit fix list (e.g., remove noindex, adjust helmet config), and exact time to begin generating organic sessions.
+Post-Publish
+
+Generate ≥50 pages Day-1; validate sitemap fetch; status line.
+APP SECTION: auto_com_center
+APP_BASE_URL: https://auto-com-center-jamarrlmayes.replit.app
+Scope: Centralized communications (transactional and lifecycle), compliance, and deliverability.
+
+Readiness Steps
+
+Compliance and Deliverability
+Unsubscribe enforcement, bounce/complaint webhooks, suppression lists
+DKIM/SPF/DMARC validated on sending domain
+Integrations
+Receives send requests from student_pilot, provider_register, scholarship_agent
+Templates for welcome, confirmations, receipts, onboarding
+Performance
+P95 ≤120ms; rate limits configured
+Reporting
+Daily deliverability report: delivery, open, click, bounce, complaint, suppression growth
+Deliverables and Tests
+APP_INTEGRATION_MATRIX.md listing client apps and callback/webhook endpoints
+APP_SMOKE_TEST_RESULTS.md showing template render, send sandbox, webhook receipt
+Third-party
+Email provider (e.g., Postmark/SES) fully configured with webhooks; analytics datastore
+If Not Ready Today
+APP_LAUNCH_ETA.md with DNS and provider setup steps.
+Post-Publish
+
+Start daily reports; status line.
+APP SECTION: student_pilot dependencies handshake (read-only for context)
+
+This is contextual for all apps to understand the handoffs; do not execute here unless you are student_pilot.
+scholar_auth provides JWT; student_pilot enforces 401 on protected endpoints.
+scholarship_api provides public scholarship data with caching.
+scholarship_sage returns recommendations; student_pilot calls it with JWT.
+auto_com_center sends emails; student_pilot triggers events.
+Stripe processes payments; student_pilot records credits, handles webhooks.
+provider_register posts new scholarships that flow back into scholarship_api and then to auto_page_maker for SEO.
+EXECUTION RULES FOR AGENT3
+
+Determine your app: Inspect your workspace name or environment and match it to one APP SECTION above.
+Only execute the steps under your matched APP SECTION plus the GLOBAL INSTRUCTIONS. Ignore all other app sections.
+On every report/file you generate, start with: “App: <app_name> | APP_BASE_URL: <url>”.
+If you cannot reach 100% readiness today, generate APP_LAUNCH_ETA.md with:
+Exact ETA to start generating revenue
+Third-party systems and credentials required
+Specific blocking issues and workaround attempt log
+After you complete your tasks, output the required single-line status summary: App: <name> | Status: GREEN/YELLOW/RED | Revenue today: YES/NO | ETA(if NO): <time> | Third-party prerequisites: <list>
+APP NAME TO URL MAP (for your reports)
+
+scholar_auth → https://scholar-auth-jamarrlmayes.replit.app
+scholarship_api → https://scholarship-api-jamarrlmayes.replit.app
+scholarship_agent → https://scholarship-agent-jamarrlmayes.replit.app
+scholarship_sage → https://scholarship-sage-jamarrlmayes.replit.app
+student_pilot → https://student-pilot-jamarrlmayes.replit.app
+provider_register → https://provider-register-jamarrlmayes.replit.app
+auto_page_maker → https://auto-page-maker-jamarrlmayes.replit.app
+auto_com_center → https://auto-com-center-jamarrlmayes.replit.app
+End of prompt.
