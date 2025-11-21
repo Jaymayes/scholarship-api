@@ -101,6 +101,10 @@ class Settings(BaseSettings):
     jwks_retry_max_attempts: int = Field(3, alias="JWKS_RETRY_MAX_ATTEMPTS", gt=0)
     jwks_retry_backoff_base: float = Field(0.5, alias="JWKS_RETRY_BACKOFF_BASE", gt=0)
     jwt_clock_skew_leeway: int = Field(60, alias="JWT_CLOCK_SKEW_LEEWAY", gt=0)  # ±60s per CEO directive
+    
+    # Event Bus Configuration - Phase 1 Multi-app Integration (Upstash Redis Streams)
+    EVENT_BUS_URL: str | None = Field(None, alias="EVENT_BUS_URL")
+    EVENT_BUS_TOKEN: str | None = Field(None, alias="EVENT_BUS_TOKEN")
 
     # Production security requirements - fix parsing issues with proper JSON parsing
     allowed_hosts: list[str] = Field(

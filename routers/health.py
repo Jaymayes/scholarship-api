@@ -483,6 +483,17 @@ async def readiness_probe(db: Session = Depends(get_db)) -> dict[str, Any]:
                 "type": "In-Memory Rate Limiting"
             }
 
+        # Phase 1: Check Event Bus (Upstash Redis Streams)
+        try:
+            from services.event_bus import event_bus
+            event_bus_health = event_bus.get_health_status()
+            health_status["checks"]["event_bus"] = event_bus_health
+        except Exception as eb_error:
+            health_status["checks"]["event_bus"] = {
+                "status": "error",
+                "error": str(eb_error)
+            }
+        
         # CEO Nov 13: Check JWKS/Auth dependency
         try:
             from services.jwks_client import jwks_client
