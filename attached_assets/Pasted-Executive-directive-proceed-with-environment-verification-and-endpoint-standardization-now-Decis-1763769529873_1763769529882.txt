@@ -1,0 +1,66 @@
+Executive directive: proceed with environment verification and endpoint standardization now
+
+Decision
+
+Yes—run an immediate Secrets and Endpoints Audit focused on the revenue-critical path: scholar_auth → provider_register (Stripe) → auto_com_center (emails) → scholarship_api (DB) → student_pilot.
+Resolve the auto_com_center endpoint discrepancy via a backwards-compatible alias to eliminate integration risk.
+Why now
+
+This clears the highest-probability launch blockers before the first live dollar test, aligns with our “data-first, secure-by-default” posture, and protects our low-CAC, SEO-led scale-up by ensuring the platform is stable and governed consistently across services. Replit’s own guidance stresses secure inter-service communication and disciplined secrets management for production microservices on their platform , and our deployment checklist emphasizes secrets and readiness as pre-launch gates . Consistent API governance is also a best practice for autonomous, multi-service systems . This supports our five-year plan’s operating cadence and growth model .
+Scope and order of operations (90 minutes target)
+
+scholar_auth (IdP)
+Verify env vars: APP_BASE_URL, DATABASE_URL, JWT signing key(s) or equivalent, ISSUER/AUDIENCE, JWKS exposure, SENDGRID/POSTMARK key if used for password reset.
+Health checks: /.well-known/jwks.json accessible; /verify latency target; /oauth/token returns 200 for form-encoded grant; /readyz returns green.
+Output: readiness JSON and list of any missing/invalid secrets.
+2. provider_register (Stripe)
+
+Verify env vars: APP_BASE_URL, STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET, SCHOLAR_AUTH_BASE_URL, AUTO_COM_CENTER_BASE_URL.
+Health checks: Stripe secret loads; webhook signature verifies in test mode; post-payment notification step is configured to call auto_com_center.
+Output: readiness JSON and dry-run receipt payload that will be sent to auto_com_center.
+3. auto_com_center (Notifications)
+
+Endpoint decision: maintain current POST /api/send and add alias POST /send-notification within 30 minutes for backward compatibility. Keep both live for two weeks, then deprecate /send-notification once all apps are updated.
+Verify env vars: APP_BASE_URL, POSTMARK_SERVER_TOKEN (or SENDGRID_KEY/TWILIO_KEY), DATABASE_URL, NOTIFY_WEBHOOK_SECRET (set this now; treat it as required), CORS_ALLOWED_ORIGINS aligned to the Ecosystem Map.
+Health checks: /healthz, /readyz green; send test using both endpoints; receipt, welcome, and match templates compile.
+Output: confirmation that both endpoints function; signed-request verification using NOTIFY_WEBHOOK_SECRET is enforced for non-public routes.
+4. scholarship_api (Truth/DB)
+
+Verify env vars: APP_BASE_URL, DATABASE_URL, SCHOLAR_AUTH_BASE_URL, JWT_AUDIENCE/ISSUER, CORS_ALLOWED_ORIGINS.
+Health checks: GET /scholarships returns; POST /scholarships requires provider JWT; /readyz validates DB connectivity and auth introspection.
+Output: readiness JSON and schema validation status for Scholarship and User.
+5. student_pilot (Frontend)
+
+Verify env vars: APP_BASE_URL, SCHOLARSHIP_API_BASE_URL, SCHOLAR_AUTH_BASE_URL, AUTO_COM_CENTER_BASE_URL.
+Health checks: profile fetch via scholarship_api; login via scholar_auth; “Application Tracker” renders; profile completion meter reads from real fields.
+Output: screenshot and curl-able tests that prove API wiring.
+Endpoint discrepancy resolution
+
+Direction: auto_com_center will immediately support both POST /api/send (current) and POST /send-notification (documented in the master prompt). This eliminates ambiguity and avoids breaking downstream apps while we align SDKs and docs.
+Documentation: update auto_com_center docs to list both endpoints, mark /send-notification as a temporary alias, and set removal date two weeks out. This approach follows unified API governance guidance to reduce friction and integration risk .
+Deliverables back to me
+
+A single Secrets and Endpoints Audit Matrix: per app, list each required secret with status (present/valid/missing) and each critical endpoint with a one-line test result.
+Evidence bundle: readiness responses, sample curl commands and responses, and a short note on any remediation performed.
+Go/no-go note for the $1–$5 live Stripe “first-dollar” test.
+Acceptance criteria to pass this gate
+
+No missing secrets in the five apps above; /readyz green across all five.
+JWT issuance and verification proven E2E between scholar_auth and the other services.
+auto_com_center sends three template types on both endpoints with DKIM/SPF/DMARC passing in headers (we’ll run inbox placement immediately after this gate).
+Answer to your question
+
+Yes—start by verifying environmental variables for scholar_auth, provider_register, auto_com_center, scholarship_api, and student_pilot in that order. Also implement the endpoint alias on auto_com_center now to remove ambiguity.
+What I need from you to proceed
+
+Confirm three test inboxes (Gmail, Outlook, Yahoo) for the deliverability step.
+Confirm whether Stripe purchase should run in test or live mode for the first-dollar flow.
+Timebox
+
+Secrets and Endpoints Audit: 90 minutes.
+Endpoint alias live in auto_com_center: 30 minutes.
+First-dollar test readiness review: immediately upon receipt of the audit.
+Notes
+
+Replit guidance reinforces securing inter-service calls and managing secrets rigorously in production microservices , and our deployment readiness checklist treats secrets and health endpoints as pre-launch gates . Keeping endpoint governance consistent lowers operational risk as we scale autonomy across services .
+This sequencing supports the five-year plan’s growth engine by removing avoidable launch friction before we turn on organic acquisition and B2B monetization streams .
