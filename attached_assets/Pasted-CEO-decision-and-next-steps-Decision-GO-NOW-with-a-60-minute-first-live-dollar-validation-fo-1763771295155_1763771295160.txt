@@ -1,0 +1,83 @@
+CEO decision and next steps
+
+Decision: GO NOW, with a 60‑minute “first live dollar” validation, followed by a 24‑hour hardening pass. We’ll keep human-in-the-loop guardrails during this phase and treat every API as a product with clear contracts and ownership to minimize execution risk and speed learning from live data. This aligns with our governance principles for autonomous systems and API-as-a-product discipline  .
+
+What I want you to do now (T+60 minutes)
+
+Unblock notifications and run the purchase
+Set NOTIFY_WEBHOOK_SECRET in both auto_com_center and provider_register (same value). Timebox: 15 minutes.
+Smoke test POST /api/send on auto_com_center using the secret.
+Execute a live $5–$10 purchase via student_pilot. Acceptable to use existing login if scholar_auth signup is degraded; we’ll fix auth migrations in the 24‑hour pass.
+Verify credits posted in student_pilot and the transaction ledger is recorded in scholarship_api.
+Required evidence (attach screenshots/JSON):
+
+Stripe Dashboard: live charge details
+student_pilot: updated credit balance
+scholarship_api: transaction/ledger fetch for the user
+2. Minimal deliverability check (parallel, do not block revenue test)
+
+Attempt a receipt email via auto_com_center after the purchase.
+If email fails, do not halt—complete the revenue flow; log the error and proceed.
+3. Post “Production Status Reports” (end of the 60 minutes)
+
+auto_com_center and provider_register: publish “Production Status Report: [YOUR_APP_NAME]” in the exact 4‑section format from the Master Prompt.
+Environment variables to verify now (highest ROI path)
+
+A. auto_com_center (priority: immediate)
+
+Required: APP_BASE_URL, POSTMARK_SERVER_TOKEN, DATABASE_URL, NOTIFY_WEBHOOK_SECRET
+Security/ops: CORS_ALLOWED_ORIGINS, JWT_ISSUER, JWT_AUDIENCE, SENTRY_DSN
+Optional: TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN Acceptance checks:
+GET /readyz returns OK
+POST /api/send returns 200 with a valid template payload
+CORS allows only ecosystem domains
+B. provider_register (priority: immediate)
+
+Required: STRIPE_SECRET_KEY (live), STRIPE_WEBHOOK_SECRET (live), DATABASE_URL, APP_BASE_URL
+Integrations: AUTO_COM_CENTER_BASE_URL, SCHOLAR_AUTH_BASE_URL (or AUTH_JWKS_URL) Acceptance checks:
+Stripe webhook verified and receiving events
+On successful payment, outbound call to auto_com_center includes NOTIFY_WEBHOOK_SECRET
+C. student_pilot (priority: as part of the test)
+
+Required: STRIPE_PUBLIC_KEY (live), SCHOLARSHIP_API_BASE_URL, AUTO_COM_CENTER_BASE_URL, SCHOLAR_AUTH_BASE_URL Acceptance checks:
+Checkout can start and complete
+Post‑purchase calls to scholarship_api succeed
+D. scholarship_api (priority: confirm JWT and ledger)
+
+Required: DATABASE_URL, AUTH_JWKS_URL (points to scholar_auth), CORS_ALLOWED_ORIGINS
+Ops: EVENT_BUS_URL/TOKEN if used Acceptance checks:
+/readyz healthy (DB and JWKS green)
+Credit ledger write/read path works
+E. scholar_auth (priority: 24‑hour window)
+
+Required: DATABASE_URL, OIDC_ISSUER, JWKS keys/secrets, SESSION_SECRET, APP_BASE_URL Action: Run migrations to resolve password_hash or related schema issues; confirm /readyz=200.
+Go/no‑go gate for the 60‑minute run
+
+Go if: NOTIFY_WEBHOOK_SECRET is set in both services, Stripe live keys verified, scholarship_api ledger read/write OK, student_pilot can complete checkout.
+No‑go only if: Stripe live keys or scholarship_api ledger are failing (fix immediately and retry within the window).
+24‑hour hardening plan (after first dollar)
+
+Fix scholar_auth DB migrations; re‑enable full signup + recovery.
+Add /send-notification alias to auto_com_center (keep /api/send; deprecate later).
+Lock CORS allowlist across all services; add Sentry DSNs consistently.
+E2E JWT issuance/verification test across all apps; capture P95 latency targets.
+Run 3‑inbox deliverability test (Gmail/Outlook/Yahoo) and capture DKIM/SPF/DMARC.
+KPIs to capture from this run
+
+Time-to-first-dollar (TFF$)
+Webhook success rate (Stripe → provider_register, provider_register → auto_com_center)
+P95 latency across the messaging and ledger endpoints (target ~120ms)
+Email deliverability attempt status (don’t block on this)
+Why this approach
+
+Phased rollout with human approval points reduces risk while accelerating learning; treat APIs as products with clear contracts and observability from day one .
+Governance and explainability during early autonomy builds trust and prevents regressions as we scale agents’ permissions .
+This is the fastest path to validate our B2C credit purchase loop while keeping security and reliability standards intact.
+Answer to your question: Yes—help me verify env vars now
+Start with auto_com_center and provider_register exactly as listed above. Post a short “Secrets Check” snippet per app showing present/missing for the names (no values). Then proceed with the 60‑minute run.
+
+Dependencies/asks from you
+
+Confirm three test inboxes for deliverability (Gmail, Outlook, Yahoo) for the 24‑hour pass.
+Confirm Stripe is in LIVE mode for provider_register and student_pilot.
+I will review the two Production Status Reports and the evidence bundle immediately on completion and authorize widening the funnel.
