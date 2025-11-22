@@ -1,0 +1,71 @@
+CEO Response: GO/NO-GO Coordination + Tools Delivered
+
+Decisive next steps
+
+Immediate priority: Verify environment variables and secrets for provider_register and auto_com_center (Stripe live mode + NOTIFY_WEBHOOK_SECRET alignment). These are revenue blockers.
+Parallel priority: Confirm student_pilot uses pk_live and points to scholarship_api; confirm scholar_auth /verify and JWKS endpoints are reachable; confirm scholarship_api JWT validation and ledger write path.
+Gate: Reply with “GO – Checklist complete” once the five confirmations below are true.
+Five confirmations required for GO
+
+auto_com_center
+NOTIFY_WEBHOOK_SECRET set (rotated, never shared in chat)
+CORS allowlist includes all ecosystem origins
+Smoke test: POST /send-notification from an allowed Origin returns 200
+2. provider_register
+
+STRIPE_SECRET_KEY = sk_live_…
+STRIPE_WEBHOOK_SECRET = whsec_… from LIVE endpoint
+VITE_STRIPE_PUBLIC_KEY = pk_live_…
+NOTIFY_WEBHOOK_SECRET matches auto_com_center
+Webhook URL configured in Stripe (LIVE): https://provider-register-…/stripe/webhook with payment_intent.succeeded + payment_intent.payment_failed
+3. student_pilot
+
+VITE_STRIPE_PUBLIC_KEY = pk_live_…
+SCHOLARSHIP_API_BASE_URL points to scholarship_api
+Checkout route reachable without CORS errors
+4. scholar_auth
+
+/verify fast (<120ms P95)
+JWKS available: /.well-known/jwks.json
+Issuer and audience values aligned across apps
+5. scholarship_api
+
+AUTH_JWKS_URL points to scholar_auth’s JWKS
+Ledger write/read paths healthy (credits purchase + balance)
+CORS allowlist set to ecosystem origins
+Deliverables to accelerate execution
+
+Environment verification checklist (CSV)
+Download the checklist
+
+Production Status Report (four-section template, copy-per-app)
+Download the PSR template
+
+First Live Dollar evidence package template
+Download the evidence template
+
+How to use these
+
+Assign owners per app; each owner fills the env checklist rows for their app and pastes their PSR (four sections exactly) back to you.
+When all five confirmations are true and PSRs are submitted, reply “GO – Checklist complete” and run the $1–$10 live purchase. Capture evidence using the template.
+KPIs and acceptance criteria
+
+Time-to-first-dollar: ≤60 minutes from GO to evidence bundle
+Stripe mode: All keys must be LIVE (sk_live_, pk_live_, whsec_)
+Ledger: 1 purchase recorded; credits appear in student_pilot
+Notification: Receipt email delivered via auto_com_center
+SLOs: Endpoints respond within ~120ms P95; no 5xx in flow
+Risk controls and rollback
+
+If any step fails, pause, capture error, and remediate; do not proceed to charge again until fixed.
+Rollback by switching provider_register and student_pilot to test keys, and disable LIVE webhook if needed.
+What I need from you now
+
+Do you want me to guide verification for provider_register and auto_com_center first, or do you prefer to run all five in parallel with your team using the checklist?
+Once ready, reply with: GO – Checklist complete:
+✓ NOTIFY_WEBHOOK_SECRET rotated and set in auto_com_center + provider_register
+✓ Stripe LIVE keys verified (sk_live_, pk_live_, whsec_)
+✓ student_pilot points to scholarship_api with pk_live
+✓ scholar_auth verify/JWKS reachable
+✓ scholarship_api ledger write/read OK
+I will then green-light the live purchase test and coordinate evidence capture.
