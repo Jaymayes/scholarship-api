@@ -1,0 +1,71 @@
+CEO Decision: Conditional GO
+
+Rationale
+
+We proceed only on evidence. A first live-dollar test is valuable, but it must ride on verified auth, CORS, and Stripe webhook controls across independent Replit apps that each carry their own secrets. Replit “autonomous apps” behave like microservices: they are isolated, deploy independently, and require explicit, secured inter-service contracts and human-governed readiness gates .
+Our production readiness checks must confirm secrets, resiliency, and security patterns per the Replit deployment best-practices and secrets management guidance before accepting live payments .
+This aligns with our Playbook’s data-first execution and KPI discipline; a clean “first live dollar” creates traceable baselines for B2C credit ARPU and funnel conversion while we scale low-CAC SEO acquisition next .
+Blocking proof required (send these 8 artifacts)
+Provide the exact artifacts below. If all pass, I will issue GO immediately.
+
+scholar_auth (IdP)
+Proof A: Curl output of JWKS with latency. Command: curl -s -w "HTTP:%{http_code} TIME:%{time_total}s\n" https://scholar-auth-jamarrlmayes.replit.app/.well-known/jwks.json | head -1. Target: HTTP 200; P95 ≤120ms.
+Proof B: The configured issuer and audience values (exact strings, not secrets) that downstream apps enforce.
+Proof C: Working token verification endpoint used by other apps (e.g., /verify or JWKS-only flow), plus a sample 401 (no token) and 200 (valid token) round-trip.
+Why required: Each service must validate tokens against the IdP’s JWKS with strict issuer/audience checks; this is a core inter-service security contract in a microservice ecosystem on Replit  .
+
+2. scholarship_api (Central DB/ledger)
+
+Proof A: Env print of AUTH_JWKS_URL value (redact everything else); must equal scholar_auth JWKS URL.
+Proof B: CORS allowlist values showing only ecosystem origins are permitted.
+Proof C: Protected endpoint test showing 401 without token and 200 with a valid token.
+Proof D: Readiness to post and read credit ledger entries (show expected endpoints). Post-payment we will require a GET balance and transaction summary reflecting the Stripe payment.
+Why required: API-as-a-product discipline and unified security/observability across internal APIs are prerequisites to safe autonomous operations and agent collaboration .
+
+3. provider_register (Stripe)
+
+Proof A: Secrets tab screenshot (prefix-only, no full keys): STRIPE_SECRET_KEY starts with sk_live_ or rk_live_, STRIPE_WEBHOOK_SECRET starts with whsec_, VITE_STRIPE_PUBLIC_KEY starts with pk_live_.
+Proof B: Stripe Dashboard screenshot (LIVE mode) of webhook endpoint:
+URL: https://provider-register-jamarrlmayes.replit.app/stripe/webhook
+Events: payment_intent.succeeded and payment_intent.payment_failed
+Status: Enabled (LIVE)
+Proof C: Presence of NOTIFY_WEBHOOK_SECRET (value not shown) to call auto_com_center.
+Why required: Payment path integrity depends on live keys, correct webhook in LIVE mode, and signed webhooks; secrets must be stored in Replit Secrets (not code) per readiness guidance  .
+
+4. auto_com_center (Notifications)
+
+Proof A: Secrets tab screenshot showing NOTIFY_WEBHOOK_SECRET present.
+Proof B: A successful POST /send-notification test result (HTTP 200) from an allowed origin with that secret.
+Why required: Inter-service communication must be secured with managed secrets and tested for resiliency patterns before production traffic .
+
+5. student_pilot (Frontend)
+
+Proof A: Env variable showing SCHOLARSHIP_API_BASE_URL set to the scholarship_api URL.
+Proof B: Browser console screenshot of checkout page load with no CORS errors.
+Proof C: Evidence the “Pay” action routes to provider_register as designed.
+Why required: Frontend must call the API gateway, not the DB directly, and respect CORS/data boundaries as a production guardrail .
+
+Execution plan to first live dollar (13–20 minutes after proofs)
+
+T+0: Issue GO once all eight artifacts above are received and validated.
+T+0–2: Final smoke tests: IdP JWKS latency and 401/200 on a protected API route.
+T+3–6: Execute $9.99 live purchase in student_pilot.
+T+7–10: Confirm credit ledger entry and balance in scholarship_api; confirm notification delivered by auto_com_center.
+T+11–13: Capture the evidence bundle (transaction ID, amount, credits granted, Stripe payment ID, balance, notification ID). This anchors our B2C revenue KPIs for ARPU and conversion in the Playbook’s financial model and growth dashboard .
+Decision logic
+
+GO: All eight artifacts pass; we proceed immediately.
+Conditional NO-GO (fix fast): Any of the following missing or failing:
+LIVE Stripe keys or LIVE webhook not configured.
+scholar_auth JWKS/issuer mismatch or verification endpoint not proving 401/200 round-trip.
+scholarship_api lacking AUTH_JWKS_URL or CORS allowlist not restricted to ecosystem origins.
+NOTIFY_WEBHOOK_SECRET mismatch between provider_register and auto_com_center.
+student_pilot showing CORS errors or misrouted checkout. These are standard, fix-in-minutes production gates for Replit deployments and must be closed before accepting live payments .
+Post-GO moves (48–72 hours)
+
+SEO engine: Approve Phase 1 Auto Page Maker expansion (200–500 pages/day) to compound low-CAC organic acquisition consistent with the Playbook’s MAU growth and ARR plan; track activation via “first document upload” as the primary early KPI for conversion lift .
+Reliability: Add retries/circuit breakers on all inter-service calls and keep secrets strictly in Replit Secrets across apps, reflecting distributed-systems resiliency guidance for Replit multi-app ecosystems .
+Governance: Require each app owner to file a 1-page Production Status Report using the 4-section template (status %, integrations, revenue readiness, third-party dependencies) to institutionalize API-as-a-product governance across the ecosystem .
+Your action
+
+Provide the eight proof artifacts above. If they pass, I will immediately issue GO and green-light the monitored first live-dollar test. If any artifact fails, we pause for a targeted fix and retest, then proceed.
