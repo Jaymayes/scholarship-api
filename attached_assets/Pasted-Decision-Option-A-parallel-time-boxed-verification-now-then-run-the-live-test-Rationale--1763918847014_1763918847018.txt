@@ -1,0 +1,63 @@
+Decision: Option A — parallel, time-boxed verification now, then run the live-$ test
+
+Rationale
+
+We optimize for urgency and low-CAC growth. A fast, parallel verification to first live dollar aligns to the Playbook’s growth engine and our path to scale via SEO and partnerships while building the B2B engine over time .
+We maintain a security-first posture on the way to SOC 2 as a revenue enabler, without stalling execution .
+What to do now (15 minutes, parallel)
+Assign one owner per app; run in their own workspace. Share only key prefixes/screenshots, never full secrets.
+
+scholar_auth (IdP) — Owner: Auth Lead
+Prove JWKS 200 and latency
+Issuer and audience values
+401/200 round-trip (or documented JWKS-only flow) GO gate: Same issuer/audience across all apps
+2. scholarship_api — Owner: API Lead
+
+AUTH_JWKS_URL points to scholar_auth JWKS
+CORS allowlist = ecosystem origins only (no wildcards)
+Protected endpoint 401 w/o token; 200 with token
+Credit ledger endpoints (purchase, balance) listed and reachable
+3. provider_register — Owner: Payments Lead
+
+Replit Secrets: STRIPE_SECRET_KEY (sk_live_), VITE_STRIPE_PUBLIC_KEY (pk_live_), STRIPE_WEBHOOK_SECRET (whsec_) — screenshot prefixes only
+Stripe Dashboard (LIVE mode) webhook screenshot: URL to /stripe/webhook; events payment_intent.succeeded, payment_intent.payment_failed
+NOTIFY_WEBHOOK_SECRET present; prefix match with auto_com_center
+4. auto_com_center — Owner: Comms Lead
+
+NOTIFY_WEBHOOK_SECRET present (matches provider_register first 8 chars)
+POST /send-notification smoke test returns 200
+5. student_pilot — Owner: Frontend Lead
+
+SCHOLARSHIP_API_BASE_URL configured
+Browser console screenshot at /checkout or /billing (no CORS/401/403)
+Network tab: “Pay” routes to provider_register domain and then Stripe
+GO criteria (must be true)
+
+All 8 artifacts pass (above)
+No wildcard CORS; JWT iss/aud aligned; Stripe LIVE keys + LIVE webhook; secrets match between provider_register and auto_com_center
+NO-GO triggers (any = stop)
+
+Issuer/audience mismatch
+Missing or TEST Stripe keys/webhook
+Open CORS (*) on scholarship_api
+Notification secret mismatch
+Immediate execution after GO (13 minutes)
+
+T+0: Issue GO; open billing/checkout in student_pilot
+T+2: Execute $9.99 purchase (test card per Stripe LIVE policies if applicable)
+T+6: Verify credits posted; capture API balance + ledger screenshots
+T+10: Confirm receipt email sent by auto_com_center
+T+13: Package “First Live Dollar” bundle for the board: Stripe payment ID, credits granted, API balance, notification message ID
+Same-day follow-ups (execution to revenue)
+
+B2C engine: Prioritize Auto Page Maker to compound organic traffic (core lever for MAU growth) and tighten the SEO loop with fresh sitemap.xml and linking back to student_pilot. This is our low-CAC growth flywheel per the Playbook .
+Security posture: Lock CORS, JWT validation, and secrets handling; plan SOC 2 track as a revenue enabler (B2B trust) per roadmap .
+Accountability and reporting
+
+Each owner posts proof artifacts in one thread with time stamps.
+After the live-$ run, I want:
+First-dollar KPI snapshot: CAC (est.), ARPU baseline from credits, conversion rate from checkout, notification delivery metric
+“Production Status Report: [APP_NAME]” in the 4-section format across all apps by EOD (Current Status %, Integration Check, Revenue Readiness with time-to-MVP if No, Third-Party Dependencies with env detection)
+If any owner is blocked, signal immediately; we’ll reassign to maintain the 15-minute clock.
+
+Proceed with Option A.
