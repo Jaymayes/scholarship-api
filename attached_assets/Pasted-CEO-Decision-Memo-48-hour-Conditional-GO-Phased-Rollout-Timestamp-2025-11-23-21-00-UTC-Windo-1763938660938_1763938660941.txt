@@ -1,0 +1,159 @@
+CEO Decision Memo — 48-hour Conditional GO, Phased Rollout
+
+Timestamp: 2025-11-23 21:00 UTC
+Window: T+0 to T+48
+Objective: Evidence-backed GO/NO-GO at T+24; execute first live-dollar test in T+24–T+48 if all gates pass
+
+Executive Decisions (Effective Now)
+
+Conditional GO with Three Non‑Negotiable Gates
+Status: NO-GO to live dollars until all three gates are evidenced. Claims without evidence are treated as unverified.
+Gate 1 (Payments): Stripe LIVE keys + webhook 200 OK + receipt notification proof
+Gate 2 (Security & Performance): Auth + API 401/200 and P95 ≤120ms proof
+Gate 3 (CORS): Strict allowlist, no wildcards; preflight pass/fail proof
+2. Auto Page Maker: GO for Phase 1 with guardrails
+
+Throughput: 200–500 pages/day starting now
+Domain and Canonicals: Use pages.scholaraiadvisor.com (or www.scholaraiadvisor.com/scholarships) only. No third-party or legacy domains. All canonical tags and sitemaps must reflect scholaraiadvisor.com.
+CTA: “Apply Now” → https://student-pilot-jamarrlmayes.replit.app with UTM tracking
+Evidence due by T+24: sitemap.xml URL, robots.txt, GSC property verification, sample of 10 live URLs, structured data validation, and Network tab showing 200 responses with no CORS errors
+Quality: No thin/duplicate pages; intent-cluster internal links; schema.org markup; automatic sitemap updates per batch
+3. Stockholder Report: Defer until evidence at T+24
+
+Rationale: Evidence-first discipline. We will prepare the template now and populate after all PSRs and evidence packs arrive at T+24.
+If you have a stockholder deadline before T+24, tell me now; otherwise, final report ETA T+30 (within 6 hours after the T+24 checkpoint).
+What Owners Must Do (Deadlines)
+T+0 to T+3 (by 2025-11-23 24:00 UTC)
+
+Each owner must post in the shared channel: “I own it: [APP_NAME] Owner: [Your Name] ETA for PSR + Evidence Pack: [Time before T+24] Status: [On track / Need help with X]”
+Apps and owners
+scholar_auth — Auth Lead
+provider_register — Payments Lead (CRITICAL PATH)
+scholarship_api — API Lead
+auto_com_center — Comms Lead
+student_pilot — Frontend Lead
+auto_page_maker — Growth Lead (Daily report due T+24)
+T+24 (by 2025-11-24 21:00 UTC)
+
+Each owner submits:
+Production Status Report (exactly 4 sections, per template)
+Evidence Pack with screenshots and curl outputs (timings visible, secrets masked)
+CEO conducts GO/NO-GO decision against the three gates
+T+24 to T+48 (if GO)
+
+Execute monitored $9.99 live-dollar test within a 30-minute window
+Capture the 10-artifact evidence bundle and publish KPI baseline for the board
+Gate-by-Gate Evidence Checklist (Exact Artifacts Required)
+Gate 1: Payments (provider_register + auto_com_center)
+
+Stripe LIVE mode only:
+STRIPE_SECRET_KEY: sk_live_…
+VITE_STRIPE_PUBLIC_KEY: pk_live_…
+STRIPE_WEBHOOK_SECRET: whsec_…
+Screenshot of Replit/Secrets: mask values, show prefixes
+Stripe Dashboard (LIVE, not test):
+Webhook endpoint: https://provider-register-jamarrlmayes.replit.app/stripe/webhook
+Events: payment_intent.succeeded, payment_intent.payment_failed
+Screenshot of recent delivery with 200 OK + timestamp
+Notification path proof:
+Event: payment_intent.succeeded triggers POST to auto_com_center
+Response: 200 OK with message ID in the response body (screenshot)
+On payment: provider account created via scholar_auth with provider scope; log the 3% fee
+Gate 2: Security & Performance (scholar_auth + scholarship_api)
+
+scholar_auth
+Issuer (exact string) and Audience documented
+JWKS endpoint reachable; curl with timing output
+Auth test endpoint: 401 without token; 200 with valid token; curl outputs include total time
+P95 token validation ≤120ms (show distribution or summary from logs/metrics)
+No PII in logs; rotation policy documented
+scholarship_api
+AUTH_JWKS_URL = https://scholar-auth-jamarrlmayes.replit.app/.well-known/jwks.json (text proof)
+Protected endpoint tests:
+GET /api/balance without token → 401 (curl with timing)
+GET /api/balance with valid token → 200 (curl with timing)
+Performance: P95 ≤120ms for read endpoints (show metrics snapshot)
+Schema validation enforced on Scholarship and User
+Endpoints: GET /scholarships (public), POST /scholarships (provider-only with scope)
+Health endpoint 200 with timing
+Gate 3: CORS (all apps, specifically scholarship_api + auto_com_center)
+
+Show the exact allowlist (no wildcards). Allowed origins must match the Ecosystem Map domains verbatim:
+https://scholar-auth-jamarrlmayes.replit.app
+https://scholarship-api-jamarrlmayes.replit.app
+https://scholarship-agent-jamarrlmayes.replit.app
+https://scholarship-sage-jamarrlmayes.replit.app
+https://student-pilot-jamarrlmayes.replit.app
+https://provider-register-jamarrlmayes.replit.app
+https://auto-page-maker-jamarrlmayes.replit.app
+https://auto-com-center-jamarrlmayes.replit.app
+Preflight tests:
+One passing from an allowed origin (curl -X OPTIONS with appropriate headers; show Access-Control-Allow-* response headers)
+One failing from a denied origin (no ACAO header, appropriate error)
+Owner-Specific Direction (Concise)
+
+Auth Lead (scholar_auth) — Gate 2 owner
+
+Fix any /oauth/token 500s. Typical causes: missing secrets, JWKS config, clock skew, or issuer/audience mismatch.
+Post evidence pack: issuer, audience, JWKS curl with time, 401/200 curl outputs, P95 timing proof, healthz with time, secrets screenshot (masked).
+Payments Lead (provider_register) — Gate 1 owner, revenue blocker
+
+Move to LIVE mode in Stripe; replace any test keys immediately.
+Configure webhook; trigger a test event in LIVE; capture 200 OK in Dashboard.
+On success: call scholar_auth to create/confirm provider role; post receipt via auto_com_center; capture message ID.
+API Lead (scholarship_api) — Gate 2 and Gate 3 partner
+
+Enforce JWT scope checks for provider-only POST /scholarships.
+Publish CORS allowlist (no wildcards); run preflight pass/fail tests and post results.
+Provide P95 read-path latency proof ≤120ms; 401/200 auth tests with curl timings.
+Comms Lead (auto_com_center) — Gate 1 and Gate 3 partner
+
+Confirm NOTIFY_WEBHOOK_SECRET present; show masked prefix.
+POST /send-notification test for “Payment Receipt”; capture 200 and message ID.
+Show CORS allowlist config; run one preflight pass and one fail.
+Frontend Lead (student_pilot) — End-to-end validation
+
+Network tab: Only calls scholarship_api (no direct DB). No 401/403 or CORS errors.
+“Pay/Buy” routes to provider_register. Provide console + network screenshots.
+Application Tracker UI and profile completion progress bar visible and working.
+Growth Lead (auto_page_maker) — Organic engine
+
+Produce 200–500 pages today on scholaraiadvisor.com footprint.
+Evidence by T+24: sitemap.xml URL, robots.txt, GSC verified, top 10 URLs, schema validation screenshots, and traffic routing to student_pilot with UTM.
+Risk Controls and Rollbacks
+
+Payments NO-GO triggers:
+
+Any Stripe test keys in use
+Missing LIVE webhook or not delivering 200 OK
+Provider role not granted on payment
+Action: Halt live-dollar test; remediation ETA required; keep Auto Page Maker running
+Security NO-GO triggers:
+
+Wildcard CORS anywhere
+Protected endpoints responding 200 without auth
+P95 >120ms on auth/API hot paths
+Action: Block live-dollar test; enforce fixes; re-test; re-evaluate
+Brand/SEO guardrail:
+
+Do not publish or canonicalize to any domain except scholaraiadvisor.com or designated subdomain.
+Action: If mismatch detected, pause publishing and correct DNS/canonicals before resuming.
+KPI Capture (for T+24 and Live Test)
+
+B2C: Free→paid conversion, ARPU from credit purchase, end-to-end page→checkout latency
+Cost: Organic CAC (media spend = $0), content ops cost separately tracked
+Ops: P95 latency by app, error rate, uptime, webhook success rate
+B2B: If a provider posts during the window, log 3% fee and provider analytics (views/clicks)
+Answers to Prior Questions
+
+Stockholder report timing: Wait until T+24. Prepare the template now; deliver evidence-backed report by T+30 unless you confirm an earlier investor deadline.
+Immediate focus (T+0–T+24):
+Support owners to produce PSRs + Evidence Packs
+Greenlight Auto Page Maker under domain/canonical guardrails
+Prepare stockholder report shell and KPI dashboard for rapid population at T+24
+Requests for Confirmation
+
+Confirm domain plan: pages.scholaraiadvisor.com (recommended) or www.scholaraiadvisor.com/scholarships as canonical base for Auto Page Maker.
+Confirm there is no stockholder deadline before T+24; if there is, specify timing.
+Final Word
+Time is the constraint. Evidence is the currency. Payments is the critical path. Keep Auto Page Maker moving under the correct domain, and get the three gates evidenced by T+24. If any gate fails, post a remediation plan with ETA immediately.
