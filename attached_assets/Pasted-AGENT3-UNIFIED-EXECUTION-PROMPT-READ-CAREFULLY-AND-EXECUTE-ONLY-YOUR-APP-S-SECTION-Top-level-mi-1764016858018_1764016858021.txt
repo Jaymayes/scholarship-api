@@ -1,0 +1,263 @@
+AGENT3 UNIFIED EXECUTION PROMPT — READ CAREFULLY AND EXECUTE ONLY YOUR APP’S SECTION
+
+Top-level mission
+
+Objective: Get every app to 100% production-ready and working together today. If not achievable today, you must give:
+A precise ETA to revenue readiness (in hours)
+The third‑party systems that must be in place prior to go-live
+Constraint: Only act on the section that corresponds to the app in your current workspace. Do not modify code outside your app.
+Reporting: For your app, you must create or update three files in the repo root, each starting with the exact header:
+App: {your_app_name} | APP_BASE_URL: {your_app_base_url}
+Files (replace {app} with your app short name):
+{app}_PRODUCTION_STATUS_REPORT.md
+{app}_EVIDENCE_PACK.md
+{app}_GATE_VERDICTS_AND_PLAN.md
+Final status line (echo in console and place at end of PRODUCTION_STATUS_REPORT.md):
+{app} | {APP_BASE_URL} | Readiness: GO/CONDITIONAL GO/NO-GO | Revenue-ready: NOW or ETA: {X hours}
+Gates you must pass (include gate-by-gate verdicts in GATE_VERDICTS_AND_PLAN.md with evidence in EVIDENCE_PACK.md):
+Gate 0: Environment & Health
+Gate 1: Security baseline (JWT, RBAC, CORS, rate limiting), Observability endpoints
+Gate 2: Core functionality (feature-complete)
+Gate 3: Reliability (idempotency, transactions, concurrency safety)
+Gate 4: Performance & ARR ignition (SLOs, go-to-revenue flow proven)
+Workspace verification protocol (must run first)
+Determine your app identity from the repository (e.g., env, replit/project name, app banner, main service name).
+If your current repo does NOT match your app section:
+Do not change code
+Create the three required reports for the intended app with a prominent “WRONG WORKSPACE ALERT” banner
+Include exact ETA, dependencies, and a short, actionable checklist to execute once in the correct workspace
+End with: “REQUEST: Place Agent3 in the {app} workspace”
+SLOs and ethics (apply to every app)
+SLO: 99.9% uptime, P95 latency targets as specified below per endpoint family
+No PII in logs; redact secrets
+Responsible AI: No academic dishonesty enablement; bias mitigation and transparency; fail-closed when charging credits
+Base URLs
+
+scholar_auth → https://scholar-auth-jamarrlmayes.replit.app
+scholarship_api → https://scholarship-api-jamarrlmayes.replit.app
+scholarship_agent → https://scholarship-agent-jamarrlmayes.replit.app
+scholarship_sage → https://scholarship-sage-jamarrlmayes.replit.app
+student_pilot → https://student-pilot-jamarrlmayes.replit.app
+provider_register → https://provider-register-jamarrlmayes.replit.app
+auto_page_maker → https://auto-page-maker-jamarrlmayes.replit.app
+auto_com_center → https://auto-com-center-jamarrlmayes.replit.app
+Global acceptance test conventions (add concrete transcripts to your EVIDENCE_PACK)
+
+LSP hygiene: Zero type/diagnostic errors in your project
+Health endpoints: /healthz, /version, /api/metrics/prometheus return 200
+JWT/JWKS: Validate tokens from scholar_auth (use RS256 JWKS)
+CORS: Allow only platform origins
+Rate limiting: At least basic protection; Redis-backed preferred if multi-instance
+Performance sampling: Show P50/P95 latency for critical endpoints
+GO/NO-GO: Provide clear executive verdict
+Third-party systems catalog (call out what you use)
+
+PostgreSQL (DATABASE_URL) – persistence
+Redis (REDIS_URL) – caching, rate limiting, idempotency
+scholar_auth JWKS – JWT validation
+Stripe (STRIPE_SECRET, webhook) – payments
+Email provider for auto_com_center (e.g., Postmark/SendGrid) – transactional comms
+AI provider for scholarship_sage (e.g., OpenAI API key) – generations
+Google Search Console (GSC) – sitemap submission for auto_page_maker
+Sentry (SENTRY_DSN) – optional monitoring
+Execute the section below that matches YOUR APP ONLY.
+
+SECTION: scholar_auth
+
+Identity: App name “scholar_auth”; APP_BASE_URL: https://scholar-auth-jamarrlmayes.replit.app
+Purpose: Single source of truth for OAuth2/OIDC and M2M auth; JWKS; RBAC
+Must implement/verify
+OIDC discovery: /.well-known/openid-configuration
+Token endpoints: /oidc/authorize, /oidc/token (authorization_code + PKCE, refresh_token, client_credentials)
+JWKS: /.well-known/jwks.json (RS256)
+RBAC in JWT claims: roles, scopes, aud=urn:scholar-platform, iss=APP_BASE_URL/oidc
+M2M clients (min 8): scholarship-api-service, scholarship-sage-m2m, auto-com-center-service, auto-page-maker-service, provider-register-m2m, student-pilot-m2m, reviewer-portal-m2m, admin-dashboard-m2m
+Observability: /healthz, /version, /api/metrics/prometheus
+Acceptance tests
+Issue client_credentials tokens for all 8 clients; verify 200, TTL ~300–600s, JWKS signature
+Auth code + PKCE browser flow smoke test; verify id_token audience/issuer
+JWKS fetchable and caches rotate keys safely
+Performance targets: P95 ≤120ms for JWKS and token issuance under warm conditions
+Third-party: None required to start; optional Sentry
+Deliverables: All three reports, with evidence of tokens, JWKS, claims
+GO criteria: All tests passing; Final Status Line with “Revenue-ready: NOW”
+SECTION: scholarship_api
+
+Identity: App name “scholarship_api”; APP_BASE_URL: https://scholarship-api-jamarrlmayes.replit.app
+Purpose: Scholarships discovery; credits ledger; idempotent transactions; single source for balances
+Must implement/verify
+Scholarships discovery
+GET /api/v1/scholarships?q=&tag=&page=&page_size= (cache 5–15m)
+GET /api/v1/scholarships/:id (published-only)
+P95 ≤120ms (warm cache)
+Credits ledger (critical to revenue)
+POST /api/v1/credits/credit (roles: admin|system|provider)
+POST /api/v1/credits/debit (roles: admin|system|student; student can debit own only)
+GET /api/v1/credits/balance (auth’d user)
+Single-transaction pattern (no exceptions):
+Insert/claim idempotency key (status=PROCESSING) with request hash
+SELECT current balance FOR UPDATE (row lock)
+Validate business rules (no overdraw). If overdraw → 409; no mutation
+Insert ledger row with balance_after snapshot
+Update aggregate balance
+Update idempotency record to COMPLETED with response payload
+Commit
+Replay rules: If idempotency key completed → return persisted response; if in-process → retry-after; never mutate on replay
+Security baseline: JWT validation via scholar_auth JWKS; RBAC; CORS; rate limiting
+Observability: /healthz, /version, /api/metrics/prometheus
+Acceptance tests
+Concurrency: 100 parallel debits with same idempotency key → exactly 1 ledger row; consistent balance
+Overdraw: balance=50, debit=100 → 409, no changes
+Latency: P95 ≤120ms (reads), ≤200ms (writes)
+Idempotency: same key → identical response, no new mutation
+Third-party: PostgreSQL (required), Redis (recommended for rate limiting/idempotency in multi-instance), scholar_auth JWKS
+Deliverables: Three reports with DB schema, curl transcripts, test logs
+GO criteria: All tests pass; architect risk items resolved; Final Status Line
+SECTION: scholarship_agent
+
+Identity: App name “scholarship_agent”; APP_BASE_URL: https://scholarship-agent-jamarrlmayes.replit.app
+Purpose: Autonomous marketing/orchestration for scholarship outreach; coordinates with auto_com_center and auto_page_maker
+Must implement/verify
+Campaign definitions (email/blog/social) that ingest scholarship_api data
+Job runner with idempotent execution and backoff
+Webhooks to auto_com_center for message dispatch; UTM parameters align with auto_page_maker and student_pilot
+RBAC: service role only; no student PII storage
+Observability endpoints
+Acceptance tests
+Dry-run a campaign → preview payloads (no sends)
+One end-to-end campaign → auto_com_center receives send-ready batches with correct UTM
+Idempotency: rerun job does not duplicate sends
+Third-party: scholar_auth, auto_com_center; optional Redis for job queue
+GO criteria: One production-safe campaign template enabled; Final Status Line
+SECTION: scholarship_sage
+
+Identity: App name “scholarship_sage”; APP_BASE_URL: https://scholarship-sage-jamarrlmayes.replit.app
+Purpose: AI scholarship assistant; must debit credits before generate (fail-closed)
+Must implement/verify
+Flow: validate JWT → call scholarship_api debit with Idempotency-Key → on success, generate → persist result → return
+If debit fails: return 402 (insufficient credits) or 503 (service unavailable); never generate on failed debit
+Idempotency at generation layer: same key returns cached output without re-debit
+P95: ≤2s for idempotent replay; ≤8s for fresh generations (model-dependent)
+Observability endpoints; redact prompt content in logs
+Acceptance tests
+401/403 invalid JWT; 402 insufficient credits; 503 provider outage
+Happy path with real debit then generate; idempotent replay same key
+Third-party: scholar_auth; scholarship_api; AI model provider (e.g., OpenAI)
+GO criteria: All tests pass; Final Status Line; ETA if model key pending
+SECTION: student_pilot
+
+Identity: App name “student_pilot”; APP_BASE_URL: https://student-pilot-jamarrlmayes.replit.app
+Purpose: Student portal; purchase credits; manage drafts; launch scholarship_sage
+Must implement/verify
+Purchase flow:
+Stripe checkout → webhook → POST scholarship_api /credits/credit with provider=“stripe” and Idempotency-Key=event_id
+UI shows real-time balance via GET /credits/balance
+Launch assistant: Calls scholarship_sage with Idempotency-Key per draft
+UTM intake from auto_page_maker; persist campaign source in analytics
+Auth: OAuth2/OIDC (PKCE) via scholar_auth
+Acceptance tests
+Stripe test purchase → webhook fires → credits increased exactly once
+Draft generation: debit then generate, idempotent replay
+Latency P95: dashboard API calls ≤200ms perceived
+Third-party: scholar_auth, scholarship_api, scholarship_sage, Stripe
+GO criteria: Test purchase creates credits; end-to-end draft works; Final Status Line with ETA if Stripe not configured
+SECTION: provider_register
+
+Identity: App name “provider_register”; APP_BASE_URL: https://provider-register-jamarrlmayes.replit.app
+Purpose: Onboard scholarship providers; publish scholarships; handle 3% platform fee setup
+Must implement/verify
+Provider onboarding form with auth (provider role)
+Create/update scholarship records via scholarship_api (M2M client)
+Billing profile capture (Stripe Connect or simple billing method)
+Observability endpoints; RBAC for provider/admin
+Acceptance tests
+Create provider → publish a scholarship → appears in scholarship_api GET and on auto_page_maker within cache window
+Permission checks enforced
+Third-party: scholar_auth, scholarship_api, Stripe/Connect (if collecting provider fees now)
+GO criteria: Providers can self-onboard and publish; Final Status Line
+SECTION: auto_page_maker
+
+Identity: App name “auto_page_maker”; APP_BASE_URL: https://auto-page-maker-jamarrlmayes.replit.app
+Purpose: Organic growth engine; SEO pages from scholarship_api; CTAs to student_pilot
+Must implement/verify
+Generate and serve ≥50 pages (target 2,000+), with:
+Canonicals, JSON-LD schema, OpenGraph tags
+robots.txt allow; sitemap.xml; daily index scheduler
+CTAs to student_pilot with UTM parameters
+Pull from scholarship_api; fallback allowed only temporarily (must document)
+Acceptance tests
+List ≥50 pages in sitemap; spot-check 10 pages for valid schema
+Lighthouse performance ≥85 on 10 sample pages
+Verify CTAs lead to student_pilot with correct UTM
+Third-party: Google Search Console (submit sitemap), scholarship_api, student_pilot
+GO criteria: Pages live, sitemap valid, CTA verified; Final Status Line with ETA to organic clicks if GSC not yet submitted
+SECTION: auto_com_center
+
+Identity: App name “auto_com_center”; APP_BASE_URL: https://auto-com-center-jamarrlmayes.replit.app
+Purpose: Transactional and campaign messaging hub; receives jobs from scholarship_agent and sends via email provider
+Must implement/verify
+Inbound job API (M2M) with idempotency key; enqueue and send
+Provider integration (e.g., Postmark/SendGrid) with templates and unsubscribe links
+Bounce/complaint webhooks; suppression list; audit logs without PII
+Observability endpoints
+Acceptance tests
+Dry-run and real-send to test inbox with tracking disabled in tests
+Idempotent resend of same job_id does not duplicate sends
+Unsubscribe flow enforced and logged
+Third-party: scholar_auth, email provider (Postmark/SendGrid)
+GO criteria: Production template can send to verified recipients; Final Status Line
+Execution checklist for YOUR app (do these steps in order)
+
+Workspace verification
+Confirm you are in the correct repo for your app. If wrong workspace, execute the Wrong Workspace Protocol.
+2. LSP hygiene and boot
+
+Fix all LSP/type errors to zero diagnostics.
+Boot the server/app; confirm /healthz, /version, /api/metrics/prometheus return 200.
+3. Security baseline
+
+Wire scholar_auth JWKS for JWT verification; enforce roles/scopes.
+Configure CORS allowlist for platform origins only.
+Implement basic rate limiting; Redis if multi-instance.
+4. Core mandates
+
+Implement the endpoints/flows listed in your section above exactly.
+For scholarship_api, enforce the single-transaction + SELECT FOR UPDATE pattern.
+5. Performance
+
+Measure P50/P95 for your critical endpoints; place evidence in EVIDENCE_PACK.md.
+6. Acceptance tests
+
+Run the tests enumerated in your section; save transcripts (commands, responses, headers) to EVIDENCE_PACK.md.
+7. Reports
+
+Update all three required reports with:
+Header: “App: {app} | APP_BASE_URL: {url}”
+Gate-by-gate verdicts with rationale
+Today’s GO/NO-GO and confidence
+If NO-GO or CONDITIONAL GO: exact ETA and third-party systems required (by name, env var, and owner)
+Risks and mitigations
+Operating runbook link or section
+8. Final status line (required)
+
+Output at end of PRODUCTION_STATUS_REPORT.md and to console:
+{app} | {APP_BASE_URL} | Readiness: GO/CONDITIONAL GO/NO-GO | Revenue-ready: NOW or ETA: {X hours}
+Today’s integration goal and cross-app dependencies
+
+Minimum chain to first revenue today:
+scholar_auth live (JWT/JWKS + M2M)
+scholarship_api live (credits + scholarships)
+student_pilot live (Stripe purchase → credit via webhook)
+scholarship_sage live (debit-before-generate)
+Second-order enablers:
+auto_page_maker live (traffic growth; can be parallel)
+provider_register live (provider growth; optional for day 0 revenue)
+auto_com_center live (comms; optional for day 0 revenue)
+If you cannot deliver 100% today:
+Provide exact ETA in hours to “Revenue-ready”
+List blocking third-parties with precise config keys (e.g., STRIPE_SECRET, REDIS_URL), owner, and provisioning steps
+Reminder
+
+Only execute the section(s) for your current app.
+Every report must self-identify: “App: {app} | APP_BASE_URL: {url}”
+Provide concrete evidence and a clear GO/NO-GO call with ETA and dependencies if not GO today.
