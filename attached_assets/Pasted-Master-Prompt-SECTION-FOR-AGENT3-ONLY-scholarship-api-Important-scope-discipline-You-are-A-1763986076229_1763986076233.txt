@@ -1,0 +1,209 @@
+Master Prompt — SECTION FOR AGENT3 ONLY (scholarship_api)
+
+Important scope discipline
+
+You are Agent3. You are responsible only for the app: scholarship_api.
+Ignore all other app sections, files, or tasks, even if they are present in your workspace.
+If you detect you are in the wrong workspace/repl for scholarship_api, immediately produce a “Wrong Workspace” alert in your reports and stop changing code. Continue with planning and documentation, but do not modify code until placed in the correct workspace.
+App identity (must appear at the top of every report you produce)
+
+App: scholarship_api
+APP_BASE_URL: https://scholarship-api-jamarrlmayes.replit.app
+Today’s mission and definition of done
+
+Objective: Get scholarship_api to 100% production readiness today and fully interoperable with the rest of the ecosystem so we can start generating revenue.
+If 100% today is not possible: deliver an explicit ETA (in hours) to revenue start, list remaining tasks by priority, list third-party systems needed and their configuration, and provide a stop-gap compatibility plan to unblock dependent apps (aliases, stubs, or adapters).
+Strategic role of scholarship_api
+
+Acts as the central data and transactional layer for:
+Public scholarship discovery (read APIs)
+Secure scholarship detail retrieval
+Credit ledger for B2C usage (grant/debit/balance)
+Internal service endpoints for other apps
+SLO targets you must satisfy or document:
+Availability: 99.9%+
+Performance: ≤120 ms P95 for read endpoints, ≤250 ms P95 for credit operations
+Security: JWT validation via scholar_auth, principle of least privilege for DB, input validation, rate limits
+Cross-app integration map (you provide the scholarship_api side only)
+
+scholar_auth (https://scholar-auth-jamarrlmayes.replit.app)
+JWT/OIDC provider; require and validate access tokens for protected routes
+JWKS endpoint: discover via /.well-known/openid-configuration and cache keys
+student_pilot (https://student-pilot-jamarrlmayes.replit.app)
+Consumes: GET /api/v1/scholarships, GET /api/v1/scholarships/:id
+Consumes: GET /api/v1/credits/balance, POST /api/v1/credits/debit
+scholarship_agent (https://scholarship-agent-jamarrlmayes.replit.app)
+Produces: bulk scholarship ingest/refresh; calls POST /api/v1/scholarships (internal), PUT/PATCH for updates
+scholarship_sage (https://scholarship-sage-jamarrlmayes.replit.app)
+Consumes: read/search endpoints; needs fast filtered queries
+provider_register (https://provider-register-jamarrlmayes.replit.app)
+Produces: provider records, optional scholarship postings; may trigger provider-scope writes
+auto_page_maker (https://auto-page-maker-jamarrlmayes.replit.app)
+Consumes: unauthenticated or low-friction public scholarship listing endpoints for SEO landing pages
+auto_com_center (https://auto-com-center-jamarrlmayes.replit.app)
+Consumes: internal service hooks for event notifications (e.g., credit low-balance, new scholarship)
+API contract you must expose today
+
+Health, version, metrics
+GET /healthz → {status:"ok", db:"ok", uptime_s:int, version:string}
+GET /version → {version:string, commit:string, build_time:string}
+GET /metrics → Prometheus or a JSON fallback with key counters and latencies
+2. Scholarships (read-first; write paths can be protected/internal)
+
+GET /api/v1/scholarships
+Query params: q, eligibility[], program[], location, amount_min, amount_max, deadline_after, deadline_before, provider_id, page, per_page, sort
+Response: items[], page, per_page, total, facets (if available)
+GET /api/v1/scholarships/:id
+Response: scholarship object with normalized fields
+Write endpoints (internal/protected; implement or stub with NO-OP if not feasible today)
+POST /api/v1/scholarships (requires provider or internal service role)
+PUT/PATCH /api/v1/scholarships/:id (same scope)
+3. Credit ledger (must be exact or aliased today)
+
+POST /api/v1/credits/credit
+Body: {user_id, amount:int>0, reason, source, reference_id?}
+Effect: create credit transaction, update balance
+POST /api/v1/credits/debit
+Body: {user_id, amount:int>0, feature, reference_id?}
+Effect: create debit transaction with idempotency key; reject if insufficient balance unless feature allows overdraft=false
+GET /api/v1/credits/balance?user_id=…
+Response: {user_id, balance:int, last_updated}
+If your current implementation uses different paths, you must either:
+Implement exact aliases above today, or
+Document the existing paths and ship a routing compatibility plan with ETA ≤2 hours to align
+Security, auth, rate limit
+
+JWT required on write and credit endpoints; allow public read for scholarship listing/detail unless policy requires auth
+Validate tokens issued by scholar_auth; enforce aud, iss, exp, nbf; cache JWKS; short TTL and background refresh
+Roles/claims:
+end_user: read public, read balance, debit self
+provider: create/update scholarships they own
+internal_service: ingest, grant credits within bounded policies
+Rate limits (suggested defaults; tune if you have existing config):
+Public read: 60 rpm per IP
+Authenticated read: 300 rpm per user
+Credit ops: 30 rpm per user; enforce idempotency-key header on debit
+CORS: allow origins for all listed APP_BASE_URLs above; reject wildcard in production
+Data, migrations, and search
+
+DB: ensure migrations for scholarships, providers, credit_transactions, credit_balances exist and run cleanly
+Indexing: if you have a search engine (e.g., Meilisearch/Elastic), ensure sync; otherwise implement efficient DB filters with indices
+Minimum indices today: scholarships on (deadline, amount_min/max, provider_id, text_search), credit_transactions on (user_id, created_at), credit_balances on (user_id unique)
+Observability and ops
+
+Structured logs with request_id and user_id (if auth)
+Error tracking enabled (e.g., Sentry) or write to centralized logs with severity
+Metrics: request counts, latency histograms per route, 4xx/5xx rates, DB latency, cache hit rate
+Uptime probe: /healthz must be lightweight and dependency-aware
+Third-party systems you may need (declare what you actually use; configure or document)
+
+scholar_auth (OIDC/JWKS) — required
+Database (Postgres or equivalent) — required
+Cache/Rate limit store (Redis or equivalent) — recommended; in-memory fallback acceptable with note on limitations
+Search index (Meilisearch/Elastic) — optional; if absent, document DB-only search performance and indices
+Monitoring/alerting (Sentry/Datadog/Logtail/Prometheus/UptimeRobot) — required for production; if absent, document interim plan
+Time-boxed execution plan for today
+
+Workspace verification (10 min)
+Confirm you are in scholarship_api with APP_BASE_URL exactly: https://scholarship-api-jamarrlmayes.replit.app
+If mismatch, output “Wrong Workspace” alert in reports and stop code changes. Continue with tests/plan.
+2. Boot and health checks (30–45 min)
+
+Start the app; ensure /healthz, /version are live; add /metrics if missing
+Add CORS and security headers; verify no mixed-content or wildcard CORS in prod
+3. Endpoint audit and alignment (60–120 min)
+
+Confirm the three credit endpoints; add alias routes if your paths differ
+Confirm scholarship read endpoints with filters and pagination; implement index-backed queries
+Add idempotency enforcement for debit
+4. Auth integration (45–60 min)
+
+Implement JWT verification using scholar_auth JWKS; cache keys; reject invalid/expired tokens
+Enforce role checks on protected routes
+5. Data integrity and migrations (45–90 min)
+
+Run migrations; backfill balances from transactions if needed
+Add unique constraints and indices; add minimal seed if required for E2E tests
+6. Rate limits, errors, logging (30–60 min)
+
+Add per-route sensible limits; add normalized error responses; add request_id
+7. E2E verification suite (45–90 min)
+
+Produce a runnable set of cURL commands (below) and verify responses and latencies
+Save outputs/screenshots into Evidence Pack
+8. Deliverables and deployment (30–60 min)
+
+Deploy to production; verify endpoints externally
+Produce all three required files (see templates below)
+Acceptance tests (include in Evidence Pack with sample outputs)
+
+Health/version
+curl -sS https://scholarship-api-jamarrlmayes.replit.app/healthz
+curl -sS https://scholarship-api-jamarrlmayes.replit.app/version
+Scholarships
+curl -sS "https://scholarship-api-jamarrlmayes.replit.app/api/v1/scholarships?q=STEM&per_page=10&page=1"
+curl -sS "https://scholarship-api-jamarrlmayes.replit.app/api/v1/scholarships/TEST_ID"
+Credit ledger (use a valid Bearer token)
+curl -sS -H "Authorization: Bearer TOKEN" -H "Content-Type: application/json" -d '{"user_id":"U123","amount":50,"reason":"starter_pack","source":"promo"}' https://scholarship-api-jamarrlmayes.replit.app/api/v1/credits/credit
+curl -sS -H "Authorization: Bearer TOKEN" -H "Content-Type: application/json" -H "Idempotency-Key: REQ-001" -d '{"user_id":"U123","amount":5,"feature":"search"}' https://scholarship-api-jamarrlmayes.replit.app/api/v1/credits/debit
+curl -sS -H "Authorization: Bearer TOKEN" "https://scholarship-api-jamarrlmayes.replit.app/api/v1/credits/balance?user_id=U123"
+Latency sampling: capture P95 from logs/metrics; include evidence
+Deliverables you must create today (file names and required sections)
+
+scholarship_api_PRODUCTION_STATUS_REPORT.md
+Header line: App: scholarship_api | APP_BASE_URL: https://scholarship-api-jamarrlmayes.replit.app
+Summary: current status, what’s live, SLO snapshot
+Endpoint inventory: list of routes implemented with auth/rate-limit notes
+Dependency checklist: DB, cache, JWKS, metrics, CORS
+Risk register: top 3 risks and mitigations
+Today verdict: GO or NO-GO for revenue; if NO-GO provide ETA in hours
+2. scholarship_api_EVIDENCE_PACK.md
+
+Header line: App: scholarship_api | APP_BASE_URL: https://scholarship-api-jamarrlmayes.replit.app
+Screenshots or logs proving:
+Server boot, /healthz OK, /version OK
+JWT validation working (sample token accepted and rejected)
+All acceptance test cURL calls with responses (redact secrets)
+Metrics snapshot (or fallback JSON)
+DB migrations applied; indices present
+Rate-limit behavior on burst
+Paste the exact cURL suite you ran and responses (truncated if needed)
+3. scholarship_api_GATE_VERDICTS_AND_PLAN.md
+
+Header line: App: scholarship_api | APP_BASE_URL: https://scholarship-api-jamarrlmayes.replit.app
+Gate 1 (Operable): PASS/FAIL with rationale and evidence references
+Gate 2 (API Contract): PASS/FAIL; note alias routes if used
+Gate 3 (Security/Compliance): PASS/FAIL; JWT, CORS, rate limits, logging
+Gate 4 (Integration Readiness): PASS/FAIL; list which apps validated against which endpoints
+Final GO/NO-GO for revenue today
+If NO-GO: exact ETA (hours), remaining tasks, owners (you or external), and third-party systems required; include a compatibility plan to unblock dependent apps in the interim
+If not 100% ready today: what you must provide
+
+A concrete ETA in hours to “revenue start” readiness
+Explicit list of third-party systems to be enabled with configuration parameters:
+scholar_auth: issuer, JWKS URI, expected audience
+Database: connection string, migration command
+Cache/Redis: connection string, enabled feature flags
+Monitoring: project DSN or API keys
+A stop-gap compatibility plan so other apps can proceed today:
+Implement route aliases or a thin compatibility router
+Provide mock responses for non-critical writes
+Document any temporary limits
+Quality bar and constraints
+
+No breaking changes to existing consumers; if uncertain, add aliases
+No wildcard CORS in production; enumerate trusted origins
+Log PII-safe; redact tokens and secrets
+Idempotent debit; transactional ledger writes
+Keep response times within stated SLOs or document variance with a plan to hit target within 72 hours
+Self-verification checklist before you submit
+
+App and base URL header appears at the top of all three reports
+All acceptance tests pass locally and on the deployed URL
+Latency samples collected and included
+JWT validation proven with both a valid and an invalid token example
+Gate verdicts are clear, with a final GO/NO-GO and ETA if needed
+Reminder
+
+Only perform the instructions in this SECTION FOR AGENT3 — scholarship_api.
+Do not modify or report on other apps beyond the integration touchpoints listed above.
