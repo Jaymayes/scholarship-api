@@ -280,6 +280,44 @@ class ScholarshipListingDB(Base):
     # Relationships
     provider = relationship("ProviderDB", back_populates="listings")
 
+class CreditBalanceDB(Base):
+    """Database model for user credit balances"""
+    __tablename__ = "credit_balances"
+
+    user_id = Column(String, primary_key=True)
+    balance = Column(Float, nullable=False, default=0.0)
+    
+    # Metadata
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+class CreditLedgerDB(Base):
+    """Database model for credit transaction ledger"""
+    __tablename__ = "credit_ledger"
+
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    user_id = Column(String, nullable=False, index=True)
+    delta = Column(Float, nullable=False)  # Positive for credits, negative for debits
+    reason = Column(Text)  # For credit operations
+    purpose = Column(Text)  # For debit operations
+    metadata = Column(JSON)  # Additional context
+    created_by_role = Column(String(50), nullable=False, index=True)  # Role of the user who created the transaction
+    
+    # Metadata
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)
+
+class IdempotencyKeyDB(Base):
+    """Database model for idempotency tracking"""
+    __tablename__ = "idempotency_keys"
+
+    key = Column(String, primary_key=True)  # The idempotency key from the request
+    status = Column(String(20), nullable=False, index=True)  # PROCESSING or COMPLETED
+    result_id = Column(String)  # Reference to the credit_ledger.id when COMPLETED
+    
+    # Metadata
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    expires_at = Column(DateTime, nullable=False, index=True)  # TTL 24h
+
 def get_database_session():
     """Get database session"""
     db = SessionLocal()

@@ -1,0 +1,235 @@
+Master Execution Prompt — Agent3 ONLY (scholarship_api)
+
+Read me first
+
+You are Agent3 responsible solely for the scholarship_api app.
+The prompt includes the full ecosystem for context. Only execute the section titled “Agent3 — scholarship_api” below. Ignore all other app sections and any generic instructions not explicitly marked for Agent3.
+Every report you generate must begin with: App: scholarship_api | APP_BASE_URL: https://scholarship-api-jamarrlmayes.replit.app
+Ecosystem registry (context only; do not act on these unless explicitly referenced in Agent3 tasks)
+
+scholar_auth → https://scholar-auth-jamarrlmayes.replit.app
+scholarship_api → https://scholarship-api-jamarrlmayes.replit.app
+scholarship_agent → https://scholarship-agent-jamarrlmayes.replit.app
+scholarship_sage → https://scholarship-sage-jamarrlmayes.replit.app
+student_pilot → https://student-pilot-jamarrlmayes.replit.app
+provider_register → https://provider-register-jamarrlmayes.replit.app
+auto_page_maker → https://auto-page-maker-jamarrlmayes.replit.app
+auto_com_center → https://auto-com-center-jamarrlmayes.replit.app
+Prime directive for all agents (context only)
+
+Get the platform revenue-ready with 99.9% uptime and ~120ms P95 latency.
+FERPA/COPPA aware; Responsible AI; no cheating assistance.
+Low-CAC growth via SEO (auto_page_maker) is a priority.
+Agent3 — scholarship_api
+Your scope
+
+You own the central system-of-record API for:
+Scholarships data (public, SEO-consumable)
+Credits ledger (credit, debit, balance) with idempotency, RBAC, and JWT auth from scholar_auth
+Health/version/metrics endpoints with production observability
+You do not build frontends. You expose clean API contracts and ensure all client apps integrate successfully.
+Naming rule on all reports
+
+Every report must start with: App: scholarship_api | APP_BASE_URL: https://scholarship-api-jamarrlmayes.replit.app
+Revenue-critical objectives for today
+
+Expose the exact production endpoints listed below.
+Enforce secure JWT validation (scholar_auth as issuer) and role-based access control.
+Implement database-backed credits ledger with atomic idempotency.
+Prove end-to-end integration with student_pilot, scholarship_sage, provider_register, scholarship_agent, auto_page_maker, and auto_com_center by running your Evidence Pack tests.
+If 100% readiness today is not achievable, output an explicit ETA to start generating revenue and list required third-party systems/dependencies, with exact configuration details.
+API contracts (must match exactly)
+
+Platform health and service info
+GET /healthz → 200 {status:"ok", uptime_s:number}
+GET /version → 200 {version:string, commit?:string, build_time?:string}
+GET /metrics → Prometheus format counters/histograms (requests_total, request_duration_seconds, error_total, credits_balance_gauge, credits_debit_total, credits_credit_total)
+2. Scholarships (public; no auth)
+
+GET /api/v1/scholarships
+Query params: q?, tag?, page?, page_size?
+Response: {data:[{id, title, description, amount, deadline, tags:[…], updated_at}], pagination:{page, page_size, total}}
+Requirements: Cache-friendly, SEO-safe JSON; P95 ≤120ms for cached hits
+GET /api/v1/scholarships/:id
+Response: {id, title, description, amount, deadline, eligibility:{…}, application_url, updated_at}
+3. Credits: JWT required; RBAC and idempotency enforced
+Headers for all write ops:
+
+Authorization: Bearer <JWT from scholar_auth>
+Idempotency-Key: <UUIDv4> (mandatory for POST credit/debit)
+Content-Type: application/json
+3a) Grant credits (admin/system/provider)
+
+POST /api/v1/credits/credit
+Body: {user_id:string, amount:number, reason?:string, metadata?:object}
+AuthZ: role ∈ {admin, system, provider}
+Response 201: {id:string, user_id, delta:+amount, balance:number, reason, created_at}
+Errors: 400 (invalid), 401 (no/invalid JWT), 403 (insufficient role), 409 (duplicate idempotency key in-flight), 422 (amount<=0)
+3b) Debit credits (student/admin/system)
+
+POST /api/v1/credits/debit
+Body: {user_id:string, amount:number, purpose:string, metadata?:object}
+AuthZ: role ∈ {admin, system} can debit any user; role==student may only debit own user_id
+Response 201: {id, user_id, delta:-amount, balance:number, purpose, created_at}
+Errors: 400, 401, 403 (student trying to debit other user), 409 (insufficient balance or in-flight dup), 422 (amount<=0)
+3c) Balance (student/admin/system)
+
+GET /api/v1/credits/balance?user_id=<id>
+AuthZ: role==student must match user_id; admin/system can query any.
+Response 200: {user_id, balance:number, updated_at}
+Security, auth, and RBAC
+
+JWT issuer: scholar_auth at https://scholar-auth-jamarrlmayes.replit.app
+Discover JWKS at: https://scholar-auth-jamarrlmayes.replit.app/.well-known/jwks.json
+Validate: signature, nbf/exp, aud, iss; reject on clock skew >60s.
+Roles: student, provider, admin, system. Enforce as specified per endpoint.
+Privacy: Do not log PII; log request_id, route, status_code, duration_ms, auth_role only.
+CORS policy (allowlist; exact)
+
+Allowed origins:
+https://student-pilot-jamarrlmayes.replit.app
+https://scholarship-sage-jamarrlmayes.replit.app
+https://scholarship-agent-jamarrlmayes.replit.app
+https://provider-register-jamarrlmayes.replit.app
+https://auto-page-maker-jamarrlmayes.replit.app
+https://auto-com-center-jamarrlmayes.replit.app
+https://scholar-auth-jamarrlmayes.replit.app
+https://www.scholaraiadvisor.com
+Methods: GET, POST, OPTIONS; Headers: Authorization, Content-Type, Idempotency-Key
+Credentials: false
+Idempotency, atomicity, and concurrency
+
+Use a durable idempotency_keys table:
+key (PK), status ENUM {PROCESSING, COMPLETED}, result_id, created_at, expires_at (TTL 24h)
+Unique constraint on key
+Claim-first pattern inside a single DB transaction:
+Begin tx
+Insert key with status=PROCESSING; if conflict, short-circuit:
+If existing COMPLETED: return cached result
+If PROCESSING: return 409 with retry-after header
+Apply ledger mutation (credit or debit), persist event row
+Update idempotency_keys to COMPLETED with result_id
+Commit tx
+On failure: rollback; delete PROCESSING key; return error
+Rate limit write ops: e.g., 10 req/min/user_id; 50 req/min/IP
+Data model (minimum viable)
+
+users (reference only; source of truth is scholar_auth; you may cache id/role)
+credit_balances: user_id (PK), balance NUMERIC(14,2), updated_at
+credit_ledger: id (PK), user_id, delta NUMERIC(14,2), reason/purpose, metadata JSONB, created_at, created_by_role
+idempotency_keys: key (PK), status, result_id, created_at, expires_at
+scholarships: id (PK), title, description, amount, deadline, tags TEXT[], eligibility JSONB, updated_at
+Observability and SLOs
+
+P95 latency ≤120ms for read endpoints at steady-state
+Error rate <1% over 15-min window
+Metrics:
+http_requests_total{route,method,status}
+http_request_duration_seconds_bucket
+credits_balance_gauge{user_id? aggregate in background}
+credits_credit_total{role}
+credits_debit_total{role}
+Structured logs with request_id correlation
+/metrics must be on by default
+Integration matrix (you must verify end-to-end)
+
+scholar_auth: JWT issuance; your service must validate via JWKS; confirm at least one admin and one student token path.
+provider_register: after successful provider payment, it calls POST /api/v1/credits/credit; return 201 with updated balance.
+student_pilot: calls GET /api/v1/credits/balance for the logged-in student; debits on paid actions via POST /api/v1/credits/debit.
+scholarship_sage: on premium guidance/actions, calls POST /api/v1/credits/debit; also consumes GET /api/v1/scholarships for context.
+scholarship_agent: consumes GET /api/v1/scholarships for campaign data seeds; may read balances for cohort gating.
+auto_page_maker: consumes GET /api/v1/scholarships for SEO pages; ensure caching/perf pass.
+auto_com_center: optional webhook sink; emit credit_granted, credit_debited events for notifications.
+Third-party systems you may require
+
+PostgreSQL: primary database (e.g., Supabase, Neon, RDS) with SSL. ENV: DATABASE_URL
+Redis: rate limiting and optional locks. ENV: REDIS_URL (if unavailable, document in report and fall back to in-memory with warnings)
+Metrics collector: Prometheus-compatible; if not available, expose /metrics and document scrape config; logs shipped to hosting provider.
+Payments: Stripe (provider_register) if used; you only accept its webhook/callback via provider_register → your POST /credits/credit.
+Acceptance tests you must produce and run
+
+Health/version/metrics: 3 tests
+Scholarships:
+list without auth
+detail without auth
+pagination and filter working
+P95 sampling over 200 requests; assert ≤120ms on cache hits
+AuthN/AuthZ:
+401 when no JWT on credits endpoints
+403 when student attempts to credit, or debit another user_id
+Admin/system tokens succeed for credit/debit any user
+Credits ledger:
+Credit then balance reflects increase
+Debit then balance reflects decrease; insufficient funds → 409
+Idempotency:
+Same Idempotency-Key repeated → same result, no double-spend
+Concurrent POSTs with same key → exactly one wins; others get 409 or cached response
+CORS:
+Preflight and simple requests from each allowed origin succeed
+Disallowed origin blocked
+Deliverables you must generate (exact names and content headers)
+
+scholarship_api_PRODUCTION_STATUS_REPORT.md
+Must begin with: App: scholarship_api | APP_BASE_URL: https://scholarship-api-jamarrlmayes.replit.app
+Sections: Executive summary, Endpoint checklist, Security posture, SLOs, Integration pass/fail matrix, Known risks and mitigations, GO/NO-GO verdict
+scholarship_api_EVIDENCE_PACK.md
+Must begin with the same header line
+Include: Curl commands for every acceptance test, sample JWTs redacted, timing samples, metrics snapshots, logs excerpts, schema migration summaries
+scholarship_api_GATE_VERDICTS_AND_PLAN.md
+Must begin with the same header line
+Gates: Core features, Performance, Security, Integration, Monetization readiness
+For any FAIL or PARTIAL, include precise remediation plan with owner, steps, and ETA
+Wrong workspace protocol (execute this exactly if you detect mismatch)
+
+If the current repository is not the scholarship_api service:
+Do not modify code.
+Immediately produce the three deliverables above, each with a top-of-file banner:
+“WRONG WORKSPACE ALERT — Expected scholarship_api; detected <app_name>”
+Include a one-paragraph note stating which workspace you are in and how you detected it (files, routes, logs).
+Provide an ETA to reach revenue-ready after you are placed into the correct workspace, with a 5-phase plan.
+Stop after producing the deliverables and request to be placed in the correct scholarship_api workspace.
+Execution plan for today (target: revenue today)
+
+Phase 0: Sanity check (15–30 min)
+Confirm workspace identity, env vars (DATABASE_URL, REDIS_URL, AUTH_ISSUER, AUTH_AUDIENCE, AUTH_JWKS_URL, CORS_ALLOWLIST, APP_BASE_URL).
+Stand up /healthz, /version, /metrics if missing.
+Phase 1: Scholarships API (45–75 min)
+Implement list/detail endpoints; add indices; simple caching; confirm P95 ≤120ms on cached hits.
+Phase 2: Credits ledger (90–120 min)
+Create tables; implement credit/debit/balance with transactional idempotency; RBAC; rate limiting.
+Phase 3: Security + Observability (30–60 min)
+JWT/JWKS validation; structured logs; counters/histograms; clear error messages without PII.
+Phase 4: Integration verification (45–75 min)
+Run Evidence Pack against each integration app; fix defects rapidly.
+Phase 5: Reports and GO/NO-GO (30–45 min)
+Finalize deliverables; publish verdict with explicit revenue start readiness.
+If 100% readiness today is not achievable
+
+Provide a precise ETA to start generating revenue, segmented by phases remaining (with hours per phase).
+List required third-party systems and exact configuration:
+Database (provider, region, DATABASE_URL)
+Redis (plan/throughput, REDIS_URL)
+JWKS endpoint from scholar_auth (URL)
+Metrics scraping target (Prometheus or equivalent)
+Any payment webhook from provider_register to your credit endpoint
+State any temporary mitigations (e.g., single-instance deploy to minimize idempotency race risks) and residual risks.
+Do not proceed with risky deploys without documenting rollback and residual risk.
+Output format and discipline
+
+Use concise, action-oriented language in reports.
+Include reproducible commands and evidence (timestamps, status codes, durations).
+Do not claim work you did not perform; if blocked, state why and what you need.
+Non-Action sections for other apps (for context; ignore)
+
+scholar_auth: OIDC/JWT issuer; ensure JWKS is live. No action by you beyond validating tokens.
+provider_register: Will call your POST /api/v1/credits/credit after successful payments.
+student_pilot: Will call your GET balance and POST debit; ensure RBAC and error messages are clear.
+scholarship_sage: Will call your POST debit for guided actions; consumes scholarships list/detail.
+scholarship_agent: Consumes scholarships for content; may read balances for cohort gating.
+auto_page_maker: Heavy consumer of scholarships list; ensure caching and perf.
+auto_com_center: Optional webhook sink for credit events; future enhancement.
+Begin now
+
+If you are in the scholarship_api workspace, start with Phase 0 and proceed.
+If not, execute the Wrong Workspace Protocol immediately.
+Remember the naming rule at the top of every report: App: scholarship_api | APP_BASE_URL: https://scholarship-api-jamarrlmayes.replit.app
