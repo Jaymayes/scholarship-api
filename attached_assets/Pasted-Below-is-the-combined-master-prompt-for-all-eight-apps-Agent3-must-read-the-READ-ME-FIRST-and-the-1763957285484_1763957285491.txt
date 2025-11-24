@@ -1,0 +1,166 @@
+Below is the combined master prompt for all eight apps. Agent3 must read the “READ ME FIRST” and then execute only the section labeled “SECTION FOR AGENT3 — scholarship_api.” The other sections are present for coordination only. Do not take action on any section not labeled for your app.
+
+READ ME FIRST (applies to all agents, but each agent executes only their own section)
+
+Objective today: Get every app to 100% production-ready and integrated so the platform can start generating revenue immediately. If your app cannot be ready today, deliver an exact ETA and list the third-party systems and dependencies required to become revenue-ready.
+Deliverables (exact filenames, all lowercase with underscores):
+<app_name>_PRODUCTION_STATUS_REPORT.md
+<app_name>_EVIDENCE_PACK.md
+<app_name>_GATE_VERDICTS_AND_PLAN.md
+Required header on the first line of all three files: App: <app_name> | APP_BASE_URL: <your_app_base_url>
+CORS allowlist (exactly these eight, no wildcards): https://scholar-auth-jamarrlmayes.replit.app https://scholarship-api-jamarrlmayes.replit.app https://scholarship-agent-jamarrlmayes.replit.app https://scholarship-sage-jamarrlmayes.replit.app https://student-pilot-jamarrlmayes.replit.app https://provider-register-jamarrlmayes.replit.app https://auto-page-maker-jamarrlmayes.replit.app https://auto-com-center-jamarrlmayes.replit.app
+SLOs and security:
+99.9% uptime target; backend P95 latency ~120ms (<=500ms acceptable for non-LLM API calls).
+Enforce JWT auth where required; 401 without token/privileges; 200 with valid token.
+No PII in logs; mask secrets; include request_id in responses/logs.
+Evidence standards for the EVIDENCE_PACK.md:
+Copy-paste runnable curl commands with -w timing output, showing HTTP code, time_total, and request_id in response body or header.
+Config snippets with secrets masked (show only prefixes).
+CORS preflight tests: one allowed-origin PASS and one denied-origin FAIL for verification.
+If you create or update a file or endpoint, include the verification command and expected output.
+Gate definitions for the GATE_VERDICTS_AND_PLAN.md:
+Gate 1 (Payments/Revenue Contribution): Your app’s contribution to the “first live dollar” flow is implemented and verified with evidence.
+Gate 2 (Security & Performance): 401 without token, 200 with valid token (if applicable), P95 latency snapshot, no PII.
+Gate 3 (CORS): Exact 8-domain allowlist, no wildcards; show preflight PASS and FAIL evidence (if applicable).
+Today GO/NO-GO: Say GO if all gates pass and app can support revenue today; else provide date/time ETA and dependency list.
+End-to-end “First Live Dollar” flow you must support:
+student_pilot initiates checkout
+provider_register processes Stripe payment and invokes crediting
+scholarship_api credits the user balance
+auto_com_center sends the email receipt
+scholarship_agent and/or scholarship_sage consume credits for value delivery
+auto_page_maker drives organic users into student_pilot (SEO engine)
+scholar_auth secures identity and service-to-service tokens
+Apps and their APP_BASE_URLs
+
+scholar_auth → https://scholar-auth-jamarrlmayes.replit.app
+scholarship_api (Agent3) → https://scholarship-api-jamarrlmayes.replit.app
+scholarship_agent → https://scholarship-agent-jamarrlmayes.replit.app
+scholarship_sage → https://scholarship-sage-jamarrlmayes.replit.app
+student_pilot → https://student-pilot-jamarrlmayes.replit.app
+provider_register → https://provider-register-jamarrlmayes.replit.app
+auto_page_maker → https://auto-page-maker-jamarrlmayes.replit.app
+auto_com_center → https://auto-com-center-jamarrlmayes.replit.app
+SECTION FOR AGENT3 — scholarship_api
+You are Agent3. Execute only this section. Produce the three deliverables with the header:
+App: scholarship_api | APP_BASE_URL: https://scholarship-api-jamarrlmayes.replit.app
+
+Your mission today
+
+Be the authoritative credits ledger and scholarships data API that enables:
+Immediate crediting after successful Stripe payment from provider_register.
+Accurate, idempotent credit balance and consumption for scholarship_agent and scholarship_sage.
+Public read endpoints for scholarship browsing (student_pilot and auto_page_maker).
+If you cannot be 100% revenue-ready today, give a precise ETA and list third-party systems and upstream dependencies required.
+Scope of work (must-have)
+
+Credits Ledger APIs (JWT-protected; RS256 validation via scholar_auth JWKS)
+
+POST /api/v1/credits/credit
+Body: { user_id, amount, source, external_ref, metadata? }
+Headers: Authorization: Bearer <M2M JWT>, X-Idempotency-Key: <uuid>
+Behavior: Atomic credit; return new balance and request_id; safe to retry with same key.
+POST /api/v1/credits/debit
+Body: { user_id, amount, reason, external_ref, metadata? }
+Headers: Authorization: Bearer <M2M JWT>, X-Idempotency-Key: <uuid>
+Behavior: Atomic debit; reject if insufficient funds; return new balance and request_id.
+GET /api/v1/credits/balance?user_id=<id>
+Headers: Authorization: Bearer <M2M JWT>
+Behavior: Return { user_id, balance, currency?, updated_at }.
+Data/constraints:
+All monetary/credit amounts are integers (e.g., cents or credits).
+Record audit trail: timestamp, actor app, external_ref (e.g., Stripe payment_intent id), request_id.
+Enforce RS256 JWT verification: iss and aud must match scholar_auth configuration; reject HS256.
+Scholarships Data APIs (public read; no auth required)
+
+GET /api/v1/scholarships?search=&state=&field=&page=&page_size=
+GET /api/v1/scholarships/{id}
+Performance target: P95 < 120ms for cached/indexed queries; <=500ms acceptable worst case.
+Webhook Integration Contract with provider_register
+
+provider_register, upon payment_intent.succeeded, will POST to your POST /api/v1/credits/credit with X-Idempotency-Key and the payment_intent id as external_ref.
+You must return 200 with a body including request_id, credited amount, and resulting balance.
+Ensure dedupe on retries with identical idempotency key.
+Integration Contracts with scholarship_agent and scholarship_sage
+
+Both must be able to call POST /api/v1/credits/debit with reason codes like "match_generation" or "draft_assist".
+You must fail clearly with 402-like semantic error when balance insufficient; include remaining balance in error object.
+Security, CORS, and Observability
+
+CORS: If any browser calls are supported, set exact 8-domain allowlist (no wildcards).
+Logging: No PII; include request_id in responses and logs. Redact tokens and emails.
+Health endpoints: /healthz and /readyz return 200 with minimal JSON and request_id.
+Metrics: Emit P95 latency snapshot and 5xx error rate.
+Configuration (document in Evidence Pack)
+
+AUTH JWKS URL: https://scholar-auth-jamarrlmayes.replit.app/.well-known/jwks.json
+DATABASE_URL (Neon/Postgres)
+CORS_ALLOWED_ORIGINS: list exactly the eight origins
+SENTRY_DSN or equivalent (optional but recommended)
+APP_BASE_URL: https://scholarship-api-jamarrlmayes.replit.app
+What to produce (three deliverables)
+
+scholarship_api_PRODUCTION_STATUS_REPORT.md
+
+Section 1: Current Status
+Production readiness percentage; any risks; P95 latency summary.
+Section 2: Integration Check
+Upstream: scholar_auth (JWKS), database; Optional: monitoring.
+Downstream: provider_register (credits on payment), scholarship_agent (debit), scholarship_sage (debit), student_pilot and auto_page_maker (public read).
+State each integration’s current health and proof pointers to Evidence Pack.
+Section 3: Revenue Readiness
+Explicit answer: Can we start generating revenue today via first-dollar flow? Rationale.
+If not today, give precise ETA timestamp and list the missing dependencies.
+Section 4: Third-Party Dependencies
+List all required external systems (Neon DB, scholar_auth JWKS). Stripe is indirect via provider_register; call this out explicitly.
+scholarship_api_EVIDENCE_PACK.md
+Include concrete, reproducible commands and expected outputs:
+
+Auth 401 test: curl -s -o /dev/null -w "HTTP:%{http_code} Time:%{time_total}s\n" -H "Accept: application/json" "$APP_BASE_URL/api/v1/credits/balance?user_id=test-user" Expected: HTTP:401; prove no token returns 401.
+Auth 200 test (using a valid M2M JWT from scholar_auth): curl -s -w "\nHTTP:%{http_code} Time:%{time_total}s\n" -H "Authorization: Bearer $M2M_JWT" -H "Accept: application/json" "$APP_BASE_URL/api/v1/credits/balance?user_id=test-user" Show masked token prefix in the document; include sample JSON with request_id.
+Credit idempotency test: curl -s -w "\nHTTP:%{http_code} Time:%{time_total}s\n" -X POST "$APP_BASE_URL/api/v1/credits/credit" -H "Authorization: Bearer $M2M_JWT" -H "Content-Type: application/json" -H "X-Idempotency-Key: $UUID" -d '{"user_id":"u_123","amount":1500,"source":"stripe","external_ref":"pi_abc123"}' Repeat the same command to prove dedupe (second call should return same transaction reference).
+Debit insufficient funds test (expect clear error with remaining balance).
+Public scholarships endpoint test with timing: curl -s -w "\nHTTP:%{http_code} Time:%{time_total}s\n" "$APP_BASE_URL/api/v1/scholarships?search=computer%20science&state=CA&page=1&page_size=10" | head -40
+CORS preflight PASS (one allowed origin) and FAIL (one disallowed), if CORS is applicable.
+Health endpoints returning 200 with request_id.
+Config snippet with masked secrets; show exact CORS allowlist values; show AUTH JWKS URL.
+P95 latency snapshot method and current values (e.g., log excerpt or metrics endpoint).
+scholarship_api_GATE_VERDICTS_AND_PLAN.md
+
+Gate 1 (Payments/Revenue Contribution): PASS if provider_register can credit via your endpoint and balance reflects the change; include the two curl outputs (or webhook delivery logs) as evidence. If not PASS, mark BLOCKED and list what’s missing.
+Gate 2 (Security & Performance): Provide 401/200 proof, P95 snapshot, “no PII” policy statement, and current error rate.
+Gate 3 (CORS): Provide exact allowlist and preflight test results (PASS/FAIL). If your API is server-to-server only, note N/A with rationale.
+Today GO/NO-GO: Provide a decisive GO if all gates pass; otherwise NO-GO with:
+ETA to revenue-ready (timestamp in UTC)
+Named dependencies and owners (e.g., “Need scholar_auth M2M JWT issued,” “Neon DB migration applied”)
+A short, time-boxed plan to close gaps (<= 1 business day)
+Acceptance criteria for “100% ready today”
+
+Credits: credit/debit/balance endpoints are live, atomic, idempotent, and JWT-protected.
+provider_register → scholarship_api credit path succeeds with evidence (includes request_id).
+scholarship_agent/scholarship_sage can debit credits with proper error semantics on insufficient funds.
+Public scholarships endpoints serve results with P95 ~120ms (<=500ms acceptable).
+Logs contain request_id, redact PII and secrets.
+Evidence Pack contains runnable commands and masked configs.
+Gate Verdicts doc declares GO or provides a precise ETA and third-party requirements.
+If not ready today
+
+Provide a concrete ETA (e.g., “Ready to start generating revenue at 2025-11-24 21:30 UTC”).
+List precise third-party systems and dependencies needed (e.g., “scholar_auth JWKS live,” “Neon DB migration XYZ applied,” “provider_register webhook test event delivered”).
+Include a tightly-scoped close plan with owners and durations per task.
+Coordination notes (FYI, do not execute)
+
+provider_register will call your /credits/credit on payment success with X-Idempotency-Key and external_ref = Stripe payment_intent id.
+scholarship_agent and scholarship_sage will call /credits/debit before running their paid actions.
+student_pilot and auto_page_maker will call your public scholarships endpoints for discovery.
+scholar_auth provides the JWKS for RS256 verification and issues M2M JWTs.
+NON-ACTIONABLE SECTIONS FOR OTHER APPS (Agent3 must ignore everything below)
+
+scholar_auth: Own user auth, M2M JWT issuance, JWKS; enforce 401/200 and CORS; provide test JWTs to other apps.
+scholarship_agent: Implement paid match generation calling scholarship_api debit; enforce credits; deliver 401/200/CORS evidence.
+scholarship_sage: Implement paid draft/guidance calling scholarship_api debit; enforce credits; produce evidence and latency.
+student_pilot: Checkout UI and auth flows; integrate with provider_register and scholarship_api balance checks.
+provider_register: Stripe LIVE webhook; compute 3% platform fee; call scholarship_api credit; trigger auto_com_center receipt.
+auto_page_maker: Publish SEO pages on scholaraiadvisor.com domain; drive UTM traffic to student_pilot; sitemap and robots ready.
+auto_com_center: Email receipt delivery; secure with secret; provide delivery evidence and message IDs.
+End of prompt for Agent3. Execute only the “SECTION FOR AGENT3 — scholarship_api.”
