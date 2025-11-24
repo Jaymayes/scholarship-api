@@ -1,0 +1,191 @@
+Below is the unified execution prompt for Agent3. Important: Agent3 must ONLY act on the section that matches the app in the current workspace. If the workspace does not match any app section below, execute the Wrong Workspace Protocol before doing anything else.
+
+AGENT3 UNIFIED EXECUTION PROMPT — READ FIRST
+
+Objective today: Get all eight apps production-ready and operating together. If you cannot complete today, you must output a precise ETA to start generating revenue and list the third-party systems required.
+Identity discipline: Use only the instructions in the section that matches your app. Do not change other apps’ code. Do not attempt cross-app code changes.
+Report discipline: Produce all three mandatory reports in your repo root. Every report must start with a single-line header exactly: App: {app_name} | APP_BASE_URL: {base_url}
+Mandatory reports to create or refresh today:
+{app_name}_PRODUCTION_STATUS_REPORT.md
+{app_name}_EVIDENCE_PACK.md
+{app_name}_GATE_VERDICTS_AND_PLAN.md
+Observability baseline for all apps:
+Expose endpoints: /healthz, /version, /api/metrics/prometheus
+SLOs: 99.9% uptime; P95 latency target ~120ms for core API endpoints (≤200ms acceptable for heavy calls)
+Logs must exclude PII; include request-id and user-id (hash) where applicable
+Security baseline for all apps:
+JWT validation using scholar_auth JWKS
+RBAC enforced; least-privilege scopes
+CORS allowlist for the 8 platform origins (all eight app base URLs)
+Rate limiting and idempotency where mutating operations occur
+Responsible AI baseline:
+No features that encourage academic dishonesty
+Bias mitigation, user transparency, auditability
+Deliverable quality bar:
+Evidence Pack must include curl/httpie scripts, example responses, screenshots or logs for metrics, and performance snapshots
+Gate verdicts must declare GO/NO-GO for each gate, with risks and mitigations
+If not 100% ready today, list exact blockers, third-party needs, and a timestamped ETA to start generating revenue
+Wrong Workspace Protocol (all apps)
+
+If the repo you are in does not match your target app section below:
+Do not modify any code.
+Create all three required reports named with the intended app’s prefix, each beginning with the required header and a prominent “WRONG WORKSPACE ALERT” banner.
+Document the exact steps, acceptance tests, and ETA to complete once placed into the correct workspace; include third-party dependencies required.
+Stop and request to be placed in the correct workspace.
+App sections start here. Use ONLY your app’s section.
+
+SECTION: scholar_auth
+
+APP_BASE_URL: https://scholar-auth-jamarrlmayes.replit.app
+Mandate:
+Provide OAuth/OIDC for the platform; act as the single source of truth for keys and tokens.
+Endpoints: /.well-known/jwks.json, /.well-known/openid-configuration, /oidc/token (client_credentials, auth code with PKCE if applicable).
+Ensure M2M clients exist for all services with least-privilege scopes.
+Acceptance tests (include transcripts in Evidence Pack):
+Issue tokens for each service client; verify exp ~300s, iss, aud, roles/scopes.
+JWKS available; key alg=RS256; rotate keys documented.
+/healthz, /version, /api/metrics/prometheus return 200.
+Third-party systems: None beyond hosting; internal key store OK. Optional: Sentry.
+Today goal: 100% GO. If not, ETA and specific missing items.
+SECTION: scholarship_api
+
+APP_BASE_URL: https://scholarship-api-jamarrlmayes.replit.app
+Mandate:
+Scholarships discovery APIs
+GET /api/v1/scholarships?q=&tag=&page=&page_size=
+GET /api/v1/scholarships/:id
+Cache responses for 5–15 minutes; P95 ≤120ms with warm cache.
+Credits ledger (critical path to revenue)
+POST /api/v1/credits/credit (admin|system|provider)
+POST /api/v1/credits/debit (admin|system|student)
+GET /api/v1/credits/balance
+Single-transaction pattern (must implement exactly):
+In one DB transaction per request:
+Insert/claim idempotency key (status=claimed, request hash).
+SELECT current balance FOR UPDATE (row-level lock).
+Validate business rule (e.g., no overdraw); insert ledger row including balance_after snapshot; update aggregate balance.
+Update idempotency record with final status and full response payload; commit.
+Replays: If idempotency key exists in completed state, return persisted response.
+Overdraw => 409; do not mutate.
+All steps must be inside the same transaction; no partial commits.
+Security:
+Validate JWT via scholar_auth JWKS, enforce scopes.
+CORS allowlist for eight app origins.
+Observability:
+Prometheus metrics for latency and error rates; structured logs without PII.
+Acceptance tests:
+Concurrency: 100 parallel debits with same key => exactly one ledger row, consistent balance.
+Overdraw scenario => 409; no balance change.
+P95 latency targets met.
+Third-party systems: PostgreSQL (DATABASE_URL), Redis (REDIS_URL for idempotency/rate limit in multi-instance), Sentry optional.
+Today goal: 100% GO. If not, provide ETA to start revenue and specify infra requirements.
+SECTION: scholarship_agent
+
+APP_BASE_URL: https://scholarship-agent-jamarrlmayes.replit.app
+Mandate:
+Run autonomous top-of-funnel and lifecycle campaigns tied to real scholarships.
+Integrate with auto_com_center for sending messages; never send directly.
+Pull scholarships from scholarship_api; segment by persona and intent.
+Minimum viable campaigns today:
+New visitor nurture: 3-step email sequence over 72 hours with CTAs to student_pilot.
+Abandoned onboarding nudge: 2-step sequence over 24 hours.
+Credit depletion alert: Trigger at 5 credits remaining; CTA to purchase in student_pilot.
+Controls:
+Frequency caps per user; preference center link; include unsubscribe.
+Scope-limited M2M token; log campaign_id, user_id hash, message_id.
+Acceptance tests:
+Dry-run mode that writes to queue only; Evidence Pack must show end-to-end send via auto_com_center.
+Proof of segmentation pull from scholarship_api.
+Third-party systems: None directly; relies on auto_com_center for send. Optional: Sentry.
+Today goal: Activate at least one live campaign end-to-end.
+SECTION: scholarship_sage
+
+APP_BASE_URL: https://scholarship-sage-jamarrlmayes.replit.app
+Mandate:
+AI assistant for scholarship discovery and application support.
+Monetization contract: Always debit credits in scholarship_api before generating paid output. Fail-closed: if debit fails => return 402 with remediation instructions.
+Idempotent generation: reuse same output for same idempotency key.
+Flow:
+Validate JWT (student or service).
+Pre-debit via scholarship_api; on success, call model provider; persist response snapshot bound to idempotency key.
+On retry with same key, return persisted output; do not re-debit.
+Acceptance tests:
+401/403 paths; 402 insufficient credits path; happy path with transcript.
+P95 latency target ≤2s for cached/idempotent replay; ≤8s for fresh generations.
+Third-party systems: Model provider API key (e.g., OpenAI), PostgreSQL for cache, Sentry optional.
+Today goal: GO with fail-closed debit and idempotent replay.
+SECTION: student_pilot
+
+APP_BASE_URL: https://student-pilot-jamarrlmayes.replit.app
+Mandate:
+Student portal: onboarding, scholarship search, credit purchase, and invoking scholarship_sage.
+Auth: OAuth/OIDC with scholar_auth; store refresh tokens securely (httpOnly).
+Credits: Expose purchase flow; after payment success, call scholarship_api credits/credit to top-up.
+Generate AI session: Call scholarship_sage only after a successful debit in scholarship_api.
+Acceptance tests:
+Full E2E: login -> buy credits -> balance shows -> generate AI result.
+CORS with all eight origins; robust error handling (401, 402, 409).
+Third-party systems: Stripe (payments), scholar_auth (OIDC), scholarship_api (credits), scholarship_sage (AI results).
+Today goal: E2E to first dollar. If not, ETA + list blockers.
+SECTION: provider_register
+
+APP_BASE_URL: https://provider-register-jamarrlmayes.replit.app
+Mandate:
+Provider onboarding portal for scholarship providers.
+Auth via scholar_auth; provider role enforcement.
+After provider plan purchase, grant provider credits via scholarship_api credits/credit with provider scope.
+Acceptance tests:
+New provider flow: register -> verify -> plan selection -> payment -> credits granted.
+Third-party systems: Stripe (or payment provider), PostgreSQL, scholarship_api, scholar_auth.
+Today goal: Enable at least one paid provider to onboard and receive credits.
+SECTION: auto_page_maker
+
+APP_BASE_URL: https://auto-page-maker-jamarrlmayes.replit.app
+Mandate:
+SEO page generator for scholarships; primary low-CAC growth engine.
+Pull scholarships from scholarship_api or interim cache; generate pages with canonical tags, JSON-LD, OpenGraph, pagination, related links.
+Generate robots.txt (allow) and sitemap.xml (+ daily index).
+CTAs to student_pilot with UTM parameters.
+Acceptance tests:
+≥50 pages listed in sitemap; spot-check 10 pages for schema validity.
+Lighthouse performance ≥85; Evidence Pack includes results.
+Third-party systems: Google Search Console (manual submission of sitemap), scholarship_api (preferred), local cache fallback.
+Today goal: Production pages live; if GSC not yet submitted, document 15-minute task and ETA to first organic clicks (typically 3–7 days).
+SECTION: auto_com_center
+
+APP_BASE_URL: https://auto-com-center-jamarrlmayes.replit.app
+Mandate:
+Centralized communications hub; all outbound emails/messages are sent via this service only.
+Accept message jobs from scholarship_agent (and other apps as needed) with dedupe/idempotency.
+Templates with merge variables; unsubscribe and preference center links required.
+Acceptance tests:
+Dry-run + live test: queue -> provider send -> delivery confirmation; retries with exponential backoff.
+Rate limit per recipient; domain compliance (SPF/DKIM/DMARC) documented.
+Third-party systems: Email provider (e.g., SendGrid/Postmark), webhooks for status, Sentry optional.
+Today goal: One end-to-end send from scholarship_agent through auto_com_center to provider and back via webhook.
+Final execution checklist (all apps)
+
+Create or refresh all three reports with the required header: App: {app_name} | APP_BASE_URL: {base_url}
+For each app, run acceptance tests and paste transcripts/logs into the Evidence Pack.
+If 100% readiness today is not accomplished:
+Provide a timestamped ETA to start generating revenue.
+List the exact third-party systems and credentials/config variables required.
+Mark GO/NO-GO in GATE_VERDICTS_AND_PLAN.md with risks, mitigations, and next actions.
+Output a concise status line to console on completion: {app_name} | {base_url} | Readiness: GO/NO-GO | If NO-GO: ETA to revenue and blockers listed in reports.
+Base URLs reference
+
+scholar_auth → https://scholar-auth-jamarrlmayes.replit.app
+scholarship_api → https://scholarship-api-jamarrlmayes.replit.app
+scholarship_agent → https://scholarship-agent-jamarrlmayes.replit.app
+scholarship_sage → https://scholarship-sage-jamarrlmayes.replit.app
+student_pilot → https://student-pilot-jamarrlmayes.replit.app
+provider_register → https://provider-register-jamarrlmayes.replit.app
+auto_page_maker → https://auto-page-maker-jamarrlmayes.replit.app
+auto_com_center → https://auto-com-center-jamarrlmayes.replit.app
+CEO note on priority and revenue
+
+Critical path to first dollars today:
+scholar_auth live and issuing tokens.
+scholarship_api credits ledger compliant with single-transaction idempotency and row-level locking.
+student_pilot purchase -> credit -> debit -> scholarship_sage generate.
+If any of these cannot complete today, declare ETA in hours and list required third-party systems (Stripe, PostgreSQL, Redis, Email provider, Model provider, Google Search Console).
