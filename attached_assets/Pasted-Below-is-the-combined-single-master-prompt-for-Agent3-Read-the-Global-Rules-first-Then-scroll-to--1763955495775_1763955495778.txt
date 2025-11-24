@@ -1,0 +1,192 @@
+Below is the combined, single master prompt for Agent3. Read the Global Rules first. Then scroll to the section marked FOR: <your app>. Execute only your app’s section. Every deliverable must start with the exact header: “App: <your app> | APP_BASE_URL: <your base URL>”.
+
+GLOBAL RULES (apply to all apps; do NOT perform actions outside your app’s section)
+
+Mission: Get your app to 100% production-ready and integrated with the ecosystem by 23:59 UTC today. If not feasible, provide a precise ETA to start generating revenue and list required third-party systems.
+Scope discipline: Execute only the section labeled FOR: <your app>. Do not alter or deliver for other apps.
+Deliverables (exactly three files, in your repo or docs directory):
+<app>_PRODUCTION_STATUS_REPORT.md containing:
+Section 1: Current Status (percent production-ready and major risks)
+Section 2: Integration Check (upstream/downstream, endpoints and health)
+Section 3: Revenue Readiness (can we start generating revenue today? yes/no with rationale)
+Section 4: Third-Party Dependencies (must be live to generate revenue)
+<app>_EVIDENCE_PACK.md containing concrete, verifiable evidence (curl commands with HTTP codes, timings; masked secrets; screenshots/IDs if available; config snippets; logs with request_id or messageId). Include copy-paste runnable commands.
+<app>_GATE_VERDICTS_AND_PLAN.md containing:
+Gate 1: Payments Flow verdict and your contribution to “first live dollar”
+Gate 2: Security & Performance verdict (401 vs 200 tests; P95 ~120ms for non-LLM endpoints; LLM endpoints document expected latency/mitigation)
+Gate 3: CORS verdict (must use strict allowlist below; no wildcards)
+Today GO/NO-GO
+If-Not-Today Plan with precise ETA and third-party systems required
+Exact header required atop every deliverable: App: <your app> | APP_BASE_URL: <your base URL>
+CORS allowlist (exactly these 8 origins; no wildcards):
+https://scholar-auth-jamarrlmayes.replit.app
+https://scholarship-api-jamarrlmayes.replit.app
+https://scholarship-agent-jamarrlmayes.replit.app
+https://scholarship-sage-jamarrlmayes.replit.app
+https://student-pilot-jamarrlmayes.replit.app
+https://provider-register-jamarrlmayes.replit.app
+https://auto-page-maker-jamarrlmayes.replit.app
+https://auto-com-center-jamarrlmayes.replit.app
+SLOs: 99.9% uptime; non-LLM endpoints target ~120ms P95. LLM endpoints may exceed; document expected latency and mitigation (idempotency, caching, streaming, circuit breakers).
+Security: 401 without token for protected endpoints, 200 with valid token; no PII in logs; mask secrets; request_id/correlation_id in responses/logs. Enforce Responsible AI: no ghostwriting, guidance-only where applicable, explainability and transparency.
+Gate 1: Payments Flow (applies primarily to provider_register; all other apps must show their contribution to the first-dollar flow).
+“Evidence or it didn’t happen”: include real, concrete outputs (HTTP status codes, timing, message IDs, masked secrets, screenshots if possible).
+“Today” means by 23:59 UTC.
+App base URLs
+
+scholar_auth → https://scholar-auth-jamarrlmayes.replit.app
+scholarship_api → https://scholarship-api-jamarrlmayes.replit.app
+scholarship_agent → https://scholarship-agent-jamarrlmayes.replit.app
+scholarship_sage → https://scholarship-sage-jamarrlmayes.replit.app
+student_pilot → https://student-pilot-jamarrlmayes.replit.app
+provider_register → https://provider-register-jamarrlmayes.replit.app
+auto_page_maker → https://auto-page-maker-jamarrlmayes.replit.app
+auto_com_center → https://auto-com-center-jamarrlmayes.replit.app
+FOR: scholar_auth
+
+Objective today: Provide reliable JWT issuance/validation for all apps; expose JWKS at /.well-known/jwks.json; enforce strict CORS; provide test tokens.
+Required evidence:
+401 without token, 200 with valid token, for at least one protected endpoint in a relying app (e.g., scholarship_api).
+JWKS endpoint curl showing 200 and at least one RS256 key.
+CORS preflight: OPTIONS with allowed origin → ACAO present; denied origin → no ACAO header.
+P95 timings for non-LLM endpoints (~120ms target).
+Integration:
+Upstream: none; Downstream: all apps validating tokens via JWKS.
+Provide a signed test JWT (short TTL) and document claims.
+If-Not-Today: ETA and third-party systems (Neon/Sentry optional). List risks and remediation.
+FOR: scholarship_api
+
+Objective today: Operate the credits ledger and scholarship data; enable credit purchase/crediting and balance checks; strict CORS; 401/200 tests; idempotent writes.
+Endpoints (examples; confirm actual):
+GET /api/v1/credits/balance (protected; 401 vs 200 tests)
+POST /api/v1/credits/credit or /purchase (protected; idempotent, record transaction_id/payment_id)
+GET /api/v1/scholarships (public)
+Required evidence:
+curl 401 without token and 200 with valid token for protected endpoints (HTTP code + time_total).
+Public scholarships endpoint timing (target <120ms).
+Config snippet: DATABASE_URL; AUTH_JWKS_URL; CORS allowlist (8 domains); masked secrets.
+Request IDs logged and returned.
+Integration:
+Upstream: scholar_auth JWKS; Downstream: scholarship_agent, scholarship_sage, student_pilot, provider_register.
+Gate 1 contribution: Accept credit confirmations from provider_register (Stripe webhook flow) and update balances idempotently.
+If-Not-Today: ETA, dependencies (Postgres, JWKS, event bus if used, Sentry optional).
+FOR: scholarship_agent
+
+Objective today: Deliver credit-gated scholarship matching; integrate debit with scholarship_api; strict CORS; 401/200; explainable scoring; no free unlimited matches.
+Must-have:
+On request, check user balance via scholarship_api; debit on successful match response (idempotent with x-idempotency-key).
+Include transparent scoring rationale in responses; log guidance-only where applicable.
+Required evidence:
+401 vs 200 tests for protected endpoints.
+Debit transaction proof: request_id and transaction_id, with 200 from scholarship_api.
+P95 non-LLM endpoints ~120ms; LLM describe expected latency/mitigation if used.
+CORS preflight pass/fail commands with headers.
+Integration:
+Upstream: scholar_auth; scholarship_api.
+Downstream: student_pilot (UI).
+If-Not-Today: Precise ETA (hours), required third-parties (scholarship_api, auth), and cutover plan to start charging credits.
+FOR: scholarship_sage
+
+Objective today: Guidance-only application assistance and recommendations; enforce “no ghostwriting”; credit consumption via scholarship_api for LLM-involved actions; strict CORS.
+Must-have:
+Telemetry: guidance_only_enforced=true.
+Idempotency for LLM calls, circuit breaker configs documented.
+Debit credits per draft/recommendation as defined; or declare “readiness to debit” with a toggle and ETA for activation.
+Required evidence:
+401 vs 200 tests for protected endpoints.
+Example guidance output showing policy adherence (no ghostwriting).
+LLM latency expectations (1–3s) + mitigations; non-LLM endpoints P95 ~120ms.
+CORS tests and config snippet; masked secrets.
+Integration:
+Upstream: scholar_auth; scholarship_api; OpenAI.
+Downstream: student_pilot.
+If-Not-Today: ETA and dependencies (OpenAI key, auth, scholarship_api).
+FOR: student_pilot
+
+Objective today: Orchestrate the student experience end-to-end: auth login, browse scholarships, purchase credits, consume credits (agent/sage), receive email receipts; strict CORS; measure P95.
+Must-have:
+Billing UI that calls provider_register to initiate checkout.
+After purchase: show updated balance from scholarship_api.
+Links/CTA to agent/sage features that debit credits on use.
+Required evidence:
+Network flow screenshots or curl proving: login → balance → checkout → webhook → updated balance → receipt email.
+CORS preflight pass/fail; performance sample (target P95 ~120ms for non-LLM UI API calls).
+Integration:
+Upstream: scholar_auth; scholarship_api; provider_register; auto_com_center (email receipt confirmation).
+Downstream: scholarship_agent; scholarship_sage.
+If-Not-Today: ETA and third-party systems (Stripe via provider_register, Postmark via auto_com_center).
+FOR: provider_register
+
+Objective today: Operationalize Stripe LIVE payment flow and 3% platform fee; on payment_intent.succeeded:
+Record platform fee (3%),
+Credit user in scholarship_api (idempotent),
+Send receipt via auto_com_center (with NOTIFY_WEBHOOK_SECRET).
+Must-have:
+Stripe Dashboard webhook configured (LIVE): events payment_intent.succeeded, payment_intent.payment_failed to /stripe/webhook.
+Correlation/request_id across crediting and receipts; retries and error handling documented.
+Required evidence:
+Stripe webhook delivery log: 200 OK, webhook ID, event ID; masked secrets.
+scholarship_api crediting: 200 with transaction_id and idempotency behavior (same event → no double credit).
+auto_com_center call: 200 with messageId.
+CORS config snippet; 401 vs 200 for any protected endpoints; P95 non-LLM ~120ms.
+Integration:
+Upstream: Stripe; Downstream: scholarship_api; auto_com_center; student_pilot.
+If-Not-Today: Precise ETA (minutes/hours), required systems: Stripe LIVE keys and webhook; scholarship_api; auto_com_center; Postgres.
+FOR: auto_page_maker
+
+Objective today: SEO engine generating 200–500 pages/day; sitemap.xml and robots.txt; internal linking and CTAs to student_pilot; strict CORS if browser-exposed; minimal runtime latency.
+Domain: Use one of:
+pages.scholaraiadvisor.com, or
+www.scholaraiadvisor.com/scholarships If domain is not yet decided/configured, state exact blockers (DNS, GSC) and provide ETA.
+Required evidence:
+sitemap.xml URL, robots.txt URL.
+10 live URLs with canonical tags and schema.org (if applicable).
+GSC verification steps; CTA click to student_pilot with UTM tags.
+If domain pending: DNS record plan and propagation ETA.
+Integration:
+Upstream: none; Downstream: student_pilot (traffic and conversions).
+If-Not-Today: ETA and required third-party systems (DNS, Google Search Console).
+FOR: auto_com_center
+
+Objective today: Transactional email delivery in LIVE mode (Postmark or equivalent). Minimum templates:
+Payment receipt (required for first dollar),
+Welcome/onboarding,
+Reset password,
+New match found. Receipt is mandatory to start revenue today; others can be delivered with ETA.
+Must-have:
+NOTIFY_WEBHOOK_SECRET for inbound notifications.
+Return 200 immediately with messageId; deliver async; no PII in logs; masked secrets.
+Strict CORS allowlist if any browser-exposed endpoints.
+Required evidence:
+curl POST to send email (template=welcome or receipt) → 200 with messageId; timing; provider=postmark (or equivalent).
+Config snippet: LIVE mode; masked server token; CORS list.
+If any templates pending: concrete ETA in hours.
+Integration:
+Upstream: provider_register webhook; Downstream: email inboxes; optional SMS in future (Twilio).
+If-Not-Today: ETA and required systems (Postmark LIVE, Neon DB for logs).
+HOW TO REPORT YOUR STATUS (in all three deliverables)
+
+Always start with header: App: <your app> | APP_BASE_URL: <your base URL>
+In PSR Section 3 (Revenue Readiness), answer: “Can we start generating revenue today?” → YES/NO with rationale. If NO, provide exact ETA to start generating revenue and list third-party systems that must be live.
+In Evidence Pack, include:
+curl commands with HTTP code and time_total for 401 vs 200 tests (protected endpoints),
+CORS preflight passing and failing tests,
+Any message IDs (email), webhook IDs (Stripe), transaction_ids, request_ids,
+Masked secrets, no PII in logs,
+Screenshots/JSON snippets when possible.
+In Gate Verdicts, include:
+Gate 1: Your app’s direct or indirect contribution to first-dollar revenue,
+Gate 2: Security/performance findings with P95 numbers or expected LLM latency,
+Gate 3: CORS allowlist verification (8 exact domains, no wildcards),
+Today GO/NO-GO and If-Not-Today Plan (ETA + dependencies).
+COMPLIANCE CHECK BEFORE SUBMISSION
+
+You used only your app’s section.
+All three files exist and follow the naming specified.
+Each file starts with: App: <your app> | APP_BASE_URL: <your base URL>
+Evidence is concrete, reproducible, and secrets are masked.
+If not ready today, your ETA is precise and lists required third-party systems to start generating revenue.
+HARD DEADLINE
+
+Target: 100% ready by 23:59 UTC today. If not possible, provide exact ETA and dependency list to be revenue-ready, plus what will be delivered in the interim.
+Begin now.
