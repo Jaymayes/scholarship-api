@@ -300,7 +300,7 @@ class CreditLedgerDB(Base):
     delta = Column(Float, nullable=False)  # Positive for credits, negative for debits
     reason = Column(Text)  # For credit operations
     purpose = Column(Text)  # For debit operations
-    metadata = Column(JSON)  # Additional context
+    transaction_metadata = Column(JSON)  # Additional context
     created_by_role = Column(String(50), nullable=False, index=True)  # Role of the user who created the transaction
     
     # Metadata

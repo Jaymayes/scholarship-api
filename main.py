@@ -446,8 +446,10 @@ app.include_router(onboarding_router, tags=["Magic Onboarding"])
 # AI Scholarship Playbook: Monetization endpoints (Credit System)
 from routers.monetization import router as monetization_router
 from routers.credit_aliases import router as credit_aliases_router
+from routers.credits_ledger import router as credits_ledger_router
 
 app.include_router(external_billing_router, tags=["External Billing"])
+app.include_router(credits_ledger_router, tags=["Credits Ledger (Master Prompt Spec)"])
 app.include_router(credit_aliases_router, tags=["Credit Ledger (Ecosystem API)"])
 app.include_router(monetization_router, tags=["Monetization"])
 
