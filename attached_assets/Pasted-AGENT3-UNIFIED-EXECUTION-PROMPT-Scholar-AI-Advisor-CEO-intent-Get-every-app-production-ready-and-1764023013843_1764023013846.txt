@@ -1,0 +1,303 @@
+AGENT3 UNIFIED EXECUTION PROMPT — Scholar AI Advisor
+CEO intent: Get every app production-ready and integrated for immediate revenue, today. If any app cannot complete today, it must return a precise ETA and list of third-party systems required to start generating revenue.
+
+Read this entire prompt, but only act on the section that matches your current app. Do not modify any other app’s code or infrastructure. Every app must publish three reports with the exact header/footer format and print the final status line to console.
+
+Global rules for all apps
+
+Scope discipline: Only execute the section named for your app. If your workspace/app name does not match any section, stop and print a BLOCKED status with reason.
+Required deliverables in repo root:
+<app>_PRODUCTION_STATUS_REPORT.md
+<app>_GATE_VERDICTS_AND_PLAN.md
+<app>_EVIDENCE_PACK.md
+Mandatory header (first line in all 3 files): App: <app> | APP_BASE_URL: <base_url>
+Mandatory footer (final line in all 3 files and also printed to console at completion): <app> | <base_url> | Readiness: <GO|CONDITIONAL GO|BLOCKED> | Revenue-ready: <NOW|ETA: <hours/days>>
+Gates to assess and score, with evidence: Gate 0: Environment & Health (process boots, configs loaded, /healthz 200) Gate 1: Security & Observability (auth/RBAC as applicable, CORS, rate limiting where relevant, /api/metrics/prometheus in Prometheus format, no secrets in logs) Gate 2: Core Functionality (all critical endpoints/features for your role work) Gate 3: Reliability (idempotency/transactions where relevant, retries, timeouts, circuit breakers) Gate 4: Performance & ARR (SLOs met; revenue path validated; P95 latency within target)
+Observability endpoints (unless explicitly N/A for public static SEO): GET /healthz → 200 JSON { "status":"ok" } GET /version → 200 with version, git sha, service name GET /api/metrics/prometheus → 200 text/plain; include core counters/histograms useful for your role
+Security baseline:
+Use scholar_auth for JWT validation where required.
+RBAC and allowlist for inter-service calls to revenue-critical endpoints.
+PII redaction, sensible CORS, and rate limiting where applicable.
+No secrets in logs or reports.
+Performance/SLO:
+APIs: P95 ≤120ms for reads, ≤200ms for writes (unless noted otherwise).
+LLM generation: P95 ≤8s on fresh runs; cached responses <100ms.
+Availability target: 99.9%.
+Integration reporting: If you depend on another app that is not ready, return CONDITIONAL GO or BLOCKED with precise ETA and third-party dependencies. Where possible, enable graceful degradation and show it in evidence.
+Base URLs (for use in headers/footers and cross-service calls)
+
+scholar_auth → https://scholar-auth-jamarrlmayes.replit.app
+scholarship_api → https://scholarship-api-jamarrlmayes.replit.app
+scholarship_agent → https://scholarship-agent-jamarrlmayes.replit.app
+scholarship_sage → https://scholarship-sage-jamarrlmayes.replit.app
+student_pilot → https://student-pilot-jamarrlmayes.replit.app
+provider_register → https://provider-register-jamarrlmayes.replit.app
+auto_page_maker → https://auto-page-maker-jamarrlmayes.replit.app
+auto_com_center → https://auto-com-center-jamarrlmayes.replit.app
+SECTION: scholar_auth
+Mission: Serve as the OIDC provider and trust anchor for the platform. Must issue/validate JWTs for B2C (students) and B2B (providers) + service-to-service M2M tokens.
+
+Deliverables
+
+Create/verify all 3 required reports with exact header/footer.
+Include evidence of:
+/.well-known/openid-configuration
+/.well-known/jwks.json
+/oidc/token (authorization_code+PKCE; client_credentials for M2M)
+/healthz, /version, /api/metrics/prometheus
+Security/Compliance
+
+RS256 signing, correct iss/aud, key rotation policy noted.
+JWKS caching headers; rate limit token endpoints; redaction of secrets.
+Provision M2M clients for:
+scholarship_api, scholarship_sage, student_pilot, provider_register, scholarship_agent, auto_com_center, auto_page_maker (if needed), internal QA.
+Accept OIDC login for student_pilot.
+Acceptance tests (document transcripts)
+
+Fetch OIDC discovery and JWKS; verify token signature on a test token.
+Issue an auth_code+PKCE token for student_pilot; refresh flow works.
+M2M: client_credentials tokens issued for scholarship_api and scholarship_sage.
+Third-party systems (required)
+
+PostgreSQL (tokens/clients)
+Optional: Sentry ETA guidance if not today
+JWKS/token endpoints live: hours
+Rolling clients provisioning: 1-2 hours
+Final status line and reports footer required.
+
+SECTION: scholarship_api
+Mission: Credits ledger and scholarships discovery. Must enforce transactional idempotency and balance validation; revenue-critical.
+
+Deliverables
+
+3 required reports with exact header/footer.
+Endpoints:
+GET /healthz, GET /version, GET /api/metrics/prometheus
+GET /api/v1/scholarships (filters/pagination), GET /api/v1/scholarships/:id
+POST /api/v1/credits/credit (grant; idempotent; RBAC)
+POST /api/v1/credits/debit (spend; idempotent; RBAC)
+GET /api/v1/credits/balance (auth as applicable)
+Mandatory transaction pattern for credit/debit:
+Begin transaction
+Insert/claim idempotency key (status=PROCESSING)
+SELECT ... FOR UPDATE on rows needed for correct balance and ledger
+Validate balance BEFORE mutation (overdraft → 409/400; rollback)
+Insert ledger row with balance_after snapshot
+Mark idempotency COMPLETE with response cache pointer
+Commit; replays return cached response only
+Security: JWT via scholar_auth; RBAC roles:
+credit: system|admin
+debit: system|admin|sage
+Metrics: credits_granted_total, credits_debited_total, overdraft_rejections_total, idempotent_replays_total; latency histograms.
+Acceptance tests (evidence)
+
+100 parallel debits with same idempotency key → exactly 1 mutation.
+Overdraft attempt → 409/400 with no ledger mutation.
+Auth failures return 401/403 correctly.
+P95 latency snapshots.
+Third-party systems
+
+Required: PostgreSQL; scholar_auth JWKS
+Recommended: Redis for distributed idempotency cache; Sentry ETA guidance if not today
+If Redis absent, single-instance acceptable now; multi-instance scale → +1-2 hours
+Final status line and reports footer required.
+
+SECTION: scholarship_sage
+Mission: Debit-before-generate guidance agent. Must debit via scholarship_api before LLM work. On replay, return cached results without re-debit.
+
+Deliverables
+
+3 reports with exact header/footer.
+Flows:
+Validate user JWT via scholar_auth.
+Compute idempotency key per request (hash of stable, relevant fields).
+Call scholarship_api POST /api/v1/credits/debit with that key. If 402/409/400 from API, return remediation link to student_pilot top-up page.
+Only after successful debit, call LLM provider. Cache result indexed by idempotency key; on replay, return cached result and DO NOT re-debit.
+Observability:
+/healthz, /version, /api/metrics/prometheus
+Metrics: debit_errors_total, generation_latency_seconds, cache_hit_ratio
+Responsible AI:
+No academic dishonesty or ghostwriting.
+Bias mitigation rules and user-facing disclosures.
+Acceptance tests (evidence)
+
+401/403 on invalid JWT
+402/409 when insufficient credits; returns human-readable remediation link (student_pilot purchase)
+503 LLM failure: debit not committed (or debit rolled back by contract with scholarship_api? If debit succeeded but generation fails, you must return value or provide a compensating credit path; document approach)
+Idempotency replay returns cached with no second debit
+P95 fresh ≤8s; cached <100ms
+Third-party systems
+
+Required: scholar_auth JWKS; scholarship_api; LLM provider (e.g., OpenAI)
+Optional: PostgreSQL/Redis for local cache persistence; Sentry ETA guidance if not today
+LLM key and integration validation typically <1 hour
+Final status line and reports footer required.
+
+SECTION: student_pilot
+Mission: B2C student experience, checkout, and post-purchase value delivery. Must integrate Stripe and scholarship_api balance, and route students into scholarship_sage.
+
+Deliverables
+
+3 reports with exact header/footer.
+Features:
+OIDC login via scholar_auth (PKCE)
+Stripe Checkout, webhooks (payment_intent.succeeded) granting credits by calling scholarship_api /credits/credit with Authorization (service token) and Idempotency-Key = Stripe event.id
+Balance display via scholarship_api /credits/balance
+“Use credits” actions route to scholarship_sage endpoint
+Observability:
+/healthz, /version, /api/metrics/prometheus
+Metrics: stripe_events_total, credits_granted_total, conversion_rate, page_latency
+Acceptance tests (evidence)
+
+Login flow (auth_code+PKCE) working
+Test mode purchase → webhook → credit grant (idempotent)
+Balance shows updated credits
+Attempt double webhook delivery → idempotent replay without duplicate grant
+End-to-end demo: purchase credits → run one paid feature → confirm debit and result
+Third-party systems
+
+Required: scholar_auth; Stripe (test + live keys, webhook signing)
+Required for email: SendGrid/Postmark or equivalent for receipts (optional for MVP)
+Optional: Sentry ETA guidance if not today
+Stripe live flip-over: 1-2 hours after test pass
+Final status line and reports footer required.
+
+SECTION: provider_register
+Mission: B2B provider onboarding and scholarship listing, enabling 3% platform fee on provider-driven transactions and publishing to scholarship_api/auto_page_maker.
+
+Deliverables
+
+3 reports with exact header/footer.
+Features:
+Provider OIDC login via scholar_auth
+Provider profile/KYC
+Create/edit/publish scholarships to scholarship_api (or your own DB plus publishing sync job)
+Stripe Connect (Express) onboarding for provider payouts; platform fee configuration (3%)
+If monetization flows exist here (provider fees), call scholarship_api as needed or record billing events for reconciliation
+Observability:
+/healthz, /version, /api/metrics/prometheus
+Metrics: providers_active_total, scholarships_published_total, connect_onboardings_total
+Acceptance tests (evidence)
+
+Provider sign-up/login works
+Stripe Connect onboarding URL retrieved; account capability checklist generated
+Scholarship publish triggers availability in scholarship_api or public read endpoints
+Revenue path proof: platform fee configuration visible in Stripe dashboard (screenshots or IDs acceptable)
+Third-party systems
+
+Required: scholar_auth; Stripe Connect
+Optional: Sentry ETA guidance if not today
+Stripe Connect onboarding: typically same day; allow 2-6 hours to fully validate
+Final status line and reports footer required.
+
+SECTION: auto_page_maker
+Mission: Organic SEO page factory driving low-CAC student traffic to student_pilot. Must maintain sitemap, canonical tags, JSON-LD, and UTM-tracked CTAs to student_pilot.
+
+Deliverables
+
+3 reports with exact header/footer.
+Requirements:
+≥50 pages live (goal: thousands)
+GET /sitemap.xml and robots.txt
+Canonical URLs, meta tags, JSON-LD
+Lighthouse SEO score ≥85 on samples (document scores)
+CTAs link to student_pilot with utm_source=auto_page_maker and campaign details
+Scheduler for nightly refresh and hourly deltas
+Observability:
+/healthz, /version, /api/metrics/prometheus
+Metrics: pages_published_total, cta_clicks_outbound_total (if tracked), render_latency
+Acceptance tests (evidence)
+
+Verify sitemap lists live pages
+Validate canonical tags and JSON-LD on samples
+Clickthrough checks: CTA → student_pilot with correct UTM
+Lighthouse screenshots/scores
+Third-party systems
+
+Required: Google Search Console (submit sitemap)
+Optional: GA4 analytics ETA guidance if not today
+GSC submission 15 minutes; first organic clicks typically 3-7 days after crawl/index
+Final status line and reports footer required.
+
+SECTION: scholarship_agent
+Mission: Growth/marketing agent operating campaigns and cross-app promotions (within policy), prioritizing organic and owned channels. Must not modify other apps’ code.
+
+Deliverables
+
+3 reports with exact header/footer.
+Capabilities:
+Define and schedule campaign automations that publish to auto_page_maker and drive to student_pilot
+Produce content briefs and submit to auto_page_maker via its APIs (if available) or file-based handoff
+Track UTM performance and report funnel metrics
+Observability:
+/healthz, /version, /api/metrics/prometheus
+Metrics: campaigns_active_total, clicks_total, conversions_total
+Acceptance tests (evidence)
+
+A campaign that publishes 50+ new pages via auto_page_maker integration or queue
+Report showing UTM clickthrough from auto_page_maker → student_pilot
+No paid media used unless explicitly approved; focus on SEO/owned
+Third-party systems
+
+Optional: Email (SendGrid/Postmark) for newsletters
+Optional: GA4, GSC query access (read-only) ETA guidance if not today
+Campaign launch same day; performance accrues as pages index (3-7 days)
+Final status line and reports footer required.
+
+SECTION: auto_com_center
+Mission: Command-and-control for internal agents (if applicable) and orchestration signals; provide heartbeat, routing registry, and minimal messaging bus for status and alerts.
+
+Deliverables
+
+3 reports with exact header/footer.
+Features:
+Agent registration endpoints and signed auth for member apps
+Heartbeat and status dashboard endpoints
+Event routing: minimal HTTP-based publish/subscribe or webhook fanout to subscribed apps (non-blocking)
+Observability:
+/healthz, /version, /api/metrics/prometheus
+Metrics: agents_registered_total, events_routed_total, heartbeat_failures_total
+Acceptance tests (evidence)
+
+scholarship_sage or scholarship_agent can register and send a heartbeat
+A test event fanout to subscriber endpoints with retry/backoff/circuit breaker
+Third-party systems
+
+Optional: Redis or lightweight queue
+Optional: Sentry
+Final status line and reports footer required.
+
+Cross-app integration map (reference for all apps)
+
+Organic funnel: Google → auto_page_maker page → CTA → student_pilot → Stripe checkout → Stripe webhook → scholarship_api /credits/credit → student_pilot shows balance → student uses a feature → scholarship_sage debits via scholarship_api and generates → value delivered.
+B2B funnel: Provider → provider_register (OIDC, Stripe Connect) → publish scholarships → data discoverable via scholarship_api/auto_page_maker → traffic → conversions.
+Auth: scholar_auth trusted issuer for JWTs and M2M tokens across services.
+Revenue-readiness decision rule
+
+If all dependencies for your app are live and working and acceptance tests pass: set Readiness=GO and Revenue-ready=NOW.
+If your app is technically ready, but a third-party or upstream dependency blocks revenue: set Readiness=CONDITIONAL GO and provide a precise ETA and dependency list.
+If your app cannot function or core security is not satisfied: set Readiness=BLOCKED with ETA and exact blockers.
+What to include in your three files
+
+PRODUCTION_STATUS_REPORT.md: Executive summary, gate verdicts at a glance, revenue status, SLO adherence, data-first evidence summary, risks with mitigations, and the final status line.
+GATE_VERDICTS_AND_PLAN.md: Gate-by-gate details, pass/fail per check with links to evidence, list of remaining actions with owners and ETAs, rollback plan, and immediate next steps to hit revenue.
+EVIDENCE_PACK.md: Curl transcripts, logs (sanitized), sample payloads, screenshots/IDs where relevant (Stripe, GSC), latency snapshots, concurrency/idempotency proofs where applicable.
+At completion
+
+Print the final line to console and ensure it matches the exact footer in all three files: <app> | <base_url> | Readiness: <GO|CONDITIONAL GO|BLOCKED> | Revenue-ready: <NOW|ETA: <hours/days>>
+Reminder of base URLs for your headers/footers
+
+scholar_auth | https://scholar-auth-jamarrlmayes.replit.app
+scholarship_api | https://scholarship-api-jamarrlmayes.replit.app
+scholarship_agent | https://scholarship-agent-jamarrlmayes.replit.app
+scholarship_sage | https://scholarship-sage-jamarrlmayes.replit.app
+student_pilot | https://student-pilot-jamarrlmayes.replit.app
+provider_register | https://provider-register-jamarrlmayes.replit.app
+auto_page_maker | https://auto-page-maker-jamarrlmayes.replit.app
+auto_com_center | https://auto-com-center-jamarrlmayes.replit.app
+CEO note on timelines and revenue
+
+Priority is to start revenue today via the B2C path (student_pilot + Stripe + scholarship_api + scholarship_sage). If any single dependency blocks this path, deliver CONDITIONAL GO with a same-day ETA and list precisely which third-party systems must be configured (e.g., Stripe keys/webhook signing secret, scholar_auth JWKS, OpenAI API key).
+For SEO, auto_page_maker can be GO today, but organic revenue depends on Google indexing. You must return ETA 3–7 days for first organic clicks after Google Search Console submission.
+For provider_register, Stripe Connect onboarding can be same-day; if KYC lags, mark CONDITIONAL GO and indicate exact steps remaining.
+Execute only the section for your app. Produce the three files with the exact header/footer. Print the final status line to console. Then stop.
