@@ -46,11 +46,18 @@ class CreditLedgerService:
         
         if existing_key:
             if existing_key.status == "COMPLETED":
-                # Return cached result
                 # Return persisted result from ledger (idempotent replay)
                 ledger_entry = db.query(CreditLedgerDB).filter(
                     CreditLedgerDB.id == existing_key.result_id
                 ).first()
+                
+                # Defensive: Handle missing ledger row (e.g., admin cleanup)
+                if not ledger_entry:
+                    logger.error(f"Ledger row missing for completed idempotency key: {idempotency_key}")
+                    raise HTTPException(
+                        status_code=409,
+                        detail="Transaction completed but ledger row missing. Contact support."
+                    )
                 
                 return {
                     "id": ledger_entry.id,
@@ -79,16 +86,17 @@ class CreditLedgerService:
             db.add(idempotency_record)
             db.flush()  # Flush to catch duplicate key errors
             
-            # Update or create balance FIRST to calculate balance_after
+            # Row-level lock balance (SELECT FOR UPDATE) - prevents race conditions
             balance = db.query(CreditBalanceDB).filter(
                 CreditBalanceDB.user_id == user_id
-            ).first()
+            ).with_for_update().first()
             
             if balance:
                 balance.balance += amount
                 balance.updated_at = datetime.utcnow()
                 balance_after = balance.balance
             else:
+                # New user - create balance record
                 balance = CreditBalanceDB(
                     user_id=user_id,
                     balance=amount,
@@ -96,6 +104,7 @@ class CreditLedgerService:
                     updated_at=datetime.utcnow()
                 )
                 db.add(balance)
+                db.flush()  # Get ID before using in ledger
                 balance_after = amount
             
             # Create ledger entry with balance_after for idempotent replay
@@ -175,6 +184,14 @@ class CreditLedgerService:
                     CreditLedgerDB.id == existing_key.result_id
                 ).first()
                 
+                # Defensive: Handle missing ledger row (e.g., admin cleanup)
+                if not ledger_entry:
+                    logger.error(f"Ledger row missing for completed idempotency key: {idempotency_key}")
+                    raise HTTPException(
+                        status_code=409,
+                        detail="Transaction completed but ledger row missing. Contact support."
+                    )
+                
                 return {
                     "id": ledger_entry.id,
                     "user_id": user_id,
@@ -202,10 +219,10 @@ class CreditLedgerService:
             db.add(idempotency_record)
             db.flush()  # Flush to catch duplicate key errors
             
-            # Check balance
+            # Row-level lock balance (SELECT FOR UPDATE) - prevents race conditions per master prompt
             balance = db.query(CreditBalanceDB).filter(
                 CreditBalanceDB.user_id == user_id
-            ).first()
+            ).with_for_update().first()
             
             if not balance or balance.balance < amount:
                 db.rollback()
@@ -214,7 +231,7 @@ class CreditLedgerService:
                     detail=f"Insufficient balance: requested {amount}, available {balance.balance if balance else 0}"
                 )
             
-            # Update balance FIRST to calculate balance_after
+            # Update balance atomically with ledger insert
             balance.balance -= amount
             balance.updated_at = datetime.utcnow()
             balance_after = balance.balance

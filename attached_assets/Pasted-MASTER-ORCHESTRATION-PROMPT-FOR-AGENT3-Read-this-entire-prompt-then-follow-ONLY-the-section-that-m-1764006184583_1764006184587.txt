@@ -1,0 +1,299 @@
+MASTER ORCHESTRATION PROMPT FOR AGENT3
+Read this entire prompt, then follow ONLY the section that matches your current app. Do not touch or comment on any other app’s section. Your mission is to get your app to 100% production-ready status and integrated with the rest of the platform today. If 100% is not achievable today, you must produce an honest ETA to start generating revenue and list the third-party systems and credentials required.
+
+Company context
+
+Org: Scholar AI Advisor (www.scholaraiadvisor.com)
+Prime 5-year target: $10M profitable ARR
+Growth model: dual engine (B2C students, B2B providers)
+SLOs: 99.9% uptime, P95 ≈120ms for read endpoints
+Responsible AI: bias mitigation, transparency, no academic dishonesty
+Pricing: 4x markup on AI services; 3% provider platform fee
+Global rules for Agent3
+
+Scope discipline
+Work only on the one app that matches your workspace identity or base URL environment variable.
+If your workspace does not match any app below, immediately execute the Wrong Workspace Protocol.
+2. Deliverables (must be created or refreshed today)
+
+3 report files in the repository root:
+PRODUCTION_STATUS_REPORT.md
+EVIDENCE_PACK.md
+GATE_VERDICTS_AND_PLAN.md
+Each file must start with this exact header:
+App: <your_app_name> | APP_BASE_URL: <your_base_url>
+Include GO/NO-GO verdicts. If NO-GO, give precise ETA and third-party requirements.
+3. Evidence standards
+
+Provide curl-style request/response transcripts, redacting secrets.
+Include latency snapshots with P50/P95.
+Include auth flows (JWT/JWKS), idempotency behaviors, rate limits, and error cases.
+Include data-model excerpts (schema, key indexes) and a one-page runbook (incidents, rollback).
+4. Security and compliance
+
+Enforce JWT validation against scholar_auth JWKS.
+Enforce RBAC and least privilege scopes.
+No PII in logs. Central request_id and user_id hashing allowed.
+FERPA/COPPA compliance statements in reports.
+5. Wrong Workspace Protocol
+
+If your current workspace does not match your app section:
+Do not change any code.
+Produce the 3 reports with a clear “WRONG WORKSPACE ALERT” banner and your honest implementation plan, ETA, acceptance tests, and third-party dependencies.
+Stop and request the correct workspace.
+App base URLs
+
+scholar_auth → https://scholar-auth-jamarrlmayes.replit.app
+scholarship_api → https://scholarship-api-jamarrlmayes.replit.app
+scholarship_agent → https://scholarship-agent-jamarrlmayes.replit.app
+scholarship_sage → https://scholarship-sage-jamarrlmayes.replit.app
+student_pilot → https://student-pilot-jamarrlmayes.replit.app
+provider_register → https://provider-register-jamarrlmayes.replit.app
+auto_page_maker → https://auto-page-maker-jamarrlmayes.replit.app
+auto_com_center → https://auto-com-center-jamarrlmayes.replit.app
+SECTION: scholar_auth (Identity and Access)
+Use only if your app is scholar_auth at the base URL above.
+
+Goal today
+
+Be the single source of truth for OIDC (authorization_code + PKCE), M2M client_credentials, JWKS publishing, roles/scopes, and Prometheus metrics. All other apps must be able to validate JWTs and obtain tokens today.
+Required endpoints and checks
+
+/.well-known/openid-configuration (valid)
+/.well-known/jwks.json (RS256, active key with kid)
+/oidc/authorize and /oidc/token (auth code with PKCE)
+/oidc/token (client_credentials for 8 back-end clients)
+/healthz, /version, /api/metrics/prometheus
+RBAC: system, admin, provider, student roles and granular scopes (scholarships.read, credits.debit, credits.credit, messages.send, pages.publish, etc.)
+Acceptance tests
+
+Issue M2M token for each service client and validate scopes.
+Validate JWTs from other apps against JWKS.
+Token TTLs sane (e.g., 5–10 min access tokens).
+Rate limiting per client_id.
+CORS: exact-origin allowlist for web apps.
+Third-party systems
+
+None strictly required beyond hosting. Optional Sentry for monitoring.
+If not 100% today
+
+Provide ETA in hours and list missing items (e.g., scope matrix, rate limiting, JWKS rotation runbook).
+SECTION: scholarship_api (System of Record and Credits)
+Use only if your app is scholarship_api at the base URL above.
+
+Goal today
+
+Provide published scholarships APIs and a transactional, idempotent credits ledger powering paywalled AI features. Enforce JWT/JWKS and RBAC.
+Endpoints
+
+GET /api/v1/scholarships?q=&tag=&page=&page_size=
+GET /api/v1/scholarships/:id
+POST /api/v1/credits/credit (admin|system|provider)
+POST /api/v1/credits/debit (admin|system|student; student can debit only own)
+GET /api/v1/credits/balance (admin|system|student; student sees own)
+/healthz, /version, /api/metrics/prometheus
+Credits ledger design
+
+Single-transaction pattern with idempotency:
+Insert/claim idempotency key
+Row-level lock balance (SELECT FOR UPDATE)
+Insert ledger mutation and update balance atomically
+Persist response snapshot; handle conflict/replay
+Overdraw yields 409 with clear code.
+Performance/SLOs
+
+Scholarships GET P95 ≤120ms warm cache; 5–15 min cache TTL acceptable.
+Writes ≤200ms P95.
+Security
+
+Validate JWT via scholar_auth JWKS.
+Scopes enforced; CORS allowlist; rate limiting (public vs auth).
+Acceptance tests
+
+Concurrency: 100 parallel debit with same Idempotency-Key → exactly one ledger row.
+Overdraw test: proper 409.
+Scholarships filtering and pagination correct.
+Third-party systems
+
+PostgreSQL for persistent storage.
+Redis for rate-limiting and cache.
+scholar_auth JWKS endpoint.
+If not 100% today
+
+Provide ETA (hours), exact blockers, and config variables needed (DATABASE_URL, REDIS_URL, AUTH_JWKS_URL).
+SECTION: scholarship_agent (Autonomous Marketing Campaigns)
+Use only if your app is scholarship_agent at the base URL above.
+
+Goal today
+
+Run autonomous campaigns to acquire students and providers. Integrate with auto_page_maker for SEO content and auto_com_center for messaging. Track KPIs.
+Core functions
+
+Campaign definitions, scheduling, and execution logs.
+Pull scholarship content from scholarship_api for messaging and landing links.
+Push emails/SMS via auto_com_center with per-campaign attribution.
+UTM tagging to student_pilot funnels.
+KPIs and observability
+
+Daily new leads, CTR, CAC proxy, conversion to signup.
+Campaign-level dashboards; /api/metrics/prometheus.
+Acceptance tests
+
+Test campaign sends to a staging list via auto_com_center.
+Confirm UTM flows to student_pilot.
+Ensure opt-out/consent flags are respected.
+Third-party systems
+
+None directly, but depends on auto_com_center’s email/SMS providers being configured.
+If not 100% today
+
+Provide ETA and note any missing integration tokens or webhooks.
+SECTION: scholarship_sage (AI Scholarship Advisor)
+Use only if your app is scholarship_sage at the base URL above.
+
+Goal today
+
+Deliver AI advising experiences that are paid via credits. Enforce fail-closed debit before any AI generation. No academic dishonesty.
+Core functions
+
+For each paid operation:
+Preflight balance check via scholarship_api.
+Debit with an Idempotency-Key.
+Only after a successful debit, generate and return output.
+Strict prompt safety and content filters; explainable reasoning displayed to users.
+Telemetry for cost and latency.
+Acceptance tests
+
+If debit fails: return 402 (insufficient credits) or 503 (service unavailable); do not generate.
+If JWT missing/invalid: 401/403.
+End-to-end debit + generate successful path within SLA.
+Third-party systems
+
+scholar_auth for JWT.
+scholarship_api for credits.
+Optional: model provider credentials; cost accounting in logs.
+If not 100% today
+
+Provide ETA, blockers (e.g., missing JWT validation, missing debit endpoint), and secrets needed.
+SECTION: student_pilot (Student App and Payments)
+Use only if your app is student_pilot at the base URL above.
+
+Goal today
+
+Convert traffic into registered users and paid credits. Integrate Stripe checkout and show live credit balance. Route users into paid AI flows.
+Core functions
+
+OAuth 2.0 (auth code + PKCE) with scholar_auth.
+Purchase credits via Stripe; credit the user in scholarship_api via idempotent webhook handler.
+Display balance and usage history; preflight check before launching paid features in scholarship_sage.
+UTM attribution and funnel metrics.
+Acceptance tests
+
+New user sign-in and token storage.
+Stripe test mode purchase → webhook → scholarship_api credit success.
+Balance reflects credit purchase within seconds.
+P95 page load and API calls within targets.
+Third-party systems
+
+Stripe (publishable key, secret key, webhook signing secret).
+scholar_auth JWKS.
+scholarship_api.
+Optional: Sentry/analytics.
+If not 100% today
+
+Provide ETA and list all Stripe config values needed.
+SECTION: provider_register (Provider Onboarding)
+Use only if your app is provider_register at the base URL above.
+
+Goal today
+
+Onboard scholarship providers, verify identity/KYC, register listings/contracts, and enable 3% platform fee billing.
+Core functions
+
+OAuth (M2M for server tasks; user auth for provider admins).
+Provider profile and KYC state tracking.
+Publish/update scholarships to scholarship_api (draft vs published).
+Billing setup for platform fee; acknowledge terms.
+Acceptance tests
+
+Provider can sign up, complete KYC, and publish a scholarship that appears in scholarship_api (is_published=true).
+Authz checks prevent non-provider roles from publishing.
+Third-party systems
+
+scholar_auth for auth.
+scholarship_api for data.
+Stripe Connect or existing billing integration (if applicable).
+If not 100% today
+
+Provide ETA and the exact billing/KYC dependencies.
+SECTION: auto_page_maker (SEO Engine)
+Use only if your app is auto_page_maker at the base URL above.
+
+Goal today
+
+Generate and serve SEO-optimized scholarship pages at scale. Feed organic traffic into student_pilot. Achieve Lighthouse ≥85 and daily-updating sitemaps.
+Core functions
+
+Pull GET /api/v1/scholarships (published only); cache results 5–15 minutes.
+Generate pages with canonical, JSON-LD, OpenGraph, related-links, pagination.
+robots.txt allow; sitemap.xml with daily index; submit to Google Search Console.
+Track CTR to student_pilot with UTM parameters.
+Acceptance tests
+
+At least 50 pages indexed in sitemap today.
+Lighthouse per template ≥85.
+200 responses with valid JSON-LD and canonical tags.
+Third-party systems
+
+Google Search Console property access.
+scholar_auth (if your API pulls require auth) and scholarship_api.
+If not 100% today
+
+Provide ETA and domain verification steps for GSC.
+SECTION: auto_com_center (Communications Hub)
+Use only if your app is auto_com_center at the base URL above.
+
+Goal today
+
+Deliver emails/SMS reliably for campaigns and lifecycle messages with compliance (unsubscribe, bounces, opt-ins).
+Core functions
+
+Providers: SendGrid or Postmark for email; Twilio for SMS.
+Inbound webhooks for bounces, complaints, deliveries; update suppression lists.
+Templates with personalization and UTM tagging; logs and metrics.
+Acceptance tests
+
+Send test email and SMS to staging list successfully.
+Unsubscribe link works and records suppression.
+Webhook events processed and visible in logs.
+Third-party systems
+
+SendGrid API key or Postmark server token.
+Twilio SID/auth token, messaging service SID.
+Signed webhook secrets storage.
+If not 100% today
+
+Provide ETA and the exact DNS/SPF/DKIM steps outstanding.
+Cross-app integration contracts (for reference only; only act on your app’s side)
+
+Auth: All services validate JWTs via scholar_auth JWKS. M2M client_credentials for server-to-server calls.
+Credits: scholarship_sage and student_pilot must call scholarship_api for balance/debit/credit. Debit-before-generate for paid features.
+SEO and growth: auto_page_maker sources scholarships from scholarship_api and drives UTM traffic to student_pilot. scholarship_agent runs campaigns via auto_com_center.
+Provider flow: provider_register publishes to scholarship_api (draft → published).
+Report and timing requirements
+
+Deadline: produce the 3 reports today. If any critical path item cannot be finished today, include:
+Revenue ETA (in hours/days) to start generating revenue
+Exact blockers
+Third-party systems and credentials required
+Throughout, prepend each report with: App: <your_app_name> | APP_BASE_URL: <your_base_url>.
+Final submission checklist (per app)
+
+All required endpoints return correct codes, payloads, and headers.
+JWT/JWKS validation enforced; RBAC scopes verified.
+Idempotency implemented for all write paths.
+P95 latency targets met.
+Evidence Pack includes curl runs, metrics snapshots, and schema/index listings.
+GO/NO-GO verdict issued with confidence level; if NO-GO, provide ETA and third-party checklists.
+Reminder
+Follow only the section that matches your app. If in the wrong workspace, execute the Wrong Workspace Protocol immediately.
