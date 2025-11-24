@@ -74,6 +74,10 @@ class Settings(BaseSettings):
         "A comprehensive API for scholarship discovery with advanced search and eligibility checking",
         alias="API_DESCRIPTION"
     )
+    
+    # Global Identity Standard (Agent3 Nov 24, 2025)
+    app_name: str = Field("scholarship_api", alias="APP_NAME")
+    app_base_url: str = Field("https://scholarship-api-jamarrlmayes.replit.app", alias="APP_BASE_URL")
 
     # Server Configuration - Replit compatible
     host: str = Field("0.0.0.0", alias="HOST")

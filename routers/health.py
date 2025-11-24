@@ -431,7 +431,48 @@ async def liveness_probe() -> dict[str, str]:
     Liveness probe - checks if the application is running
     Returns 200 if the service is alive
     """
-    return {"status": "ok", "service": "scholarship-api"}
+    app_name = os.getenv("APP_NAME", "scholarship_api")
+    return {"status": "ok", "service": app_name}
+
+@router.get("/version")
+async def version_info() -> dict[str, str]:
+    """
+    Global Identity Standard: Returns app identity and version information
+    Required by Agent3 unified execution prompt (Nov 24, 2025)
+    """
+    app_name = os.getenv("APP_NAME", "scholarship_api")
+    app_base_url = os.getenv("APP_BASE_URL", "https://scholarship-api-jamarrlmayes.replit.app")
+    version = os.getenv("APP_VERSION", "1.0.0")
+    environment = os.getenv("ENVIRONMENT", "production")
+    
+    return {
+        "service": app_name,
+        "app_base_url": app_base_url,
+        "version": version,
+        "environment": environment
+    }
+
+@router.get("/api/metrics/prometheus")
+async def prometheus_metrics() -> Response:
+    """
+    Prometheus metrics endpoint (Agent3 unified execution prompt compliance)
+    Returns Prometheus text format with core counters and histograms
+    """
+    from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
+    
+    try:
+        content = generate_latest()
+        return Response(
+            content=content,
+            media_type=CONTENT_TYPE_LATEST
+        )
+    except Exception as e:
+        logger.error(f"Failed to generate Prometheus metrics: {str(e)}")
+        return Response(
+            content="# Failed to generate metrics\n",
+            status_code=500,
+            media_type=CONTENT_TYPE_LATEST
+        )
 
 @router.get("/readyz")
 async def readiness_probe(db: Session = Depends(get_db)) -> dict[str, Any]:
@@ -440,9 +481,10 @@ async def readiness_probe(db: Session = Depends(get_db)) -> dict[str, Any]:
     Checks database connectivity and other dependencies
     """
     try:
+        app_name = os.getenv("APP_NAME", "scholarship_api")
         health_status = {
             "status": "ready",
-            "service": "scholarship-api",
+            "service": app_name,
             "checks": {}
         }
 
