@@ -58,12 +58,12 @@ class BalanceResponse(BaseModel):
     last_updated: str
 
 
-@router.post("/credit")
+@router.post("/credit", status_code=201)
 @rate_limit()
 async def credit_alias(
     request: Request,
     request_data: CreditRequest,
-    authorization: str = Header(...),
+    current_user: User = Depends(require_auth()),
     idempotency_key: Optional[str] = Header(None, alias="Idempotency-Key")
 ) -> CreditResponse:
     """
@@ -87,6 +87,14 @@ async def credit_alias(
     ```
     """
     try:
+        # Verify user has admin or system role (master prompt requirement)
+        user_roles = [r.lower() for r in current_user.roles] if current_user.roles else []
+        if not any(role in ["admin", "system"] for role in user_roles):
+            raise HTTPException(
+                status_code=403,
+                detail=f"Insufficient permissions: requires admin or system role, got {current_user.roles}"
+            )
+        
         # Transform to external_billing format
         credit_grant = CreditGrantRequest(
             user_id=request_data.user_id,
@@ -94,20 +102,18 @@ async def credit_alias(
             amount_usd=0.0,  # Not specified in master prompt, set to 0 for internal grants
             external_tx_id=idempotency_key or f"credit_{request_data.user_id}_{request_data.reference_id}",
             source_app=ExternalPaymentSource.ADMIN_PORTAL,  # Internal service call
-            signature="internal",  # Internal service call
+            signature="internal",  # Internal service call (bypass signature check)
             timestamp=0,  # Will be validated by handler
             metadata={
                 "reason": request_data.reason,
                 "reference_id": request_data.reference_id,
                 "source": request_data.source,
-                "alias_endpoint": "/api/v1/credits/credit"
+                "alias_endpoint": "/api/v1/credits/credit",
+                "authorized_by": current_user.user_id
             }
         )
         
-        # Verify authorization (reuse existing verification)
-        verify_service_key(authorization)
-        
-        # Forward to existing handler
+        # Forward to existing handler (already authorized via JWT)
         result = await grant_credits_external(credit_grant, _authorized=True)
         
         # Transform response to master prompt format
@@ -124,7 +130,7 @@ async def credit_alias(
         raise HTTPException(status_code=500, detail=f"Failed to grant credits: {str(e)}")
 
 
-@router.post("/debit")
+@router.post("/debit", status_code=201)
 @rate_limit()
 async def debit_alias(
     request: Request,
@@ -154,31 +160,77 @@ async def debit_alias(
     ```
     """
     try:
+        # Verify user has student or service role (master prompt requirement)
+        user_roles = [r.lower() for r in current_user.roles] if current_user.roles else []
+        if not any(role in ["student", "service", "admin", "system"] for role in user_roles):
+            raise HTTPException(
+                status_code=403,
+                detail=f"Insufficient permissions: requires student or service role, got {current_user.roles}"
+            )
+        
         # Verify user_id matches authenticated user (security check)
-        if request_data.user_id != current_user.user_id:
+        # Admin/system can debit for any user
+        is_admin_or_system = any(role in ["admin", "system"] for role in user_roles)
+        if not is_admin_or_system and request_data.user_id != current_user.user_id:
             raise HTTPException(
                 status_code=403,
                 detail="Cannot debit credits for another user"
             )
         
-        # Transform to consume format
-        usage_request = CreditUsageRequest(
-            feature=request_data.feature,
-            operation_id=request_data.reference_id or idempotency_key or f"debit_{current_user.user_id}",
-            estimated_tokens=request_data.amount  # Map amount to tokens
+        # Get current balance
+        balance_before = await monetization_service.initialize_user_credits(request_data.user_id)
+        
+        # Check sufficient funds
+        if balance_before.available_credits < request_data.amount:
+            raise HTTPException(
+                status_code=409,
+                detail={
+                    "code": "INSUFFICIENT_FUNDS",
+                    "message": f"Insufficient credits: requested {request_data.amount}, available {balance_before.available_credits}"
+                }
+            )
+        
+        # Deduct credits directly from ledger
+        operation_id = request_data.reference_id or idempotency_key or f"debit_{request_data.user_id}_{request_data.feature}"
+        
+        # Calculate new balance
+        new_credits_amount = balance_before.available_credits - request_data.amount
+        
+        # Update credit balance (create new CreditBalance object)
+        from datetime import datetime
+        updated_balance = CreditBalance(
+            user_id=request_data.user_id,
+            total_credits=new_credits_amount,
+            available_credits=new_credits_amount,
+            reserved_credits=0,
+            last_updated=datetime.utcnow()
         )
+        monetization_service.credit_balances[request_data.user_id] = updated_balance
         
-        # Forward to existing consume handler
-        result = await consume_credits(request, usage_request, current_user)
+        logger.info(f"Debited {request_data.amount} credits from user {request_data.user_id}: {balance_before.available_credits} → {new_credits_amount}")
         
-        # Get updated balance
-        balance = await monetization_service.initialize_user_credits(current_user.user_id)
+        # Emit event for tracking (optional, don't fail if it doesn't work)
+        try:
+            from services.event_emission import event_emission_service
+            await event_emission_service.emit_event(
+                event_type="credits_consumed",
+                user_id=request_data.user_id,
+                data={
+                    "amount": request_data.amount,
+                    "feature": request_data.feature,
+                    "operation_id": operation_id,
+                    "previous_balance": balance_before.available_credits,
+                    "new_balance": new_credits_amount
+                }
+            )
+        except Exception as e:
+            logger.warning(f"Failed to emit credits_consumed event: {str(e)}")
         
         # Transform response to master prompt format
         return CreditResponse(
             user_id=request_data.user_id,
-            new_balance=balance.available_credits,
-            ledger_entry_id=result.operation_id
+            new_balance=new_credits_amount,
+            ledger_entry_id=operation_id
         )
         
     except HTTPException:
@@ -221,15 +273,19 @@ async def balance_alias(
     ```
     """
     try:
-        # Verify user_id matches authenticated user (security check)
-        if user_id != current_user.user_id:
+        # Verify authorization: students can only view their own balance
+        # Admin/system can view any user's balance
+        user_roles = [r.lower() for r in current_user.roles] if current_user.roles else []
+        is_admin_or_system = any(role in ["admin", "system"] for role in user_roles)
+        
+        if not is_admin_or_system and user_id != current_user.user_id:
             raise HTTPException(
                 status_code=403,
                 detail="Cannot view credits for another user"
             )
         
-        # Get balance from existing handler
-        balance = await get_credit_balance(request, current_user)
+        # Get balance for the specified user_id (not current_user)
+        balance = await monetization_service.initialize_user_credits(user_id)
         
         # Transform to master prompt format
         return BalanceResponse(
