@@ -300,6 +300,7 @@ class CreditLedgerDB(Base):
     delta = Column(Float, nullable=False)  # Positive for credits, negative for debits
     reason = Column(Text)  # For credit operations
     purpose = Column(Text)  # For debit operations
+    balance_after = Column(Float, nullable=False)  # Balance after this transaction (for idempotent replay)
     transaction_metadata = Column(JSON)  # Additional context
     created_by_role = Column(String(50), nullable=False, index=True)  # Role of the user who created the transaction
     
@@ -311,7 +312,7 @@ class IdempotencyKeyDB(Base):
     __tablename__ = "idempotency_keys"
 
     key = Column(String, primary_key=True)  # The idempotency key from the request
-    status = Column(String(20), nullable=False, index=True)  # PROCESSING or COMPLETED
+    status = Column(String(20), nullable=False, index=True)  # PROCESSING, COMPLETED, or FAILED
     result_id = Column(String)  # Reference to the credit_ledger.id when COMPLETED
     
     # Metadata

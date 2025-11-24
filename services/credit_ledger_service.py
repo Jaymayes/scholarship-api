@@ -47,18 +47,16 @@ class CreditLedgerService:
         if existing_key:
             if existing_key.status == "COMPLETED":
                 # Return cached result
+                # Return persisted result from ledger (idempotent replay)
                 ledger_entry = db.query(CreditLedgerDB).filter(
                     CreditLedgerDB.id == existing_key.result_id
-                ).first()
-                balance = db.query(CreditBalanceDB).filter(
-                    CreditBalanceDB.user_id == user_id
                 ).first()
                 
                 return {
                     "id": ledger_entry.id,
                     "user_id": user_id,
-                    "delta": amount,
-                    "balance": balance.balance if balance else amount,
+                    "delta": ledger_entry.delta,
+                    "balance": ledger_entry.balance_after,  # Use persisted balance
                     "reason": ledger_entry.reason,
                     "created_at": ledger_entry.created_at.isoformat()
                 }
@@ -81,19 +79,7 @@ class CreditLedgerService:
             db.add(idempotency_record)
             db.flush()  # Flush to catch duplicate key errors
             
-            # Create ledger entry
-            ledger_entry = CreditLedgerDB(
-                user_id=user_id,
-                delta=amount,
-                reason=reason,
-                transaction_metadata=metadata,
-                created_by_role=created_by_role,
-                created_at=datetime.utcnow()
-            )
-            db.add(ledger_entry)
-            db.flush()  # Get the ID
-            
-            # Update or create balance
+            # Update or create balance FIRST to calculate balance_after
             balance = db.query(CreditBalanceDB).filter(
                 CreditBalanceDB.user_id == user_id
             ).first()
@@ -101,6 +87,7 @@ class CreditLedgerService:
             if balance:
                 balance.balance += amount
                 balance.updated_at = datetime.utcnow()
+                balance_after = balance.balance
             else:
                 balance = CreditBalanceDB(
                     user_id=user_id,
@@ -109,13 +96,31 @@ class CreditLedgerService:
                     updated_at=datetime.utcnow()
                 )
                 db.add(balance)
+                balance_after = amount
             
-            # Mark idempotency key as completed
+            # Create ledger entry with balance_after for idempotent replay
+            ledger_entry = CreditLedgerDB(
+                user_id=user_id,
+                delta=amount,
+                reason=reason,
+                balance_after=balance_after,  # Store balance at this point in time
+                transaction_metadata=metadata,
+                created_by_role=created_by_role,
+                created_at=datetime.utcnow()
+            )
+            db.add(ledger_entry)
+            db.flush()  # Get the ID
+            
+            # Mark idempotency key as completed BEFORE commit
             idempotency_record.status = "COMPLETED"
             idempotency_record.result_id = ledger_entry.id
+            db.flush()  # Ensure status update is part of this transaction
             
-            # Commit transaction
+            # Commit transaction (now includes the status update)
             db.commit()
+            
+            # Refresh to get final state
+            db.refresh(balance)
             
             logger.info(f"Credited {amount} to user {user_id}, new balance: {balance.balance}")
             
@@ -130,20 +135,12 @@ class CreditLedgerService:
             
         except IntegrityError as e:
             db.rollback()
-            # Delete PROCESSING key on failure
-            db.query(IdempotencyKeyDB).filter(
-                IdempotencyKeyDB.key == idempotency_key
-            ).delete()
-            db.commit()
+            # Don't mutate existing keys - just raise the error
+            # Concurrent requests will see existing COMPLETED/PROCESSING status
             logger.error(f"Integrity error during credit: {str(e)}")
             raise HTTPException(status_code=409, detail="Duplicate idempotency key collision")
         except Exception as e:
             db.rollback()
-            # Delete PROCESSING key on failure
-            db.query(IdempotencyKeyDB).filter(
-                IdempotencyKeyDB.key == idempotency_key
-            ).delete()
-            db.commit()
             logger.error(f"Error during credit: {str(e)}")
             raise
     
@@ -173,19 +170,16 @@ class CreditLedgerService:
         
         if existing_key:
             if existing_key.status == "COMPLETED":
-                # Return cached result
+                # Return persisted result from ledger (idempotent replay)
                 ledger_entry = db.query(CreditLedgerDB).filter(
                     CreditLedgerDB.id == existing_key.result_id
-                ).first()
-                balance = db.query(CreditBalanceDB).filter(
-                    CreditBalanceDB.user_id == user_id
                 ).first()
                 
                 return {
                     "id": ledger_entry.id,
                     "user_id": user_id,
-                    "delta": -amount,
-                    "balance": balance.balance if balance else 0,
+                    "delta": ledger_entry.delta,
+                    "balance": ledger_entry.balance_after,  # Use persisted balance
                     "purpose": ledger_entry.purpose,
                     "created_at": ledger_entry.created_at.isoformat()
                 }
@@ -215,21 +209,22 @@ class CreditLedgerService:
             
             if not balance or balance.balance < amount:
                 db.rollback()
-                # Delete PROCESSING key
-                db.query(IdempotencyKeyDB).filter(
-                    IdempotencyKeyDB.key == idempotency_key
-                ).delete()
-                db.commit()
                 raise HTTPException(
                     status_code=409,
                     detail=f"Insufficient balance: requested {amount}, available {balance.balance if balance else 0}"
                 )
             
-            # Create ledger entry (negative delta for debit)
+            # Update balance FIRST to calculate balance_after
+            balance.balance -= amount
+            balance.updated_at = datetime.utcnow()
+            balance_after = balance.balance
+            
+            # Create ledger entry with balance_after for idempotent replay (negative delta for debit)
             ledger_entry = CreditLedgerDB(
                 user_id=user_id,
                 delta=-amount,
                 purpose=purpose,
+                balance_after=balance_after,  # Store balance at this point in time
                 transaction_metadata=metadata,
                 created_by_role=created_by_role,
                 created_at=datetime.utcnow()
@@ -237,16 +232,16 @@ class CreditLedgerService:
             db.add(ledger_entry)
             db.flush()  # Get the ID
             
-            # Update balance
-            balance.balance -= amount
-            balance.updated_at = datetime.utcnow()
-            
-            # Mark idempotency key as completed
+            # Mark idempotency key as completed BEFORE commit
             idempotency_record.status = "COMPLETED"
             idempotency_record.result_id = ledger_entry.id
+            db.flush()  # Ensure status update is part of this transaction
             
-            # Commit transaction
+            # Commit transaction (now includes the status update)
             db.commit()
+            
+            # Refresh to get final state
+            db.refresh(balance)
             
             logger.info(f"Debited {amount} from user {user_id}, new balance: {balance.balance}")
             
@@ -261,22 +256,14 @@ class CreditLedgerService:
             
         except IntegrityError as e:
             db.rollback()
-            # Delete PROCESSING key on failure
-            db.query(IdempotencyKeyDB).filter(
-                IdempotencyKeyDB.key == idempotency_key
-            ).delete()
-            db.commit()
+            # Don't mutate existing keys - just raise the error
+            # Concurrent requests will see existing COMPLETED/PROCESSING status
             logger.error(f"Integrity error during debit: {str(e)}")
             raise HTTPException(status_code=409, detail="Duplicate idempotency key collision")
         except HTTPException:
             raise
         except Exception as e:
             db.rollback()
-            # Delete PROCESSING key on failure
-            db.query(IdempotencyKeyDB).filter(
-                IdempotencyKeyDB.key == idempotency_key
-            ).delete()
-            db.commit()
             logger.error(f"Error during debit: {str(e)}")
             raise
     

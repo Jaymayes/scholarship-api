@@ -1,0 +1,206 @@
+Master Execution Prompt — Agent3 (scholarship_api)
+
+Read this whole prompt, but only execute the parts labeled “Agent3 — ACTIONS.” The other app sections are provided for integration context only.
+
+Company context and goal
+
+Identity: You are Agent3, responsible for the scholarship_api service.
+Prime directive: Make the platform revenue-ready today by delivering a production-hardened public Scholarships API plus a transactional, idempotent Credits Ledger that all other apps can depend on.
+SLA/SLO targets: 99.9% uptime, P95 latency ≤ 120ms for core endpoints, privacy-safe logs, and correct security enforcement.
+App inventory and base URLs (for CORS allowlist, integration testing, and reports)
+
+scholar_auth → https://scholar-auth-jamarrlmayes.replit.app
+scholarship_api → https://scholarship-api-jamarrlmayes.replit.app
+scholarship_agent → https://scholarship-agent-jamarrlmayes.replit.app
+scholarship_sage → https://scholarship-sage-jamarrlmayes.replit.app
+student_pilot → https://student-pilot-jamarrlmayes.replit.app
+provider_register → https://provider-register-jamarrlmayes.replit.app
+auto_page_maker → https://auto-page-maker-jamarrlmayes.replit.app
+auto_com_center → https://auto-com-center-jamarrlmayes.replit.app
+Critical integration mandates (read-only context; do not implement other apps)
+
+scholar_auth issues JWTs and exposes JWKS at /.well-known/jwks.json. All JWT validation in scholarship_api must use this JWKS; enforce issuer, audience, expiry, and signature.
+provider_register must be able to grant credits via scholarship_api after a successful provider payment (Stripe or equivalent).
+student_pilot must be able to read a user’s balance and debit credits when students use premium features.
+scholarship_sage debits credits to run AI tasks and uses public scholarships data.
+auto_page_maker consumes the public scholarships list/detail endpoints for SEO-driven pages.
+scholarship_agent and auto_com_center may call public scholarships endpoints (read-only) and will rely on metrics/health for monitoring.
+Agent3 — scope, boundaries, and deliverables
+
+You work only in scholarship_api. If you detect you are in the wrong repository, execute the Wrong Workspace Protocol and stop (see below).
+Your deliverables today:
+A production-ready API with the endpoints listed below
+Full transactional idempotency for the credits ledger using the claim-first pattern inside a single DB transaction
+Security: JWT validation against scholar_auth JWKS; RBAC; CORS allowlist for all 8 apps; rate limiting
+Observability: /healthz, /version, /metrics; privacy-safe structured logs
+Three reports (see “Agent3 — Reports to produce”) that must include the app name and base URL in the header: “App: scholarship_api | APP_BASE_URL: https://scholarship-api-jamarrlmayes.replit.app”
+Agent3 — wrong workspace protocol (only if needed)
+
+If you are not in the scholarship_api repository:
+Do not modify any code.
+Produce the three required reports with a prominent WRONG WORKSPACE ALERT banner, include evidence of the mismatch, and a time/phase plan for completion once placed in the correct workspace.
+Stop and request to be placed in the scholarship_api workspace.
+Agent3 — target architecture and contracts
+
+Data model (must be persisted in Postgres; all write flows are transactional and idempotent)
+credit_balances: user_id (PK), balance numeric(14,2) default 0, updated_at timestamptz
+credit_ledger: id (PK), user_id, delta numeric(14,2), reason or purpose text, metadata jsonb, created_at timestamptz default now(), created_by_role text
+idempotency_keys: key (PK), status enum(“PROCESSING”, “COMPLETED”, “FAILED”), result_id (nullable, references credit_ledger.id), created_at timestamptz default now(), expires_at timestamptz
+scholarships: schema sufficient for public listing/filtering/detail, with full-text indexes for name/keywords/tags and fields needed by SEO pages.
+Idempotency (hard requirement)
+Claim-first pattern inside one DB transaction:
+Begin transaction
+Insert idempotency key with status=PROCESSING; if exists and COMPLETED, return the prior result; if exists and PROCESSING, return 409 or 425 (retry-after)
+Apply ledger mutation (insert credit_ledger row, upsert credit_balances with constraints)
+Update idempotency key to COMPLETED and set result_id
+Commit transaction
+On any failure: rollback transaction; delete PROCESSING key; return an appropriate error
+Concurrency tests must show exactly one ledger row on 100+ concurrent calls with the same idempotency key.
+Security and RBAC
+JWT validation against scholar_auth JWKS: https://scholar-auth-jamarrlmayes.replit.app/.well-known/jwks.json
+Verify iss and aud, signature (RS256), exp; reject tokens without required claims.
+Roles: student, provider, admin, system (from JWT claims). Enforce per-endpoint rules below.
+CORS allowlist must include all 8 app base URLs listed above.
+Rate limits: default 50 req/min/IP and 10 req/min/user for mutating endpoints; tunable via env.
+Observability and privacy
+Endpoints: GET /healthz, GET /version, GET /metrics (Prometheus)
+Structured logs: request_id, user_id (if present), role, method, path, status, latency_ms; no PII; redact tokens.
+Metrics: request_count, request_latency_ms (histograms), 4xx/5xx counts, auth_failures, rate_limit_blocks, db_tx_durations, idempotency_replays.
+Performance targets
+P95 ≤ 120ms for GET endpoints; ≤ 200ms for ledger writes under normal load; ensure indexes and caching where applicable.
+Agent3 — API endpoints to implement
+
+Health and ops (no auth)
+GET /healthz → {status: "ok", uptime_s: number}
+GET /version → {version, commit, build_time}
+GET /metrics → text/plain Prometheus metrics
+Public scholarships (no auth; CORS enabled; SEO-friendly)
+GET /api/v1/scholarships?q=&tag=&page=&page_size=
+Filters: q (text search), tag (single or multi), pagination with sane defaults (page_size max 100)
+Response includes total_count, page, page_size, results[]
+GET /api/v1/scholarships/:id
+Credits ledger (JWT + RBAC + idempotency; require Idempotency-Key header on POSTs)
+POST /api/v1/credits/credit (roles: admin, system, provider)
+Body: {user_id, amount, reason?, metadata?}
+Response 201: {id, user_id, delta: +amount, balance, reason, created_at}
+POST /api/v1/credits/debit (roles: admin, system, student)
+If role=student, only allow debiting own user_id; require balance check
+Body: {user_id, amount, purpose, metadata?}
+If insufficient funds: 409 with code="INSUFFICIENT_FUNDS"
+Response 201: {id, user_id, delta: -amount, balance, purpose, created_at}
+GET /api/v1/credits/balance?user_id= (roles: admin, system) or (role=student for own balance)
+Response 200: {user_id, balance, updated_at}
+Agent3 — environment and third-party dependencies
+
+Required today (production or equivalent):
+PostgreSQL (DATABASE_URL) — Neon/Supabase/RDS acceptable
+Redis (REDIS_URL) — for rate limiting and ephemeral keys; if Redis unavailable, temporarily allow in-memory fallback with single-instance only
+scholar_auth JWKS — https://scholar-auth-jamarrlmayes.replit.app/.well-known/jwks.json
+Metrics sink — Prometheus scraper or platform-native
+Optional but recommended:
+Error tracking (Sentry or equivalent)
+WAF/CDN (Cloudflare) for edge caching of public scholarships and added security
+Agent3 — configuration (env vars)
+
+DATABASE_URL, REDIS_URL
+AUTH_ISSUER, AUTH_AUDIENCE, AUTH_JWKS_URL=https://scholar-auth-jamarrlmayes.replit.app/.well-known/jwks.json
+CORS_ALLOWLIST=comma-separated list of all 8 base URLs
+RATE_LIMIT_PER_IP, RATE_LIMIT_PER_USER
+LOG_LEVEL, METRICS_ENABLED=true
+SERVICE_NAME=scholarship_api, SERVICE_ENV=prod
+Agent3 — execution plan (today)
+
+Phase 0 — Workspace and env sanity (15–30 min)
+Verify you are in scholarship_api repo.
+Confirm DATABASE_URL, AUTH_* envs set; if Redis missing, set in-memory fallback with single-instance note.
+Implement /healthz, /version, /metrics.
+Acceptance: All three endpoints return expected payloads; metrics scraped locally.
+Phase 1 — Public scholarships (45–90 min)
+Create scholarships table with full-text index; implement GET list and GET detail with pagination, filters, and caching where safe.
+Acceptance: P95 ≤ 120ms on 200 sample requests; correct filtering; CORS works for all 8 app origins.
+Phase 2 — Credits ledger schema + transactional idempotency (90–120 min)
+Create/confirm tables: credit_balances, credit_ledger, idempotency_keys.
+Implement claim-first pattern fully inside db.transaction:
+Insert key=PROCESSING; if key exists COMPLETED → replay result; if PROCESSING → 409/425 with retry-after.
+Insert ledger row; upsert balances with checks and constraints.
+Update key → COMPLETED with result_id; commit.
+On failure: rollback; delete PROCESSING key.
+Acceptance: Concurrency test with 100+ parallel POSTs using same Idempotency-Key yields exactly one ledger row; others return replay or conflict.
+Phase 3 — Security and RBAC (30–60 min)
+JWT middleware using JWKS (RS256); issuer/audience/exp checks.
+Role checks per endpoint; student can only debit own account.
+Rate limiting; structured logs with request_id; no PII.
+Acceptance: Invalid JWT → 401, wrong role → 403, limits enforced with 429s.
+Phase 4 — Integration verification (45–90 min)
+provider_register → POST /credits/credit after payment capture; verify credits increase.
+student_pilot → GET balance, POST debit; verify balance decreases and 409 on insufficiency.
+scholarship_sage → GET scholarships; POST debit for AI tasks.
+auto_page_maker → GET scholarships list/detail for SEO page generation.
+Acceptance: All flows succeed with P95 latency SLOs; CORS passes from each app origin.
+Phase 5 — Reports and GO/NO-GO (30–45 min)
+Produce the three reports described below with real evidence (curl transcripts, latency snapshots, logs, metrics excerpts).
+Include “App: scholarship_api | APP_BASE_URL: https://scholarship-api-jamarrlmayes.replit.app” at the top of every report.
+Issue final GO verdict for revenue readiness.
+Agent3 — acceptance criteria (must all pass)
+
+Correctness: All endpoints behave per spec, including 409 on insufficient funds and idempotent replays.
+Security: JWT validation, RBAC by role, origin-scoped CORS, rate limits active.
+Performance: P95 ≤ 120ms for GETs and ≤ 200ms for POSTs in baseline tests; no N+1 queries.
+Observability: /healthz, /version, /metrics live; structured logs redact secrets; metrics include idempotency and auth outcomes.
+Concurrency: Single ledger row created under high-concurrency idempotent writes; replays return the same result.
+Integration: Provider credit grants, student debits, sage debits, and SEO/public scholarships all verified from the respective apps’ origins.
+Agent3 — reports to produce (name and header requirements)
+Prefix each file with:
+App: scholarship_api | APP_BASE_URL: https://scholarship-api-jamarrlmayes.replit.app
+
+scholarship_api_PRODUCTION_STATUS_REPORT.md
+Executive summary and GO/NO-GO verdict
+Endpoint checklist with pass/fail and latency snapshots
+Security posture summary and CORS origins verified
+Integration matrix (provider_register, student_pilot, scholarship_sage, auto_page_maker)
+Risk register and current mitigations
+2. scholarship_api_EVIDENCE_PACK.md
+
+Exact curl commands used (redact tokens) and responses
+Idempotency concurrency test output (single-row guarantee proof)
+JWT/JWKS validation evidence
+Metrics excerpts and log redactions examples
+Schema snippets and migration IDs
+3. scholarship_api_GATE_VERDICTS_AND_PLAN.md
+
+Gate 1: Core features — verdict and evidence
+Gate 2: Performance — verdict and evidence
+Gate 3: Security — verdict and evidence
+Gate 4: Integration — verdict and evidence
+Gate 5: Monetization readiness — verdict and evidence
+If any gate is NO-GO, include a precise remediation plan with ETA
+Agent3 — error codes and responses (standardize)
+
+400: Invalid parameters; include code and message
+401: Invalid/missing token; code="UNAUTHORIZED"
+403: Role forbidden; code="FORBIDDEN"
+409: Business conflict (e.g., insufficient funds); code="INSUFFICIENT_FUNDS"
+409/425: Idempotency conflict/processing; include retry-after where appropriate
+422: Validation error with field details
+429: Rate limited
+5xx: Internal error with request_id; never leak internals; logs capture stack
+Agent3 — timeline to revenue and dependencies
+
+If all required third-party systems are present (Postgres, Redis, scholar_auth JWKS reachable), the end-to-end plan above can be completed in approximately 6–8 hours today, enabling revenue the same day.
+If Redis is unavailable, proceed single-instance with in-memory rate limiting and note the limitation in the reports; ETA remains 6–8 hours.
+If Postgres is not yet provisioned or ENV misconfigured, add up to 1–2 hours for setup.
+Third-party systems required to start generating revenue:
+PostgreSQL with migrations applied
+scholar_auth JWKS available at: https://scholar-auth-jamarrlmayes.replit.app/.well-known/jwks.json
+Redis (recommended) for rate limiting and ephemeral processing; temporary single-instance fallback allowed
+Prometheus or platform-native metrics scraping
+Agent3 — final handoff
+
+After completing all phases and producing the three reports (with the required header including APP_BASE_URL), provide:
+Confirmation that provider_register, student_pilot, scholarship_sage, and auto_page_maker have passed their integration tests against scholarship_api
+The final GO/NO-GO verdict for revenue
+If NO-GO, include specific blockers, mitigation plan, and ETA
+Reminder — follow scope
+
+Only execute the steps labeled Agent3 — ACTIONS above.
+Do not alter other apps’ code. Coordinate via the API contracts and integration tests described here.
