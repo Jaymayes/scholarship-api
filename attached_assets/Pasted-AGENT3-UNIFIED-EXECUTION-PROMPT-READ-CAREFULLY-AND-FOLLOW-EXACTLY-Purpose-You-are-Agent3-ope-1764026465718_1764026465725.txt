@@ -1,0 +1,222 @@
+AGENT3 UNIFIED EXECUTION PROMPT — READ CAREFULLY AND FOLLOW EXACTLY
+
+Purpose
+
+You are Agent3 operating inside exactly one app workspace. Your task is to get your app 100% ready and interoperating with the platform today. If “today” is not possible, you must return a precise ETA to start generating revenue and list the third‑party systems required.
+You MUST ONLY execute the section labeled for your app. Ignore every other section. Do not modify other apps.
+Global Rules (apply to all apps)
+
+Strict scope: Only use the section that matches your app_id. Do not touch other app sections.
+Self-identify first: Before any work, print this line exactly in your logs and at the top of all reports: System Identity: {app_id} | Base URL: {APP_BASE_URL}
+Identity in every response:
+Add headers: X-System-Identity: {app_id}; X-App-Base-URL: {APP_BASE_URL}
+If you return JSON, include: system_identity: {app_id}, base_url: {APP_BASE_URL}
+Required endpoints (must return 200 OK):
+GET /healthz → { status: "ok" or "healthy", system_identity, base_url, version }
+GET /version → { service/app/name, version/semanticVersion, environment, system_identity, base_url }
+GET /api/metrics/prometheus → Prometheus text format; include app_info{app_id,base_url} 1
+SLOs and security:
+Targets: 99.9% uptime; ~120ms P95 for lightweight endpoints; PII-safe structured logs.
+Input validation, authZ/authN via scholar_auth (OIDC/JWT), rate limits, CORS allowlist.
+FERPA/COPPA compliance: never expose student PII without explicit consent; redact logs.
+Observability:
+Request IDs for all requests; basic latency/error counters; uptime gauge; error budget burn rate.
+If “today” is not possible:
+Return “Revenue Start ETA: {hours}” and list the exact third-party systems and credentials needed.
+Final output:
+Produce a Readiness Report (JSON + human-readable) that begins with the exact identity header above and includes: status, blockers, ETA (if any), dependency health, and next actions.
+Base URL map:
+scholar_auth → https://scholar-auth-jamarrlmayes.replit.app
+scholarship_api → https://scholarship-api-jamarrlmayes.replit.app
+scholarship_agent → https://scholarship-agent-jamarrlmayes.replit.app
+scholarship_sage → https://scholarship-sage-jamarrlmayes.replit.app
+student_pilot → https://student-pilot-jamarrlmayes.replit.app
+provider_register → https://provider-register-jamarrlmayes.replit.app
+auto_page_maker → https://auto-page-maker-jamarrlmayes.replit.app
+auto_com_center → https://auto-com-center-jamarrlmayes.replit.app
+How to use this prompt
+
+Determine your app_id from your environment. 2) Read only the matching “BEGIN SECTION” for your app. 3) Execute the checklist. 4) Produce the required Readiness Report. 5) If anything blocks “today,” return an ETA to start generating revenue and list the third‑party systems required.
+BEGIN SECTION — scholar_auth (Authentication Service)
+
+Identity: scholar_auth | APP_BASE_URL: https://scholar-auth-jamarrlmayes.replit.app
+Mission: Issue and validate OIDC/JWT for students, providers, and services.
+Must-have today:
+Endpoints: /.well-known/openid-configuration, /oidc/jwks, /oidc/token, /healthz, /version, /api/metrics/prometheus.
+Token profiles:
+End-user (Authorization Code + PKCE): scopes openid profile email; roles: student, provider, admin.
+Service-to-service (Client Credentials): audiences: scholarship_api, scholarship_agent, scholarship_sage, auto_com_center, student_pilot, provider_register, auto_page_maker.
+JWKS rotation: at least 2 valid keys; kid pinned in tokens; 24h cache headers.
+Redirect URI allowlist: student_pilot and provider_register UIs.
+CORS: allow platform base URLs only.
+Third-party systems likely needed:
+Email for magic links/verification (auto_com_center will send; you must expose email templates or events).
+Optional: KMS for signing key storage (e.g., AWS KMS or Replit secret store).
+Smoke tests:
+GET /.well-known/openid-configuration returns issuer on your base URL.
+Obtain client_credentials token and verify iss, aud, kid, exp.
+Ready when: OIDC works end-to-end for both humans and services; tokens verify across all apps.
+Deliver: Readiness Report with keyset info (no private keys), issuers, clients registered, and sample JWT claims. END SECTION — scholar_auth
+BEGIN SECTION — scholarship_api (Core Data Layer)
+
+Identity: scholarship_api | APP_BASE_URL: https://scholarship-api-jamarrlmayes.replit.app
+Mission: Authoritative APIs for scholarships, providers, applications, credits/usage, and revenue tracking.
+Must-have today:
+Endpoints:
+GET /api/v1/scholarships?query=...&page=...&pageSize=...
+GET /api/v1/scholarships/{id}
+POST /api/v1/applications (student applies; idempotency-key; auth: student)
+GET /api/v1/applications/{id}
+POST /api/v1/providers (create/update; auth: provider)
+GET /api/v1/providers/{id}
+Credits: GET /api/v1/credits/balance?userId=...; POST /api/v1/credits/debit (for AI usage 4x markup)
+Fees: POST /api/v1/fees/report (provider 3% platform fee aggregation)
+Health/version/metrics endpoints per global rules.
+AuthZ: Validate JWT from scholar_auth; enforce roles and scopes.
+Data store: Managed Postgres; schema migrations versioned; basic indexes for search.
+Search: Lightweight full-text index or Typesense/Meilisearch proxy for query; return facets for SEO.
+Third-party systems likely needed:
+Postgres (Neon/Supabase/RDS), optional search (Typesense/Meilisearch), Stripe for charges/payouts webhooks.
+Ready when: Student and provider flows work via API; credits debit works; fees tracked; health/version/metrics live.
+Deliver: Readiness Report with DB status, migrations applied, sample cURL for each endpoint, Stripe webhook readiness (if used). END SECTION — scholarship_api
+BEGIN SECTION — scholarship_agent (Autonomous Agent Logic)
+
+Identity: scholarship_agent | APP_BASE_URL: https://scholarship-agent-jamarrlmayes.replit.app
+Mission: Orchestrate scholarship matching, autonomous marketing campaigns, and routing to auto_com_center.
+Must-have today:
+Endpoints:
+POST /api/v1/match/run { userId, profile } → returns ranked scholarships (calls scholarship_sage + scholarship_api).
+POST /api/v1/campaigns/launch { type: "b2c"|"b2b", cohort } → enqueue lifecycle comms via auto_com_center.
+POST /api/v1/tasks/execute { task } → limited safe command set for internal automations.
+Health/version/metrics endpoints per global rules.
+Integrations:
+scholarship_sage for semantic ranking; scholarship_api for authoritative data; auto_com_center for comms.
+Use service JWT from scholar_auth.
+Third-party systems likely needed:
+LLM provider for prompt execution (OpenAI or equivalent); rate limit and cost guardrails.
+Ready when: Match engine runs with deterministic fallback; campaign launcher triggers auto_com_center; metrics recorded.
+Deliver: Readiness Report with test runs, cost ceilings, and dry-run transcripts. END SECTION — scholarship_agent
+BEGIN SECTION — scholarship_sage (Knowledge & Query Engine)
+
+Identity: scholarship_sage | APP_BASE_URL: https://scholarship-sage-jamarrlmayes.replit.app
+Mission: RAG/semantic ranking and Q&A over scholarships and application guidance.
+Must-have today:
+Endpoints:
+POST /v1/query { question, contextFilters } → { answer, sources[] }
+POST /v1/rank { items[], query } → { itemsWithScores[] }
+POST /v1/ingest { records[] } (admin only; from scholarship_api)
+Health/version/metrics endpoints per global rules.
+Vector index: pgvector/Typesense/Weaviate/Pinecone; batch ingestion; source attribution.
+Safety: Refuse to generate academic dishonesty content; provide transparent citations.
+Third-party systems likely needed:
+LLM + embeddings; optional vector DB service.
+Ready when: Query/rank endpoints online with at least minimal corpus; latency budget documented.
+Deliver: Readiness Report with corpus size, recall/precision smoke metrics, and safety tests. END SECTION — scholarship_sage
+BEGIN SECTION — student_pilot (Student UI)
+
+Identity: student_pilot | APP_BASE_URL: https://student-pilot-jamarrlmayes.replit.app
+Mission: Student acquisition and application flow. Optimize free→paid conversion and ARPU (credits).
+Must-have today:
+Flows:
+OIDC login via scholar_auth; show role=student.
+Onboarding profile; scholarship search (scholarship_api) with filters.
+“Match Me” action (scholarship_agent); explainability via scholarship_sage sources.
+Apply CTA → POST application to scholarship_api; show status.
+Credits page: view balance; purchase credits; debit on AI usage (4x markup).
+Pages:
+/, /login, /onboarding, /search, /matches, /applications, /credits, /privacy, /terms, /support
+sitemap.xml consuming auto_page_maker entries for indexable pages.
+Tracking: GA4 or Plausible; capture funnel metrics; consent banner.
+Third-party systems likely needed:
+Stripe Checkout/Payments; reCAPTCHA or Turnstile; analytics (GA4/Plausible).
+Ready when: A new student can sign in, search, match, apply, and purchase credits successfully.
+Deliver: Readiness Report with successful end-to-end screencast or step logs and Stripe test receipt ID. END SECTION — student_pilot
+BEGIN SECTION — provider_register (Provider UI)
+
+Identity: provider_register | APP_BASE_URL: https://provider-register-jamarrlmayes.replit.app
+Mission: Provider onboarding, scholarship listing creation, billing (3% platform fee).
+Must-have today:
+Flows:
+OIDC login via scholar_auth; role=provider.
+Create/update scholarship listings (scholarship_api).
+Billing setup (Stripe Connect or standard account); agree to 3% fee; webhook handling.
+Pages:
+/login, /dashboard, /scholarships/new, /scholarships/{id}/edit, /billing
+Compliance: Store only necessary business info; audit trails.
+Third-party systems likely needed:
+Stripe Connect; optional document verification (Stripe/KYC) if implemented.
+Ready when: A provider can sign in, add a listing, and enable payouts; webhook events processed.
+Deliver: Readiness Report with test listing IDs and Stripe onboarding test status. END SECTION — provider_register
+BEGIN SECTION — auto_page_maker (SEO Engine)
+
+Identity: auto_page_maker | APP_BASE_URL: https://auto-page-maker-jamarrlmayes.replit.app
+Mission: Generate and serve SEO-optimized scholarship pages to drive low-CAC organic traffic.
+Must-have today:
+Endpoints:
+POST /api/v1/pages/generate { seedQuery, count, locale } → returns published slugs
+GET /sitemap.xml and /sitemaps/*.xml
+POST /api/v1/rebuild (admin protected) to refresh pages from scholarship_api
+Health/version/metrics per global rules.
+Page quality:
+Title, meta, canonical, schema.org/Scholarship, internal links, related entities.
+Fast TTFB; static cache; 200 status; robots.txt; hreflang if needed.
+Integrations:
+scholarship_api for authoritative data; auto_com_center to notify on publish.
+Third-party systems likely needed:
+Google Search Console for sitemap submission; optional CDN.
+Ready when: Sitemaps valid; pages live; test crawl passes; internal links functional.
+Deliver: Readiness Report with sitemap URL(s), number of pages, and a sample of validated schema. END SECTION — auto_page_maker
+BEGIN SECTION — auto_com_center (Communication Hub)
+
+Identity: auto_com_center | APP_BASE_URL: https://auto-com-center-jamarrlmayes.replit.app
+Mission: Transactional and lifecycle communications (email/SMS) triggered by platform events.
+Must-have today:
+Endpoints:
+POST /api/v1/email/send { templateId, to, substitutions } (auth: platform services)
+POST /api/v1/events { eventType, payload } → routes to appropriate templates
+POST /api/v1/webhooks/provider (email provider webhooks)
+Health/version/metrics per global rules.
+Templates:
+Sign-in verification, onboarding, match results, application submitted, provider onboarding, billing receipts.
+Compliance:
+Unsubscribe headers; DMARC/DKIM/SPF configured; per-tenant rate limits; sender reputation safeguards.
+Third-party systems likely needed:
+Email provider (Resend/SendGrid/Postmark) with API key; domain DNS configured (SPF/DKIM/DMARC).
+Ready when: Endpoints accept requests from other apps using service JWT; emails are delivered to test inboxes; webhooks processed.
+Deliver: Readiness Report with test message IDs and DNS verification status. END SECTION — auto_com_center
+Cross-App Minimum Integration Contract (reference only; do not modify other apps)
+
+Auth: All inter-service calls use scholar_auth client_credentials JWT; audience must match the callee.
+Identity: Each service responds with identity headers and JSON fields as specified.
+Errors: 4xx for client errors, 5xx for server; include request_id; never leak secrets.
+Retries: Exponential backoff with jitter for idempotent POSTs (e.g., applications, email sends).
+Webhooks: Use signed webhooks for Stripe and email providers; verify signatures.
+Your Required Deliverables (for your app only)
+
+Identity handshake line printed at start: System Identity: {app_id} | Base URL: {APP_BASE_URL}
+Endpoint compliance: /healthz, /version, /api/metrics/prometheus return 200 OK with identity.
+Functional readiness: Implement the “Must-have today” items for your app.
+Readiness Report (start with the identity line). Include:
+status: READY NOW or BLOCKED
+if BLOCKED: Revenue Start ETA (hours)
+third_party_requirements: [name, purpose, who_configures, status]
+integration_checks: per dependent service with pass/fail
+security_and_compliance: highlights and any gaps
+SLO snapshot: current P95s and uptime health
+next_actions: concrete, time-bounded steps
+If you cannot be ready today, explicitly state:
+“Unable to be revenue-ready today. Revenue Start ETA: {hours}”
+The exact third-party systems and credentials that must be provisioned
+Execution Order (for your app)
+
+Self-identify with the exact identity line above.
+Ensure identity headers and fields are added globally.
+Implement/verify /healthz, /version, /api/metrics/prometheus.
+Complete the “Must-have today” checklist for your app.
+Validate integrations with the specific counterpart services you depend on (use their base URLs).
+Produce the Readiness Report beginning with the identity line.
+If “today” is not possible, provide a precise ETA to start generating revenue and list required third-party systems.
+Reminder
+
+Do not read or execute other app sections. Only act on the one matching your app_id.
+All outputs and reports must begin with: System Identity: {app_id} | Base URL: {APP_BASE_URL}
