@@ -1,0 +1,186 @@
+Combined Master Prompt for the Scholar AI Advisor Ecosystem — Execute Only Your Section
+
+READ ME FIRST
+
+You are Agent3. Your assigned app is: scholarship_api.
+Execute only the section labeled: SECTION FOR AGENT3 — scholarship_api. Ignore all other sections. Do not modify other apps’ code or deliverables.
+Objective today: Bring all eight apps to 100% operational readiness and interoperating end-to-end. If 100% is not possible for your app, provide a precise ETA to start generating revenue, list all third-party systems that must be in place, and produce mitigation steps to unblock dependencies.
+Company-wide success criteria for today
+
+First-dollar revenue can be processed: provider registers and pays fees, student uses credits, scholarship matching flows end-to-end, receipts/notifications are sent.
+P95 API latency at or below 120 ms for all synchronous flows; 99.9% uptime target acknowledged.
+Security and compliance: JWT-based auth for private endpoints, strict CORS allowlist across services, no PII leakage, FERPA/COPPA posture documented.
+Responsible AI: no academic dishonesty, bias mitigation steps documented per app.
+Ecosystem map (for context; do not execute unless it is your section)
+
+scholar_auth → https://scholar-auth-jamarrlmayes.replit.app
+scholarship_api → https://scholarship-api-jamarrlmayes.replit.app
+scholarship_agent → https://scholarship-agent-jamarrlmayes.replit.app
+scholarship_sage → https://scholarship-sage-jamarrlmayes.replit.app
+student_pilot → https://student-pilot-jamarrlmayes.replit.app
+provider_register → https://provider-register-jamarrlmayes.replit.app
+auto_page_maker → https://auto-page-maker-jamarrlmayes.replit.app
+auto_com_center → https://auto-com-center-jamarrlmayes.replit.app
+Mandatory deliverables (all apps, Agent3 must produce these for scholarship_api only)
+
+Three files in repo root for your app, each starting with the exact header: App: scholarship_api | APP_BASE_URL: https://scholarship-api-jamarrlmayes.replit.app
+scholarship_api_PRODUCTION_STATUS_REPORT.md
+Section A: Current status and what is live now
+Section B: Integration matrix (upstream/downstream), current health, and gaps
+Section C: Revenue readiness decision (GO/NO-GO today) with rationale
+Section D: Risks, mitigations, roll-back plan
+scholarship_api_EVIDENCE_PACK.md
+Copy-paste runnable commands (curl) showing auth failures/successes, idempotency, credits credit/debit/balance, public scholarships, health/ready checks, CORS preflight allow/deny, and latency snapshots
+scholarship_api_GATE_VERDICTS_AND_PLAN.md
+Gate 1: Payments/Revenue Flow – verdict and proof
+Gate 2: Security/Performance – verdict and proof
+Gate 3: Interop/CORS – verdict and proof
+24–72 hour hardening plan with task owners and estimates
+If you are in the wrong repository
+
+If your local codebase does not match scholarship_api or the APP_BASE_URL above, stop and raise a Wrong Workspace alert in your PSR, and do not apply changes to other apps. Include the exact workspace you are currently in.
+SECTION FOR AGENT3 — scholarship_api (execute this section only)
+
+Your mission
+
+Provide the platform’s credits ledger and public scholarships data API with secure JWT validation, strict CORS, idempotent financial mutations, and sub-120 ms P95 latency. You are the source of truth for credits.
+Definition of done for today
+
+Must-have endpoints live and tested:
+POST /api/v1/credits/credit (grant credits; idempotent)
+POST /api/v1/credits/debit (consume credits; idempotent)
+GET /api/v1/credits/balance (current balance)
+GET /api/v1/scholarships (public search, no auth)
+GET /api/v1/scholarships/{id} (public detail, no auth)
+GET /healthz and GET /readyz (include request_id)
+AuthN/AuthZ:
+Private endpoints require an RS256 JWT issued by scholar_auth, audience = scholarship_api, with appropriate scopes: credits:grant, credits:debit, credits:read.
+Public scholarship endpoints require no auth but enforce rate limits and CORS.
+Idempotency:
+All write operations must require Idempotency-Key header and enforce idempotent behavior across retries.
+CORS:
+Allowlist only the following origins: https://scholar-auth-jamarrlmayes.replit.app https://scholarship-api-jamarrlmayes.replit.app https://scholarship-agent-jamarrlmayes.replit.app https://scholarship-sage-jamarrlmayes.replit.app https://student-pilot-jamarrlmayes.replit.app https://provider-register-jamarrlmayes.replit.app https://auto-page-maker-jamarrlmayes.replit.app https://auto-com-center-jamarrlmayes.replit.app
+No wildcard origins; preflight behavior documented in Evidence Pack.
+Performance:
+P95 latency ≤ 120 ms on credit/debit/balance and scholarships search for requests ≤ 512 KB payloads.
+Observability:
+Return x-request-id on every response; log correlation id, endpoint, status, latency.
+Metrics: request_count, error_count, p95_latency by route; provide a snapshot in Evidence Pack.
+Data integrity:
+ACID guarantees for the credits ledger. Use transactional semantics: write ledger rows and update balance atomically or via double-entry ledger patterns.
+Prevent negative balances on debit; respond with 409 Conflict and a machine-readable error code INSUFFICIENT_FUNDS.
+Endpoint contracts (implement or provide compatibility aliases)
+
+If your current implementation uses different paths, you must either:
+Implement exact aliases today for:
+POST /api/v1/credits/credit
+POST /api/v1/credits/debit
+GET /api/v1/credits/balance
+Or document the exact existing paths and supply a routing compatibility plan with a 2-hour ETA to add aliases. Aliases should return identical schemas.
+Request/response baseline
+POST /api/v1/credits/credit Request: { user_id, amount, reference_type, reference_id } plus Idempotency-Key Response: 201 Created, { user_id, new_balance, ledger_entry_id }
+POST /api/v1/credits/debit Request: { user_id, amount, reason, order_id } plus Idempotency-Key Response: 201 Created, { user_id, new_balance, ledger_entry_id }
+GET /api/v1/credits/balance?user_id=... Response: 200 OK, { user_id, balance, last_updated_at }
+Errors: 401 Unauthorized, 403 Forbidden, 409 Conflict (INSUFFICIENT_FUNDS), 422 UnprocessableEntity (validation), 429 TooManyRequests, 5xx with request_id
+Data model (reference)
+
+Tables
+users (reference only; not owned by you if centralized elsewhere)
+credit_balances: user_id (pk), balance, updated_at
+credit_ledger: id (pk), user_id, delta_amount (+/-), reason, reference_type, reference_id, idempotency_key (unique), created_at
+Indexes
+credit_ledger(user_id, created_at desc), credit_ledger(idempotency_key unique)
+credit_balances(user_id unique)
+Transactions
+On credit: insert ledger row, upsert balance = balance + amount
+On debit: verify balance ≥ amount, insert ledger row (negative delta), update balance = balance – amount
+Integrations you must support today
+
+Upstream
+scholar_auth: Validate RS256 JWT, retrieve JWKS for key rotation, enforce scopes.
+Downstream
+provider_register: Calls your POST /api/v1/credits/credit after successful provider payment to seed student/provider wallets as designed. Confirm idempotency behavior with their payment webhook retry semantics.
+scholarship_agent and scholarship_sage: Call POST /api/v1/credits/debit for each AI operation according to the 4x markup model; respond with clear quota errors.
+student_pilot: Reads GET /api/v1/credits/balance to show live wallet status.
+auto_com_center: May consume webhooks emitted by you (optional) for receipts/notifications; if not implemented, document that they will poll or receive events from payment systems directly.
+Security and compliance tasks
+
+Validate JWT aud, iss, iat, exp; clock skew tolerance ≤ 60s.
+Enforce least privilege via scopes.
+Input validation and output filtering; no PII in logs.
+Rate limits
+Public scholarships endpoints: per-IP or per-origin limits to deter scraping.
+Private credits endpoints: per user_id/per token limits for abuse protection.
+CORS and CSRF: CORS strict allowlist; all write endpoints designed for API usage (no browser forms), so CSRF not applicable if no cookies.
+Third-party systems required
+
+Database: Postgres (or your chosen transactional DB) with persistence configured and migrations applied.
+Auth: scholar_auth for JWT issuance and JWKS hosting.
+Monitoring/Logging: Sentry/Datadog/CloudWatch equivalent (at least one) for error and latency tracking.
+Optional but recommended: Queue or outbox for event emission to auto_com_center; can be deferred if not gating revenue.
+Evidence Pack requirements (what to include exactly)
+
+curl examples with time_total for:
+401 on credits endpoint without token
+200 on credits endpoint with valid RS256 token
+Idempotent credit: same Idempotency-Key twice returns same ledger_entry_id
+Debit with insufficient funds returns 409 with code INSUFFICIENT_FUNDS
+Balance reflects credit and debit sequence accurately
+Public scholarships: list and detail endpoints return 200 with access-control-allow-origin set correctly
+CORS preflight: one allowed origin succeeds; one denied origin fails
+Health/ready endpoints include request_id
+p95 latency snapshot per route (show 50+ requests or representative sampling)
+Config snippet with secrets redacted that demonstrates:
+JWKS URL, expected aud/iss, allowed origins, rate limit config
+If aliases are required, show routes list before and after aliases with diff or router map.
+Readiness decision and ETA rules
+
+If all endpoints, security, CORS, and performance are verifiably live: mark Revenue Ready = YES (Today) in the PSR and set Today GO/NO-GO = GO in Gate Verdicts.
+If any item is missing, provide:
+ETA to start generating revenue (in hours)
+Exact blocking items and owners
+Third-party systems that must be enabled
+A minimal workaround plan if possible (for example, add aliases instead of refactoring callers)
+Operational runbook checks (today)
+
+Port binding and process health: ensure no EADDRINUSE conflicts; document how the process is started and supervised in your environment.
+CORS smoke test results captured.
+Database migration applied; rollback plan stated.
+Error budget policy: if p95 > 120 ms after launch, define throttling or queueing of heavy operations.
+Your three required files (produce for scholarship_api only)
+
+scholarship_api_PRODUCTION_STATUS_REPORT.md
+Start with: App: scholarship_api | APP_BASE_URL: https://scholarship-api-jamarrlmayes.replit.app
+Contents:
+Section A: What’s live now vs. missing (explicit checklist)
+Section B: Integration matrix with app URLs and status (OK/Needs alias/Blocked)
+Section C: Revenue readiness statement; if NO, include ETA and dependencies
+Section D: Risks and mitigations
+scholarship_api_EVIDENCE_PACK.md
+Start with: App: scholarship_api | APP_BASE_URL: https://scholarship-api-jamarrlmayes.replit.app
+Provide all curl commands and outputs (redact secrets), logs, latency measurements, and config snippets as described above.
+scholarship_api_GATE_VERDICTS_AND_PLAN.md
+Start with: App: scholarship_api | APP_BASE_URL: https://scholarship-api-jamarrlmayes.replit.app
+Gate 1, Gate 2, Gate 3 verdicts with proof; Today GO/NO-GO decision; 24–72 hour hardening plan.
+Coordination annex (for awareness; do not execute)
+
+scholar_auth: provides RS256 JWTs and JWKS; must publish aud=scholarship_api.
+provider_register: triggers credits credit on successful payment; expects your idempotent behavior on webhook retries.
+scholarship_agent and scholarship_sage: consume credits via your debit endpoint for each AI operation.
+student_pilot: displays balances and handles user flows that lead to debit.
+auto_com_center: sends transactional messages upon credit or debit events (optional webhook integration from you).
+auto_page_maker: SEO pages drive traffic to student_pilot; your public scholarships endpoints should be index-safe with appropriate rate limits.
+Conflict handling rule
+
+If you detect a mismatch between the specified endpoints and your current implementation, do not refactor callers today. Instead, add alias routes to match the contracts and document both paths in your Evidence Pack. Target to implement aliases within 2 hours.
+Reporting style
+
+Keep reports concise, quantitative, and decision-oriented.
+Always place the exact header on line 1 of each deliverable: App: scholarship_api | APP_BASE_URL: https://scholarship-api-jamarrlmayes.replit.app
+Completion criteria for Agent3
+
+All three files produced with required header and content.
+Endpoints up, tested, and evidenced as above.
+Revenue readiness clearly stated as YES (Today) or NO with a concrete ETA and third-party dependencies listed.
+If NO, provide a single-day plan that moves the app to revenue-ready status within 24 hours, unless a third-party dependency is the blocker.
+End of prompt for Agent3 — execute only the SECTION FOR AGENT3 — scholarship_api.
