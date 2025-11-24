@@ -1,0 +1,213 @@
+AGENT3 UNIFIED EXECUTION PROMPT — READ ME FIRST
+
+Purpose
+
+You are Agent3. Your job is to take exactly one app from the Scholar AI Advisor ecosystem to 100% production readiness and fully integrated with the rest of the platform today.
+IMPORTANT: Only act on the section that matches your current app. Do not touch other apps. If your current workspace/app does not match a section below, follow the Wrong Workspace Protocol.
+Global Rules (Apply to All Apps)
+
+Wrong Workspace Protocol:
+Detect your current app/workspace name.
+If it does not match any section below, do not modify anything. Output: “AGENT3: WRONG WORKSPACE. Expected to execute section: <app_name>. Current workspace: <detected>. No actions taken.”
+If it matches, proceed.
+Deliverables (create all 3 in your repo root):
+<app>_PRODUCTION_STATUS_REPORT.md
+<app>_GATE_VERDICTS_AND_PLAN.md
+<app>_EVIDENCE_PACK.md
+Mandatory Report Header (first line in all 3 files, exactly):
+App: <app_name> | APP_BASE_URL: <app_url>
+Mandatory Report Footer (last line in all 3 files, exactly; set appropriate values):
+<app_name> | <app_url> | Readiness: <GO|CONDITIONAL GO|NO-GO> | Revenue-ready: <NOW or ETA: Xh>
+Observability endpoints for every service that runs a server:
+/healthz → 200 OK
+/version → 200 OK
+/api/metrics/prometheus → Prometheus text format
+Security/SLO baselines (unless your section overrides):
+Availability target: 99.9%
+Reads P95: ≤120ms
+Writes P95: ≤200ms (≤8s for LLM generation flows)
+JWT validation via scholar_auth JWKS; RBAC enforced
+CORS allowlist to first-party app origins only
+Gates (score and document Pass/Fail+Fix/ETA):
+Gate 0: Environment & Health
+Gate 1: Security & Observability
+Gate 2: Core Functionality
+Gate 3: Reliability
+Gate 4: Performance & ARR (revenue ignition)
+If 100% today is not possible:
+Provide a precise ETA (hours), the exact third-party systems needed, and what will be revenue-ready at that time.
+Base URLs (for use in report headers/footers and integrations)
+
+scholar_auth → https://scholar-auth-jamarrlmayes.replit.app
+scholarship_api → https://scholarship-api-jamarrlmayes.replit.app
+scholarship_agent → https://scholarship-agent-jamarrlmayes.replit.app
+scholarship_sage → https://scholarship-sage-jamarrlmayes.replit.app
+student_pilot → https://student-pilot-jamarrlmayes.replit.app
+provider_register → https://provider-register-jamarrlmayes.replit.app
+auto_page_maker → https://auto-page-maker-jamarrlmayes.replit.app
+auto_com_center → https://auto-com-center-jamarrlmayes.replit.app
+Revenue-Critical Integration Map (context for all sections)
+
+Student flow: Google Search → auto_page_maker page → CTA → student_pilot → purchase credits (Stripe) → scholarship_api credit → scholarship_sage (debit-before-generate) → deliver guidance to student
+Provider flow: provider_register → create/update scholarships → scholarship_api publishes → auto_page_maker indexes → student_pilot consumption
+SECTION: scholar_auth (Only execute if your app is scholar_auth)
+
+Objective: Serve as the platform trust anchor (OIDC/OAuth2), issuing JWTs, publishing JWKS, and enforcing RBAC claims for all other apps.
+Must-have endpoints:
+/.well-known/openid-configuration (issuer MUST include /oidc if that’s your path)
+/.well-known/jwks.json
+/oidc/token (authorization_code + PKCE, client_credentials for M2M)
+/api/metrics/prometheus, /healthz, /version
+Security and settings:
+RS256 signing keys; rotate-ready; JWKS cache-friendly
+Issuer claim must match discovery document exactly; fix mismatches
+Clients provisioned: scholarship_api, scholarship_sage, scholarship_agent, student_pilot, provider_register, auto_page_maker, auto_com_center (M2M where needed)
+Rate limit token endpoints; redact secrets in logs
+Acceptance tests:
+JWKS reachable and valid; tokens verifiable by scholarship_api
+All registered clients can get tokens; roles/scopes embedded
+P95 latency for JWKS ≤120ms; token issuance ≤200ms
+Third-party systems:
+PostgreSQL (if used for clients/keys), optional Sentry
+Deliver: All 3 reports; if not 100% today, ETA and blockers.
+Final status lines must include: App: scholar_auth | APP_BASE_URL: https://scholar-auth-jamarrlmayes.replit.app; footer per global rules.
+SECTION: scholarship_api (Only execute if your app is scholarship_api)
+
+Objective: Own scholarships and credits; expose REST API to all apps; enforce idempotent monetary mutations with strict transactional integrity.
+Endpoints (v1):
+GET /api/v1/scholarships (filters, pagination)
+GET /api/v1/scholarships/:id
+GET /api/v1/credits/balance (self-only for students; admin/system for any user_id)
+POST /api/v1/credits/credit (grant) [RBAC: system/admin], idempotent via key
+POST /api/v1/credits/debit (spend) [RBAC: system/admin/sage], idempotent via key, fail-closed
+/api/metrics/prometheus, /healthz, /version
+Mandatory transaction pattern (no exceptions):
+Begin transaction
+Insert/claim idempotency key (status=PROCESSING, request fingerprint)
+SELECT ... FOR UPDATE row-level locks on balance/ledger aggregates
+Validate balance BEFORE mutation (overdraft → 409, rollback)
+Insert ledger row with balance_after snapshot
+Update idempotency key to COMPLETED; persist response reference
+Commit; replay returns cached response; never re-mutate
+Security:
+JWT verify via scholar_auth JWKS; RBAC on endpoints
+CORS allowlist for platform apps; no wildcards
+SLOs: P95 reads ≤120ms, writes ≤200ms
+Acceptance tests:
+Health and metrics present
+100-parallel debits with same idempotency key → exactly one mutation
+Overdraw attempt → 409; no ledger row created
+Auth failures: 401 without token; 403 insufficient role/scope
+Third-party systems:
+Required: PostgreSQL, scholar_auth JWKS
+Recommended: Redis (rate limiting/caching), Sentry optional
+Deliverables: All 3 reports with correct header/footer; if not 100% today, ETA and dependencies.
+SECTION: scholarship_sage (Only execute if your app is scholarship_sage)
+
+Objective: AI guidance generation; must debit credits via scholarship_api before any generation; idempotent by request key; Responsible AI guardrails.
+Core flows:
+Validate JWT via scholar_auth; enforce student role for end-user actions
+For each generation:
+Call scholarship_api POST /api/v1/credits/debit (idempotency key = request hash)
+Only if success, call LLM provider; cache result keyed by idempotency key
+On replay, return cached result without new debit
+Handle 402 (insufficient credits) with remediation link to student_pilot
+Performance: End-to-end P95 ≤8s (fresh); cached responses ≤120ms
+Responsible AI:
+No ghostwriting academic dishonesty; disclose AI assistance; bias mitigation measures
+Observability:
+/healthz, /version, /api/metrics/prometheus; track debit_errors_total, generation_latency_seconds
+Third-party systems:
+Required: scholarship_api, scholar_auth, LLM provider key, PostgreSQL (if used for caching/history)
+Acceptance tests:
+401/403 handling; 402 handling; 503 LLM failure → no debit committed
+Deliverables: All 3 reports with correct header/footer; if not 100% today, ETA and dependencies.
+SECTION: student_pilot (Only execute if your app is student_pilot)
+
+Objective: Student portal; OAuth login; buy credits; see balance; launch scholarship_sage.
+Integrations:
+OAuth2 login via scholar_auth (authorization_code + PKCE)
+Stripe checkout for credits; webhook posts to scholarship_api /credits/credit with Stripe event_id as idempotency key
+Display balance via scholarship_api GET /credits/balance
+Launch scholarship_sage; pass JWT
+UX requirements:
+Clear purchase flow; errors explained; link back if 402 arises
+UTM tracking preserved from auto_page_maker CTAs
+Observability:
+/healthz, /version, /api/metrics/prometheus; track stripe_webhook_failures_total
+Third-party systems:
+Required: scholar_auth, scholarship_api, Stripe
+Acceptance tests:
+Successful purchase → balance increments exactly once despite webhook retries
+JWT/role checks enforced; CORS only first-party
+Deliverables: All 3 reports with correct header/footer; if not 100% today, ETA and dependencies.
+SECTION: provider_register (Only execute if your app is provider_register)
+
+Objective: Provider onboarding and scholarship submission; OIDC via scholar_auth; write to scholarship_api.
+Integrations:
+OIDC discovery from scholar_auth (issuer must match exactly)
+POST new/updated scholarships to scholarship_api (secure M2M if applicable)
+Observability:
+/healthz, /version, /api/metrics/prometheus
+Security:
+Strict CORS; provider role enforcement; no secrets in logs
+Acceptance tests:
+Successful login; token contains provider role
+Create/update scholarship → visible via scholarship_api GET endpoints
+Third-party systems:
+Required: scholar_auth, scholarship_api
+Deliverables: All 3 reports with correct header/footer; if not 100% today, ETA and dependencies.
+SECTION: auto_page_maker (Only execute if your app is auto_page_maker)
+
+Objective: Organic acquisition engine; publish SEO pages for scholarships; link to student_pilot with UTM.
+Requirements:
+≥50 live pages (target 2,000+); valid sitemap.xml and robots.txt
+Canonical tags, meta, JSON-LD; Lighthouse SEO ≥85 on samples
+CTAs link to student_pilot with utm_source=auto_page_maker
+Nightly refresh scheduler; hourly delta updates
+Observability:
+/healthz, /version, /api/metrics/prometheus; track pages_published_total
+Third-party systems:
+Required: None to render pages; Submit sitemap to Google Search Console
+Optional: GA4 analytics
+Acceptance tests:
+Sample pages crawlable and fast; links resolve; sitemap contains all published pages
+Deliverables: All 3 reports with correct header/footer; if not 100% today, provide ETA to first organic traffic (indexing typically 3–7 days) and note GSC submission as a dependency.
+SECTION: auto_com_center (Only execute if your app is auto_com_center)
+
+Objective: Transactional communications (email/SMS) for key events: signup, purchase, credit changes, scholarship deadlines and recommendations.
+Integrations:
+Receive events (webhooks or queue) from student_pilot, scholarship_api, scholarship_agent
+Send via provider(s): SendGrid (email), Twilio (SMS)
+Respect user preferences and legal compliance
+Observability:
+/healthz, /version, /api/metrics/prometheus; track sends, bounces, failures
+Security:
+Sign webhook sources; verify HMAC; redact PII in logs
+Acceptance tests:
+Purchase event triggers email; failure paths retry with backoff; preferences honored
+Third-party systems:
+Required: SendGrid API key, Twilio account (if SMS)
+Deliverables: All 3 reports with correct header/footer; if not 100% today, ETA and dependencies.
+Common Acceptance Evidence to Include in EVIDENCE_PACK.md
+
+Curl transcripts: /healthz, /version, /api/metrics/prometheus
+Auth flows: sample JWT (redacted), JWKS verification notes
+Latency snapshots: P50/P95/P99 for critical endpoints
+For scholarship_api: idempotency test protocol and outcomes; “SELECT FOR UPDATE” proof (code or logs)
+For student_pilot: Stripe webhook replay proof (idempotent credit)
+For scholarship_sage: debit-before-generate proof; idempotent replay proof
+For auto_page_maker: sitemap.xml sample, Lighthouse scores, CTA UTM verification
+For provider_register: OIDC discovery issuer match proof, successful create/update flow
+For auto_com_center: provider API integration proof; bounce/failure handling evidence
+Final Output Requirements (Console/Logs and Reports)
+
+At the end of your run, print this exact final status line to the console/log:
+<app_name> | <app_url> | Readiness: <GO|CONDITIONAL GO|NO-GO> | Revenue-ready: <NOW or ETA: Xh>
+Ensure the same final status line is the last line in all 3 reports.
+Revenue Deadline
+
+Target: All apps working together to enable first-dollar revenue today.
+If not possible for your app:
+Provide a crisp ETA in hours to Revenue-ready, and list exact third-party systems that must be in place (e.g., scholar_auth JWKS live, Stripe keys, LLM provider key, Google Search Console submission).
+Agent3, execute only the section for your current app. Build the three reports with exact headers/footers. Bring your app to GO or specify a precise ETA and dependencies for Revenue-ready.
