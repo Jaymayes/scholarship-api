@@ -1,0 +1,286 @@
+AGENT3 UNIFIED EXECUTION PROMPT — READ THIS FIRST
+
+Strict scope rule
+
+You MUST ONLY execute the section that matches your current app workspace. If you are not in that app’s repo, do not modify code. Follow the Wrong Workspace Protocol below.
+Base URL map (use exactly)
+
+scholar_auth → https://scholar-auth-jamarrlmayes.replit.app
+scholarship_api → https://scholarship-api-jamarrlmayes.replit.app
+scholarship_agent → https://scholarship-agent-jamarrlmayes.replit.app
+scholarship_sage → https://scholarship-sage-jamarrlmayes.replit.app
+student_pilot → https://student-pilot-jamarrlmayes.replit.app
+provider_register → https://provider-register-jamarrlmayes.replit.app
+auto_page_maker → https://auto-page-maker-jamarrlmayes.replit.app
+auto_com_center → https://auto-com-center-jamarrlmayes.replit.app
+Required deliverables for every app (exact file names)
+
+{app}_PRODUCTION_STATUS_REPORT.md
+{app}_GATE_VERDICTS_AND_PLAN.md
+{app}_EVIDENCE_PACK.md
+Header and footer standard for all three files
+
+First line must be: App: {app} | APP_BASE_URL: {base_url}
+Last lines must include the single-line final status line in this exact format: {app} | {base_url} | Readiness: {GO|NO-GO|CONDITIONAL GO} | Revenue-ready: {NOW|ETA: <time>}
+Global gates (apply to every app)
+
+Gate 0 — Environment & Health: process boots; /healthz and /version return 200; env vars loaded.
+Gate 1 — Security & Observability: JWT (if applicable), RBAC (if applicable), CORS allowlist, basic rate limiting, no secrets in logs, /api/metrics/prometheus.
+Gate 2 — Core Functionality: app’s critical features complete end-to-end and callable via HTTP.
+Gate 3 — Reliability: idempotency rules, transactional integrity, retries/fail-closed where applicable.
+Gate 4 — Performance & ARR ignition: P95 latency targets met; revenue path proven or ETA given.
+SLOs and guardrails
+
+Availability target: 99.9% uptime.
+Latency targets (unless app-specific stricter targets are below):
+Reads P95 ≤ 120ms
+Writes P95 ≤ 200ms
+Compliance: FERPA/COPPA where applicable; Responsible AI (no academic dishonesty assistance); log redaction for PII; no secrets or tokens in logs.
+Wrong Workspace Protocol (mandatory if repo ≠ your app)
+
+Do not touch code.
+Create the three required reports for the intended app with a prominent line near the top: WRONG WORKSPACE ALERT — PLACE ME IN {app} REPO.
+Include: exact ETA to GO/Revenue-ready once in the correct repo; dependencies; a 10–20 step implementation checklist.
+End all three files with: REQUEST: Place Agent3 in the {app} workspace.
+Print the final status line to console and in the reports with Readiness: NO-GO and Revenue-ready: ETA: <time after placement>.
+Cross-app end-to-end “first dollar” path (for context only; execute only your section)
+
+student_pilot (Stripe checkout) -> Stripe webhook -> scholarship_api /credits/credit (idempotent with event_id)
+student_pilot shows updated balance (GET /credits/balance)
+scholarship_sage on generation request -> calls scholarship_api /credits/debit (fail-closed) -> generates draft
+auto_page_maker feeds organic traffic into student_pilot with UTM
+auto_com_center sends transactional notifications (welcome, low-balance, receipt)
+scholar_auth is source of truth for JWKS/JWT; all apps validating tokens must use it
+Acceptance evidence standard
+
+Provide curl transcripts, example JWT flows (redact secrets), sample request/response payloads, latency measurements (P50/P95/P99), and reliability/idempotency proofs in the EVIDENCE_PACK.
+In PRODUCTION_STATUS_REPORT.md include executive summary, gate verdicts, risks, and GO/NO-GO.
+In GATE_VERDICTS_AND_PLAN.md include gate-by-gate tests performed, failures found, fixes applied, and outstanding actions with owners and ETAs.
+Output requirement
+
+Print your final status line to console and include it as the last lines of all three reports.
+======================================== SECTION: scholar_auth (execute ONLY in scholar_auth)
+Mission
+
+Provide OIDC/OAuth2, JWKS (RS256), client_credentials for M2M, authorization_code(+PKCE) for users. Act as trust anchor for all services.
+Definition of done
+
+JWKS reachable; token issuance for all platform M2M clients; OAuth2 flows working for student_pilot; RBAC claims present; P95 JWKS ≤ 120ms.
+Third-party systems required
+
+None to generate revenue; self-contained. Optional: Sentry.
+Key env/config
+
+Rotating RS256 keypair store; issuer=https://scholar-auth-...; exact audience values per consuming app.
+Must-have endpoints
+
+/.well-known/jwks.json, /.well-known/openid-configuration, /oidc/token, /authorize (for user flow), /healthz, /version, /api/metrics/prometheus.
+Acceptance tests (minimum)
+
+Health: curl GET /healthz → 200.
+JWKS: curl GET /.well-known/jwks.json → 200; contains at least one RS256 key with kid.
+M2M: Issue tokens for 8 clients: scholarship_api, scholarship_sage, scholarship_agent, auto_com_center, auto_page_maker, provider_register, reviewer_portal (if exists), admin_dashboard (if exists). Validate roles/scopes claims.
+OAuth2: Perform authorization_code(+PKCE) happy path with student_pilot callback; get ID token + access token; verify iss, aud, sub, exp, nonce/PKCE binding.
+Performance: JWKS P95 ≤ 120ms, token issuance ≤ 200ms P95.
+Security: CORS allowlist; rate limit on token issuance; no secrets in logs.
+Reports
+
+Include header and final status line format as specified.
+If NOT GO today
+
+Provide ETA and any missing config; typically 0 hours (ready now).
+======================================== SECTION: scholarship_api (execute ONLY in scholarship_api)
+Mission
+
+Expose scholarships discovery endpoints and the credits ledger (credit, debit, balance) with strict idempotency and transactional integrity; fail-closed on errors.
+Definition of done
+
+Single-transaction pattern for credit/debit with dual-table locking and pre-mutation balance validation; idempotency keys with claim-first logic; strict replay rules; P95 reads ≤ 120ms, writes ≤ 200ms; architect-grade concurrency tests pass.
+Third-party systems required
+
+PostgreSQL (DATABASE_URL) required.
+scholar_auth JWKS required for JWT.
+Redis recommended for distributed rate limiting / idempotency cache (single instance can run without).
+Optional: Sentry.
+Key endpoints
+
+GET /api/v1/credits/balance
+POST /api/v1/credits/credit
+POST /api/v1/credits/debit
+GET /api/v1/scholarships (and any filters)
+/healthz, /version, /api/metrics/prometheus
+Mandated transaction pattern (no exceptions)
+
+Begin
+Insert/claim idempotency key (status=PROCESSING, request_hash).
+SELECT ... FOR UPDATE on both balance/idempotency-related rows as applicable; lock order consistent.
+Validate (e.g., overdraft → abort with 409; no mutation).
+Insert ledger row with balance_after snapshot.
+Update aggregate balance.
+Mark idempotency key COMPLETED with response payload.
+Commit; on any error, rollback.
+Acceptance tests (minimum)
+
+100 parallel debits with same key: exactly 1 ledger mutation, stable balance.
+Overdraw: seed balance=50; debit=100 → 409; no ledger row, no balance change.
+Idempotency replay: same key returns identical response with no new mutation.
+Auth: 401 without token; 403 for disallowed roles/scopes.
+Latency: measure P95 on GET balance and POST credit/debit.
+Observability: metrics exported for credit/debit totals and durations.
+Reports
+
+Include header and final status line.
+If Redis absent and single instance used, note CONDITIONAL GO; provide ETA to add Redis for scale.
+======================================== SECTION: scholarship_sage (execute ONLY in scholarship_sage)
+Mission
+
+AI scholarship assistant. Must debit credits via scholarship_api before generation (fail-closed). Provide responsible AI responses with bias mitigation and transparency.
+Definition of done
+
+debit-before-generate enforced; idempotent generation by request key; P95 end-to-end generation ≤ 8s; clear 401/402/503 handling; no drafts generated on failed debit.
+Third-party systems required
+
+scholar_auth JWKS (JWT).
+scholarship_api (M2M creds).
+Model provider API key (e.g., OpenAI).
+Optional: Redis for caching; Sentry.
+Acceptance tests (minimum)
+
+401 invalid/expired JWT.
+402 insufficient credits path (friendly remediation).
+503 upstream model outage path (no generation, no debit).
+Happy path: debit→generate; idempotent replay returns cached output without re-debit.
+P95 latency on 20 runs ≤ 8s; include P50/P95/P99.
+Reports
+
+Include header and final status line. Conditional GO acceptable if observability dashboards pending; include ETA.
+======================================== SECTION: student_pilot (execute ONLY in student_pilot)
+Mission
+
+Student portal, OAuth2 login, Stripe checkout to buy credits, display balance, launch scholarship_sage requests.
+Definition of done
+
+OAuth2 with scholar_auth working; Stripe payment and webhook map to scholarship_api /credits/credit using Stripe event_id as idempotency key; balance visible; calls to scholarship_sage include JWT; UTM parameters from auto_page_maker preserved.
+Third-party systems required
+
+scholar_auth (OIDC).
+Stripe (checkout + webhook secret).
+scholarship_api (M2M/service token for credit operation if server-to-server).
+Optional: Sentry, GA4.
+Acceptance tests (minimum)
+
+OAuth2 login happy path; ID token validated; session established.
+Credit purchase: create checkout session → complete → webhook hits server → POST /credits/credit idempotently; UI shows updated balance within 2s.
+Replay webhook: send same event again → no duplicate credit.
+Latency: pages P95 ≤ 500ms server-side; critical API calls within targets.
+Reports
+
+Include header and final status line with NOW or ETA (Stripe keys and webhook routing are typical gating items).
+======================================== SECTION: provider_register (execute ONLY in provider_register)
+Mission
+
+Provider onboarding to list scholarships; validate provider identity; publish to scholarship_api.
+Definition of done
+
+Secure provider signup/login; create/edit scholarship listings; moderation workflow or admin approval flag; spam protection; listings flow to scholarship_api.
+Third-party systems required
+
+scholar_auth (OIDC/JWT).
+PostgreSQL.
+CAPTCHA (hCaptcha or reCAPTCHA).
+Optional: Sentry.
+Acceptance tests (minimum)
+
+Signup + email verification path or equivalent validation.
+Create listing: required fields validated; draft→approved state; appears via scholarship_api GET /scholarships within 60s (or immediate).
+Security: 401/403 enforced; CORS allowlist; rate limiting on write endpoints.
+Reports
+
+Include header and final status line with NOW or ETA.
+======================================== SECTION: auto_page_maker (execute ONLY in auto_page_maker)
+Mission
+
+SEO engine creating scholarship landing pages that drive organic traffic to student_pilot with correct UTM tracking.
+Definition of done
+
+≥50 live pages; sitemap.xml and robots.txt; canonical/meta/JSON-LD; Lighthouse SEO ≥85 on 10 sampled pages; CTAs route to student_pilot with utm_source=apm; nightly refresh scheduler.
+Third-party systems required
+
+Google Search Console (manual submission of sitemap).
+Optional: GA4; Sentry.
+Acceptance tests (minimum)
+
+GET /sitemap.xml contains ≥50 unique pages; all 200 OK.
+Ten random pages Lighthouse SEO ≥85; record scores.
+CTA links verified with correct UTM parameters and 200 OK on student_pilot landing.
+Performance: P95 page render ≤ 500ms.
+Note: Revenue ramp depends on indexing; if not possible today, set ETA to first organic clicks post-GSC submission (typ. 3–7 days).
+Reports
+
+Include header and final status line. If indexing not yet in place, use ETA: 168 hours post GSC submission.
+======================================== SECTION: auto_com_center (execute ONLY in auto_com_center)
+Mission
+
+Transactional and lifecycle communications: welcome, payment receipts, low-balance alerts, provider approvals.
+Definition of done
+
+Inbound events via webhooks or queue; templates parameterized; emails/SMS sent with provider; idempotency on event keys; retry with backoff; unsubscribe management for non-transactional messages.
+Third-party systems required
+
+Email/SMS provider (SendGrid/Postmark/Twilio).
+scholar_auth for service tokens if pulling PII; ensure minimal data use.
+Optional: Sentry.
+Acceptance tests (minimum)
+
+Send test welcome email on student signup (simulate event).
+Send payment receipt on Stripe success (simulate).
+Low-balance alert when balance < threshold after debit (simulate).
+Idempotency: same event key twice → 1 message.
+Observability: metrics for sends, failures, retries.
+Reports
+
+Include header and final status line with NOW or ETA based on provider keys availability.
+======================================== SECTION: scholarship_agent (execute ONLY in scholarship_agent)
+Mission
+
+Autonomous marketing execution agent to launch, monitor, and optimize campaigns that drive traffic to auto_page_maker pages and conversions to student_pilot.
+Definition of done
+
+Campaign definitions stored; posting to allowed channels (owned properties only); UTM discipline; safe rate limits; daily performance report.
+Third-party systems required
+
+None strictly required for first dollar; integrates with GA4/GSC if available.
+Optional: Sentry.
+Acceptance tests (minimum)
+
+Dry-run mode produces a daily plan with URLs to auto_page_maker pages including UTMs.
+If posting is enabled, publish to owned channels only (no private APIs without keys).
+Metrics roll-up report generated and stored.
+Reports
+
+Include header and final status line; if posting disabled today, set ETA for when posting keys are available.
+========================================
+FINALIZATION STEPS (every app executes only within its section)
+
+Update the three reports with:
+Header: App: {app} | APP_BASE_URL: {base_url}
+Gate-by-gate verdicts and key evidence
+Exact third-party systems required, with status (Configured/Optional/Pending) and clear ETAs
+Risks and mitigations
+Final status line
+Print your final status line to the console.
+If you cannot reach GO today, use Readiness: CONDITIONAL GO or NO-GO and include Revenue-ready: ETA: <time> plus which third-party systems must be in place.
+Required final status line examples (format must match exactly)
+
+scholar_auth | https://scholar-auth-jamarrlmayes.replit.app | Readiness: GO | Revenue-ready: NOW
+scholarship_api | https://scholarship-api-jamarrlmayes.replit.app | Readiness: GO | Revenue-ready: NOW
+auto_page_maker | https://auto-page-maker-jamarrlmayes.replit.app | Readiness: GO | Revenue-ready: ETA: 168 hours (post-GSC submission)
+Execution notes
+
+Think data-first. Provide measured latencies and concrete test evidence.
+Student value is business value. Fail-closed on credits and never generate drafts without debit.
+Prioritize organic growth (auto_page_maker + GSC).
+Keep operation lean and autonomous; deliver reports and a clear GO/NO-GO.
+Act with urgency: aim for 100% readiness today; otherwise provide precise ETA and dependencies.
+End of prompt. Execute only the section for your current app.
+
