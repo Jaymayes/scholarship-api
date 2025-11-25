@@ -22,6 +22,12 @@ from sqlalchemy.orm import Session
 
 from models.database import get_db
 from utils.logger import get_logger
+from observability.metrics import (
+    credits_debit_total, 
+    fee_reports_total, 
+    applications_total, 
+    providers_total
+)
 
 logger = get_logger("agent3_v1")
 router = APIRouter(prefix="/api/v1", tags=["Agent3 V1 Compliance"])
@@ -89,6 +95,7 @@ async def submit_application(
         db.commit()
         
         logger.info(f"Application submitted: {application_id} (user: {request.user_id}, scholarship: {request.scholarship_id})")
+        applications_total.labels(status="success").inc()
         
         return ApplicationResponse(
             application_id=application_id,
@@ -100,6 +107,7 @@ async def submit_application(
         
     except Exception as e:
         db.rollback()
+        applications_total.labels(status="error").inc()
         logger.error(f"Failed to submit application: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to submit application")
 
@@ -214,6 +222,7 @@ async def create_provider(
         db.commit()
         
         logger.info(f"Provider created: {provider_id} ({request.name})")
+        providers_total.labels(status="success").inc()
         
         return ProviderResponse(
             provider_id=provider_id,
@@ -226,6 +235,7 @@ async def create_provider(
         
     except Exception as e:
         db.rollback()
+        providers_total.labels(status="error").inc()
         logger.error(f"Failed to create provider: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to create provider")
 
@@ -342,6 +352,7 @@ async def report_fee(
         db.commit()
         
         logger.info(f"Platform fee recorded: {fee_id} (provider: {request.provider_id}, fee: ${platform_fee})")
+        fee_reports_total.labels(status="success").inc()
         
         return FeeReportResponse(
             fee_id=fee_id,
@@ -354,5 +365,6 @@ async def report_fee(
         
     except Exception as e:
         db.rollback()
+        fee_reports_total.labels(status="error").inc()
         logger.error(f"Failed to record platform fee: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to record platform fee")

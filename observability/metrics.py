@@ -79,6 +79,31 @@ waf_allowlist_bypasses_total = Counter(
     ['endpoint']
 )
 
+# Agent3 Required Observability Counters
+credits_debit_total = Counter(
+    'credits_debit_total',
+    'Total credit debit operations',
+    ['status']
+)
+
+fee_reports_total = Counter(
+    'fee_reports_total',
+    'Total fee report operations',
+    ['status']
+)
+
+applications_total = Counter(
+    'applications_total',
+    'Total application submissions',
+    ['status']
+)
+
+providers_total = Counter(
+    'providers_total',
+    'Total provider registrations',
+    ['status']
+)
+
 # Active scholarships gauge for real-time tracking
 # METRICS DUPLICATION FIX: Removed Gauge - using only CustomCollector approach
 

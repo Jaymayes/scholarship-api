@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 from models.database import get_db
 from services.credit_ledger_service import credit_ledger_service
 from middleware.auth import get_current_user, User
+from observability.metrics import credits_debit_total
 
 logger = logging.getLogger(__name__)
 
@@ -184,17 +185,24 @@ async def debit_user_endpoint(
     # Use the first matching role as the created_by_role
     created_by_role = user_roles[0] if user_roles else "unknown"
     
-    result = credit_ledger_service.debit_user(
-        db=db,
-        user_id=request_data.user_id,
-        amount=request_data.amount,
-        purpose=request_data.purpose,
-        idempotency_key=idempotency_key,
-        created_by_role=created_by_role,
-        metadata=request_data.metadata
-    )
-    
-    return DebitResponse(**result)
+    try:
+        result = credit_ledger_service.debit_user(
+            db=db,
+            user_id=request_data.user_id,
+            amount=request_data.amount,
+            purpose=request_data.purpose,
+            idempotency_key=idempotency_key,
+            created_by_role=created_by_role,
+            metadata=request_data.metadata
+        )
+        credits_debit_total.labels(status="success").inc()
+        return DebitResponse(**result)
+    except HTTPException as e:
+        credits_debit_total.labels(status="error").inc()
+        raise e
+    except Exception as e:
+        credits_debit_total.labels(status="error").inc()
+        raise
 
 @router.get("/balance", response_model=BalanceResponse, status_code=200)
 async def get_balance_endpoint(
