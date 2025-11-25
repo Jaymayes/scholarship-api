@@ -188,22 +188,26 @@ async def create_provider(
     provider_id = f"prov_{datetime.utcnow().timestamp()}_{request.name[:20].replace(' ', '_').lower()}"
     
     try:
+        # Extract domain from email for institutional_domain requirement
+        domain = request.contact_email.split('@')[1] if '@' in request.contact_email else 'unknown.org'
+        
         db.execute(
             text("""
-                INSERT INTO providers (id, name, contact_email, organization_type, description, status, created_at)
-                VALUES (:id, :name, :email, :org_type, :description, :status, :created_at)
-                ON CONFLICT (id) DO UPDATE SET
+                INSERT INTO providers (provider_id, name, contact_email, segment, status, institutional_domain, created_at)
+                VALUES (:id, :name, :email, :segment, :status, :domain, :created_at)
+                ON CONFLICT (provider_id) DO UPDATE SET
                     name = EXCLUDED.name,
                     contact_email = EXCLUDED.contact_email,
-                    description = EXCLUDED.description
+                    segment = EXCLUDED.segment,
+                    institutional_domain = EXCLUDED.institutional_domain
             """),
             {
                 "id": provider_id,
                 "name": request.name,
                 "email": request.contact_email,
-                "org_type": request.organization_type,
-                "description": request.description,
+                "segment": request.organization_type,
                 "status": "active",
+                "domain": domain,
                 "created_at": datetime.utcnow()
             }
         )
@@ -241,7 +245,7 @@ async def list_providers(
     try:
         results = db.execute(
             text("""
-                SELECT id, name, contact_email, organization_type, status, created_at
+                SELECT provider_id, name, contact_email, segment, status, created_at
                 FROM providers
                 ORDER BY created_at DESC
                 LIMIT :limit OFFSET :offset
@@ -254,9 +258,9 @@ async def list_providers(
                 provider_id=row[0],
                 name=row[1],
                 contact_email=row[2],
-                organization_type=row[3],
+                organization_type=row[3],  # segment maps to organization_type in response
                 status=row[4],
-                created_at=row[5].isoformat() + "Z"
+                created_at=row[5].isoformat() + "Z" if row[5] else datetime.utcnow().isoformat() + "Z"
             )
             for row in results
         ]

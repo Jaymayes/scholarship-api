@@ -68,6 +68,9 @@ class WAFProtection(BaseHTTPMiddleware):
             "/command",  # Agent Bridge orchestration from Command Center
             "/billing/external/credit-grant",  # External billing app credit grants (signed JSON)
             "/billing/external/provider-fee-paid",  # External billing app provider fees (signed JSON)
+            "/api/v1/applications",  # Agent3 application submissions (JSON payloads)
+            "/api/v1/providers",  # Agent3 provider creation (JSON payloads)
+            "/api/v1/fees/report",  # Agent3 fee reporting (JSON payloads)
         }
         
         # SECURITY: Regex patterns for dynamic routes that require WAF bypass
