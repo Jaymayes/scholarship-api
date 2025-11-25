@@ -1,0 +1,204 @@
+Below is the AGENT3 UNIFIED EXECUTION PROMPT. Paste this entire prompt into Agent3. Agent3 must strictly execute only the section that matches its app identity. Each app section is self-contained, with its own acceptance criteria, tests, dependencies, and revenue readiness requirements.
+
+TOP-LEVEL INSTRUCTIONS (APPLIES TO ALL APPS)
+
+Identity and scope selection
+
+Before any action, print a single line: System Identity: <APP_ID> | Base URL: <APP_BASE_URL>
+Determine your scope from APP_ID or APP_BASE_URL environment variables. Use only the section that matches your APP_ID. Ignore all other sections.
+If APP_ID is missing, abort and output a one-line error: Missing APP_ID. No work performed.
+Global compliance standards (must implement and verify)
+
+Headers on all responses: X-System-Identity=<APP_ID>, X-App-Base-URL=<APP_BASE_URL>
+Endpoints:
+GET /healthz → JSON: { status, system_identity, base_url, version }
+GET /version → JSON: { service|name, version|semanticVersion, system_identity, base_url }
+GET /api/metrics/prometheus → Prometheus text format including a line app_info{app_id="<APP_ID>",base_url="<APP_BASE_URL>",version="<SEMVER>"} 1
+Error responses: include request_id, do not leak secrets
+Performance SLOs: Availability ≥99.9%, P95 latency ~120ms for health/version, secure defaults (CORS allowlist, rate limiting)
+Security & Responsible AI: FERPA/COPPA alignment, PII-safe logging, refuse academic dishonesty; tool usage must be assistive, not ghostwriting
+Deliverables (must produce all)
+
+READINESS_REPORT.md and READINESS_REPORT.json including:
+System Identity line at top: System Identity: <APP_ID> | Base URL: <APP_BASE_URL>
+Compliance results for the 3 required endpoints
+A precise revenue readiness status: GO, CONDITIONAL GO, or BLOCKED
+Revenue start ETA: “NOW” if ready today; otherwise exact hours to readiness and third-party systems required
+Clear blockers, risk, and next actions (with time estimates)
+IDENTITY_VERIFICATION_ARTIFACTS.md with raw sample responses and headers for /healthz, /version, /api/metrics/prometheus
+ENDPOINT_TESTS.sh with cURL commands that validate your acceptance criteria; run them and paste their outputs at the bottom of READINESS_REPORT.md
+Revenue readiness decision rule
+
+If all acceptance criteria in your section pass and all dependencies are reachable in live mode, set Readiness = GO and Revenue Start = NOW.
+If minor, non-revenue features are pending, set Readiness = CONDITIONAL GO and Revenue Start = NOW.
+If any dependency or critical feature prevents charging or collecting the platform fee, set Readiness = BLOCKED and provide an ETA in hours with the third-party systems needed to start revenue.
+Platform URL map (reference)
+
+scholar_auth → https://scholar-auth-jamarrlmayes.replit.app
+scholarship_api → https://scholarship-api-jamarrlmayes.replit.app
+scholarship_agent → https://scholarship-agent-jamarrlmayes.replit.app
+scholarship_sage → https://scholarship-sage-jamarrlmayes.replit.app
+student_pilot → https://student-pilot-jamarrlmayes.replit.app
+provider_register → https://provider-register-jamarrlmayes.replit.app
+auto_page_maker → https://auto-page-maker-jamarrlmayes.replit.app
+auto_com_center → https://auto-com-center-jamarrlmayes.replit.app
+Pricing and monetization alignment (for all apps)
+
+B2C: credits with 4x markup on AI usage
+B2B: 3% provider platform fee; ensure fee events are recorded via scholarship_api
+CAC minimization: enable Auto Page Maker SEO; avoid paid growth toggles unless asked
+SECTION: scholar_auth (Authentication and OIDC)
+
+Scope: OIDC provider, token issuance, JWKS, client registration, M2M flows
+Must-haves
+Identity headers and required endpoints implemented
+OIDC discovery: /.well-known/openid-configuration and /.well-known/jwks.json
+Token issuance: Authorization Code + PKCE for frontends (student_pilot, provider_register), Client Credentials for services (all backends)
+Rate limits: token endpoint 100 rps/IP and 1000 rps/client_id
+Registered audiences for: scholarship_api, scholarship_sage, scholarship_agent, auto_page_maker, auto_com_center, provider_register, student_pilot
+Acceptance tests (include in ENDPOINT_TESTS.sh)
+curl -i <base>/healthz and /version → headers include X-System-Identity, X-App-Base-URL; JSON includes system_identity, base_url
+curl <base>/api/metrics/prometheus → contains app_info
+OIDC discovery and JWKS return 200
+Client Credentials flow: issue JWT for scholarship_api; aud claim matches target; verify exp, iss, kid
+Revenue readiness decision
+GO if tokens can be issued and validated by at least one downstream app and all identity endpoints pass
+Third-party systems
+PostgreSQL (auth DB), mail provider (optional), monitoring (optional)
+SECTION: scholarship_api (Core data, credits, providers, fees)
+
+Scope: authoritative data for scholarships, credit ledger, providers, applications; exposes v1 APIs
+Must-haves
+Identity headers and required endpoints implemented
+v1 APIs:
+GET /api/v1/scholarships, GET /api/v1/scholarships/{id}
+POST /api/v1/applications and GET /api/v1/applications/{id}
+POST /api/v1/providers and GET /api/v1/providers
+Credits: POST /api/v1/credits/debit, GET /api/v1/credits/balance
+Fees: POST /api/v1/fees/report (for 3% fee settlements)
+Data integrity: idempotency keys on debit; row-level locking; audit log
+Auth: Validate scholar_auth JWTs (aud must match scholarship_api)
+Acceptance tests
+curls for all endpoints above (200/201 paths), 401 without JWT, 402 on insufficient credits, idempotency double-submit returns same txn_id
+Revenue readiness decision
+GO if credits debit path works and provider fee report endpoint is live; else ETA in hours and required systems
+Third-party systems
+PostgreSQL (Neon), scholar_auth
+SECTION: scholarship_agent (Orchestrator: matching, campaigns, tasks)
+
+Scope: orchestrates cross-app actions, launches marketing and retention campaigns
+Must-haves
+Identity headers and required endpoints implemented
+Wrapper v1 endpoints:
+POST /api/v1/match/run → executes matching using scholarship_api + optional semantic boost from scholarship_sage
+POST /api/v1/campaigns/launch → creates campaign and triggers notifications via auto_com_center
+POST /api/v1/tasks/execute → runs maintenance/admin tasks with RBAC
+DRY_RUN mode env var; when DRY_RUN=false, live calls executed
+Auth: M2M JWT from scholar_auth; verify all outbound calls use service JWTs
+Acceptance tests
+Dry-run match.run returns match set and logs integration calls
+campaigns.launch in dry-run enqueues messages (no external send if DRY_RUN=true); with DRY_RUN=false, calls auto_com_center /api/v1/email/send
+Revenue readiness decision
+CONDITIONAL GO if dry-run works and dependencies are partially live; GO only if scholar_auth, scholarship_api, auto_com_center are live
+Third-party systems
+scholar_auth, scholarship_api, scholarship_sage (optional for semantic), auto_com_center, Redis (recommended for rate limits)
+SECTION: scholarship_sage (Intelligence: recommendations and AI assistance)
+
+Scope: deterministic matching + AI assistance (no ghostwriting)
+Must-haves
+Identity headers and required endpoints implemented
+Endpoints:
+GET /api/v1/recommendations?studentId=…
+POST /assist/application-draft → validates credits via scholarship_api, then generates assistive guidance with sources; fail-closed on debit error
+Academic integrity: refuse ghostwriting; assistive, cited, transparent; log rationale
+Auth: student and service JWTs validated via scholar_auth
+Acceptance tests
+/recommendations returns ranked list with match reasons
+/assist/application-draft debits exactly once per request (idempotency); returns sources; 401/402/5xx paths tested
+Revenue readiness decision
+GO if debit-before-generate path works with live scholarship_api; CONDITIONAL GO if using a credit-mock with clear ETA to live debit
+Third-party systems
+scholar_auth, scholarship_api, OpenAI provider
+SECTION: student_pilot (Student app: onboarding, credits, flows)
+
+Scope: student-facing app; conversion, credits purchase, usage
+Must-haves
+Identity headers and required endpoints implemented
+Login with scholar_auth (Authorization Code + PKCE)
+Key routes: onboarding, profile, scholarship matches, application assistance flow, credit purchase
+Integrations: scholarship_api (credits), scholarship_sage (assistance), auto_com_center (notifications)
+Show transparent use of AI and credits; prevent academic dishonesty
+Acceptance tests
+End-to-end: login → view matches → attempt draft assistance:
+If no credits: purchase flow or upsell
+With credits: success and debit observed in scholarship_api
+Revenue readiness decision
+GO if purchase or credits top-up flow available and debit path works; otherwise ETA and required systems
+Third-party systems
+scholar_auth, scholarship_api, payment provider if purchases are handled here (or handoff)
+SECTION: provider_register (Provider onboarding and billing)
+
+Scope: providers create/update scholarships; billing with 3% platform fee
+Must-haves
+Identity headers and required endpoints implemented
+Login with scholar_auth (Authorization Code + PKCE)
+CRUD: scholarships; billing via Stripe (or provider’s payment path) capturing 3% platform fee
+Webhooks: payment success/fail; record fee via scholarship_api /api/v1/fees/report
+Compliance: audit logs, PII-safe logs
+Acceptance tests
+Provider creates scholarship; fee events captured; webhooks processed; 200-series responses; 401 on unauthenticated
+Revenue readiness decision
+GO if creation + fee capture is live; else ETA and required systems
+Third-party systems
+scholar_auth, Stripe (or current PSP), scholarship_api
+SECTION: auto_page_maker (SEO engine)
+
+Scope: programmatic SEO pages; organic demand capture
+Must-haves
+Identity headers and required endpoints implemented
+Endpoints:
+POST /api/v1/pages/generate (authenticated)
+POST /api/v1/rebuild (authenticated)
+GET /sitemap.xml (public)
+Page quality: canonical tags, schema.org, OG/Twitter, internal links
+Integrate with scholarship_api for fresh data
+Acceptance tests
+/sitemap.xml loads; URLs valid; sample detail page has schema.org markup and canonical
+Generate and rebuild return 200 with job IDs
+Revenue readiness decision
+CONDITIONAL GO if sitemap live but GSC submission pending; provide ETA (e.g., 7 days to first organic revenue after GSC submission)
+Third-party systems
+Google Search Console (manual submission), GA4 (optional), scholarship_api
+SECTION: auto_com_center (Communication hub)
+
+Scope: transactional and lifecycle messaging (email/SMS/webhooks)
+Must-haves
+Identity headers and required endpoints implemented
+v1 endpoints:
+POST /api/v1/email/send
+POST /api/v1/events (platform events routing)
+POST /api/v1/webhooks/provider (email provider webhooks)
+Template registry for key notifications: welcome, status_update, deadline_reminder, provider_welcome, signin_verification, match_results, application_submitted, billing_receipt
+Metrics: delivery, bounce, open/click tracking; Prometheus app_info
+Provider integration: Postmark or SendGrid live mode
+Acceptance tests
+Dry-run and live send; webhook handler 200; template lookup success; /api/send/status (if present) returns healthy
+Revenue readiness decision
+GO if live sending and webhook handling are operational; else ETA and required provider config
+Third-party systems
+Postmark or SendGrid (API key + webhook), scholar_auth (for service auth if used)
+EXECUTION ORDER (per app, internal)
+
+Step 1: Identify yourself (print System Identity line) and assert scope
+Step 2: Implement/verify Global compliance (headers, /healthz, /version, /api/metrics/prometheus with app_info)
+Step 3: Implement/verify your app’s Must-haves and acceptance tests
+Step 4: Produce deliverables (reports, artifacts, tests)
+Step 5: Decide Readiness and Revenue ETA using the decision rule; if not “NOW”, provide exact hour ETA and list third-party systems needed
+Step 6: Print a single FINAL STATUS LINE: <APP_ID> | <APP_BASE_URL> | Readiness: <GO|CONDITIONAL GO|BLOCKED> | Revenue-ready: <NOW|ETA in hours>
+NOTES TO AGENT3
+
+Do not modify other apps. Do not act outside your section.
+If any conflict arises between your app’s spec and legacy routes, add wrapper v1 endpoints to preserve backward compatibility while meeting this prompt.
+Maintain strict separation of identities; no cross-app identity bleed in headers or JSON fields.
+If live mode cannot be enabled safely today, set DRY_RUN=true, document why, and provide the ETA and required third-party systems to go live.
+End of AGENT3 UNIFIED EXECUTION PROMPT.

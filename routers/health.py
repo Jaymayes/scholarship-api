@@ -428,11 +428,19 @@ async def canary_check_no_cache(request: Request, response: Response, db: Sessio
 @router.get("/healthz")
 async def liveness_probe() -> dict[str, str]:
     """
-    Liveness probe - checks if the application is running
-    Returns 200 if the service is alive
+    Liveness probe - Agent3 compliant
+    Checks if the application is running with required identity fields
     """
     app_name = os.getenv("APP_NAME", "scholarship_api")
-    return {"status": "ok", "service": app_name}
+    base_url = os.getenv("APP_BASE_URL", "https://scholarship-api-jamarrlmayes.replit.app")
+    version = os.getenv("APP_VERSION", "1.0.0")
+    
+    return {
+        "status": "ok",
+        "system_identity": app_name,
+        "base_url": base_url,
+        "version": version
+    }
 
 @router.get("/version")
 async def version_info() -> dict[str, str]:
@@ -447,8 +455,10 @@ async def version_info() -> dict[str, str]:
     
     return {
         "service": app_name,
-        "app_base_url": app_base_url,
+        "system_identity": app_name,
+        "base_url": app_base_url,
         "version": version,
+        "semanticVersion": version,
         "environment": environment
     }
 

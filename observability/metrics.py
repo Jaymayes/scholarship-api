@@ -107,6 +107,32 @@ class ActiveScholarshipsCollector:
                 value=0
             )
 
+
+class AppInfoCollector:
+    """Agent3 compliance: app_info metric with identity labels"""
+    
+    def collect(self):
+        """Generate app_info metric per Agent3 unified execution prompt"""
+        import os
+        from prometheus_client.core import InfoMetricFamily
+        
+        app_id = os.getenv("APP_NAME", "scholarship_api")
+        base_url = os.getenv("APP_BASE_URL", "https://scholarship-api-jamarrlmayes.replit.app")
+        version = os.getenv("APP_VERSION", "1.0.0")
+        
+        # Create info metric with labels
+        info = InfoMetricFamily(
+            'app',
+            'Application information',
+            value={
+                'app_id': app_id,
+                'base_url': base_url,
+                'version': version
+            }
+        )
+        
+        yield info
+
 # Note: active_scholarships value set directly in /metrics endpoint to avoid circular imports
 
 class MetricsService:
@@ -333,6 +359,11 @@ def setup_metrics(app: FastAPI):
     collector = ActiveScholarshipsCollector()
     prometheus_client.REGISTRY.register(collector)
     logger.info("✅ CUSTOM COLLECTOR: Registered ActiveScholarshipsCollector for scrape-time computation")
+    
+    # Agent3: Register app_info collector
+    app_info_collector = AppInfoCollector()
+    prometheus_client.REGISTRY.register(app_info_collector)
+    logger.info("✅ AGENT3: Registered AppInfoCollector for identity compliance")
 
     # Create our own /metrics route using prometheus_client.REGISTRY
     @app.get("/metrics", include_in_schema=False)

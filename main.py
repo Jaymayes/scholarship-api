@@ -39,11 +39,13 @@ from middleware.error_handling import (
 from middleware.rate_limiting import limiter
 from middleware.request_id import RequestIDMiddleware
 from middleware.waf_protection import WAFProtection
+from middleware.identity_headers import IdentityHeadersMiddleware
 from observability.metrics import setup_metrics
 from observability.tracing import tracing_service
 from observability.dashboards import router as observability_router
 from routers.observability_api import router as observability_api_router
 from routers.agent import router as agent_router
+from routers.agent3_v1 import router as agent3_v1_router
 from routers.ai import router as ai_router
 from routers.analytics import router as analytics_router
 from routers.auth import router as auth_router
@@ -322,6 +324,9 @@ app.add_middleware(BodySizeLimitMiddleware, max_size=settings.max_request_size_b
 app.add_middleware(RequestIDMiddleware)
 app.middleware("http")(trace_id_middleware)
 
+# 4.05 AGENT3: Identity headers (add system_identity to all responses)
+app.add_middleware(IdentityHeadersMiddleware)
+
 # 4.1 GATE 0: Resilience Patterns (Circuit Breaker + Request Timeout)
 # Prevents cascading failures and queue buildup per CEO directive
 from middleware.request_timeout import RequestTimeoutMiddleware
@@ -397,6 +402,8 @@ async def handle_method_not_allowed(request: Request, exc: HTTPException):
 # Include routers
 # V2.2 Note: /canary endpoint moved to health router for proper organization
 app.include_router(auth_router)
+# Agent3 V1 compliance endpoints (prioritized for revenue readiness)
+app.include_router(agent3_v1_router, tags=["Agent3 V1"])
 app.include_router(scholarships_router, prefix="/api/v1", tags=["scholarships"])
 app.include_router(applications_router, prefix="/api/v1", tags=["applications"])
 app.include_router(prompts_router, tags=["System Prompts"])
