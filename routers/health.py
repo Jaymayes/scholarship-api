@@ -426,10 +426,10 @@ async def canary_check_no_cache(request: Request, response: Response, db: Sessio
     }
 
 @router.get("/healthz")
-async def liveness_probe() -> dict[str, str]:
+async def liveness_probe() -> dict[str, Any]:
     """
-    Liveness probe - Agent3 compliant
-    Checks if the application is running with required identity fields
+    Liveness probe - Agent3 v3.0 compliant
+    Returns: {status:"ok", version, system_identity, base_url, timestamp}
     """
     app_name = os.getenv("APP_NAME", "scholarship_api")
     base_url = os.getenv("APP_BASE_URL", "https://scholarship-api-jamarrlmayes.replit.app")
@@ -437,27 +437,30 @@ async def liveness_probe() -> dict[str, str]:
     
     return {
         "status": "ok",
+        "version": version,
         "system_identity": app_name,
         "base_url": base_url,
-        "version": version
+        "timestamp": datetime.utcnow().isoformat() + "Z"
     }
 
 @router.get("/version")
-async def version_info() -> dict[str, str]:
+async def version_info() -> dict[str, Any]:
     """
     Global Identity Standard: Returns app identity and version information
-    Required by Agent3 unified execution prompt (Nov 24, 2025)
+    Agent3 v3.0 compliant - includes git_sha
     """
     app_name = os.getenv("APP_NAME", "scholarship_api")
     app_base_url = os.getenv("APP_BASE_URL", "https://scholarship-api-jamarrlmayes.replit.app")
     version = os.getenv("APP_VERSION", "1.0.0")
     environment = os.getenv("ENVIRONMENT", "production")
+    git_sha = os.getenv("GIT_SHA", os.getenv("REPL_SLUG", "unknown"))
     
     return {
         "service": app_name,
+        "version": version,
+        "git_sha": git_sha,
         "system_identity": app_name,
         "base_url": app_base_url,
-        "version": version,
         "semanticVersion": version,
         "environment": environment
     }

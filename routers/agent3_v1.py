@@ -56,14 +56,18 @@ class ApplicationResponse(BaseModel):
     base_url: str = "https://scholarship-api-jamarrlmayes.replit.app"
 
 
-@router.post("/applications", response_model=ApplicationResponse)
+@router.post("/applications/submit", response_model=ApplicationResponse)
+@router.post("/applications", response_model=ApplicationResponse, include_in_schema=False)
 async def submit_application(
     request: ApplicationRequest,
     db: Session = Depends(get_db),
     authorization: str | None = Header(None)
 ):
     """
-    Submit scholarship application (Agent3 compliant)
+    Submit scholarship application (Agent3 v3.0 compliant)
+    
+    Primary: POST /api/v1/applications/submit
+    Alias: POST /api/v1/applications
     
     Features:
     - Idempotency via idempotency_key
@@ -177,14 +181,18 @@ class ProviderResponse(BaseModel):
     base_url: str = "https://scholarship-api-jamarrlmayes.replit.app"
 
 
-@router.post("/providers", response_model=ProviderResponse)
+@router.post("/providers/register", response_model=ProviderResponse)
+@router.post("/providers", response_model=ProviderResponse, include_in_schema=False)
 async def create_provider(
     request: ProviderRequest,
     db: Session = Depends(get_db),
     authorization: str | None = Header(None)
 ):
     """
-    Create or update provider (Agent3 compliant)
+    Create or update provider (Agent3 v3.0 compliant)
+    
+    Primary: POST /api/v1/providers/register
+    Alias: POST /api/v1/providers
     
     Features:
     - Auth via JWT (role: provider or admin)
@@ -368,3 +376,87 @@ async def report_fee(
         fee_reports_total.labels(status="error").inc()
         logger.error(f"Failed to record platform fee: {str(e)}")
         raise HTTPException(status_code=500, detail="Failed to record platform fee")
+
+
+# ==============================================================================
+# SCHOLARSHIPS SEARCH ENDPOINT (Agent3 v3.0)
+# ==============================================================================
+
+class ScholarshipSearchResult(BaseModel):
+    """Search result item"""
+    id: str
+    title: str
+    amount: float | None = None
+    deadline: str | None = None
+    provider: str | None = None
+    match_score: float | None = None
+    system_identity: str = "scholarship_api"
+    base_url: str = "https://scholarship-api-jamarrlmayes.replit.app"
+
+
+class ScholarshipSearchResponse(BaseModel):
+    """Paginated search response"""
+    scholarships: list[ScholarshipSearchResult]
+    total: int
+    page: int
+    page_size: int
+    query: str
+    system_identity: str = "scholarship_api"
+    base_url: str = "https://scholarship-api-jamarrlmayes.replit.app"
+
+
+@router.get("/scholarships/search", response_model=ScholarshipSearchResponse)
+async def search_scholarships(
+    q: str = "",
+    page: int = 1,
+    page_size: int = 20,
+    authorization: str | None = Header(None)
+):
+    """
+    Search scholarships (Agent3 v3.0 compliant)
+    
+    GET /api/v1/scholarships/search?q=...
+    
+    Returns paginated list of scholarships matching the query
+    """
+    try:
+        from services.scholarship_service import scholarship_service
+        
+        all_scholarships = list(scholarship_service.scholarships.values())
+        
+        if q:
+            results = [
+                s for s in all_scholarships
+                if q.lower() in getattr(s, 'title', '').lower() 
+                or q.lower() in getattr(s, 'description', '').lower()
+                or q.lower() in getattr(s, 'provider', '').lower()
+            ]
+        else:
+            results = all_scholarships
+        
+        total = len(results)
+        start = (page - 1) * page_size
+        end = start + page_size
+        paginated = results[start:end]
+        
+        return ScholarshipSearchResponse(
+            scholarships=[
+                ScholarshipSearchResult(
+                    id=getattr(s, 'id', ''),
+                    title=getattr(s, 'title', ''),
+                    amount=getattr(s, 'amount', None),
+                    deadline=getattr(s, 'deadline', None),
+                    provider=getattr(s, 'provider', None),
+                    match_score=None
+                )
+                for s in paginated
+            ],
+            total=total,
+            page=page,
+            page_size=page_size,
+            query=q
+        )
+        
+    except Exception as e:
+        logger.error(f"Failed to search scholarships: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to search scholarships")

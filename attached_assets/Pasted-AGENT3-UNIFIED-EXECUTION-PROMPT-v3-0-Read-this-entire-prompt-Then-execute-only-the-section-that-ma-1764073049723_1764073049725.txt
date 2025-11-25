@@ -1,0 +1,248 @@
+AGENT3 UNIFIED EXECUTION PROMPT v3.0
+Read this entire prompt. Then execute only the section that matches your app. Do not touch any other app’s code, data, or infrastructure.
+
+0. How Agent3 must operate
+
+Self-identify first: Before doing any work, print a single line exactly in this format: FINAL_SYSTEM_IDENTITY: <app_id> | APP_BASE_URL: <base_url> | SECTION: <letter> Example: FINAL_SYSTEM_IDENTITY: scholar_auth | APP_BASE_URL: https://scholar-auth-jamarrlmayes.replit.app | SECTION: A
+Strict scope: Only implement and verify the section for your app. Ignore all other sections. If you need a dependency from another app, call it via HTTP and record the check in your report; do not modify the other app.
+Reporting: Every report you create must start with: <app_id> | <APP_BASE_URL> Example: scholarship_api | https://scholarship-api-jamarrlmayes.replit.app
+Deliverables (required for every app):
+READINESS_REPORT.md: human-readable, include status, test evidence, SLOs, revenue readiness, and risks.
+READINESS_REPORT.json: machine-readable JSON summary of the above.
+IDENTITY_VERIFICATION_ARTIFACTS.md: raw samples of headers/bodies from key endpoints.
+ENDPOINT_TESTS.sh: executable bash script that runs your acceptance tests; exit nonzero on any failure.
+Revenue status: If you cannot achieve “Revenue-ready: NOW” today, output an ETA in hours and list all third-party systems that must be live. Use this exact final status line: <app_id> | <APP_BASE_URL> | Readiness: <GO|CONDITIONAL GO|NO-GO> | Revenue-ready: <NOW|ETA: ##h>
+Global platform contract (applies to every app)
+Identity on every HTTP response:
+Headers (all responses): X-System-Identity: <app_id>, X-App-Base-URL: <APP_BASE_URL>
+JSON fields (all JSON responses): system_identity, base_url
+Required endpoints in every app:
+GET /healthz: 200, JSON includes {status:"ok", version, system_identity, base_url, timestamp}
+GET /version: 200, JSON includes version, git_sha (if available), system_identity, base_url
+GET /api/metrics/prometheus: text/plain; expose app_info{app_id,base_url,version} 1 plus app-specific counters
+SLOs: 99.9% uptime, P95 latency ≤120ms for /healthz and /version. Include P95 in READINESS_REPORT.md.
+Security:
+CORS: restricted allowlist, no wildcard in production
+Rate limiting on public endpoints
+Omit secrets from logs and responses; log request_id with errors
+Honor FERPA/COPPA: never return PII in logs; redact emails and tokens
+Observability:
+Prometheus endpoint as above
+Business counters per app (detailed in each section)
+Request IDs on error JSON: include request_id field
+2. App roster and base URLs
+
+A) scholar_auth → https://scholar-auth-jamarrlmayes.replit.app
+B) scholarship_api → https://scholarship-api-jamarrlmayes.replit.app
+C) scholarship_agent → https://scholarship-agent-jamarrlmayes.replit.app
+D) scholarship_sage → https://scholarship-sage-jamarrlmayes.replit.app
+E) student_pilot → https://student-pilot-jamarrlmayes.replit.app
+F) provider_register → https://provider-register-jamarrlmayes.replit.app
+G) auto_page_maker → https://auto-page-maker-jamarrlmayes.replit.app
+H) auto_com_center → https://auto-com-center-jamarrlmayes.replit.app
+3. Cross-app revenue “happy path” (for your awareness; do not implement other apps)
+
+B2C: student buys credits in student_pilot (Stripe) → credits ledger/debit in scholarship_api → uses scholarship_sage for drafting → auto_com_center sends confirmations.
+B2B: provider registers via provider_register (Stripe/fees) → scholarships listed via scholarship_api → scholarship_agent campaigns drive traffic → auto_page_maker SEO attracts students.
+4. Per-app execution specifications
+Only execute the section matching your app’s system_identity.
+
+SECTION A — scholar_auth (OIDC Identity Provider)
+
+Outcome: Issue JWTs for all platform clients with identity injection; serve OIDC discovery and JWKS.
+Must implement:
+/.well-known/openid-configuration (discovery)
+/.well-known/jwks.json (or /oidc/jwks) public keys
+/oidc/token supports:
+Client Credentials for M2M clients
+Authorization Code + PKCE for user flows
+Inject identity in OIDC JSON responses:
+system_identity: "scholar_auth"
+base_url: "https://scholar-auth-jamarrlmayes.replit.app"
+Metrics:
+app_info{app_id="scholar_auth",...} 1
+tokens_issued_total{grant_type,status}
+jwks_requests_total
+Third-party:
+None mandatory; standard crypto libs only
+Acceptance tests in ENDPOINT_TESTS.sh:
+curl -sI /healthz shows identity headers; body contains system_identity/base_url
+GET /.well-known/openid-configuration 200
+GET /.well-known/jwks.json 200 with at least 1 key
+POST /oidc/token (client_credentials) returns access_token and includes injected identity fields
+Deliverables: required 4 files
+Final status line: as specified
+SECTION B — scholarship_api (Scholarship, Applications, Credits, Fees)
+
+Outcome: Single API for scholarships, applications, provider catalog, credits debit, and fee reporting.
+Must implement core endpoints (v1):
+POST /api/v1/credits/debit: body {user_id, amount, reason}; returns remaining_balance; increment credits_debit_total{status}
+POST /api/v1/applications/submit: returns application_id; increment applications_total{status}
+POST /api/v1/providers/register: create provider record; increment providers_total{status}
+POST /api/v1/fees/report: records fee payout; increment fee_reports_total{status}
+GET /api/v1/scholarships/search?q=...: returns paginated list
+Auth: Validate access_token from scholar_auth; 401/403 on failure
+Metrics:
+app_info{app_id="scholarship_api",...} 1
+credits_debit_total{status}
+fee_reports_total{status}
+applications_total{status}
+providers_total{status}
+Third-party:
+Postgres/Neon (primary), Redis optional
+Acceptance tests:
+Identity checks for /healthz, /version, /api/metrics/prometheus
+Successful and failure cases for debit (increments counters)
+401 without token for protected endpoints
+Deliverables: required 4 files
+Final status line
+SECTION C — scholarship_agent (Acquisition engine and campaigns)
+
+Outcome: Run match jobs, launch campaigns; default DRY_RUN=true until explicitly switched off.
+Must implement (v1):
+POST /api/v1/match/run: simulate or perform matching; returns total_matches; increment matches_run_total
+POST /api/v1/campaigns/launch: launches b2c/b2b campaign; returns campaign.id; increment campaigns_launched_total
+POST /api/v1/tasks/execute: internal tasks (e.g., health_check); increment tasks_executed_total
+Metrics:
+app_info{app_id="scholarship_agent",...} 1
+matches_run_total{status}
+campaigns_launched_total{status}
+tasks_executed_total{status}
+Third-party:
+None required; talks to scholarship_api and auto_com_center via HTTP
+Acceptance tests:
+Identity checks
+Run endpoints; verify counters increment
+Cross-app checks: GET scholar_auth OIDC config reachable
+Deliverables: required 4 files
+Final status line
+SECTION D — scholarship_sage (Student guidance and drafting)
+
+Outcome: Generate safe, high-quality drafts; debit credits before generation.
+Must implement:
+GET /api/v1/recommendations (JWT required; 401 without token)
+POST /assist/application-draft: flow = debit via scholarship_api → generate draft → return draft_id; record trace_id
+Metrics:
+app_info{app_id="scholarship_sage",...} 1
+drafts_created_total{status}
+debit_attempts_total{status}
+Third-party:
+OpenAI (or configured LLM provider); redact prompts/PII in logs
+Acceptance tests:
+Identity checks
+401 for recommendations without JWT
+Draft creation triggers debit (record evidence)
+Deliverables: required 4 files
+Final status line
+SECTION E — student_pilot (B2C storefront + credits)
+
+Outcome: Sell credits, keep ledger accurate, Stripe live-ready with 4x markup transparency.
+Must implement (v1):
+POST /api/v1/credits/purchase: creates Stripe Checkout Session; price = 4x AI cost basis; return checkout_url; increment purchases_total{status}
+GET /api/v1/credits/balance?user_id=...
+POST /api/v1/credits/grant (admin; RBAC)
+POST /api/webhooks/stripe: validate signature; idempotent; increment webhooks_total{status}
+Metrics:
+app_info{app_id="student_pilot",...} 1
+purchases_total{status}
+webhooks_total{status}
+Third-party:
+Stripe live keys
+Postgres/Neon
+Acceptance tests:
+Identity checks
+Purchase endpoint returns session url
+Webhook signature verification (simulate) increments counter
+Deliverables: required 4 files
+Final status line
+SECTION F — provider_register (B2B provider onboarding + platform fees)
+
+Outcome: Register providers, manage fee reports, Stripe Connect/webhooks.
+Must implement (v1):
+POST /api/v1/providers/register: {name,email,type,description,terms_accepted}; increment providers_registered_total{status}
+POST /api/webhooks/stripe: validate signature; idempotent; increment stripe_webhooks_total{status}
+POST /api/v1/fees/report: proxy/report to scholarship_api; increment fee_reports_total{status}
+Metrics:
+app_info{app_id="provider_register",...} 1
+providers_registered_total{status}
+fee_reports_total{status}
+stripe_webhooks_total{status}
+Third-party:
+Stripe (Connect if applicable), Postgres/Neon
+Acceptance tests:
+Identity checks
+Register provider happy path
+Webhook validation and idempotency
+Deliverables: required 4 files
+Final status line
+SECTION G — auto_page_maker (SEO engine)
+
+Outcome: Generate scholarship pages and sitemap.xml; identity-compliant; no wildcard CORS.
+Must implement:
+GET /sitemap.xml and /robots.txt
+GET /{slug} pages for scholarships (cache headers acceptable)
+Metrics:
+app_info{app_id="auto_page_maker",...} 1
+pages_rendered_total{status}
+Third-party:
+Google Search Console (manual submission), Analytics optional
+Acceptance tests:
+Identity checks
+/sitemap.xml returns 200 and lists at least 10 URLs
+Deliverables: required 4 files
+Final status line
+SECTION H — auto_com_center (Messaging and webhooks)
+
+Outcome: Send transactional emails (e.g., purchase receipts, draft ready), enforce templates, capture provider webhooks.
+Must implement:
+POST /api/v1/email/send: {templateId,to,substitutions}; enforce allowlisted templates only; increment emails_sent_total{status}
+POST /api/v1/events: record event telemetry (non-PII)
+POST /api/v1/webhooks/provider: idempotent; increment webhooks_total{status}
+Metrics:
+app_info{app_id="auto_com_center",...} 1
+emails_sent_total{status}
+webhooks_total{status}
+Third-party:
+Postmark in live mode with open/click tracking; Postgres/Neon
+Acceptance tests:
+Identity checks
+Send test using a known template; verify metric increments
+Webhook test increments counter, idempotency verified
+Deliverables: required 4 files
+Final status line
+5. Cross-app verification (each agent executes only read checks)
+
+scholar_auth:
+GET /.well-known/openid-configuration returns 200 within 5s
+GET /.well-known/jwks.json (or /oidc/jwks) returns at least 1 key
+For your declared downstream dependencies, add read-only reachability checks in ENDPOINT_TESTS.sh and summarize results in READINESS_REPORT.md.
+6. Revenue readiness rubric
+
+GO: All acceptance tests pass; required third-party systems live; counters increment; identity standard verified; SLOs met.
+CONDITIONAL GO: Minor non-blocking items remain; revenue can start now; list risks and mitigations with owners and deadlines.
+NO-GO: Blocking issues; provide ETA in hours and list all missing third-party systems and exact configuration needed.
+7. Output formatting requirements
+
+All reports start with: <app_id> | <APP_BASE_URL>
+All JSON responses contain system_identity and base_url
+All HTTP responses contain X-System-Identity and X-App-Base-URL
+Final status line appended at end of READINESS_REPORT.md and echoed to stdout.
+8. Known base URLs (for identity headers and JSON fields)
+
+scholar_auth: https://scholar-auth-jamarrlmayes.replit.app
+scholarship_api: https://scholarship-api-jamarrlmayes.replit.app
+scholarship_agent: https://scholarship-agent-jamarrlmayes.replit.app
+scholarship_sage: https://scholarship-sage-jamarrlmayes.replit.app
+student_pilot: https://student-pilot-jamarrlmayes.replit.app
+provider_register: https://provider-register-jamarrlmayes.replit.app
+auto_page_maker: https://auto-page-maker-jamarrlmayes.replit.app
+auto_com_center: https://auto-com-center-jamarrlmayes.replit.app
+9. What to do if today isn’t possible
+
+Stop work; write NO-GO in your final status line with ETA in hours and list each third-party system required, exact environment variables, and who must provision it. Include a precise Blocker List and an Unblock Plan with steps and owners.
+Reminder to Agent3
+
+First action: print your FINAL_SYSTEM_IDENTITY line with the correct SECTION letter.
+Then execute only your section.
+Produce the 4 deliverables and the final status line.
+If revenue can start now, set Revenue-ready: NOW. If not, set ETA in hours and list third-party systems required.
