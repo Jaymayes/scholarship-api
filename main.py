@@ -46,6 +46,7 @@ from observability.dashboards import router as observability_router
 from routers.observability_api import router as observability_api_router
 from routers.agent import router as agent_router
 from routers.agent3_v1 import router as agent3_v1_router
+from routers.master_prompt import router as master_prompt_router
 from routers.ai import router as ai_router
 from routers.analytics import router as analytics_router
 from routers.auth import router as auth_router
@@ -404,6 +405,8 @@ async def handle_method_not_allowed(request: Request, exc: HTTPException):
 app.include_router(auth_router)
 # Agent3 V1 compliance endpoints (prioritized for revenue readiness)
 app.include_router(agent3_v1_router, tags=["Agent3 V1"])
+# Master Prompt compliance endpoints (standard /api endpoints)
+app.include_router(master_prompt_router, tags=["Master Prompt"])
 app.include_router(scholarships_router, prefix="/api/v1", tags=["scholarships"])
 app.include_router(applications_router, prefix="/api/v1", tags=["applications"])
 app.include_router(prompts_router, tags=["System Prompts"])

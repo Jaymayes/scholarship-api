@@ -218,13 +218,18 @@ class Settings(BaseSettings):
     @property
     def get_cors_origins(self) -> list[str]:
         """
-        GATE 0 CORS Configuration: Master Prompt Section B Requirements
-        "CORS allowlist for student_pilot, provider_register"
-        Per global env standard: FRONTEND_ORIGIN_STUDENT, FRONTEND_ORIGIN_PROVIDER
+        Master Prompt CORS Configuration: All 8 ScholarshipAI apps
+        Restricts cross-origin requests to only the allowed ecosystem apps
         """
         return [
+            "https://scholar-auth-jamarrlmayes.replit.app",
+            "https://scholarship-api-jamarrlmayes.replit.app",
+            "https://scholarship-agent-jamarrlmayes.replit.app",
+            "https://scholarship-sage-jamarrlmayes.replit.app",
             "https://student-pilot-jamarrlmayes.replit.app",
-            "https://provider-register-jamarrlmayes.replit.app"
+            "https://provider-register-jamarrlmayes.replit.app",
+            "https://auto-page-maker-jamarrlmayes.replit.app",
+            "https://auto-com-center-jamarrlmayes.replit.app",
         ]
 
     @property

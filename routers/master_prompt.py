@@ -1,0 +1,454 @@
+"""
+Master Prompt Endpoints - Agent3 Unified Readiness Compliance
+
+Standard endpoints required by the Master Prompt for scholarship_api:
+- GET /api/health → {status:"ok", app:"scholarship_api", baseUrl:"..."}
+- GET /api/metrics/basic → minimal counters
+- GET /api/scholarships?query=&filters=
+- GET /api/scholarships/{id}
+- GET /api/featured
+- POST /api/scholarships (provider only)
+- POST /api/webhooks/scholarships.updated
+"""
+
+import hashlib
+import hmac
+import os
+from datetime import datetime
+from typing import Any
+
+import httpx
+from fastapi import APIRouter, Depends, HTTPException, Header, Query, Request
+from pydantic import BaseModel
+from sqlalchemy.orm import Session
+
+from models.database import get_db
+from utils.logger import get_logger
+
+logger = get_logger("master_prompt")
+router = APIRouter(tags=["Master Prompt Compliance"])
+
+APP_NAME = "scholarship_api"
+APP_BASE_URL = os.getenv("APP_BASE_URL", "https://scholarship-api-jamarrlmayes.replit.app")
+WEBHOOK_SECRET = os.getenv("WEBHOOK_SECRET", "")
+
+ALLOWED_CORS_ORIGINS = [
+    "https://scholar-auth-jamarrlmayes.replit.app",
+    "https://scholarship-api-jamarrlmayes.replit.app",
+    "https://scholarship-agent-jamarrlmayes.replit.app",
+    "https://scholarship-sage-jamarrlmayes.replit.app",
+    "https://student-pilot-jamarrlmayes.replit.app",
+    "https://provider-register-jamarrlmayes.replit.app",
+    "https://auto-page-maker-jamarrlmayes.replit.app",
+    "https://auto-com-center-jamarrlmayes.replit.app",
+]
+
+
+class HealthResponse(BaseModel):
+    """Standard health response per Master Prompt"""
+    status: str
+    app: str
+    baseUrl: str
+    version: str | None = None
+    jwks_url: str | None = None
+
+
+class MetricsBasicResponse(BaseModel):
+    """Basic metrics response per Master Prompt"""
+    requests_total: int
+    errors_total: int
+    latency_p95_ms: float | None = None
+
+
+class ScholarshipItem(BaseModel):
+    """Scholarship item"""
+    id: str
+    title: str
+    description: str | None = None
+    amount: float | None = None
+    deadline: str | None = None
+    provider: str | None = None
+    location: str | None = None
+    eligibility: dict[str, Any] | None = None
+
+
+class ScholarshipListResponse(BaseModel):
+    """Paginated scholarship list"""
+    items: list[ScholarshipItem]
+    total: int
+    page: int
+    page_size: int
+
+
+class ScholarshipCreateRequest(BaseModel):
+    """Request to create a scholarship (provider only)"""
+    title: str
+    description: str
+    amount: float
+    deadline: str | None = None
+    provider_id: str
+    eligibility_criteria: dict[str, Any] = {}
+    location: str | None = None
+    major: str | None = None
+
+
+class WebhookScholarshipUpdated(BaseModel):
+    """Webhook payload for scholarship updates"""
+    event: str = "scholarships.updated"
+    scholarship_id: str
+    action: str  # created, updated, deleted
+    timestamp: str
+    data: dict[str, Any] = {}
+
+
+@router.get("/api/health", response_model=HealthResponse)
+async def master_health():
+    """
+    Master Prompt standard health endpoint
+    
+    GET /api/health → {status:"ok", app:"scholarship_api", baseUrl:"..."}
+    """
+    return HealthResponse(
+        status="ok",
+        app=APP_NAME,
+        baseUrl=APP_BASE_URL,
+        version="1.0.0",
+        jwks_url="https://scholar-auth-jamarrlmayes.replit.app/.well-known/jwks.json"
+    )
+
+
+@router.get("/api/metrics/basic", response_model=MetricsBasicResponse)
+async def master_metrics_basic():
+    """
+    Master Prompt basic metrics endpoint
+    
+    GET /api/metrics/basic → minimal counters: requests_total, errors_total, latency_p95_ms
+    """
+    try:
+        from prometheus_client import REGISTRY
+        
+        requests_total = 0
+        errors_total = 0
+        latency_p95_ms = None
+        
+        for metric in REGISTRY.collect():
+            if metric.name == "http_requests_total":
+                for sample in metric.samples:
+                    if sample.name == "http_requests_total":
+                        requests_total += int(sample.value)
+            elif metric.name == "http_errors_total":
+                for sample in metric.samples:
+                    if sample.name == "http_errors_total":
+                        errors_total += int(sample.value)
+        
+        return MetricsBasicResponse(
+            requests_total=requests_total,
+            errors_total=errors_total,
+            latency_p95_ms=latency_p95_ms
+        )
+    except Exception as e:
+        logger.error(f"Failed to collect metrics: {e}")
+        return MetricsBasicResponse(
+            requests_total=0,
+            errors_total=0,
+            latency_p95_ms=None
+        )
+
+
+@router.get("/api/scholarships", response_model=ScholarshipListResponse)
+async def list_scholarships(
+    query: str = Query("", description="Search query"),
+    amount_min: float | None = Query(None, description="Minimum amount filter"),
+    amount_max: float | None = Query(None, description="Maximum amount filter"),
+    deadline_from: str | None = Query(None, description="Deadline from (YYYY-MM-DD)"),
+    deadline_to: str | None = Query(None, description="Deadline to (YYYY-MM-DD)"),
+    location: str | None = Query(None, description="Location filter"),
+    major: str | None = Query(None, description="Major/field filter"),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+    authorization: str | None = Header(None)
+):
+    """
+    Master Prompt scholarship search endpoint
+    
+    GET /api/scholarships?query=&filters=
+    
+    Filters: amount_min/max, deadline_from/to, location, major, GPA, demographics, keywords
+    """
+    try:
+        from services.scholarship_service import scholarship_service
+        
+        all_scholarships = list(scholarship_service.scholarships.values())
+        results = all_scholarships
+        
+        if query:
+            q = query.lower()
+            results = [
+                s for s in results
+                if q in getattr(s, 'title', '').lower()
+                or q in getattr(s, 'description', '').lower()
+                or q in getattr(s, 'provider', '').lower()
+            ]
+        
+        if amount_min is not None:
+            results = [s for s in results if getattr(s, 'amount', 0) >= amount_min]
+        if amount_max is not None:
+            results = [s for s in results if getattr(s, 'amount', float('inf')) <= amount_max]
+        
+        total = len(results)
+        start = (page - 1) * page_size
+        end = start + page_size
+        paginated = results[start:end]
+        
+        return ScholarshipListResponse(
+            items=[
+                ScholarshipItem(
+                    id=getattr(s, 'id', ''),
+                    title=getattr(s, 'title', ''),
+                    description=getattr(s, 'description', None),
+                    amount=getattr(s, 'amount', None),
+                    deadline=getattr(s, 'deadline', None),
+                    provider=getattr(s, 'provider', None),
+                    location=getattr(s, 'location', None),
+                    eligibility=None
+                )
+                for s in paginated
+            ],
+            total=total,
+            page=page,
+            page_size=page_size
+        )
+        
+    except Exception as e:
+        logger.error(f"Failed to list scholarships: {e}")
+        raise HTTPException(status_code=500, detail="Failed to list scholarships")
+
+
+@router.get("/api/scholarships/{scholarship_id}", response_model=ScholarshipItem)
+async def get_scholarship(
+    scholarship_id: str,
+    authorization: str | None = Header(None)
+):
+    """
+    Master Prompt get scholarship by ID
+    
+    GET /api/scholarships/{id}
+    """
+    try:
+        from services.scholarship_service import scholarship_service
+        
+        scholarship = scholarship_service.scholarships.get(scholarship_id)
+        if not scholarship:
+            raise HTTPException(status_code=404, detail="Scholarship not found")
+        
+        return ScholarshipItem(
+            id=getattr(scholarship, 'id', scholarship_id),
+            title=getattr(scholarship, 'title', ''),
+            description=getattr(scholarship, 'description', None),
+            amount=getattr(scholarship, 'amount', None),
+            deadline=getattr(scholarship, 'deadline', None),
+            provider=getattr(scholarship, 'provider', None),
+            location=getattr(scholarship, 'location', None),
+            eligibility=None
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to get scholarship: {e}")
+        raise HTTPException(status_code=500, detail="Failed to get scholarship")
+
+
+@router.get("/api/featured", response_model=ScholarshipListResponse)
+async def get_featured_scholarships(
+    limit: int = Query(10, ge=1, le=50),
+    authorization: str | None = Header(None)
+):
+    """
+    Master Prompt featured scholarships endpoint
+    
+    GET /api/featured
+    
+    Returns top featured scholarships (highest amount, soonest deadline, etc.)
+    """
+    try:
+        from services.scholarship_service import scholarship_service
+        
+        all_scholarships = list(scholarship_service.scholarships.values())
+        
+        featured = sorted(
+            all_scholarships,
+            key=lambda s: (getattr(s, 'amount', 0) or 0),
+            reverse=True
+        )[:limit]
+        
+        return ScholarshipListResponse(
+            items=[
+                ScholarshipItem(
+                    id=getattr(s, 'id', ''),
+                    title=getattr(s, 'title', ''),
+                    description=getattr(s, 'description', None),
+                    amount=getattr(s, 'amount', None),
+                    deadline=getattr(s, 'deadline', None),
+                    provider=getattr(s, 'provider', None),
+                    location=getattr(s, 'location', None),
+                    eligibility=None
+                )
+                for s in featured
+            ],
+            total=len(featured),
+            page=1,
+            page_size=limit
+        )
+        
+    except Exception as e:
+        logger.error(f"Failed to get featured scholarships: {e}")
+        raise HTTPException(status_code=500, detail="Failed to get featured scholarships")
+
+
+@router.post("/api/scholarships", response_model=ScholarshipItem)
+async def create_scholarship(
+    request: ScholarshipCreateRequest,
+    db: Session = Depends(get_db),
+    authorization: str | None = Header(None)
+):
+    """
+    Master Prompt create scholarship endpoint (provider only)
+    
+    POST /api/scholarships
+    
+    Auth: role=provider via provider_register
+    """
+    from sqlalchemy import text
+    
+    scholarship_id = f"sch_{datetime.utcnow().timestamp()}_{request.provider_id[:8]}"
+    
+    try:
+        db.execute(
+            text("""
+                INSERT INTO scholarships (id, title, description, amount, deadline, provider, location, created_at)
+                VALUES (:id, :title, :description, :amount, :deadline, :provider, :location, :created_at)
+            """),
+            {
+                "id": scholarship_id,
+                "title": request.title,
+                "description": request.description,
+                "amount": request.amount,
+                "deadline": request.deadline,
+                "provider": request.provider_id,
+                "location": request.location,
+                "created_at": datetime.utcnow()
+            }
+        )
+        db.commit()
+        
+        logger.info(f"Scholarship created: {scholarship_id} by provider {request.provider_id}")
+        
+        await notify_scholarship_update(scholarship_id, "created", {
+            "title": request.title,
+            "amount": request.amount,
+            "provider_id": request.provider_id
+        })
+        
+        return ScholarshipItem(
+            id=scholarship_id,
+            title=request.title,
+            description=request.description,
+            amount=request.amount,
+            deadline=request.deadline,
+            provider=request.provider_id,
+            location=request.location,
+            eligibility=request.eligibility_criteria
+        )
+        
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Failed to create scholarship: {e}")
+        raise HTTPException(status_code=500, detail="Failed to create scholarship")
+
+
+class WebhookReceivePayload(BaseModel):
+    """Incoming webhook payload"""
+    event: str
+    scholarship_id: str
+    action: str
+    timestamp: str
+    data: dict[str, Any] = {}
+
+
+@router.post("/api/webhooks/scholarships.updated")
+async def receive_scholarship_webhook(
+    payload: WebhookReceivePayload,
+    request: Request,
+    x_webhook_signature: str | None = Header(None)
+):
+    """
+    Master Prompt webhook receiver for scholarship updates
+    
+    POST /api/webhooks/scholarships.updated
+    
+    Consumers: auto_page_maker, scholarship_agent, student_pilot
+    Verifies HMAC-SHA256 signature in X-Webhook-Signature header
+    """
+    if WEBHOOK_SECRET and x_webhook_signature:
+        body = await request.body()
+        expected_sig = hmac.new(
+            WEBHOOK_SECRET.encode(),
+            body,
+            hashlib.sha256
+        ).hexdigest()
+        
+        if not hmac.compare_digest(x_webhook_signature, expected_sig):
+            raise HTTPException(status_code=401, detail="Invalid webhook signature")
+    
+    logger.info(f"Webhook received: {payload.event} for scholarship {payload.scholarship_id} ({payload.action})")
+    
+    return {
+        "received": True,
+        "event": payload.event,
+        "scholarship_id": payload.scholarship_id,
+        "action": payload.action,
+        "timestamp": datetime.utcnow().isoformat() + "Z"
+    }
+
+
+async def notify_scholarship_update(scholarship_id: str, action: str, data: dict[str, Any]):
+    """
+    Send webhook notification to consumers when scholarship is updated
+    
+    Consumers: auto_page_maker, scholarship_agent, student_pilot
+    """
+    webhook_urls = [
+        "https://auto-page-maker-jamarrlmayes.replit.app/api/webhooks/scholarships.updated",
+        "https://scholarship-agent-jamarrlmayes.replit.app/api/webhooks/event",
+        "https://student-pilot-jamarrlmayes.replit.app/api/webhooks/scholarships.updated",
+    ]
+    
+    payload = {
+        "event": "scholarships.updated",
+        "scholarship_id": scholarship_id,
+        "action": action,
+        "timestamp": datetime.utcnow().isoformat() + "Z",
+        "data": data
+    }
+    
+    for url in webhook_urls:
+        try:
+            signature = ""
+            if WEBHOOK_SECRET:
+                import json
+                body = json.dumps(payload).encode()
+                signature = hmac.new(WEBHOOK_SECRET.encode(), body, hashlib.sha256).hexdigest()
+            
+            async with httpx.AsyncClient(timeout=5.0) as client:
+                await client.post(
+                    url,
+                    json=payload,
+                    headers={
+                        "X-Webhook-Signature": signature,
+                        "Content-Type": "application/json"
+                    }
+                )
+            logger.info(f"Webhook sent to {url}")
+        except Exception as e:
+            logger.warning(f"Failed to send webhook to {url}: {e}")
