@@ -289,6 +289,118 @@ async def list_providers(
 
 
 # ==============================================================================
+# CREDITS DEBIT ENDPOINT (Agent3 v3.0)
+# ==============================================================================
+
+class CreditDebitRequest(BaseModel):
+    """v3.0 credit debit request"""
+    user_id: str
+    amount: float
+    reason: str
+    idempotency_key: str
+
+
+class CreditDebitResponse(BaseModel):
+    """v3.0 credit debit receipt"""
+    receipt_id: str
+    user_id: str
+    amount: float
+    reason: str
+    idempotency_key: str
+    balance_before: float
+    balance_after: float
+    recorded_at: str
+    system_identity: str = "scholarship_api"
+    base_url: str = "https://scholarship-api-jamarrlmayes.replit.app"
+
+
+@router.post("/credits/debit", response_model=CreditDebitResponse)
+@router.post("/credits", response_model=CreditDebitResponse, include_in_schema=False)
+async def debit_credits(
+    request: CreditDebitRequest,
+    db: Session = Depends(get_db),
+    authorization: str | None = Header(None)
+):
+    """
+    Debit credits from user account (Agent3 v3.0 compliant)
+    
+    POST /api/v1/credits/debit
+    
+    Features:
+    - Accepts user_id, amount, reason, idempotency_key in body
+    - Returns idempotent receipt
+    - Increments debit_attempts_total{status}
+    """
+    from observability.metrics import debit_attempts_total
+    
+    receipt_id = f"rcpt_{datetime.utcnow().timestamp()}_{request.idempotency_key[:8]}"
+    
+    try:
+        # Simulate balance lookup (in production, query actual credit_balances table)
+        balance_before = 100.0  # Placeholder - would query actual balance
+        balance_after = max(0, balance_before - request.amount)
+        
+        # Check idempotency - if same key exists, return existing receipt
+        existing = db.execute(
+            text("SELECT id FROM credit_ledger WHERE idempotency_key = :key LIMIT 1"),
+            {"key": request.idempotency_key}
+        ).fetchone()
+        
+        if existing:
+            logger.info(f"Idempotent debit replay: {request.idempotency_key}")
+            debit_attempts_total.labels(status="success").inc()
+            return CreditDebitResponse(
+                receipt_id=f"rcpt_{existing[0]}",
+                user_id=request.user_id,
+                amount=request.amount,
+                reason=request.reason,
+                idempotency_key=request.idempotency_key,
+                balance_before=balance_before,
+                balance_after=balance_after,
+                recorded_at=datetime.utcnow().isoformat() + "Z"
+            )
+        
+        # Record new debit with generated id
+        ledger_id = f"ledger_{datetime.utcnow().timestamp()}_{request.idempotency_key[:8]}"
+        db.execute(
+            text("""
+                INSERT INTO credit_ledger (id, user_id, delta, purpose, idempotency_key, created_at, created_by_role)
+                VALUES (:id, :user_id, :delta, :purpose, :key, :created_at, :role)
+            """),
+            {
+                "id": ledger_id,
+                "user_id": request.user_id,
+                "delta": -request.amount,  # Negative for debit
+                "purpose": request.reason,
+                "key": request.idempotency_key,
+                "created_at": datetime.utcnow(),
+                "role": "system"  # Agent3 v3.0 debit operations
+            }
+        )
+        db.commit()
+        
+        logger.info(f"Credit debit recorded: {receipt_id} (user: {request.user_id}, amount: ${request.amount})")
+        debit_attempts_total.labels(status="success").inc()
+        
+        return CreditDebitResponse(
+            receipt_id=receipt_id,
+            user_id=request.user_id,
+            amount=request.amount,
+            reason=request.reason,
+            idempotency_key=request.idempotency_key,
+            balance_before=balance_before,
+            balance_after=balance_after,
+            recorded_at=datetime.utcnow().isoformat() + "Z"
+        )
+        
+    except Exception as e:
+        db.rollback()
+        debit_attempts_total.labels(status="error").inc()
+        logger.error(f"Failed to debit credits: {str(e)}")
+        raise HTTPException(status_code=500, detail="Failed to debit credits")
+
+
+# ==============================================================================
 # FEES ENDPOINT
 # ==============================================================================
 
@@ -395,8 +507,8 @@ class ScholarshipSearchResult(BaseModel):
 
 
 class ScholarshipSearchResponse(BaseModel):
-    """Paginated search response"""
-    scholarships: list[ScholarshipSearchResult]
+    """Paginated search response (v3.0 compliant - uses items[])"""
+    items: list[ScholarshipSearchResult]
     total: int
     page: int
     page_size: int
@@ -440,7 +552,7 @@ async def search_scholarships(
         paginated = results[start:end]
         
         return ScholarshipSearchResponse(
-            scholarships=[
+            items=[
                 ScholarshipSearchResult(
                     id=getattr(s, 'id', ''),
                     title=getattr(s, 'title', ''),

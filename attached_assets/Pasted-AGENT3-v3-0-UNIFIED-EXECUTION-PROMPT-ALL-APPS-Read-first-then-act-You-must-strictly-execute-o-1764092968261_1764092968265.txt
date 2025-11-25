@@ -1,0 +1,193 @@
+AGENT3 v3.0 UNIFIED EXECUTION PROMPT — ALL APPS
+
+Read first, then act. You must strictly execute only the section for your app. Do not touch any other section.
+
+0. Self-identify before any action
+
+Immediately print the following single line and stop if it does not match your app: FINAL_SYSTEM_IDENTITY: {your_app_id} | APP_BASE_URL: {your_base_url} | SECTION: {your_section_letter}
+If the environment cannot resolve your app_id or base_url, abort and emit a BLOCKER report with ETA and required third-party systems.
+Global conventions you must apply to your app’s section work
+Identity on all responses:
+Add HTTP headers: X-System-Identity: {app_id}, X-App-Base-URL: {base_url}
+In all JSON responses include: system_identity: {app_id}, base_url: {base_url}
+Health/version endpoints:
+GET /healthz returns JSON with: status:"ok", version, system_identity, base_url, timestamp (ISO8601)
+GET /version returns JSON with: version, git_sha, system_identity, base_url
+Observability:
+GET /api/metrics/prometheus must expose app_info{app_id,base_url,version} 1 and all required counters in your section, each labeled with status where applicable (e.g., status="success"|"failure")
+SLOs:
+Target 99.9% uptime; P95 latency ≤120ms for public endpoints
+If currently above targets, include temporary mitigation and ETA to compliance in your report
+Security and correctness:
+Enforce 401/403 where required (authN/authZ)
+Idempotency on all webhook and financial endpoints
+Request IDs included on error responses
+Deliverables to produce for your app (use your app_id and base_url in the first line of each file):
+READINESS_REPORT.md (human-readable)
+READINESS_REPORT.json (machine-readable; include app_id, base_url, version, git_sha, SLOs, metrics summary, acceptance_tests summary, readiness, revenue_ready, ETA if not now, and third-party systems required)
+IDENTITY_VERIFICATION_ARTIFACTS.md (raw example response bodies and headers proving identity fields and required endpoints)
+ENDPOINT_TESTS.sh (executable test script; exit non-zero on any failure)
+Final status line to print at the very end of your run: {app_id} | {base_url} | Readiness: {GO|CONDITIONAL GO|HOLD} | Revenue-ready: {NOW|ETA: <hours>}
+If you cannot complete today, you must output:
+The exact blockers
+ETA in hours to be revenue-ready
+The precise third-party systems and credentials required to proceed
+2. Apps directory (use this map to find your section)
+
+Section A: scholar_auth → https://scholar-auth-jamarrlmayes.replit.app
+Section B: scholarship_api → https://scholarship-api-jamarrlmayes.replit.app
+Section C: scholarship_agent → https://scholarship-agent-jamarrlmayes.replit.app
+Section D: scholarship_sage → https://scholarship-sage-jamarrlmayes.replit.app
+Section E: student_pilot → https://student-pilot-jamarrlmayes.replit.app
+Section F: provider_register → https://provider-register-jamarrlmayes.replit.app
+Section G: auto_page_maker → https://auto-page-maker-jamarrlmayes.replit.app
+Section H: auto_com_center → https://auto-com-center-jamarrlmayes.replit.app
+3. Section instructions per app
+Important: Only read and execute the section that matches your app_id and section.
+
+SECTION A — scholar_auth (OIDC identity provider)
+
+Implement/verify endpoints:
+GET /.well-known/openid-configuration returns issuer, authorization_endpoint, token_endpoint, jwks_uri, response_types_supported; include system_identity and base_url
+GET /.well-known/jwks.json returns ≥1 valid JWK
+POST /oauth/token issues JWT access tokens (short-lived) and refresh tokens; expose tokens_issued_total{grant_type,status}
+GET /healthz and GET /version as per global conventions
+GET /api/metrics/prometheus exposes: app_info; tokens_issued_total{status}; jwks_rotations_total; auth_requests_total{status}; p95_latency_ms gauge if available
+Security:
+Validate client_id/secret for confidential clients
+Use RS256 signing; rotate JWKS on schedule; include kid
+Acceptance tests to include in ENDPOINT_TESTS.sh:
+Discovery doc reachable within 5s, keys length ≥1, token issuance success and failure paths
+Third-party systems:
+KMS or secure secret storage for signing keys (or file-based protected)
+Optional: Sentry/Logs
+Revenue-ready criteria:
+Other apps can validate JWTs and fetch JWKS within 5s
+SECTION B — scholarship_api (scholarships, providers, fees, debit)
+
+Implement/verify endpoints:
+GET /api/v1/scholarships/search?q= returns {total, items[]}
+POST /api/v1/applications/submit returns durable application_id; increments applications_submitted_total{status}
+POST /api/v1/providers/register validates payload, returns provider_id; increments providers_total{status}
+POST /api/v1/credits/debit accepts {user_id, amount, reason, idempotency_key}; returns receipt; increments debit_attempts_total{status}
+POST /api/v1/fees/report returns 3% platform fee computation; increments fee_reports_total{status}
+GET /healthz, /version, /api/metrics/prometheus with: app_info; applications_submitted_total{status}; providers_total{status}; debit_attempts_total{status}; fee_reports_total{status}
+Cross-app checks:
+scholar_auth OIDC discovery and JWKS reachable within 5s
+Third-party systems:
+PostgreSQL/Neon for durable records
+Revenue-ready criteria:
+Debit and fee reporting are idempotent; provider registration works
+SECTION C — scholarship_agent (growth engine: matching + campaigns)
+
+Implement/verify endpoints:
+POST /api/v1/match/run {userId, filters?} returns {request_id, total_matches, dry_run}
+POST /api/v1/campaigns/launch {type:"b2c"|"b2b", ...} returns {request_id, campaign:{id,...}}
+POST /api/v1/tasks/execute {task:"health_check"|...} returns {request_id, result}
+GET /healthz, /version, /api/metrics/prometheus with: app_info; matches_run_total{status}; campaigns_launched_total{status}; tasks_executed_total{status}
+Cross-app checks:
+OIDC discovery within 5s
+If emailing, require auto_com_center to be reachable
+Third-party systems:
+None additional if auto_com_center is live; otherwise Postmark readiness via auto_com_center is a dependency
+Revenue-ready criteria:
+Can run live campaigns that call auto_com_center; if auto_com_center is not live, operate in dry-run and report ETA
+SECTION D — scholarship_sage (application-writing assistant)
+
+Implement/verify endpoints:
+POST /assist/application-draft enforces JWT auth and debit-before-generate workflow; returns {draft_id, tokens_used}
+GET /api/v1/recommendations requires JWT; returns personalized recommendations
+GET /healthz, /version, /api/metrics/prometheus with: app_info; drafts_created_total{status}; debit_attempts_total{status}; 401 on protected endpoints when missing JWT
+Cross-app checks:
+scholar_auth OIDC discovery within 5s
+Debit via scholarship_api or student_pilot present and idempotent
+Third-party systems:
+Model provider or internal LLM; logging/trace store
+Revenue-ready criteria:
+Auth works; debit-before-generate enforced; metrics tracked
+SECTION E — student_pilot (B2C credits and Stripe)
+
+Implement/verify endpoints:
+POST /api/v1/credits/purchase returns {checkout_url}; increments purchases_total{status}
+GET /api/v1/credits/balance returns current balance
+POST /api/v1/credits/grant enforces RBAC; increments grants_total{status}
+POST /api/webhooks/stripe validates signature, idempotent; increments webhooks_total{status}
+GET /healthz, /version, /api/metrics/prometheus with: app_info; purchases_total{status}; webhooks_total{status}; grants_total{status}
+Third-party systems:
+Stripe (live keys configured), PostgreSQL/Neon for balances
+Revenue-ready criteria:
+Live checkout operational and webhook receipts update balances
+SECTION F — provider_register (B2B onboarding and 3% platform fee)
+
+Implement/verify endpoints:
+POST /api/v1/providers/register returns provider_id; increments providers_total{status}
+POST /api/v1/fees/report returns accurate 3% fee; increments fee_reports_total{status}
+POST /api/webhooks/stripe validates signature and is idempotent
+GET /healthz, /version, /api/metrics/prometheus with: app_info; providers_total{status}; fee_reports_total{status}; webhooks_total{status}
+Third-party systems:
+Stripe (Connect if used), PostgreSQL/Neon
+Revenue-ready criteria:
+Providers can onboard; fees computed; Stripe webhook live
+SECTION G — auto_page_maker (SEO engine and sitemap)
+
+Implement/verify endpoints and artifacts:
+GET /sitemap.xml present with ≥1,000 URLs when seeded
+Page renders include: <link rel="canonical">, schema.org JSON-LD, Open Graph, Twitter Cards
+Expose pages_rendered_total{status}; app_info
+GET /healthz, /version, /api/metrics/prometheus as per conventions
+401 on protected admin routes
+Third-party systems:
+Google Search Console (submit sitemap), analytics (optional), CDN/edge cache
+Revenue-ready criteria:
+Traffic acquisition is organic; submit sitemap immediately. If new deployment, set ETA for traffic ramp (typically 7 days). Report ETA hours to first indexed pages and to meaningful traffic.
+Required actions today:
+Generate sitemap, verify robots.txt, submit to GSC; include submission confirmation link or error in report
+SECTION H — auto_com_center (comms hub: email, events, webhooks)
+
+Implement/verify endpoints:
+POST /api/v1/email/send requires templateId and substitutions; returns {success, message_id, status}; increments emails_sent_total{status}
+POST /api/v1/events accepts validated eventType; returns ack
+POST /api/webhooks/v1/provider idempotent; increments webhooks_total{status}
+GET /api/metrics/prometheus with: app_info; emails_sent_total{status}; webhooks_total{status}
+GET /healthz, /version as per conventions
+Third-party systems:
+Postmark (live mode with open/click tracking), PostgreSQL/Neon for emailAuditLog, unsubscribes
+Revenue-ready criteria:
+Email delivery in live mode with tracking; idempotent webhooks
+4. Cross-app integration tests every app must run for its dependencies
+
+scholar_auth OIDC discovery and JWKS reachable within 5s
+If you call Stripe: create and verify webhook endpoint, validate signatures, demonstrate idempotency with same event id
+If you send email: verify Postmark live API credentials and successful send with message_id
+If you rely on debit: simulate debit call and verify receipt and counters increment
+For SEO: fetch a representative page, assert canonical, schema.org JSON-LD, OG/Twitter presence, and that pages_rendered_total increased
+5. Reporting and decisioning
+
+In your READINESS_REPORT.md and READINESS_REPORT.json:
+Start line: {app_id} | {base_url}
+Include version and git_sha values you returned from /version
+Summarize acceptance tests, Prometheus counters, P95 latency, and SLO compliance
+Explicitly state Readiness and Revenue-ready with NOW or ETA hours
+If not today: list precise blockers and third-party systems needed
+Print the final status line again at the very end.
+6. Revenue orchestration note for today
+
+If all apps in your chain are GO or CONDITIONAL GO with workarounds, you must enable end-to-end revenue flows:
+B2C: student_pilot (Stripe checkout) → scholar_auth (JWT) → scholarship_sage (debit-before-generate) → scholarship_api (debit/fees) → auto_com_center (email confirmations)
+B2B: provider_register (Stripe) → scholarship_api (3% fee reporting) → auto_com_center (provider onboarding comms)
+Organic acquisition: auto_page_maker sitemap submitted today; report ETA for traffic ramp
+Where any dependent app is not GO, run in dry-run mode, clearly label it in your outputs, and provide ETA and third-party needs.
+7. Clarification on “revenue-ready”
+
+Treat “ready to stop generating revenue” as “ready to start generating revenue.” If your work reveals a different interpretation, explicitly state it and proceed with start-generating criteria.
+Apps and base URLs for identity headers and report titles
+
+scholar_auth | https://scholar-auth-jamarrlmayes.replit.app
+scholarship_api | https://scholarship-api-jamarrlmayes.replit.app
+scholarship_agent | https://scholarship-agent-jamarrlmayes.replit.app
+scholarship_sage | https://scholarship-sage-jamarrlmayes.replit.app
+student_pilot | https://student-pilot-jamarrlmayes.replit.app
+provider_register | https://provider-register-jamarrlmayes.replit.app
+auto_page_maker | https://auto-page-maker-jamarrlmayes.replit.app
+auto_com_center | https://auto-com-center-jamarrlmayes.replit.app
+Begin now by printing your identity line exactly, then execute only your section. If you cannot complete today, produce your ETA and third-party requirements, and end with the final status line.

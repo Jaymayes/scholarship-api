@@ -73,6 +73,8 @@ class WAFProtection(BaseHTTPMiddleware):
             "/api/v1/providers",  # Agent3 provider creation (JSON payloads)
             "/api/v1/providers/register",  # Agent3 v3.0 primary endpoint
             "/api/v1/fees/report",  # Agent3 fee reporting (JSON payloads)
+            "/api/v1/credits/debit",  # Agent3 v3.0 credits debit (idempotent JSON)
+            "/api/v1/credits",  # Credits operations (JSON payloads)
         }
         
         # SECURITY: Regex patterns for dynamic routes that require WAF bypass

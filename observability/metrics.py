@@ -79,10 +79,10 @@ waf_allowlist_bypasses_total = Counter(
     ['endpoint']
 )
 
-# Agent3 Required Observability Counters
-credits_debit_total = Counter(
-    'credits_debit_total',
-    'Total credit debit operations',
+# Agent3 v3.0 Required Observability Counters
+debit_attempts_total = Counter(
+    'debit_attempts_total',
+    'Total credit debit operations (v3.0)',
     ['status']
 )
 
@@ -92,9 +92,9 @@ fee_reports_total = Counter(
     ['status']
 )
 
-applications_total = Counter(
-    'applications_total',
-    'Total application submissions',
+applications_submitted_total = Counter(
+    'applications_submitted_total',
+    'Total application submissions (v3.0)',
     ['status']
 )
 
@@ -103,6 +103,10 @@ providers_total = Counter(
     'Total provider registrations',
     ['status']
 )
+
+# Backwards compatibility aliases for existing code
+credits_debit_total = debit_attempts_total
+applications_total = applications_submitted_total
 
 # Active scholarships gauge for real-time tracking
 # METRICS DUPLICATION FIX: Removed Gauge - using only CustomCollector approach
