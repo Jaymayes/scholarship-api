@@ -1,0 +1,307 @@
+AGENT3 UNIFIED EXECUTION PROMPT v3.0 — ALL APPS
+
+Read carefully. Execute ONLY the section that matches your app’s identity. Before any action, print your identity header exactly as:
+FINAL_SYSTEM_IDENTITY: <app_id> | APP_BASE_URL: <base_url> | SECTION: <letter>
+
+On every generated report or artifact, the first line must be:
+<app_id> | <base_url>
+
+Global conventions for all apps
+
+Identity headers: Add on every HTTP response:
+X-System-Identity: <app_id>
+X-App-Base-URL: <base_url>
+Identity JSON: Include in every JSON body where appropriate:
+system_identity: <app_id>
+base_url: <base_url>
+Core endpoints (must exist and pass tests):
+GET /healthz → JSON includes: status:"ok", version, system_identity, base_url, timestamp (ISO8601)
+GET /version → JSON includes: version, git_sha (or gitSha), system_identity, base_url
+GET /api/metrics/prometheus → Prometheus text format. Must include:
+app_info{app_id="<app_id>",base_url="<base_url>",version="<semver>"} 1
+Performance SLO: 99.9% uptime target; P95 latency ~120ms for the core endpoints
+Required deliverables (files, no spaces in names):
+READINESS_REPORT.md
+READINESS_REPORT.json
+IDENTITY_VERIFICATION_ARTIFACTS.md
+ENDPOINT_TESTS.sh (executable; returns non-zero on failure)
+Final output: After tests, print the “FINAL STATUS LINE” exactly: <app_id> | <base_url> | Readiness: <GO|CONDITIONAL GO|BLOCKED> | Revenue-ready: <NOW|ETA: h/d/timestamp>
+If you cannot reach “Revenue-ready: NOW” today, provide a realistic ETA and list the required third-party systems and credentials blocking go-live.
+Cross-app checks: Where specified, verify dependent apps are reachable (5s timeout) and record results in reports.
+App registry
+
+scholar_auth → https://scholar-auth-jamarrlmayes.replit.app (SECTION A)
+scholarship_api → https://scholarship-api-jamarrlmayes.replit.app (SECTION B)
+scholarship_agent → https://scholarship-agent-jamarrlmayes.replit.app (SECTION C)
+scholarship_sage → https://scholarship-sage-jamarrlmayes.replit.app (SECTION D)
+student_pilot → https://student-pilot-jamarrlmayes.replit.app (SECTION E)
+provider_register → https://provider-register-jamarrlmayes.replit.app (SECTION F)
+auto_page_maker → https://auto-page-maker-jamarrlmayes.replit.app (SECTION G)
+auto_com_center → https://auto-com-center-jamarrlmayes.replit.app (SECTION H)
+SECTION A — scholar_auth
+APP_BASE_URL: https://scholar-auth-jamarrlmayes.replit.app
+
+Primary mission
+
+Be the single source of identity and JWTs for the ecosystem. Provide OIDC discovery and JWKS. Emit security and issuance metrics. No PII leakage.
+Must-have endpoints and behavior
+
+GET /.well-known/openid-configuration → valid OIDC discovery JSON
+GET /.well-known/jwks.json → valid JWKS with at least one active signing key
+GET /healthz, /version, /api/metrics/prometheus (global spec)
+Security/Business metrics:
+tokens_issued_total{grant_type,status}
+jwks_requests_total
+app_info gauge with version label
+Headers + JSON identity on all responses
+Acceptance tests (implement in ENDPOINT_TESTS.sh)
+
+Healthz fields + headers; Version includes git_sha; Metrics include app_info + counters above
+OIDC discovery returns issuer, jwks_uri, authorization_endpoint
+JWKS contains ≥1 key and increments jwks_requests_total
+Third-party systems
+
+Key management/HSM or secure env for signing keys
+Time sync (NTP) to ensure token validity windows
+Revenue-ready definition
+
+System issues/validates tokens for all other apps without errors at P95 ≤120ms.
+Final status line must reflect NOW if all above pass.
+SECTION B — scholarship_api
+APP_BASE_URL: https://scholarship-api-jamarrlmayes.replit.app
+
+Primary mission
+
+Core domain API for scholarships, applications, providers, fees, and credits debits.
+Must-have endpoints and behavior
+
+POST /api/v1/applications/submit
+POST /api/v1/providers/register
+GET /api/v1/scholarships/search?q=term
+POST /api/v1/credits/debit
+POST /api/v1/fees/report (3% platform fee computation)
+GET /healthz, /version, /api/metrics/prometheus (global spec)
+Metrics:
+applications_total{status}
+providers_total{status}
+credits_debit_total{status}
+fee_reports_total{status}
+Auth: Validate JWTs issued by scholar_auth on protected endpoints
+Acceptance tests
+
+Healthz, Version, Metrics with counters above
+Submit application returns durable id; Providers register with validation
+Search returns total and list; Debit returns idempotent receipt
+Cross-app: GET scholar_auth OIDC and JWKS reachable within 5s
+Third-party systems
+
+Database (e.g., Postgres/Neon) with migrations applied
+Access to scholar_auth OIDC/JWKS
+Revenue-ready definition
+
+Applications submit and credits debit operate end-to-end.
+Fee report computes 3% correctly.
+Final status NOW if all pass.
+SECTION C — scholarship_agent
+APP_BASE_URL: https://scholarship-agent-jamarrlmayes.replit.app
+
+Primary mission
+
+Run matching, autonomous campaigns, and operational tasks for growth.
+Must-have endpoints and behavior
+
+POST /api/v1/match/run
+POST /api/v1/campaigns/launch
+POST /api/v1/tasks/execute
+GET /healthz, /version, /api/metrics/prometheus (global spec)
+Metrics:
+matches_run_total{status}
+campaigns_launched_total{status}
+tasks_executed_total{status}
+Identity headers/JSON on all responses
+Acceptance tests
+
+Healthz/Version/Prometheus compliance
+Each POST endpoint returns request_id and increments counters with status label
+Cross-app: scholar_auth OIDC reachable within 5s
+Third-party systems
+
+None required to go live if operating in dry-run for campaigns; configure secrets for any messaging integrations when moving to live.
+Revenue-ready definition
+
+Matching and campaigns callable and report metrics. If any dependency blocks live campaigns, set ETA (e.g., “ETA: 2h”) and list dependencies.
+SECTION D — scholarship_sage
+APP_BASE_URL: https://scholarship-sage-jamarrlmayes.replit.app
+
+Primary mission
+
+Student-facing AI assistance for recommendations and application drafts; must debit credits before generation.
+Must-have endpoints and behavior
+
+GET /api/v1/recommendations → requires JWT; 401 without auth
+POST /assist/application-draft → requires auth; debit credits via scholarship_api before generate
+GET /healthz, /version, /api/metrics/prometheus (global spec)
+Metrics:
+drafts_created_total{status}
+debit_attempts_total{status}
+Errors must include request_id; no prompt or key leakage
+Acceptance tests
+
+Healthz/Version/Prometheus compliance
+401 on recommendations without JWT
+application-draft enforces auth; logs debit_attempts_total
+Cross-app: scholarship_api /healthz reachable; scholar_auth OIDC reachable
+Third-party systems
+
+OpenAI/LLM provider key (secure)
+Access to scholarship_api and scholar_auth
+Revenue-ready definition
+
+Debit-before-generate flow proven; error handling robust.
+Final status NOW if all pass.
+SECTION E — student_pilot
+APP_BASE_URL: https://student-pilot-jamarrlmayes.replit.app
+
+Primary mission
+
+B2C monetization via credit packages; handle Stripe Checkout and webhooks.
+Must-have endpoints and behavior
+
+POST /api/v1/credits/purchase → returns checkout_url
+GET /api/v1/credits/balance
+POST /api/v1/credits/grant (RBAC enforced)
+POST /api/webhooks/stripe → validates signatures; idempotent credit grants
+GET /healthz, /version, /api/metrics/prometheus (global spec)
+Metrics:
+purchases_total{status}
+webhooks_total{status}
+Acceptance tests
+
+Healthz/Version/Prometheus compliance
+Purchase returns checkout_url; webhook increments webhooks_total
+Balance reflects credits after webhook
+RBAC enforced on grant
+Third-party systems
+
+Stripe account (live mode), API keys, webhook signing secret, product/prices configured
+Database for credit ledger
+Revenue-ready definition
+
+Full purchase → webhook → credits → usable in scholarship_sage flow.
+Final status NOW if all pass.
+SECTION F — provider_register
+APP_BASE_URL: https://provider-register-jamarrlmayes.replit.app
+
+Primary mission
+
+Onboard providers; compute/report 3% platform fee; process Stripe webhooks for payouts if applicable.
+Must-have endpoints and behavior
+
+POST /api/v1/providers/register
+POST /api/v1/fees/report → computes 3% platform fee
+POST /api/webhooks/stripe → signature validation, idempotent
+GET /healthz, /version, /api/metrics/prometheus (global spec)
+Metrics: providers_total{status}, fee_reports_total{status}, webhooks_total{status}
+Acceptance tests
+
+Healthz/Version/Prometheus compliance
+Register validates fields and returns id
+Fee report correct for sample payloads
+Stripe webhook signature validation and idempotency
+Third-party systems
+
+Stripe connect (if payouts), webhook signing secret
+Database for providers
+Revenue-ready definition
+
+Providers can register and fee reporting is correct.
+Final status NOW if all pass.
+SECTION G — auto_page_maker
+APP_BASE_URL: https://auto-page-maker-jamarrlmayes.replit.app
+
+Primary mission
+
+SEO-driven acquisition engine: render scholarship pages at scale with proper metadata and sitemap.
+Must-have endpoints and behavior
+
+GET /sitemap.xml → ≥1,000 URLs preferred; no broken self-links
+Pages include:
+rel=canonical; schema.org markup; OG/Twitter cards; fast render
+GET /healthz, /version, /api/metrics/prometheus (global spec)
+Metrics: pages_rendered_total{status}, app_info
+Acceptance tests
+
+Healthz/Version/Prometheus compliance
+sitemap.xml contains many URLs and is valid XML
+Random sample of pages contain canonical, schema.org, OG/Twitter
+Third-party systems
+
+Google Search Console ownership verification and sitemap submission
+Google Analytics property with Measurement ID installed
+Revenue-ready definition
+
+Conditional. Organic traffic ramps post-indexing. If GSC not yet submitted, set ETA: 7 days from submission. Include explicit action: verify domain; submit sitemap; request indexing of top pages.
+SECTION H — auto_com_center
+APP_BASE_URL: https://auto-com-center-jamarrlmayes.replit.app
+
+Primary mission
+
+Centralized communications: transactional and marketing email with auditing and webhooks.
+Must-have endpoints and behavior
+
+POST /api/v1/email/send → template-based; logs message_id; enforces known templateId
+POST /api/v1/events → telemetry intake
+POST /api/webhooks/v1/provider → idempotent inbound provider webhooks (e.g., Postmark Delivery/Open/Click)
+GET /api/metrics/prometheus → includes:
+emails_sent_total{status}
+webhooks_total{status}
+app_info gauge
+GET /healthz, /version (global spec)
+Acceptance tests
+
+Healthz/Version/Prometheus compliance
+email/send returns success:true, message_id, status:"sent"
+events accepts and stores telemetry
+webhooks increments webhooks_total and is idempotent
+Third-party systems
+
+Postmark (live server token, templates provisioned, open/click tracking)
+Database (Neon/Postgres) for emailAuditLog and unsubscribes
+Revenue-ready definition
+
+Email sending live and audited; templates enforced.
+Final status NOW if all pass.
+Cross-app integration contract (for all sections to respect)
+
+Auth: All protected endpoints validate JWTs from scholar_auth
+Credits: scholarship_sage must call scholarship_api debit before generating any paid artifact
+Monetization: student_pilot issues credits and Stripe webhooks credit accounts; scholarship_api can debit; scholarship_sage spends
+Provider ecosystem: provider_register registers providers; scholarship_api recognizes providers and computes 3% fee; auto_com_center delivers notifications; scholarship_agent runs campaigns
+SEO funnel: auto_page_maker produces pages; GSC sitemap submission required; GA measurement enabled
+Observability: Each app exposes app_info and business counters; errors include request_id
+Required deliverables content (all apps)
+
+READINESS_REPORT.md
+First line: <app_id> | <base_url>
+What was tested, results, SLOs, risks, remediation
+Cross-app checks performed and outcomes
+Revenue-ready conclusion and ETA if not NOW
+READINESS_REPORT.json
+{ app_id, base_url, version, git_sha, readiness, revenue_ready, eta, tests: {...}, dependencies: {...}, metrics_sample: "...", timestamp }
+IDENTITY_VERIFICATION_ARTIFACTS.md
+Raw sample headers/bodies for healthz, version, metrics, and 2 key endpoints
+ENDPOINT_TESTS.sh
+Executable; performs acceptance tests; exits non-zero on any failure
+Execution order (per app)
+
+Print identity header exactly as specified
+Ensure endpoints implemented/updated, identity headers/JSON added
+Ensure metrics exported with required counters and labels {status}
+Run ENDPOINT_TESTS.sh locally and against deployed base_url where applicable; record evidence
+Produce deliverables; ensure they begin with “<app_id> | <base_url>”
+Print FINAL STATUS LINE
+Today’s target
+
+Goal: 100% ready and working together today.
+If any blocker prevents “Revenue-ready: NOW”, state an ETA and list the exact third-party systems and credentials that must be in place (e.g., “Stripe live key + webhook secret”, “Postmark server token + templateId=welcome”, “GSC site verification + sitemap submission”).
+Begin now by identifying yourself.
