@@ -1,0 +1,97 @@
+# MASTER PROTOCOL: SCHOLAR AI ADVISOR ECOSYSTEM LAUNCH
+# MISSION: REVENUE READINESS & SYSTEM SYNCHRONIZATION
+
+You are an expert Systems Architect Agent operating within the Scholar AI Advisor ecosystem. Your goal is to verify that this specific application is 100% production-ready and fully integrated with the 7 other apps in the cluster *today*.
+
+**ECOSYSTEM MAP & BASE URLs:**
+1. scholar_auth -> https://scholar-auth-jamarrlmayes.replit.app
+2. scholarship_api -> https://scholarship-api-jamarrlmayes.replit.app
+3. scholarship_agent -> https://scholarship-agent-jamarrlmayes.replit.app
+4. scholarship_sage -> https://scholarship-sage-jamarrlmayes.replit.app
+5. student_pilot -> https://student-pilot-jamarrlmayes.replit.app
+6. provider_register -> https://provider-register-jamarrlmayes.replit.app
+7. auto_page_maker -> https://auto-page-maker-jamarrlmayes.replit.app
+8. auto_com_center -> https://auto-com-center-jamarrlmayes.replit.app
+
+---
+
+### PHASE 1: SELF-IDENTIFICATION
+**INSTRUCTION:** Before executing any logic, inspect your current file structure (e.g., `package.json`, `replit.nix`, or directory names) to determine which APP_ID you are.
+* **REPORT:** "I have identified myself as: [APP_ID]"
+* **REPORT:** "My Base URL is: [YOUR_BASE_URL]"
+* **ACTION:** Only execute the section below labeled with your [APP_ID]. Ignore all other sections.
+
+---
+
+### PHASE 2: APP-SPECIFIC EXECUTION PROTOCOLS
+
+#### [SECTION: scholarship_agent]
+**Role:** The Autonomous Core (Campaign Orchestration)
+**Objective:** Confirm ability to trigger campaigns and dispatch tasks to Page Maker and Com Center.
+1.  **Environment Check:** Verify `DRY_RUN` is set to `FALSE` (or ensure you have a specific flag to enable live revenue actions). Verify `SCHOLARSHIP_API_SERVICE_SECRET` and `M2M_CLIENT_ID` are loaded.
+2.  **Live Connection Test:**
+    * Ping `auto_page_maker` health endpoint: `https://auto-page-maker-jamarrlmayes.replit.app/api/health`
+    * Ping `auto_com_center` health endpoint: `https://auto-com-center-jamarrlmayes.replit.app/api/health`
+3.  **Revenue Readiness:** If "today" is the launch target, verify that the `POST /api/campaigns/trigger` endpoint is live and protected by `scholar_auth`.
+4.  **Third-Party Deps:** Confirm **Groq API Key** (for inference) and **Stripe Connect** (if handling payouts) are valid.
+5.  **Report:** "Revenue Readiness Status: [GO/NO-GO]. If NO-GO, list missing third-party keys."
+
+#### [SECTION: scholar_auth]
+**Role:** Identity & Security (JWT Issuer)
+**Objective:** Ensure M2M tokens can be minted for the Agent.
+1.  **Client Verification:** Check database for `scholarship-agent-service` client ID. Confirm scopes `read:scholarships` and `send:notifications` are assigned.
+2.  **Key Rotation:** Verify JWKS endpoint `/.well-known/jwks.json` is publicly accessible (return 200 OK).
+3.  **Report:** "Auth Subsystem Status: [GO/NO-GO]. M2M Client for Agent: [VERIFIED/MISSING]."
+
+#### [SECTION: scholarship_api]
+**Role:** Data Core (Source of Truth)
+**Objective:** Confirm webhook dispatch logic is active.
+1.  **Webhook Config:** Verify the webhook dispatcher is configured to send `event_type` (not just `event`) to `scholarship_agent`.
+2.  **Data Persistence:** Run a read-only query to count active scholarships. `SELECT count(*) FROM scholarships WHERE status='active'`.
+3.  **Report:** "Data Core Status: [GO/NO-GO]. Active Scholarships for Matching: [COUNT]."
+
+#### [SECTION: auto_com_center]
+**Role:** Communications Backbone (Email/SMS)
+**Objective:** Confirm transport is live (not mocking).
+1.  **Transport Check:** Verify **Postmark/SendGrid** API Key is present in Secrets.
+2.  **Template Check:** Verify standard templates ("Scholarship Match", "Provider Welcome") exist in the registry.
+3.  **Integration:** Verify `POST /api/notify` accepts Bearer tokens from `scholar_auth`.
+4.  **Report:** "Comms Status: [GO/NO-GO]. Transport: [LIVE/MOCK]."
+
+#### [SECTION: auto_page_maker]
+**Role:** SEO Engine (Landing Pages)
+**Objective:** Confirm page generation and sitemap rebuilding.
+1.  **Build API:** Verify `POST /api/pages/build` is live.
+2.  **Sitemap:** Verify `POST /api/sitemap/rebuild` triggers a ping to search engines (or logs it).
+3.  **Third-Party Deps:** Confirm **Google Search Console** indexing API keys (if applicable) are present.
+4.  **Report:** "SEO Engine Status: [GO/NO-GO]. Sitemap URL: [URL]."
+
+#### [SECTION: provider_register]
+**Role:** Supply Side Acquisition
+**Objective:** Confirm provider onboarding flow.
+1.  **Public Access:** Verify the app is published and publicly accessible.
+2.  **Registration Flow:** Ensure the "Sign Up" form posts correctly to `scholar_auth` for user creation and `scholarship_api` for provider profile creation.
+3.  **Report:** "Provider Portal Status: [GO/NO-GO]."
+
+#### [SECTION: student_pilot]
+**Role:** Demand Side Interface (Student UI)
+**Objective:** Confirm scholarship matching UI.
+1.  **Match Feed:** Verify the student dashboard can fetch matches from `scholarship_api`.
+2.  **Uploads:** Verify the Document Hub upload endpoint is connected to storage.
+3.  **Report:** "Student Pilot Status: [GO/NO-GO]."
+
+#### [SECTION: scholarship_sage]
+**Role:** AI RAG Interface
+**Objective:** Confirm Vector DB connectivity.
+1.  **Vector Store:** Verify connection to **Pinecone/Weaviate/Replit Vector DB**.
+2.  **Inference:** Verify **OpenAI/Anthropic/Groq** key is present for RAG generation.
+3.  **Report:** "Sage Status: [GO/NO-GO]. Vector DB: [CONNECTED/FAILED]."
+
+---
+
+### PHASE 3: EXECUTION & REPORTING
+**INSTRUCTION:**
+1.  Run the checks for your specific ID.
+2.  If you encounter critical failures (missing secrets, 500 errors, database connection failures), explicitly state: **"BLOCKER: [Reason]"**.
+3.  If you are **100% READY** for revenue operations (live payments, live emails, live data), conclude with: **"STATUS: FULL REVENUE GO"**.
+4.  If you cannot be ready today, calculate the estimated time to fix blockers and list specifically which Third-Party Systems (Stripe, SendGrid, Groq, etc.) need configuration.
