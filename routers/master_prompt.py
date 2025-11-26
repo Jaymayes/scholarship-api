@@ -22,7 +22,7 @@ from fastapi import APIRouter, Depends, HTTPException, Header, Query, Request
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-from models.database import get_db
+from models.database import get_db, ScholarshipDB
 from utils.logger import get_logger
 
 logger = get_logger("master_prompt")
@@ -117,6 +117,17 @@ async def master_health():
     )
 
 
+@router.get("/api/healthz")
+@router.head("/api/healthz")
+async def master_healthz():
+    """
+    Kubernetes/deployment-style health check endpoint via /api/ prefix
+    
+    GET /api/healthz → {status:"ok"} (works through production proxy)
+    """
+    return {"status": "ok"}
+
+
 @router.get("/api/metrics/basic", response_model=MetricsBasicResponse)
 async def master_metrics_basic():
     """
@@ -166,53 +177,52 @@ async def list_scholarships(
     major: str | None = Query(None, description="Major/field filter"),
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
-    authorization: str | None = Header(None)
+    authorization: str | None = Header(None),
+    db: Session = Depends(get_db)
 ):
     """
-    Master Prompt scholarship search endpoint
+    Master Prompt scholarship search endpoint (REAL-TIME DATABASE)
     
     GET /api/scholarships?query=&filters=
     
     Filters: amount_min/max, deadline_from/to, location, major, GPA, demographics, keywords
     """
     try:
-        from services.scholarship_service import scholarship_service
-        
-        all_scholarships = list(scholarship_service.scholarships.values())
-        results = all_scholarships
+        db_query = db.query(ScholarshipDB).filter(ScholarshipDB.is_active == True)
         
         if query:
-            q = query.lower()
-            results = [
-                s for s in results
-                if q in getattr(s, 'title', '').lower()
-                or q in getattr(s, 'description', '').lower()
-                or q in getattr(s, 'provider', '').lower()
-            ]
+            q = f"%{query.lower()}%"
+            db_query = db_query.filter(
+                (ScholarshipDB.name.ilike(q)) |
+                (ScholarshipDB.description.ilike(q)) |
+                (ScholarshipDB.organization.ilike(q))
+            )
         
         if amount_min is not None:
-            results = [s for s in results if getattr(s, 'amount', 0) >= amount_min]
+            db_query = db_query.filter(ScholarshipDB.amount >= amount_min)
         if amount_max is not None:
-            results = [s for s in results if getattr(s, 'amount', float('inf')) <= amount_max]
+            db_query = db_query.filter(ScholarshipDB.amount <= amount_max)
         
-        total = len(results)
-        start = (page - 1) * page_size
-        end = start + page_size
-        paginated = results[start:end]
+        total = db_query.count()
+        
+        offset = (page - 1) * page_size
+        scholarships = db_query.order_by(ScholarshipDB.amount.desc()).offset(offset).limit(page_size).all()
+        
+        logger.info(f"[REAL-TIME] Fetched {len(scholarships)} scholarships from database (total: {total})")
         
         return ScholarshipListResponse(
             items=[
                 ScholarshipItem(
-                    id=getattr(s, 'id', ''),
-                    title=getattr(s, 'title', ''),
-                    description=getattr(s, 'description', None),
-                    amount=getattr(s, 'amount', None),
-                    deadline=getattr(s, 'deadline', None),
-                    provider=getattr(s, 'provider', None),
-                    location=getattr(s, 'location', None),
+                    id=s.id,
+                    title=s.name,
+                    description=s.description,
+                    amount=s.amount,
+                    deadline=s.application_deadline.isoformat() if s.application_deadline else None,
+                    provider=s.organization,
+                    location=None,
                     eligibility=None
                 )
-                for s in paginated
+                for s in scholarships
             ],
             total=total,
             page=page,
@@ -220,78 +230,82 @@ async def list_scholarships(
         )
         
     except Exception as e:
-        logger.error(f"Failed to list scholarships: {e}")
+        logger.error(f"Failed to list scholarships from database: {e}")
         raise HTTPException(status_code=500, detail="Failed to list scholarships")
 
 
 @router.get("/api/scholarships/{scholarship_id}", response_model=ScholarshipItem)
 async def get_scholarship(
     scholarship_id: str,
-    authorization: str | None = Header(None)
+    authorization: str | None = Header(None),
+    db: Session = Depends(get_db)
 ):
     """
-    Master Prompt get scholarship by ID
+    Master Prompt get scholarship by ID (REAL-TIME DATABASE)
     
     GET /api/scholarships/{id}
     """
     try:
-        from services.scholarship_service import scholarship_service
+        scholarship = db.query(ScholarshipDB).filter(
+            ScholarshipDB.id == scholarship_id,
+            ScholarshipDB.is_active == True
+        ).first()
         
-        scholarship = scholarship_service.scholarships.get(scholarship_id)
         if not scholarship:
             raise HTTPException(status_code=404, detail="Scholarship not found")
         
+        logger.info(f"[REAL-TIME] Fetched scholarship {scholarship_id} from database")
+        
         return ScholarshipItem(
-            id=getattr(scholarship, 'id', scholarship_id),
-            title=getattr(scholarship, 'title', ''),
-            description=getattr(scholarship, 'description', None),
-            amount=getattr(scholarship, 'amount', None),
-            deadline=getattr(scholarship, 'deadline', None),
-            provider=getattr(scholarship, 'provider', None),
-            location=getattr(scholarship, 'location', None),
+            id=scholarship.id,
+            title=scholarship.name,
+            description=scholarship.description,
+            amount=scholarship.amount,
+            deadline=scholarship.application_deadline.isoformat() if scholarship.application_deadline else None,
+            provider=scholarship.organization,
+            location=None,
             eligibility=None
         )
         
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Failed to get scholarship: {e}")
+        logger.error(f"Failed to get scholarship from database: {e}")
         raise HTTPException(status_code=500, detail="Failed to get scholarship")
 
 
 @router.get("/api/featured", response_model=ScholarshipListResponse)
 async def get_featured_scholarships(
     limit: int = Query(10, ge=1, le=50),
-    authorization: str | None = Header(None)
+    authorization: str | None = Header(None),
+    db: Session = Depends(get_db)
 ):
     """
-    Master Prompt featured scholarships endpoint
+    Master Prompt featured scholarships endpoint (REAL-TIME DATABASE)
     
     GET /api/featured
     
     Returns top featured scholarships (highest amount, soonest deadline, etc.)
     """
     try:
-        from services.scholarship_service import scholarship_service
+        featured = db.query(ScholarshipDB).filter(
+            ScholarshipDB.is_active == True
+        ).order_by(
+            ScholarshipDB.amount.desc()
+        ).limit(limit).all()
         
-        all_scholarships = list(scholarship_service.scholarships.values())
-        
-        featured = sorted(
-            all_scholarships,
-            key=lambda s: (getattr(s, 'amount', 0) or 0),
-            reverse=True
-        )[:limit]
+        logger.info(f"[REAL-TIME] Fetched {len(featured)} featured scholarships from database")
         
         return ScholarshipListResponse(
             items=[
                 ScholarshipItem(
-                    id=getattr(s, 'id', ''),
-                    title=getattr(s, 'title', ''),
-                    description=getattr(s, 'description', None),
-                    amount=getattr(s, 'amount', None),
-                    deadline=getattr(s, 'deadline', None),
-                    provider=getattr(s, 'provider', None),
-                    location=getattr(s, 'location', None),
+                    id=s.id,
+                    title=s.name,
+                    description=s.description,
+                    amount=s.amount,
+                    deadline=s.application_deadline.isoformat() if s.application_deadline else None,
+                    provider=s.organization,
+                    location=None,
                     eligibility=None
                 )
                 for s in featured
@@ -302,7 +316,7 @@ async def get_featured_scholarships(
         )
         
     except Exception as e:
-        logger.error(f"Failed to get featured scholarships: {e}")
+        logger.error(f"Failed to get featured scholarships from database: {e}")
         raise HTTPException(status_code=500, detail="Failed to get featured scholarships")
 
 
