@@ -434,23 +434,47 @@ async def notify_scholarship_update(scholarship_id: str, action: str, data: dict
     Send webhook notification to consumers when scholarship is updated
     
     Consumers: auto_page_maker, scholarship_agent, student_pilot
+    Each consumer may expect slightly different payload formats
     """
-    webhook_urls = [
-        "https://auto-page-maker-jamarrlmayes.replit.app/api/webhooks/scholarships.updated",
-        "https://scholarship-agent-jamarrlmayes.replit.app/api/webhooks/event",
-        "https://student-pilot-jamarrlmayes.replit.app/api/webhooks/scholarships.updated",
+    webhook_configs = [
+        {
+            "url": "https://auto-page-maker-jamarrlmayes.replit.app/api/webhooks/scholarships.updated",
+            "payload": {
+                "event": "scholarships.updated",
+                "scholarship_id": scholarship_id,
+                "action": action,
+                "timestamp": datetime.utcnow().isoformat() + "Z",
+                "data": data
+            }
+        },
+        {
+            "url": "https://scholarship-agent-jamarrlmayes.replit.app/api/webhooks/event",
+            "payload": {
+                "event_type": "scholarships.updated",
+                "scholarship_id": scholarship_id,
+                "action": action,
+                "timestamp": datetime.utcnow().isoformat() + "Z",
+                "data": data,
+                "source": "scholarship_api"
+            }
+        },
+        {
+            "url": "https://student-pilot-jamarrlmayes.replit.app/api/webhooks/scholarships.updated",
+            "payload": {
+                "event": "scholarships.updated",
+                "scholarship_id": scholarship_id,
+                "action": action,
+                "timestamp": datetime.utcnow().isoformat() + "Z",
+                "data": data
+            }
+        },
     ]
     
-    payload = {
-        "event": "scholarships.updated",
-        "scholarship_id": scholarship_id,
-        "action": action,
-        "timestamp": datetime.utcnow().isoformat() + "Z",
-        "data": data
-    }
-    
-    for url in webhook_urls:
+    for config in webhook_configs:
         try:
+            url = config["url"]
+            payload = config["payload"]
+            
             signature = ""
             if WEBHOOK_SECRET:
                 import json
