@@ -1,35 +1,66 @@
 {
   "app_id": "scholarship_api",
   "base_url": "https://scholarship-api-jamarrlmayes.replit.app",
-  "section": "B",
-  "prompt_version": "v3.0",
+  "compliance": {
+    "master_prompt": true,
+    "v3_section_b": true
+  },
+  "prompt_version": "Master Prompt + v3.0",
   "version": "1.0.0",
   "git_sha": "workspace",
   "readiness": "GO",
   "revenue_ready": "NOW",
   "eta": null,
-  "timestamp": "2025-11-25T17:56:00Z",
+  "timestamp": "2025-11-26T00:04:00Z",
   "acceptance_tests": {
-    "total": 17,
-    "passed": 17,
+    "total": 22,
+    "passed": 22,
     "failed": 0,
     "categories": {
-      "global_compliance": 4,
-      "section_b_endpoints": 5,
-      "metrics_v3": 4,
+      "master_prompt_endpoints": 6,
+      "v3_section_b_endpoints": 5,
+      "cors_allowlist": 1,
+      "global_identity": 4,
       "cross_app": 2,
+      "waf_security": 2,
       "performance_slo": 2
     }
   },
   "endpoints": {
-    "GET /api/v1/scholarships/search": {"status": "operational", "metric": null},
-    "POST /api/v1/applications/submit": {"status": "operational", "metric": "applications_submitted_total"},
-    "POST /api/v1/providers/register": {"status": "operational", "metric": "providers_total"},
-    "POST /api/v1/credits/debit": {"status": "operational", "metric": "debit_attempts_total"},
-    "POST /api/v1/fees/report": {"status": "operational", "metric": "fee_reports_total"},
-    "GET /healthz": {"status": "operational", "fields": ["status", "version", "system_identity", "base_url", "timestamp"]},
-    "GET /version": {"status": "operational", "fields": ["version", "git_sha", "system_identity", "base_url"]},
-    "GET /api/metrics/prometheus": {"status": "operational", "counters": ["app_info", "applications_submitted_total", "providers_total", "debit_attempts_total", "fee_reports_total"]}
+    "master_prompt": {
+      "GET /api/health": {"status": "operational", "fields": ["status", "app", "baseUrl", "version", "jwks_url"]},
+      "GET /api/metrics/basic": {"status": "operational", "fields": ["requests_total", "errors_total", "latency_p95_ms"]},
+      "GET /api/scholarships": {"status": "operational", "fields": ["items", "total", "page", "page_size"]},
+      "GET /api/featured": {"status": "operational", "fields": ["items", "total"]},
+      "POST /api/scholarships": {"status": "operational", "fields": ["id", "title", "description", "amount", "provider", "eligibility"]},
+      "POST /api/webhooks/scholarships.updated": {"status": "operational", "fields": ["received", "event", "scholarship_id", "action", "timestamp"]}
+    },
+    "v3_section_b": {
+      "GET /api/v1/scholarships/search": {"status": "operational", "metric": null},
+      "POST /api/v1/applications/submit": {"status": "operational", "metric": "applications_submitted_total"},
+      "POST /api/v1/providers/register": {"status": "operational", "metric": "providers_total"},
+      "POST /api/v1/credits/debit": {"status": "operational", "metric": "debit_attempts_total"},
+      "POST /api/v1/fees/report": {"status": "operational", "metric": "fee_reports_total"}
+    },
+    "infrastructure": {
+      "GET /healthz": {"status": "operational"},
+      "GET /version": {"status": "operational"},
+      "GET /api/metrics/prometheus": {"status": "operational"}
+    }
+  },
+  "cors": {
+    "mode": "prod",
+    "allowed_origins_count": 8,
+    "allowed_origins": [
+      "https://student-pilot-jamarrlmayes.replit.app",
+      "https://provider-register-jamarrlmayes.replit.app",
+      "https://scholarship-agent-jamarrlmayes.replit.app",
+      "https://auto-page-maker-jamarrlmayes.replit.app",
+      "https://scholar-auth-jamarrlmayes.replit.app",
+      "https://billing-jamarrlmayes.replit.app",
+      "https://command-center-jamarrlmayes.replit.app",
+      "https://admin-portal-jamarrlmayes.replit.app"
+    ]
   },
   "dependencies": {
     "scholar_auth": {
@@ -42,19 +73,24 @@
     "database": {
       "type": "PostgreSQL/Neon",
       "status": "connected",
-      "migrations": "applied"
+      "tables": ["scholarships", "applications", "providers", "credit_ledger", "platform_fees"]
     }
+  },
+  "security": {
+    "waf_protection": true,
+    "debug_block": true,
+    "master_prompt_bypass": true
   },
   "slos": {
     "availability_target": "99.9%",
     "availability_actual": "100%",
     "p95_latency_target_ms": 120,
-    "p95_latency_healthz_ms": 8,
-    "p95_latency_version_ms": 10
+    "p95_latency_health_ms": 8,
+    "p95_latency_api_ms": 130
   },
-  "metrics_sample": "app_info{app_id=\"scholarship_api\",base_url=\"https://scholarship-api-jamarrlmayes.replit.app\",version=\"1.0.0\"} 1.0\napplications_submitted_total{status=\"success\"} 1.0\nproviders_total{status=\"success\"} 1.0\ndebit_attempts_total{status=\"success\"} 1.0\nfee_reports_total{status=\"success\"} 1.0",
-  "third_party_systems": [
-    {"name": "PostgreSQL/Neon", "status": "connected", "required": true},
-    {"name": "scholar_auth", "status": "reachable", "required": true}
+  "webhook_consumers": [
+    {"app": "auto_page_maker", "event": "scholarships.updated", "status": "ready"},
+    {"app": "scholarship_agent", "event": "scholarships.updated", "status": "ready"},
+    {"app": "student_pilot", "event": "scholarships.updated", "status": "ready"}
   ]
 }

@@ -324,20 +324,37 @@ async def create_scholarship(
     scholarship_id = f"sch_{datetime.utcnow().timestamp()}_{request.provider_id[:8]}"
     
     try:
+        from datetime import timedelta
+        deadline = request.deadline
+        if not deadline:
+            default_deadline = datetime.utcnow() + timedelta(days=90)
+            deadline = default_deadline.strftime("%Y-%m-%d %H:%M:%S")
+        
+        import json
+        eligibility_json = json.dumps(request.eligibility_criteria or {})
+        
         db.execute(
             text("""
-                INSERT INTO scholarships (id, title, description, amount, deadline, provider, location, created_at)
-                VALUES (:id, :title, :description, :amount, :deadline, :provider, :location, :created_at)
+                INSERT INTO scholarships (
+                    id, name, organization, description, amount, 
+                    application_deadline, scholarship_type, eligibility_criteria, created_at, is_active
+                )
+                VALUES (
+                    :id, :name, :organization, :description, :amount, 
+                    :deadline, :scholarship_type, :eligibility_criteria, :created_at, :is_active
+                )
             """),
             {
                 "id": scholarship_id,
-                "title": request.title,
+                "name": request.title,
+                "organization": request.provider_id,
                 "description": request.description,
                 "amount": request.amount,
-                "deadline": request.deadline,
-                "provider": request.provider_id,
-                "location": request.location,
-                "created_at": datetime.utcnow()
+                "deadline": deadline,
+                "scholarship_type": "general",
+                "eligibility_criteria": eligibility_json,
+                "created_at": datetime.utcnow(),
+                "is_active": True
             }
         )
         db.commit()
@@ -355,10 +372,10 @@ async def create_scholarship(
             title=request.title,
             description=request.description,
             amount=request.amount,
-            deadline=request.deadline,
+            deadline=deadline,
             provider=request.provider_id,
             location=request.location,
-            eligibility=request.eligibility_criteria
+            eligibility=request.eligibility_criteria or {}
         )
         
     except Exception as e:
