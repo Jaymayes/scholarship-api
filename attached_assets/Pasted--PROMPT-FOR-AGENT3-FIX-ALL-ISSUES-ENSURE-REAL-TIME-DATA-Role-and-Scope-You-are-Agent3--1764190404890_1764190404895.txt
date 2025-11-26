@@ -1,0 +1,90 @@
+# PROMPT FOR AGENT3 (FIX ALL ISSUES & ENSURE REAL-TIME DATA)
+
+**Role and Scope**
+You are Agent3, an expert Full-Stack Engineer and Systems Architect. Your goal is to FIX all identified issues, ensure all data handling is REAL-TIME (no mocks, no stale caches), and verify the application is 100% production-ready.
+* You must only execute the section of this prompt that corresponds to your assigned app. Ignore all other sections.
+* **Constraint:** Do not break existing functionality. Apply fixes surgically.
+
+**App Registry (App Name → APP_BASE_URL)**
+1.  scholar_auth -> https://scholar-auth-jamarrlmayes.replit.app
+2.  scholarship_api -> https://scholarship-api-jamarrlmayes.replit.app
+3.  scholarship_agent -> https://scholarship-agent-jamarrlmayes.replit.app
+4.  scholarship_sage -> https://scholarship-sage-jamarrlmayes.replit.app
+5.  student_pilot -> https://student-pilot-jamarrlmayes.replit.app
+6.  provider_register -> https://provider-register-jamarrlmayes.replit.app
+7.  auto_page_maker -> https://auto-page-maker-jamarrlmayes.replit.app
+8.  auto_com_center -> https://auto-com-center-jamarrlmayes.replit.app
+
+**Identification (must execute before any work)**
+Before starting, output a single-line identification:
+`IDENTIFY: Agent3 | APP_NAME=<exact app name> | APP_BASE_URL=<exact URL> | UTC=<timestamp in ISO 8601>`
+If you cannot determine which app is yours, stop and request clarification. Do not continue.
+
+---
+
+### **Global Instructions: Real-Time Data Enforcement**
+For ALL apps, you must ensure:
+1.  **No Mock Data:** All API endpoints must return data from the live database or upstream service. Remove any hardcoded JSON responses.
+2.  **Cache Invalidation:** If caching is present (e.g., Redis, memory), ensure it has a short TTL (e.g., < 60s) or invalidates immediately on write.
+3.  **Live Connectivity:** All cross-app calls must hit the production URLs defined in the App Registry, not localhost (except for internal loopbacks).
+
+---
+
+### **App-Specific Fix & Optimization Plans**
+
+**Only execute the plan for the app that matches your APP_NAME.**
+
+#### **scholar_auth**
+* **Fix:** Ensure all `/api/auth/*` aliases (login, signup, whoami) accept `POST` requests and correctly forward to the OIDC provider without 404s.
+* **Real-Time:** Verify JWKS rotation logic fetches fresh keys from the database on startup.
+* **Verification:** Run a curl test against `/api/auth/login` to confirm it returns a validation error (400) instead of 404.
+
+#### **scholarship_api**
+* **Fix:** Update the `/healthz` route to work correctly through the production proxy (currently returning 404). Ensure it returns JSON `{"status": "ok"}`.
+* **Fix:** Update API documentation (Swagger/scratchpad) to reference `/api/v1/fees/report` instead of the incorrect `/schedule` path.
+* **Real-Time:** Ensure `GET /api/scholarships` executes a live `SELECT` count query on the database, not a cached count.
+* **Verification:** Curl `/healthz` and `/api/scholarships` to confirm 200 OK and live data.
+
+#### **scholarship_agent**
+* **Fix:** Add `aria-label` attributes to all sidebar navigation links for accessibility compliance.
+* **Fix:** Ensure the "View All", "Edit", and "Pause" buttons on the dashboard are wired to functional event handlers (even if they just log to console for now).
+* **Real-Time:** Verify the Dashboard KPIs (Reach, Cost, Actions) are fetching live metrics from the database/analytics service, not hardcoded constants.
+* **Verification:** Verify navigation links have aria-labels and KPIs update on refresh.
+
+#### **scholarship_sage**
+* **Fix:** Add `aria-label` to the Chat Input field.
+* **Fix:** Address the "Horizontal scroll on mobile" issue by ensuring the main container has `overflow-x: hidden` or responsive padding.
+* **Real-Time:** Ensure the "Active Conversations" count on the dashboard is a live query from the `conversations` table.
+* **Verification:** Check mobile view CSS and chat input attributes.
+
+#### **student_pilot**
+* **Fix:** Add a server-side rendered `<title>` tag or use `react-helmet` to fix the "Empty Title Tag" SEO issue.
+* **Fix:** Update the Sentry configuration to use a valid DSN (or disable if not ready) to stop console errors.
+* **Real-Time:** Ensure `/api/scholarships` fetches live results from `scholarship_api` with no aggressive caching (> 60s).
+* **Verification:** Inspect `<head>` for title and verify scholarship list freshness.
+
+#### **provider_register**
+* **Fix:** Resolve the "ScholarAuth OIDC issuer mismatch" warning if possible (check `ISSUER_URL` env var).
+* **Real-Time:** Ensure the "Provider Registration" form submits directly to the live database and creates a real user in `scholar_auth`.
+* **Verification:** Check console for issuer warnings and verify registration flow.
+
+#### **auto_page_maker**
+* **Fix:** Fix the 22px horizontal overflow on mobile (360px viewport) by auditing body/container widths.
+* **Fix:** Add `role="status"` to the newsletter toast notification for accessibility.
+* **Real-Time:** Ensure `sitemap.xml` is generated dynamically based on the current scholarship list from `scholarship_api`.
+* **Verification:** Check mobile layout and sitemap generation.
+
+#### **auto_com_center**
+* **Fix:** Standardize `/healthz` to return JSON `{"status": "healthy"}` instead of plain text.
+* **Fix:** Implement a visual 404 Not Found component for unknown routes.
+* **Real-Time:** Verify that `/api/send/status` returns the live count of emails sent from the database.
+* **Verification:** Curl `/healthz` and check for JSON response.
+
+---
+
+### **Deliver Your Output**
+1.  Start with the identification line.
+2.  Report on the **Fixes Applied** (what files were changed and why).
+3.  Report on **Real-Time Data Verification** (evidence that data is live).
+4.  Run a final **Validation Test** for the specific fixes.
+5.  End with: `STATUS: FIXED & REAL-TIME READY`
