@@ -365,8 +365,14 @@ async def create_scholarship(
     if not current_user:
         raise HTTPException(status_code=401, detail="Authentication required")
     
-    user_role = getattr(current_user, 'role', None) or current_user.get('role') if isinstance(current_user, dict) else None
-    if user_role not in ['provider', 'admin', 'system']:
+    user_roles = []
+    if hasattr(current_user, 'roles'):
+        user_roles = current_user.roles or []
+    elif isinstance(current_user, dict):
+        user_roles = current_user.get('roles', [])
+    
+    allowed_roles = ['provider', 'admin', 'system']
+    if not any(role in allowed_roles for role in user_roles):
         raise HTTPException(status_code=403, detail="Provider role required")
     
     scholarship_id = f"sch_{datetime.utcnow().timestamp()}_{request.provider_id[:8]}"
