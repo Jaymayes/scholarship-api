@@ -14,6 +14,7 @@ Standard endpoints required by the Master Prompt for scholarship_api:
 import hashlib
 import hmac
 import os
+import time
 from datetime import datetime
 from typing import Any
 
@@ -23,10 +24,13 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from models.database import get_db, ScholarshipDB
+from middleware.auth import get_current_user, User
 from utils.logger import get_logger
 
 logger = get_logger("master_prompt")
 router = APIRouter(tags=["Master Prompt Compliance"])
+
+AUTO_COM_CENTER_URL = "https://auto-com-center-jamarrlmayes.replit.app"
 
 APP_NAME = "scholarship_api"
 APP_BASE_URL = os.getenv("APP_BASE_URL", "https://scholarship-api-jamarrlmayes.replit.app")
@@ -58,6 +62,9 @@ class MetricsBasicResponse(BaseModel):
     requests_total: int
     errors_total: int
     latency_p95_ms: float | None = None
+    total_scholarships: int | None = None
+    total_users: int | None = None
+    api_latency_ms: float | None = None
 
 
 class ScholarshipItem(BaseModel):
@@ -129,11 +136,12 @@ async def master_healthz():
 
 
 @router.get("/api/metrics/basic", response_model=MetricsBasicResponse)
-async def master_metrics_basic():
+async def master_metrics_basic(db: Session = Depends(get_db)):
     """
     Master Prompt basic metrics endpoint
     
     GET /api/metrics/basic → minimal counters: requests_total, errors_total, latency_p95_ms
+    Also includes: total_scholarships, total_users, api_latency_ms
     """
     try:
         from prometheus_client import REGISTRY
@@ -152,17 +160,35 @@ async def master_metrics_basic():
                     if sample.name == "http_errors_total":
                         errors_total += int(sample.value)
         
+        start_time = time.time()
+        total_scholarships = db.query(ScholarshipDB).filter(ScholarshipDB.is_active == True).count()
+        api_latency_ms = (time.time() - start_time) * 1000
+        
+        total_users = 0
+        try:
+            from sqlalchemy import text
+            result = db.execute(text("SELECT COUNT(*) FROM users")).scalar()
+            total_users = result or 0
+        except Exception:
+            pass
+        
         return MetricsBasicResponse(
             requests_total=requests_total,
             errors_total=errors_total,
-            latency_p95_ms=latency_p95_ms
+            latency_p95_ms=latency_p95_ms,
+            total_scholarships=total_scholarships,
+            total_users=total_users,
+            api_latency_ms=round(api_latency_ms, 2)
         )
     except Exception as e:
         logger.error(f"Failed to collect metrics: {e}")
         return MetricsBasicResponse(
             requests_total=0,
             errors_total=0,
-            latency_p95_ms=None
+            latency_p95_ms=None,
+            total_scholarships=None,
+            total_users=None,
+            api_latency_ms=None
         )
 
 
@@ -324,16 +350,24 @@ async def get_featured_scholarships(
 async def create_scholarship(
     request: ScholarshipCreateRequest,
     db: Session = Depends(get_db),
-    authorization: str | None = Header(None)
+    current_user: User = Depends(get_current_user)
 ):
     """
     Master Prompt create scholarship endpoint (provider only)
     
     POST /api/scholarships
     
-    Auth: role=provider via provider_register
+    Auth: Bearer Token validated against scholar_auth
+    Role: provider required
     """
     from sqlalchemy import text
+    
+    if not current_user:
+        raise HTTPException(status_code=401, detail="Authentication required")
+    
+    user_role = getattr(current_user, 'role', None) or current_user.get('role') if isinstance(current_user, dict) else None
+    if user_role not in ['provider', 'admin', 'system']:
+        raise HTTPException(status_code=403, detail="Provider role required")
     
     scholarship_id = f"sch_{datetime.utcnow().timestamp()}_{request.provider_id[:8]}"
     
@@ -381,6 +415,16 @@ async def create_scholarship(
             "provider_id": request.provider_id
         })
         
+        await notify_auto_com_center(
+            event_type="scholarship.created",
+            data={
+                "scholarship_id": scholarship_id,
+                "title": request.title,
+                "amount": request.amount,
+                "provider_id": request.provider_id
+            }
+        )
+        
         return ScholarshipItem(
             id=scholarship_id,
             title=request.title,
@@ -392,6 +436,8 @@ async def create_scholarship(
             eligibility=request.eligibility_criteria or {}
         )
         
+    except HTTPException:
+        raise
     except Exception as e:
         db.rollback()
         logger.error(f"Failed to create scholarship: {e}")
@@ -507,3 +553,40 @@ async def notify_scholarship_update(scholarship_id: str, action: str, data: dict
             logger.info(f"Webhook sent to {url}")
         except Exception as e:
             logger.warning(f"Failed to send webhook to {url}: {e}")
+
+
+async def notify_auto_com_center(event_type: str, data: dict[str, Any]):
+    """
+    Send webhook notification to auto_com_center for email/SMS notifications
+    
+    Triggers confirmation emails for:
+    - scholarship.created: Provider confirmation
+    - application.submitted: Student confirmation
+    - application.received: Provider notification
+    """
+    try:
+        payload = {
+            "event_type": event_type,
+            "timestamp": datetime.utcnow().isoformat() + "Z",
+            "source": "scholarship_api",
+            "data": data
+        }
+        
+        signature = ""
+        if WEBHOOK_SECRET:
+            import json
+            body = json.dumps(payload).encode()
+            signature = hmac.new(WEBHOOK_SECRET.encode(), body, hashlib.sha256).hexdigest()
+        
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            response = await client.post(
+                f"{AUTO_COM_CENTER_URL}/api/webhooks/notify",
+                json=payload,
+                headers={
+                    "X-Webhook-Signature": signature,
+                    "Content-Type": "application/json"
+                }
+            )
+            logger.info(f"Notification sent to auto_com_center: {event_type} (status: {response.status_code})")
+    except Exception as e:
+        logger.warning(f"Failed to send notification to auto_com_center: {e}")
