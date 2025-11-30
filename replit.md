@@ -27,6 +27,12 @@ The application uses FastAPI for high performance and async capabilities, with P
 - **Ranking System**: A hybrid approach combining content-based filtering with "eligible-first" prioritization.
 - **Search Intelligence**: Features semantic and keyword search, smart suggestions, and quality assessment.
 - **Business Event Instrumentation**: A central event tracking system for executive KPI reporting, including a `business_events` table and an event emission service using a fire-and-forget async approach with a circuit breaker pattern. Fixed 2025-11-30: asyncpg SSL/JSONB compatibility for proper event recording.
+- **Telemetry Contract v1.1** (2025-11-30): Ecosystem-wide telemetry endpoints for Command Center integration:
+  - `POST /api/events` - Fallback event write endpoint for ecosystem apps
+  - `GET /api/stats?window=5m|1h|24h&group=event_type` - DB-backed aggregated stats
+  - `GET /api/kpis/today` and `GET /api/kpis/rollup?days=7` - Revenue-aware KPI summaries
+  - `app_heartbeat` emission every 60 seconds on startup
+  - Synthetic event validation when `SYNTHETIC=true` environment variable is set
 - **Credits Ledger System**: A transactional credit ledger system enabling B2C monetization and paywalled AI features, featuring a database-backed ledger, transactional idempotency, row-level locking, API endpoints with JWT and RBAC, and security/compliance features.
 
 ## System Design Choices
