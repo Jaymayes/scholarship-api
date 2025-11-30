@@ -56,18 +56,21 @@ class StatsTimeWindow(str, Enum):
 
 
 @router.post("/events", response_model=EventWriteResponse, tags=["Telemetry"])
+@router.post("/analytics/events", response_model=EventWriteResponse, tags=["Telemetry"])
 async def write_events(
     batch: TelemetryEventBatch,
     request: Request,
     db=Depends(get_db)
 ):
     """
-    Fallback telemetry event write endpoint (Contract v1.1)
+    Central telemetry event write endpoint (Contract v1.1)
     
-    Primary: POST https://scholarship-sage-jamarrlmayes.replit.app/api/analytics/events
-    Fallback: POST https://scholarship-api-jamarrlmayes.replit.app/api/events (this endpoint)
+    Dual Routing (CSRF FIX 2025-11-30):
+    - Primary: POST /api/analytics/events (what ecosystem apps call)
+    - Fallback: POST /api/events (legacy/simple)
     
     Accepts batches of events from any ecosystem app and persists to business_events table.
+    S2S Auth: Bearer token from scholar_auth JWKS OR service-to-service token.
     """
     accepted = 0
     failed = 0
