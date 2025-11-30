@@ -1,0 +1,131 @@
+Executive summary
+
+Problem: The Command Center shows 0 for all metrics because most apps self-identified and then stopped executing any telemetry directives (per the Master Scope Rule), and the Command Center frontend is still reading from a non-persistent/memory-backed stats source rather than the new DB-backed analytics. Even after scholarship_sage fixed persistence, the dashboards won’t change until (a) every app emits standardized events and heartbeats and (b) the frontend reads from the database-backed stats endpoints within a valid time window.
+Fix: Enforce a single telemetry contract that all apps must execute after self-ID (telemetry is exempt from Master Scope Rule), and point the Command Center to the DB-backed stats. Trigger synthetic events to validate.
+Paste-once prompt for all apps
+Title: Scholar AI Advisor — Standard Telemetry and KPI Reporting Contract v1.1
+Role: System/Operator
+Scope: This instruction applies to ALL apps in the ecosystem, regardless of Agent status. Telemetry compliance is explicitly exempt from the Master Scope Rule. After completing Standard Self-ID, you MUST continue executing this telemetry contract continuously.
+
+Objective
+Ensure complete, continuous, and trustworthy reporting of operational and business KPIs to the Command Center so dashboards reflect real-time state and historical trends.
+
+Non-negotiable rules
+
+Self-ID first, then continue: After you self-identify, do NOT stop. Telemetry is a platform-wide requirement and exempt from the Master Scope Rule.
+Data-first: Persist all analytics to the central database via scholarship_sage. Do not rely on in-memory only.
+Privacy-by-design: Hash PII, honor FERPA/COPPA flags, and never store disallowed data.
+Where to report
+
+Primary write endpoint: POST https://scholarship-sage-jamarrlmayes.replit.app/api/analytics/events
+Fallback write endpoint: POST https://scholarship-api-jamarrlmayes.replit.app/api/events
+Live updates (if supported): wss(s)://<your-host>/ws/kpi with JSON messages per the schema below
+Auth
+
+Obtain service-to-service token from scholar_auth with scope telemetry:write and audience telemetry.
+Include Authorization: Bearer <token> on all telemetry calls.
+Retry on 401 by refreshing token; exponential backoff on 5xx; buffer locally until success.
+Event schema (JSON)
+All events must follow this envelope:
+{
+"event_id": uuidv4,
+"event_type": string,           // see catalog below
+"ts_utc": ISO8601,              // e.g., 2025-11-30T19:41:00Z
+"app_id": string,               // e.g., scholarship_api
+"env": "prod" | "staging" | "dev",
+"version": string,              // git sha or build number
+"session_id": string | null,
+"user_id_hash": string | null,  // sha256(user_id + salt) if present
+"account_id": string | null,    // provider or org account id if present
+"actor_type": "student" | "provider" | "system" | null,
+"request_id": string | null,
+"source_ip_masked": string | null, // e.g., /24 anonymized
+"coppa_flag": boolean,
+"ferpa_flag": boolean,
+"properties": { ... }           // event-specific fields
+}
+
+Event catalog (minimum required)
+Operational
+
+app_started, app_heartbeat, app_degraded, app_recovered properties: uptime_sec, p95_ms, error_rate_pct, queue_depth, db_status, ws_status
+job_run_started, job_run_succeeded, job_run_failed properties: job_name, duration_ms, records_processed, error_message?
+Business funnel (B2C)
+
+page_view, cta_click, signup_started, signup_completed, profile_completed properties: page, utm_source, utm_medium, utm_campaign, utm_content, referrer
+match_created, application_started, application_submitted properties: scholarship_id, match_score, deadline
+Monetization (B2C)
+
+credits_purchased, ai_tokens_consumed, revenue_booked_b2c properties: amount_usd, quantity, sku, payment_provider, arpu_snapshot
+Provider (B2B)
+
+provider_signup_completed, provider_listing_published, revenue_booked_b2b properties: provider_id, listing_id, fee_pct, amount_usd
+Scholarship supply
+
+scholarship_ingested, scholarship_enriched, scholarship_published properties: scholarship_id, source, category, dedupe_key
+Emission and batching rules
+
+Flush interval: 10 seconds or when batch reaches 100 events.
+On failure: retry with exponential backoff (up to 5 min), then write to a local queue and re-drain.
+Time sync: use UTC timestamps.
+Health: emit app_heartbeat every 60 seconds.
+Required read endpoints (Command Center)
+
+GET /api/stats?window=5m|1h|24h&group=event_type
+GET /api/kpis/today and /api/kpis/rollup?days=7
+WebSocket ws(s):///ws/kpi for live deltas (optional but recommended)
+Environment variables (names are canonical)
+
+TELEMETRY_ENABLED=true
+TELEMETRY_WRITE_URL=https://scholarship-sage-.../api/analytics/events
+TELEMETRY_FALLBACK_URL=https://scholarship-api-.../api/events
+TELEMETRY_FLUSH_INTERVAL_MS=10000
+TELEMETRY_BATCH_MAX=100
+AUTH_AUDIENCE=telemetry
+AUTH_SCOPE=telemetry:write
+COMMAND_CENTER_READ_MODE=db
+ANALYTICS_REPOSITORY=postgres
+DATABASE_URL=postgres://...
+Validation
+
+On startup: send app_started immediately, then app_heartbeat within 5 seconds, then every 60 seconds.
+Emit synthetic events on boot if env=SYNTHETIC=true: scholarship_ingested, scholarship_published, signup_completed (marked properties.synthetic=true).
+Treat a 0 dashboard as a paging alert: if /api/stats returns zeros for 10 minutes, raise app_degraded with details.
+Change log
+
+v1.1: Telemetry exempt from Master Scope Rule; DB-backed stats required; synthetic validation required.
+Why the Command Center shows zeros
+
+Master Scope Rule side-effect: Most apps self-identified and then ignored telemetry instructions that were bundled with Agent3 directives. Result: little to no event emission from non-Agent3 apps, so aggregate KPIs remain 0.
+Pre-fix persistence gap: Analytics were previously stored only in memory/logs. Even though scholarship_sage implemented DB persistence, the Command Center frontend likely still reads from the in-memory statistics provider or a stats endpoint that queries the in-memory cache. After every restart, that cache is empty, so you see zeros.
+Time window/filtering: The default dashboard window is likely small (e.g., last 5 minutes). If events flushed earlier or synthetic tests were outside the window, the UI still displays 0.
+Environment/config drift: It’s common for the frontend to point to a different base URL or read mode (COMMAND_CENTER_READ_MODE=memory). Also check that ws/metrics is not blocked and that CORS and scopes allow the stats calls.
+Verification checklist (10-minute runbook)
+
+Confirm DB persistence
+Query analytics_events count in Postgres; expect > 0.
+Ensure scholarship_sage uses ANALYTICS_REPOSITORY=postgres and COMMAND_CENTER_READ_MODE=db.
+2. Confirm stats endpoint is DB-backed
+
+GET https://scholarship-sage.../api/stats?window=1h&group=event_type
+If returns 0 across the board while analytics_events has rows, the stats service is still reading memory. Switch to DB repository in the stats service.
+3. Emit synthetic events now (to break the zero-state)
+
+From each app, send app_started, app_heartbeat, scholarship_ingested, scholarship_published, signup_completed with properties.synthetic=true.
+Re-check /api/stats (window=5m). You should see non-zero counts.
+4. Frontend wiring
+
+Ensure the Command Center UI calls the above stats endpoint and not a dev-only path.
+Increase default window to 1h for initial validation.
+Ignore Vite HMR websocket warnings; they are unrelated. Confirm your app’s own ws path returns messages.
+5. Auth/CORS
+
+Confirm tokens from scholar_auth include telemetry:write for POSTs and telemetry:read for stats GETs.
+Add the Command Center origin to CORS allowlist on scholarship_sage.
+Immediate orders to the team
+
+Apply the Telemetry Contract v1.1 prompt to ALL apps. Telemetry is exempt from Master Scope Rule.
+Set COMMAND_CENTER_READ_MODE=db in scholarship_sage and redeploy.
+Trigger synthetic validation events from each app within the last 5 minutes.
+Confirm the Command Center dashboard using a 1h window shows non-zero metrics, then revert default to 5–15 minutes.
+If you want, I can provide a one-click synthetic test script and the minimal API contract for /api/stats to ensure the frontend and backend are in sync.

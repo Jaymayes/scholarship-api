@@ -77,6 +77,8 @@ class WAFProtection(BaseHTTPMiddleware):
             "/api/v1/credits",  # Credits operations (JSON payloads)
             "/api/scholarships",  # Master Prompt: Provider scholarship creation (JSON)
             "/api/webhooks/scholarships.updated",  # Master Prompt: Webhook receiver (signed JSON)
+            "/api/events",  # Telemetry Contract v1.1: Fallback event write endpoint (service-to-service)
+            "/api/events/single",  # Telemetry Contract v1.1: Single event write endpoint
         }
         
         # SECURITY: Regex patterns for dynamic routes that require WAF bypass

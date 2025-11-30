@@ -249,6 +249,97 @@ async def startup_jwks_prewarm():
         logger.error(f"❌ JWKS prewarm failed: {e}")
         logger.warning("⚠️ Falling back to lazy initialization on first protected request")
 
+
+@app.on_event("startup")
+async def startup_telemetry():
+    """TELEMETRY CONTRACT v1.1: Emit app_started and start heartbeat loop"""
+    import asyncio
+    import os
+    from datetime import datetime
+    from services.event_emission import EventEmissionService
+    from models.business_events import BusinessEvent
+    
+    logger.info("📊 TELEMETRY: Starting telemetry emissions (Contract v1.1)")
+    
+    emitter = EventEmissionService()
+    
+    async def emit_app_event(event_name: str, extra_props: dict | None = None):
+        """Helper to emit operational events"""
+        import psutil
+        props: dict = {
+            "uptime_sec": 0,
+            "p95_ms": 0,
+            "error_rate_pct": 0.0,
+            "queue_depth": 0,
+            "db_status": "connected",
+            "ws_status": "not_configured",
+            "memory_mb": psutil.Process().memory_info().rss / (1024 * 1024),
+            "cpu_percent": psutil.cpu_percent()
+        }
+        if extra_props:
+            props.update(extra_props)
+        
+        event = BusinessEvent(
+            event_name=event_name,
+            actor_type="system",
+            actor_id="scholarship_api",
+            session_id=None,
+            org_id=None,
+            properties=props
+        )
+        await emitter.emit(event)
+    
+    await emit_app_event("app_started", {"version": settings.api_version})
+    logger.info("✅ TELEMETRY: app_started event emitted")
+    
+    if os.getenv("SYNTHETIC", "false").lower() == "true":
+        logger.info("🔬 TELEMETRY: SYNTHETIC=true, emitting validation events")
+        
+        from models.business_events import (
+            create_scholarship_viewed_event,
+            create_application_submitted_event
+        )
+        
+        await emitter.emit(create_scholarship_viewed_event(
+            scholarship_id="synthetic_001",
+            source="synthetic_validation",
+            match_score=0.99,
+            actor_id="synthetic_test"
+        ))
+        
+        await emitter.emit(create_application_submitted_event(
+            scholarship_id="synthetic_002",
+            application_time_minutes=5.0,
+            credit_spent=5,
+            revenue_usd=2.49,
+            actor_id="synthetic_test"
+        ))
+        
+        logger.info("✅ TELEMETRY: Synthetic validation events emitted")
+    
+    async def heartbeat_loop():
+        """Background task: emit app_heartbeat every 60 seconds"""
+        import time
+        start_time = time.time()
+        
+        await asyncio.sleep(5)
+        
+        while True:
+            try:
+                uptime = int(time.time() - start_time)
+                await emit_app_event("app_heartbeat", {
+                    "uptime_sec": uptime,
+                    "version": settings.api_version
+                })
+                logger.debug(f"💓 TELEMETRY: heartbeat emitted (uptime={uptime}s)")
+            except Exception as e:
+                logger.warning(f"⚠️ TELEMETRY: heartbeat failed: {e}")
+            
+            await asyncio.sleep(60)
+    
+    asyncio.create_task(heartbeat_loop())
+    logger.info("💓 TELEMETRY: Heartbeat loop started (60s interval)")
+
 # Mount static files
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
@@ -496,6 +587,10 @@ app.include_router(observability_api_router)  # New: Daily ops dashboards and KP
 app.include_router(evidence_router, tags=["Evidence"])
 app.include_router(debug_routes_router, tags=["Diagnostics"])
 app.include_router(docs_workaround_router)  # GATE 0 FIX: Manual Swagger/ReDoc mounting
+
+# TELEMETRY CONTRACT v1.1: Command Center Integration (2025-11-30)
+from routers.telemetry import router as telemetry_router
+app.include_router(telemetry_router, prefix="/api", tags=["Telemetry"])
 
 # Metrics already setup above - this was the wrong location causing route shadowing
 
