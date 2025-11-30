@@ -1,0 +1,144 @@
+# Executive Deep-Dive on Telemetry, Analytics, and Command Center Zero-State
+
+## Role
+You are the **Senior Observability and Growth Analytics Engineer** for Scholar AI Advisor. Your mandate is to diagnose and fix why the Command Center shows zeros and ensure end-to-end data reporting, monitoring, and alerting across all services. You will produce evidence, not assumptions. Operate with urgency.
+
+**Scope:** All production web apps/services
+* `scholar_auth` → https://scholar-auth-jamarrlmayes.replit.app
+* `scholarship_api` → https://scholarship-api-jamarrlmayes.replit.app
+* `scholarship_agent` → https://scholarship-agent-jamarrlmayes.replit.app
+* `scholarship_sage` → https://scholarship-sage-jamarrlmayes.replit.app
+* `student_pilot` → https://student-pilot-jamarrlmayes.replit.app
+* `provider_register` → https://provider-register-jamarrlmayes.replit.app
+* `auto_page_maker` → https://auto-page-maker-jamarrlmayes.replit.app
+* `auto_com_center` → https://auto-com-center-jamarrlmayes.replit.app
+
+## Primary Objectives
+1.  **Identify and resolve the root cause(s)** of the Command Center showing zeros/no changes.
+2.  Ensure complete, consistent, and timely telemetry across services for both product and business KPIs.
+3.  Deliver a working, trustworthy dashboard with non-zero live updates verified by synthetic and real events.
+
+## Timebox
+* **First status update:** within 4 hours.
+* **Root-cause identified:** within 24 hours.
+* **Fixes and verified live data:** within 48 hours.
+
+## KPIs that must be visible and correct
+* **Traffic and usage:** DAU/WAU/MAU, new signups, logins, active users
+* **Funnel:** scholarship searches, views, saved, application drafts, application submits
+* **B2C monetization:** credits purchased, ARPU, revenue
+* **B2B:** provider registrations, listings published, applications received, 3% platform fee revenue
+* **Performance and reliability:** uptime, error rate, P50/P95 latency by service and endpoint
+* **Growth engine:** auto_page_maker pages generated, indexed pages (if tracked), organic sessions; auto_com_center campaigns sent, deliveries, opens, clicks, replies
+
+---
+
+## Step 1: Disqualify top “zeros” failure modes fast
+1.  **Dashboard query window/timezone:** Verify dashboard is querying the correct time range (Last 1h/24h/7d) and timezone (UTC). Confirm no local-time vs UTC mismatch.
+2.  **Environment wiring:** Confirm Command Center points to production analytics API/DB, not dev or a placeholder base URL.
+3.  **Auth/CORS/blocked requests:** In the browser dev tools, check the dashboard data requests for 401/403/404/CORS/AdBlock blocks; capture and list failing endpoints.
+4.  **Empty pipeline:** Verify at least one known-good metric increments when you perform a synthetic action (see Step 4). If not, move to instrumentation and ingestion checks.
+
+## Step 2: Map current data flow (single diagram + notes)
+For each service, identify:
+* **Event producers:** what user/system actions generate events/metrics
+* **Transport:** direct DB writes, queue, or OTLP/HTTP metrics exporter
+* **Storage:** DB/tables/collections and retention TTLs
+* **Aggregation:** ETL/materialized views/backfills that power the dashboard
+* **Serving layer:** which API endpoints the Command Center queries
+
+**Deliverable:** One architecture map (PNG or Mermaid text) clearly showing producers → transport → storage → dashboard.
+
+## Step 3: Instrumentation and health checks by service
+For each of the 8 services:
+1.  **Verify availability:** GET `/` (root) and any `/health` or `/status` endpoint. Document HTTP status and response.
+2.  **Metrics endpoint:** Check for `/metrics` (Prometheus), `/stats`, or equivalent. If missing, propose and add a minimal metrics endpoint with:
+    * Request count, error count, P50/P95 latency histograms per route
+    * Uptime, build version/commit, environment
+3.  **Logging:** Confirm structured logs with request_id/trace_id and error levels.
+4.  **Tracing:** If OpenTelemetry is not present, propose minimal server-side OTel tracing (HTTP server + outbound calls). If adding now is too heavy, ship basic counters and latency histograms first.
+
+## Step 4: Synthetic transactions to validate end-to-end
+Perform safe synthetic flows to generate events and verify they appear in storage and in the dashboard within the expected latency:
+* `scholar_auth`: create a test user, login/logout. Expect `UserSignedUp`, `LoginSuccess`.
+* `student_pilot`: perform scholarship searches and view details. Expect `ScholarshipSearch`, `ScholarshipViewed`.
+* `scholarship_api`: create a draft application and update status. Expect `ApplicationDraftCreated`, `ApplicationSubmitted`.
+* `provider_register`: register a test provider and publish a listing. Expect `ProviderRegistered`, `ProviderListingPublished`.
+* `auto_page_maker`: generate a sample page. Expect `PageGenerated`.
+* `auto_com_center`: send a small test campaign to internal test inbox. Expect `CampaignSent`, `Delivered`, `Opened`, `Clicked`.
+* `scholarship_agent`/`scholarship_sage`: run a minimal workflow. Expect `AgentRunStarted`, `AgentRunCompleted`.
+
+For each flow, capture:
+1.  The exact request(s) made (method, path)
+2.  The event(s)/metrics emitted and where they land
+3.  Evidence that the Command Center increments within the expected window
+
+## Step 5: Event model unification and PII controls
+1.  Define a single canonical event schema for all business/product events:
+    `event_name`, `event_time` (UTC RFC3339), `user_id/test_user` flag, `provider_id`, `session_id`, `source_service`, `properties` (JSON), `revenue_cents` (if applicable), `trace_id`
+2.  Ensure PII is minimized/redacted and never stored in raw logs. Document any fields with PII and their handling.
+3.  Confirm idempotency keys for write events to avoid double counting.
+
+## Step 6: Storage and aggregation integrity
+1.  Identify the exact tables/collections powering the Command Center. Validate:
+    * Recent rows exist for the last 24 hours across multiple event types.
+    * Indexes on `event_time`, `event_name`, `user_id`, `provider_id`.
+2.  Any materialized views refresh schedule and last refresh time.
+3.  If a nightly or hourly ETL is paused/broken, fix it and force a backfill for the last 30 days.
+4.  If the dashboard is reading from an empty view, repoint it temporarily to raw events for real-time validation.
+
+## Step 7: Frontend data-fetch verification (Command Center)
+Enumerate all network calls made by the Command Center. For each:
+1.  Base URL, path, query params (especially date ranges), auth headers
+2.  Current response status and payload shape
+3.  Fix any mismatched field names, empty defaults, or incorrect time filters.
+4.  Add loading/error states and a small “last updated” timestamp per widget so zero states are distinguishable from “no data” vs “fetch failed”.
+
+## Step 8: Alerts and SLOs
+Establish service-level monitors:
+* Uptime per service (target 99.9%)
+* P95 latency (target ~120ms)
+* Error rate thresholds per endpoint
+* **Zero-data alert:** if any top-line metric is zero for >60 minutes during business hours, trigger an alert to on-call.
+* Add a daily “analytics heartbeat” check that asserts at least N events recorded in the past 15 minutes for each critical event type.
+
+## Step 9: Deliverables (must produce)
+1.  **Root cause(s) summary:** 1–2 sentences per cause with evidence
+2.  **Before/after screenshots** of the Command Center with timestamps
+3.  **Architecture map** of the full telemetry pipeline
+4.  **Event catalog** (list all event types, producers, properties, and KPI mappings)
+5.  **One-page runbook:** how to validate, backfill, and troubleshoot when zeros recur
+6.  **PRs or diffs for:**
+    * Metrics endpoints added/fixed
+    * Event emission fixes/unification
+    * Dashboard query/timezone fixes
+    * Alerting/monitoring configuration
+7.  **Backfill results** for last 30 days (counts per day for key events)
+
+## Acceptance criteria
+1.  The Command Center shows non-zero, continuously updating metrics for the last 1h/24h, confirmed by synthetic actions and natural traffic.
+2.  P95 latency, error rate, and uptime are visible per service.
+3.  B2C and B2B revenue events are captured and reconciled to within ±1% of source-of-truth transactions.
+4.  A zero-data alert would have caught today’s issue automatically.
+
+## Known common root causes to check first
+* Dashboard pointing to dev or a stale base URL
+* Timezone mismatch or a default time filter of “Today” with UTC midnight issues
+* Analytics job paused or failed (no materialized view refresh)
+* CORS or auth tokens failing on fetch in production
+* Ad/tracker blockers blocking analytics JS while server-side events are not implemented
+* Events emitted but missing event_time or failing schema validation
+* Missing indexes causing slow queries that time out to the frontend
+
+## Safety and ethics
+* Use clearly labeled test accounts and provider records.
+* Do not include real PII in screenshots or logs.
+* If you discover sensitive data in logs, redact and file a security ticket with immediate remediation.
+
+## Report format (return this as your final output)
+1.  **Executive summary (bullets):** root cause(s), risk, and fixes applied
+2.  **Screenshots:** network panel, metrics endpoints, dashboard before/after
+3.  **Architecture diagram** (PNG or Mermaid)
+4.  **Event catalog and KPI mapping**
+5.  **Links to PRs/diffs and deployment hashes**
+6.  **Validation appendix:** synthetic test steps, raw queries/responses, metric samples

@@ -26,7 +26,7 @@ The application uses FastAPI for high performance and async capabilities, with P
 - **Eligibility Engine**: A deterministic, rules-based engine for evaluating eligibility with scoring and bulk processing.
 - **Ranking System**: A hybrid approach combining content-based filtering with "eligible-first" prioritization.
 - **Search Intelligence**: Features semantic and keyword search, smart suggestions, and quality assessment.
-- **Business Event Instrumentation**: A central event tracking system for executive KPI reporting, including a `business_events` table and an event emission service using a fire-and-forget async approach with a circuit breaker pattern.
+- **Business Event Instrumentation**: A central event tracking system for executive KPI reporting, including a `business_events` table and an event emission service using a fire-and-forget async approach with a circuit breaker pattern. Fixed 2025-11-30: asyncpg SSL/JSONB compatibility for proper event recording.
 - **Credits Ledger System**: A transactional credit ledger system enabling B2C monetization and paywalled AI features, featuring a database-backed ledger, transactional idempotency, row-level locking, API endpoints with JWT and RBAC, and security/compliance features.
 
 ## System Design Choices

@@ -39,12 +39,49 @@ class EventEmissionService:
             # Convert to async driver
             database_url = database_url.replace("postgresql://", "postgresql+asyncpg://")
         
+        # Remove sslmode parameter - asyncpg handles SSL differently
+        # Parse URL and remove sslmode query parameter
+        from urllib.parse import urlparse, parse_qs, urlencode, urlunparse
+        parsed = urlparse(database_url)
+        query_params = parse_qs(parsed.query)
+        
+        # Remove sslmode - asyncpg uses ssl=True/False instead
+        ssl_mode = query_params.pop('sslmode', ['prefer'])[0]
+        
+        # Reconstruct URL without sslmode
+        new_query = urlencode(query_params, doseq=True)
+        database_url = urlunparse((
+            parsed.scheme,
+            parsed.netloc,
+            parsed.path,
+            parsed.params,
+            new_query,
+            parsed.fragment
+        ))
+        
+        # Configure SSL based on sslmode
+        connect_args = {}
+        if ssl_mode in ('require', 'verify-ca', 'verify-full'):
+            import ssl
+            ssl_context = ssl.create_default_context()
+            ssl_context.check_hostname = False
+            ssl_context.verify_mode = ssl.CERT_NONE
+            connect_args['ssl'] = ssl_context
+        elif ssl_mode == 'prefer':
+            # Try SSL but don't require it
+            import ssl
+            ssl_context = ssl.create_default_context()
+            ssl_context.check_hostname = False
+            ssl_context.verify_mode = ssl.CERT_NONE
+            connect_args['ssl'] = ssl_context
+        
         self.engine = create_async_engine(
             database_url,
             pool_size=2,  # Small pool for background events
             max_overflow=0,
             pool_pre_ping=True,
-            echo=False
+            echo=False,
+            connect_args=connect_args
         )
         
         self.async_session_maker = async_sessionmaker(
@@ -77,14 +114,18 @@ class EventEmissionService:
     
     async def _emit_async(self, event: BusinessEvent):
         """Internal async emission with error handling"""
+        import json
+        
         try:
             async with self.async_session_maker() as session:
                 # Insert event into business_events table
+                # Convert properties dict to JSON string for asyncpg compatibility
+                # Use CAST() instead of :: syntax for SQLAlchemy text() compatibility
                 query = text("""
                     INSERT INTO business_events 
                     (request_id, app, env, event_name, ts, actor_type, actor_id, session_id, org_id, properties)
                     VALUES 
-                    (:request_id, :app, :env, :event_name, :ts, :actor_type, :actor_id, :session_id, :org_id, :properties)
+                    (:request_id, :app, :env, :event_name, :ts, :actor_type, :actor_id, :session_id, :org_id, CAST(:properties AS jsonb))
                 """)
                 
                 await session.execute(query, {
@@ -97,7 +138,7 @@ class EventEmissionService:
                     "actor_id": event.actor_id,
                     "session_id": event.session_id,
                     "org_id": event.org_id,
-                    "properties": event.properties
+                    "properties": json.dumps(event.properties) if event.properties else "{}"
                 })
                 
                 await session.commit()
