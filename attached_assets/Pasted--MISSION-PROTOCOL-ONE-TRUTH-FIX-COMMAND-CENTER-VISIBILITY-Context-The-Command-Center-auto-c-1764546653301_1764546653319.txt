@@ -1,0 +1,84 @@
+🚀 MISSION: PROTOCOL "ONE TRUTH" - FIX COMMAND CENTER VISIBILITY
+Context: The Command Center (auto_com_center) currently displays "Zeros" because telemetry data is trapped in local databases (Siloed Data Failure). The Central Aggregator (scholarship_api) is rejecting valid server-to-server (S2S) signals as CSRF attacks.
+
+Agent3 Instruction: Identify your current APP ID from the list below. Execute ONLY the Phase relevant to your current application. Do not hallucinate files from other apps.
+
+📍 ECOSYSTEM REFERENCE
+scholar_auth → https://scholar-auth-jamarrlmayes.replit.app
+
+scholarship_api → https://scholarship-api-jamarrlmayes.replit.app (THE CENTRAL AGGREGATOR)
+
+scholarship_agent → https://scholarship-agent-jamarrlmayes.replit.app
+
+scholarship_sage → https://scholarship-sage-jamarrlmayes.replit.app
+
+student_pilot → https://student-pilot-jamarrlmayes.replit.app
+
+provider_register → https://provider-register-jamarrlmayes.replit.app
+
+auto_page_maker → https://auto-page-maker-jamarrlmayes.replit.app
+
+auto_com_center → https://auto-com-center-jamarrlmayes.replit.app (THE FRONTEND)
+
+🟢 IF CURRENT APP IS: scholarship_api (The Heart)
+Objective: Unlock the Central Ingest. Stop blocking friendly S2S traffic.
+
+Modify Security Middleware (server/index.ts or server/middleware/security.ts):
+
+Explicitly DISABLE CSRF/WAF checks for the route /api/analytics/events.
+
+Whitelist the Authorization header in CORS configuration to allow cross-origin S2S tokens.
+
+Ensure the JSON body parser accepts payloads up to 5MB for batch telemetry.
+
+Validate Token Logic:
+
+Ensure the validateS2SAuth middleware accepts tokens signed by scholar_auth (add scholar_auth JWKS URL to trusted issuers).
+
+Verification:
+
+Run a curl command to POST a dummy event to your own /api/analytics/events. It MUST return 200 OK, not 403 Forbidden.
+
+🔵 IF CURRENT APP IS: auto_com_center (The Eyes)
+Objective: Visualize the Aggregated Data.
+
+Retarget Frontend:
+
+Locate the KPI fetcher hook (e.g., client/src/hooks/use-kpi.ts or server/routes/dashboard.ts).
+
+CHANGE the data source URL from localhost (local DB) to https://scholarship-api-jamarrlmayes.replit.app/api/stats.
+
+Ensure it passes the S2S_SECRET in the Authorization header to read the stats.
+
+Verify Display:
+
+Confirm the dashboard widgets are mapping the JSON response from scholarship_api correctly.
+
+🟠 IF CURRENT APP IS: scholar_auth, scholarship_agent, student_pilot, provider_register, auto_page_maker, or scholarship_sage (The Satellites)
+Objective: Stop hoarding data. Push to the Central Aggregator.
+
+Update Telemetry Client (server/services/telemetry-client.ts or server/lib/telemetry.ts):
+
+SET ENDPOINT: Change target URL to https://scholarship-api-jamarrlmayes.replit.app/api/analytics/events.
+
+FIX AUTH: Ensure the Authorization header generates a Bearer <token> using your app's M2M_SECRET.
+
+DISABLE SILENT FALLBACK: If the remote request fails (403/500), log a CRITICAL ERROR to the console. Do not just silently save to the local DB. We need to see the failure to fix it.
+
+Restart & Flush:
+
+Restart the server.
+
+Trigger a heartbeat event immediately on startup.
+
+📝 REQUIRED OUTPUT FORMAT
+After executing your specific phase, report status immediately:
+
+Plaintext
+
+APP: [App Name]
+URL: [App Base URL]
+STATUS: [Fixed / Blocked]
+ACTION TAKEN: [Specific file modified]
+VERIFICATION: [Result of curl test or log check]
+NEXT STEP: [Instructions for the next app in the chain]

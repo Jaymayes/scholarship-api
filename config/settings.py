@@ -353,8 +353,9 @@ class Settings(BaseSettings):
     feature_bulk_operations: bool = Field(True, alias="FEATURE_BULK_OPERATIONS")
 
     # Request/Response Size and URL Length Limits
+    # Protocol ONE TRUTH (2025-11-30): Increased to 5MiB for batch telemetry aggregation
     max_request_size_bytes: int = Field(
-        1048576,  # 1 MiB
+        5242880,  # 5 MiB - supports batch telemetry from all ecosystem apps
         alias="MAX_REQUEST_SIZE_BYTES",
         description="Maximum request body size in bytes"
     )
@@ -366,7 +367,7 @@ class Settings(BaseSettings):
 
     # Legacy field for backward compatibility
     max_request_body_bytes: int = Field(
-        1048576,  # 1 MiB
+        5242880,  # 5 MiB - matches max_request_size_bytes for Protocol ONE TRUTH
         alias="MAX_REQUEST_BODY_BYTES",
         description="Maximum request body size in bytes (legacy)"
     )
