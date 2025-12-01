@@ -1,0 +1,209 @@
+AGENT3 UNIFIED MASTER PROMPT — PROTOCOL “ONE TRUTH” v1.0
+Purpose: Guarantee every app emits telemetry to the central aggregator, is monitored by the Command Center, and surfaces metrics on the frontend to drive launch, traffic, and revenue.
+Strict scope rule: Each app must implement only the section labeled for its app. Ignore all other sections.
+
+GLOBAL INSTRUCTIONS (apply to all apps)
+
+Self-identify before any work:
+Print exactly: IDENTIFY: APP=<app_id> | APP_BASE_URL=<base_url> | ROLE=<role> | ENV=<env>
+Include “APP: <app_id> | APP_BASE_URL: <base_url>” on every status report line you output.
+One Truth data flow:
+All telemetry/events go to the central aggregator: POST https://scholarship-api-jamarrlmayes.replit.app/api/analytics/events
+Command Center reads from the aggregator only; no app should render KPIs from its own DB.
+Event envelope and required fields:
+POST body: {"events":[{event_type, app_id, env, ts_utc, properties:{...}}]}
+Conventions: snake_case keys; ts_utc in ISO-8601 UTC; env ∈ {dev, staging, prod}; app_id ∈ the 8 app IDs below.
+Mandatory properties on all business events (include when applicable):
+session_id, request_id
+utm_source, utm_medium, utm_campaign, utm_content, utm_term (preserve if present; else null/omit)
+user_id_hash (salted SHA-256), source_ip_masked (/24 for IPv4, /64 for IPv6)
+is_minor (bool), ferpa_protected (bool)
+Base events (all apps):
+app_started (once on boot) → {uptime_sec=0, version, service_ok=true}
+app_heartbeat (every 60s) → {uptime_sec, service_ok, p95_ms, error_rate_pct}
+SLO targets and error budget:
+Availability 99.9%+, p95 ≤ 120ms. Emit app_heartbeat with p95_ms, error_rate_pct.
+Retries and durability:
+If POST fails, queue locally and retry with exponential backoff. Never drop events.
+No plaintext PII:
+Only hashed user_id and masked IP. Do not send emails, names, addresses, card data.
+Frontend/tiles contract (aggregator computed):
+Tiles: SLO, B2C, B2B, SEO, Growth, Trust, Finance, Ecosystem
+Status: GREEN, YELLOW, RED, NO_DATA. Apps must emit events to light up tiles; Command Center only reads aggregator JSON.
+Launch focus (first 72 hours):
+SEO: publish programmatic pages (Auto Page Maker)
+Growth: launch campaigns (Scholarship Agent)
+B2C: drive page_view → application_started → application_submitted → credit_purchased → payment_succeeded
+B2B: onboard providers and publish scholarships; track 3% platform fee
+Finance: ensure Stripe webhook to payment_succeeded is live
+SECTION: auto_com_center (Command Center — THE EYES)
+APP_BASE_URL=https://auto-com-center-jamarrlmayes.replit.app
+Role: Read-only dashboard. Single source of truth is the aggregator.
+
+Do only this:
+Self-identify, then render tiles by calling:
+GET https://scholarship-api-jamarrlmayes.replit.app/api/executive/central-stats?window=24h
+GET https://scholarship-api-jamarrlmayes.replit.app/api/kpis/today
+Never read a local DB for metrics. If aggregator returns NO_DATA for a tile, display NO_DATA.
+Display mapping:
+SLO tile: overallStatus, uptime, heartbeats, p95_ms (from aggregator)
+B2C tile: page views, application funnel counts
+B2B tile: providers onboarded, scholarships published, GMV proxy
+SEO tile: pages_published, indexability signals
+Growth tile: campaigns launched, clicks
+Trust tile: bias_checks, NPS, privacy flags observed
+Finance tile: credit_purchased and payment_succeeded amounts
+Output a status report on load and every 5 minutes:
+APP: auto_com_center | APP_BASE_URL: https://auto-com-center-jamarrlmayes.replit.app
+Tiles: show status and key counts from aggregator; include “Protocol: ONE TRUTH”
+SECTION: scholarship_api (Central Aggregator — THE HEART)
+APP_BASE_URL=https://scholarship-api-jamarrlmayes.replit.app
+Role: Ingest events, compute KPIs, serve dashboards to Command Center.
+
+Implement/ensure these endpoints:
+POST /api/analytics/events → validate schema, store, dedupe (idempotency by request_id + ts_utc), respond 200
+GET /api/executive/central-stats?window=24h → return tiles + app health + ecosystem metrics
+GET /api/kpis/today and GET /api/stats?window=24h&group=app
+Tile computation rules:
+SLO: aggregate app_heartbeat p95_ms, error_rate_pct, uptime_sec → overallStatus
+B2C: counts of page_view, application_started, application_submitted
+B2B: provider_registered, scholarship_published; compute GMV proxy from award_cents × cohort_size where available
+SEO: page_published, page_view
+Growth: campaign_launched, campaign_click
+Trust: bias_check_run, feedback_submitted, nps_score
+Finance: credit_purchased, payment_succeeded (sum amount_cents by currency)
+One Truth enforcement:
+Do not fetch from any other service for KPIs; everything derives from ingested events.
+SECTION: scholar_auth (Auth Gateway)
+APP_BASE_URL=https://scholar-auth-jamarrlmayes.replit.app
+Role: Authentication and privacy compliance events.
+
+Emit events:
+user_signed_up → {user_id_hash, referral_source, utm_*, is_minor, ferpa_protected, session_id, request_id, source_ip_masked, method, mfa_used}
+user_logged_in → {user_id_hash, method, mfa_used, is_minor, ferpa_protected, session_id, request_id, source_ip_masked}
+Ensure low-noise operation:
+If downstream endpoints accept unauthenticated telemetry, treat OAuth token as optional; do not spam 401 logs.
+Objective linkage:
+B2C funnel attribution via UTM fields; ensure events reach aggregator to light B2C and Trust tiles.
+SECTION: scholarship_agent (Growth Engine)
+APP_BASE_URL=https://scholarship-agent-jamarrlmayes.replit.app
+Role: Launch campaigns that drive organic sessions to programmatic pages and convert to applications/purchases.
+
+Emit events:
+campaign_launched → {campaign_id, channel, audience, budget_cents, utm_source, utm_medium, utm_campaign, creative_ids}
+campaign_click → {campaign_id, creative_id, landing_url, utm_*}
+landing_page_created (if applicable) → {slug, canonical_url, utm_*}
+Traffic and revenue mandate:
+Launch at least 2 campaigns on day 1: “sotd” and “top-deadlines”
+All links carry full UTM chain; landing pages should be from Auto Page Maker
+S2S auth:
+If OAuth client_credentials to scholar_auth fails, continue unauthenticated telemetry for now; raise a single alert.
+SECTION: scholarship_sage (Advising)
+APP_BASE_URL=https://scholarship-sage-jamarrlmayes.replit.app
+Role: Guide students to high-match scholarships and nudge purchases.
+
+Emit events:
+session_started → {session_id, user_id_hash, plan_tier, referral_source, utm_*}
+recommendation_shown → {session_id, scholarship_id, match_score, rank, plan_tier}
+recommendation_clicked → {session_id, scholarship_id, match_score, rank}
+session_completed → {session_id, duration_sec, recommendations_shown, recommendations_clicked, nudged_to_purchase}
+Funnel linkage:
+When a recommendation is clicked that routes to student_pilot, propagate utm_* and session_id for attribution.
+SECTION: student_pilot (B2C Core + Payments)
+APP_BASE_URL=https://student-pilot-jamarrlmayes.replit.app
+Role: Core student flows and monetization.
+
+Emit events:
+page_view → {page, referrer, utm_*, session_id, request_id}
+application_started → {session_id, user_id_hash, scholarship_id}
+application_submitted → {session_id, user_id_hash, scholarship_id, match_score}
+credit_purchased → {user_id_hash, credits, amount_cents, currency, session_id, utm_*}
+payment_succeeded (Stripe webhook) → {user_id_hash, amount_cents, currency, payment_provider="stripe", session_id, charge_id_hash}
+Finance tile requirement:
+Ensure Stripe webhook in prod is active; on receipt, emit payment_succeeded immediately to aggregator.
+ARPU readiness:
+Include credits and amount_cents for ARPU and revenue rollups.
+SECTION: provider_register (B2B Providers + Supply)
+APP_BASE_URL=https://provider-register-jamarrlmayes.replit.app
+Role: Onboard providers and publish scholarships; capture platform fee.
+
+Emit events:
+provider_registered → {provider_id_hash, org_type, referral_source, utm_*}
+scholarship_published → {scholarship_id, title, award_cents, deadline_utc, eligibility_tags, cohort_size, platform_fee_cents}
+provider_profile_completed → {provider_id_hash, fields_completed}
+B2B revenue visibility:
+Always include platform_fee_cents and expected_award_total_cents when available to populate 3% fee projections.
+SECTION: auto_page_maker (SEO Engine)
+APP_BASE_URL=https://auto-page-maker-jamarrlmayes.replit.app
+Role: Programmatic SEO to drive organic traffic.
+
+Emit events:
+page_published → {slug, topic, word_count, internal_links, canonical_url, has_json_ld, indexable=true|false}
+page_view (server-side observable where possible) → {page, referrer, utm_*}
+scholarship_ingested → {source, count, parsing_time_ms}
+scholarship_published (when indexing scholarships) → {scholarship_id, title, award_cents, deadline_utc, eligibility_tags}
+SEO musts:
+Generate and serve sitemap.xml and robots.txt; include canonical URLs and JSON-LD; ensure internal linking to high-value pages.
+Publish a minimum of 100 targeted pages in the first 24 hours across “deadline soon”, “major-based”, “state-based” clusters.
+SECTION: auto_com_center (repeat for clarity)
+APP_BASE_URL=https://auto-com-center-jamarrlmayes.replit.app
+
+Render tiles exclusively from scholarship_api endpoints. Never from local storage.
+Surface NO_DATA where applicable until upstream events arrive.
+FRONTEND DISPLAY CONTRACT (what Command Center reads; aggregator is responsible to supply)
+
+GET /api/executive/central-stats returns JSON with:
+data.overallStatus
+data.slo: {status, uptime, p95_ms, heartbeats}
+data.b2c: {status, traffic, funnel:{started, submitted}}
+data.b2b: {status, providers, scholarshipsPublished, gmv}
+data.seo: {status, pagesPublished}
+data.growth: {status, campaigns, clicks}
+data.trust: {status, biasChecks, nps}
+data.finance: {status, total_revenue_cents, tx_count}
+data.ecosystemMetrics: {totalEvents, appsReporting, eventTypes, heartbeats, scholarshipsPublished}
+data._meta: {protocol:"ONE TRUTH", source:"scholarship_api", central_aggregator:url}
+VERIFICATION CHECKS (each app must run after implementation)
+
+Print a status block titled EXACTLY: OPERATIONAL VERIFICATION REPORT
+Include:
+APP: <app_id> | APP_BASE_URL: <base_url>
+Event types implemented and counts in last 15m/24h (as known from aggregator, if available)
+“Protocol ONE TRUTH v1.0: COMPLIANT” or list missing items with TODO
+Example final line format (use your app_id and base_url):
+Command Center: ONLINE | Protocol: ONE TRUTH
+Or
+<Your App Name>: ACTIVE | Reporting to Central Aggregator | Protocol: ONE TRUTH
+LAUNCH CHECKLIST (72-hour goal: traffic and revenue)
+
+Day 0–1:
+auto_page_maker: publish ≥100 pages; emit page_published; verify SEO tile GREEN
+scholarship_agent: launch 2 campaigns with UTM; verify Growth tile activity
+student_pilot: enable Stripe webhook; verify payment_succeeded flows → Finance tile transitions from NO_DATA to GREEN
+Day 1–2:
+provider_register: onboard at least 5 providers; publish ≥10 scholarships; verify B2B tile GREEN
+scholar_auth: verify user_signed_up/user_logged_in events feed B2C attribution
+Day 2–3:
+scholarship_sage: run advising sessions; increase recommendation_clicked → application_started on student_pilot
+STRICT SCOPE REMINDER FOR AGENT3
+
+Use only the section labeled with your app_id.
+If app_id is not one of: scholar_auth, scholarship_api, scholarship_agent, scholarship_sage, student_pilot, provider_register, auto_page_maker, auto_com_center — abort with a clear IDENTIFY line and do nothing else.
+On every report you print, include: APP: <app_id> | APP_BASE_URL: <base_url>.
+APP IDS AND BASE URLS (for self-identification)
+
+scholar_auth → https://scholar-auth-jamarrlmayes.replit.app
+scholarship_api → https://scholarship-api-jamarrlmayes.replit.app
+scholarship_agent → https://scholarship-agent-jamarrlmayes.replit.app
+scholarship_sage → https://scholarship-sage-jamarrlmayes.replit.app
+student_pilot → https://student-pilot-jamarrlmayes.replit.app
+provider_register → https://provider-register-jamarrlmayes.replit.app
+auto_page_maker → https://auto-page-maker-jamarrlmayes.replit.app
+auto_com_center → https://auto-com-center-jamarrlmayes.replit.app
+Success criteria
+
+All eight apps self-identify on startup with APP and APP_BASE_URL.
+Aggregator receives events from every app; Command Center tiles all visible.
+Finance tile shows payment_succeeded and credit_purchased totals.
+SLO tile shows uptime and p95_ms; overallStatus is GREEN or improving.
+Organic traffic and campaign-driven traffic visible via UTM in B2C tile.
