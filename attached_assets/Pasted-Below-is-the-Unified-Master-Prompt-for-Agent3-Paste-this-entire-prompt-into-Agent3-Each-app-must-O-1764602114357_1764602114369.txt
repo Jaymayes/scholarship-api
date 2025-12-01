@@ -1,0 +1,227 @@
+Below is the Unified Master Prompt for Agent3. Paste this entire prompt into Agent3. Each app must ONLY execute the instructions under its own APP SECTION after printing its IDENTIFY line. The prime objective is to ensure all telemetry is reported to the Command Center and shown on the frontend, and to launch actions that drive traffic and revenue immediately.
+
+UNIFIED MASTER PROMPT v1.2 — Agent3
+ENV: prod
+Protocol: ONE_TRUTH v1.1 (Telemetry and Command Center)
+
+Global Operating Rules (Agent3 must enforce for all apps)
+
+Identification: Before any action, print EXACTLY ONE line: IDENTIFY: APP={your_app_id} | APP_BASE_URL={your_app_base_url} | ROLE={your_role} | ENV=prod
+Scope discipline: After identifying, ONLY execute the APP SECTION that matches your APP. Ignore all other sections.
+Telemetry mandate: Every app must continuously emit telemetry to the Central Aggregator at: TELEMETRY_WRITE_URL=https://scholarship-api-jamarrlmayes.replit.app/api/analytics/events
+Event envelope (ONE_TRUTH v1.1):
+Payload field: events (array)
+Each event object must include:
+event_id: uuid v4
+event_type: snake_case string
+app_id: one of [scholar_auth, scholarship_api, scholarship_agent, scholarship_sage, student_pilot, provider_register, auto_page_maker, auto_com_center]
+env: prod
+ts_utc: ISO-8601 UTC timestamp
+properties: object with only snake_case keys; MUST include app_base_url={your_app_base_url}; NEVER include plaintext PII
+Retry: Exponential backoff with jitter on 5xx/429; deduplicate via event_id
+Base events every app MUST emit:
+app_started: on boot with {uptime_sec=0, version, service_ok, p95_ms=0, error_rate_pct=0, app_base_url}
+app_heartbeat: every 60s with {uptime_sec, service_ok, p95_ms, error_rate_pct, app_base_url}
+SLO targets: 99.9% uptime; p95_ms ≤ 120; error_rate_pct ≤ 1
+Frontend monitoring: The Command Center (auto_com_center) must be able to display tiles fed by the Central Aggregator (scholarship_api). Every app’s business events must flow so tiles show GREEN where applicable.
+Reporting format: Where a report is required, title it “OPERATIONAL VERIFICATION REPORT” and include at top and bottom: {app_id} | {app_base_url} | Protocol: ONE_TRUTH v1.1 | First 60 Minutes: {COMPLETE or PENDING}
+App-to-URL map
+
+scholar_auth → https://scholar-auth-jamarrlmayes.replit.app
+scholarship_api → https://scholarship-api-jamarrlmayes.replit.app
+scholarship_agent → https://scholarship-agent-jamarrlmayes.replit.app
+scholarship_sage → https://scholarship-sage-jamarrlmayes.replit.app
+student_pilot → https://student-pilot-jamarrlmayes.replit.app
+provider_register → https://provider-register-jamarrlmayes.replit.app
+auto_page_maker → https://auto-page-maker-jamarrlmayes.replit.app
+auto_com_center → https://auto-com-center-jamarrlmayes.replit.app
+Tile model and business-event drivers (all apps must emit relevant events to drive these tiles in the Command Center)
+
+SLO Health: app_started, app_heartbeat (with p95_ms, error_rate_pct)
+B2C Funnel: user_signed_up, page_view, application_started, application_submitted
+B2B Providers: provider_registered, provider_active, scholarship_published
+SEO Engine: page_published, page_view, scholarship_ingested
+Growth North Star: campaign_launched, landing_page_created, campaign_click
+Trust & Safety: bias_check_performed, login_failed
+Finance Snapshot: payment_succeeded, credit_purchased, fee_reported (platform_fee_cents)
+First 60 Minutes Playbook (every app executes its own, see section specifics)
+
+Emit base events, verify TELEMETRY_WRITE_URL=OK
+Emit at least one business event relevant to your tile(s)
+Ensure properties.app_base_url is present on every event
+Produce an OPERATIONAL VERIFICATION REPORT printed to stdout
+Ensure links to student_pilot carry UTM parameters for attribution (utm_source, utm_medium, utm_campaign)
+Drive at least one action that increases traffic or revenue
+Revenue-critical UTMs (use consistently on outbound links/CTAs)
+
+utm_source: your_app_id
+utm_medium: organic or referral or email or cpc
+utm_campaign: short_campaign_name
+APP SECTIONS (execute only the section that matches your APP)
+
+APP SECTION: auto_com_center (Command Center, THE EYES)
+Role: Dashboard that monitors and displays tiles in frontend.
+Actions:
+
+IDENTIFY line: print first.
+Poll Central Aggregator executive endpoints to render tiles and ecosystem stats in the frontend. If no API exists, request:
+GET /api/executive/central-stats?window=24h
+GET /api/stats?window=24h&group=event_type
+Emit base events.
+Emit business events:
+dashboard_loaded: {view: "executive", tiles_rendered, app_base_url}
+tile_status_rendered: {tile, status, drivers[], app_base_url}
+Display tiles for SLO, B2C, B2B, SEO, Growth, Trust, Finance, plus ecosystem metrics:
+totalEvents, appsReporting, appsExpected, heartbeats, pageViews, appStarts
+OPERATIONAL VERIFICATION REPORT must include:
+Execution checklist (identify, telemetry verified, events flowing)
+Base and business event counts
+Tiles status table with GREEN/YELLOW/NO_DATA flags
+“Next Actions to Drive Revenue” checklist
+Success criteria (first 60 minutes): All tiles rendered; NO_DATA highlighted; Finance turns GREEN once payment_succeeded is observed.
+APP SECTION: scholarship_api (Central Aggregator, THE HEART)
+Role: Receive telemetry, compute tile statuses, expose executive endpoints to Command Center.
+Actions:
+
+IDENTIFY line: print first.
+Host POST /api/analytics/events to accept batch events:
+Validate event schema; reject PII; ensure app_base_url present.
+Dedup by event_id; backoff on 5xx/429.
+Compute and expose executive endpoints:
+GET /api/executive/central-stats?window=24h → returns:
+overallStatus
+tiles: slo, b2c, b2b, seo, growth, trust, finance with status GREEN/YELLOW/NO_DATA and driver counts
+ecosystemMetrics: totalEvents, appsReporting, appsExpected, heartbeats, pageViews, appStarts
+_meta: protocol, version, app_id, app_base_url
+Emit base events and these business events:
+aggregator_ingestion_ok: {batch_count, accepted, rejected, error_rate_pct, app_base_url}
+First 60 Minutes:
+Verify ingestion from ≥6 apps
+Expose tile statuses for auto_com_center
+Keep error_rate_pct ≤1%
+Report: Full OPERATIONAL VERIFICATION REPORT with endpoint health and counts.
+APP SECTION: scholar_auth (Auth Gateway)
+Role: Authentication and attribution source of truth.
+Actions:
+
+IDENTIFY line: print first.
+Emit base events and:
+user_signed_up: {method, utm_*, is_minor, ferpa_protected, app_base_url}
+user_logged_in: {method, mfa_used, app_base_url}
+login_failed: {reason, app_base_url}
+First 60 Minutes:
+Emit 10 diverse user_signed_up with varied utm_* to prime B2C tile
+Ensure post-signup redirects include utm passthrough to student_pilot
+Report: Show last 10 user_signed_up and Trust tile impact.
+APP SECTION: scholarship_agent (Growth Engine, Campaigns)
+Role: Launches campaigns and landing pages to drive traffic.
+Actions:
+
+IDENTIFY line: print first.
+Emit base events and:
+campaign_launched: {campaign_id, start_utc, end_utc, budget_usd, creative_variant, utm_* , app_base_url}
+landing_page_created: {campaign_id, page_url, topic, has_json_ld, indexable, utm_*, app_base_url}
+campaign_click: {campaign_id, page_url, utm_*, app_base_url} when traffic observed
+First 60 Minutes:
+Launch ≥2 campaigns, create ≥7 landing pages
+Ensure all CTAs link to student_pilot with utm passthrough
+Report: Show campaigns launched, landing pages created, and Growth tile status.
+APP SECTION: scholarship_sage (Advisor + Responsible AI)
+Role: Responsible AI governance and recommendation quality.
+Actions:
+
+IDENTIFY line: print first.
+Emit base events and:
+bias_check_performed: {check_id, model_name, metric, value, threshold, result, app_base_url}
+model_inference_evaluated: {model_name, version, latency_ms, success, input_shape, output_shape, app_base_url}
+recommendation_served: {user_id_hash, scholarship_id, score, rank, explanation_available, session_id, request_id, app_base_url}
+First 60 Minutes:
+Run ≥1 bias check per model path; emit recommendation_served if any traffic
+Report: Trust tile and B2C influence; confirm no plaintext PII.
+APP SECTION: student_pilot (Conversion & Billing)
+Role: Applications, checkout, payments.
+Actions:
+
+IDENTIFY line: print first.
+Emit base events and:
+application_started: {scholarship_id, session_id, utm_*, app_base_url}
+application_submitted: {scholarship_id, session_id, utm_*, app_base_url}
+payment_succeeded: {amount_cents, currency, product, plan_id, stripe_customer_id_hash, utm_*, app_base_url}
+credit_purchased: {credits, amount_cents, currency, utm_*, app_base_url}
+Stripe webhooks:
+On receipt, immediately emit payment_succeeded with app_base_url and utm_* where available
+First 60 Minutes:
+Trigger at least one payment_succeeded (test mode acceptable) to turn Finance GREEN
+Report: Show conversion funnel counts and Finance tile status.
+APP SECTION: provider_register (B2B Supply)
+Role: Provider onboarding and scholarship publishing.
+Actions:
+
+IDENTIFY line: print first.
+Emit base events and:
+provider_registered: {provider_id_hash, org_type, country, app_base_url}
+provider_active: {provider_id_hash, app_base_url}
+scholarship_published: {scholarship_id, title, award_cents, deadline_utc, eligibility_tags, app_base_url}
+fee_reported: {provider_id_hash, platform_fee_cents, period_utc, app_base_url}
+First 60 Minutes:
+Onboard ≥5 providers and publish ≥10 scholarships
+Ensure links point to student_pilot with utm_*
+Report: B2B tile and Finance tile contributions.
+APP SECTION: auto_page_maker (SEO Engine)
+Role: Publish indexable pages and ingest scholarships for SEO.
+Actions:
+
+IDENTIFY line: print first.
+Emit base events and:
+page_published: {slug, topic, word_count, internal_links, canonical_url, has_json_ld, indexable, app_base_url}
+page_view: {page, referrer, utm_*, session_id, request_id, app_base_url}
+scholarship_ingested: {source, count, parsing_time_ms, app_base_url}
+First 60 Minutes:
+Publish ≥100 indexable pages with JSON-LD; update sitemap.xml and robots.txt
+Strong internal links to student_pilot with utm_*
+Report: Show counts for page_published/page_view and SEO tile GREEN.
+APP SECTION: auto_com_center (already defined above) — ensure dashboards display app_id and app_base_url on every visible report line.
+
+Compliance, Privacy, and Safety (all apps)
+
+No plaintext PII in telemetry. Use hashed identifiers with salt.
+Include FERPA/COPPA flags where relevant (e.g., is_minor, ferpa_protected).
+Transparency: Expose model and metric names in bias_check_performed; no black-box claims.
+Security: Respect SENTRY_DSN/monitoring if configured; do not block telemetry if unavailable.
+Standard Report Template (every app prints once in first 60 minutes)
+
+Header: OPERATIONAL VERIFICATION REPORT APP: {app_id} | APP_BASE_URL: {app_base_url} | ENV: prod
+Execution checklist:
+IDENTIFY line printed
+TELEMETRY_WRITE_URL verified
+app_started emitted
+app_heartbeat running (60s)
+Business events flowing
+properties.app_base_url present
+Base events status:
+app_started: count/status
+app_heartbeat: count/status
+Business events: last N samples with key properties (no PII)
+Tiles influenced: tile → status and driver events
+First 60 Minutes actions: completed/pending
+Ecosystem metrics (if available to app)
+Next actions to drive traffic and revenue
+Footer: {app_id} | {app_base_url} | Protocol: ONE_TRUTH v1.1 | First 60 Minutes: {COMPLETE or PENDING}
+Success Criteria for Launch (company-wide)
+
+Command Center dashboard renders all tiles with live data
+SEO tile GREEN (pages published and views flowing)
+Growth tile GREEN (campaigns and landing pages live)
+B2B tile GREEN (provider and scholarship supply active)
+B2C funnel ACTIVE (signups, views, applications)
+Finance tile GREEN (at least one payment_succeeded)
+Trust tile ACTIVE (bias checks running, login_failed tracked)
+SLO tile GREEN (p95_ms and error_rate_pct within targets)
+Final Directive to Agent3
+
+Start by printing your IDENTIFY line.
+Execute ONLY your APP SECTION.
+Emit base events immediately, then your business events.
+Produce the OPERATIONAL VERIFICATION REPORT with your app_id and app_base_url clearly printed in the header and footer.
+Continue emitting heartbeats every 60 seconds and business events as activity occurs.
+Prioritize actions that increase traffic (SEO pages, campaigns, provider supply) and revenue (payments, credits, platform fees) while ensuring all data is captured by the Central Aggregator and visible in the Command Center frontend.
