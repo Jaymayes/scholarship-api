@@ -363,12 +363,20 @@ async def get_stats(
         
         return {
             "window": window,
+            "group": group,
             "group_by": group,
             "cutoff_utc": cutoff.isoformat(),
             "total_events": total_result or 0,
             "stats": stats,
+            "breakdown": {k: v["count"] for k, v in stats.items()},
             "data_source": "postgres",
-            "generated_at": datetime.utcnow().isoformat()
+            "generated_at": datetime.utcnow().isoformat(),
+            "_meta": {
+                "protocol": "ONE_TRUTH",
+                "version": "1.2",
+                "source": "central_aggregator",
+                "app_id": "scholarship_api"
+            }
         }
         
     except Exception as e:
@@ -379,7 +387,11 @@ async def get_stats(
 @router.get("/kpis/today", tags=["Telemetry"])
 async def get_kpis_today(db=Depends(get_db)):
     """
-    Today's KPI summary for Command Center
+    Today's KPI summary for Command Center (Protocol ONE_TRUTH v1.2)
+    
+    Returns structured KPIs expected by auto_com_center:
+    - page_views, app_starts, heartbeats, scholarships_published
+    - payments_count, revenue_cents (from payment_succeeded + credit_purchased)
     """
     try:
         today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
@@ -388,8 +400,8 @@ async def get_kpis_today(db=Depends(get_db)):
             SELECT 
                 event_name,
                 COUNT(*) as count,
-                SUM(CASE WHEN (properties->>'revenue_usd')::numeric IS NOT NULL 
-                    THEN (properties->>'revenue_usd')::numeric ELSE 0 END) as revenue
+                SUM(CASE WHEN (properties->>'amount_cents')::numeric IS NOT NULL 
+                    THEN (properties->>'amount_cents')::numeric ELSE 0 END) as amount_cents
             FROM business_events
             WHERE ts >= :today_start
             GROUP BY event_name
@@ -399,18 +411,37 @@ async def get_kpis_today(db=Depends(get_db)):
         rows = result.fetchall()
         
         event_counts = {}
-        total_revenue = 0.0
+        revenue_cents = 0
         for row in rows:
-            event_counts[row[0]] = row[1]
-            total_revenue += float(row[2] or 0)
+            event_name = row[0] or "unknown"
+            event_counts[event_name] = row[1]
+            if event_name in ("payment_succeeded", "credit_purchased"):
+                revenue_cents += int(row[2] or 0)
+        
+        page_views = event_counts.get("page_view", 0)
+        app_starts = event_counts.get("app_started", 0)
+        heartbeats = event_counts.get("app_heartbeat", 0)
+        scholarships_published = event_counts.get("scholarship_published", 0)
+        payments_count = event_counts.get("payment_succeeded", 0) + event_counts.get("credit_purchased", 0)
         
         return {
             "date": today_start.date().isoformat(),
+            "page_views": page_views,
+            "app_starts": app_starts,
+            "heartbeats": heartbeats,
+            "scholarships_published": scholarships_published,
+            "payments_count": payments_count,
+            "revenue_cents": revenue_cents,
             "event_counts": event_counts,
-            "total_events": sum(event_counts.values()),
-            "revenue_usd": round(total_revenue, 2),
+            "total_events": sum(event_counts.values()) if event_counts else 0,
             "data_source": "postgres",
-            "generated_at": datetime.utcnow().isoformat()
+            "generated_at": datetime.utcnow().isoformat(),
+            "_meta": {
+                "protocol": "ONE_TRUTH",
+                "version": "1.2",
+                "source": "central_aggregator",
+                "app_id": "scholarship_api"
+            }
         }
         
     except Exception as e:
@@ -792,7 +823,7 @@ async def get_central_stats(
                 },
                 "_meta": {
                     "protocol": "ONE_TRUTH",
-                    "version": "1.1",
+                    "version": "1.2",
                     "source": "central_aggregator",
                     "central_aggregator": "https://scholarship-api-jamarrlmayes.replit.app",
                     "app_id": "scholarship_api",

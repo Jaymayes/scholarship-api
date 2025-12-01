@@ -1,0 +1,159 @@
+Unified Command + Telemetry Master Prompt for Agent3 (v1.2)
+
+Read me first (Agent discipline)
+
+You are Agent3.
+Only execute the instructions under the section tagged FOR auto_com_center (Agent3). All other app sections are included for system-wide consistency and cross-team orientation; do not act on them unless your app_id equals that section’s app_id.
+Before any work, IDENTIFY yourself to logs and reports so there is no confusion.
+All reports and all telemetry properties must include your app name and base APP_BASE_URL.
+Prime outcome for this run
+
+Ensure all data from every app is reported into the Command Center and rendered to the frontend dashboard so we can launch, drive traffic, and generate revenue (B2C + B2B + Finance tiles).
+Confirm event flow end-to-end and show live tile statuses on the dashboard.
+App registry (id → APP_BASE_URL)
+
+scholar_auth → https://scholar-auth-jamarrlmayes.replit.app
+scholarship_api (central aggregator) → https://scholarship-api-jamarrlmayes.replit.app
+scholarship_agent → https://scholarship-agent-jamarrlmayes.replit.app
+scholarship_sage → https://scholarship-sage-jamarrlmayes.replit.app
+student_pilot → https://student-pilot-jamarrlmayes.replit.app
+provider_register → https://provider-register-jamarrlmayes.replit.app
+auto_page_maker → https://auto-page-maker-jamarrlmayes.replit.app
+auto_com_center (Command Center) → https://auto-com-center-jamarrlmayes.replit.app
+Global telemetry protocol (ONE_TRUTH v1.2)
+
+Telemetry write URL (all apps): POST https://scholarship-api-jamarrlmayes.replit.app/api/analytics/events
+Event envelope (snake_case): { "events": [{ "event_id": "uuid-v4", "event_type": "string", "app_id": "string", "env": "prod", "ts_utc": "ISO-8601", "properties": { "...", "app_base_url": "https://<app>" } }]}
+Required base events for every app:
+app_started at boot (include version, uptime_sec=0, service_ok, p95_ms, error_rate_pct, app_base_url)
+app_heartbeat every 60s (include uptime_sec, service_ok, p95_ms, error_rate_pct, app_base_url)
+SLO targets (all apps): uptime ≥ 99.9%, p95 latency ≤ 120ms, error_rate_pct ≤ 1%. Exclude S2S telemetry endpoints from user-facing SLO metrics.
+Privacy & Safety: no plaintext PII in telemetry, FERPA/COPPA/Trust safeguards flags only (e.g., is_minor, ferpa_protected), hashed ids.
+UTM attribution: capture utm_source, utm_medium, utm_campaign on inbound; pass-through to cross-app redirects and in telemetry.
+Business events by app (for clarity; Agent3 only uses its own section)
+
+scholar_auth: user_signed_up, user_logged_in (mfa_used), login_failed (reason), session_refreshed
+scholarship_api: events_ingested, tile_computed, kpis_computed
+scholarship_agent: campaign_launched, landing_page_created, utm_routed
+scholarship_sage: bias_check_performed, risk_flagged
+student_pilot: page_view, application_started, application_submitted, checkout_started, payment_succeeded, credit_purchased
+provider_register: provider_registered, provider_active, scholarship_published, fee_reported
+auto_page_maker: page_published, page_view, scholarship_ingested, scholarship_published
+auto_com_center (Agent3): dashboard_loaded, tile_status_rendered
+Tiles to render in Command Center
+
+SLO (system health)
+B2C (student funnel)
+B2B (provider/supply)
+SEO (organic traffic engine)
+Growth (campaigns/landing)
+Trust (safety/compliance)
+Finance (payments/fees)
+FOR auto_com_center (Agent3) — Command Center — Your execution plan
+
+Identify yourself (print once at start and attach to all reports)
+Print IDENTIFY line exactly: IDENTIFY: APP=auto_com_center | APP_BASE_URL=https://auto-com-center-jamarrlmayes.replit.app | ROLE=Command Center | ENV=prod
+In all reports and logs, prefix with: APP: auto_com_center | APP_BASE_URL: https://auto-com-center-jamarrlmayes.replit.app
+2. Boot sequence and telemetry
+
+Verify TELEMETRY_WRITE_URL availability (HTTP 200 on scholarship_api /api/analytics/events).
+Emit base events:
+app_started (immediately at boot)
+app_heartbeat (interval=60s)
+Include properties.app_base_url on every event.
+3. Dashboard data ingestion + rendering loop
+
+Poll central aggregator endpoints every 30s (staggered to avoid thundering herd):
+GET /api/executive/central-stats?window=24h
+GET /api/kpis/today
+GET /api/stats?window=24h&group=event_type
+On each dashboard render:
+Emit business event dashboard_loaded with {view: "executive", tiles_rendered: <count>, app_base_url}.
+For each tile rendered (slo, b2c, b2b, seo, growth, trust, finance), emit tile_status_rendered with: {tile: "slo"|"b2c"|..., status: "GREEN"|"YELLOW"|"RED"|"NO_DATA", drivers: [event_types], app_base_url}.
+Frontend display requirements:
+Render all seven tiles with status badges and primary driver events.
+Show overall status banner (GREEN/YELLOW/RED) from central-stats.
+Show KPIs snapshot: pageViews, appStarts, heartbeats, scholarshipsPublished, paymentsCount, revenueToday.
+Show “Last updated” timestamp (UTC) and data freshness indicator.
+4. Status computation (if aggregator provides only raw)
+
+If central-stats includes tile statuses, render them directly.
+If not present, compute provisional statuses locally using last 24h event presence and SLO metrics:
+SLO: GREEN if p95_ms ≤ 120 and error_rate_pct ≤ 1% and uptime ≥ 99.9%; YELLOW if one guardrail breached; RED if two or more; NO_DATA if missing metrics.
+B2C: GREEN if application_started>0 and application_submitted>0; YELLOW if only started>0; RED if zero; NO_DATA if no events.
+B2B: GREEN if provider_registered>0 and scholarship_published>0; YELLOW if one present; RED if zero; NO_DATA if no events.
+SEO: GREEN if page_published>0 or page_view>0; YELLOW if low; RED if zero; NO_DATA if no events.
+Growth: GREEN if campaign_launched>0 or landing_page_created>0; else RED/NO_DATA accordingly.
+Trust: GREEN if bias_check_performed>0 and login_failed monitored; YELLOW if only one driver present; RED if none; NO_DATA if no events.
+Finance: GREEN if payment_succeeded>0 or credit_purchased>0; YELLOW if checkout_started>0 but no payments; RED if zero; NO_DATA if no events.
+5. Revenue-driving callouts (display in “Next Actions” panel)
+
+If Finance NO_DATA or RED, display: “student_pilot: trigger Stripe test + live webhooks to emit payment_succeeded, credit_purchased.”
+If B2C YELLOW/RED, display: “scholar_auth: route signups to student_pilot with utm_; student_pilot: strengthen application_ events.”
+If B2B YELLOW/RED, display: “provider_register: onboard providers, publish scholarships, emit fee_reported for platform_fee_cents.”
+If SEO YELLOW/RED, display: “auto_page_maker: publish indexable pages, ensure JSON-LD, link to student_pilot with UTM.”
+If Growth YELLOW/RED, display: “scholarship_agent: launch campaigns, create landing pages with UTM routed to student_pilot.”
+6. UI telemetry + branding
+
+Every time the dashboard route loads, emit dashboard_loaded then tile_status_rendered for each tile.
+Surface an Operational Verification Report banner with:
+“APP: auto_com_center | APP_BASE_URL: https://auto-com-center-jamarrlmayes.replit.app | ENV: prod”
+Counts from central-stats, tiles with statuses, and any warnings (SLO breaches).
+All reports must include “APP: auto_com_center | APP_BASE_URL: https://auto-com-center-jamarrlmayes.replit.app”.
+7. Guardrails and ethics
+
+Do not display any PII in the dashboard. Show counts, rates, and hashed ids only.
+Respect FERPA/COPPA flags; never surface student-level details.
+8. Success criteria (declare COMPLETE when all true)
+
+Base events emitted and visible in central aggregator.
+dashboard_loaded and tile_status_rendered events present in aggregator.
+Frontend dashboard renders seven tiles with statuses and KPIs.
+At least one of Finance/B2C/B2B/SEO/Growth tiles shows GREEN or ACTIVE driver events.
+All reports carry the required “APP … | APP_BASE_URL …” header.
+Stop conditions
+
+If TELEMETRY_WRITE_URL is unavailable (non-200), retry with exponential backoff and log a single RED banner “Aggregator unavailable”; continue heartbeats and retry quietly in the background.
+If any tile lacks data after 10 minutes, mark NO_DATA and surface targeted Next Actions.
+Reference sections for other apps (do not execute; for orientation only)
+
+FOR scholarship_api (central aggregator — THE HEART)
+
+Accept event envelope v1.2, dedupe by event_id, backfill on reconnect.
+Expose:
+POST /api/analytics/events
+GET /api/executive/central-stats?window=24h (include overallStatus, tile statuses, ecosystemMetrics, and _report branding)
+GET /api/kpis/today
+GET /api/stats?window=24h&group=event_type or &group=app
+Exclude S2S endpoints from user-facing SLO error_rate_pct.
+Compute tiles and KPIs; include app_base_url in aggregates.
+FOR scholar_auth
+
+Emit user_signed_up (include utm_*, method, flags is_minor/ferpa_protected), user_logged_in (mfa_used), login_failed (reason).
+Redirect to student_pilot with UTM passthrough.
+FOR student_pilot
+
+Emit page_view, application_started, application_submitted, checkout_started, payment_succeeded (via Stripe webhook), credit_purchased (credits, amount_cents, stripe_mode).
+Finance tile depends on payment_succeeded/credit_purchased.
+FOR provider_register
+
+Emit provider_registered, provider_active, scholarship_published, fee_reported (platform_fee_cents, period_utc).
+Link to student_pilot with UTM for discovery.
+FOR auto_page_maker
+
+Emit page_published (slug, topic, canonical_url, has_json_ld, indexable), page_view, scholarship_ingested, scholarship_published.
+Ensure internal links to student_pilot with UTM for conversion.
+FOR scholarship_agent
+
+Emit campaign_launched, landing_page_created, utm_routed; route traffic to student_pilot.
+FOR scholarship_sage
+
+Emit bias_check_performed and risk_flagged; contribute to Trust tile.
+Kickoff now (Agent3 only)
+
+Print IDENTIFY line.
+Verify telemetry write URL; emit app_started and start app_heartbeat.
+Load executive dashboard → emit dashboard_loaded and tile_status_rendered per tile.
+Render KPIs and tiles on the frontend; include Next Actions to move Finance and Growth to GREEN.
+Ensure every report and on-screen Operational Verification Report includes: APP: auto_com_center | APP_BASE_URL: https://auto-com-center-jamarrlmayes.replit.app | ENV: prod
+End of prompt.
