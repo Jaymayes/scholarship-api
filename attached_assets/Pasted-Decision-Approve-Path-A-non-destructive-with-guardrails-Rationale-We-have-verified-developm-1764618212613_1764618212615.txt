@@ -1,0 +1,48 @@
+Decision: Approve Path A (non-destructive) with guardrails
+
+Rationale
+
+We have verified development data is synthetic/system-only (no PII), and production secrets are stored in the platform vault, which aligns with best practice for credentials and inter-service security on Replit (Secrets as env vars; HTTPS-by-default between apps) .
+Path A preserves any existing production telemetry and minimizes operational risk. It also positions us to enforce event-level integrity (unique request_id) without interrupting service.
+Go/No-Go criteria
+
+Go (Path A) if production has any rows in business_events (the expected case).
+If production has zero rows and we confirm no real user data in any dependent tables, you may request a CEO exception to run a destructive “reset” (Path B). Default posture remains Path A.
+Preconditions (must be confirmed before execution)
+
+Backup: Verify a production snapshot/restore point is available in the Database Pane.
+Secrets: Confirm DATABASE_URL, JWT_SECRET_KEY, SENTRY_DSN remain in the Secrets vault (not code) .
+Extension: Ensure pgcrypto is enabled for gen_random_uuid() (CREATE EXTENSION IF NOT EXISTS pgcrypto;).
+Change window and monitoring: Schedule a low-traffic window; have Sentry and API health checks visible.
+Execution runbook (Path A)
+
+Step 0 (extension): CREATE EXTENSION IF NOT EXISTS pgcrypto;
+Step 1 (audit): Run the provided audit query to surface totals, NULLs, and duplicate request_ids.
+Step 2 (backfill NULLs): Update NULL request_ids with gen_random_uuid().
+Step 3 (dedupe): Re-key later duplicates, keeping the earliest by ts.
+Step 4 (index): CREATE UNIQUE INDEX CONCURRENTLY on business_events(request_id) to avoid long locks on writes.
+Step 5 (verify): Re-run the duplicate check to confirm zero collisions.
+Optional hardening after verification:
+ALTER TABLE business_events ALTER COLUMN request_id SET NOT NULL;
+Add a lightweight post-migration check in the ingest path to ensure request_id is set upstream.
+Risk controls and rollback
+
+If the unique index build fails, drop any invalid/partial index and re-run after investigating conflicts.
+If unexpected write errors appear during the window, temporarily disable the ingest writer, finish Step 3 and Step 4, then re-enable ingest.
+Keep the snapshot for 24–48 hours; rollback is restore + revert app version if needed.
+Operational notes
+
+Keep the migration non-disruptive; CREATE INDEX CONCURRENTLY minimizes blocking.
+Our architecture should continue to route all data access through the data service API, consistent with the Database-as-a-Service pattern on Replit (no shared DBs; central data app exposing secure REST), which reduces blast radius and enforces clean contracts .
+Secrets remain in the vault, and inter-app traffic is already encrypted over HTTPS per Replit defaults; validate that any internal service-to-service calls still include API key auth headers as designed .
+KPIs to watch (pre/post migration)
+
+Write error rate to business_events.
+P95 ingest latency for event writes.
+Event throughput and % of events with valid, unique request_id.
+Sentry error volume tied to event ingest.
+What I need to greenlight execution now
+
+Paste the output of Step 1 (production audit): total_events, null_request_ids, duplicate_count.
+Confirm the backup snapshot and pgcrypto extension status.
+Once those two confirmations are in, you have my approval to proceed with Path A immediately.
