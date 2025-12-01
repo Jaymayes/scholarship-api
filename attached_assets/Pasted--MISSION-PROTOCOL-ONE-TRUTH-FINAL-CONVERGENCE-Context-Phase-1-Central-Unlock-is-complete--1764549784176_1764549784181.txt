@@ -1,0 +1,94 @@
+🚀 MISSION: PROTOCOL "ONE TRUTH" - FINAL CONVERGENCE
+Context: Phase 1 (Central Unlock) is complete. scholarship_api is accepting data. Most satellites are reporting in. Remaining Blockers:
+
+provider_register: Sending invalid payload format (422 Unprocessable Entity).
+
+scholarship_sage: Sending invalid payload format (422).
+
+auto_com_center: Needs to switch frontend to consume the new aggregated feed.
+
+Agent3 Instruction: Identify your current APP ID. Execute ONLY the relevant block.
+
+📍 ECOSYSTEM REFERENCE
+scholarship_api → Central Aggregator (Working ✅)
+
+provider_register → Satellite (Blocked ❌ - 422 Error)
+
+scholarship_sage → Satellite (Blocked ❌ - 422 Error)
+
+auto_com_center → Command Center (Pending Visualization ⏳)
+
+🟠 IF CURRENT APP IS: provider_register OR scholarship_sage (The Blocked Satellites)
+Objective: Fix Payload Formatting to match Central Aggregator schema.
+
+Analyze Validation Error:
+
+The Central Aggregator expects specific fields. It is rejecting your current format.
+
+Required Schema:
+
+JSON
+
+{
+  "events": [
+    {
+      "event_type": "string",
+      "app_id": "string",
+      "env": "string",
+      "properties": {}
+    }
+  ]
+}
+Common Mistake: Sending camelCase keys when snake_case is required (e.g., eventType vs event_type).
+
+Update Telemetry Client:
+
+Open server/services/telemetry-client.ts (or equivalent).
+
+Ensure the JSON payload keys match the Required Schema exactly.
+
+Ensure you are wrapping the event in an events array: { "events": [...] }.
+
+Restart & Verify:
+
+Restart the server.
+
+Trigger a heartbeat.
+
+Check logs for "200 OK" from Central Aggregator.
+
+🔵 IF CURRENT APP IS: auto_com_center (The Eyes)
+Objective: Switch Visualization to Real Data.
+
+Switch Data Source:
+
+Open client/src/hooks/use-kpi.ts (or the relevant data fetcher file).
+
+REPLACE the fetch URL http://localhost:5000/api/executive/ecosystem (local aggregation) with the new proxy endpoint you created: /api/executive/central-stats.
+
+Alternatively, ensure /api/executive/ecosystem is internally fetching from scholarship_api (which you may have already done).
+
+Verify Frontend:
+
+Open the dashboard in the browser.
+
+Verify that the numbers match the "Total Events" count you saw in the scholarship_api logs (should be > 600).
+
+🟢 IF CURRENT APP IS: scholarship_api (The Heart)
+Objective: Stability & Monitoring.
+
+Monitor Ingest:
+
+Run a tail log on the server to watch for incoming 422 errors.
+
+If you see 422s, log the exact body of the failed request so we can tell the satellites exactly what field is wrong.
+
+print(f"Validation Error: {request.json()}") inside the exception handler for the analytics endpoint.
+
+📝 REQUIRED OUTPUT FORMAT
+Plaintext
+
+APP: [App Name]
+STATUS: [Fixed / Monitoring]
+ACTION: [Specific fix applied]
+VERIFICATION: [Log output showing 200 OK or Frontend showing data]

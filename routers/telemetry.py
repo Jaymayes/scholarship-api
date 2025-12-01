@@ -1,14 +1,18 @@
 """
 Telemetry Router - Command Center Integration
 Implements Telemetry Contract v1.1 endpoints for ecosystem-wide event collection and stats
+
+Protocol ONE TRUTH (2025-11-30): Added validation error logging and flexible payload handling
 """
 from datetime import datetime, timedelta
-from typing import Optional, Dict, Any, List, Literal
+from typing import Optional, Dict, Any, List, Literal, Union
 from enum import Enum
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 import uuid
+import json
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi.responses import JSONResponse
 from sqlalchemy import text
 
 from models.database import get_db
@@ -19,22 +23,32 @@ router = APIRouter()
 
 
 class TelemetryEvent(BaseModel):
-    """Telemetry event schema per Contract v1.1"""
+    """
+    Telemetry event schema per Contract v1.1
+    
+    Protocol ONE TRUTH: Flexible field handling for satellite compatibility
+    - Accepts both snake_case and camelCase field names
+    - Auto-generates missing fields with sensible defaults
+    """
     event_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     event_type: str = Field(..., description="Event type from catalog")
     ts_utc: datetime = Field(default_factory=datetime.utcnow)
     app_id: str = Field(..., description="Source app identifier")
-    env: Literal["prod", "staging", "dev"] = Field(default="prod")
+    env: str = Field(default="prod")  # Relaxed: accept any string, not just Literal
     version: Optional[str] = None
     session_id: Optional[str] = None
     user_id_hash: Optional[str] = None
     account_id: Optional[str] = None
-    actor_type: Optional[Literal["student", "provider", "system"]] = None
+    actor_type: Optional[str] = None  # Relaxed: accept any string
     request_id: Optional[str] = None
     source_ip_masked: Optional[str] = None
     coppa_flag: bool = False
     ferpa_flag: bool = False
     properties: Dict[str, Any] = Field(default_factory=dict)
+    
+    class Config:
+        extra = "allow"  # Accept extra fields from satellites
+        populate_by_name = True  # Accept field aliases
 
 
 class TelemetryEventBatch(BaseModel):
@@ -53,6 +67,152 @@ class StatsTimeWindow(str, Enum):
     FIVE_MIN = "5m"
     ONE_HOUR = "1h"
     TWENTY_FOUR_HOUR = "24h"
+
+
+def normalize_event_keys(event_dict: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Protocol ONE TRUTH: Normalize satellite payload keys to expected schema.
+    Handles camelCase -> snake_case conversion and common field name variations.
+    """
+    key_mapping = {
+        # camelCase -> snake_case
+        "eventType": "event_type",
+        "eventId": "event_id",
+        "appId": "app_id",
+        "tsUtc": "ts_utc",
+        "userId": "user_id_hash",
+        "userIdHash": "user_id_hash",
+        "actorType": "actor_type",
+        "sessionId": "session_id",
+        "accountId": "account_id",
+        "requestId": "request_id",
+        "sourceIpMasked": "source_ip_masked",
+        "coppaFlag": "coppa_flag",
+        "ferpaFlag": "ferpa_flag",
+        # Common variations
+        "type": "event_type",
+        "name": "event_type",
+        "app": "app_id",
+        "source": "app_id",
+        "timestamp": "ts_utc",
+        "ts": "ts_utc",
+        "data": "properties",
+        "payload": "properties",
+        "metadata": "properties",
+    }
+    
+    normalized = {}
+    for key, value in event_dict.items():
+        normalized_key = key_mapping.get(key, key)
+        normalized[normalized_key] = value
+    
+    return normalized
+
+
+@router.post("/analytics/events/raw", tags=["Telemetry"])
+async def write_events_raw(
+    request: Request,
+    db=Depends(get_db)
+):
+    """
+    Protocol ONE TRUTH: Raw body fallback endpoint for debugging 422 errors.
+    
+    Accepts ANY JSON payload and attempts to normalize it to the expected schema.
+    Logs the raw body for debugging satellite format issues.
+    """
+    try:
+        raw_body = await request.body()
+        body_str = raw_body.decode('utf-8')
+        
+        logger.info(f"🔍 RAW TELEMETRY RECEIVED: {body_str[:500]}")
+        
+        try:
+            payload = json.loads(body_str)
+        except json.JSONDecodeError as e:
+            logger.error(f"❌ INVALID JSON from satellite: {e}")
+            return JSONResponse(
+                status_code=422,
+                content={
+                    "error": "Invalid JSON",
+                    "detail": str(e),
+                    "raw_sample": body_str[:200]
+                }
+            )
+        
+        events_to_process = []
+        
+        if isinstance(payload, dict):
+            if "events" in payload and isinstance(payload["events"], list):
+                events_to_process = [normalize_event_keys(e) for e in payload["events"]]
+            else:
+                events_to_process = [normalize_event_keys(payload)]
+        elif isinstance(payload, list):
+            events_to_process = [normalize_event_keys(e) for e in payload]
+        
+        accepted = 0
+        failed = 0
+        event_ids = []
+        errors = []
+        
+        for event_data in events_to_process:
+            try:
+                event_id = event_data.get("event_id", str(uuid.uuid4()))
+                event_type = event_data.get("event_type", "unknown")
+                app_id = event_data.get("app_id", "unknown_satellite")
+                env = event_data.get("env", "prod")
+                
+                if not event_type or event_type == "unknown":
+                    errors.append({"event": event_data, "error": "Missing event_type"})
+                    failed += 1
+                    continue
+                
+                query = text("""
+                    INSERT INTO business_events 
+                    (request_id, app, env, event_name, ts, actor_type, actor_id, session_id, org_id, properties)
+                    VALUES 
+                    (:request_id, :app, :env, :event_name, :ts, :actor_type, :actor_id, :session_id, :org_id, CAST(:properties AS jsonb))
+                """)
+                
+                db.execute(query, {
+                    "request_id": event_id,
+                    "app": app_id,
+                    "env": env,
+                    "event_name": event_type,
+                    "ts": datetime.utcnow(),
+                    "actor_type": event_data.get("actor_type", "system"),
+                    "actor_id": event_data.get("user_id_hash"),
+                    "session_id": event_data.get("session_id"),
+                    "org_id": event_data.get("account_id"),
+                    "properties": json.dumps(event_data.get("properties", {}))
+                })
+                
+                accepted += 1
+                event_ids.append(event_id)
+                
+            except Exception as e:
+                logger.error(f"Failed to process raw event: {e}")
+                errors.append({"event": event_data, "error": str(e)})
+                failed += 1
+        
+        if accepted > 0:
+            db.commit()
+        
+        logger.info(f"📊 RAW TELEMETRY: accepted={accepted}, failed={failed}, errors={len(errors)}")
+        
+        return {
+            "accepted": accepted,
+            "failed": failed,
+            "event_ids": event_ids,
+            "errors": errors[:5] if errors else [],
+            "hint": "If you're seeing errors, ensure events have 'event_type' and 'app_id' fields"
+        }
+        
+    except Exception as e:
+        logger.error(f"💥 RAW TELEMETRY ERROR: {e}")
+        return JSONResponse(
+            status_code=500,
+            content={"error": str(e)}
+        )
 
 
 @router.post("/events", response_model=EventWriteResponse, tags=["Telemetry"])

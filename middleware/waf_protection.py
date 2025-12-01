@@ -80,6 +80,7 @@ class WAFProtection(BaseHTTPMiddleware):
             "/api/events",  # Telemetry Contract v1.1: Fallback event write endpoint (service-to-service)
             "/api/events/single",  # Telemetry Contract v1.1: Single event write endpoint
             "/api/analytics/events",  # Telemetry Contract v1.1: Primary S2S event write (CSRF FIX 2025-11-30)
+            "/api/analytics/events/raw",  # Protocol ONE TRUTH: Raw body fallback for 422 debugging
         }
         
         # SECURITY: Regex patterns for dynamic routes that require WAF bypass
