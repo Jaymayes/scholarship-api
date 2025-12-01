@@ -791,10 +791,12 @@ async def get_central_stats(
                     "scholarshipsPublished": scholarship_published
                 },
                 "_meta": {
-                    "protocol": "ONE TRUTH",
-                    "version": "1.0",
-                    "source": "scholarship_api",
+                    "protocol": "ONE_TRUTH",
+                    "version": "1.1",
+                    "source": "central_aggregator",
                     "central_aggregator": "https://scholarship-api-jamarrlmayes.replit.app",
+                    "app_id": "scholarship_api",
+                    "app_base_url": "https://scholarship-api-jamarrlmayes.replit.app",
                     "window": window,
                     "cutoff_utc": cutoff.isoformat(),
                     "generated_at": datetime.utcnow().isoformat()
