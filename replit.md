@@ -36,6 +36,13 @@ The application uses FastAPI for high performance and async capabilities, with P
   - Synthetic event validation when `SYNTHETIC=true` environment variable is set
   - **S2S CSRF Fix (2025-11-30)**: WAF bypass for `/api/analytics/events` enables service-to-service telemetry without CSRF false positives
 - **Credits Ledger System**: A transactional credit ledger system enabling B2C monetization and paywalled AI features, featuring a database-backed ledger, transactional idempotency, row-level locking, API endpoints with JWT and RBAC, and security/compliance features.
+- **Legal Pages & Report Branding** (2025-12-01): Unified Business + Legal Pages specification implementation:
+  - `GET /privacy` - Privacy Policy (FERPA/COPPA compliant, SEO-optimized HTML)
+  - `GET /terms` - Terms of Service (binding arbitration, Maricopa County jurisdiction, class action waiver)
+  - `GET /accessibility` - Accessibility Statement (WCAG 2.1 AA, 2-day response SLA, alternative formats)
+  - JSON-LD Organization schema with sameAs entries for SEO
+  - Report branding (`_report` field) in central-stats endpoint with legal links
+  - Business identity: Scholar AI Advisor by Referral Service LLC, contact: support@referralsvc.com, 602-796-0177
 
 ## System Design Choices
 - **Middleware**: Includes CORS, structured logging, and centralized error handling.
