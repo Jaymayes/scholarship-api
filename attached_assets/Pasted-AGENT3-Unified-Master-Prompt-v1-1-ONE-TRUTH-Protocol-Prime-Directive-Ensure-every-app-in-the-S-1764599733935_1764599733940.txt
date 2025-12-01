@@ -1,0 +1,198 @@
+AGENT3 Unified Master Prompt v1.1 — ONE_TRUTH Protocol
+Prime Directive
+
+Ensure every app in the Scholar AI Advisor ecosystem reports telemetry and business events into the Central Aggregator, is monitored by the Command Center, and is displayed on the frontend tiles.
+Launch now to drive organic traffic, conversions, provider supply, and revenue. Favor SEO-driven growth and Stripe-enabled payments.
+IMPORTANT: Only execute the section labeled for your app (SECTION: <your APP>). Ignore all other sections.
+Read-Me First (Agent3)
+
+You will receive this single master prompt containing all apps. Before doing any work, identify your app and execute only your app’s section.
+At start of execution, print IDENTIFY exactly once: IDENTIFY: APP=<app_id> | APP_BASE_URL=<base_url> | ROLE=<role> | ENV=prod
+All reports and logs must include app name and APP_BASE_URL.
+All telemetry events must include properties.app_base_url = <your APP_BASE_URL>.
+App Directory (APP → APP_BASE_URL | ROLE)
+
+scholar_auth → https://scholar-auth-jamarrlmayes.replit.app | Auth Gateway
+scholarship_api → https://scholarship-api-jamarrlmayes.replit.app | Central Aggregator (The Heart)
+scholarship_agent → https://scholarship-agent-jamarrlmayes.replit.app | Growth Engine (Campaigns)
+scholarship_sage → https://scholarship-sage-jamarrlmayes.replit.app | Advisor + Responsible AI
+student_pilot → https://student-pilot-jamarrlmayes.replit.app | B2C Core + Payments
+provider_register → https://provider-register-jamarrlmayes.replit.app | B2B Supply
+auto_page_maker → https://auto-page-maker-jamarrlmayes.replit.app | SEO Engine
+auto_com_center → https://auto-com-center-jamarrlmayes.replit.app | Command Center (THE EYES)
+Global Telemetry Contract (ONE_TRUTH v1.1)
+
+TELEMETRY_WRITE_URL (Central Aggregator): POST https://scholarship-api-jamarrlmayes.replit.app/api/analytics/events
+Event envelope (snake_case): { "events": [ { "event_type": "...", "app_id": "<your app_id>", "env": "prod", "ts_utc": "<ISO-8601 UTC>", "properties": { "app_base_url": "<your APP_BASE_URL>", "...": "..." } } ] }
+Base events required (all apps):
+app_started (on boot): {uptime_sec=0, version, service_ok, p95_ms, error_rate_pct, app_base_url}
+app_heartbeat (every 60s): {uptime_sec, service_ok, p95_ms, error_rate_pct, app_base_url}
+Reliability:
+Exponential backoff with jitter on 5xx/429 (5s→10s→30s→60s→120s→300s max) and dedupe by event_id where available.
+Keep 422/5xx near-zero. Reflect failures in error_rate_pct and logs.
+Privacy/Safety:
+No plaintext PII in telemetry. Hash user_id/email (salted SHA-256). Include is_minor and ferpa_protected flags where relevant.
+Comply with FERPA/COPPA and Responsible AI guidelines.
+Frontend Display Contract (auto_com_center reads from scholarship_api)
+
+Read endpoints (GET):
+/api/executive/central-stats?window=24h → tile statuses: slo, b2c, b2b, seo, growth, trust, finance
+/api/stats?window=24h&group=app → per-app volumes
+/api/kpis/today → executive KPIs
+Tile drivers (examples; your app emits the relevant events):
+SLO: app_started, app_heartbeat (p95_ms, error_rate_pct)
+B2C: user_signed_up, page_view, application_started, application_submitted, recommendation_served
+B2B: provider_registered, provider_active, scholarship_published
+SEO: page_published, page_view, scholarship_ingested
+Growth: campaign_launched, landing_page_created, campaign_click
+Trust: login_failed, mfa_used, bias_check_performed, model_inference_evaluated
+Finance: payment_succeeded, credit_purchased, fee_reported, platform_fee_cents
+UTM and Linking Rules (all apps with links or pages)
+
+All outbound links and landing pages must include utm_source, utm_medium, utm_campaign (plus utm_term/utm_content where applicable).
+Capture utm_* in events that represent page views, signups, campaigns, and conversions.
+First-60-Minutes Launch Objective (all apps)
+
+Emit app_started immediately and app_heartbeat within 60s.
+Execute your app’s “First 60 Minutes” checklist to populate your tile(s) and generate real traffic paths to student_pilot conversion flows.
+Produce an Operational Verification Report (template provided below) including APP and APP_BASE_URL.
+Operational Verification Report (OVR) — Required Output Format
+
+Header: OPERATIONAL VERIFICATION REPORT APP: <app_id> | APP_BASE_URL: <base_url> | ENV: prod
+Execution Checklist: IDENTIFY line printed; TELEMETRY_WRITE_URL verified; app_started emitted; app_heartbeat running; business events flowing; properties.app_base_url present on all events.
+Base Events Status and Business Events (with last-N samples).
+Tiles Influenced and current status.
+First 60 Minutes Actions: status and notes.
+Next Actions to drive traffic and revenue (clear, prioritized).
+Protocol Status: ONE_TRUTH v1.1 COMPLIANT or remediation steps.
+SECTION: scholar_auth (Auth Gateway)
+
+ROLE: Auth Gateway. Scope: Authentication, signup/login flows, MFA.
+IDENTIFY: APP=scholar_auth | APP_BASE_URL=https://scholar-auth-jamarrlmayes.replit.app | ROLE=Auth Gateway | ENV=prod
+Business events to emit:
+user_signed_up: {user_id_hash, email_hash, method, referral_source, utm_*, is_minor, ferpa_protected, app_base_url}
+user_logged_in: {user_id_hash, mfa_used, method, app_base_url}
+login_failed: {reason, mfa_required, app_base_url}
+First 60 Minutes:
+Emit 10 test user_signed_up events with varied utm_* and referral_source to populate B2C and Trust tiles.
+Ensure MFA flows log user_logged_in with mfa_used flag and capture login_failed with reason.
+Verify backoff and dedupe working and error_rate_pct < 1%.
+Traffic/Revenue:
+Ensure post-signup redirect includes UTM and routes to student_pilot conversion pages.
+SECTION: scholarship_api (Central Aggregator, The Heart)
+
+ROLE: Central Aggregator. Scope: ingest, store, compute, serve tiles and KPIs to frontend.
+IDENTIFY: APP=scholarship_api | APP_BASE_URL=https://scholarship-api-jamarrlmayes.replit.app | ROLE=Central Aggregator (The Heart) | ENV=prod
+Responsibilities:
+Accept POST /api/analytics/events with schema above; validate snake_case, redact PII.
+Serve: /api/executive/central-stats, /api/stats, /api/kpis/*
+Compute tile statuses (GREEN/YELLOW/NO_DATA) and surface ecosystemMetrics.
+First 60 Minutes:
+Emit own base events.
+Confirm ingestion from ≥6 apps and return tile data to auto_com_center.
+Keep 422/5xx near-zero; expose error_rate_pct.
+Traffic/Revenue:
+None directly; ensure reliable data feeds to display conversion funnels and Finance.
+SECTION: scholarship_agent (Growth Engine, Campaigns)
+
+ROLE: Launch campaigns, create landing pages, drive traffic with UTM.
+IDENTIFY: APP=scholarship_agent | APP_BASE_URL=https://scholarship-agent-jamarrlmayes.replit.app | ROLE=Growth Engine (Campaigns) | ENV=prod
+Business events to emit:
+campaign_launched: {campaign_id, start_utc, end_utc, budget_usd, creative_variant, utm_*, app_base_url}
+landing_page_created: {path, campaign_id, topic, app_base_url}
+campaign_click: {campaign_id, path, utm_*, referrer, app_base_url}
+First 60 Minutes:
+Launch 2 campaigns: “Scholarship of the Day” and “Top Deadlines”.
+Create ≥7 landing pages total with utm_* linking to student_pilot.
+Emit campaign_launched immediately; emit landing_page_created on publish.
+Traffic/Revenue:
+Ensure links feed auto_page_maker pages and student_pilot checkout/credit flows.
+SECTION: scholarship_sage (Advisor + Responsible AI)
+
+ROLE: Personalization and Responsible AI monitoring.
+IDENTIFY: APP=scholarship_sage | APP_BASE_URL=https://scholarship-sage-jamarrlmayes.replit.app | ROLE=Advisor + Responsible AI | ENV=prod
+Business events:
+recommendation_served: {user_id_hash, scholarship_id, score, rank, explanation_available, session_id, request_id, app_base_url}
+bias_check_performed: {check_id, model_name, metric, value, threshold, result, app_base_url}
+model_inference_evaluated: {model_name, version, latency_ms, success, input_shape, output_shape, app_base_url}
+First 60 Minutes:
+Run bias_check_performed at least once.
+Emit recommendation_served on first traffic events.
+Traffic/Revenue:
+Increase B2C funnel efficiency via better recs; link “Apply” to student_pilot with utm_*.
+SECTION: student_pilot (B2C Core + Payments)
+
+ROLE: Main student app, conversion, Stripe payments.
+IDENTIFY: APP=student_pilot | APP_BASE_URL=https://student-pilot-jamarrlmayes.replit.app | ROLE=B2C Core + Payments | ENV=prod
+Business events:
+page_view: {page, referrer, utm_*, session_id, request_id, app_base_url}
+application_started: {scholarship_id, session_id, request_id, app_base_url}
+application_submitted: {scholarship_id, user_id_hash, session_id, request_id, app_base_url}
+checkout_started: {product, price_id, session_id, request_id, app_base_url}
+payment_succeeded: {invoice_id, amount_usd, currency, stripe_mode, user_id_hash, session_id, request_id, app_base_url}
+credit_purchased: {credits, amount_usd, currency, user_id_hash, session_id, request_id, app_base_url}
+First 60 Minutes:
+Ensure Stripe webhooks emit payment_succeeded and credit_purchased.
+Process at least 1 test payment to turn Finance tile GREEN.
+Capture UTM on page_view and carry through to conversion.
+Traffic/Revenue:
+Set BILLING_ROLLOUT_PERCENTAGE=100 (if applicable) and verify success path.
+SECTION: provider_register (B2B Supply)
+
+ROLE: Onboard providers; capture supply; platform fee events.
+IDENTIFY: APP=provider_register | APP_BASE_URL=https://provider-register-jamarrlmayes.replit.app | ROLE=B2B Supply | ENV=prod
+Business events:
+provider_registered: {provider_id_hash, org_type, country, app_base_url}
+provider_active: {provider_id_hash, app_base_url}
+scholarship_published: {scholarship_id, title, award_cents, deadline_utc, eligibility_tags, app_base_url}
+fee_reported: {provider_id_hash, platform_fee_cents, period_utc, app_base_url}
+First 60 Minutes:
+Onboard ≥5 providers (test OK) and publish ≥10 scholarships.
+Emit fee_reported with platform_fee_cents for Finance tile.
+Traffic/Revenue:
+Ensure published scholarships link to student_pilot application flow (utm_*).
+SECTION: auto_page_maker (SEO Engine)
+
+ROLE: Publish indexable pages and scholarship content to drive organic traffic.
+IDENTIFY: APP=auto_page_maker | APP_BASE_URL=https://auto-page-maker-jamarrlmayes.replit.app | ROLE=SEO Engine | ENV=prod
+Business events:
+page_published: {slug, topic, word_count, internal_links, canonical_url, has_json_ld, indexable, app_base_url}
+page_view: {page, referrer, utm_*, session_id, request_id, app_base_url}
+scholarship_ingested: {source, count, parsing_time_ms, app_base_url}
+scholarship_published: {scholarship_id, title, award_cents, deadline_utc, eligibility_tags, app_base_url}
+First 60 Minutes:
+Publish ≥100 indexable pages with JSON-LD; update sitemap.xml and robots.txt.
+Create strong internal links to student_pilot conversion pages with utm_*.
+Traffic/Revenue:
+Drive organic traffic to student_pilot and scholarship_sage recommendation flows.
+SECTION: auto_com_center (Command Center, THE EYES)
+
+ROLE: Frontend dashboard and monitoring.
+IDENTIFY: APP=auto_com_center | APP_BASE_URL=https://auto-com-center-jamarrlmayes.replit.app | ROLE=Command Center (THE EYES) | ENV=prod
+Responsibilities:
+Poll scholarship_api read endpoints and render tiles: SLO, B2C, B2B, SEO, Growth, Trust, Finance.
+Show ecosystemMetrics: page views, heartbeats, app starts, scholarships published, total events.
+Display NO_DATA for any tile missing its minimum event(s) and prompt the owning app in the UI banner.
+First 60 Minutes:
+Confirm Overall Status reflects computed tile statuses.
+Finance tile must turn GREEN upon first payment_succeeded from student_pilot.
+Success Criteria (All Apps)
+
+IDENTIFY printed once at start and included in OVR.
+Base events flowing (app_started, app_heartbeat with p95_ms and error_rate_pct).
+Business events flowing with properties.app_base_url populated.
+Tiles show GREEN or ACTIVE where applicable. Finance turns GREEN upon first payment_succeeded.
+UTM parameters present end-to-end; links drive traffic to student_pilot pages.
+Failure Handling
+
+If Central Aggregator POST fails (5xx/429), retry with backoff and jitter; log failures; reflect in error_rate_pct.
+If schema validation fails (422), correct payload immediately and re-emit.
+If any tile is NO_DATA after First 60 Minutes, include explicit remediation steps in the OVR.
+Completion Signal (All Apps)
+
+After completing your First 60 Minutes actions, output your Operational Verification Report in the required format.
+End with: <APP> | <APP_BASE_URL> | Protocol: ONE_TRUTH v1.1 | First 60 Minutes: COMPLETE
+Reminder
+
+Only execute the section labeled for your app. Do not act on other sections.
+Include the app name and APP_BASE_URL on all reports and in properties.app_base_url for every event.
