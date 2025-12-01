@@ -71,7 +71,22 @@ class Settings(BaseSettings):
     api_title: str = Field("Scholarship Discovery & Search API", alias="API_TITLE")
     api_version: str = Field("1.0.0", alias="API_VERSION")
     api_description: str = Field(
-        "A comprehensive API for scholarship discovery with advanced search and eligibility checking",
+        """A comprehensive API for scholarship discovery with advanced search and eligibility checking.
+
+**Scholar AI Advisor** by **Referral Service LLC**
+
+## Legal
+- [Privacy Policy](/privacy)
+- [Terms of Service](/terms)
+- [Accessibility Statement](/accessibility)
+
+## Contact
+- Email: support@referralsvc.com
+- Phone: 602-796-0177
+- Address: 16031 N 171st Ln, Surprise, AZ 85388, USA
+
+---
+© 2025 Referral Service LLC. All rights reserved.""",
         alias="API_DESCRIPTION"
     )
     

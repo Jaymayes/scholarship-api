@@ -800,6 +800,19 @@ async def get_central_stats(
                     "window": window,
                     "cutoff_utc": cutoff.isoformat(),
                     "generated_at": datetime.utcnow().isoformat()
+                },
+                "_report": {
+                    "generated_by": "scholarship_api",
+                    "brand_name": "Scholar AI Advisor",
+                    "company_legal_name": "Referral Service LLC",
+                    "contact_email": "support@referralsvc.com",
+                    "contact_phone": "602-796-0177",
+                    "copyright": "© 2025 Referral Service LLC. All rights reserved.",
+                    "legal_links": {
+                        "privacy_policy": "https://scholarship-api-jamarrlmayes.replit.app/privacy",
+                        "terms_of_service": "https://scholarship-api-jamarrlmayes.replit.app/terms",
+                        "accessibility": "https://scholarship-api-jamarrlmayes.replit.app/accessibility"
+                    }
                 }
             },
             "apps": apps,

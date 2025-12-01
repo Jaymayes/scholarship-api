@@ -87,6 +87,7 @@ from routers.prompts import router as prompts_router
 from routers.evidence import router as evidence_router
 from routers.debug_routes import router as debug_routes_router
 from routers.docs_workaround import router as docs_workaround_router
+from routers.legal_pages import router as legal_pages_router
 from schemas.error_responses import ERROR_RESPONSES
 from utils.logger import setup_logger
 
@@ -587,6 +588,9 @@ app.include_router(observability_api_router)  # New: Daily ops dashboards and KP
 app.include_router(evidence_router, tags=["Evidence"])
 app.include_router(debug_routes_router, tags=["Diagnostics"])
 app.include_router(docs_workaround_router)  # GATE 0 FIX: Manual Swagger/ReDoc mounting
+
+# LEGAL PAGES: Privacy Policy, Terms of Service, Accessibility Statement
+app.include_router(legal_pages_router, tags=["Legal"])
 
 # TELEMETRY CONTRACT v1.1: Command Center Integration (2025-11-30)
 from routers.telemetry import router as telemetry_router, executive_router
