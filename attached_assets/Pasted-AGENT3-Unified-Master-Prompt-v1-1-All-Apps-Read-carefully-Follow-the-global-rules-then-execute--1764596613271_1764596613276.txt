@@ -1,0 +1,229 @@
+AGENT3 Unified Master Prompt v1.1 (All Apps)
+Read carefully. Follow the global rules, then execute only the section for your own app. Do not run or modify tasks in any other section.
+
+Global Mission
+
+Prime objective: Drive traffic and revenue while ensuring every app reports telemetry to the Command Center and that the Command Center displays it on the frontend.
+Single source of truth: All telemetry must be sent to the central aggregator (scholarship_api). The Command Center (auto_com_center) renders only what the aggregator provides. No local computations for metrics on the Command Center.
+SLO: Maintain 99.9% uptime and ~120ms P95 latency. Error counting: 5xx and 404 count as errors; 400/401/403/429 do not.
+Global Execution Rules (Apply to every app)
+
+Identify yourself first (required)
+Before doing any work, write the IDENTIFY line exactly once: IDENTIFY: APP={your_app_id} | APP_BASE_URL={your_base_url} | ROLE={your_role} | ENV=prod
+2. Respect prompt boundaries
+
+Only execute the steps in SECTION_START[{your_app_id}] … SECTION_END[{your_app_id}].
+Ignore all other sections. Do not perform tasks for other apps.
+3. Telemetry Protocol: ONE TRUTH v1.1
+
+Endpoint (central aggregator): https://scholarship-api-jamarrlmayes.replit.app/api/analytics/events
+Envelope: {"events":[{event_type, app_id, env, ts_utc, properties}]}
+Required:
+app_id = your_app_id (exact)
+env = "prod" (always)
+ts_utc = ISO-8601 UTC timestamp
+properties.app_base_url = your_base_url (always present)
+Keys in snake_case; no plaintext PII
+If user identifiers are needed, use user_id_hash (salted SHA-256)
+Mask source_ip to /24 if included
+Include session_id and request_id when available
+event_id should be unique per event (UUID) for deduplication
+Retries: exponential backoff min 5s → max 5m with jitter on 5xx/429/timeouts
+4. Base events required for all apps
+
+app_started: emit at boot with {uptime_sec=0, version, service_ok, p95_ms, error_rate_pct, app_base_url}
+app_heartbeat: emit every 60s with {uptime_sec, service_ok, p95_ms, error_rate_pct, app_base_url}
+5. Frontend Display Contract (Command Center reads only from aggregator)
+
+auto_com_center only calls:
+GET /api/executive/central-stats?window=24h
+GET /api/kpis/today
+GET /api/stats?window=24h&group=app
+Tiles: SLO, B2C, B2B, SEO, Growth, Trust, Finance. Status and metrics come from the aggregator’s payload only.
+6. Reporting format for any operational report you generate
+
+Include app name and base URL in the header and in every report block: APP: {your_app_id} | APP_BASE_URL: {your_base_url}
+Clearly show which data source endpoints you used (aggregator endpoints only).
+App IDs and Base URLs (resolve your APP_BASE_URL from this list)
+
+scholar_auth → https://scholar-auth-jamarrlmayes.replit.app
+scholarship_api → https://scholarship-api-jamarrlmayes.replit.app
+scholarship_agent → https://scholarship-agent-jamarrlmayes.replit.app
+scholarship_sage → https://scholarship-sage-jamarrlmayes.replit.app
+student_pilot → https://student-pilot-jamarrlmayes.replit.app
+provider_register → https://provider-register-jamarrlmayes.replit.app
+auto_page_maker → https://auto-page-maker-jamarrlmayes.replit.app
+auto_com_center → https://auto-com-center-jamarrlmayes.replit.app
+Launch Priorities (shared context)
+
+Turn Finance tile GREEN by emitting payment_succeeded from student_pilot upon successful charges.
+Drive B2C traffic: auto_page_maker publishes pages; scholarship_agent launches campaigns; scholar_auth enables smooth sign-ups.
+Drive B2B supply: provider_register onboards providers and publishes scholarships.
+scholarship_sage serves recommendations and bias checks to power Trust.
+auto_com_center must display tiles using aggregator endpoints only—surface NO_DATA states with next steps.
+SECTION_START[scholarship_api] Role: Central Aggregator (THE HEART)
+Your job is to ingest telemetry, compute rollups, and expose executive endpoints for the Command Center.
+
+Telemetry ingest (must accept, validate, dedupe)
+POST /api/analytics/events accepts {"events":[...]} in ONE TRUTH v1.1.
+Validation: env="prod", app_id present, ts_utc ISO-8601, properties.app_base_url present.
+Deduplicate using event_id; persist for analytics; no PII storage.
+2. Executive endpoints (frontend data contract)
+
+GET /api/executive/central-stats?window=24h returns:
+data.overallStatus
+tiles: slo, b2c, b2b, seo, growth, trust, finance (each with status and key metrics)
+ecosystemMetrics: totalEvents, appsReporting, appsExpected, heartbeats, pageViews, appStarts, scholarshipsPublished, eventTypes
+_meta: {protocol:"ONE_TRUTH", version:"1.1", source:"central_aggregator", central_aggregator:"your_base_url", app_id:"scholarship_api", app_base_url:"your_base_url"}
+GET /api/kpis/today
+GET /api/kpis/rollup?days=N
+GET /api/stats?window=24h&group=app
+3. Tile logic (compute once, centrally)
+
+SLO: from app_started/app_heartbeat, uptime, p95_ms, error_rate_pct
+B2C: from student events (page_view, application_started/submitted)
+B2B: from provider and scholarship events
+SEO: from page_published and page_view (organic)
+Growth: from campaign_launched/campaign_click, landing_page_created
+Trust: from bias_check_performed, login_failed, nps if available
+Finance: from payment_succeeded, platform_fee_cents
+4. Compliance and performance
+
+SLO counting: 5xx+404 errors count; 400/401/403/429 do not.
+Keep P95 latency ≤120ms for executive endpoints.
+Output
+
+Emit base events (app_started, app_heartbeat).
+Produce executive endpoints with _meta and all tiles populated where data exists. SECTION_END[scholarship_api]
+SECTION_START[auto_com_center] Role: Command Center (THE EYES)
+Render the executive dashboard UI by reading aggregator endpoints only. No local metric computations.
+
+Identify and base events
+Print IDENTIFY line; emit app_started; emit app_heartbeat every 60s.
+2. Data sources (read-only)
+
+GET /api/executive/central-stats?window=24h
+GET /api/kpis/today
+GET /api/stats?window=24h&group=app
+3. Frontend tiles and statuses
+
+Display tiles exactly as provided by aggregator payload. If a tile is NO_DATA, surface a “Next action” note (e.g., Finance NO_DATA → student_pilot must emit payment_succeeded).
+Show ecosystemMetrics and eventTypes as provided.
+4. Reporting
+
+All rendered reports and logs must include: APP: auto_com_center | APP_BASE_URL: https://auto-com-center-jamarrlmayes.replit.app
+Do not compute numbers locally; display centralized values.
+Output
+
+Dashboard view online; GREEN if aggregator data reachable and tiles populated per payload. SECTION_END[auto_com_center]
+SECTION_START[auto_page_maker] Role: SEO Engine (Content + Indexation)
+Publish indexable pages to drive organic traffic and provide telemetry.
+
+Identify and base events
+IDENTIFY; app_started; app_heartbeat every 60s (include app_base_url).
+2. SEO publishing
+
+Generate at least 100 indexable pages with JSON-LD, canonical_url, proper internal linking.
+Maintain sitemap.xml and robots.txt.
+3. Telemetry events (include app_base_url)
+
+page_published {slug, topic, word_count, internal_links, canonical_url, has_json_ld, indexable, app_base_url}
+page_view {page, referrer, utm_*, session_id, request_id, app_base_url}
+scholarship_ingested {source, count, parsing_time_ms, app_base_url}
+Output
+
+Pages published and sitemap updated; SEO tile turns GREEN via aggregator. SECTION_END[auto_page_maker]
+SECTION_START[scholarship_agent] Role: Growth Engine (Campaigns)
+Launch campaigns to drive qualified traffic to student and provider funnels.
+
+Identify and base events
+IDENTIFY; app_started; app_heartbeat every 60s (include app_base_url).
+2. Campaign execution (UTM-first)
+
+Launch at least two campaigns on boot; pair with Auto Page Maker landing models.
+Ensure UTM params on all outbound links.
+3. Telemetry events (v1.1; include app_base_url)
+
+campaign_launched {campaign_id, start_utc, end_utc, channel, budget_usd, creative_variant, app_base_url}
+campaign_click {campaign_id, landing_page, utm_source, utm_medium, utm_campaign, session_id, request_id, app_base_url}
+landing_page_created {campaign_id, page_url, template_id, topic, has_json_ld, indexable, app_base_url}
+Output
+
+Growth tile turns GREEN; traffic flows to student_pilot and provider_register. SECTION_END[scholarship_agent]
+SECTION_START[provider_register] Role: B2B Supply (Providers + Scholarships)
+Onboard providers and publish scholarships to feed B2B and Finance tiles.
+
+Identify and base events
+IDENTIFY; app_started; app_heartbeat every 60s (include app_base_url).
+2. Provider and scholarship flow
+
+Onboard ≥5 providers and publish ≥10 scholarships.
+3. Telemetry events (include app_base_url)
+
+provider_registered {provider_id_hash, org_type, name, session_id, request_id, app_base_url}
+scholarship_published {scholarship_id, expected_award_total_cents, cohort_size, platform_fee_cents, app_base_url}
+provider_profile_completed {provider_id_hash, completeness_pct, app_base_url} (if implemented)
+Output
+
+B2B tile turns GREEN; platform_fee_cents informs Finance rollups. SECTION_END[provider_register]
+SECTION_START[student_pilot] Role: B2C Core + Payments
+Maximize student conversions and ensure Finance events.
+
+Identify and base events
+IDENTIFY; app_started; app_heartbeat every 60s (include app_base_url).
+2. Payments integration
+
+Enable Stripe (or equivalent) webhook; emit payment_succeeded on successful charge.
+3. Telemetry events (include app_base_url)
+
+application_started {user_id_hash, scholarship_id, session_id, request_id, app_base_url}
+application_submitted {user_id_hash, scholarship_id, submitted_utc, app_base_url}
+checkout_started {user_id_hash, product_id, price_cents, session_id, request_id, app_base_url}
+payment_succeeded {user_id_hash, order_id, amount_cents, currency, provider="stripe", app_base_url}
+Output
+
+Finance tile turns GREEN; B2C funnel metrics populate in aggregator. SECTION_END[student_pilot]
+SECTION_START[scholar_auth] Role: Auth Gateway
+Secure sign-up/login and enrich Trust/B2C signals.
+
+Identify and base events
+IDENTIFY; app_started; app_heartbeat every 60s (include app_base_url).
+2. Telemetry events (v1.1; include app_base_url)
+
+user_signed_up {user_id_hash, email_hash, is_minor, ferpa_protected, referral_code, utm_*, session_id, request_id, app_base_url}
+user_logged_in {user_id_hash, mfa_used, session_id, request_id, app_base_url}
+login_failed {reason, mfa_required, session_id, request_id, app_base_url}
+Output
+
+B2C and Trust tiles show activity; no plaintext PII; compliance with FERPA/COPPA. SECTION_END[scholar_auth]
+SECTION_START[scholarship_sage] Role: Recommendations + Trust
+Serve scholarship recommendations and perform bias checks.
+
+Identify and base events
+IDENTIFY; app_started; app_heartbeat every 60s (include app_base_url).
+2. Telemetry events (v1.1; include app_base_url)
+
+recommendation_served {user_id_hash, scholarship_id, score, rank, explanation_available, session_id, request_id, app_base_url}
+model_inference_evaluated {model_name, version, latency_ms, success, input_shape, output_shape, app_base_url}
+bias_check_performed {check_id, model_name, metric, value, threshold, result, app_base_url}
+Output
+
+Trust tile shows bias checks; B2C uplift measurable via recommendation_served. SECTION_END[scholarship_sage]
+Operational Verification Checklist (each app runs this for itself)
+
+Print IDENTIFY line with APP and APP_BASE_URL (ENV=prod).
+Emit app_started on boot and app_heartbeat every 60s (include app_base_url).
+Emit your business events (include app_base_url).
+Confirm aggregator accepts your events (HTTP 2xx; retries on 5xx/429/timeouts with backoff).
+Confirm Command Center displays your tile(s) via aggregator endpoints (do not compute locally).
+If a tile shows NO_DATA, emit the required events to turn it GREEN and state next actions in your report.
+Reporting Template (each app must use this format)
+
+Header: APP: {app_id} | APP_BASE_URL: {base_url}
+Protocol status: ONE TRUTH v1.1 COMPLIANT or actions needed
+Data source: scholarship_api (list endpoints read or written)
+Base events: status
+Business events: last 10 emitted types
+Tiles influenced: which tiles your app powers and current status
+Next actions: specific steps to drive traffic and revenue
+End of AGENT3 Unified Master Prompt v1.1. Execute only your SECTION.
