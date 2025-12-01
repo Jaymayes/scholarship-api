@@ -1,0 +1,210 @@
+Below is the UNIFIED COMMAND + TELEMETRY MASTER PROMPT for AGENT3. It combines instructions for all eight apps in the Scholar AI Advisor ecosystem. Important: Every running app MUST only execute the section labeled for its own app name. Do not modify or act on any other section.
+
+AGENT3 UNIFIED COMMAND + TELEMETRY MASTER PROMPT v1.2
+Purpose
+
+Ensure all data from every app is reported to the central command center and displayed on the frontend dashboard.
+Accelerate launch, traffic, and revenue using organic SEO (Auto Page Maker), targeted campaigns (Scholarship Agent), and frictionless conversion (Student Pilot).
+Maintain a single source of truth across telemetry and dashboards.
+How to Use (All Apps)
+
+Self-Identify before any work:
+
+Immediately print a single-line IDENTIFY statement (no extra text before it): IDENTIFY: APP=<your_app_name> | APP_BASE_URL=<your_base_url> | ROLE=<short_role> | ENV=<dev|staging|prod>
+Examples per app are provided in each section.
+Only use your app’s section:
+
+After identification, find the section below where APP=<your_app_name>.
+Execute ONLY the directives in your app’s section plus the Global Rules and Event Envelope sections.
+Reporting format for all logs and health confirmations:
+
+Every log/telemetry confirmation that you print MUST add a REPORT prefix with app and base_url: REPORT: app=<your_app_name> | app_base_url=<your_base_url> | env=<env> | msg=<message>
+Telemetry transport
+
+Send all events to the aggregator at: POST {SCHOLARSHIP_API_BASE}/api/analytics/events Where SCHOLARSHIP_API_BASE = https://scholarship-api-jamarrlmayes.replit.app
+Batch in small groups (1–50 events). Retries with exponential backoff on 5xx. Do not drop events; queue if offline, flush when online.
+Command Center visibility
+
+The Executive Command Center (auto_com_center) reads from scholarship_api. When you emit events correctly, they appear on the dashboard tiles.
+After your app starts and first telemetry is sent, print a confirmation REPORT: REPORT: app=<your_app_name> | app_base_url=<your_base_url> | env=<env> | msg=Telemetry v1.2 active, events flowing, Command Center visible
+Global Constants (for all apps)
+
+scholar_auth → https://scholar-auth-jamarrlmayes.replit.app
+scholarship_api → https://scholarship-api-jamarrlmayes.replit.app
+scholarship_agent → https://scholarship-agent-jamarrlmayes.replit.app
+scholarship_sage → https://scholarship-sage-jamarrlmayes.replit.app
+student_pilot → https://student-pilot-jamarrlmayes.replit.app
+provider_register → https://provider-register-jamarrlmayes.replit.app
+auto_page_maker → https://auto-page-maker-jamarrlmayes.replit.app
+auto_com_center → https://auto-com-center-jamarrlmayes.replit.app
+Global Rules (apply to all apps)
+
+Protocol: ONE_TRUTH v1.2
+SLO targets: 99.9% uptime, ≤120ms P95 latency, <2% error rate
+Security: include app_base_url at root of every event; include env; sign S2S calls with SHARED_SECRET if configured
+Heartbeats: emit app_heartbeat every 60s with uptime_sec, p95_ms, error_rate_pct
+Start event: emit app_started once at boot with version, uptime_sec=0, p95_ms=0, error_rate_pct=0
+Deduplication: generate event_id (uuidv4). Do not re-send the same event_id
+PII: do not send sensitive identifiers in clear text unless explicitly whitelisted; hash or tokenize if needed
+Responsible AI: no academic dishonesty, bias checks logged, transparent explanations
+UTM convention (for traffic/revenue attribution):
+utm_source, utm_medium, utm_campaign, utm_term, utm_content; persist across redirects and app boundaries
+Frontend visibility: the auto_com_center tiles are updated from scholarship_api central-stats builder; your job is to emit the business events required by your tile(s)
+Event Envelope (all events to scholarship_api)
+
+Root fields: event_id, event_type, ts (ISO-8601 UTC), app_id, app_base_url, env, properties (object), _meta
+_meta: { protocol: "ONE_TRUTH", version: "1.2" }
+Required: event_type is one of the listed events in your section; properties contain required fields specified in your section
+Tile Mapping (for your awareness)
+
+SLO (operational health): all apps app_started, app_heartbeat, error and latency stats
+B2C (student funnel): student_pilot + scholar_auth + scholarship_sage
+B2B (provider funnel): provider_register + scholarship_api
+SEO (organic traffic): auto_page_maker + scholarship_agent (landing pages)
+Growth (campaigns/routing): scholarship_agent (campaigns, UTM routing)
+Trust (Responsible AI): scholarship_sage (bias checks), scholar_auth (privacy flags)
+Finance (revenue): student_pilot (payments, credits), provider_register (platform fees)
+Launch Sequence (cross-app awareness; do only your part)
+
+auto_page_maker publishes indexed pages (SEO)
+scholarship_agent launches campaigns linked to pages (traffic)
+student_pilot captures and converts traffic (applications, payments)
+scholar_auth handles sign-ups/logins securely
+scholarship_sage provides guidance and keeps users engaged, logs bias checks
+provider_register onboards providers and publishes scholarships (inventory, fees)
+scholarship_api aggregates all telemetry and builds central stats
+auto_com_center displays tiles and “next actions” to drive growth
+SECTION: scholarship_api (Aggregator + One Truth)
+Use only if APP=scholarship_api and APP_BASE_URL=https://scholarship-api-jamarrlmayes.replit.app
+
+IDENTIFY on start: IDENTIFY: APP=scholarship_api | APP_BASE_URL=https://scholarship-api-jamarrlmayes.replit.app | ROLE=Central Aggregator + Stats | ENV=<env>
+Responsibilities:
+Ingest POST /api/analytics/events with envelope v1.2, validate app_base_url presence, enforce dedup by event_id
+Aggregate into 7 tiles (SLO, B2C, B2B, SEO, Growth, Trust, Finance)
+Expose GET /api/executive/central-stats?window=<e.g.,1h,24h> returning { data: { tiles... }, _meta }
+Emit tile_status_rendered after each central-stats build with tile statuses and counts
+Events you must emit:
+app_started, app_heartbeat (your own)
+tile_status_rendered { tile, status, counts }
+KPIs: stats_build_latency_ms, ingest_queue_depth, dedup_dropped_count
+SECTION: auto_com_center (Command Center + Next Actions)
+Use only if APP=auto_com_center and APP_BASE_URL=https://auto-com-center-jamarrlmayes.replit.app
+
+IDENTIFY: IDENTIFY: APP=auto_com_center | APP_BASE_URL=https://auto-com-center-jamarrlmayes.replit.app | ROLE=Executive Dashboard + Next Actions | ENV=<env>
+Responsibilities:
+Pull central-stats from scholarship_api and render 7 tiles
+Display actionable “Next Actions” per tile based on thresholds
+Emit tile_status_rendered after rendering each tile on the frontend
+Events you must emit:
+app_started, app_heartbeat (your own)
+tile_status_rendered { tile, status, kpis, recommendation }
+KPIs: dashboard_render_ms, last_stats_ts, visible_tiles_count=7
+SECTION: auto_page_maker (Organic SEO + Pages)
+Use only if APP=auto_page_maker and APP_BASE_URL=https://auto-page-maker-jamarrlmayes.replit.app
+
+IDENTIFY: IDENTIFY: APP=auto_page_maker | APP_BASE_URL=https://auto-page-maker-jamarrlmayes.replit.app | ROLE=Organic SEO + Pages | ENV=<env>
+Responsibilities (traffic engine):
+Generate crawlable scholarship pages; publish sitemap.xml; set canonical tags; internal linking structure
+Emit page_published for new/updated pages; emit page_view on server-side capture; emit scholarship_ingested and scholarship_published when content is generated
+Events you must emit:
+page_published { url, template, word_count, status=published, utm_campaign? }
+page_view { url, referrer, user_agent_hash, utm_* }
+scholarship_ingested { source, count, latency_ms }
+scholarship_published { scholarship_id, url, provider_id? }
+KPIs → SEO tile: indexed_pages, daily_pageviews, ctr_estimate, avg_rank_position
+SECTION: scholarship_agent (Campaigns + Routing)
+Use only if APP=scholarship_agent and APP_BASE_URL=https://scholarship-agent-jamarrlmayes.replit.app
+
+IDENTIFY: IDENTIFY: APP=scholarship_agent | APP_BASE_URL=https://scholarship-agent-jamarrlmayes.replit.app | ROLE=Campaigns + Routing | ENV=<env>
+Responsibilities (growth engine):
+Launch campaigns that drive traffic to auto_page_maker and student_pilot
+Append UTM parameters; track CTA routing with utm_routed
+Events you must emit:
+campaign_launched { campaign_id, theme, target_segments }
+utm_routed { from_url, to_url, utm_source, utm_medium, utm_campaign, cta_id }
+landing_page_published { url, campaign_id, utm_* }
+KPIs → Growth & SEO tiles: campaigns_active, routed_sessions, ctr_to_apply, sessions_to_application_rate
+SECTION: student_pilot (Student App + Payments)
+Use only if APP=student_pilot and APP_BASE_URL=https://student-pilot-jamarrlmayes.replit.app
+
+IDENTIFY: IDENTIFY: APP=student_pilot | APP_BASE_URL=https://student-pilot-jamarrlmayes.replit.app | ROLE=Student App + Payments | ENV=<env>
+Responsibilities (conversion + revenue engine):
+Guide students to apply; sell credits or subscriptions; process payments
+Events you must emit:
+application_started { user_id_hash, scholarship_id, utm_* }
+application_submitted { user_id_hash, scholarship_id, time_to_submit_sec }
+credit_purchased { user_id_hash, credits, total_cents, payment_method }
+payment_succeeded { user_id_hash, order_id, total_cents, currency }
+payment_failed { user_id_hash, order_id, reason }
+KPIs → B2C & Finance tiles: free_to_paid_rate, ARPU_cents, app_start_to_submit_rate, revenue_cents, refund_rate
+SECTION: scholar_auth (Auth Gateway)
+Use only if APP=scholar_auth and APP_BASE_URL=https://scholar-auth-jamarrlmayes.replit.app
+
+IDENTIFY: IDENTIFY: APP=scholar_auth | APP_BASE_URL=https://scholar-auth-jamarrlmayes.replit.app | ROLE=Auth Gateway | ENV=<env>
+Responsibilities:
+Secure sign-ups/logins; manage sessions; respect FERPA/COPPA flags
+Events you must emit:
+user_signed_up { method, utm_*, privacy_flags: { is_minor, ferpa_protected } }
+user_logged_in { method, mfa_used }
+login_failed { reason, method }
+session_refreshed { method }
+KPIs → B2C & Trust tiles: signup_rate, login_success_rate, mfa_adoption_rate, minors_protected_count
+SECTION: scholarship_sage (Advisor + Responsible AI)
+Use only if APP=scholarship_sage and APP_BASE_URL=https://scholarship-sage-jamarrlmayes.replit.app
+
+IDENTIFY: IDENTIFY: APP=scholarship_sage | APP_BASE_URL=https://scholarship-sage-jamarrlmayes.replit.app | ROLE=Advisor + Responsible AI | ENV=<env>
+Responsibilities:
+Provide scholarship guidance; never produce academic dishonesty; perform and log bias checks
+Events you must emit:
+recommendation_served { user_id_hash, scholarship_id, rationale_summary, model_id }
+recommendation_clicked { user_id_hash, scholarship_id }
+bias_check_performed { model_id, metric, result, sample_size }
+risk_flagged { risk_type, severity, context }
+KPIs → Trust & B2C tiles: engagement_rate, clickthrough_rate, bias_checks_pass_rate, risks_open_count
+SECTION: provider_register (Provider Onboarding)
+Use only if APP=provider_register and APP_BASE_URL=https://provider-register-jamarrlmayes.replit.app
+
+IDENTIFY: IDENTIFY: APP=provider_register | APP_BASE_URL=https://provider-register-jamarrlmayes.replit.app | ROLE=Provider Onboarding | ENV=<env>
+Responsibilities (B2B engine):
+Onboard providers and publish scholarships; calculate fees
+Events you must emit:
+provider_registered { provider_id, org_name }
+provider_active { provider_id }
+scholarship_published { provider_id, scholarship_id, expected_award_total_cents, cohort_size, platform_fee_cents }
+fee_reported { provider_id, platform_fee_cents, period_utc }
+KPIs → B2B & Finance tiles: providers_active, scholarships_live, platform_fees_cents
+BEGIN Sequence (All Apps)
+
+On process start:
+Print IDENTIFY line (exact format; single line).
+After services are ready (allow ~5s warmup), emit app_started and print: REPORT: app=<your_app_name> | app_base_url=<your_base_url> | env=<env> | msg=Startup validation passed
+Start 60s app_heartbeat with uptime_sec, p95_ms, error_rate_pct
+Confirm telemetry visibility: REPORT: app=<your_app_name> | app_base_url=<your_base_url> | env=<env> | msg=Telemetry v1.2 active, events flowing, Command Center visible
+Operational Guardrails (All Apps)
+
+If scholarship_api returns non-2xx: queue events; retry with backoff; print REPORT with brief cause and queued_count
+If any required field is missing: do not drop; fill with null and include validation_errors in properties.errors
+If P95 > 120ms or error_rate_pct ≥ 2% over 5 minutes: print REPORT with degradation alert and include top_endpoints
+Always include app_base_url in the event root; never omit
+For every REPORT printed, include app and app_base_url exactly as specified
+Business Outcomes (focus for traffic and revenue)
+
+Traffic: auto_page_maker publishes pages; scholarship_agent launches campaigns with clean UTM; utm_routed sends to student_pilot
+Conversion: student_pilot raises application_submitted and payment_succeeded; scholar_auth reduces login friction; scholarship_sage increases engagement
+Supply: provider_register increases providers_active and scholarship_published
+Aggregation & Visibility: scholarship_api compiles tiles; auto_com_center displays GREEN statuses and next steps
+Acceptance Criteria (visible in auto_com_center)
+
+All 7 tiles present and updating
+SEO tile shows page_published and page_view growth
+Growth tile shows campaign_launched and utm_routed events
+B2C tile shows application_started → application_submitted conversion
+Finance tile shows credit_purchased/payment_succeeded and fee_reported
+B2B tile shows provider_registered/provider_active and scholarship_published
+Trust tile shows bias_check_performed and zero critical risk_flagged
+SLO tile shows uptime ≥ 99.9%, P95 ≤ 120ms, error_rate_pct < 2%
+Reminder
+
+Use only your section plus Global Rules and Event Envelope.
+Always include your app name and base URL on all REPORT lines.
+The prime directive is to launch, drive traffic, and generate profitable revenue while maintaining Responsible AI and SLOs.
