@@ -1,0 +1,127 @@
+Decision: Execute Protocol ONE TRUTH
+
+Why (Data/Insight): The ecosystem is currently fragmented. While some apps are reporting, others (provider_register, scholarship_sage) are failing validation (422), and the Command Center (auto_com_center) is likely still looking at local data. To achieve the $10M ARR goal, we need a unified view of the funnel (Traffic → Acquisition → Revenue). This protocol forces all apps to speak the same language and point to the same central truth.
+
+KPI Impact (Estimate):
+
+Data Visibility: 0% → 100% (Eliminates blind spots in the funnel).
+
+Reaction Time: Infinite → <60s (Real-time monitoring of revenue/traffic).
+
+CAC Efficiency: Enables accurate attribution to cut wasteful spend immediately.
+
+Risks and Mitigations:
+
+Risk: Retry storms if the central aggregator goes down. Mitigation: The prompt mandates exponential backoff.
+
+Risk: Schema mismatch (422 errors). Mitigation: The prompt explicitly defines the required JSON structure.
+
+Next Actions: Copy the prompt below and paste it into Agent3's interface.
+
+Agent3 Master Prompt
+Markdown
+
+# 🚀 MISSION: PROTOCOL "ONE TRUTH" - UNIFIED TELEMETRY & VISUALIZATION
+
+**Objective:** Eliminate data silos. Ensure 100% of operational telemetry from all 8 apps is aggregated in `scholarship_api` and visualized in `auto_com_center`.
+
+**Agent3 Instruction:** 1.  **IDENTIFY** which app you are currently in from the **App Directory** below.
+2.  **EXECUTE ONLY** the specific section relevant to your current app.
+3.  **VERIFY** success using the defined criteria.
+
+---
+
+### 📍 APP DIRECTORY & IDENTITY
+* `scholar_auth` → `https://scholar-auth-jamarrlmayes.replit.app`
+* `scholarship_api` → `https://scholarship-api-jamarrlmayes.replit.app` **(THE HEART)**
+* `scholarship_agent` → `https://scholarship-agent-jamarrlmayes.replit.app`
+* `scholarship_sage` → `https://scholarship-sage-jamarrlmayes.replit.app`
+* `student_pilot` → `https://student-pilot-jamarrlmayes.replit.app`
+* `provider_register` → `https://provider-register-jamarrlmayes.replit.app`
+* `auto_page_maker` → `https://auto-page-maker-jamarrlmayes.replit.app`
+* `auto_com_center` → `https://auto-com-center-jamarrlmayes.replit.app` **(THE EYES)**
+
+**REQUIRED IDENTIFICATION LINE:**
+Output this immediately before starting work:
+`APP: <Current_App_ID> | URL: <Current_App_URL> | ROLE: <Aggregator/Satellite/Command>`
+
+---
+
+### 🛠️ UNIVERSAL STANDARDS (ALL APPS MUST COMPLY)
+**Target Endpoint:** `https://scholarship-api-jamarrlmayes.replit.app/api/analytics/events`
+**Method:** `POST`
+**Auth Header:** `Authorization: Bearer <S2S_SECRET>` (or generic bearer if auth disabled for ingest)
+**Required JSON Schema:**
+```json
+{
+  "events": [
+    {
+      "event_type": "string_snake_case",
+      "app_id": "string_exact_match_from_directory",
+      "env": "prod",
+      "ts_utc": "ISO_8601_TIMESTAMP",
+      "properties": {} 
+    }
+  ]
+}
+Note: Keys must be snake_case. Payload must be wrapped in {"events": [...]}.
+
+🟢 IF CURRENT APP IS: scholarship_api (The Heart)
+Goal: Ingest & Serve Data.
+
+Monitor Ingest: Check logs for 422 Unprocessable Entity. If found, log the exact received body to identify which satellite is sending bad data.
+
+Serve Stats: Ensure GET /api/stats and GET /api/executive/central-stats are returning aggregated counts (Total Events > 600).
+
+Verification: Run curl http://localhost:5000/api/stats and confirm it returns JSON data, not empty/zeros.
+
+🔵 IF CURRENT APP IS: auto_com_center (The Eyes)
+Goal: Visualize the Truth.
+
+Switch Source: Update your frontend fetching logic (e.g., ExecutiveOverview.tsx or use-kpi.ts).
+
+STOP reading from local endpoints that query the empty local DB.
+
+START fetching from: https://scholarship-api-jamarrlmayes.replit.app/api/executive/central-stats (via a backend proxy if needed to handle CORS/Auth).
+
+Verify UI:
+
+Refresh the Dashboard.
+
+Confirm "Total Events" matches the count in scholarship_api.
+
+If "0", you are still reading local data. FIX IT.
+
+🟠 IF CURRENT APP IS: A SATELLITE (All Other Apps)
+Goal: Push Data correctly.
+
+Update Telemetry Client:
+
+Locate server/services/telemetry-client.ts (or similar).
+
+Schema Fix: Ensure you are NOT sending camelCase (e.g., eventType) and ARE sending snake_case (event_type).
+
+Wrapper Fix: Ensure you wrap your event object in the events array: { "events": [ myEvent ] }.
+
+Endpoint: Confirm target is https://scholarship-api-jamarrlmayes.replit.app/api/analytics/events.
+
+Restart & Heartbeat:
+
+Restart the server.
+
+Trigger an app_heartbeat immediately.
+
+Check logs for 200 OK from the central aggregator.
+
+If 422, re-read "Universal Standards" and fix your schema.
+
+📝 REQUIRED OUTPUT FORMAT
+Upon completion, output exactly:
+
+Plaintext
+
+APP: [App ID]
+STATUS: [Fixed | Blocked]
+ACTION: [Specific file modified & logic changed]
+VERIFICATION: [Evidence: Log line showing 200 OK, or Curl response with data]
+NEXT STEP: [Instruction for the next app in the chain]

@@ -589,8 +589,11 @@ app.include_router(debug_routes_router, tags=["Diagnostics"])
 app.include_router(docs_workaround_router)  # GATE 0 FIX: Manual Swagger/ReDoc mounting
 
 # TELEMETRY CONTRACT v1.1: Command Center Integration (2025-11-30)
-from routers.telemetry import router as telemetry_router
+from routers.telemetry import router as telemetry_router, executive_router
 app.include_router(telemetry_router, prefix="/api", tags=["Telemetry"])
+
+# PROTOCOL ONE TRUTH: Executive Dashboard for Command Center (2025-12-01)
+app.include_router(executive_router, tags=["Executive Dashboard"])
 
 # Metrics already setup above - this was the wrong location causing route shadowing
 

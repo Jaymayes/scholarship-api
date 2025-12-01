@@ -517,3 +517,99 @@ async def telemetry_health(db=Depends(get_db)):
             "data_source": "postgres",
             "checked_at": datetime.utcnow().isoformat()
         }
+
+
+executive_router = APIRouter(prefix="/api/executive", tags=["Executive Dashboard"])
+
+
+@executive_router.get("/central-stats", tags=["Executive Dashboard"])
+async def get_central_stats(
+    window: str = Query("1h", description="Time window: 5m, 1h, 24h"),
+    db=Depends(get_db)
+):
+    """
+    Protocol ONE TRUTH: Central aggregated stats for Command Center visualization.
+    
+    This is THE endpoint auto_com_center should consume for the unified ecosystem view.
+    Returns stats from ALL 8 apps aggregated in the business_events table.
+    """
+    try:
+        time_window = parse_window(window)
+        cutoff = datetime.utcnow() - time_window
+        
+        app_stats_query = text("""
+            SELECT 
+                app as app_id,
+                COUNT(*) as event_count,
+                COUNT(DISTINCT event_name) as event_types,
+                MIN(ts) as first_event,
+                MAX(ts) as last_event
+            FROM business_events
+            WHERE ts >= :cutoff
+            GROUP BY app
+            ORDER BY event_count DESC
+        """)
+        
+        result = db.execute(app_stats_query, {"cutoff": cutoff})
+        rows = result.fetchall()
+        
+        apps = {}
+        total_events = 0
+        for row in rows:
+            app_id = row[0] or "unknown"
+            count = row[1]
+            apps[app_id] = {
+                "event_count": count,
+                "event_types": row[2],
+                "first_event": row[3].isoformat() if row[3] else None,
+                "last_event": row[4].isoformat() if row[4] else None,
+                "status": "reporting"
+            }
+            total_events += count
+        
+        event_breakdown_query = text("""
+            SELECT 
+                event_name,
+                COUNT(*) as count
+            FROM business_events
+            WHERE ts >= :cutoff
+            GROUP BY event_name
+            ORDER BY count DESC
+            LIMIT 20
+        """)
+        
+        event_result = db.execute(event_breakdown_query, {"cutoff": cutoff})
+        event_rows = event_result.fetchall()
+        
+        event_breakdown = {}
+        for row in event_rows:
+            event_breakdown[row[0] or "unknown"] = row[1]
+        
+        expected_apps = [
+            "scholar_auth", "scholarship_api", "scholarship_agent",
+            "scholarship_sage", "student_pilot", "provider_register",
+            "auto_page_maker", "auto_com_center"
+        ]
+        reporting_apps = list(apps.keys())
+        missing_apps = [a for a in expected_apps if a not in reporting_apps]
+        
+        return {
+            "source": "scholarship_api (THE HEART)",
+            "window": window,
+            "cutoff_utc": cutoff.isoformat(),
+            "ecosystem_health": {
+                "total_events": total_events,
+                "apps_reporting": len(apps),
+                "apps_expected": len(expected_apps),
+                "coverage_pct": round(len(apps) / len(expected_apps) * 100, 1),
+                "missing_apps": missing_apps
+            },
+            "apps": apps,
+            "event_breakdown": event_breakdown,
+            "data_source": "postgres",
+            "generated_at": datetime.utcnow().isoformat()
+        }
+        
+    except Exception as e:
+        logger.error(f"Central stats query failed: {e}")
+        raise HTTPException(status_code=500, detail=f"Central stats query failed: {str(e)}")
