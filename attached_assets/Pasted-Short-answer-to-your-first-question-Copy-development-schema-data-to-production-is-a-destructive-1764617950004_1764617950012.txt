@@ -1,0 +1,54 @@
+Short answer to your first question
+“Copy development schema & data to production” is a destructive operation: it replaces your production database with whatever is in development—schema and rows—overwriting existing production data. It’s only appropriate very early, when there’s no sensitive or business‑critical prod data to preserve, and only after you’ve validated backups and restores. This aligns with the general principle of keeping dev and prod strictly separated and making deliberate, atomic releases rather than ad‑hoc changes to a live system  .
+
+CEO decision on your deployment conflict
+Given the unique index requirement for v1.2 deduplication and the presence of duplicates/NULLs in production:
+
+Default recommendation: Do not use a destructive dev→prod copy if production contains any real user/provider data or telemetry you need for trendlines. Run a zero‑data‑loss migration to v1.2 instead. This preserves historical data that feeds our growth KPIs and avoids compliance risk from accidentally promoting non‑sanitized dev data to prod. It also maintains the disciplined separation between environments that underpins reliable operations and auditability .
+
+Conditional exception: If production is truly greenfield (no sensitive data, no active B2C/B2B traffic, no metrics we care to retain), then a fresh start is acceptable. But we must still complete the pre‑flight checklist below to avoid propagating dev secrets, test users, or PII into prod  .
+
+Two viable paths
+Path A — Non‑destructive migration (preferred)
+
+Snapshot and restore-test: Take a full backup and verify we can restore quickly.
+Data cleanup for unique index:
+Fill NULL request_id with generated UUIDs.
+Resolve duplicates deterministically (e.g., keep the earliest by created_at; re-key later duplicates).
+Add unique index concurrently on request_id.
+Deploy v1.2 code with ON CONFLICT handling and begin emitting v1.2 heartbeat/tiles.
+Verify ingestion and dashboards; keep read replicas or backups for 30+ days. This approach keeps prod data intact, preserves analytics continuity, and adheres to production‑grade data management practices on our managed PostgreSQL .
+Path B — Greenfield cutover via dev→prod copy (only if prod is empty)
+
+Sanitize dev data: Ensure no test PII, fake providers, or non‑compliant records will appear in prod.
+Secrets hygiene: Replace all development secrets with production secrets via a proper secrets vault; never promote dev keys to prod .
+Publish intentionally: Treat this as a deliberate, atomic release; you are not “syncing,” you’re deploying a snapshot to a clean prod environment .
+Post‑deploy validation and monitoring (below).
+Pre‑flight checklist (must-do for either path)
+
+Backups and a timed restore test completed; define an explicit rollback window.
+Confirm environment separation: .replit deployment commands, secrets, and DB URLs are production‑grade and distinct from dev .
+Security and compliance:
+No PII or education records in telemetry; confirm FERPA/COPPA posture.
+Rotate all secrets on cutover; store only in Secrets, not code .
+Data strategy:
+Define telemetry retention (e.g., 90 days raw events; 12–13 months aggregates) to manage cost and risk.
+Verify connection pooling and database configuration for production load on managed Postgres .
+Operational readiness:
+Maintenance window and stakeholder comms plan.
+Logging and resource monitoring enabled to verify health post‑deploy (response codes, request durations, CPU/memory) .
+Post‑deploy verification (success criteria)
+
+Central stats endpoint returns all seven tiles with protocol/version set; heartbeats received at the expected cadence.
+Event ingestion accepts POSTs and deduplicates by request_id as intended.
+Dashboards render; no error spikes in logs; P95 ≤ target; uptime within SLOs. Use deployment logs, web analytics, and resource graphs to confirm steady state .
+My call
+
+If production already has any real traffic or data: proceed with Path A (non‑destructive migration). This protects our KPI continuity and avoids avoidable compliance risk while getting us to v1.2 promptly.
+If production is genuinely empty and non‑sensitive: green‑light Path B with the pre‑flight controls above.
+What I need to approve execution today
+
+Current production row counts for telemetry tables, number of NULL/duplicate request_id, and confirmation whether any rows contain user‑linked fields.
+Confirmation that development data is synthetic/sanitized and that production secrets are staged in the Secrets vault .
+A dated backup snapshot and a tested restore time.
+If you confirm those three items, I’ll issue the go order and the chosen path.
