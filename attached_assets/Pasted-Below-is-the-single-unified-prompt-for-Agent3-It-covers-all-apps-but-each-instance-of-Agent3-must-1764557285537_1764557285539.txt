@@ -1,0 +1,112 @@
+Below is the single, unified prompt for Agent3. It covers all apps, but each instance of Agent3 must only execute the section labeled for its own app. Every Agent3 must identify itself before doing any work and include its APP name and APP_BASE_URL in every status/report it emits.
+
+AGENT3 MASTER PROMPT — COMPANY: Scholar AI Advisor — PRIME OBJECTIVE
+
+Objective: Launch, bring in traffic and revenue, and ensure 100% of relevant data is reported to the central Command Center and visible on the frontend dashboard.
+Governance: Follow Protocol ONE TRUTH for telemetry. Report to the central aggregator (scholarship_api) and power the Command Center (auto_com_center).
+Scope: This prompt includes instructions for all 8 apps. Only act on the [APP=your_app_id] section that matches your app.
+IDENTIFY YOURSELF (MANDATORY — DO THIS FIRST)
+
+Before any work, print a single-line identification banner: APP: <your_app_id> | APP_BASE_URL: <your_base_url> | ROLE: <your_role> | ENV: <prod|staging|dev>
+Include exactly the same “APP: … | APP_BASE_URL: …” header at the top of every report, status, or log you submit.
+If you cannot determine your app_id or base URL from the table below, stop and report: “Unrecognized app_id — exiting.” • scholar_auth → https://scholar-auth-jamarrlmayes.replit.app • scholarship_api → https://scholarship-api-jamarrlmayes.replit.app • scholarship_agent → https://scholarship-agent-jamarrlmayes.replit.app • scholarship_sage → https://scholarship-sage-jamarrlmayes.replit.app • student_pilot → https://student-pilot-jamarrlmayes.replit.app • provider_register → https://provider-register-jamarrlmayes.replit.app • auto_page_maker → https://auto-page-maker-jamarrlmayes.replit.app • auto_com_center → https://auto-com-center-jamarrlmayes.replit.app
+GLOBAL PROTOCOL — ONE TRUTH (APPLIES TO ALL APPS)
+
+Telemetry ingest endpoint (central aggregator): • POST https://scholarship-api-jamarrlmayes.replit.app/api/analytics/events • Fallback (raw): POST /api/analytics/events/raw
+Payload wrapper and schema: • Wrap events in: {"events": [ ... ]} • Each event fields (snake_case):
+event_type (string)
+app_id (string; one of the 8 app ids above)
+env (prod|staging|dev)
+ts_utc (ISO 8601, UTC)
+properties (object; app-specific)
+Baseline required events for every app: • app_started (once at boot) • app_heartbeat (every 60 seconds; include uptime_sec)
+Reliability and retries: • Queue locally when 5xx or network errors. Exponential backoff (base 2, max 5 min). Flush on recovery. • If 422 schema errors occur, switch to /api/analytics/events/raw and log the error details for later fix.
+Privacy and compliance: • No plaintext PII in telemetry. Hash user identifiers (stable salted hash). Include privacy flags if applicable (e.g., ferpa: true/false, coppa: true/false).
+Correlation and attribution: • Preserve session_id, request_id, utm_source/medium/campaign/content/term when available. • Ensure cross-app correlation via session_id and user_id_hash.
+SLO observability: • Emit error_rate, p95_latency_ms, uptime_window_min in a periodic ops_health event if your app can compute it.
+Reporting cadence: • On successful initialization: send a “Readiness Report.” • On completing the tasks below: send a “Operational Verification Report.” • On failures or missing data sources: send a “Data Source Status Report.”
+COMMAND CENTER INTEGRATION (AUTO COM CENTER EXPECTATION)
+
+The Command Center frontend reads central roll-ups from scholarship_api. Do not hardcode dashboard metrics locally in satellites.
+Satellites: only push events. Aggregator composes KPIs. Command Center visualizes.
+“NO_DATA” is acceptable only when upstream sources are not connected; do not fabricate.
+APP-SPECIFIC IMPLEMENTATION INSTRUCTIONS
+Important: Only execute the section that matches your own app_id. Ignore all other sections.
+
+[APP=scholar_auth] ROLE: Satellite (Authentication)
+
+Events to emit: • user_signed_up: user_id_hash, method (e.g., replit_oidc), referral_source, session_id, request_id, source_ip_truncated • user_logged_in: user_id_hash, method, mfa_used (bool), session_id, request_id, source_ip_truncated
+Triggers: • Emit upon successful signup and successful login completion.
+Goal impact: • Feed B2C funnel entry and attribution in Command Center.
+[APP=auto_page_maker] ROLE: Satellite (SEO Engine)
+
+Events to emit: • page_published: slug, topic, word_count, internal_links, canonical_url, has_json_ld (bool) • scholarship_ingested: source, count, parsing_time_ms • scholarship_published: scholarship_id, title, award_cents, deadline_utc, eligibility_tags • page_view (server-side observable): page, referrer, utm_*
+Operational heartbeat additions: • sitemap_ok (bool), robots_ok (bool), indexed_pages (int)
+Goal impact: • Drive organic traffic; ensure Command Center “SEO Engine” tile reflects content volume and freshness.
+[APP=scholarship_agent] ROLE: Satellite (Growth Engine, campaigns)
+
+Events to emit: • campaign_launched: campaign_id, campaign_name, medium, source, landing_pages[], target_audience, budget_cents • campaign_click: campaign_id, landing_page, utm_*, referrer • campaign_conversion: campaign_id, conversion_type (signup|application|purchase), revenue_cents, user_id_hash, session_id
+Triggers: • Launch the “Scholarship of the Day” micro-campaign on boot and daily at 08:00 UTC. Emit campaign_launched immediately.
+Goal impact: • Show acquisition activity and conversions in Command Center; attribute revenue.
+[APP=scholarship_sage] ROLE: Satellite (Advising)
+
+Events to emit: • session_started: session_id, user_id_hash, plan_tier (free|paid), referral_source • recommendation_shown: session_id, user_id_hash, scholarship_id, match_score, rank, plan_tier • recommendation_clicked: session_id, user_id_hash, scholarship_id, match_score, rank, plan_tier, nudged_to_purchase (bool) • session_completed: session_id, user_id_hash, duration_sec, recommendations_shown, recommendations_clicked, nudged_to_purchase (bool)
+Goal impact: • Surface engagement quality; support upsell nudges and conversion tracking.
+[APP=student_pilot] ROLE: Satellite (B2C core + payments)
+
+Events to emit: • page_view: page, utm_*, referrer, ab_variant • application_started: user_id_hash, scholarship_id, plan_tier, session_id • application_submitted: user_id_hash, scholarship_id, plan_tier, match_score, time_to_submit_sec • credit_purchased: user_id_hash, amount_cents, quantity, sku, currency, session_id • payment_succeeded: transaction_id, user_id_hash, amount_cents, currency, payment_provider, sku, session_id
+Triggers: • Fire payment_succeeded upon confirmed provider callback/webhook success.
+Goal impact: • Command Center “B2C Funnel” and “Finance Snapshot” tiles populate from these events.
+[APP=provider_register] ROLE: Satellite (B2B providers + supply)
+
+Events to emit: • provider_registered: provider_id_hash, org_type, country, referral_source • provider_profile_completed: provider_id_hash, profile_completeness_pct • scholarship_published: provider_id_hash, scholarship_id, title, expected_award_total_cents, cohort_size, platform_fee_cents, deadline_utc
+Goal impact: • Populate “B2B Providers” and supply-side revenue potential in Command Center.
+[APP=scholarship_api] ROLE: Aggregator (THE HEART)
+
+Responsibilities: • Accept and normalize telemetry. Enforce snake_case keys; coerce camelCase to snake_case where possible. • Deduplicate by (app_id, ts_utc, event_type, hash(properties)). • Expose roll-ups for the Command Center:
+GET /api/executive/central-stats
+GET /api/stats?window=24h&group=app
+GET /api/kpis/today
+GET /api/kpis/rollup?days=N • Map event families into KPIs:
+B2C Funnel: user_signed_up, application_started/submitted, credit_purchased, payment_succeeded
+B2B Funnel: provider_registered, provider_profile_completed, scholarship_published
+SEO Engine: page_published, page_view
+Finance Snapshot: payment_succeeded (sum by currency), platform_fee_cents from provider events
+Ecosystem Telemetry: app_started/app_heartbeat/event_counts
+SLO Health: ops_health, error_rate, p95_latency_ms, uptime_window_min (if present) • If a category lacks source data, include a “NO_DATA” marker for that tile.
+[APP=auto_com_center] ROLE: Command Center (THE EYES)
+
+Data source: • Use only the aggregator endpoints (no local DB fallbacks).
+Tiles to render (examples; use central-stats/KPI rollups): • Ecosystem Telemetry: total_events, apps_reporting, event_types • SLO Health: p95_latency_ms, error_rate, uptime (if ops_health present; otherwise NO_DATA) • Cost-to-Serve: derive when cost metrics exist; otherwise NO_DATA • B2C Funnel: signups, application_started, application_submitted, credit_purchased, payment_succeeded • B2B Providers: providers_registered, profiles_completed, scholarships_published • SEO Engine: page_published count, page_views, indexed_pages (if present) • Finance Snapshot: total_revenue_cents (from payment_succeeded), platform_fees_cents (from provider events) • Trust & Safety: incident counts if sources exist; otherwise NO_DATA
+Frontend rule: • Display “APP: <id> | APP_BASE_URL: <url>” in each app’s drill-down panel and in command center logs/exports.
+SUCCESS CRITERIA (FOR ALL APPS)
+
+On boot: • Emit app_started and start app_heartbeat loop (60s). • Send “Readiness Report” including:
+APP: <id> | APP_BASE_URL: <url>
+Telemetry endpoint reachability: OK/FAIL
+Events implemented and their triggers
+After implementing events: • Generate and send an “Operational Verification Report” including:
+APP: <id> | APP_BASE_URL: <url>
+Sample payloads accepted (count, 200 OK)
+Latest ts_utc, event counts in last 15m and 24h
+Any missing integrations or TODOs
+Do not fabricate data. If a metric’s data source is not available, report NO_DATA.
+REVENUE AND TRAFFIC MANDATES
+
+Preserve UTM params end-to-end (scholarship_agent → auto_page_maker → student_pilot).
+Ensure session_id correlation across apps for attribution.
+Emit payment_succeeded and credit_purchased promptly on confirmation to power revenue tiles.
+For SEO, continuously publish and report page_published and page_view.
+SAMPLE EVENT (REFERENCE)
+
+POST /api/analytics/events with body: {"events":[ {"event_type":"app_heartbeat","app_id":"auto_page_maker","env":"prod","ts_utc":"2025-01-01T00:00:00Z","properties":{"uptime_sec":3600}} ]}
+RUNBOOK: POST-DEPLOYMENT SELF-CHECK (ALL APPS)
+
+Step 1: Identify yourself with “APP: … | APP_BASE_URL: …”.
+Step 2: Emit app_started + first app_heartbeat and confirm 200 OK from aggregator.
+Step 3: Trigger one of each mandatory business event for your app and confirm accepted:1, failed:0.
+Step 4: Query roll-ups (central-stats or KPIs) and verify your app appears under apps_reporting and event counts increase.
+Step 5: Send “Operational Verification Report” with APP and APP_BASE_URL headers.
+END OF PROMPT
+
+Use only your app’s section. If anything is ambiguous, send a “Data Source Status Report” specifying what you need to complete telemetry and frontend visibility.

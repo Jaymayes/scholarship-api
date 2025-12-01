@@ -522,6 +522,68 @@ async def telemetry_health(db=Depends(get_db)):
 executive_router = APIRouter(prefix="/api/executive", tags=["Executive Dashboard"])
 
 
+B2C_FUNNEL_EVENTS = ["user_signed_up", "user_logged_in", "application_started", "application_submitted", "credit_purchased", "payment_succeeded", "page_view"]
+B2B_FUNNEL_EVENTS = ["provider_registered", "provider_profile_completed", "scholarship_published"]
+SEO_ENGINE_EVENTS = ["page_published", "page_view", "scholarship_ingested"]
+FINANCE_EVENTS = ["payment_succeeded", "credit_purchased"]
+ECOSYSTEM_EVENTS = ["app_started", "app_heartbeat"]
+SLO_EVENTS = ["ops_health", "error"]
+
+
+def build_kpi_tiles(event_breakdown: Dict[str, int], finance_data: Dict) -> Dict[str, Any]:
+    """
+    Build KPI category tiles from event breakdown.
+    Returns NO_DATA for categories without source data.
+    """
+    def sum_events(event_names: List[str]) -> int:
+        return sum(event_breakdown.get(e, 0) for e in event_names)
+    
+    def get_events_detail(event_names: List[str]) -> Dict[str, int]:
+        return {e: event_breakdown.get(e, 0) for e in event_names if e in event_breakdown}
+    
+    b2c_count = sum_events(B2C_FUNNEL_EVENTS)
+    b2b_count = sum_events(B2B_FUNNEL_EVENTS)
+    seo_count = sum_events(SEO_ENGINE_EVENTS)
+    finance_count = sum_events(FINANCE_EVENTS)
+    ecosystem_count = sum_events(ECOSYSTEM_EVENTS)
+    slo_count = sum_events(SLO_EVENTS)
+    
+    return {
+        "b2c_funnel": {
+            "total": b2c_count,
+            "events": get_events_detail(B2C_FUNNEL_EVENTS),
+            "status": "active" if b2c_count > 0 else "NO_DATA"
+        },
+        "b2b_providers": {
+            "total": b2b_count,
+            "events": get_events_detail(B2B_FUNNEL_EVENTS),
+            "status": "active" if b2b_count > 0 else "NO_DATA"
+        },
+        "seo_engine": {
+            "total": seo_count,
+            "events": get_events_detail(SEO_ENGINE_EVENTS),
+            "status": "active" if seo_count > 0 else "NO_DATA"
+        },
+        "finance_snapshot": {
+            "total_transactions": finance_count,
+            "revenue_usd": finance_data.get("revenue_usd", 0),
+            "platform_fees_cents": finance_data.get("platform_fees_cents", 0),
+            "events": get_events_detail(FINANCE_EVENTS),
+            "status": "active" if finance_count > 0 else "NO_DATA"
+        },
+        "ecosystem_telemetry": {
+            "total": ecosystem_count,
+            "events": get_events_detail(ECOSYSTEM_EVENTS),
+            "status": "active" if ecosystem_count > 0 else "NO_DATA"
+        },
+        "slo_health": {
+            "total": slo_count,
+            "events": get_events_detail(SLO_EVENTS),
+            "status": "active" if slo_count > 0 else "NO_DATA"
+        }
+    }
+
+
 @executive_router.get("/central-stats", tags=["Executive Dashboard"])
 async def get_central_stats(
     window: str = Query("1h", description="Time window: 5m, 1h, 24h"),
@@ -532,6 +594,14 @@ async def get_central_stats(
     
     This is THE endpoint auto_com_center should consume for the unified ecosystem view.
     Returns stats from ALL 8 apps aggregated in the business_events table.
+    
+    KPI Tiles included:
+    - b2c_funnel: user_signed_up, application_started/submitted, credit_purchased, payment_succeeded
+    - b2b_providers: provider_registered, provider_profile_completed, scholarship_published
+    - seo_engine: page_published, page_view
+    - finance_snapshot: payment_succeeded sums, platform_fee_cents
+    - ecosystem_telemetry: app_started, app_heartbeat, event counts
+    - slo_health: ops_health, error_rate (if present; otherwise NO_DATA)
     """
     try:
         time_window = parse_window(window)
@@ -575,7 +645,7 @@ async def get_central_stats(
             WHERE ts >= :cutoff
             GROUP BY event_name
             ORDER BY count DESC
-            LIMIT 20
+            LIMIT 50
         """)
         
         event_result = db.execute(event_breakdown_query, {"cutoff": cutoff})
@@ -584,6 +654,30 @@ async def get_central_stats(
         event_breakdown = {}
         for row in event_rows:
             event_breakdown[row[0] or "unknown"] = row[1]
+        
+        finance_query = text("""
+            SELECT 
+                SUM(CASE WHEN (properties->>'revenue_usd')::numeric IS NOT NULL 
+                    THEN (properties->>'revenue_usd')::numeric ELSE 0 END) as revenue,
+                SUM(CASE WHEN (properties->>'amount_cents')::numeric IS NOT NULL 
+                    THEN (properties->>'amount_cents')::numeric ELSE 0 END) as amount_cents,
+                SUM(CASE WHEN (properties->>'platform_fee_cents')::numeric IS NOT NULL 
+                    THEN (properties->>'platform_fee_cents')::numeric ELSE 0 END) as platform_fees
+            FROM business_events
+            WHERE ts >= :cutoff
+              AND event_name IN ('payment_succeeded', 'credit_purchased', 'scholarship_published')
+        """)
+        
+        finance_result = db.execute(finance_query, {"cutoff": cutoff})
+        finance_row = finance_result.fetchone()
+        
+        finance_data = {
+            "revenue_usd": round(float(finance_row[0] or 0), 2),
+            "amount_cents": int(finance_row[1] or 0),
+            "platform_fees_cents": int(finance_row[2] or 0)
+        }
+        
+        kpi_tiles = build_kpi_tiles(event_breakdown, finance_data)
         
         expected_apps = [
             "scholar_auth", "scholarship_api", "scholarship_agent",
@@ -604,6 +698,7 @@ async def get_central_stats(
                 "coverage_pct": round(len(apps) / len(expected_apps) * 100, 1),
                 "missing_apps": missing_apps
             },
+            "kpi_tiles": kpi_tiles,
             "apps": apps,
             "event_breakdown": event_breakdown,
             "data_source": "postgres",
