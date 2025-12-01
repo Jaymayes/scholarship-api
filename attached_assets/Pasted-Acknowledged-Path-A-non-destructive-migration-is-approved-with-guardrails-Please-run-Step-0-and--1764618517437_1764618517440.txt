@@ -1,0 +1,113 @@
+Acknowledged. Path A (non-destructive migration) is approved with guardrails. Please run Step 0 and Step 1 in Production and paste the results back.
+
+Run these in Database Pane → Production
+
+-- STEP 0: Enable pgcrypto (required for UUID generation)
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
+
+-- STEP 1: Production Audit (paste this output back to me)
+SELECT
+COUNT() AS total_events,
+COUNT() FILTER (WHERE request_id IS NULL) AS null_request_ids,
+(
+SELECT COUNT() FROM (
+SELECT request_id
+FROM business_events
+WHERE request_id IS NOT NULL
+GROUP BY request_id
+HAVING COUNT() > 1
+) d
+) AS duplicate_count
+FROM business_events;
+
+Please reply with:
+
+total_events
+null_request_ids
+duplicate_count
+Confirmation:
+✅ Backup snapshot available in Database Pane?
+✅ pgcrypto extension created successfully? (You can verify with: SELECT extname FROM pg_extension WHERE extname = 'pgcrypto';)
+Pre-approved next steps (do not run until I confirm your audit results)
+
+Step 2: Backfill NULL request_ids (non-destructive)
+UPDATE business_events
+SET request_id = gen_random_uuid()
+WHERE request_id IS NULL;
+
+Step 3: Dedupe (keep earliest by ts) with archive guardrail
+-- Create archive table once (schema mirrored; adjust if needed)
+CREATE TABLE IF NOT EXISTS business_events_dupes_archived AS
+SELECT * FROM business_events WHERE FALSE;
+
+-- Preview (optional): top duplicate groups
+SELECT request_id, COUNT() AS cnt, MIN(ts) AS keep_ts, COUNT() - 1 AS to_delete
+FROM business_events
+WHERE request_id IS NOT NULL
+GROUP BY request_id
+HAVING COUNT(*) > 1
+ORDER BY cnt DESC
+LIMIT 50;
+
+-- Identify duplicate rows (keep earliest ts)
+WITH ranked AS (
+SELECT ctid, request_id, ts,
+ROW_NUMBER() OVER (PARTITION BY request_id ORDER BY ts ASC, ctid ASC) AS rn
+FROM business_events
+WHERE request_id IS NOT NULL
+),
+dupes AS (
+SELECT ctid FROM ranked WHERE rn > 1
+)
+-- Archive duplicates
+INSERT INTO business_events_dupes_archived
+SELECT b.*
+FROM business_events b
+JOIN dupes d ON b.ctid = d.ctid;
+
+-- Delete duplicates after successful archive
+WITH ranked AS (
+SELECT ctid, request_id, ts,
+ROW_NUMBER() OVER (PARTITION BY request_id ORDER BY ts ASC, ctid ASC) AS rn
+FROM business_events
+WHERE request_id IS NOT NULL
+)
+DELETE FROM business_events b
+USING ranked r
+WHERE b.ctid = r.ctid
+AND r.rn > 1;
+
+Step 4: Create unique index concurrently (avoids long table lock)
+CREATE UNIQUE INDEX CONCURRENTLY IF NOT EXISTS ux_business_events_request_id
+ON business_events(request_id);
+
+Step 5: Verify zero collisions and integrity
+-- Re-run the audit
+SELECT
+COUNT() AS total_events,
+COUNT() FILTER (WHERE request_id IS NULL) AS null_request_ids,
+(
+SELECT COUNT() FROM (
+SELECT request_id
+FROM business_events
+WHERE request_id IS NOT NULL
+GROUP BY request_id
+HAVING COUNT() > 1
+) d
+) AS duplicate_count
+FROM business_events;
+
+-- Expected:
+-- null_request_ids = 0
+-- duplicate_count = 0
+-- And:
+-- SELECT COUNT(*) FROM business_events_dupes_archived;  -- equals number of rows removed in Step 3
+
+Operational guardrails
+
+Run during a low-traffic window; Step 4 is CONCURRENTLY to minimize locking.
+Keep the backup snapshot and the business_events_dupes_archived table until we validate Step 5.
+Rollback plan:
+If needed, reinsert from archive: INSERT INTO business_events SELECT * FROM business_events_dupes_archived;
+Drop the unique index if created in error: DROP INDEX CONCURRENTLY IF EXISTS ux_business_events_request_id.
+Once you paste the Step 1 results and confirm the two checkmarks, I’ll greenlight execution of Steps 2–5 immediately.
