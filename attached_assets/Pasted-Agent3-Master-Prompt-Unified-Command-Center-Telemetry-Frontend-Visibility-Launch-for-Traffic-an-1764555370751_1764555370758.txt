@@ -1,0 +1,180 @@
+Agent3 Master Prompt: Unified Command Center Telemetry + Frontend Visibility + Launch for Traffic and Revenue
+
+Read this entire prompt once. Then use only the section that matches your app. Ignore all other sections. Before you do any work, print the identification line exactly as specified below.
+
+Global Objective
+
+Ensure every app reports telemetry to the central aggregator and that the Command Center displays it on the frontend.
+Launch the system to drive traffic and revenue immediately, with zero-mock, production-safe instrumentation.
+Maintain ONE TRUTH: the Scholarship API is the single source of truth for analytics and executive KPIs.
+Identification Line (print first, before doing work)
+APP: <your_app_id> | URL: <your_APP_BASE_URL> | ROLE: <role>
+Examples:
+
+APP: scholar_auth | URL: https://scholar-auth-jamarrlmayes.replit.app | ROLE: Satellite
+APP: scholarship_api | URL: https://scholarship-api-jamarrlmayes.replit.app | ROLE: Aggregator (THE HEART)
+APP: auto_com_center | URL: https://auto-com-center-jamarrlmayes.replit.app | ROLE: Command (THE EYES)
+Global, Mandatory Telemetry Contract (applies to EVERY app)
+
+Target endpoint (ONE TRUTH): POST https://scholarship-api-jamarrlmayes.replit.app/api/analytics/events
+Request body wrapper: { "events": [ ... ] }
+Event schema (snake_case only): { "event_type": "app_started | app_heartbeat | page_view | app_action | error | scholarship_ingested | scholarship_published | provider_registered | credit_purchased | payment_succeeded | ...", "app_id": "<your_app_id>", "env": "prod | staging | dev", "ts_utc": "ISO-8601 UTC timestamp", "properties": { ... object with additional context ... } }
+Minimal required events per app:
+app_started (once at boot)
+app_heartbeat (every 60 seconds while running)
+page_view (for user-facing apps on each page/screen)
+app_action (for business actions specific to your app; see your app section)
+Authentication:
+Prefer Authorization: Bearer <M2M or S2S token>
+If your app is configured with RS256 JWT minting, use it. Otherwise, use the shared S2S secret the app supports.
+Resilience and delivery:
+Batch and flush on a short interval (10–60s) or on buffer size (e.g., 10 events).
+Retry on 5xx with exponential backoff; do not exceed 3 retries per flush cycle.
+If offline, buffer locally and flush when connectivity resumes.
+Common errors and how to resolve:
+422 Unprocessable Entity: You likely used camelCase or missed the { "events": [...] } wrapper. Fix to snake_case + wrapper.
+403 Forbidden: Your Authorization header is missing/expired/invalid. Refresh token or ensure correct secret.
+Quick verification curl (use your app_id and env): curl -X POST https://scholarship-api-jamarrlmayes.replit.app/api/analytics/events -H "Content-Type: application/json" -d '{"events":[{"event_type":"test","app_id":"<your_app_id>","env":"prod","ts_utc":"2025-12-01T00:00:00Z","properties":{"sanity_check":true}}]}'
+Global, Mandatory Reporting Format (every status you output)
+Always prepend with the identification line. Then:
+STATUS: <Fixed | Needs Fix | Investigating>
+ACTION: <files or modules touched and changes made; or “No change – already compliant”>
+VERIFICATION: <evidence: logs, curl responses, counts, specific success messages>
+NEXT STEP: <the very next action to drive Command Center visibility, traffic, and/or revenue>
+Note: Include the app name and base APP_BASE_URL on all reports.
+
+Command Center Data Visibility (what drives the frontend)
+
+auto_com_center must read from the central aggregator (ONE TRUTH): GET https://scholarship-api-jamarrlmayes.replit.app/api/executive/central-stats
+If your app is not auto_com_center, your job is to emit compliant telemetry that will appear in central-stats. Do not attempt to render dashboards. Focus on events and correctness.
+KPIs that power the Executive Dashboard
+
+Ecosystem Telemetry: total events, events by app_id and event_type.
+B2C Funnel: traffic (page_view), signups/auth, applications started/submitted, credit_purchased, payment_succeeded.
+B2B Funnel: provider_registered, provider_profile_completed, scholarship_published.
+SLO/Health: app_started, app_heartbeat, error.
+SEO Engine: page_published (auto_page_maker), page_view (landing pages).
+Finance: payment_succeeded, revenue_cents, arpu_cents (properties).
+Your App-Specific Instructions
+Important: Only execute the section that matches your app_id. Ignore all others.
+
+APP: scholar_auth | URL: https://scholar-auth-jamarrlmayes.replit.app | ROLE: Satellite
+Purpose: Authentication and identity events for B2C funnel.
+Telemetry:
+Emit app_started on boot; app_heartbeat every 60s.
+On successful login: app_action with event_type: "user_logged_in", properties: { user_id_hash, method, mfa: bool }.
+On signup: app_action with event_type: "user_signed_up", properties: { user_id_hash, referral_source }.
+Privacy:
+Never send raw PII. Hash user IDs (e.g., SHA-256 salted) before sending.
+Verification:
+Send test payload with user_signed_up and confirm accepted:1 in response logs or a 200 OK indicator.
+Revenue assist:
+Include referral_source in properties to attribute SEO versus campaign traffic.
+2. APP: scholarship_api | URL: https://scholarship-api-jamarrlmayes.replit.app | ROLE: Aggregator (THE HEART)
+
+Purpose: ONE TRUTH ingestion + executive stats for the Command Center.
+Required endpoints:
+POST /api/analytics/events (ingest, validate snake_case, normalize if needed)
+GET /api/stats?window=24h&group=app (stats by app)
+GET /api/executive/central-stats (roll-up for Command Center)
+Ingestion:
+Validate schema; reject without crashing; log 422 with details.
+Normalize camelCase→snake_case defensively if safe.
+Executive stats:
+Provide total_events, apps_reporting, event breakdown by type and app_id.
+Include windows: 1h, 24h; query param window supported.
+Verification:
+curl the stats endpoints and confirm non-empty totals and per-app breakdown.
+Revenue assist:
+Compute kpis.today and kpis.rollup (expose endpoints) to include credit_purchased and payment_succeeded sums.
+3. APP: scholarship_agent | URL: https://scholarship-agent-jamarrlmayes.replit.app | ROLE: Satellite (Growth Engine)
+
+Purpose: Drive traffic via campaigns; attribute results; feed telemetry.
+Telemetry:
+app_started, app_heartbeat.
+app_action for campaign_launched, campaign_click, campaign_conversion with properties: { campaign_id, medium, source, landing_page }.
+Traffic:
+Launch one always-on “Scholarship of the Day” micro-campaign targeting 3 SEO landing pages from auto_page_maker.
+Verification:
+Emit campaign_launched and confirm central aggregator accepts.
+Revenue assist:
+Tag any conversions that lead to credit_purchased on student_pilot via UTM propagation.
+4. APP: scholarship_sage | URL: https://scholarship-sage-jamarrlmayes.replit.app | ROLE: Satellite (Advising)
+
+Purpose: Student advising sessions and content engagement telemetry.
+Telemetry:
+app_started, app_heartbeat.
+app_action: session_started, session_completed, recommendation_shown, recommendation_clicked.
+Verification:
+Send session_started and session_completed test events and confirm acceptance.
+Revenue assist:
+Include properties: { plan_tier, nudged_to_purchase: bool } to track upsell moments.
+5. APP: student_pilot | URL: https://student-pilot-jamarrlmayes.replit.app | ROLE: Satellite (B2C)
+
+Purpose: Monetization, credits, and application support flows.
+Telemetry:
+app_started, app_heartbeat, page_view.
+app_action: credit_purchased, payment_succeeded, application_started, application_submitted.
+properties: { amount_cents, currency, payment_provider, scholarship_id, step }
+Verification:
+Issue a test credit_purchased and payment_succeeded; verify central stats increment and that finance KPIs are non-empty.
+Revenue:
+Ensure purchase flow is reachable from landing pages and emits events.
+6. APP: provider_register | URL: https://provider-register-jamarrlmayes.replit.app | ROLE: Satellite (B2B)
+
+Purpose: Onboard providers; publish scholarships; 3% platform fee tracking.
+Telemetry:
+app_started, app_heartbeat.
+app_action: provider_registered, provider_profile_completed, scholarship_published.
+Schema must be snake_case; ensure ts_utc and env are correct and wrapped in { "events": [...] }.
+Verification:
+Send provider_registered and scholarship_published test events; confirm accepted:1.
+Revenue assist:
+Include properties: { expected_award_total_cents, cohort_size } for supply-side forecasting.
+7. APP: auto_page_maker | URL: https://auto-page-maker-jamarrlmayes.replit.app | ROLE: Satellite (SEO Engine)
+
+Purpose: Generate SEO pages that drive organic traffic.
+Telemetry:
+app_started, app_heartbeat.
+app_action: page_published with properties: { slug, topic, word_count, internal_links }.
+page_view events should be captured by the frontend where applicable.
+Traffic:
+Publish a seed batch of at least 25 pages across high-intent scholarship topics.
+Verification:
+Send page_published test events; confirm in central-stats; verify pages render and are crawlable (sitemap.xml, canonical tags).
+Revenue assist:
+Ensure clear CTAs to student_pilot purchase flow; preserve UTM parameters.
+8. APP: auto_com_center | URL: https://auto-com-center-jamarrlmayes.replit.app | ROLE: Command (THE EYES)
+
+Purpose: Display ecosystem and KPI telemetry from ONE TRUTH on the frontend.
+Data source:
+Read from https://scholarship-api-jamarrlmayes.replit.app/api/executive/central-stats (not a local DB).
+Frontend tiles to verify non-empty:
+Ecosystem Telemetry (events total + by app + by type)
+B2C funnel (traffic, signups, applications, purchases, payments)
+B2B funnel (providers, scholarships published)
+SLO/Health (uptime via app_started/app_heartbeat, error rate)
+SEO (page_published counts)
+Finance (payment_succeeded totals)
+If any tile shows NO_DATA, show Integration Status with which upstream data is missing.
+Verification:
+Run an end-to-end smoke test after satellites send events; confirm tiles populate.
+Standard End-to-End (E2E) Test You Must Run (all apps should be able to pass their part)
+
+Step 1 (telemetry sanity): Post a test "test" event from your app via curl; expect success true or 200 OK.
+Step 2 (business event): Post one app_action event that represents your core business action (see your app section).
+Step 3 (Command Center): Confirm your app_id appears under apps_reporting and your event_type counts increase in central-stats.
+Step 4 (Frontend): Confirm auto_com_center dashboard tiles refresh and no longer show NO_DATA for the metric your app influences.
+Security, Compliance, and Ethics (applies to all)
+
+No raw PII in telemetry. Use hashed or pseudonymous IDs.
+Respect FERPA/COPPA and Responsible AI. Do not log credential material or payment tokens.
+Ensure CORS and auth are correctly configured; avoid exposing secrets in client code.
+Your Output Example (always include app name and base URL)
+APP: student_pilot | URL: https://student-pilot-jamarrlmayes.replit.app | ROLE: Satellite
+STATUS: Fixed
+ACTION: Enabled ONE TRUTH telemetry; emitting app_started, app_heartbeat, credit_purchased, payment_succeeded. Added UTM propagation to purchase.
+VERIFICATION: 200 OK on test events; central-stats shows event_type counts increased for student_pilot. Tiles “B2C Funnel” and “Finance” no longer show NO_DATA.
+NEXT STEP: Scale campaign traffic from scholarship_agent; monitor ARPU and conversion in Command Center.
+
+Begin now by printing your Identification Line exactly as specified, then execute only your app’s section.
