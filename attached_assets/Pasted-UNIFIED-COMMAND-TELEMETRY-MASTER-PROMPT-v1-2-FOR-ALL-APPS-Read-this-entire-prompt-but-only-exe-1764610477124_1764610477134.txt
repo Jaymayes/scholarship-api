@@ -1,0 +1,199 @@
+UNIFIED COMMAND + TELEMETRY MASTER PROMPT v1.2 (FOR ALL APPS)
+Read this entire prompt, but only execute the instructions that apply to your app_id. Before taking any action, IDENTIFY yourself using the IDENTIFY line below so there is no confusion across apps. Every event you emit and every report you produce must include your app_id and APP_BASE_URL. The goal is to launch, drive traffic, and generate revenue while ensuring all data is reported to and monitored by the Command Center and displayed on the frontend.
+
+APP REGISTRY (app_id → APP_BASE_URL)
+
+scholar_auth → https://scholar-auth-jamarrlmayes.replit.app
+scholarship_api → https://scholarship-api-jamarrlmayes.replit.app
+scholarship_agent → https://scholarship-agent-jamarrlmayes.replit.app
+scholarship_sage → https://scholarship-sage-jamarrlmayes.replit.app
+student_pilot → https://student-pilot-jamarrlmayes.replit.app
+provider_register → https://provider-register-jamarrlmayes.replit.app
+auto_page_maker → https://auto-page-maker-jamarrlmayes.replit.app
+auto_com_center (Agent3) → https://auto-com-center-jamarrlmayes.replit.app
+GLOBAL PRIME DIRECTIVE (ALL APPS)
+
+Only act on the section explicitly tagged FOR <your app_id>.
+Emit required telemetry to the central aggregator (scholarship_api) so the Command Center (auto_com_center, Agent3) can monitor and display the data on the frontend.
+Keep Customer Acquisition Cost low by prioritizing organic SEO (auto_page_maker) and conversion funnels (scholarship_agent → student_pilot).
+Maintain SLOs: 99.9% uptime, ~120ms P95 latency. Report your SLO metrics in heartbeats.
+GLOBAL TELEMETRY ENVELOPE (ALL APPS)
+
+Destination: POST https://scholarship-api-jamarrlmayes.replit.app/api/analytics/events
+Envelope (batch):
+events: array of event objects where each event has:
+event_id: UUID v4
+event_type: string
+app_id: one of the app_ids above
+env: "prod"
+ts_utc: ISO8601 timestamp (UTC)
+properties: object including at minimum:
+app_base_url: your APP_BASE_URL
+version: your app’s semantic version
+uptime_sec, service_ok (boolean), p95_ms (number), error_rate_pct (0–1 float) on app_started and app_heartbeat
+Emission rules:
+app_started on boot, then app_heartbeat every 60s
+Batch flush every 10s (with exponential backoff on failure)
+Deduplicate by event_id on the server side; client keeps a 24h idempotency cache
+Include app_base_url on all events
+Required IDENTIFY line (stdout or first log line):
+IDENTIFY: APP=<app_id> | APP_BASE_URL=<url> | ROLE=<short role> | ENV=prod
+COMMAND CENTER DASHBOARD (AUTO_COM_CENTER, AGENT3)
+
+The dashboard will display seven tiles sourced from the central aggregator:
+SLO tile: app_heartbeat, error_rate_pct, p95_ms
+B2C tile: page_view, user_signed_up, application_started, application_submitted, payment_succeeded, credit_purchased
+B2B tile: provider_registered, scholarship_published, provider_active, fee_reported
+SEO tile: page_published, page_view
+Growth tile: campaign_launched, landing_page_created, utm_routed
+Trust tile: bias_check_performed, risk_flagged
+Finance tile: payment_succeeded, fee_reported
+All tiles must render GREEN/YELLOW/RED or NO_DATA based on protocol thresholds (defined in your app section and summarized below).
+REQUIRED REPORTING FORMAT (ALL APPS)
+
+All reports (logs, dashboards, API responses, PDF/CSV exports) must include your app_name and APP_BASE_URL at the top. Example:
+REPORT: app=student_pilot | app_base_url=https://student-pilot-jamarrlmayes.replit.app | env=prod
+Include key metrics relevant to your app’s tile(s) contribution and always include the app_base_url in report metadata.
+LAUNCH & REVENUE ACTIVATION (ALL APPS)
+
+SEO engine on: auto_page_maker must publish landing pages, sitemaps, and link to student_pilot with UTM attribution for conversions.
+Campaigns on: scholarship_agent must launch campaigns and route traffic to student_pilot with UTM passthrough; log utm_routed clicks.
+Monetization on: student_pilot must activate Stripe webhooks to emit payment_succeeded and credit_purchased.
+Provider revenue on: provider_register must emit provider_registered, scholarship_published, and fee_reported (3% platform fee).
+Trust on: scholarship_sage must emit bias_check_performed and risk_flagged for the Trust tile.
+Auth growth on: scholar_auth must emit user_signed_up, user_logged_in, login_failed, and session_refreshed (when applicable).
+STATUS THRESHOLDS (FOR COMMAND CENTER INTERPRETATION)
+
+SLO: GREEN if p95_ms ≤ 120 and error_rate_pct < 0.02 and heartbeats present in last 2 minutes; YELLOW if p95_ms ≤ 200 and error_rate_pct < 0.05; RED otherwise.
+B2C (24h window): GREEN if user_signed_up ≥ 100 and application_started ≥ 75 and application_submitted ≥ 25 and payment_succeeded ≥ 10; YELLOW if at least half; RED if below.
+B2B (24h window): GREEN if provider_registered ≥ 5 and scholarship_published ≥ 5 and fee_reported ≥ 1; YELLOW if partial; RED if low or zero.
+SEO (24h window): GREEN if page_published ≥ 25 and page_view ≥ 500; YELLOW partial; RED low or zero.
+Growth (24h window): GREEN if campaign_launched ≥ 5 and landing_page_created ≥ 10 and utm_routed ≥ 100; YELLOW partial; RED low or zero.
+Trust (24h window): GREEN if bias_check_performed ≥ 20 and risk_flagged ≤ 1% of total decisions; YELLOW if 1–3%; RED if >3% or no telemetry.
+Finance (24h window): GREEN if payment_succeeded ≥ 10 and fee_reported ≥ 1; YELLOW if partial; RED if low or zero.
+FAILSAFE (ALL APPS)
+
+If real traffic is zero, emit synthetic diagnostic events tagged properties.synthetic=true at a low rate (max 1/min) to validate Command Center displays. Do not mix synthetic with real KPIs.
+SECURITY & PRIVACY (ALL APPS)
+
+No PII in event payloads; hash user_id with a stable salt; mask IPs to /24
+Include flags: is_minor (boolean), ferpa_protected (boolean) where applicable
+COPPA/FERPA compliance signals must be recorded on auth and app events
+FOR auto_com_center (Agent3) — Command Center
+Role: Read-only Command Center that aggregates and visualizes platform telemetry. You are Agent3.
+IDENTIFY immediately:
+
+IDENTIFY: APP=auto_com_center | APP_BASE_URL=https://auto-com-center-jamarrlmayes.replit.app | ROLE=Command Center | ENV=prod
+Your Objectives
+
+Ensure all data across apps is reported, monitored, and displayed on the frontend dashboard.
+Provide executives with actionable insights to launch, drive traffic, and generate revenue.
+Emit your own base telemetry (so SLO tile reflects your health) and frontend rendering events.
+Startup Actions
+
+On boot, emit app_started with version, uptime_sec=0, service_ok, p95_ms, error_rate_pct, app_base_url.
+Begin app_heartbeat every 60s with current SLO metrics.
+Record dashboard_loaded whenever the executive overview page is rendered.
+For each tile render, emit tile_status_rendered with tile_id, status, counts, app_base_url.
+Data Sources (read from scholarship_api)
+
+GET /api/executive/central-stats?window=24h
+GET /api/kpis/today
+GET /api/stats?window=24h&group=event_type
+Cache last good payload; if fetch fails, serve cached + banner “Telemetry delayed; showing last known good data.”
+Frontend Requirements
+
+Always place report header on top: app=auto_com_center | app_base_url=https://auto-com-center-jamarrlmayes.replit.app | env=prod | timestamp=...
+Render seven tiles (SLO, B2C, B2B, SEO, Growth, Trust, Finance) with:
+Status (GREEN/YELLOW/RED/NO_DATA)
+Key driver counts for the last 24h
+Sparkline for 24h trend (from /api/stats grouped by hour if available)
+“Apps Reporting” panel:
+Show count of apps with heartbeats in last 2 minutes and list app_id + app_base_url
+Drilldown:
+Click a tile to open deeper metrics including raw event_type counts and last 10 events by recency
+Alerts:
+If any tile degrades by ≥1 level within 10 minutes, raise a toast + emit tile_status_rendered with degradation=true
+Finance tile special note:
+If payment_succeeded or fee_reported = 0 in last 24h, show “Awaiting payment telemetry” warning
+Telemetry You Must Emit (in addition to base events)
+
+dashboard_loaded: properties { route, user_role: "executive", app_base_url }
+tile_status_rendered: properties { tile_id, status, counts (per driver), app_base_url }
+page_view: properties { route, app_base_url } when Command Center pages are viewed
+Validation Routine (run hourly and on deploy)
+
+Verify central-stats returns _meta.protocol="ONE_TRUTH" and _meta.version="1.2"
+Verify all seven tiles present; if missing, show NO_DATA and include which events are absent
+Emit a diagnostic tile_status_rendered for each tile updated
+Log an executive summary report with app and base URL in header
+Do Not
+
+Do not mutate or write business data to scholarship_api beyond your own telemetry events.
+Do not attempt to impersonate other apps; every report and event must include your app_id and app_base_url.
+Output & Reporting
+
+Every generated summary, PDF/CSV, and on-screen header must include:
+REPORT: app=auto_com_center | app_base_url=https://auto-com-center-jamarrlmayes.replit.app | env=prod
+Include a “Next Actions” section computed from tile statuses:
+Finance RED/YELLOW → prompt student_pilot to verify Stripe webhooks and emit payment_succeeded, credit_purchased
+B2C YELLOW → prompt scholarship_agent and auto_page_maker to increase campaigns and page_published; prompt student_pilot to improve application_started/application_submitted events
+B2B YELLOW → prompt provider_register to onboard providers and publish scholarships; ensure fee_reported is emitted
+Trust YELLOW/RED → prompt scholarship_sage to run bias_check_performed and review risk_flagged
+These are advisories only; you do not perform the other apps’ actions. You log advisories and reflect them on the dashboard.
+Success Criteria for Agent3
+
+Seven tiles consistently display with correct statuses, metrics, and trends.
+Apps Reporting panel shows all active apps and their base URLs.
+Executive overview loads in <200ms P95 from cache when possible.
+Alerts and advisories are emitted within 60s of metric degradation.
+FOR scholar_auth — Auth Gateway
+
+Emit: user_signed_up (utm_*, method, is_minor, ferpa_protected, mfa_used), user_logged_in (mfa_used), login_failed (reason), session_refreshed (when refresh exists)
+Include app_started and app_heartbeat with SLO metrics
+Ensure IDENTIFY line with role “Auth Gateway”
+Contribution: B2C tile (signups), Trust tile (privacy flags present)
+FOR scholarship_api — Central Aggregator (“THE HEART”)
+
+Accept POST /api/analytics/events with v1.2 envelope; dedupe by event_id; store
+Provide:
+/api/executive/central-stats?window=24h with 7 tile objects, overallStatus, ecosystemMetrics, _meta {protocol:"ONE_TRUTH", version:"1.2"}
+/api/kpis/today (page_views, app_starts, heartbeats, scholarships_published, payments_count, revenue_cents, total_events, date)
+/api/stats?window=24h&group=event_type with breakdown and totals
+Maintain IDENTIFY line with role “Central Aggregator”
+Contribution: All tiles via aggregation
+FOR scholarship_agent — Campaign Orchestrator
+
+Emit: campaign_launched, landing_page_created, utm_routed (on CTA click-through to student_pilot)
+Ensure landing pages link to student_pilot with UTM passthrough
+Contribution: Growth and B2C tiles
+FOR scholarship_sage — Trust & Risk
+
+Emit: bias_check_performed (model, policy, sample_size, fairness_metrics), risk_flagged (category, severity, remediation)
+Contribution: Trust tile
+FOR student_pilot — Student App + Payments
+
+Emit: page_view, application_started, application_submitted
+Stripe webhooks: payment_succeeded (amount_cents, currency, product), credit_purchased (credits, amount_cents)
+Contribution: B2C and Finance tiles
+FOR provider_register — Provider Onboarding
+
+Emit: provider_registered, provider_active, scholarship_published (expected_award_total_cents, cohort_size, platform_fee_cents), fee_reported (platform_fee_cents, period_utc=YYYY-MM)
+Contribution: B2B and Finance tiles
+FOR auto_page_maker — SEO Engine
+
+Emit: page_published (slug, topic, canonical_url, has_json_ld, indexable), page_view, scholarship_ingested, scholarship_published
+Ensure internal links to student_pilot with UTM for conversions
+Contribution: SEO and B2C tiles
+BEGIN EXECUTION PROTOCOL
+
+Step 1 (all apps): Print IDENTIFY line immediately on start with your correct app_id and APP_BASE_URL.
+Step 2 (all apps): Start base telemetry (app_started then app_heartbeat every 60s).
+Step 3 (per app): Implement your app-specific events exactly as specified above and include app_base_url on every event.
+Step 4 (Agent3 only): Render the Command Center dashboard, poll aggregator endpoints, cache results, and emit dashboard_loaded and tile_status_rendered on each refresh.
+Step 5 (all apps): Include your app_name and APP_BASE_URL in every report header and dashboard section you output.
+Step 6 (Agent3 only): Produce hourly Executive Summary with statuses and “Next Actions,” prefixed with: REPORT: app=auto_com_center | app_base_url=https://auto-com-center-jamarrlmayes.replit.app | env=prod.
+Step 7 (all apps): If no live traffic, emit low-rate synthetic diagnostics (properties.synthetic=true) so the frontend validates end-to-end, without polluting KPIs.
+Reminder
+
+You are Agent3 only if app_id=auto_com_center. If you are not auto_com_center, do not execute the Agent3 section. Only execute the section for your app_id.

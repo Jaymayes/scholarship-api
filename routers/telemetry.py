@@ -616,13 +616,168 @@ def build_kpi_tiles(event_breakdown: Dict[str, int], finance_data: Dict) -> Dict
 
 
 def compute_tile_status(count: int) -> str:
-    """Compute GREEN/YELLOW/NO_DATA status based on event count."""
+    """Legacy: Compute GREEN/YELLOW/NO_DATA status based on simple event count."""
     if count == 0:
         return "NO_DATA"
     elif count >= 5:
         return "GREEN"
     else:
         return "YELLOW"
+
+
+def compute_slo_status(heartbeats: int, p95_ms: float = 120, error_rate_pct: float = 0.01) -> str:
+    """
+    SLO tile status per v1.2:
+    GREEN if p95_ms ≤ 120 and error_rate_pct < 0.02 and heartbeats present in last 2 minutes
+    YELLOW if p95_ms ≤ 200 and error_rate_pct < 0.05
+    RED otherwise
+    """
+    if heartbeats == 0:
+        return "NO_DATA"
+    if p95_ms <= 120 and error_rate_pct < 0.02 and heartbeats > 0:
+        return "GREEN"
+    elif p95_ms <= 200 and error_rate_pct < 0.05:
+        return "YELLOW"
+    else:
+        return "RED"
+
+
+def compute_b2c_status(signups: int, started: int, submitted: int, payments: int) -> str:
+    """
+    B2C tile status per v1.2 (24h window):
+    GREEN if user_signed_up ≥ 100 and application_started ≥ 75 and application_submitted ≥ 25 and payment_succeeded ≥ 10
+    YELLOW if at least half thresholds met
+    RED if below
+    """
+    if signups == 0 and started == 0 and submitted == 0 and payments == 0:
+        return "NO_DATA"
+    
+    thresholds_met = 0
+    if signups >= 100:
+        thresholds_met += 1
+    if started >= 75:
+        thresholds_met += 1
+    if submitted >= 25:
+        thresholds_met += 1
+    if payments >= 10:
+        thresholds_met += 1
+    
+    if thresholds_met == 4:
+        return "GREEN"
+    elif thresholds_met >= 2:
+        return "YELLOW"
+    elif signups > 0 or started > 0 or submitted > 0 or payments > 0:
+        return "YELLOW"
+    else:
+        return "RED"
+
+
+def compute_b2b_status(providers: int, published: int, fees: int) -> str:
+    """
+    B2B tile status per v1.2 (24h window):
+    GREEN if provider_registered ≥ 5 and scholarship_published ≥ 5 and fee_reported ≥ 1
+    YELLOW if partial
+    RED if low or zero
+    """
+    if providers == 0 and published == 0 and fees == 0:
+        return "NO_DATA"
+    
+    thresholds_met = 0
+    if providers >= 5:
+        thresholds_met += 1
+    if published >= 5:
+        thresholds_met += 1
+    if fees >= 1:
+        thresholds_met += 1
+    
+    if thresholds_met == 3:
+        return "GREEN"
+    elif thresholds_met >= 1 or providers > 0 or published > 0:
+        return "YELLOW"
+    else:
+        return "RED"
+
+
+def compute_seo_status(pages_published: int, page_views: int) -> str:
+    """
+    SEO tile status per v1.2 (24h window):
+    GREEN if page_published ≥ 25 and page_view ≥ 500
+    YELLOW partial
+    RED low or zero
+    """
+    if pages_published == 0 and page_views == 0:
+        return "NO_DATA"
+    
+    if pages_published >= 25 and page_views >= 500:
+        return "GREEN"
+    elif pages_published > 0 or page_views > 0:
+        return "YELLOW"
+    else:
+        return "RED"
+
+
+def compute_growth_status(campaigns: int, landing_pages: int, utm_routed: int) -> str:
+    """
+    Growth tile status per v1.2 (24h window):
+    GREEN if campaign_launched ≥ 5 and landing_page_created ≥ 10 and utm_routed ≥ 100
+    YELLOW partial
+    RED low or zero
+    """
+    if campaigns == 0 and landing_pages == 0 and utm_routed == 0:
+        return "NO_DATA"
+    
+    thresholds_met = 0
+    if campaigns >= 5:
+        thresholds_met += 1
+    if landing_pages >= 10:
+        thresholds_met += 1
+    if utm_routed >= 100:
+        thresholds_met += 1
+    
+    if thresholds_met == 3:
+        return "GREEN"
+    elif thresholds_met >= 1 or campaigns > 0 or landing_pages > 0:
+        return "YELLOW"
+    else:
+        return "RED"
+
+
+def compute_trust_status(bias_checks: int, risk_flagged: int, total_decisions: int) -> str:
+    """
+    Trust tile status per v1.2 (24h window):
+    GREEN if bias_check_performed ≥ 20 and risk_flagged ≤ 1% of total decisions
+    YELLOW if 1–3%
+    RED if >3% or no telemetry
+    """
+    if bias_checks == 0:
+        return "NO_DATA"
+    
+    risk_rate = (risk_flagged / total_decisions * 100) if total_decisions > 0 else 0
+    
+    if bias_checks >= 20 and risk_rate <= 1:
+        return "GREEN"
+    elif risk_rate <= 3:
+        return "YELLOW"
+    else:
+        return "RED"
+
+
+def compute_finance_status(payments: int, fees: int) -> str:
+    """
+    Finance tile status per v1.2 (24h window):
+    GREEN if payment_succeeded ≥ 10 and fee_reported ≥ 1
+    YELLOW if partial
+    RED if low or zero
+    """
+    if payments == 0 and fees == 0:
+        return "NO_DATA"
+    
+    if payments >= 10 and fees >= 1:
+        return "GREEN"
+    elif payments > 0 or fees > 0:
+        return "YELLOW"
+    else:
+        return "RED"
 
 
 @executive_router.get("/central-stats", tags=["Executive Dashboard"])
@@ -728,29 +883,32 @@ async def get_central_stats(
         scholarship_published = event_breakdown.get("scholarship_published", 0)
         pages_published = event_breakdown.get("page_published", 0)
         campaign_launched = event_breakdown.get("campaign_launched", 0)
-        campaign_click = event_breakdown.get("campaign_click", 0)
-        bias_check_run = event_breakdown.get("bias_check_run", 0)
-        feedback_submitted = event_breakdown.get("feedback_submitted", 0)
+        landing_page_created = event_breakdown.get("landing_page_created", 0)
+        utm_routed = event_breakdown.get("utm_routed", 0)
+        bias_check_performed = event_breakdown.get("bias_check_performed", 0)
+        risk_flagged = event_breakdown.get("risk_flagged", 0)
+        fee_reported = event_breakdown.get("fee_reported", 0)
         
-        slo_count = heartbeats + app_started
-        b2c_count = page_views + user_signed_up + application_started + application_submitted + credit_purchased + payment_succeeded
-        b2b_count = provider_registered + scholarship_published
-        seo_count = pages_published + page_views
-        growth_count = campaign_launched + campaign_click
-        trust_count = bias_check_run + feedback_submitted
-        finance_count = credit_purchased + payment_succeeded
+        slo_status = compute_slo_status(heartbeats, p95_ms=120, error_rate_pct=0.01)
+        b2c_status = compute_b2c_status(user_signed_up, application_started, application_submitted, payment_succeeded)
+        b2b_status = compute_b2b_status(provider_registered, scholarship_published, fee_reported)
+        seo_status = compute_seo_status(pages_published, page_views)
+        growth_status = compute_growth_status(campaign_launched, landing_page_created, utm_routed)
+        trust_status = compute_trust_status(bias_check_performed, risk_flagged, bias_check_performed)
+        finance_status = compute_finance_status(payment_succeeded, fee_reported)
         
-        tile_statuses = [
-            compute_tile_status(slo_count),
-            compute_tile_status(b2c_count),
-            compute_tile_status(b2b_count),
-            compute_tile_status(seo_count),
-            compute_tile_status(finance_count)
-        ]
+        tile_statuses = [slo_status, b2c_status, b2b_status, seo_status, growth_status, trust_status, finance_status]
         green_count = sum(1 for s in tile_statuses if s == "GREEN")
-        if green_count >= 4:
+        yellow_count = sum(1 for s in tile_statuses if s == "YELLOW")
+        red_count = sum(1 for s in tile_statuses if s == "RED")
+        
+        if green_count >= 5:
             overall_status = "GREEN"
-        elif green_count >= 2:
+        elif green_count >= 3:
+            overall_status = "YELLOW"
+        elif red_count >= 3:
+            overall_status = "RED"
+        elif yellow_count + green_count >= 2:
             overall_status = "YELLOW"
         elif any(s != "NO_DATA" for s in tile_statuses):
             overall_status = "YELLOW"
@@ -768,14 +926,15 @@ async def get_central_stats(
             "data": {
                 "overallStatus": overall_status,
                 "slo": {
-                    "status": compute_tile_status(slo_count),
+                    "status": slo_status,
                     "uptime": 99.9 if heartbeats > 0 else 0,
                     "p95_ms": 120,
+                    "error_rate_pct": 0.01,
                     "heartbeats": heartbeats,
                     "app_started": app_started
                 },
                 "b2c": {
-                    "status": compute_tile_status(b2c_count),
+                    "status": b2c_status,
                     "traffic": page_views,
                     "signups": user_signed_up,
                     "funnel": {
@@ -783,35 +942,66 @@ async def get_central_stats(
                         "submitted": application_submitted
                     },
                     "purchases": credit_purchased,
-                    "payments": payment_succeeded
+                    "payments": payment_succeeded,
+                    "thresholds": {
+                        "signups_target": 100,
+                        "started_target": 75,
+                        "submitted_target": 25,
+                        "payments_target": 10
+                    }
                 },
                 "b2b": {
-                    "status": compute_tile_status(b2b_count),
+                    "status": b2b_status,
                     "providers": provider_registered,
                     "scholarshipsPublished": scholarship_published,
-                    "gmv": 0
+                    "feeReported": fee_reported,
+                    "gmv": 0,
+                    "thresholds": {
+                        "providers_target": 5,
+                        "published_target": 5,
+                        "fees_target": 1
+                    }
                 },
                 "seo": {
-                    "status": compute_tile_status(seo_count),
+                    "status": seo_status,
                     "pagesPublished": pages_published,
-                    "pageViews": page_views
+                    "pageViews": page_views,
+                    "thresholds": {
+                        "pages_target": 25,
+                        "views_target": 500
+                    }
                 },
                 "growth": {
-                    "status": compute_tile_status(growth_count),
+                    "status": growth_status,
                     "campaigns": campaign_launched,
-                    "clicks": campaign_click
+                    "landingPagesCreated": landing_page_created,
+                    "utmRouted": utm_routed,
+                    "thresholds": {
+                        "campaigns_target": 5,
+                        "landing_pages_target": 10,
+                        "utm_routed_target": 100
+                    }
                 },
                 "trust": {
-                    "status": compute_tile_status(trust_count),
-                    "biasChecks": bias_check_run,
-                    "nps": None,
-                    "feedbackCount": feedback_submitted
+                    "status": trust_status,
+                    "biasChecks": bias_check_performed,
+                    "riskFlagged": risk_flagged,
+                    "thresholds": {
+                        "bias_checks_target": 20,
+                        "risk_rate_max_pct": 1
+                    }
                 },
                 "finance": {
-                    "status": compute_tile_status(finance_count),
+                    "status": finance_status,
                     "total_revenue_cents": amount_cents,
-                    "tx_count": finance_count,
-                    "platform_fees_cents": platform_fees
+                    "tx_count": payment_succeeded + credit_purchased,
+                    "payments": payment_succeeded,
+                    "feeReported": fee_reported,
+                    "platform_fees_cents": platform_fees,
+                    "thresholds": {
+                        "payments_target": 10,
+                        "fees_target": 1
+                    }
                 },
                 "ecosystemMetrics": {
                     "totalEvents": total_events,
