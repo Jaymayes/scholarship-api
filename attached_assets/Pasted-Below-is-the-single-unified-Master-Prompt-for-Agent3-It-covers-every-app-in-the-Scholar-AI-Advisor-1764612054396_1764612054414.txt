@@ -1,0 +1,218 @@
+Below is the single, unified Master Prompt for Agent3. It covers every app in the Scholar AI Advisor ecosystem. Each app must ONLY execute the section that explicitly names that app. No app should perform actions from another app’s section.
+
+AGENT3 UNIFIED COMMAND + TELEMETRY MASTER PROMPT v1.2
+
+Prime objective
+
+Ensure every app reports complete, correct telemetry to the Command Center and that data is rendered on the frontend, driving traffic, conversions, and revenue.
+Enforce Protocol ONE_TRUTH v1.2 across all apps, including event envelope, IDENTIFY line, and app_base_url on all events and reports.
+Launch and scale organic growth (SEO) and performance marketing (campaigns), drive B2C conversions, onboard B2B providers, and enable payments so Finance tile goes GREEN.
+Global self-identification (all apps must do this first, then only run their own section)
+
+At process start, identify yourself and then stop to confirm your identity before doing ANY work:
+
+Print exactly: IDENTIFY: APP=<app_id> | APP_BASE_URL=<app_base_url> | ROLE=<role> | ENV=prod
+Allowed app_id and base URLs:
+scholar_auth | https://scholar-auth-jamarrlmayes.replit.app
+scholarship_api | https://scholarship-api-jamarrlmayes.replit.app
+scholarship_agent | https://scholarship-agent-jamarrlmayes.replit.app
+scholarship_sage | https://scholarship-sage-jamarrlmayes.replit.app
+student_pilot | https://student-pilot-jamarrlmayes.replit.app
+provider_register | https://provider-register-jamarrlmayes.replit.app
+auto_page_maker | https://auto-page-maker-jamarrlmayes.replit.app
+auto_com_center | https://auto-com-center-jamarrlmayes.replit.app
+ROLE should reflect your function (examples below in each app’s section).
+ENV must be prod for all production telemetry and reporting.
+Reporting discipline (all apps, every log/report line):
+
+Prefix logs and reports with: REPORT: app=<app_id> | app_base_url=<app_base_url> | env=prod
+Protocol ONE_TRUTH v1.2 (applies to all apps)
+
+Event envelope (all emitted events to central aggregator must conform): { "event_id": "<uuid-v4>", "event_type": "<string>", "ts": "<ISO-8601 UTC timestamp>", "app_id": "<one of the 8 ids>", "app_base_url": "<the exact base URL above>", "env": "prod", "properties": { ... event-specific fields ... }, "_meta": { "protocol": "ONE_TRUTH", "version": "1.2" } }
+Required base events for all apps:
+app_started (emit on boot, include version, uptime_sec=0, p95_ms if measurable=0 on start, error_rate_pct=0)
+app_heartbeat (emit every 60s; include p95_ms, error_rate_pct; ensure heartbeats do not drop)
+Central aggregator endpoint (all apps send to this):
+POST https://scholarship-api-jamarrlmayes.replit.app/api/analytics/events
+Backoff and resiliency:
+If POST fails, buffer locally and retry with exponential backoff (up to 5 minutes), then flush when available.
+Health checks:
+Add a 5-second delay before the very first synthetic check after boot to avoid race conditions.
+Cold-start grace: do not alert on threshold breaches for the first 10 seconds or first synthetic check after boot.
+Command Center and Executive endpoints (for visibility)
+
+The Command Center (auto_com_center) reads from the central aggregator and powers the executive dashboard:
+GET /api/executive/dashboard
+GET /api/executive/validate
+Validation routine must pass on deploy and hourly:
+Protocol = "ONE_TRUTH"
+Version = "1.2"
+All 7 tiles present
+tile_status_rendered diagnostics emitted
+Tile definitions (24h rolling window; v1.2 thresholds)
+
+SLO: GREEN if p95_ms ≤ 120 AND error_rate_pct < 0.02 AND heartbeats present
+B2C: GREEN if signups ≥ 100, application_started ≥ 75, application_submitted ≥ 25, payments ≥ 10
+B2B: GREEN if providers ≥ 5, scholarship_published ≥ 5, fee_reported ≥ 1
+SEO: GREEN if pages ≥ 25, views ≥ 500
+Growth: GREEN if campaign_launched ≥ 5, landing_page_created ≥ 10, utm_routed ≥ 100
+Trust: GREEN if bias_checks ≥ 20 AND risk_rate ≤ 1%
+Finance: GREEN if payments ≥ 10 AND fees ≥ 1
+Security, privacy, and ethics (all apps)
+
+Comply with FERPA/COPPA. No PII leakage. Only necessary data is emitted.
+Responsible AI: bias mitigation, transparent explanations, no academic dishonesty.
+App-specific execution sections
+Important: Each app must only execute its own section. Ignore all other sections.
+
+scholar_auth (ROLE: Identity & Access)
+Base URLs: https://scholar-auth-jamarrlmayes.replit.app
+Events to emit (all include app_base_url):
+user_signed_up { method, utm_source, utm_medium, utm_campaign, privacy_flags }
+user_logged_in { mfa_used: boolean }
+login_failed { reason }
+session_refreshed { method }
+SLO health:
+Provide p95_ms and error_rate_pct on heartbeats.
+Cache OIDC discovery for 24h to avoid latency spikes; log slow discovery if >200ms, but do not alert during cold-start grace.
+Validation:
+IDENTIFY line present on startup.
+app_started + app_heartbeat working.
+Emit at least 10 test events within first 60 minutes after deploy.
+2. scholarship_api (ROLE: Central Aggregator “THE HEART”)
+
+Base URLs: https://scholarship-api-jamarrlmayes.replit.app
+Responsibilities:
+Ingest all v1.2 events at POST /api/analytics/events.
+Expose:
+GET /api/exec­­utive/central-stats with the 7 tiles and their v1.2 thresholds
+GET /api/kpis/today with structured KPIs
+GET /api/stats?group=event_type event breakdowns
+Requirements:
+Compute SLO metrics from incoming events; maintain p95_ms, error_rate_pct.
+Enforce presence of app_id and app_base_url on all accepted events.
+IDENTIFY line printed at startup.
+Reporting:
+Emit tile_status_rendered diagnostics after each dashboard build.
+Storage and backfill:
+Accept backfilled buffered events and deduplicate via event_id.
+3. scholarship_agent (ROLE: Marketing Campaign Engine)
+
+Base URLs: https://scholarship-agent-jamarrlmayes.replit.app
+Events to emit:
+campaign_launched { name, channel, budget_cents, start_ts }
+landing_page_created { page_url, utm_source, utm_medium, utm_campaign, has_json_ld: boolean }
+utm_routed { from_url, to_url, utm_source, utm_medium, utm_campaign, cta_id }
+Actions to drive Growth tile GREEN:
+Launch ≥5 campaigns and ≥10 landing pages in 24h.
+Ensure all CTAs route to student_pilot with complete UTM passthrough.
+Record ≥100 utm_routed events in 24h.
+Verification:
+Return 201 from /api/telemetry/utm-routed and flush to aggregator.
+Confirm events visible on Command Center Growth tile.
+4. scholarship_sage (ROLE: Trust & Risk)
+
+Base URLs: https://scholarship-sage-jamarrlmayes.replit.app
+Events to emit:
+bias_check_performed { model, policy, sample_size, fairness_metrics }
+risk_flagged { category, severity, remediation }
+Actions to drive Trust tile GREEN:
+Schedule bias checks at least every 5 minutes.
+Keep risk_flagged rate ≤1% over 24h.
+Compliance:
+All events include app_base_url; IDENTIFY line at startup.
+5. student_pilot (ROLE: Student App + Payments)
+
+Base URLs: https://student-pilot-jamarrlmayes.replit.app
+Events to emit:
+page_view { url, referrer, utm_* }
+application_started { scholarship_id, step }
+application_submitted { scholarship_id, submission_id }
+payment_succeeded { amount_cents, currency, provider="stripe", payment_intent_id }
+credit_purchased { sku, quantity, amount_cents }
+Actions to drive B2C and Finance tiles GREEN:
+Enable Stripe webhooks in prod; ensure payment_succeeded and credit_purchased fire reliably.
+Convert UTM traffic from scholarship_agent and auto_page_maker.
+Verification:
+Payments ≥10 in 24h → Finance GREEN threshold contribution.
+6. provider_register (ROLE: Provider Onboarding)
+
+Base URLs: https://provider-register-jamarrlmayes.replit.app
+Events to emit:
+provider_registered { provider_id, org_name }
+provider_active { provider_id }
+scholarship_published { provider_id, scholarship_id, expected_award_total_cents, cohort_size, platform_fee_cents }
+fee_reported { provider_id, platform_fee_cents, period_utc } where period_utc = YYYY-MM
+Actions to drive B2B and Finance tiles GREEN:
+Onboard ≥5 providers; publish ≥5 scholarships; report ≥1 fee within 24h.
+Verification:
+Ensure platform_fee_cents aggregates correctly in Finance tile.
+7. auto_page_maker (ROLE: SEO Engine)
+
+Base URLs: https://auto-page-maker-jamarrlmayes.replit.app
+Events to emit:
+page_published { page_url, schema="Scholarship", has_json_ld: boolean }
+page_view { page_url, referrer, utm_* }
+scholarship_ingested { source, count }
+scholarship_published { scholarship_id, page_url }
+Actions to drive SEO and B2C tiles GREEN:
+Publish ≥25 scholarship pages/day with valid JSON-LD and sitemap inclusion.
+Achieve ≥500 page_view events/24h.
+Ensure all pages link to student_pilot with UTM parameters for conversions.
+Verification:
+Confirm Command Center SEO tile displays GREEN thresholds as traffic grows.
+8. auto_com_center (ROLE: Command Center “THE EYES”)
+
+Base URLs: https://auto-com-center-jamarrlmayes.replit.app
+Responsibilities:
+Aggregate and display SLO, B2C, B2B, SEO, Growth, Trust, Finance tiles.
+Provide Next Actions Panel based on tile statuses (e.g., “Finance: student_pilot needs Stripe webhooks.”)
+Expose:
+GET /api/executive/dashboard (full v1.2 dashboard)
+GET /api/executive/validate (runs validation routine)
+Diagnostics and validation (v1.2):
+On deploy and hourly: verify Protocol="ONE_TRUTH", Version="1.2", all 7 tiles present, diagnostic tile_status_rendered emitted.
+Use standardized report header on all logs and responses.
+Performance SLO:
+Maintain 99.9% uptime; ~120ms P95 latency target.
+Frontend:
+Render tile colors and numeric counts; show “Next Actions” clearly tied to thresholds.
+Launch plan and KPIs (all apps align to this)
+
+Organic growth priority:
+auto_page_maker publishes 25+ pages/day; ensure internal linking to student_pilot with UTMs.
+Campaigns:
+scholarship_agent launches 5+ campaigns and 10+ landing pages; ≥100 utm_routed events/24h.
+Conversions and payments:
+student_pilot optimizes signup→started→submitted→paid flow; ≥10 payments/24h.
+Provider growth:
+provider_register onboards 5+ providers, publishes 5+ scholarships, reports fees.
+Trust and SLO:
+scholarship_sage runs frequent bias checks; keep risks ≤1%.
+All apps maintain p95 ≤120ms and error_rate <2%.
+Finance:
+Ensure platform fee (3%) events flow; ensure 4x AI service markup profitability tracked.
+Failure handling and quality gates (all apps)
+
+Port conflicts: auto-retry with backoff; ensure graceful shutdown of stale processes.
+Synthetic checks: delay first run by 5s; add 10s cold-start grace for thresholds.
+Data integrity: dedupe by event_id; reject events missing app_base_url; log validation failures with REPORT header.
+Done criteria for each app:
+IDENTIFY line printed.
+app_started and app_heartbeat emitting.
+All business events implemented and visible on Command Center tiles.
+Validation routine passes (auto_com_center).
+Next Actions Panel populated.
+Operator quick test checklist (per app, run after deploy)
+
+Print IDENTIFY line (one time on boot).
+Emit app_started, then app_heartbeat within 60s.
+Trigger 2+ representative business events for your app.
+Confirm aggregator receives events (HTTP 200).
+Open Command Center dashboard; verify tile counts move; run GET /api/executive/validate and confirm “Protocol ONE_TRUTH v1.2 verified” and “All 7 tiles present.”
+Check reports/logs include: REPORT: app=<app_id> | app_base_url=<app_base_url> | env=prod
+Reminder
+
+Only execute the section for your app_id.
+Always include app_base_url on all events and report lines.
+Goal: launch, drive traffic, convert to paid, and surface everything on the Command Center frontend.

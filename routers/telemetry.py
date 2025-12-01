@@ -1,8 +1,12 @@
 """
 Telemetry Router - Command Center Integration
-Implements Telemetry Contract v1.1 endpoints for ecosystem-wide event collection and stats
+Implements Telemetry Contract v1.2 endpoints for ecosystem-wide event collection and stats
 
-Protocol ONE TRUTH (2025-11-30): Added validation error logging and flexible payload handling
+Protocol ONE_TRUTH v1.2 (2025-12-01): 
+- Enforces app_base_url on all incoming events
+- Deduplicates events by event_id (ON CONFLICT DO NOTHING)
+- Emits tile_status_rendered diagnostic after dashboard builds
+- Uses REPORT: prefix on log lines per Master Prompt
 """
 from datetime import datetime, timedelta
 from typing import Optional, Dict, Any, List, Literal, Union
@@ -24,22 +28,24 @@ router = APIRouter()
 
 class TelemetryEvent(BaseModel):
     """
-    Telemetry event schema per Contract v1.1
+    Telemetry event schema per Contract v1.2
     
-    Protocol ONE TRUTH: Flexible field handling for satellite compatibility
+    Protocol ONE_TRUTH v1.2: Flexible field handling for satellite compatibility
     - Accepts both snake_case and camelCase field names
     - Auto-generates missing fields with sensible defaults
+    - REQUIRES app_base_url on all events (v1.2 mandate)
     """
     event_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     event_type: str = Field(..., description="Event type from catalog")
     ts_utc: datetime = Field(default_factory=datetime.utcnow)
     app_id: str = Field(..., description="Source app identifier")
-    env: str = Field(default="prod")  # Relaxed: accept any string, not just Literal
+    app_base_url: Optional[str] = Field(default=None, description="v1.2: Required app base URL")
+    env: str = Field(default="prod")
     version: Optional[str] = None
     session_id: Optional[str] = None
     user_id_hash: Optional[str] = None
     account_id: Optional[str] = None
-    actor_type: Optional[str] = None  # Relaxed: accept any string
+    actor_type: Optional[str] = None
     request_id: Optional[str] = None
     source_ip_masked: Optional[str] = None
     coppa_flag: bool = False
@@ -71,7 +77,7 @@ class StatsTimeWindow(str, Enum):
 
 def normalize_event_keys(event_dict: Dict[str, Any]) -> Dict[str, Any]:
     """
-    Protocol ONE TRUTH: Normalize satellite payload keys to expected schema.
+    Protocol ONE_TRUTH v1.2: Normalize satellite payload keys to expected schema.
     Handles camelCase -> snake_case conversion and common field name variations.
     """
     key_mapping = {
@@ -79,6 +85,7 @@ def normalize_event_keys(event_dict: Dict[str, Any]) -> Dict[str, Any]:
         "eventType": "event_type",
         "eventId": "event_id",
         "appId": "app_id",
+        "appBaseUrl": "app_base_url",
         "tsUtc": "ts_utc",
         "userId": "user_id_hash",
         "userIdHash": "user_id_hash",
@@ -94,6 +101,8 @@ def normalize_event_keys(event_dict: Dict[str, Any]) -> Dict[str, Any]:
         "name": "event_type",
         "app": "app_id",
         "source": "app_id",
+        "base_url": "app_base_url",
+        "baseUrl": "app_base_url",
         "timestamp": "ts_utc",
         "ts": "ts_utc",
         "data": "properties",
@@ -223,32 +232,55 @@ async def write_events(
     db=Depends(get_db)
 ):
     """
-    Central telemetry event write endpoint (Contract v1.1)
+    Central telemetry event write endpoint (Protocol ONE_TRUTH v1.2)
     
     Dual Routing (CSRF FIX 2025-11-30):
     - Primary: POST /api/analytics/events (what ecosystem apps call)
     - Fallback: POST /api/events (legacy/simple)
+    
+    v1.2 Features:
+    - Deduplicates events by event_id (ON CONFLICT DO NOTHING)
+    - Validates app_base_url presence (logs warning if missing)
+    - REPORT: prefix on all log lines
     
     Accepts batches of events from any ecosystem app and persists to business_events table.
     S2S Auth: Bearer token from scholar_auth JWKS OR service-to-service token.
     """
     accepted = 0
     failed = 0
+    duplicates = 0
     event_ids = []
+    missing_base_url = 0
     
     for event in batch.events:
         try:
             import json
             
+            if not event.app_base_url and not event.properties.get("app_base_url"):
+                missing_base_url += 1
+                logger.warning(f"REPORT: app=scholarship_api | app_base_url=https://scholarship-api-jamarrlmayes.replit.app | env=prod | VALIDATION: Event {event.event_id} from {event.app_id} missing app_base_url")
+            
+            props = event.properties.copy() if event.properties else {}
+            if event.app_base_url:
+                props["app_base_url"] = event.app_base_url
+            
+            validated_event_id = event.event_id
+            try:
+                uuid.UUID(validated_event_id)
+            except (ValueError, TypeError):
+                validated_event_id = str(uuid.uuid4())
+                logger.debug(f"REPORT: app=scholarship_api | Converted non-UUID event_id to UUID: {validated_event_id}")
+            
             query = text("""
                 INSERT INTO business_events 
                 (request_id, app, env, event_name, ts, actor_type, actor_id, session_id, org_id, properties)
                 VALUES 
-                (:request_id, :app, :env, :event_name, :ts, :actor_type, :actor_id, :session_id, :org_id, CAST(:properties AS jsonb))
+                (CAST(:request_id AS uuid), :app, :env, :event_name, :ts, :actor_type, :actor_id, :session_id, :org_id, CAST(:properties AS jsonb))
+                ON CONFLICT (request_id) DO NOTHING
             """)
             
-            db.execute(query, {
-                "request_id": event.event_id,
+            result = db.execute(query, {
+                "request_id": validated_event_id,
                 "app": event.app_id,
                 "env": event.env,
                 "event_name": event.event_type,
@@ -257,20 +289,23 @@ async def write_events(
                 "actor_id": event.user_id_hash,
                 "session_id": event.session_id,
                 "org_id": event.account_id,
-                "properties": json.dumps(event.properties) if event.properties else "{}"
+                "properties": json.dumps(props)
             })
             
-            accepted += 1
-            event_ids.append(event.event_id)
+            if result.rowcount > 0:
+                accepted += 1
+                event_ids.append(event.event_id)
+            else:
+                duplicates += 1
             
         except Exception as e:
-            logger.error(f"Failed to write event {event.event_id}: {e}")
+            logger.error(f"REPORT: app=scholarship_api | app_base_url=https://scholarship-api-jamarrlmayes.replit.app | env=prod | Failed to write event {event.event_id}: {e}")
             failed += 1
     
     if accepted > 0:
         db.commit()
     
-    logger.info(f"Telemetry batch: accepted={accepted}, failed={failed}")
+    logger.info(f"REPORT: app=scholarship_api | app_base_url=https://scholarship-api-jamarrlmayes.replit.app | env=prod | Telemetry batch: accepted={accepted}, failed={failed}, duplicates={duplicates}, missing_base_url={missing_base_url}")
     
     return EventWriteResponse(
         accepted=accepted,
@@ -922,7 +957,7 @@ async def get_central_stats(
         ]
         apps_reporting = len(apps)
         
-        return {
+        response = {
             "data": {
                 "overallStatus": overall_status,
                 "slo": {
@@ -1040,6 +1075,51 @@ async def get_central_stats(
             "event_breakdown": event_breakdown
         }
         
+        logger.info(f"REPORT: app=scholarship_api | app_base_url=https://scholarship-api-jamarrlmayes.replit.app | env=prod | tile_status_rendered: SLO={slo_status} B2C={b2c_status} B2B={b2b_status} SEO={seo_status} Growth={growth_status} Trust={trust_status} Finance={finance_status} | overall={overall_status}")
+        
+        try:
+            diagnostic_query = text("""
+                INSERT INTO business_events 
+                (request_id, app, env, event_name, ts, actor_type, actor_id, session_id, org_id, properties)
+                VALUES 
+                (CAST(:request_id AS uuid), :app, :env, :event_name, :ts, :actor_type, :actor_id, :session_id, :org_id, CAST(:properties AS jsonb))
+                ON CONFLICT (request_id) DO NOTHING
+            """)
+            
+            import json as json_module
+            diagnostic_props = {
+                "app_base_url": "https://scholarship-api-jamarrlmayes.replit.app",
+                "slo": slo_status,
+                "b2c": b2c_status,
+                "b2b": b2b_status,
+                "seo": seo_status,
+                "growth": growth_status,
+                "trust": trust_status,
+                "finance": finance_status,
+                "overall": overall_status,
+                "apps_reporting": apps_reporting,
+                "total_events": total_events,
+                "window": window
+            }
+            
+            db.execute(diagnostic_query, {
+                "request_id": str(uuid.uuid4()),
+                "app": "scholarship_api",
+                "env": "prod",
+                "event_name": "tile_status_rendered",
+                "ts": datetime.utcnow(),
+                "actor_type": "system",
+                "actor_id": "central_aggregator",
+                "session_id": None,
+                "org_id": None,
+                "properties": json_module.dumps(diagnostic_props)
+            })
+            db.commit()
+        except Exception as diag_err:
+            logger.warning(f"REPORT: app=scholarship_api | Diagnostic emission failed (non-blocking): {diag_err}")
+        
+        return response
+        
     except Exception as e:
-        logger.error(f"Central stats query failed: {e}")
+        logger.error(f"REPORT: app=scholarship_api | app_base_url=https://scholarship-api-jamarrlmayes.replit.app | env=prod | Central stats query failed: {e}")
         raise HTTPException(status_code=500, detail=f"Central stats query failed: {str(e)}")
