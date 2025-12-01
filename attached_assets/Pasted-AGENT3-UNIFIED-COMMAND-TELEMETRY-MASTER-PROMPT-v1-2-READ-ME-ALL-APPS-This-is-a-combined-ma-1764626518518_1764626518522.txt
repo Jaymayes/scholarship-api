@@ -1,0 +1,241 @@
+AGENT3 UNIFIED COMMAND + TELEMETRY MASTER PROMPT v1.2
+
+READ-ME (ALL APPS)
+
+This is a combined master prompt for the entire Scholar AI Advisor ecosystem.
+CRITICAL RULE: Only execute the section for your app. Ignore all other sections. Do not act on instructions for other apps.
+Agent3 is scholarship_agent. If you are scholarship_agent, execute the Global Rules and Section A3 only.
+Before doing anything, IDENTIFY yourself exactly once and include your APP and APP_BASE_URL on all REPORT lines.
+GLOBAL CONSTANTS
+
+ONE_TRUTH Protocol Version: v1.2
+ENV: prod (unless explicitly overridden by deployment)
+Central Aggregator (ingestion + command center data):
+POST ingest events: https://scholarship-api-jamarrlmayes.replit.app/api/analytics/events
+GET dashboard tiles: https://scholarship-api-jamarrlmayes.replit.app/api/executive/central-stats
+Registered Apps and Base URLs (APP → APP_BASE_URL):
+scholar_auth → https://scholar-auth-jamarrlmayes.replit.app
+scholarship_api → https://scholarship-api-jamarrlmayes.replit.app
+scholarship_agent (Agent3) → https://scholarship-agent-jamarrlmayes.replit.app
+scholarship_sage → https://scholarship-sage-jamarrlmayes.replit.app
+student_pilot → https://student-pilot-jamarrlmayes.replit.app
+provider_register → https://provider-register-jamarrlmayes.replit.app
+auto_page_maker → https://auto-page-maker-jamarrlmayes.replit.app
+auto_com_center → https://auto-com-center-jamarrlmayes.replit.app
+GLOBAL TELEMETRY PROTOCOL (ALL APPS)
+
+Event envelope for every event you emit:
+event_id: uuid v4
+ts: ISO-8601 UTC timestamp (e.g., 2025-01-01T00:00:00.000Z)
+app_id: one of the APP values above
+app_base_url: your APP_BASE_URL
+env: prod | dev | staging
+type: event name (snake_case)
+properties: object with schema defined in your section
+_meta: { protocol: "ONE_TRUTH", version: "v1.2" }
+Transport:
+POST JSON body: { "events": [ <event>, ... ] } to the Central Aggregator ingest endpoint.
+Deduplicate by event_id. On conflict, do nothing.
+Logging and reports (STDOUT/console):
+IDENTIFY (exactly once at startup): IDENTIFY: APP=<your_app> | APP_BASE_URL=<your_base_url> | ROLE=<your_role> | ENV=<env>
+REPORT (all subsequent logs must include app + base url): REPORT: app=<your_app> | app_base_url=<your_base_url> | env=<env> | msg=<human-readable message>
+Startup & heartbeats:
+On boot: emit app_started, then every 60s emit app_heartbeat with uptime_sec, p95_ms, error_rate_pct.
+SLOs (all apps):
+Uptime: 99.9% monthly
+P95 latency: ≤120ms
+Error rate: <2%
+Privacy and trust:
+Never log PII. Hash user identifiers (SHA-256 recommended) as user_id_hash.
+Comply with FERPA/COPPA. Include privacy flags when specified.
+Tiles (Command Center expects 7):
+SLO, B2C, B2B, SEO, Growth, Trust, Finance
+UTM TAXONOMY (ALL APPS THAT HANDLE TRAFFIC)
+
+utm_campaign: machine-readable identifier for the campaign (e.g., sotd_2025-12-01)
+utm_source, utm_medium, utm_content, utm_term as applicable
+Always persist and forward UTM parameters. Emit utm_routed when routing based on UTM.
+BEGIN SEQUENCE (ALL APPS)
+
+IDENTIFY
+REPORT: Startup validation passed
+Emit app_started
+Start 60s app_heartbeat loop (uptime_sec, p95_ms, error_rate_pct)
+COMMAND CENTER DISPLAY (auto_com_center + scholarship_api)
+
+auto_com_center: Pull tiles from /api/executive/central-stats and render all 7 tiles with next actions.
+scholarship_api: Aggregate, deduplicate, and serve dashboard tile metrics. Must include _meta { protocol:"ONE_TRUTH", version:"v1.2" } in executive responses.
+========================================================
+A1) scholar_auth — ignore unless APP=scholar_auth
+
+ROLE: Auth Gateway
+Events (Tiles: B2C, Trust)
+user_signed_up { method, utm_*, privacy_flags { is_minor, ferpa_protected } }
+user_logged_in { method, mfa_used }
+login_failed { reason, method }
+session_refreshed { method }
+SLO: standard (see Global)
+Reporting: Include app and base URL on all REPORTs
+========================================================
+A2) scholarship_api — ignore unless APP=scholarship_api
+
+ROLE: Central Aggregator + Executive API
+Responsibilities:
+Ingest events at POST /api/analytics/events
+Deduplicate by event_id; validate app_base_url; enrich with received_ts
+Compute and serve tiles at GET /api/executive/central-stats
+Required internal emissions:
+app_started, app_heartbeat
+ingest_succeeded { count }
+ingest_failed { reason, count }
+Response must embed _meta: { protocol: "ONE_TRUTH", version: "v1.2" }
+SLO: standard (see Global)
+========================================================
+A3) scholarship_agent (Agent3) — YOU EXECUTE THIS SECTION
+
+ROLE: Growth Campaigns + UTM Routing
+Mission: Launch campaigns that drive traffic and revenue, coordinate page creation with auto_page_maker, route UTM traffic, and ensure full telemetry to Command Center.
+STEP 0 — IDENTIFY BEFORE ANY ACTION
+
+Print exactly once: IDENTIFY: APP=scholarship_agent | APP_BASE_URL=https://scholarship-agent-jamarrlmayes.replit.app | ROLE=Growth Campaigns + UTM Routing | ENV=prod
+STEP 1 — STARTUP AND HEALTH
+
+REPORT: app=scholarship_agent | app_base_url=https://scholarship-agent-jamarrlmayes.replit.app | env=prod | msg=Startup validation passed
+Emit app_started
+Start 60s app_heartbeat loop with uptime_sec, p95_ms, error_rate_pct
+STEP 2 — CAMPAIGN STRATEGY (LAUNCH NOW)
+
+Launch two evergreen campaigns immediately:
+Campaign A: Scholarship of the Day (SOTD) — daily highlight to drive recency traffic
+Campaign B: Top Deadlines — weekly aggregation to drive urgency conversions
+UTM Definitions:
+SOTD: utm_campaign=sotd_<YYYY-MM-DD>, utm_source=organic, utm_medium=seo, utm_content=headline
+Top Deadlines: utm_campaign=top_deadlines_<YYYY-WW>, utm_source=organic, utm_medium=seo, utm_content=listicle
+Plan at least 3 new landing pages per campaign on each launch iteration (min 6 total initially).
+STEP 3 — PAGE PRODUCTION VIA auto_page_maker (DO NOT BUILD PAGES YOURSELF)
+
+For each planned page:
+Create a Page Brief (internal):
+url: /scholarships/<slug>
+template: scholarship-seo
+outline: H1/H2s, FAQ, CTA slots
+utm_campaign: defined above
+POST a build request to auto_page_maker, then wait for confirmation.
+When auto_page_maker publishes, record the published URL and emit landing_page_published (see Telemetry below).
+If the build request fails:
+Emit page_request_failed with reason and retry policy (exponential backoff).
+After publishing, verify indexability (noindex off, canonical set) and emit seo_check_performed.
+STEP 4 — UTM ROUTING AND CTA FLOW
+
+On any inbound request with known utm_*:
+Resolve target_url based on campaign rules and content mapping.
+Route 302 to the appropriate page and emit utm_routed with details below.
+On CTA clicks that redirect to signup, credit purchase, or scholarship view:
+Preserve utm_* through to destination.
+Emit cta_routed { cta_type, path, dest, utm_* }.
+STEP 5 — KPI TARGETS & LOOP
+
+Primary KPIs: sessions, CTR on CTAs, signup conversions, credits purchased.
+Secondary KPIs: indexed pages, avg rank position, daily pageviews (SEO tile).
+Every 15 minutes:
+REPORT campaign status and short KPI deltas.
+If landing_page_published < planned_pages, escalate via REPORT and retry queue.
+TELEMETRY (Agent3 events you MUST emit)
+
+campaign_launched
+properties: { campaign_id, theme, target_segments[], start_ts, planned_pages, budget_cents?, goal_kpis? }
+landing_page_published
+properties: { campaign_id, url, template, status: "published" }
+Emit after receiving success from auto_page_maker (A7).
+page_request_sent
+properties: { campaign_id, url, template }
+page_request_failed
+properties: { campaign_id, url, template, reason }
+utm_routed
+properties: { utm_campaign, utm_source, utm_medium, utm_content?, utm_term?, path, target_url, http_status }
+cta_routed
+properties: { cta_type, path, dest, utm_campaign?, utm_source?, utm_medium? }
+app_started, app_heartbeat
+standard fields (see Global)
+REPORTING (Agent3 — include app + base URL on EVERY log)
+
+Example: REPORT: app=scholarship_agent | app_base_url=https://scholarship-agent-jamarrlmayes.replit.app | env=prod | msg=SOTD launched with 3 planned pages (campaign_id=sotd_2025-12-01)
+DONE CRITERIA (Agent3)
+
+campaign_launched ≥ 2 within first 15 minutes
+landing_page_published ≥ 6 across campaigns
+utm_routed events present and rising with traffic
+Command Center Growth tile moves from YELLOW to GREEN; SEO tile trending up
+========================================================
+A4) scholarship_sage — ignore unless APP=scholarship_sage
+
+ROLE: AI scholarship recommendations + Risk/Trust signals
+Events (Tiles: B2C, Trust)
+recommendation_served { user_id_hash, scholarship_id, rationale_summary, model_id }
+recommendation_clicked { user_id_hash, scholarship_id }
+bias_check_performed { model_id, metric, result, sample_size }
+risk_flagged { risk_type, severity, context }
+SLO: standard
+========================================================
+A5) student_pilot — ignore unless APP=student_pilot
+
+ROLE: Student workspace + payments + AI assist
+Events (Tiles: Finance, B2C)
+payment_succeeded { amount_cents, product, credits }
+credit_purchased { credits, amount_cents, source } // e.g., stripe_checkout
+payment_failed { reason, amount_cents, intent_id }
+document_uploaded { document_type, document_id, is_first }
+ai_assist_used { tool, op, tokens_in, tokens_out }
+SLO: standard
+========================================================
+A6) provider_register — ignore unless APP=provider_register
+
+ROLE: Provider onboarding and scholarship publishing
+Events (Tiles: B2B, Finance)
+provider_registered { provider_id, org_name }
+provider_active { provider_id }
+scholarship_published { provider_id, scholarship_id, expected_award_total_cents, cohort_size, platform_fee_cents }
+fee_reported { provider_id, platform_fee_cents, period_utc } // YYYY-MM
+SLO: standard
+========================================================
+A7) auto_page_maker — ignore unless APP=auto_page_maker
+
+ROLE: Organic SEO page generation, ingestion, and publication
+Events (Tile: SEO)
+page_published { url, template, word_count, status: "published", utm_campaign? }
+page_view { url, referrer, user_agent_hash, utm_* }
+scholarship_ingested { source, count, latency_ms }
+scholarship_published { scholarship_id, url, provider_id? }
+SLO: standard
+Contract with Agent3:
+Accept build requests with { url, template, outline, utm_campaign }
+On success, emit page_published and return 201 with url
+On failure, return 4xx/5xx with reason
+========================================================
+A8) auto_com_center — ignore unless APP=auto_com_center
+
+ROLE: Command Center frontend
+Responsibilities:
+Pull GET /api/executive/central-stats
+Render 7 tiles (SLO, B2C, B2B, SEO, Growth, Trust, Finance)
+Emit tile_status_rendered { tile, status } on render
+SLO: standard
+GLOBAL ACCEPTANCE CHECKLIST (ALL APPS)
+
+IDENTIFY printed once with APP and APP_BASE_URL
+REPORT lines include app and base URL
+app_started emitted at boot; app_heartbeat every 60s
+Events use ONE_TRUTH v1.2 envelope with _meta
+Events delivered to Central Aggregator; Command Center shows live data
+SLOs within targets
+AGENT3 QUICK-START (RUN THIS NOW IF YOU ARE scholarship_agent)
+
+IDENTIFY and REPORT startup passed.
+Emit app_started and begin heartbeats.
+Emit campaign_launched for:
+SOTD with planned_pages=3
+Top Deadlines with planned_pages=3
+For each planned page, send build request to auto_page_maker. On success, emit landing_page_published. On failure, emit page_request_failed and retry.
+Begin UTM routing for inbound traffic; emit utm_routed for each redirect; preserve utm_* through CTAs; emit cta_routed for major CTAs.
+Every 15 minutes, REPORT campaign status with counts for planned vs published pages, utm_routed counts, and observed CTR from the latest window.
+Continue page production until both campaigns have ≥3 pages published. Keep running and iterating to drive traffic and revenue.
