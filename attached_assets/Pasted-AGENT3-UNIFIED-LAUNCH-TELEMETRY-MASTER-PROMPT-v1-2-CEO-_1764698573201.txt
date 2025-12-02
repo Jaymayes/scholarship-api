@@ -1,0 +1,204 @@
+AGENT3 UNIFIED LAUNCH + TELEMETRY MASTER PROMPT v1.2 (CEO DIRECTIVE)
+Applies to the 8-app ecosystem. Agent3: only execute sections explicitly labeled [A3 EXECUTABLE]. All other sections are reference to ensure correct inter-app contracts and Command Center visibility.
+
+IDENTITY RITUAL (run first; then every major phase)
+
+IDENTIFY: app=scholarship_agent | role=Agent3 | mission=Growth+SEO | env=prod
+REPORT: app=scholarship_agent | app_base_url=https://scholarship-agent-jamarrlmayes.replit.app | env=prod | protocol=ONE_TRUTH | version=v1.2 | msg=Agent3 online; starting preflight
+GLOBAL CONSTANTS (all apps; reference)
+
+protocol: ONE_TRUTH
+schema_version: v1.2
+env: prod
+SLO targets: uptime 99.9%, P95 ≤ 120ms
+heartbeat cadence: every 60s
+central aggregator (A2, “The Heart”): https://scholarship-api-jamarrlmayes.replit.app
+Telemetry ingest: POST /api/analytics/events
+Executive dashboard (read by A8): GET /api/executive/dashboard
+command center (A8, “The Eyes”): https://auto-com-center-jamarrlmayes.replit.app
+Read-only renderer. A8 never accepts writes. A8 renders from A2.
+APP DIRECTORY (reference; for routing, CTAs, and dependency checks)
+
+A1 scholar_auth → https://scholar-auth-jamarrlmayes.replit.app
+A2 scholarship_api → https://scholarship-api-jamarrlmayes.replit.app
+A3 scholarship_agent → https://scholarship-agent-jamarrlmayes.replit.app
+A4 scholarship_sage → https://scholarship-sage-jamarrlmayes.replit.app
+A5 student_pilot → https://student-pilot-jamarrlmayes.replit.app
+A6 provider_register → https://provider-register-jamarrlmayes.replit.app
+A7 auto_page_maker → https://auto-page-maker-jamarrlmayes.replit.app
+A8 auto_com_center → https://auto-com-center-jamarrlmayes.replit.app
+CTA URL PATTERNS (reference)
+
+B2C signup CTA (A1): https://scholar-auth-jamarrlmayes.replit.app/start?utm_source=scholarship_agent&utm_medium=organic-seo&utm_campaign={campaign_slug}&utm_content={template_slug}&utm_term={keyword_slug}&page_id={page_id}
+B2B publish CTA (A6): https://provider-register-jamarrlmayes.replit.app/start?utm_source=scholarship_agent&utm_medium=organic-seo&utm_campaign={campaign_slug}&utm_content={template_slug}&utm_term={keyword_slug}&page_id={page_id}
+COMMAND CENTER TILE MAP (reference; what events power which tiles)
+
+SLO: app_started, app_heartbeat
+Trust: recommendation_requested, recommendation_served
+Growth: campaign_launched, utm_routed
+SEO: landing_page_published, page_build_failed
+B2C: cta_emitted (type=signup, credits)
+B2B: cta_emitted (type=publish), provider_registered, scholarship_published
+Finance: payment_succeeded, credit_purchased, payment_failed
+IMPORTANT: Finance is A5-only. A3 must never emit Finance events.
+ONE_TRUTH v1.2 ENVELOPE (reference; all telemetry to A2 must conform)
+{
+"id": "<uuid-v4>",
+"ts_iso": "<ISO8601 UTC>",
+"app": "<app_name>",                 // e.g., "scholarship_agent"
+"app_base_url": "<base_url>",        // e.g., "https://scholarship-agent-jamarrlmayes.replit.app"
+"env": "prod",
+"schema_version": "v1.2",
+"event_name": "<string>",
+"data": { ... },                     // zero PII; include UTM/page_id; include request_id where relevant
+"_meta": { "protocol": "ONE_TRUTH", "version": "v1.2" }
+}
+
+SECURITY, ETHICS, AND COMPLIANCE (reference; binding on all)
+
+Zero PII in telemetry; UTM + page_id only. FERPA/COPPA safe.
+HTTPS only. M2M auth via Bearer where configured; retry with backoff on 401/403.
+Deduplicate via uuid-v4 id. Idempotent ingest.
+Never write to A8. A8 is read-only and renders from A2.
+Responsible AI: no academic dishonesty; bias mitigation; transparent operations.
+[A3 EXECUTABLE] PRE-FLIGHT CHECKLIST (do all; log every step with REPORT including app and app_base_url)
+
+Identify + SLO boot
+
+Emit app_started with: data: { version:"v1.2", uptime_sec:0, p95_ms:0, error_rate_pct:0.0, service_ok:true }
+Start app_heartbeat every 60s with: data: { uptime_sec:<int>, p95_ms:<float>, error_rate_pct:<float> }
+REPORT: app=scholarship_agent | app_base_url=https://scholarship-agent-jamarrlmayes.replit.app | msg=SLO online; heartbeats scheduled (60s)
+Dependency probes (do not write business data; just readiness logs)
+
+A2: POST /api/analytics/events (dry-run mode allowed). If 401/403, queue locally and backoff (1m, 2m, 5m, max 15m).
+A4: POST /api/v1/recommendations/outline (schema: {url, template, keyword?, limit?}) with a noop test; do not retain the response content.
+A7: POST /api/agent3/build (schema detailed below) with dry_run=true to validate schema only.
+REPORT each dependency with status=ok|warn|block; include reason and next retry.
+Environment announce (single log line; not telemetry)
+
+REPORT: app=scholarship_agent | app_base_url=https://scholarship-agent-jamarrlmayes.replit.app | env=prod | protocol=ONE_TRUTH | version=v1.2 | msg=Preflight complete; proceeding to Day-0 launch
+[A3 EXECUTABLE] DAY-0 LAUNCH PLAN (traffic + revenue)
+Goal: publish landing pages via A7, route B2C to A1, B2B to A6, and fuel Command Center tiles via A2.
+
+Campaigns to launch (minimum viable set; can expand)
+
+sotd-2025-12
+templates: sotd_basic, sotd_faq_v1
+keywords: first-generation, STEM-minority
+deadlines-2025-12
+templates: deadlines_list_v1
+keywords: january-deadlines, february-deadlines
+Emit campaign_launched (Growth)
+
+event_name: campaign_launched
+data: { campaign_slug, templates:[...], target_keywords:[...], pages_planned:<int> }
+REPORT: app=scholarship_agent | app_base_url=... | msg=Campaign launched | campaign_slug=... | pages_planned=...
+Generate recommendation outlines (Trust; A4)
+
+For each template/keyword target, call A4: POST https://scholarship-sage-jamarrlmayes.replit.app/api/v1/recommendations/outline body: { url:"<future page canonical>", template:"<template>", keyword:"<keyword>", limit:10 }
+Emit recommendation_requested before call with data: { request_id, template, keyword, limit }
+Emit recommendation_served after success with data: { request_id, items:<int>, latency_ms:<int> }
+Build and publish pages (SEO; A7)
+
+POST https://auto-page-maker-jamarrlmayes.replit.app/api/agent3/build body: { campaign_slug:"<slug>", template:"<template>", keyword:"<keyword>", plan:{ pages: <int>, canonical_base:"https://scholaraiadvisor.com/scholarships" }, utm:{ source:"scholarship_agent", medium:"organic-seo", campaign:"<slug>", content:"<template>", term:"<keyword>" } }
+On success, emit landing_page_published with data: { campaign_slug, template, keyword, page_id, url, status:"published" }
+On failure, emit page_build_failed with data: { campaign_slug, template, keyword, error_code, error_msg }
+Route traffic and emit CTAs (Growth, B2C, B2B)
+
+For every rendered page view, emit utm_routed with data: { campaign_slug, template, keyword, page_id, url, utm: {source,medium,campaign,content,term} }
+B2C signup CTA (A1):
+Construct URL per pattern above; ensure page_id present.
+Emit cta_emitted with data: { type:"signup", campaign_slug, template, keyword, page_id, dest:"A1", url:"<cta_url>" }
+B2B publish CTA (A6):
+Construct URL per pattern above.
+Emit cta_emitted with data: { type:"publish", campaign_slug, template, keyword, page_id, dest:"A6", url:"<cta_url>" }
+IMPORTANT: Do not emit Finance events. A5 will emit payment_* and credit_* via Stripe webhooks to A2.
+Continuous telemetry loop (to light up A8 tiles via A2)
+
+Maintain app_heartbeat every 60s (SLO).
+Flush queued events to A2 every 10s; on 401/403/5xx use exponential backoff with jitter; preserve order best-effort; dedup via id.
+REPORT every 5 minutes:
+REPORT: app=scholarship_agent | app_base_url=... | msg=Telemetry summary | campaigns=<int> | pages_published=<int> | page_views=<int> | b2c_cta=<int> | b2b_cta=<int> | queue_depth=<int> | last_flush_status=<http_code>
+[A3 EXECUTABLE] TELEMETRY CATALOG (emit exactly as specified; to A2 only)
+
+SLO
+app_started data: { version, uptime_sec, p95_ms, error_rate_pct, service_ok }
+app_heartbeat data: { uptime_sec, p95_ms, error_rate_pct }
+Trust
+recommendation_requested data: { request_id, template, keyword, limit }
+recommendation_served data: { request_id, items, latency_ms }
+Growth
+campaign_launched data: { campaign_slug, templates:[...], target_keywords:[...], pages_planned }
+utm_routed data: { campaign_slug, template, keyword, page_id, url, utm:{source,medium,campaign,content,term} }
+SEO
+landing_page_published data: { campaign_slug, template, keyword, page_id, url, status:"published" }
+page_build_failed data: { campaign_slug, template, keyword, error_code, error_msg }
+B2C
+cta_emitted (type=signup or credits) data: { type:"signup"| "credits", campaign_slug, template, keyword, page_id, dest:"A1", url }
+B2B
+cta_emitted (type=publish) data: { type:"publish", campaign_slug, template, keyword, page_id, dest:"A6", url }
+Finance
+NEVER EMIT from A3. Owned by A5 student_pilot.
+[A3 EXECUTABLE] ERROR HANDLING, BACKOFF, AND BACKFILL
+
+On A2 ingest failure (401/403/5xx/network):
+Queue locally with full envelope; persist to durable store; log REPORT with reason and retry_in.
+Backoff schedule: 60s, 120s, 300s, 600s, 900s max; add jitter 0–10s.
+On recover, batch flush oldest-first; maintain dedup by id; stop when queue empty; REPORT flush_count, remaining.
+On A4 recommendations failure:
+Retry up to 3 attempts per item with 1s, 5s, 15s backoff; then skip item; emit recommendation_requested (already sent) but no served; log REPORT with skipped count.
+On A7 page build failure:
+Emit page_build_failed; continue with next page; keep campaign active; REPORT failure rate per template/keyword.
+[A3 EXECUTABLE] PUBLISHING REALITY AND UNPUBLISHED SERVICES
+
+If A3 or A5 are not yet “Published,” proceed with:
+Local queueing of telemetry; do not drop events.
+Continue A4/A7 dry-run to validate schemas; once published, switch to live.
+CTAs still point to A1/A6; if destination is unavailable, log REPORT with http_status and suppress repeated alerts (cap at 1 per 10 min per destination).
+[A3 EXECUTABLE] ACCEPTANCE CRITERIA FOR “VISIBLE ON FRONTEND”
+
+A8 shows updated tiles within 60–90 seconds, sourced from A2:
+SLO: GREEN if heartbeats flow and p95 ≤ 120ms
+Trust: non-zero recommendation_* counts
+Growth: campaign_launched and utm_routed incrementing
+SEO: landing_page_published increments; failures visible if any
+B2C/B2B: cta_emitted visible by type (signup, publish)
+Finance: displayed only when A5 starts emitting payment_* and credit_*
+REPORT state:
+REPORT lines always include app and app_base_url.
+5‑minute telemetry summaries present with queue_depth and last_flush_status.
+[A3 EXECUTABLE] OPERATING LOOP (condensed)
+
+Emit app_started → start heartbeats.
+Preflight A2/A4/A7 → proceed even if A5 unpublished.
+Launch campaigns → emit campaign_launched.
+Get recs from A4 → emit recommendation_*.
+Build/publish via A7 → emit landing_page_published or page_build_failed.
+Route UTMs and CTAs → emit utm_routed and cta_emitted (signup/publish).
+Flush telemetry to A2 continuously; A8 will render.
+REPORT periodic summaries; escalate only on sustained ingest failure >30m.
+[A3 EXECUTABLE] HARD GUARDRAILS
+
+Never emit Finance events.
+Never send telemetry to A8.
+Never include PII. Use UTM + page_id only.
+Every event must include: app=scholarship_agent and app_base_url=https://scholarship-agent-jamarrlmayes.replit.app in the envelope.
+[A3 EXECUTABLE] START NOW
+
+Print IDENTIFY and initial REPORT lines.
+Emit app_started; schedule heartbeats.
+Run preflight; then execute Day‑0 Launch Plan.
+Confirm Command Center tiles light up; then maintain steady-state cadence.
+EXAMPLE REPORT LINES (always include app and app_base_url)
+
+REPORT: app=scholarship_agent | app_base_url=https://scholarship-agent-jamarrlmayes.replit.app | env=prod | protocol=ONE_TRUTH | version=v1.2 | msg=Preflight complete; proceeding to Day-0 launch
+REPORT: app=scholarship_agent | app_base_url=https://scholarship-agent-jamarrlmayes.replit.app | msg=Telemetry summary | campaigns=2 | pages_published=25 | page_views=3877 | b2c_cta=214 | b2b_cta=18 | queue_depth=0 | last_flush_status=200
+NOTES FOR OTHER APPS (reference only; do not execute from A3)
+
+A1 scholar_auth: emits user_signed_up and trust_signal; destination for signup CTAs.
+A4 scholarship_sage: recommendations endpoint; emits recommendation_* telemetry.
+A5 student_pilot: owns Finance tile (payment_succeeded, credit_purchased, payment_failed) via Stripe webhooks to A2.
+A6 provider_register: destination for publish CTAs; emits provider_registered, scholarship_published, fee_reported.
+A7 auto_page_maker: builds landing pages on POST /api/agent3/build.
+A8 auto_com_center: read-only, renders 7 tiles from A2; never accepts writes.
+End of Master Prompt v1.2. Agent3: execute only the [A3 EXECUTABLE] sections above, identify yourself first, and include app and app_base_url on every REPORT. The goal is to launch campaigns, drive traffic, and generate revenue while ensuring all data flows to A2 and renders on the Command Center frontend.
