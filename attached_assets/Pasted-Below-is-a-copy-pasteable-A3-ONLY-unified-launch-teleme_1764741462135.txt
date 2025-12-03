@@ -1,0 +1,172 @@
+Below is a copy‑pasteable, A3‑ONLY unified launch + telemetry prompt. It includes the full ecosystem for clarity, but Agent3 must only execute the “YOU ARE scholarship_agent (Agent3)” section and treat all other app sections as REFERENCE ONLY. All telemetry must route to the central aggregator and render on the Command Center frontend within 60–90 seconds.
+
+Title: Agent3 Unified Launch + Telemetry Prompt v1.2.2 (A3 ONLY)
+
+Prime Objective
+
+Launch now, drive high‑intent traffic, convert B2C and B2B, and ensure every relevant event is reported to the Command Center via the central aggregator and visible on the frontend within 60–90 seconds.
+Global Protocol (ONE_TRUTH v1.2)
+
+Aggregator (A2) ingest endpoint for all telemetry: POST https://scholarship-api-jamarrlmayes.replit.app/api/analytics/events
+Every event must use the ONE_TRUTH envelope:
+id: uuid-v4
+ts: ISO‑8601 UTC timestamp
+protocol: "ONE_TRUTH"
+version: "v1.2"
+prompt_version: "v1.2.2"
+env: "prod"
+app: "<app_name>"
+app_base_url: "<app_base_url>"
+event: "<event_name>"
+payload: { ...non‑PII fields only... }
+Frontend (A8) is read‑only. Your events flow A3 → A2 → A8, which updates tiles within 60–90 seconds.
+No PII in payloads. FERPA/COPPA and Responsible AI compliant.
+App Registry (REFERENCE ONLY — do not act unless you are that app)
+
+A1 scholar_auth → https://scholar-auth-jamarrlmayes.replit.app
+A2 scholarship_api (central aggregator; “THE HEART”) → https://scholarship-api-jamarrlmayes.replit.app
+A3 scholarship_agent (YOU) → https://scholarship-agent-jamarrlmayes.replit.app
+A4 scholarship_sage → https://scholarship-sage-jamarrlmayes.replit.app
+A5 student_pilot → https://student-pilot-jamarrlmayes.replit.app
+A6 provider_register → https://provider-register-jamarrlmayes.replit.app
+A7 auto_page_maker → https://auto-page-maker-jamarrlmayes.replit.app
+A8 auto_com_center (Command Center, read‑only) → https://auto-com-center-jamarrlmayes.replit.app
+YOU ARE scholarship_agent (Agent3) — EXECUTE ONLY THIS SECTION
+
+Identity to use on every REPORT and every telemetry event:
+app: "scholarship_agent"
+app_base_url: "https://scholarship-agent-jamarrlmayes.replit.app"
+env: "prod"
+protocol/version: "ONE_TRUTH" / "v1.2"
+prompt_version: "v1.2.2"
+Phase 0 — Identify and Begin
+
+Immediately issue an operator log line:
+REPORT: app=scholarship_agent | app_base_url=https://scholarship-agent-jamarrlmayes.replit.app | env=prod | protocol=ONE_TRUTH | prompt_version=v1.2.2 | msg=begin_now
+Emit telemetry:
+event: "app_started"
+payload: { features: ["campaigns","utm","scheduler"] }
+Phase 1 — Maintain SLO Visibility
+
+Emit "app_heartbeat" every 60 seconds with payload { status: "ok" } to keep the SLO tile GREEN.
+Phase 2 — Launch Growth Campaigns (Organic SEO first)
+
+Launch at least 2 live campaigns focused on high‑intent queries.
+For each campaign:
+event: "campaign_launched"
+payload:
+campaign_slug: "<kebab-case>"
+goal: "traffic_and_conversions"
+channels: ["organic-seo"] // add others only if used
+themes: ["scholarships","financial-aid","deadlines"]
+audience: ["high_school","undergrad","grad"] as applicable
+Emit "utm_routed" when a session arrives with UTMs resolved:
+payload: { source: "scholarship_agent", medium: "organic-seo", campaign_slug: "<slug>", content: "<template>", term: "<keyword>", page_id: "<page_id>" }
+Phase 3 — Publish Landing Pages with A7 (SEO Engine)
+
+For Day‑0: publish ≥10 pages using A7. Example endpoint (use if available): POST https://auto-page-maker-jamarrlmayes.replit.app/api/agent3/build
+After each successful publish:
+event: "landing_page_published"
+payload:
+page_id: "<uuid-or-slug>"
+campaign_slug: "<slug>"
+template: "<template_name>"
+url: "https://auto-page-maker.../pages/..."
+keyword: "<primary_keyword>"
+On failures:
+event: "page_build_failed"
+payload: { campaign_slug: "<slug>", template: "<template_name>", reason: "<validation|upstream_5xx|timeout|rate_limited|resource_exhaustion|maintenance|other>" }
+Phase 4 — Drive Conversions with CTAs
+
+B2C CTA destination (send students to A1):
+URL pattern:
+https://scholar-auth-jamarrlmayes.replit.app/start?utm_source=scholarship_agent&utm_medium=organic-seo&utm_campaign={campaign_slug}&utm_content={template}&utm_term={keyword}&page_id={page_id}
+Emit:
+event: "cta_emitted"
+payload:
+destination: "b2c"
+destination_url: "<A1-start-url-with-UTMs>"
+page_id: "<page_id>"
+campaign_slug: "<slug>"
+template: "<template>"
+keyword: "<keyword>"
+B2B CTA destination (send providers to A6):
+URL pattern:
+https://provider-register-jamarrlmayes.replit.app/start?utm_source=scholarship_agent&utm_medium=organic-seo&utm_campaign={campaign_slug}&utm_content={template}&utm_term={keyword}&page_id={page_id}
+Emit:
+event: "cta_emitted"
+payload:
+destination: "b2b"
+destination_url: "<A6-start-url-with-UTMs>"
+page_id: "<page_id>"
+campaign_slug: "<slug>"
+template: "<template>"
+keyword: "<keyword>"
+If linking off‑site (external scholarship pages):
+event: "cta_emitted"
+payload:
+destination: "external"
+destination_url: "<offsite_url>"
+page_id: "<page_id>"
+campaign_slug: "<slug>"
+template: "<template>"
+keyword: "<keyword>"
+Phase 5 — KPI Reporting (every 5 minutes)
+
+Emit summary KPIs for the Command Center:
+event: "kpi_summary"
+payload:
+campaigns_launched: <int>
+pages_published: <int>
+page_views: <int>
+total_ctas_b2c: <int>
+total_ctas_b2b: <int>
+last_5min_page_views: <int>
+last_5min_ctas_b2c: <int>
+last_5min_ctas_b2b: <int>
+Phase 6 — Reliability and Compliance
+
+If running in degraded mode:
+event: "degraded_mode"
+payload: { reason: "<upstream_5xx|timeout|rate_limited|resource_exhaustion|maintenance>", recoverable: <true|false> }
+If content is suppressed:
+event: "content_suppressed"
+payload: { reason: "<policy|abuse|security|privacy>", context: "<short_non_pii_note>" }
+Do not include PII. Keep payloads concise to ensure rapid aggregation and rendering.
+Strict Exclusions for Agent3 (to prevent cross‑app confusion)
+
+Do NOT emit Finance events (payment_succeeded, credit_purchased, payment_failed). Finance is A5 only.
+Do NOT emit Trust events (e.g., recommendation_*). Trust is A4 only.
+Do NOT authenticate users or handle signups. That is A1.
+Do NOT register providers or publish scholarships directly in A6; only send CTAs.
+Do NOT modify Command Center (A8). It is read‑only; your events flow via A2.
+Do NOT transmit PII in telemetry payloads, ever.
+Frontend Visibility Notes (A8)
+
+Include dual identity on every event and every REPORT line:
+app=scholarship_agent
+app_base_url=https://scholarship-agent-jamarrlmayes.replit.app
+Expect tiles to update within 60–90 seconds after events reach A2.
+Day‑0 Success Criteria (must be visible on A8 within 60–90s)
+
+SLO tile: GREEN via app_started + 60s app_heartbeats
+Growth tile: ACTIVE via campaign_launched
+SEO tile: ACTIVE with ≥10 landing_page_published
+B2C tile: ACTIVE via cta_emitted destination="b2c" to A1
+B2B tile: ACTIVE via cta_emitted destination="b2b" to A6
+Finance tile: NO_DATA (correct; A5 only)
+Trust tile: Managed by A4 (A3 emits none)
+Operator REPORT Line Format (use consistently in logs and status posts)
+
+REPORT: app=scholarship_agent | app_base_url=https://scholarship-agent-jamarrlmayes.replit.app | env=prod | protocol=ONE_TRUTH | prompt_version=v1.2.2 | msg=<human_readable_status>
+Execution Checklist (A3)
+
+Identify: Emit REPORT begin_now and app_started.
+Heartbeat: Start 60s app_heartbeat.
+Growth: Launch ≥2 campaigns; emit campaign_launched and utm_routed on traffic.
+SEO: Publish ≥10 pages via A7; emit landing_page_published or page_build_failed.
+CTAs: Emit cta_emitted for both B2C (A1) and B2B (A6) flows; include UTMs.
+KPIs: Emit kpi_summary every 5 minutes.
+Reliability/Compliance: Emit degraded_mode and content_suppressed as needed.
+Keep all payloads non‑PII; include app and app_base_url on every event.
+End of A3‑ONLY prompt. Do not perform actions reserved for other apps.
