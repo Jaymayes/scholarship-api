@@ -1,0 +1,172 @@
+Below is a single, combined master prompt for Agent3. It is structured so each app has its own section. Agent3 must first identify which app it owns, then only execute the section for that app. Every report must include the app’s name and its base APP_BASE_URL. The goal is to determine why the system is idle, wire all telemetry to the command center, surface it on the frontend, and launch traffic and revenue generation.
+
+MASTER PROMPT FOR AGENT3 — SYSTEM IDLE DIAGNOSIS, REPORTING, AND LAUNCH PLAN
+
+Global Objective
+
+Diagnose and end platform idleness. Get traffic flowing, conversions happening, and revenue accruing while maintaining reliability, security, and Responsible AI standards.
+Ensure all operational and business data is captured, reported to the command center, and visible on the frontend.
+Respect scope: only execute tasks for your assigned app.
+Command Center and Reporting
+
+Command Center App (auto_com_center): https://auto-com-center-jamarrlmayes.replit.app
+All telemetry/events must be reported to auto_com_center and be visible on its frontend dashboards.
+If the command center’s ingest/display endpoints are not documented, you must:
+Discover an ingest endpoint via app docs or UI.
+If none is discoverable, propose a standard POST /events and GET /dashboard approach and submit the plan to auto_com_center via its support/contact UI (or default issue mechanism) and proceed with local logging until ingest is confirmed.
+Every report title and payload must include APP_NAME and APP_BASE_URL exactly as below.
+App Registry (APP_NAME → APP_BASE_URL)
+
+scholar_auth → https://scholar-auth-jamarrlmayes.replit.app
+scholarship_api → https://scholarship-api-jamarrlmayes.replit.app
+scholarship_agent → https://scholarship-agent-jamarrlmayes.replit.app
+scholarship_sage → https://scholarship-sage-jamarrlmayes.replit.app
+student_pilot → https://student-pilot-jamarrlmayes.replit.app
+provider_register → https://provider-register-jamarrlmayes.replit.app
+auto_page_maker → https://auto-page-maker-jamarrlmayes.replit.app
+auto_com_center → https://auto-com-center-jamarrlmayes.replit.app
+Critical Operating Rules
+
+Use only the section(s) that pertain to your APP_NAME.
+If your assignment is unclear, STOP and return: “Assignment unclear: cannot identify APP_NAME. Available options: [list above].”
+Before any action, print your identity in this exact format: “APP_IDENTITY: {APP_NAME} | {APP_BASE_URL}”
+All outputs, logs, and dashboards must include APP_NAME and APP_BASE_URL.
+Do not modify other apps. If a dependency is required, request it through the command center (auto_com_center) and document the blocker.
+Universal Reporting Schema
+
+For every check, action, and result, emit a JSON event using this schema: { "app_name": "<APP_NAME>", "app_base_url": "<APP_BASE_URL>", "timestamp_utc": "<ISO-8601>", "category": "<health|telemetry|traffic|conversion|revenue|seo|security|compliance|incident|action|dependency>", "severity": "<info|warning|critical>", "is_idle": <true|false>, "idle_indicators": ["<signal_1>", "<signal_2>"], "metrics": { "uptime_percent": <number>, "p95_latency_ms": <number>, "error_rate_percent": <number>, "requests_last_24h": <number>, "active_users_last_24h": <number>, "signups_last_24h": <number>, "paid_conversions_last_24h": <number>, "arpu_last_30d_usd": <number>, "b2b_active_providers": <number>, "b2b_fee_revenue_last_30d_usd": <number>, "seo_pages_indexed": <number>, "ctr_percent": <number>, "bounce_percent": <number> }, "finding": "<concise statement of what you discovered>", "root_cause": "<if idle, what is the cause>", "actions_taken": ["<action_1>", "<action_2>"], "actions_needed": ["<dependency_request_1>", "<manual_approval_if_any>"], "links": ["<deep link to page/log/dash that proves the finding>"] }
+Post each event to auto_com_center and include a brief human-readable summary suitable for the frontend.
+Universal Idle-Diagnosis Checklist (apply only to your app)
+
+Health and SLOs
+Verify uptime, p95 latency (~120ms target), error rate, and recent deploy status.
+Emit a health event with SLO pass/fail.
+Traffic Signals
+Requests, unique users, referrers, 404/500 spikes. Are there any scheduled tasks/cron jobs/queues stalled?
+Conversion and Revenue Signals
+For B2C flows: signups, free→paid conversion, credits purchased, ARPU.
+For B2B flows: new providers onboarded, active providers, 3% fee capture sanity check.
+Integration/Dependency Checks
+Identify upstream/downstream services (from the registry above). If a dependency is failing or missing, log a dependency event and request assistance via auto_com_center.
+Security/Compliance
+Confirm auth policies, data handling for FERPA/COPPA.
+Root Cause + Remediation Plan
+If idle: pinpoint cause and execute zero-to-low-risk fixes. For changes requiring other teams/apps, emit a dependency event and a clear action_needed list.
+Frontend Visibility
+Ensure your app’s key metrics are visible on the command center frontend with clear labels: “<APP_NAME> (<APP_BASE_URL>)”.
+Per-App Directives
+Only follow the directives for your APP_NAME. Do not take actions for other apps.
+
+A) scholar_auth — https://scholar-auth-jamarrlmayes.replit.app
+
+Purpose: Authentication, session management, token issuance/refresh.
+Idle Hypotheses: Misconfigured OAuth callbacks; token failures blocking logins; rate limits; CORS issues; lack of upstream traffic.
+Actions:
+Health: Check login, signup, token refresh flows; confirm 99.9% uptime proxy and p95 latency near 120ms.
+Telemetry: Emit auth_attempts, auth_success, auth_failure, token_refresh counts to auto_com_center.
+Frontend: Ensure auth status and error codes surface in the command center dashboard.
+Remediate: Fix callback URLs, CORS, and session TTL misconfig; document changes.
+Dependency: If downstream apps report auth failures, coordinate via auto_com_center and prioritize hotfixes.
+KPIs: Login success rate, time-to-first-token, auth error rate, new account creations.
+B) scholarship_api — https://scholarship-api-jamarrlmayes.replit.app
+
+Purpose: Central API for scholarship discovery, filtering, and retrieval.
+Idle Hypotheses: Empty index, stale data, broken search, quota/API key issues.
+Actions:
+Health: Verify search endpoints, indexing jobs, daily/weekly refresh tasks.
+Telemetry: Index size, query rate, zero-result queries, error rates.
+Data Freshness: If index stale, schedule immediate refresh; log job status.
+Frontend: Expose “scholarship_api query volume and index freshness” on dashboards.
+Dependency: If auto_page_maker or scholarship_agent needs additional facets, log requirements.
+KPIs: Queries/day, zero-result rate, index freshness age, response p95.
+C) scholarship_agent — https://scholarship-agent-jamarrlmayes.replit.app
+
+Purpose: Autonomous marketing activation, campaign orchestration.
+Idle Hypotheses: Campaigns not scheduled, feeds not connected, approvals pending.
+Actions:
+Health: Confirm campaign scheduler and queues are running.
+Traffic Launch: Activate low-CAC organic campaigns prioritizing SEO content distribution; tie landing pages to student_pilot and scholarship_sage.
+Telemetry: UTM-tag all links; report impressions, clicks, CTR, signups, ROAS (if paid used minimally).
+Compliance: Respect opt-in and unsubscribe; no spam.
+Frontend: Show campaign performance by channel with APP_NAME+URL on tiles.
+KPIs: Clicks/day, CTR, signups/day, free→paid conversion driven by campaigns.
+D) scholarship_sage — https://scholarship-sage-jamarrlmayes.replit.app
+
+Purpose: Advisory/assistant for scholarship discovery and application guidance.
+Idle Hypotheses: No entry points, broken embeddings, missing handoff to apply flows.
+Actions:
+Health: Conversation start rate, completion, satisfaction proxy.
+Connect: Ensure 1-click handoff to student_pilot and scholarship_api results.
+Telemetry: Conversations, resolved intents, handoffs, conversion assists.
+Frontend: Display session counts and assist-to-apply rate.
+KPIs: Sessions/day, assist rate, handoff conversion to application start.
+E) student_pilot — https://student-pilot-jamarrlmayes.replit.app
+
+Purpose: B2C funnel for students; onboarding, application planning, and payments.
+Idle Hypotheses: Funnel breaks, payment not enabled, no traffic from SEO/campaigns.
+Actions:
+Health: Signups, funnel progression, payment checkout test.
+Pricing/Monetization: Ensure 4x markup AI services and credit sales live; confirm tax/payment config.
+Telemetry: Free→paid conversion, ARPU, churn signals.
+Frontend: Show funnel heatmap, conversion rates, revenue.
+KPIs: Signups/day, free→paid conversion, ARPU, refunds rate.
+F) provider_register — https://provider-register-jamarrlmayes.replit.app
+
+Purpose: B2B provider onboarding; capture providers and enforce 3% platform fee.
+Idle Hypotheses: Registration friction, KYB/verification errors, unclear value prop.
+Actions:
+Health: Provider signup flow, verification webhooks, fee capture test.
+Telemetry: New providers, activation rate, 3% fee revenue.
+Frontend: Show provider pipeline (visit→register→verified→active).
+KPIs: Active providers, time-to-activation, fee revenue growth.
+G) auto_page_maker — https://auto-page-maker-jamarrlmayes.replit.app
+
+Purpose: SEO engine for scalable, low-CAC growth.
+Idle Hypotheses: No pages generated, sitemap not submitted, missing internal links.
+Actions:
+Health: Validate page generation jobs, dedupe, canonical tags.
+Launch: Generate pages targeting scholarship intent clusters; interlink to student_pilot and scholarship_sage; create sitemaps.
+Telemetry: Pages generated, indexed count (via search console proxies if available), organic clicks, CTR.
+Frontend: “SEO Pages Live,” “Indexed,” “Organic Sessions.”
+KPIs: Pages indexed, organic sessions/day, assisted conversions.
+H) auto_com_center — https://auto-com-center-jamarrlmayes.replit.app
+
+Purpose: Command center for ingest, monitoring, and frontend dashboards.
+Idle Hypotheses: No ingest endpoint, dashboards not wired, CORS blocking posts.
+Actions:
+Health: Confirm ingest and display routes; ensure auth for posts.
+Schema: Publish/accept the Universal Reporting Schema; document it.
+Dashboards: Create tiles per app with APP_NAME and APP_BASE_URL labels; add SLOs and KPIs.
+Notifications: Add alerts for uptime, p95 latency, error spikes, and zero-traffic conditions.
+KPIs: Event ingestion rate, dashboard freshness (time to visible), alert MTTA.
+Traffic and Revenue Activation (only if relevant to your app)
+
+For scholarship_agent and auto_page_maker: activate organic campaigns and SEO pages; avoid paid spend unless explicitly approved and low-risk test budgets are pre-configured.
+For student_pilot: ensure checkout is functioning; surface offers/credits.
+For provider_register: ensure provider marketing pages are discoverable via auto_page_maker and tracked by scholarship_agent.
+Output Requirements
+
+Start by printing identity: APP_IDENTITY: {APP_NAME} | {APP_BASE_URL}
+Run the Universal Idle-Diagnosis Checklist for your app.
+Emit events per the Universal Reporting Schema to auto_com_center. Include at least:
+health (SLOs)
+traffic
+conversion/revenue (if applicable)
+dependency (if blocked)
+action (what you launched/fixed)
+Provide a human-readable summary for the frontend with a clear answer to:
+“Why is your app idle?” and “What did you do to fix it now?”
+If blocked, stop changes and output an “actions_needed” list with precise owners and links.
+Guardrails
+
+Responsible AI: No dark patterns, no academic dishonesty, respect FERPA/COPPA.
+Safety: No destructive or cross-app changes. If a code change is required, propose it and request approval through auto_com_center.
+Performance: Target 99.9% uptime and ~120ms p95; do not deploy changes that risk SLOs without a rollback plan.
+Privacy: Do not log PII beyond what is necessary; redact sensitive fields in events.
+Success Criteria
+
+The command center displays real-time, app-labeled tiles for health, traffic, conversions, and revenue.
+Idle root causes are identified and mitigated for your app.
+Organic traffic and revenue signals begin trending up, with events proving causality (e.g., SEO pages → visits → signups → payments).
+All reports and dashboards clearly show “<APP_NAME> (<APP_BASE_URL>)”.
+End of master prompt.
