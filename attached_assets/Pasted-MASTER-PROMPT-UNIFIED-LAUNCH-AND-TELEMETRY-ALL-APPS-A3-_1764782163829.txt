@@ -1,0 +1,304 @@
+MASTER PROMPT — UNIFIED LAUNCH AND TELEMETRY (ALL APPS; A3 EXECUTES SECTION C ONLY)
+SECTION 0 — PRIME OBJECTIVE AND OPERATING RULES (APPLIES TO ALL; A3 READ-ONLY CONTEXT)
+Prime objective: Launch now, grow organic traffic and revenue, and ensure 100% of operational and business events are reported to the Central Aggregator and rendered in the Command Center frontend.
+
+Growth strategy: Prioritize SEO-based, low-CAC growth via auto_page_maker.
+
+Data visibility: All apps must attach app_name and app_base_url on all telemetry events. All events go to the Central Aggregator so the Command Center can render tiles (Growth, B2C, B2B, Finance, SLO/Health, Trust).
+
+SLO guardrails: 99.9% uptime; target ~120ms p95 latency. Emit health and latency telemetry continuously.
+
+Responsible AI and compliance: No academic dishonesty. Respect FERPA/COPPA. Minimize PII, use S2S auth, and log only non-sensitive operational metrics.
+
+SECTION 1 — APP DIRECTORY (APPLIES TO ALL; A3 READ-ONLY CONTEXT)
+A1 scholar_auth → https://scholar-auth-jamarrlmayes.replit.app
+
+A2 scholarship_api (Central Aggregator) → https://scholarship-api-jamarrlmayes.replit.app
+
+A3 scholarship_agent (YOU) → https://scholarship-agent-jamarrlmayes.replit.app
+
+A4 scholarship_sage → https://scholarship-sage-jamarrlmayes.replit.app
+
+A5 student_pilot → https://student-pilot-jamarrlmayes.replit.app
+
+A6 provider_register → https://provider-register-jamarrlmayes.replit.app
+
+A7 auto_page_maker → https://auto-page-maker-jamarrlmayes.replit.app
+
+A8 auto_com_center (Command Center Frontend) → https://auto-com-center-jamarrlmayes.replit.app
+
+SECTION 2 — UNIVERSAL REPORTING PROTOCOL (APPLIES TO ALL; A3 WILL USE)
+Identity handshake (required on startup for every app):
+
+Log to stdout: APP_IDENTITY: <app_name> | <app_base_url>
+
+Emit an identity event to A2 with app_name and app_base_url.
+
+Telemetry target (write-only for apps): POST A2 /api/analytics/events
+
+Base: https://scholarship-api-jamarrlmayes.replit.app
+
+Batch payload: { events: [ {event_name, app_name, app_base_url, timestamp_utc, category, severity, metrics, context, utm, s2s_token} ] }
+
+Use Authorization: Bearer <S2S_JWT> minted from A1 (see Section 5).
+
+Heartbeat cadence:
+
+Every 60 seconds emit app_heartbeat with uptime, p95 latency, error rate, queue depth.
+
+Idle detection policy:
+
+Do not declare IDLE immediately. Only declare is_idle=true if impressions==0 OR clicks==0 continuously for >= 15 minutes. Provide idle_indicators and idle_duration_mins in events.
+
+Tile mappings used by Command Center (A8 reads A2; apps do not push directly to A8):
+
+Growth tile: campaign_launched, page_published, impression, click, ctr_update
+
+B2C tile: b2c_referral, student_engaged
+
+B2B tile: b2b_referral, provider_engaged
+
+Finance tile: payment_succeeded, arpu_update (originates from A5; A3 only sends referrals)
+
+SLO/Health tile: app_started, app_heartbeat, latency, errors
+
+Trust tile: recommendation_served (A4), content_quality_score
+
+SECTION 3 — EVENT TAXONOMY (APPLIES TO ALL; A3 WILL USE)
+Required fields for all events:
+
+event_name (string), timestamp_utc (ISO8601), app_name, app_base_url
+
+category (one of: identity, health, growth, b2c, b2b, finance, trust, ops)
+
+severity (info, warn, error), s2s_token (opaque), metrics (object), context (object), utm (object)
+
+Example payloads Agent3 will use frequently:
+
+identity: {event_name:"app_started", category:"health", metrics:{version, uptime_s:0, p95_ms:null, error_rate_pct:0.0}}
+
+campaign: {event_name:"campaign_launched", category:"growth", metrics:{campaign_id, campaign_type:"SEO", pages:int}, utm:{source:"scholarship_agent", medium:"organic", campaign:"day0_launch"}}
+
+page build: {event_name:"page_build_requested", category:"growth", context:{target_app:"auto_page_maker", count:int, template:"sotd_basic"}}
+
+publishing: {event_name:"page_published", category:"growth", context:{page_url, template}, utm:{...}}
+
+traffic: {event_name:"impression"|"click", category:"growth", metrics:{count:int}, utm:{...}}
+
+referrals:
+
+B2C: {event_name:"b2c_referral", category:"b2c", context:{target_app:"student_pilot", dest_url}, utm:{...}}
+
+B2B: {event_name:"b2b_referral", category:"b2b", context:{target_app:"provider_register", dest_url}, utm:{...}}
+
+idle: {event_name:"idle_diagnosis", category:"ops", metrics:{is_idle:bool, idle_duration_mins:int}, context:{idle_indicators:[...]}}
+
+SECTION 4 — UTM AND ATTRIBUTION CONVENTIONS (APPLIES TO ALL; A3 WILL USE)
+Required UTM parameters for any outbound link A3 generates:
+
+utm_source=scholarship_agent
+
+utm_medium=organic
+
+utm_campaign=day0_launch or the specific campaign slug
+
+utm_content=<page_or_asset_slug>
+
+Destination examples:
+
+To A5 (B2C): https://student-pilot-jamarrlmayes.replit.app/?utm_source=scholarship_agent&utm_medium=organic&utm_campaign=day0_launch&utm_content=<slug>
+
+To A6 (B2B): https://provider-register-jamarrlmayes.replit.app/?utm_source=scholarship_agent&utm_medium=organic&utm_campaign=day0_launch&utm_content=<slug>
+
+SECTION 5 — AUTHENTICATION FOR TELEMETRY (APPLIES TO ALL; A3 WILL USE)
+Obtain S2S JWT:
+
+POST A1 scholar_auth to mint an S2S token for scholarship_agent.
+
+Cache token and refresh on 401/expiry.
+
+Include Authorization: Bearer <S2S_JWT> on all POSTs to A2.
+
+SECTION 6 — ERROR HANDLING AND RELIABILITY (APPLIES TO ALL; A3 WILL USE)
+Retries:
+
+429/5xx: exponential backoff starting at 1s, max 60s, jitter. Max 8 attempts.
+
+401: refresh token via A1, then retry immediately once.
+
+Local buffering:
+
+Buffer events when offline or blocked; flush in-order when connectivity resumes.
+
+Circuit breakers:
+
+Open after 5 consecutive failures; half-open after backoff window to test.
+
+Validation:
+
+Drop or quarantine any event missing app_name or app_base_url; emit validation_error to ops category with details.
+
+SECTION 7 — COMMAND CENTER VISIBILITY (APPLIES TO ALL; A3 READ-ONLY CONTEXT)
+Apps never write directly to A8. They push to A2, which powers A8’s tiles.
+
+A8 polls A2 every 60 seconds for updated stats. Ensuring your events reach A2 is sufficient for frontend visibility.
+
+SECTION C — AGENT3 EXECUTION SECTION (scholarship_agent) — EXECUTE THIS SECTION ONLY
+You are Agent3. Your app_name is scholarship_agent and your app_base_url is https://scholarship-agent-jamarrlmayes.replit.app. Execute the steps below and only those below. Other sections are reference to integrate your work.
+
+C.1 Identify and Initialize
+
+Before any action, print to stdout exactly: APP_IDENTITY: scholarship_agent | https://scholarship-agent-jamarrlmayes.replit.app
+
+Immediately emit to A2 two events:
+
+app_started (health): include version, commit_sha if available, uptime_s=0, p95_ms=null, error_rate_pct=0.0
+
+identity (identity): include app_name and app_base_url
+
+Acquire an S2S JWT from A1 scholar_auth and cache it for use on all A2 requests.
+
+C.2 Launch Day‑0 Organic Growth Campaigns
+
+Objective: Create immediate organic surface area and measurable traffic.
+
+Actions:
+
+Request A7 auto_page_maker to build at least 50 SEO pages in prioritized niches (e.g., “top scholarships by major/state/identity”, “deadline this month”, “no-essay scholarships”).
+
+For each requested page, call A4 scholarship_sage to enrich or outline content (template “sotd_basic” or equivalent) to improve E-E-A-T signals.
+
+Emit page_build_requested for each batch to A2 with count and template.
+
+When A7 confirms publication, emit page_published for each page with page_url and template, and include UTM default set: source=scholarship_agent, medium=organic, campaign=day0_launch, content=slugified-page-name.
+
+Record campaign metadata:
+
+Emit one campaign_launched event with campaign_id=day0_seo_surface_v1, campaign_type="SEO", pages=<count>.
+
+Include list of top 10 slugs in context for auditability.
+
+C.3 Drive B2C and B2B Referrals With Correct Attribution
+
+B2C funnel:
+
+For every page with a student CTA, link to A5 student_pilot using the UTM convention in Section 4.
+
+Emit b2c_referral whenever a user clicks that CTA with context.dest_url set to the full A5 URL and utm populated. Include a page_slug field in context.
+
+B2B funnel:
+
+For provider-facing CTAs (e.g., “List your scholarship”), link to A6 provider_register using the UTM convention in Section 4.
+
+Emit b2b_referral on click with context.dest_url set to the full A6 URL and utm populated.
+
+Do not emit payment_succeeded directly; A5 owns finance events. Your responsibility is referral fidelity and volume.
+
+C.4 Traffic and CTR Telemetry to Power the Growth Tile
+
+If you receive impression/click signals from A7 or analytics hooks:
+
+Emit impression and click events with metrics.count and the same UTM set used when the page was created.
+
+Optionally compute and emit ctr_update with metrics.ctr_pct=(clicks/impressions*100) when feasible.
+
+If raw signals are not yet wired:
+
+Emit page_published immediately and ensure links carry UTM so downstream analytics can backfill impressions/clicks. Do not synthesize fake metrics.
+
+C.5 Health, Heartbeats, and Idle Diagnosis
+
+Heartbeat: Every 60 seconds emit app_heartbeat with metrics.uptime_s, p95_ms, error_rate_pct, queue_depth.
+
+Idle policy: Track the first moment where clicks==0 or impressions==0. Only emit idle_diagnosis with metrics.is_idle=true after a continuous 15-minute window of zero traffic. Include metrics.idle_duration_mins and context.idle_indicators (e.g., ["no_impressions_15m"]).
+
+Recovery actions on sustained idle:
+
+Trigger A7 to generate 10 additional pages in segments adjacent to top performers, re-emit page_build_requested and page_published as applicable.
+
+Refresh internal sitemaps and resubmit to indexing endpoints if available.
+
+Emit campaign_launched with campaign_id=idle_recovery_v1 and include corrective steps in context.
+
+C.6 SLO and Error Reporting
+
+Emit error events with category=ops, severity=warn|error for:
+
+A1 token acquisition failures.
+
+A2 ingestion failures after max retries.
+
+A4/A7 integration timeouts (>3s) or p95_ms > 120 target breaches sustained over 5 minutes.
+
+Always include app_name and app_base_url in every event. Include integration_target in context for cross‑app failures.
+
+C.7 Data Quality and Validation
+
+Before sending any event:
+
+Ensure presence of app_name=scholarship_agent and app_base_url=https://scholarship-agent-jamarrlmayes.replit.app.
+
+Validate timestamp_utc is ISO8601.
+
+Validate utm object fields when relevant.
+
+On validation failure, quarantine the event locally and emit validation_error with details.
+
+C.8 Stop Conditions and Success Criteria
+
+Minimum bar to consider “launched”:
+
+app_started and identity sent to A2 successfully.
+
+campaign_launched emitted with >= 50 pages requested to A7.
+
+At least 1 page_published recorded.
+
+At least 1 b2c_referral and 1 b2b_referral recorded with correct UTM.
+
+Ongoing success indicators:
+
+Growth tile shows campaign and traffic events within the Command Center.
+
+B2C and B2B tiles show increasing referral counts.
+
+Finance tile begins showing revenue as A5 conversions occur (attribution from your UTMs).
+
+SECTION D — INTEGRATION ENDPOINTS (REFERENCE ONLY; A3 MUST NOT EXECUTE OTHER APPS’ WORK)
+A1 scholar_auth (S2S token minting): https://scholar-auth-jamarrlmayes.replit.app
+
+A2 scholarship_api (telemetry ingest): https://scholarship-api-jamarrlmayes.replit.app/api/analytics/events
+
+A4 scholarship_sage (content enrichment): https://scholarship-sage-jamarrlmayes.replit.app
+
+A5 student_pilot (B2C destination): https://student-pilot-jamarrlmayes.replit.app
+
+A6 provider_register (B2B destination): https://provider-register-jamarrlmayes.replit.app
+
+A7 auto_page_maker (SEO pages): https://auto-page-maker-jamarrlmayes.replit.app
+
+A8 auto_com_center (frontend, read-only to apps): https://auto-com-center-jamarrlmayes.replit.app
+
+SECTION E — SECURITY, PRIVACY, AND ETHICS (REFERENCE ONLY; A3 MUST COMPLY)
+Use S2S auth for back-end calls; do not expose tokens client-side.
+
+Do not collect or emit PII in telemetry; keep it operational and aggregate.
+
+Avoid academic dishonesty; content must guide, not do work for students.
+
+Respect FERPA/COPPA; no tracking of minors without lawful basis.
+
+SECTION F — QUICKCHECK FOR A3 BEFORE RUN
+Does the process print APP_IDENTITY: scholarship_agent | https://scholarship-agent-jamarrlmayes.replit.app at startup?
+
+Are app_started and identity events posted to A2 with app_name and app_base_url?
+
+Is S2S JWT acquired from A1 and attached to all A2 calls?
+
+Are Day‑0 campaign events emitted and pages requested from A7?
+
+Are B2C and B2B referral events emitted with correct UTM on outbound links?
+
+Is the 60s heartbeat active and is the 15-minute idle rule enforced?
+
+End of Master Prompt.
