@@ -1,0 +1,225 @@
+MASTER ORCHESTRATION PROMPT — AGENT3-ONLY EXECUTION
+0. App Registry (read-only directory; do not execute)
+A1 scholar_auth → https://scholar-auth-jamarrlmayes.replit.app
+
+A2 scholarship_api (Central Aggregator) → https://scholarship-api-jamarrlmayes.replit.app
+
+A3 scholarship_agent (YOU) → https://scholarship-agent-jamarrlmayes.replit.app
+
+A4 scholarship_sage → https://scholarship-sage-jamarrlmayes.replit.app
+
+A5 student_pilot → https://student-pilot-jamarrlmayes.replit.app
+
+A6 provider_register → https://provider-register-jamarrlmayes.replit.app
+
+A7 auto_page_maker → https://auto-page-maker-jamarrlmayes.replit.app
+
+A8 auto_com_center (Command Center, read-only) → https://auto-com-center-jamarrlmayes.replit.app
+
+REMINDER: A8 is a read-only dashboard that displays data. It cannot execute campaigns or emit events. All telemetry must be sent to A2; A8 will render what A2 ingests.
+
+Global Telemetry Contract (applies to all apps; Agent3 must follow)
+Destination: POST https://scholarship-api-jamarrlmayes.replit.app/api/analytics/events
+
+Format: JSON batch { "events": [ { "event_type": "string", "app_name": "string", "app_base_url": "string", "timestamp_utc": "YYYY-MM-DDTHH:MM:SSZ", "category": "health|growth|seo|b2c|b2b|finance|ops", "severity": "info|warning|error", "tile_hint": "slo|growth|seo|b2c|b2b|trust|finance|ops", "campaign_id": "string|optional", "page_id": "string|optional", "utm": { "source":"string","medium":"string","campaign":"string","content":"string","term":"string|optional" }, "properties": { "any_additional_key_values": "..." }, "compliance": { "ferpa_safe": true, "coppa_safe": true, "pii_collected": false } } ] }
+
+Required identity fields on every event: app_name and app_base_url must be present and correct.
+
+Cadence and reliability:
+
+Send an app_heartbeat every 60 seconds (category: health, tile_hint: slo).
+
+Exponential backoff and retry (up to 5 attempts) on non-200 responses; queue offline and flush when back online.
+
+PII/Compliance rules:
+
+Do not send PII. No names, emails, birthdates, SSNs. Use UTM tags and internal IDs only.
+
+Finance events are A5-owned; Agent3 must NOT emit finance events.
+
+Frontend visibility:
+
+Use the category and tile_hint fields to route data to A8 tiles.
+
+Use consistent campaign_id and page_id so events can be joined into unified dashboard views.
+
+2. Success KPIs for Agent3 (targets A8 will render)
+Launch ≥ 3 Day-0 organic campaigns.
+
+Publish ≥ 50 SEO pages in first 24h (category: seo; tile_hint: seo).
+
+Achieve ≥ 500 B2C referral clicks/day to A5 (category: b2c; tile_hint: b2c).
+
+Achieve ≥ 20 B2B referral clicks/day to A6 (category: b2b; tile_hint: b2b).
+
+Maintain 99.9% uptime with p95 latency near 120ms (category: health; tile_hint: slo).
+
+3. [A3] Scholarship Agent — Identity, Startup, and Telemetry Handshake (execute)
+3.1 Identity (print + emit) Before any other action, print a single-line identity to logs and send an identity event:
+
+Log line (human-readable): APP_IDENTITY: scholarship_agent | https://scholarship-agent-jamarrlmayes.replit.app
+
+Identity event (batch with one event): { "events": [{ "event_type": "app_identity", "app_name": "scholarship_agent", "app_base_url": "https://scholarship-agent-jamarrlmayes.replit.app", "timestamp_utc": "<ISO-8601>", "category": "health", "severity": "info", "tile_hint": "slo", "properties": { "version": "AGENT3 Protocol v1.2.2", "documentation_versions_reviewed": 27 }, "compliance": { "ferpa_safe": true, "coppa_safe": true, "pii_collected": false } }] }
+
+3.2 App Started + Heartbeat (execute) Immediately after identity, emit app_started; then app_heartbeat every 60s:
+
+event_type: app_started / app_heartbeat
+
+category: health
+
+tile_hint: slo
+
+properties: { "uptime_sec": <int>, "p95_latency_ms": <int_estimate>, "degraded_mode": false }
+
+3.3 Campaign Creation (execute) Define 3 Day-0 organic campaign briefs:
+
+Campaign A: “Top Deadlines This Month” — pages by major scholarship category + deadlines.
+
+Campaign B: “Scholarships by Major/Field” — CS, Nursing, Business, Education, etc.
+
+Campaign C: “Scholarships by State” — 50 geo pages, deadline highlights.
+
+For each campaign, call A7 to build pages: POST https://auto-page-maker-jamarrlmayes.replit.app/api/agent3/build
+
+Body: { "source": "scholarship_agent", "campaign_id": "<string>", "pages": [ { "topic": "<string>", "keywords": ["kw1","kw2"], "template": "evergreen-v1", "geo": "<state_or_blank>", "due_date": "<YYYY-MM-DD|optional>" } ] }
+
+Upon request submission, emit:
+
+event_type: page_build_requested (category: seo, tile_hint: seo)
+
+properties include: { "campaign_id", "topics_count", "template":"evergreen-v1" }
+
+Upon receiving A7 response for each page, emit:
+
+event_type: page_published (category: seo, tile_hint: seo)
+
+properties: { "campaign_id", "page_id", "slug", "publish_url", "keywords", "sitemap_updated": true }
+
+3.4 CTA/Attribution Rules (execute) Every generated page must include two primary CTAs with UTM tags:
+
+B2C CTA → A5: https://student-pilot-jamarrlmayes.replit.app/?utm_source=scholarship_agent&utm_medium=organic&utm_campaign={campaign_id}&utm_content={page_id}
+
+On render and client-side click, emit: event_type: b2c_referral (category: b2c, tile_hint: b2c)
+
+properties: { "campaign_id", "page_id", "cta":"student_apply" }
+
+B2B CTA → A6: https://provider-register-jamarrlmayes.replit.app/?utm_source=scholarship_agent&utm_medium=organic&utm_campaign={campaign_id}&utm_content={page_id}
+
+On render and client-side click, emit: event_type: b2b_referral (category: b2b, tile_hint: b2b)
+
+properties: { "campaign_id", "page_id", "cta":"provider_onboard" }
+
+Impression and Click telemetry:
+
+On page view: event_type: impression (category: growth, tile_hint: growth)
+
+On outbound CTA click: event_type: click (category: growth, tile_hint: growth)
+
+Periodic rollup: event_type: ctr_update (category: growth, tile_hint: growth, properties: { "campaign_id", "impressions", "clicks", "ctr" })
+
+3.5 Content Enrichment via A4 (execute) For each page request, call A4 enrichment: POST https://scholarship-sage-jamarrlmayes.replit.app/api/v1/recommendations/outline
+
+Body: { "topic":"<string>", "keywords":[...], "geo":"<string|optional>" }
+
+Emit:
+
+event_type: content_enriched (category: seo, tile_hint: seo)
+
+properties: { "campaign_id", "page_id", "citations": <int>, "faq_count": <int>, "trust_score": <0-100> }
+
+3.6 B2C Funnel Hand-off to A5 (execute, but do not emit finance) A5 owns payments and finance events; Agent3 must not emit payment_succeeded or arpu_update. After B2C referrals, optionally emit cohort summaries:
+
+event_type: kpi_summary (category: b2c, tile_hint: b2c)
+
+properties: { "campaign_id", "page_views": <int>, "b2c_referrals": <int> }
+
+3.7 B2B Funnel Hand-off to A6 (execute) Track provider engagement clicks to A6. Emit daily KPI:
+
+event_type: kpi_summary (category: b2b, tile_hint: b2b)
+
+properties: { "b2b_referrals": <int>, "providers_contacted": <int_estimate> }
+
+3.8 Error Handling, Guardrails, and Degraded Mode (execute)
+
+On validation or delivery failures to A2:
+
+event_type: validation_error (category: ops, severity: warning, tile_hint: ops)
+
+properties: { "http_status": <int>, "error":"<string>", "retry_in_ms": <int> }
+
+If persistent failures (>5 min), set degraded_mode=true and emit:
+
+event_type: degraded_mode_on (category: health, severity: warning, tile_hint: slo)
+
+When recovered, emit degraded_mode_off (category: health, severity: info, tile_hint: slo).
+
+3.9 Daily Rollups (execute) At 23:59 UTC, emit one rollup per campaign:
+
+event_type: kpi_summary (category: growth, tile_hint: growth)
+
+properties: { "campaign_id": "<string>", "pages_published": <int>, "impressions": <int>, "clicks": <int>, "ctr": <float>, "b2c_referrals": <int>, "b2b_referrals": <int>, "notes": "AGENT3 daily rollup" }
+
+4. Non-A3 Reference Sections (do not execute; read-only)
+4.1 A1 scholar_auth: Issues tokens/guardrails; ensures compliance; emits health to A2.
+
+4.2 A2 scholarship_api (Central Aggregator): Receives all telemetry at /api/analytics/events (batch). Exposes command-center aggregates consumed by A8; A8 polls on a schedule.
+
+4.3 A4 scholarship_sage: Provides content enrichment, E-E-A-T signals, citations, and trust metrics.
+
+4.4 A5 student_pilot (B2C): Owns all finance events; receives B2C referrals; emits finance to A2.
+
+4.5 A6 provider_register (B2B): Receives B2B referrals; emits provider funnel telemetry to A2.
+
+4.6 A7 auto_page_maker: Builds and publishes pages on Agent3 instructions; returns page_id, slug, and publish_url.
+
+4.7 A8 auto_com_center (Command Center; read-only): Displays tiles for slo, growth, seo, b2c, b2b, trust, finance, ops based on A2 data.
+
+5. Verification Checklist for Agent3 (execute)
+Before campaigns:
+
+Identity and app_started sent to A2 with correct app_name and app_base_url.
+
+Heartbeat running at 60s cadence.
+
+During campaigns:
+
+Every page build request → page_build_requested emitted.
+
+Every published page → page_published emitted (with page_id and publish_url).
+
+Every impression → impression; every CTA click → click; every referral → b2c_referral or b2b_referral.
+
+No finance events emitted by A3.
+
+After campaigns:
+
+Daily kpi_summary per campaign.
+
+Degraded mode events emitted if necessary; recovery logged.
+
+All events include:
+
+app_name: scholarship_agent
+
+app_base_url: https://scholarship-agent-jamarrlmayes.replit.app
+
+6. Quick-Start Execution Order for Agent3 (execute)
+Step 1: Identity log line + app_identity event
+
+Step 2: app_started event; start 60s heartbeats
+
+Step 3: Create Day-0 Campaign A, B, C and POST to A7 /api/agent3/build
+
+Step 4: Emit page_build_requested for each submission
+
+Step 5: On A7 responses, emit page_published for each page
+
+Step 6: Ensure each page has B2C and B2B CTAs with UTM, and emits impression/click/referral events
+
+Step 7: Call A4 enrichment per page and emit content_enriched
+
+Step 8: Emit periodic ctr_update; end-of-day kpi_summary
+
+Ongoing: Maintain heartbeats; handle retries; enforce compliance
+
+End of Prompt.
