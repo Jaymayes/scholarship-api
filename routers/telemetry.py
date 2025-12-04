@@ -11,7 +11,7 @@ Protocol ONE_TRUTH v1.2 (2025-12-01):
 from datetime import datetime, timedelta
 from typing import Optional, Dict, Any, List, Literal, Union
 from enum import Enum
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, AliasChoices
 import uuid
 import json
 
@@ -38,7 +38,7 @@ class TelemetryEvent(BaseModel):
     event_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     event_type: str = Field(..., description="Event type from catalog")
     ts_utc: datetime = Field(default_factory=datetime.utcnow)
-    app_id: str = Field(..., description="Source app identifier")
+    app_id: str = Field(..., description="Source app identifier", validation_alias=AliasChoices("app_id", "app_name", "appId", "appName", "app", "source"))
     app_base_url: Optional[str] = Field(default=None, description="v1.2: Required app base URL")
     env: str = Field(default="prod")
     version: Optional[str] = None
@@ -100,6 +100,8 @@ def normalize_event_keys(event_dict: Dict[str, Any]) -> Dict[str, Any]:
         "type": "event_type",
         "name": "event_type",
         "app": "app_id",
+        "app_name": "app_id",  # A3 Master Prompt compatibility
+        "appName": "app_name",  # camelCase variant
         "source": "app_id",
         "base_url": "app_base_url",
         "baseUrl": "app_base_url",
