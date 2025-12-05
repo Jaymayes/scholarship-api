@@ -1,0 +1,331 @@
+Below is a single, unified Command Center prompt designed to be pasted into the scholarship_agent (Agent3, A3). It includes all apps’ context so the Command Center can attribute and visualize data end-to-end. Agent3 must only execute the A3 sections and integration points explicitly marked for A3. All other app sections are for reference and routing only.
+
+Paste the entire prompt into A3. If this prompt is run anywhere else, it must STOP and mark itself READ-ONLY.
+
+— START OF UNIFIED COMMAND CENTER PROMPT (TARGET: A3 scholarship_agent) —
+
+EXECUTION GATE
+
+If current app_name != scholarship_agent (A3), STOP. Treat this prompt as read-only context and emit no write operations.
+APP REGISTRY (REFERENCE ONLY — A3 uses this for routing; do not execute others’ responsibilities)
+
+A1 scholar_auth → https://scholar-auth-jamarrlmayes.replit.app
+A2 scholarship_api (Command Center + Event Ingest) → https://scholarship-api-jamarrlmayes.replit.app
+A3 scholarship_agent → https://scholarship-agent-jamarrlmayes.replit.app
+A4 scholarship_sage → https://scholarship-sage-jamarrlmayes.replit.app
+A5 student_pilot (payments/credits) → https://student-pilot-jamarrlmayes.replit.app
+A6 provider_register → https://provider-register-jamarrlmayes.replit.app
+A7 auto_page_maker → https://auto-page-maker-jamarrlmayes.replit.app
+A8 auto_com_center (Dashboard, read-only) → https://auto-com-center-jamarrlmayes.replit.app
+COMMAND CENTER CONTRACT (A3 MUST COMPLY)
+
+Authentication (A1):
+POST {A1}/oauth/token
+Body: grant_type=client_credentials, client_id=scholarship_agent, client_secret={SCHOLARSHIP_AGENT_SECRET}, scope=telemetry:write
+Response: { access_token, token_type:"Bearer", expires_in:300 }
+Telemetry/Event Ingest (A2):
+Primary: POST {A2}/events
+Fallback (if needed): POST {A2}/telemetry
+Headers: Authorization: Bearer {access_token}, Content-Type: application/json
+Health/Stats (read-only checks):
+GET {A2}/health
+GET {A2}/api/stats
+SLO (A3 responsibility): ensure telemetry emissions uphold 99.9% uptime and ~120ms P95 for event POSTs.
+TILE ROUTING (A3 MUST SET tile_hint PER EVENT)
+
+system.health → app_identity, preflight_check, run_progress, run_completion, heartbeat
+traffic.overview → campaign_config, page_published, cta_emitted, cta_impression
+bandit.variants → bandit_config, cta_click
+revenue.overview → purchase_attributed
+providers.pipeline → provider_referral
+GLOBAL EVENT ENVELOPE (ALL EVENTS EMITTED BY A3 MUST INCLUDE)
+
+ts: ISO8601 UTC timestamp (string)
+app_name: "scholarship_agent"
+app_id: "A3"
+reporting_name: "scholarship_agent | https://scholarship-agent-jamarrlmayes.replit.app" (exact format)
+request_id: UUID v4
+session_id: UUID v4 stable for this run
+campaign_id: string (default "day1_launch_v1" unless otherwise provided)
+campaign_name: string (default "Day-1 Launch")
+tile_hint: one of [system.health, traffic.overview, bandit.variants, revenue.overview, providers.pipeline]
+utm_source: "scholarship_agent"
+utm_medium: "seo"
+utm_campaign: e.g., "day1_launch_v1"
+utm_content: variant/placement descriptor
+utm_id: a unique id for the ad or CTA variant
+metrics: object (always present; can be empty {})
+metadata: object (always present; can be empty {})
+BANDIT CONFIG (A3)
+
+Algorithm: epsilon-greedy, epsilon = 0.12
+CTA Variants (initial equal priors, updated via clicks/purchases):
+A: goal = purchase (send to A5 credits page)
+B: goal = trial_to_paid (send to A5 trial → paid funnel)
+C: goal = provider_referral (send to A6 provider sign-up flow)
+A3 must emit bandit_config once per campaign_id.
+DAY-1 OBJECTIVES (A3-LED)
+
+pages_published ≥ 200
+cta_impression ≥ 5,000
+cta_click ≥ 500
+purchase_attributed ≥ 25
+provider_referral ≥ 5
+UTM AND DESTINATIONS (A3 MUST ATTACH TO ALL OUTBOUND LINKS)
+
+To A5 credit purchase: {A5}/buy-credits?utm_source=scholarship_agent&utm_medium=seo&utm_campaign={campaign_id}&utm_content={variant}&utm_id={uuid}
+To A5 trial: {A5}/start-trial?...(same UTM)
+To A6 provider sign-up: {A6}/register?...(same UTM)
+A3 EXECUTION PLAN (ONLY THIS SECTION IS ACTIONABLE FOR AGENT3)
+
+A3.IDENTITY — IDENTIFY AND REGISTER (REQUIRED FIRST)
+
+Acquire access token from A1.
+Emit app_identity (tile_hint: system.health) to A2 with:
+reporting_name = "scholarship_agent | https://scholarship-agent-jamarrlmayes.replit.app"
+metrics: { version: "1.0", environment: "prod" }
+metadata: { description: "Agent3 launch orchestration and growth engine" }
+Example:
+{
+"ts": "2025-01-01T00:00:00Z",
+"app_name": "scholarship_agent",
+"app_id": "A3",
+"reporting_name": "scholarship_agent | https://scholarship-agent-jamarrlmayes.replit.app",
+"request_id": "uuid",
+"session_id": "uuid",
+"campaign_id": "day1_launch_v1",
+"campaign_name": "Day-1 Launch",
+"tile_hint": "system.health",
+"utm_source": "scholarship_agent",
+"utm_medium": "seo",
+"utm_campaign": "day1_launch_v1",
+"utm_content": "identity",
+"utm_id": "uuid",
+"metrics": { "version": "1.0", "environment": "prod" },
+"metadata": { "description": "Agent3 launch orchestration and growth engine" }
+}
+
+A3.1 PREFLIGHT — CONNECTIVITY AND PERMISSIONS
+
+Validate A1 token acquisition works (expires_in ~300s).
+Validate A2 ingestion: POST a test preflight_check event (tile_hint: system.health).
+On success, proceed; on failure, emit error and STOP.
+Example:
+{
+"tile_hint": "system.health",
+"metrics": { "auth_ok": 1, "ingest_ok": 1 },
+"metadata": { "notes": "Preflight successful" }
+}
+
+A3.2 CAMPAIGN CONFIG — LAUNCH TOPIC CLUSTERS
+
+Define campaign_id = "day1_launch_v1", campaign_name = "Day-1 Launch".
+Create 6–10 keyword clusters, each with 20–40 planned pages; goal total ≥200 pages.
+Emit campaign_config (tile_hint: traffic.overview) describing clusters, pages_planned, top_slugs.
+Example:
+{
+"tile_hint": "traffic.overview",
+"metrics": { "clusters": 7, "pages_planned": 240 },
+"metadata": {
+"clusters": [
+{ "name": "scholarships 2025", "pages_planned": 40, "top_slugs": ["scholarships-2025-overview","deadline-calendar"] },
+{ "name": "STEM scholarships", "pages_planned": 35, "top_slugs": ["stem-scholarships-high-school","stem-first-year"] },
+{ "name": "nursing scholarships", "pages_planned": 35 },
+{ "name": "first-generation scholarships", "pages_planned": 30 },
+{ "name": "HBCU scholarships", "pages_planned": 30 },
+{ "name": "adult learner scholarships", "pages_planned": 35 },
+{ "name": "international students scholarships", "pages_planned": 35 }
+]
+}
+}
+
+A3.3 BANDIT CONFIG — MULTI-CTA SETUP
+
+Emit bandit_config (tile_hint: bandit.variants) once for campaign_id, with epsilon=0.12 and initial priors for A/B/C.
+Example:
+{
+"tile_hint": "bandit.variants",
+"metrics": { "epsilon": 0.12 },
+"metadata": {
+"variants": [
+{ "id": "A", "goal": "purchase", "allocation": 0.34, "destination": "https://student-pilot-jamarrlmayes.replit.app/buy-credits" },
+{ "id": "B", "goal": "trial_to_paid", "allocation": 0.33, "destination": "https://student-pilot-jamarrlmayes.replit.app/start-trial" },
+{ "id": "C", "goal": "provider_referral", "allocation": 0.33, "destination": "https://provider-register-jamarrlmayes.replit.app/register" }
+]
+}
+}
+
+A3.4 CONTENT ENRICHMENT (A4 INTEGRATION)
+
+For each cluster, request brief outlines from A4 to improve page quality and FAQs.
+Do not emit A4’s events; A3 only emits its own. Record enrichment request/receive as run_progress (tile_hint: system.health) with counts.
+A3.5 PAGE GENERATION (A7 INTEGRATION)
+
+Instruct A7 to generate pages for each cluster; aim for ≥200 total.
+For each published page, A3 emits page_published (tile_hint: traffic.overview), including keyword, url, and variant used.
+Example:
+{
+"tile_hint": "traffic.overview",
+"metrics": { "pages_published_delta": 1 },
+"metadata": {
+"keyword": "stem scholarships",
+"url": "https://auto-page-maker-jamarrlmayes.replit.app/s/stem-scholarships-high-school",
+"variant": "A"
+}
+}
+
+A3.6 CTA EMISSION AND IMPRESSIONS
+
+On page render, A3 emits cta_emitted (tile_hint: traffic.overview) with placement ("sidebar","inline","header") and variant.
+On viewable impressions, A3 emits cta_impression (tile_hint: traffic.overview) with the same attribution fields.
+Examples:
+{
+"tile_hint": "traffic.overview",
+"metrics": { "cta_emitted": 1 },
+"metadata": { "placement": "inline", "variant": "B", "page_url": "..." }
+}
+{
+"tile_hint": "traffic.overview",
+"metrics": { "cta_impression": 1 },
+"metadata": { "placement": "inline", "variant": "B", "page_url": "..." }
+}
+
+A3.7 CTA CLICKS AND ROUTING (A5/A6 INTEGRATION)
+
+On click, A3 emits cta_click (tile_hint: bandit.variants), including variant, placement, and destination with full UTM params.
+Variant routing:
+A → A5 buy-credits URL
+B → A5 trial URL
+C → A6 provider registration URL
+Example:
+{
+"tile_hint": "bandit.variants",
+"metrics": { "cta_click": 1 },
+"metadata": {
+"variant": "A",
+"placement": "inline",
+"page_url": "...",
+"destination": "https://student-pilot-jamarrlmayes.replit.app/buy-credits?utm_source=scholarship_agent&utm_medium=seo&utm_campaign=day1_launch_v1&utm_content=A&utm_id=uuid"
+}
+}
+
+A3.8 PURCHASE ATTRIBUTION (LISTEN TO A5 SIGNALS)
+
+When A5 indicates a purchase with A3 UTM, A3 emits purchase_attributed (tile_hint: revenue.overview). Use last_touch attribution, include order_id and anonymized student_id hash.
+Example:
+{
+"tile_hint": "revenue.overview",
+"metrics": { "revenue_usd": 49.00, "arpu_usd": 49.00, "conversion_rate": 0.012, "credits_purchased": 200 },
+"metadata": {
+"order_id": "ord_123",
+"student_id_hash": "sha256:...",
+"attribution_model": "last_touch",
+"utm_source": "scholarship_agent",
+"utm_medium": "seo",
+"utm_campaign": "day1_launch_v1",
+"utm_content": "A",
+"utm_id": "uuid"
+}
+}
+
+A3.9 PROVIDER REFERRALS (A6 INTEGRATION)
+
+When A6 receives a valid new provider sign-up originating from A3 UTM, A3 emits provider_referral (tile_hint: providers.pipeline).
+Example:
+{
+"tile_hint": "providers.pipeline",
+"metrics": { "provider_referral": 1 },
+"metadata": {
+"provider_id": "prov_456",
+"source_page": "...",
+"utm_source": "scholarship_agent",
+"utm_medium": "seo",
+"utm_campaign": "day1_launch_v1",
+"utm_content": "C",
+"utm_id": "uuid"
+}
+}
+
+A3.10 RUN PROGRESS, HEARTBEATS, AND MONITORING
+
+Emit heartbeat every 60s (tile_hint: system.health) with counts so far: pages_published, cta_impression, cta_click, purchases, provider_referrals.
+Emit run_progress (tile_hint: system.health) at major milestones (e.g., every 25 pages, every 1000 impressions).
+Example heartbeat:
+{
+"tile_hint": "system.health",
+"metrics": {
+"heartbeat": 1,
+"pages_published": 120,
+"cta_impression": 3100,
+"cta_click": 390,
+"purchase_attributed": 19,
+"provider_referral": 3
+},
+"metadata": { "notes": "Running nominally" }
+}
+
+A3.11 ERROR HANDLING
+
+On any failure, emit error event (tile_hint: system.health), include error_type, error_message, and context request_id.
+Example:
+{
+"tile_hint": "system.health",
+"metrics": { "error": 1 },
+"metadata": {
+"error_type": "ingest_failure",
+"error_message": "HTTP 500 from A2",
+"failed_event_type": "cta_click",
+"retry_in_ms": 3000
+}
+}
+
+A3.12 DAILY SUMMARY (OPTIONAL IF RUN SPANS > 12H)
+
+Emit run_progress with summary metrics for dashboard roll-ups.
+A3.13 STOP CONDITIONS
+
+If A2 ingestion fails consistently for more than 5 attempts or if auth fails after 3 retries, emit error and STOP.
+A3.14 RESUME CONDITIONS
+
+On next run, reuse session_id if resuming within 24h; otherwise start a new session_id and emit a new app_identity.
+A3.15 RUN COMPLETION
+
+Emit run_completion (tile_hint: system.health) with final counts.
+Ensure reporting_name includes app and base URL as specified.
+Example:
+{
+"tile_hint": "system.health",
+"metrics": {
+"run_completion": 1,
+"pages_published": 220,
+"cta_impression": 5400,
+"cta_click": 615,
+"purchase_attributed": 28,
+"provider_referral": 6
+},
+"metadata": { "duration_sec": 3620, "status": "success" }
+}
+
+READ-ONLY RESPONSIBILITIES OF OTHER APPS (FOR CONTEXT — DO NOT EXECUTE IN A3)
+
+A1 scholar_auth: Issue OAuth tokens to A3 and others for telemetry:write.
+A2 scholarship_api: Ingest and store events; power A8 dashboards.
+A4 scholarship_sage: Provide content outlines/FAQs on request from A3; may emit sage_* events independently.
+A5 student_pilot: Process trials, credits, and payments; preserve UTM; emit finance events; notify A3 so A3 can emit purchase_attributed.
+A6 provider_register: Handle provider sign-ups/listings; preserve UTM; notify A3 so A3 can emit provider_referral.
+A7 auto_page_maker: Generate and publish SEO pages per A3’s plan; may emit its own events; A3 emits page_published for orchestration-level accounting.
+A8 auto_com_center: Read-only dashboard that visualizes tiles; never executes prompts.
+DATA GOVERNANCE AND ETHICS (A3)
+
+Do not log PII beyond hashed identifiers where needed (e.g., student_id_hash).
+Maintain Responsible AI: no academic dishonesty, bias mitigation where content is generated, and clear attribution for recommendations.
+Comply with relevant student privacy regulations.
+START NOW — A3 MUST:
+
+Execute A3.IDENTITY through A3.15 in order.
+Only act on instructions explicitly labeled for A3 and its integrations.
+Ensure every emitted event includes reporting_name = "scholarship_agent | https://scholarship-agent-jamarrlmayes.replit.app".
+Drive toward Day-1 targets, prioritizing organic SEO traffic and monetization via A/B/C CTA bandit.
+— END OF UNIFIED COMMAND CENTER PROMPT (TARGET: A3 scholarship_agent) —
+
+Where to run: Paste this entire prompt into the scholarship_agent (A3) environment here: https://scholarship-agent-jamarrlmayes.replit.app (or via its Replit agent console). A8 is read-only and will display the results automatically once A3 starts emitting events.
