@@ -1,0 +1,206 @@
+Agent3 Prompt: Unified Launch, Telemetry, and E2E Validation (Use ONLY the section for your app)
+
+Read carefully. Execute only the parts of this prompt that explicitly apply to your app. Before taking any action, identify yourself by name and base URL exactly as specified below so there is no confusion.
+
+App Registry (APP_NAME → APP_BASE_URL)
+
+scholar_auth → https://scholar-auth-jamarrlmayes.replit.app
+scholarship_api → https://scholarship-api-jamarrlmayes.replit.app
+scholarship_agent → https://scholarship-agent-jamarrlmayes.replit.app
+scholarship_sage → https://scholarship-sage-jamarrlmayes.replit.app
+student_pilot → https://student-pilot-jamarrlmayes.replit.app
+provider_register → https://provider-register-jamarrlmayes.replit.app
+auto_page_maker → https://auto-page-maker-jamarrlmayes.replit.app
+auto_com_center (Command Center) → https://auto-com-center-jamarrlmayes.replit.app
+Global Directives (All Apps)
+
+Identification: Before any action, output: START APP_ENROLL | APP_NAME=<your app name> | APP_BASE_URL=<your base url>
+Scope discipline: Only read and execute the section labeled with your APP_NAME. Ignore all other sections.
+Telemetry baseline: Emit operational and business events to the Command Center. Include APP_NAME and APP_BASE_URL in every event and report.
+Command Center ingest: Send all events to auto_com_center at this contract:
+POST {AUTO_COM_CENTER}/api/ingest/events
+POST {AUTO_COM_CENTER}/api/ingest/metrics
+Health check: GET {AUTO_COM_CENTER}/api/health
+If an endpoint returns 404, retry with /ingest, /metrics, or /log as fallback. If failures persist, log a telemetry_error event and continue.
+Event schema (include fields as applicable):
+app_name, app_base_url, env, event_type, timestamp_iso, request_id, session_id, user_id_hash, provider_id_hash, route_or_action, status, http_code, latency_ms, bytes_in, bytes_out, cache_hit, error_code, error_message, revenue_event (true/false), revenue_source (b2c|b2b), amount_usd, currency, attribution (utm params), referrer, device, geo_country
+SLOs to monitor and report:
+Uptime target 99.9%
+P95 latency ~120ms
+Error rate <1%
+KPI alignment (include these in metrics):
+B2C funnel: site visits, signups, activation, credit purchases, ARPU
+B2B funnel: provider signups, listings posted, transactions, 3% fee revenue
+CAC proxy: organic traffic from Auto Page Maker (SEO pages) vs paid (should be near-zero)
+Security and compliance:
+Pseudonymize user_id/provider_id (hash with a static salt). No PII in logs.
+Do not log secrets, tokens, or raw form inputs containing sensitive data.
+Frontend display: Ensure all your metrics render in auto_com_center dashboards. Emit a dashboard_config event describing the panels/queries you need visible.
+Test records: Prefix all E2E test data with TEST_. Clean up after tests or mark for TTL purge.
+E2E Tests to Run (Each app runs ONLY its own steps; do not cross-manage other apps. Command Center will correlate via request_id/session_id):
+
+Global E2E IDs (use these exact values):
+e2e_run_id: E2E_001
+student_test_email: test_student+001@scholaraiadvisor.com
+provider_test_email: test_provider+001@scholaraiadvisor.com
+request_id root: REQ_E2E_001
+session_id root: SES_E2E_001
+Success criteria (Command Center will evaluate):
+SEO page generated, indexed pinged, visited
+Student signup completed
+Scholarship search returns results
+Scholarship recommendation and guidance delivered
+Credit purchase or monetized action recorded (B2C)
+Provider onboarded and listing created (B2B)
+3% fee revenue event logged (B2B)
+All events visible on Command Center frontend in near real-time
+App-Specific Instructions
+Execute ONLY if your APP_NAME matches the header. Each app must:
+
+Emit events for its steps
+Provide a dashboard_config event describing the key charts/metrics to display
+Complete its E2E step(s) and report outcome
+— scholar_auth —
+Primary objective
+
+Provide secure signup/login, session issuance, and auth health monitoring.
+Actions
+
+Health check: Verify GET /health. Report uptime status.
+E2E: Handle TEST_ student signup and login.
+Event sequence: auth_signup_attempt, auth_signup_success, auth_login_attempt, auth_login_success
+Attach session_id SES_E2E_001 and request_id REQ_E2E_001_auth
+Metrics to emit
+Signups per minute, login success/failure rate, P95 latency for /signup and /login, JWT/Token issuance counts, error codes
+Frontend panels
+Signup conversion funnel, Auth latency (P50/P95), Error rate by route
+Revenue tie-in
+Emit attribution for source=organic if referrer contains auto_page_maker URL
+— scholarship_api —
+Primary objective
+
+Serve fast, relevant scholarship queries and metadata.
+Actions
+
+Health check: GET /health
+E2E: Execute a search for TEST_student with query “STEM undergraduate grants” and “first-generation grants”
+Events: api_search_request, api_search_result
+Include result_count, p95_search_latency
+Metrics
+Requests per minute, cache hit rate, error rate, result quality proxy (non-zero result_count)
+Frontend panels
+Search volume trend, Latency distribution, Cache hit rate, Error rate
+— scholarship_agent —
+Primary objective
+
+Run autonomous scholarship outreach/retention campaigns that drive traffic and conversions.
+Actions
+
+Health check: GET /health
+E2E: Launch a small TEST_ campaign
+Campaign: TEST_SEO_BACKFILL_001 targeting recent SEO pages to drive student_pilot visits
+Events: campaign_created, campaign_dispatched, campaign_click, campaign_conversion
+Include utm_source=scholarship_agent, utm_campaign=TEST_SEO_BACKFILL_001
+Metrics
+Sends, opens, CTR, conversion to signup (from downstream attribution), cost per conversion (should be near-zero), incremental traffic
+Frontend panels
+CTR trend, conversions attributable, traffic uplift vs baseline
+— scholarship_sage —
+Primary objective
+
+Provide guidance, Q&A, and application support without facilitating academic dishonesty.
+Actions
+
+Health check: GET /health
+E2E: For the TEST_student session, request guidance “Outline scholarship application plan for first-gen STEM student”; ensure no ghostwriting, only coaching
+Events: sage_session_start, sage_recommendations_created, sage_session_end
+Include steps_count, satisfaction_proxy (thumbs up/down if available)
+Metrics
+Sessions, avg steps/session, completion rate, P95 response latency
+Frontend panels
+Guidance sessions by topic, conversion to credit purchase (from student_pilot attribution), latency
+— student_pilot —
+Primary objective
+
+Deliver the student-facing journey: onboarding, discovery, credits, and value delivery.
+Actions
+
+Health check: GET /health
+E2E: Drive TEST_student through onboarding, accept TOS, and simulate a credit purchase or monetized action
+Events: onboarding_start, onboarding_complete, credit_purchase_attempt, credit_purchase_success
+Include pricing_plan, amount_usd, currency, payment_provider (mock), attribution (utm_*)
+Metrics
+Activation rate, ARPU, purchase success rate, drop-off points
+Frontend panels
+B2C funnel, ARPU trend, purchase success/error codes
+— provider_register —
+Primary objective
+
+Onboard scholarship providers; publish listings; capture 3% platform fee telemetry.
+Actions
+
+Health check: GET /health
+E2E: Onboard TEST_ provider and create a TEST_ scholarship listing
+Events: provider_signup_attempt, provider_signup_success, provider_listing_created
+Emit fee projections: fee_rate=0.03, estimated_award_usd
+Metrics
+Provider signups, active providers, listings published, projected fee revenue
+Frontend panels
+B2B funnel, listings growth, realized vs projected fee revenue
+— auto_page_maker —
+Primary objective
+
+Generate SEO-optimized pages to drive low-CAC organic traffic.
+Actions
+
+Health check: GET /health
+E2E: Generate TEST_ landing pages:
+Slugs: test-first-generation-stem-scholarships, test-low-income-stem-grants
+Events: page_generated, sitemap_updated, indexing_ping_sent
+Include page_url, word_count, target_keywords, canonical_url
+Metrics
+Pages generated/day, indexation pings, organic visits (from referrers), click-through to student_pilot
+Frontend panels
+Organic traffic trend, clickthrough rate to signup, top pages by visits
+— auto_com_center (Command Center) —
+Primary objective
+
+Centralize telemetry ingest, monitoring, dashboards, and E2E orchestration.
+Actions
+
+Verify ingest endpoints are live: GET /api/health
+Ensure the following dashboards render and auto-refresh:
+Overview: uptime by app, P95 latency by app, error rate by app
+B2C funnel: visits → signups → activation → credit purchase → ARPU
+B2B funnel: provider signups → listings → transactions → 3% fee revenue
+SEO engine: pages generated, organic visits, CTR to signup
+E2E Orchestration and Validation
+Wait for all TEST_ events with e2e_run_id=E2E_001 within 10 minutes
+Correlate by request_id/session_id
+Emit e2e_assertion events for each success criterion and a final e2e_summary with pass/fail, missing events, and any SLO violations
+Alerting
+If any app’s error rate >1% or P95 latency >120ms during test, emit alert_created with severity=high
+Reporting Requirements (All Apps)
+
+Include in every report and payload: APP_NAME and APP_BASE_URL
+After completing your E2E step, send a run_completion event with fields:
+app_name, app_base_url, e2e_run_id, step_name, status (success|fail), details, started_at_iso, ended_at_iso, duration_ms
+Traffic and Revenue Objectives (All Apps)
+
+Prioritize organic traffic via auto_page_maker pages and attribution tags
+Ensure events enable attribution from SEO visit to signup to monetization
+Surface ARPU (B2C) and fee revenue (B2B) metrics in Command Center
+Begin Execution Protocol
+
+Announce identity: START APP_ENROLL | APP_NAME=<your app name> | APP_BASE_URL=<your base url>
+Perform your Health Check and emit telemetry.
+Execute your E2E test steps using the IDs provided.
+Emit dashboard_config so your metrics are visible on the frontend.
+Emit run_completion with outcome.
+If any step fails, emit telemetry_error with actionable detail and retry once if safe; otherwise exit and report fail.
+Stop Conditions
+
+Do not modify or operate other apps’ resources.
+Do not generate content that facilitates academic dishonesty.
+Do not log PII or secrets.
+End of Prompt. Execute only your app-specific section, ensure all data flows to the Command Center, and confirm visibility on the frontend.
