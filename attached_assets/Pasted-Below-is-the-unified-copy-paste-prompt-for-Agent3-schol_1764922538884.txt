@@ -1,0 +1,196 @@
+Below is the unified, copy-paste prompt for Agent3 (scholarship_agent). It contains the full ecosystem context so all apps report to the Command Center via the central API and display correctly on the frontend. Important: Agent3 must only execute the Agent3 sections. All other apps must treat this as read-only context.
+
+MASTER ORCHESTRATION PROMPT — ONE_TRUTH v1.4-Unified
+
+0. EXECUTION GATE (Do-Not-Run Rule)
+
+If app_name != "scholarship_agent", STOP. Do not execute. Treat as read-only context. No network calls. No side effects.
+If app_name == "scholarship_agent", proceed with Sections A3.1–A3.10 only.
+GLOBAL APP REGISTRY (Read-Only context for every app; Agent3 uses this to identify dependencies)
+A1 scholar_auth → https://scholar-auth-jamarrlmayes.replit.app
+A2 scholarship_api (Central Telemetry + Data API, “THE HEART”) → https://scholarship-api-jamarrlmayes.replit.app
+A3 scholarship_agent (YOU) → https://scholarship-agent-jamarrlmayes.replit.app
+A4 scholarship_sage (Content Enrichment) → https://scholarship-sage-jamarrlmayes.replit.app
+A5 student_pilot (Payments/Credits) → https://student-pilot-jamarrlmayes.replit.app
+A6 provider_register (Provider Onboarding) → https://provider-register-jamarrlmayes.replit.app
+A7 auto_page_maker (SEO Page Factory) → https://auto-page-maker-jamarrlmayes.replit.app
+A8 auto_com_center (Command Center/Dashboard; Read-Only Visualizer) → https://auto-com-center-jamarrlmayes.replit.app
+2. REPORTING CONTRACT (For ALL telemetry; Agent3 must use this now)
+
+Never write directly to A8. A8 visualizes what A2 stores. All events must be sent to A2.
+Telemetry endpoint (A2): POST https://scholarship-api-jamarrlmayes.replit.app/api/analytics/events
+Authentication:
+Obtain M2M token from A1 with client_credentials:
+POST https://scholar-auth-jamarrlmayes.replit.app/oauth/token
+grant_type=client_credentials
+client_id=scholarship_agent
+client_secret=<SCHOLARSHIP_AGENT_SECRET>
+scope=telemetry:write
+Required telemetry envelope (ALL reports/events):
+prompt_version: "v1.4-Unified"
+app_id: "A3" (for Agent3)
+app_name: "scholarship_agent"
+app_base_url: "https://scholarship-agent-jamarrlmayes.replit.app"
+environment: "production"
+timestamp_utc: ISO8601
+event_id: UUIDv4
+category: one of ["identity","heartbeat","publish","traffic","cta","payment","provider","bandit","health","success","error"]
+event_name: concise snake_case label (e.g., "app_identity","page_published","cta_click")
+action: verb-like descriptor (e.g., "emit","observe","update")
+tile_hint: hints for A8 routing (e.g., "traffic.overview","bandit.variants","revenue.overview","providers.pipeline","system.health")
+correlations: { session_id, request_id, source_page_url, target_url, utm: {source, medium, campaign, content, term} }
+bandit: { variant_id: "A|B|C", policy: "epsilon_greedy", epsilon: 0.20, exploit: 0.80 }
+metrics: free-form numeric map (e.g., { ctr: 0.12, rpc: 0.85, pages_published: 200 })
+user: never include PII; use anon_user_id or cohort tags
+data: additional context payload; ensure no PII
+Heartbeat interval for Agent3: every 60 seconds
+Error reporting: category="error", event_name="telemetry_error", include error_code, error_message, component
+3. COMMAND CENTER (A8) VISUALIZATION MAPPING (Read-Only; executed implicitly when events arrive at A2)
+
+A8 reads from A2 and renders tiles based on tile_hint:
+traffic.overview → visits, pageviews, pages_published
+bandit.variants → CTR by variant, traffic allocation, reward
+revenue.overview → A5 purchases, ARPU, conversion rate, 3% provider fee revenue
+providers.pipeline → A6 provider_signups, activation funnel
+system.health → uptime, heartbeat status, error rate
+Agent3 must set tile_hint on events to ensure they appear on the frontend.
+4. B2C/B2B GROWTH OBJECTIVE (Day-1 launch goals for Agent3)
+
+Traffic: Publish and index 200+ scholarship pages via A7
+Bandit: Run CTA variant tests targeting A5 with 80% exploit / 20% explore
+Revenue: Drive students to purchase credits on A5; attribute revenue to A3 UTM campaign
+Provider awareness: Include provider CTAs on relevant pages to seed A6 traffic
+A3) AGENT3 EXECUTION PLAN (Only Agent3 executes A3.1–A3.10)
+
+A3.1 Identity handshake (App identifies itself before doing anything)
+
+Identify yourself and emit app_identity to A2 with the envelope above.
+app_id="A3", app_name="scholarship_agent", app_base_url="https://scholarship-agent-jamarrlmayes.replit.app"
+category="identity", event_name="app_identity", action="emit", tile_hint="system.health"
+metrics: { prompt_version_major: 1.4 }
+data: { dependencies: ["A1","A2","A4","A5","A6","A7"] }
+Acquire M2M token from A1 (scope: telemetry:write). Cache and refresh as needed.
+A3.2 Preflight health and SLO check
+
+Validate dependencies are reachable:
+A1 /oauth/token
+A2 /healthz or /api/e2e/status (whichever is implemented)
+A4 /api/v1/recommendations/outline (dry-run with a test keyword)
+A7 /api/agent3/build (dry-run with no publish flag)
+A5 landing page reachable (HEAD / or health endpoint if available)
+Emit health check result:
+category="health", event_name="preflight_check", action="observe", tile_hint="system.health"
+metrics: { deps_ok: 1|0, preflight_ms: <int> }
+If deps_ok=0, emit telemetry_error and retry with exponential backoff.
+A3.3 Campaign plan and bandit configuration (Day-1)
+
+Campaign name: "day1_200_indexable"
+UTM defaults for all outbound CTAs to A5:
+utm_source="scholarship_agent"
+utm_medium="seo"
+utm_campaign="day1_200_indexable"
+utm_content=variant_id
+CTA bandit variants:
+Variant A (control): "Get Matched and Apply Faster"
+Variant B: "Unlock Scholarships Today"
+Variant C: "Save Time. Win More Funding."
+Policy: epsilon_greedy; epsilon=0.20 (explore 20%), exploit=0.80
+Emit configuration:
+category="bandit", event_name="bandit_config", action="emit", tile_hint="bandit.variants"
+data: { variants: ["A","B","C"], policy:"epsilon_greedy", epsilon:0.20, exploit:0.80 }
+A3.4 Page build and publish (via A7 + enrichment via A4)
+
+For each target keyword cluster (goal ≥200 pages):
+Ask A4 to enrich content (outline, FAQs, schema).
+Ask A7 to generate page drafts (noindex=false, canonical set).
+Publish page via A7; capture URL and metadata.
+Embed CTA block with bandit variant; link to A5 with UTM.
+Emit page_published:
+category="publish", event_name="page_published", action="emit", tile_hint="traffic.overview"
+bandit: { variant_id:"A|B|C", policy:"epsilon_greedy", epsilon:0.20, exploit:0.80 }
+metrics: { pages_published_running_total:<int> }
+data: { page_url, keyword, schema_applied:true, cta_destination:"A5" }
+Target: ≥200 published pages within first execution cycle.
+A3.5 Heartbeat (every 60s)
+
+Emit heartbeat:
+category="heartbeat", event_name="heartbeat", action="emit", tile_hint="system.health"
+metrics: { pages_published:<int>, error_rate:<float>, queue_depth:<int> }
+data: { running_campaigns:["day1_200_indexable"] }
+If any dependency is down, include degraded:true and emit telemetry_error.
+A3.6 E2E_001 (Traffic and CTA)
+
+For a sample of newly published pages, simulate/observe one visit → one CTA click to A5:
+visit event:
+category="traffic", event_name="visit", action="observe", tile_hint="traffic.overview"
+correlations: { source_page_url, utm, session_id }
+cta_click event:
+category="cta", event_name="cta_click", action="observe", tile_hint="bandit.variants"
+bandit fields populated; correlations.target_url points to A5 with UTM
+Ensure events reach A2; if not, emit telemetry_error and retry.
+A3.7 E2E_002_BANDIT_CHECK (Validation of explore/exploit)
+
+Emit bandit_check with counters:
+category="bandit", event_name="bandit_check", action="observe", tile_hint="bandit.variants"
+metrics: { alloc_A:<int>, alloc_B:<int>, alloc_C:<int>, explore_rate_observed:<float> }
+Validate explore_rate_observed ≈ 0.20 ± tolerance; if outside, adjust epsilon and emit bandit_tuning event.
+A3.8 Revenue loop instrumentation (A5 attribution)
+
+Ensure all CTAs lead to A5 with UTM fields set.
+Observe payment funnel signals returned by A2 (once A5 emits them):
+payment_intent_succeeded mirrored in A2:
+category="payment", event_name="purchase_attributed", action="observe", tile_hint="revenue.overview"
+metrics: { revenue_usd:<float>, arpu:<float>, conversion_rate:<float> }
+correlations.utm.campaign="day1_200_indexable", correlations.source_page_url
+If purchase events are not arriving, emit telemetry_error and notify with suspected cause (e.g., missing UTM, route mismatch).
+A3.9 Provider pathway (optional but enabled)
+
+Add secondary CTA on suitable pages pointing to A6 for providers.
+Emit provider_referral when clicked:
+category="provider", event_name="provider_referral", action="observe", tile_hint="providers.pipeline"
+correlations.target_url points to A6 with UTM {source:"scholarship_agent", medium:"seo", campaign:"provider_seeding_v1"}
+A3.10 Success criteria and run-completion
+
+When the following are true:
+pages_published ≥ 200
+bandit explore/exploit running and validated
+telemetry queue healthy (no backlog > 2 minutes)
+Emit success_criteria:
+category="success", event_name="success_criteria", action="emit", tile_hint="traffic.overview"
+metrics: { pages_published:<int>, explore_rate_observed:<float>, ctr_weighted:<float> }
+data: { campaign:"day1_200_indexable", revenue_signals_seen:true|false }
+Then emit run_completion:
+category="success", event_name="run_completion", action="emit", tile_hint="system.health"
+data: { next_steps:["scale_keywords","iterate_variants","expand_regional_pages"] }
+5. NON-A3 READ-ONLY APP RESPONSIBILITIES (Do not execute here; for context only)
+
+A1 scholar_auth: Issue M2M tokens for scopes: telemetry:write. Maintain 99.9% uptime, 5-minute token TTL. No PII in tokens; include claims: sub, scope, role=service.
+A2 scholarship_api (THE HEART): Ingest all events. Power A8 dashboards. Provide /healthz and /api/analytics/events. Enforce schema and drop PII. Aggregate KPIs: B2C conversion, ARPU, provider fee revenue, CTR by variant, CAC proxy via organic share.
+A4 scholarship_sage: Enrich page outlines. Emit sage_* events to A2.
+A5 student_pilot: Process payments/credits; emit finance events (purchase, refund, ARPU updates) to A2 with UTM preservation.
+A6 provider_register: Emit provider funnel events to A2.
+A7 auto_page_maker: Build/publish pages; emit publish and indexing events to A2.
+A8 auto_com_center: Read-only dashboards. Never accept writes; renders tiles from A2 using tile_hint.
+6. RISK, ETHICS, AND COMPLIANCE (All apps; Agent3 must comply)
+
+No PII in telemetry payloads. Use anon_user_id only.
+Comply with FERPA/COPPA. Do not facilitate academic dishonesty. Content must guide, not generate or submit applications.
+Respect robots.txt and sitemaps. Avoid thin/duplicate content.
+7. ERROR HANDLING AND ROLLBACK (Agent3)
+
+If A2 rejects events (schema or auth), emit telemetry_error and backoff with jitter; re-auth with A1; do not drop events—queue and retry.
+If publish rate falls below target due to A7/A4 degradation, degrade gracefully: reduce page batch size, continue heartbeats, and emit degraded_mode=true in heartbeat.
+If bandit logic fails, default to Variant A (control) and emit bandit_fallback.
+8. EXECUTION START REMINDER (Agent3)
+
+Step 1: Identify yourself:
+Emit app_identity with app_name="scholarship_agent" and app_base_url="https://scholarship-agent-jamarrlmayes.replit.app"
+Step 2: Obtain token from A1 and cache.
+Step 3: Run A3.2–A3.10. All events MUST include app_name and app_base_url in the envelope exactly.
+End of ONE_TRUTH v1.4-Unified prompt for Agent3.
+
+Notes for the operator
+
+Paste this entire prompt into the Agent panel for scholarship_agent (A3).
+A3 will execute Sections A3.1–A3.10. All other sections are read-only context and must not be executed by any other app.
+Once running, A8 will visualize within ~10 seconds as A3 sends events to A2.

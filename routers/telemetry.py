@@ -36,7 +36,7 @@ class TelemetryEvent(BaseModel):
     - REQUIRES app_base_url on all events (v1.2 mandate)
     """
     event_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    event_type: str = Field(..., description="Event type from catalog")
+    event_type: str = Field(..., description="Event type from catalog", validation_alias=AliasChoices("event_type", "event_name", "eventType", "eventName", "type", "name"))
     ts_utc: datetime = Field(default_factory=datetime.utcnow)
     app_id: str = Field(..., description="Source app identifier", validation_alias=AliasChoices("app_id", "app_name", "appId", "appName", "app", "source"))
     app_base_url: Optional[str] = Field(default=None, description="v1.2: Required app base URL")
@@ -96,9 +96,10 @@ def normalize_event_keys(event_dict: Dict[str, Any]) -> Dict[str, Any]:
         "sourceIpMasked": "source_ip_masked",
         "coppaFlag": "coppa_flag",
         "ferpaFlag": "ferpa_flag",
-        # Common variations
+        # Common variations - v1.4-Unified compatibility
         "type": "event_type",
         "name": "event_type",
+        "event_name": "event_type",  # v1.4-Unified uses event_name
         "app": "app_id",
         "app_name": "app_id",  # A3 Master Prompt compatibility
         "appName": "app_name",  # camelCase variant
