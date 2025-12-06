@@ -1,0 +1,129 @@
+// AGENT 3: THE HUNTER (Scholarship Ecosystem)
+// Implementation of Swarm Constitution v1.0
+// Role: Outbound Traffic & Lead Matcher
+
+const express = require('express');
+const axios = require('axios');
+const app = express();
+const PORT = process.env.PORT || 3000;
+
+// --- CONFIGURATION & ENV ---
+const AGENT_ID = "scholarship_agent";
+const APP_BASE_URL = "https://scholarship-agent-jamarrlmayes.replit.app";
+// Swarm Endpoints (A2 & A8)
+const API_CORE_URL = "https://scholarship-api-jamarrlmayes.replit.app"; 
+const COMMAND_HUB_URL = "https://auto-com-center-jamarrlmayes.replit.app";
+
+// --- STATE MANAGEMENT ---
+let sessionStats = {
+    leadsProcessed: 0,
+    trafficRoutedToPilot: 0,
+    providerLeadsFound: 0,
+    apiLatencyMs: 0
+};
+
+// --- LOGGING STANDARD (Constitution §3) ---
+function log(message, type = "INFO") {
+    const timestamp = new Date().toISOString();
+    console.log(`[${AGENT_ID}] | [${APP_BASE_URL}] | [${timestamp}] | ${type}: ${message}`);
+}
+
+// --- ANTI-PERSONA FILTER (Constitution §2.A) ---
+function isViableLead(postContent, userBio) {
+    const prohibitedTerms = [
+        "student loans", "debt consolidation", "crypto", "giveaway", "bot", "nft"
+    ];
+    
+    const combinedText = (postContent + " " + userBio).toLowerCase();
+    
+    // 1. Check prohibited terms
+    for (const term of prohibitedTerms) {
+        if (combinedText.includes(term)) {
+            log(`Filtered Anti-Persona: Triggered by term '${term}'`, "FILTER");
+            return false;
+        }
+    }
+    return true; // Lead is clean
+}
+
+// --- EXECUTION LOOP: THE COLD START PROTOCOL ---
+async function runColdStartProtocol() {
+    log("INITIATING COLD START PROTOCOL...", "ACTION");
+
+    // SIMULATION: In production, this would hook into a Twitter/Reddit API stream
+    // We mock 10 incoming leads to demonstrate the loop
+    const mockLeadStream = [
+        { user: "StudentA", text: "Need tuition help for nursing school", type: "student" },
+        { user: "LoanSharkBot", text: "Get debt consolidation fast", type: "bot" }, // Should be filtered
+        { user: "DonorFoundation", text: "Looking to grant money to engineers", type: "provider" },
+        // ... (Simulating stream)
+    ];
+
+    for (const lead of mockLeadStream) {
+        sessionStats.leadsProcessed++;
+
+        // STEP A: ANALYSIS
+        if (!isViableLead(lead.text, lead.user)) continue;
+
+        // STEP B: THE MATCH (Querying A2)
+        const startTime = Date.now();
+        try {
+            // Simulating API call to A2 Data Core
+            // const match = await axios.get(`${API_CORE_URL}/match?query=${lead.text}`);
+            sessionStats.apiLatencyMs = Date.now() - startTime;
+            log(`Match found for ${lead.user} (Latency: ${sessionStats.apiLatencyMs}ms)`, "MATCH");
+        } catch (error) {
+            log(`A2 Connection Error: ${error.message}`, "ERROR");
+        }
+
+        // STEP C & D: HOOK & HANDOFF
+        if (lead.type === "student") {
+            log(`Routing ${lead.user} to Student Pilot (A5)`, "ROUTING");
+            sessionStats.trafficRoutedToPilot++;
+        } else if (lead.type === "provider") {
+            log(`Routing ${lead.user} to Provider Register (A6)`, "ROUTING");
+            sessionStats.providerLeadsFound++;
+        }
+
+        // REPORTING REQUIREMENT (Constitution §3)
+        // Report every 10 leads OR 1 conversion (Simplified here to report on every loop for demo)
+        await sendReportToCommandHub();
+    }
+}
+
+// --- REPORTING (Constitution §3) ---
+async function sendReportToCommandHub() {
+    const payload = {
+        agent: AGENT_ID,
+        url: APP_BASE_URL,
+        status: "active",
+        leads_processed: sessionStats.leadsProcessed,
+        traffic_routed_to_pilot: sessionStats.trafficRoutedToPilot,
+        provider_leads_found: sessionStats.providerLeadsFound,
+        api_latency_ms: sessionStats.apiLatencyMs
+    };
+
+    try {
+        // Simulating POST to A8
+        // await axios.post(`${COMMAND_HUB_URL}/report`, payload);
+        log(`Report Transmitted: ${JSON.stringify(payload)}`, "REPORT");
+    } catch (error) {
+        log(`Failed to report to Command Hub: ${error.message}`, "ERROR");
+    }
+}
+
+// --- SERVER INIT ---
+app.get('/', (req, res) => {
+    res.send('Agent 3 (The Hunter) is ACTIVE. Cold Start Protocol Running.');
+});
+
+// Start the server and the loop
+app.listen(PORT, () => {
+    log(`System Online. Listening on port ${PORT}`, "STARTUP");
+    
+    // Start the Execution Loop Interval (e.g., every 60 seconds)
+    setInterval(runColdStartProtocol, 60000);
+    
+    // Run immediately on boot
+    runColdStartProtocol();
+});
