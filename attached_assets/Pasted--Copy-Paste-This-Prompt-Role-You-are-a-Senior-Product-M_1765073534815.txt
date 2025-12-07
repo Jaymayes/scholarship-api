@@ -1,0 +1,105 @@
+📋 Copy/Paste This Prompt
+Role: You are a Senior Product Manager and Lead QA Engineer. Mission: Conduct a "Ruthless Audit" of the Scholar Autonomous Ecosystem. Goal: Identify Critical Technical Blockers (why it breaks) and Revenue Voids (why it makes $0).
+
+1. The Architecture (Target URLs)
+Auth (The Key): https://scholar-auth-jamarrlmayes.replit.app
+
+Backend (The Brain): https://scholarship-api-jamarrlmayes.replit.app
+
+Student UI (The Dashboard): https://student-pilot-jamarrlmayes.replit.app
+
+AI Services: https://scholarship-sage-jamarrlmayes.replit.app & https://scholarship-agent-jamarrlmayes.replit.app
+
+Provider UI (The Money): https://provider-register-jamarrlmayes.replit.app
+
+Growth Engine: https://auto-page-maker-jamarrlmayes.replit.app & https://auto-com-center-jamarrlmayes.replit.app
+
+Step 1: The "Wake Up" Protocol (Infrastructure Check)
+Context: Replit apps "sleep" when inactive. If the API sleeps, the frontend crashes.
+
+Action: Visit every URL in the list above immediately.
+
+Observation:
+
+Do they load a visible UI within 10 seconds?
+
+Critical Check: Visit the scholarship_api URL directly in your browser. Does it return a 200 OK status (e.g., a JSON message like {"status": "alive"}) or does it hang/return a 502/404?
+
+Step 2: The "Handshake" Audit (Identity Flow)
+Context: If users can't stay logged in across subdomains, they cannot pay.
+
+Shutterstock
+
+Action: Go to scholar_auth and register a new test account.
+
+Action: Upon success, immediately navigate to student_pilot.
+
+The "Cookie" Test: Are you still logged in?
+
+Pass: You see a dashboard with your username.
+
+Fail: You see a "Login" screen. (This indicates Authentication Cookies are being blocked by the browser due to cross-domain security policies).
+
+Step 3: The "Money Hunt" (Revenue Logic)
+Context: Find exactly where the payment transaction is supposed to happen.
+
+Path A: The Provider (B2B)
+
+Go to provider_register. Attempt to "Post a Scholarship".
+
+The Gate Check: Is there a Stripe/PayPal checkout screen?
+
+If YES: Is it in "Test Mode"? Can you bypass it?
+
+If NO: Can you submit the form for free? (If yes, this is a Revenue Void).
+
+Path B: The Student (B2C)
+
+Go to scholarship_sage. Ask a high-value question (e.g., "Draft an essay for the Coca-Cola Scholarship").
+
+The Leak: Does it answer fully for free?
+
+Go to student_pilot. Look for an "Upgrade" or "Buy Credits" button.
+
+The Dead End: Click it. Does it open a payment modal? Or does it do nothing?
+
+Step 4: The Automation Loop
+Go to auto_page_maker. Click the generate button.
+
+Result: Does it create a valid link? If you click that link, does it lead to a working signup page? (Broken links = wasted marketing spend).
+
+📝 The Deliverable: Audit Report
+Please summarize your findings in this exact structure:
+
+🔴 1. THE "RED LIST" (Broken Tech)
+
+List any URL that failed to load (Status 404/500/502).
+
+Did the login session survive the jump from scholar_auth to student_pilot? (Yes/No).
+
+Note any CORS errors seen in the console.
+
+💸 2. THE REVENUE BLOCKERS
+
+Provider Side: Is payment required to register? (Yes/No).
+
+Student Side: Is the AI advice gated behind a paywall? (Yes/No).
+
+Payment Gateway: Did you see a visible Stripe/PayPal integration?
+
+⚠️ 3. UX FRICTION
+
+How many seconds did the API take to wake up? (e.g., "API took 25s, Frontend timed out").
+
+💡 4. HYPOTHESIS
+
+Based on the above, state the #1 reason this system has generated $0 revenue so far.
+
+🕵️ Likely Findings (Cheat Sheet for the Tester)
+If you are running this test, keep an eye out for these Replit-specific issues:
+
+CORS Errors: (F12 Console) Red text saying Access to fetch at... blocked by CORS policy. This means the Frontend cannot talk to the Backend.
+
+The "Free" Loophole: The AI Agents likely provide full value without checking for a "Paid User" token.
+
+Sleep Timeout: If the API takes 30s to wake up, the Frontend usually times out at 10s, showing the user a "Network Error."
