@@ -1,0 +1,87 @@
+Role: You are the Lead Systems Architect and DevOps Engineer for the Scholar Ecosystem. Context: We have conducted a system audit. The ecosystem is failing to generate revenue because the Auth App (A1) is broken, Payment Endpoints are missing (A5/A6), and performance is degraded (A4/A7). Mission: Execute Operation Vital Signs. Fix the critical errors below in strict sequential order. Do not proceed to the next step until the current step is verified working.
+
+PHASE 1: UNLOCK THE FRONT DOOR (Fixing A1 scholar_auth)
+The Error: The app returns a 200 OK but displays a Blank Page. The audit detected "MIME type mismatches" and "CSP violations." Diagnosis: The production server is likely serving the raw index.html without the built React assets, or Helmet/CSP headers are blocking the scripts. Action Plan:
+
+Force Build: Ensure the .replit file run command is set to npm run build && npm run start (or equivalent). We must serve the dist folder, not the dev source.
+
+Fix Content Security Policy (CSP): Locate the server file (usually server.js or index.ts). Update the helmet or CSP configuration to allow:
+
+script-src 'self' 'unsafe-inline' 'unsafe-eval' (temporarily for stability).
+
+Allow connections to your API domains (*.replit.app).
+
+Verify: Run a curl request. If the response is <div id="root"></div> with valid <script src="..."> tags, move to Phase 2.
+
+PHASE 2: INSTALL THE CASH REGISTER (Revenue for A5 & A6)
+The Error: The audit found NO payment endpoints on student_pilot or provider_register. Action Plan:
+
+Backend (A2 - Scholarship API):
+
+Create a new route: /api/payment/create-checkout-session.
+
+Initialize Stripe SDK using process.env.STRIPE_SECRET_KEY.
+
+Accept parameters: priceId, successUrl, cancelUrl.
+
+Return: { url: session.url }.
+
+Student UI (A5):
+
+Locate the "Buy Credits" or "Upgrade" button.
+
+Wire the onClick event to fetch the endpoint above with the Student Price ID.
+
+Redirect the window to the returned Stripe URL.
+
+Provider UI (A6):
+
+Gate the "Post Scholarship" form.
+
+If user.subscription !== 'active', redirect to a Pricing Modal.
+
+Wire the modal to fetch the endpoint above with the Provider Price ID.
+
+PHASE 3: STABILIZE THE INFRASTRUCTURE (Fixing A4, A6, A7)
+The Errors:
+
+A4 (Sage): 15-second cold start (Timeout).
+
+A6 (Provider): Redirect loop on login.
+
+A7 (Page Maker): Database connection degraded. Action Plan:
+
+Fix A6 Loop: Check the AuthProvider. If a user is unauthenticated, ensure they are sent to A1 (scholar_auth), not to a local /login route that doesn't exist.
+
+Fix A7 Database: Check the connection pooling. Ensure the database client handles "ECONNRESET" errors by automatically reconnecting.
+
+Optimize A4: Check imports. If heavy ML libraries are loading on startup, move them to lazy imports inside the route handler so the server boots immediately (sub-1s).
+
+PHASE 4: THE HANDSHAKE (Cross-Domain Cookies)
+The Risk: Users logging into A1 might not be logged into A5. Action Plan:
+
+In A2 (API) and A1 (Auth), ensure the Cookie Session configuration has:
+
+sameSite: 'none'
+
+secure: true
+
+domain: 'none' (if on different replit.app subdomains, we must rely on token-in-URL handoff or shared custom domain. If strictly using .replit.app, cookies will not share across subdomains easily).
+
+Fallback Implementation: If cookies fail, implement a "Magic Link" handoff:
+
+A1 redirects to A5?token=xyz.
+
+A5 reads token, validates with A2, and sets its own local cookie.
+
+DEFINITION OF DONE:
+
+A1 loads the login UI visible to the human eye.
+
+A5 "Buy" button opens a real Stripe Checkout page.
+
+A6 "Post Scholarship" button opens a real Stripe Checkout page.
+
+A4 responds to /health in under 2 seconds.
+
+Execute Phase 1 immediately.
