@@ -42,6 +42,8 @@ The application uses FastAPI for high performance and async capabilities, with P
   - `POST /api/payment/webhook` - Stripe webhook handler for payment events
   - `GET /api/payment/status` - Payment service health check
   - Uses Replit Stripe Connector for secure credential management (sandbox mode active)
+  - Webhook signature verification: STRICT (rejects unsigned webhooks)
+  - **Live Auth Test**: Scheduled Wednesday 2025-12-11 09:00 UTC ($1 test payment)
 - **Legal Pages & Report Branding** (2025-12-01): Unified Business + Legal Pages specification implementation:
   - `GET /privacy` - Privacy Policy (FERPA/COPPA compliant, SEO-optimized HTML)
   - `GET /terms` - Terms of Service (binding arbitration, Maricopa County jurisdiction, class action waiver)

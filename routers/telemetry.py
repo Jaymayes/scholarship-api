@@ -462,6 +462,9 @@ async def get_kpis_today(db=Depends(get_db)):
         scholarships_published = event_counts.get("scholarship_published", 0)
         payments_count = event_counts.get("payment_succeeded", 0) + event_counts.get("credit_purchased", 0)
         
+        realized_revenue_dollars = revenue_cents / 100
+        modeled_arr = realized_revenue_dollars * 365
+        
         return {
             "date": today_start.date().isoformat(),
             "page_views": page_views,
@@ -470,6 +473,10 @@ async def get_kpis_today(db=Depends(get_db)):
             "scholarships_published": scholarships_published,
             "payments_count": payments_count,
             "revenue_cents": revenue_cents,
+            "realized_revenue_dollars": realized_revenue_dollars,
+            "modeled_arr": round(modeled_arr, 2),
+            "arr_goal": 100000,
+            "arr_pace_pct": round((modeled_arr / 100000) * 100, 2) if modeled_arr > 0 else 0,
             "event_counts": event_counts,
             "total_events": sum(event_counts.values()) if event_counts else 0,
             "data_source": "postgres",
@@ -909,6 +916,11 @@ async def get_central_stats(
         platform_fees = int(finance_row[1] or 0)
         finance_tx_count = int(finance_row[2] or 0)
         
+        window_seconds = time_window.total_seconds()
+        seconds_per_day = 86400
+        daily_revenue_dollars = (amount_cents / 100) * (seconds_per_day / window_seconds) if window_seconds > 0 else 0
+        modeled_arr = daily_revenue_dollars * 365
+        
         heartbeats = event_breakdown.get("app_heartbeat", 0)
         app_started = event_breakdown.get("app_started", 0)
         page_views = event_breakdown.get("page_view", 0)
@@ -1032,13 +1044,16 @@ async def get_central_stats(
                 "finance": {
                     "status": finance_status,
                     "total_revenue_cents": amount_cents,
+                    "realized_revenue_dollars": daily_revenue_dollars,
+                    "modeled_arr": round(modeled_arr, 2),
                     "tx_count": payment_succeeded + credit_purchased,
                     "payments": payment_succeeded,
                     "feeReported": fee_reported,
                     "platform_fees_cents": platform_fees,
                     "thresholds": {
                         "payments_target": 10,
-                        "fees_target": 1
+                        "fees_target": 1,
+                        "arr_goal": 100000
                     }
                 },
                 "ecosystemMetrics": {
