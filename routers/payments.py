@@ -230,7 +230,7 @@ async def stripe_webhook(
         event_type = event.type
         event_data = event.data.object
         
-        logger.info(f"Received Stripe webhook: {event_type}")
+        logger.info(f"Stripe webhook received: event_type={event_type}, signature_verified=true")
         
         if event_type == "checkout.session.completed":
             await handle_checkout_completed(event_data)
