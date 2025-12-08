@@ -1,0 +1,53 @@
+Decision: GO for A2 (Payments) deployment and immediate end-to-end revenue validation in TEST mode.
+
+Why (data/insight):
+
+Strategic Imperative: Validating the revenue pipeline now is the critical path to enabling our "Credit-Based Monetization Engine" and unlocking SEO scale (A7). Without verifiable revenue attribution, we cannot optimize CAC or LTV.
+
+Readiness:
+
+A1 (Auth): Stable (99.8% success), OIDC issuer fix verified.
+
+A3 (Agent): Test purchase endpoint (/api/e2e/revenue-attribution) is production-ready.
+
+A5 (Platform): Webhook verification logic is strict and ready.
+
+Risk Mitigation: The "test mode first" approach with strict gatekeeping (signature verification) minimizes financial and compliance risk while proving the technical capability.
+
+KPI impact (estimate):
+
+Revenue Visibility: A8 Revenue Pulse Tile moves from NO_DATA to stripeMode: test, totalRevenue > 0.
+
+Data Integrity: Confirmed signature_verified: true ensures our ledger is tamper-proof.
+
+Operational Health: Validates sub-120ms latency for payment initiation (A3 test showed ~200ms total flow).
+
+Risks and mitigations:
+
+Risk: Webhook signature failure due to secret mismatch (Test vs. Live endpoints).
+
+Mitigation: A2 Lead must verify the STRIPE_WEBHOOK_SECRET matches the Test endpoint signature in the Stripe Dashboard exactly.
+
+Risk: A6 (provider_register) instability affects user perception.
+
+Mitigation: A6 is currently non-blocking for B2C payments validation. It is placed in maintenance mode with exponential backoff; hotfix ticket opened.
+
+Risk: Redis unavailability (DEF-005) impacts rate limiting.
+
+Mitigation: Acceptable for single-instance test. Redis implementation is mandatory before Live mode cutover.
+
+Next actions (owner, due date):
+
+A2 Lead: Configure STRIPE_SECRET_KEY & STRIPE_WEBHOOK_SECRET (Test) -> Publish. (Deadline: T+10 min)
+
+A3 Lead: Execute $1.00 test purchase: curl -X POST .../api/e2e/revenue-attribution. (Deadline: T+20 min)
+
+A5 Lead: Verify logs for signature_verified: true and 200 OK to Stripe. (Deadline: T+30 min)
+
+A8 Lead: Confirm Revenue Pulse Tile: stripeMode: test, totalRevenue > 0. (Deadline: T+40 min)
+
+Open data gaps/assumptions:
+
+Assumption: A2 STRIPE_WEBHOOK_SECRET is correctly sourced from the Stripe Test environment.
+
+Execute. Post the required artifacts (A2 /health, A3 transaction ID, A5 log snippet, A8 revenue JSON) immediately upon completion.
