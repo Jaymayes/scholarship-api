@@ -13,7 +13,7 @@ from fastapi import APIRouter, HTTPException, Request, Header
 from pydantic import BaseModel
 import stripe
 
-from services.stripe_client import configure_stripe, get_publishable_key
+from services.stripe_client import configure_stripe, get_publishable_key, StripeConfigurationError
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/payment", tags=["Payments"])
@@ -76,7 +76,18 @@ async def create_checkout_session(
     """
     try:
         await configure_stripe()
-        
+    except StripeConfigurationError as e:
+        logger.error(f"Stripe not configured: {e}")
+        raise HTTPException(
+            status_code=503,
+            detail={
+                "error": "stripe_not_configured",
+                "message": str(e),
+                "action": "Configure Stripe integration in Replit to enable payments"
+            }
+        )
+    
+    try:
         create_params: Dict[str, Any] = {
             "line_items": [{"price": request_data.price_id, "quantity": 1}],
             "mode": request_data.mode,
@@ -117,7 +128,11 @@ async def create_checkout_session(
         if "No API key provided" in error_msg or "Invalid API Key" in error_msg:
             raise HTTPException(
                 status_code=503,
-                detail="Payment service temporarily unavailable. Stripe not configured."
+                detail={
+                    "error": "stripe_credentials_invalid",
+                    "message": "Stripe API key is missing or invalid",
+                    "action": "Reconfigure Stripe integration in Replit"
+                }
             )
         
         if "No such price" in error_msg:
@@ -154,6 +169,16 @@ async def get_stripe_publishable_key() -> PublishableKeyResponse:
     try:
         key = await get_publishable_key()
         return PublishableKeyResponse(publishable_key=key)
+    except StripeConfigurationError as e:
+        logger.error(f"Stripe not configured: {e}")
+        raise HTTPException(
+            status_code=503,
+            detail={
+                "error": "stripe_not_configured",
+                "message": str(e),
+                "action": "Configure Stripe integration in Replit to enable payments"
+            }
+        )
     except Exception as e:
         logger.error(f"Failed to get publishable key: {e}")
         raise HTTPException(

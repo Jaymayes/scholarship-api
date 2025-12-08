@@ -36,6 +36,12 @@ The application uses FastAPI for high performance and async capabilities, with P
   - Synthetic event validation when `SYNTHETIC=true` environment variable is set
   - **S2S CSRF Fix (2025-11-30)**: WAF bypass for `/api/analytics/events` enables service-to-service telemetry without CSRF false positives
 - **Credits Ledger System**: A transactional credit ledger system enabling B2C monetization and paywalled AI features, featuring a database-backed ledger, transactional idempotency, row-level locking, API endpoints with JWT and RBAC, and security/compliance features.
+- **Stripe Payment Integration** (2025-12-08): Centralized payment endpoints for ecosystem apps (Operation Vital Signs):
+  - `POST /api/payment/create-checkout-session` - Create Stripe Checkout session (for A5/A6)
+  - `GET /api/payment/publishable-key` - Get Stripe publishable key for frontend
+  - `POST /api/payment/webhook` - Stripe webhook handler for payment events
+  - `GET /api/payment/status` - Payment service health check
+  - Uses Replit Stripe Connector for secure credential management (sandbox mode active)
 - **Legal Pages & Report Branding** (2025-12-01): Unified Business + Legal Pages specification implementation:
   - `GET /privacy` - Privacy Policy (FERPA/COPPA compliant, SEO-optimized HTML)
   - `GET /terms` - Terms of Service (binding arbitration, Maricopa County jurisdiction, class action waiver)

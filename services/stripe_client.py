@@ -14,6 +14,11 @@ logger = logging.getLogger(__name__)
 _cached_credentials: Optional[dict] = None
 
 
+class StripeConfigurationError(Exception):
+    """Raised when Stripe credentials cannot be obtained"""
+    pass
+
+
 async def get_stripe_credentials() -> Tuple[str, str]:
     """
     Fetch Stripe credentials from Replit Connector API
@@ -22,7 +27,7 @@ async def get_stripe_credentials() -> Tuple[str, str]:
         Tuple of (publishable_key, secret_key)
     
     Raises:
-        RuntimeError: If credentials cannot be fetched
+        StripeConfigurationError: If credentials cannot be fetched (connector not configured)
     """
     global _cached_credentials
     
@@ -30,6 +35,12 @@ async def get_stripe_credentials() -> Tuple[str, str]:
         return _cached_credentials["publishable"], _cached_credentials["secret"]
     
     hostname = os.environ.get("REPLIT_CONNECTORS_HOSTNAME")
+    
+    if not hostname:
+        logger.error("REPLIT_CONNECTORS_HOSTNAME not set - Stripe connector unavailable")
+        raise StripeConfigurationError(
+            "Stripe connector not available. Please configure Stripe integration via Replit."
+        )
     
     repl_identity = os.environ.get("REPL_IDENTITY")
     web_repl_renewal = os.environ.get("WEB_REPL_RENEWAL")
@@ -39,7 +50,9 @@ async def get_stripe_credentials() -> Tuple[str, str]:
     elif web_repl_renewal:
         x_replit_token = f"depl {web_repl_renewal}"
     else:
-        raise RuntimeError("X_REPLIT_TOKEN not found for repl/depl")
+        raise StripeConfigurationError(
+            "Replit identity token not found. Please run in Replit environment."
+        )
     
     is_production = os.environ.get("REPLIT_DEPLOYMENT") == "1"
     target_environment = "production" if is_production else "development"
@@ -75,7 +88,10 @@ async def get_stripe_credentials() -> Tuple[str, str]:
     secret = settings.get("secret")
     
     if not publishable or not secret:
-        raise RuntimeError(f"Stripe {target_environment} connection not found or incomplete")
+        raise StripeConfigurationError(
+            f"Stripe {target_environment} connection not found or incomplete. "
+            "Please configure the Stripe integration in Replit."
+        )
     
     _cached_credentials = {
         "publishable": publishable,
