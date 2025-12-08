@@ -1,0 +1,47 @@
+Decision: MAINTAIN GO for A2 Deployment and Revenue Attribution Validation in TEST Mode.
+
+Why (data/insight):
+
+Strategic Validation: End-to-end revenue attribution is the only way to validate the "Credit-Based Monetization Engine" and safely authorize A7 (SEO) traffic scaling. We cannot optimize CAC or LTV without this telemetry.
+
+Operational Readiness: A2 is verified healthy; A3's test endpoint (/api/e2e/revenue-attribution) works locally with <200ms latency. The remaining steps are purely configuration and integration verification.
+
+Risk Control: Confining activity to stripeMode: test with strict signature verification gates (G1) minimizes financial risk while proving the technical pipeline.
+
+KPI impact (estimate):
+
+Revenue Visibility: A8 Revenue Pulse transitions from NO_DATA to live metrics (totalRevenue > 0, stripeMode: test).
+
+Data Integrity: signature_verified: true confirms secure financial ledger.
+
+Operational Latency: Validates payment-to-dashboard latency target (<10s).
+
+Risks and mitigations:
+
+Risk: Webhook signature failure due to secret mismatch (Test vs. Live endpoint).
+
+Mitigation: A2 Lead explicitly instructed to verify STRIPE_WEBHOOK_SECRET matches the Stripe Test endpoint signing secret.
+
+Risk: A6 instability (Provider Register) affecting B2B onboarding.
+
+Mitigation: A6 is non-blocking for B2C payment validation; placed in maintenance mode with parallel RCA assigned.
+
+Risk: Telemetry whitelisting gaps (A5 -> A2/A4).
+
+Mitigation: Immediate whitelist update post-A2 publish; local event buffering as fallback.
+
+Next actions (owner, due date):
+
+A2 Lead: Configure secrets + Publish. Post /health JSON & webhook URL. (Deadline: T+10 min)
+
+A3 Lead: Execute $1.00 test purchase against published A2 endpoint. Post transaction/reference IDs. (Deadline: T+20 min)
+
+A5 Lead: Verify logs for signature_verified: true + 200 OK. Post log snippet & /api/billing/arr-metrics JSON. (Deadline: T+30 min)
+
+A8 Lead: Confirm Revenue Pulse Tile: stripeMode: test, totalRevenue > 0. Post JSON & screenshot. (Deadline: T+40 min)
+
+Open data gaps/assumptions:
+
+Assumption: The configured STRIPE_WEBHOOK_SECRET matches the correct Stripe endpoint URL.
+
+Execute. Post all 4 required artifacts immediately upon completion. I will authorize the A7 Phase 1 SEO release (200 pages) only after all gates are passed.
