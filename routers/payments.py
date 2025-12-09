@@ -8,6 +8,7 @@ Provides centralized payment endpoints for A5 (student_pilot) and A6 (provider_r
 import logging
 import os
 import json
+from datetime import datetime
 from typing import Optional, Any, Dict
 from fastapi import APIRouter, HTTPException, Request, Header
 from pydantic import BaseModel
@@ -256,25 +257,59 @@ async def handle_checkout_completed(session: Any) -> None:
     
     - For payment mode: Grant credits to user via external billing service
     - For subscription mode: Activate provider subscription
+    - Emit revenue event to A8 Command Center
     """
+    import httpx
+    
     if isinstance(session, dict):
         session_id = session.get("id", "unknown")
         metadata = session.get("metadata", {})
         mode = session.get("mode", "payment")
+        amount_total = session.get("amount_total", 0)
+        currency = session.get("currency", "usd")
     else:
         session_id = getattr(session, "id", "unknown")
         metadata = getattr(session, "metadata", {}) or {}
         mode = getattr(session, "mode", "payment")
+        amount_total = getattr(session, "amount_total", 0)
+        currency = getattr(session, "currency", "usd")
     
-    logger.info(f"Checkout completed: {session_id}")
+    logger.info(f"Checkout completed: {session_id}, amount={amount_total} {currency}")
     
     if mode == "payment":
         user_id = metadata.get("user_id", "unknown")
-        app = metadata.get("app", "unknown")
+        app = metadata.get("app", "scholarship_api")
         logger.info(f"Credit purchase completed. User: {user_id}, App: {app}")
     elif mode == "subscription":
         provider_id = metadata.get("provider_id", "unknown")
         logger.info(f"Subscription activated. Provider: {provider_id}")
+    
+    a8_url = os.environ.get("A8_INGEST_URL", "https://auto-com-center-jamarrlmayes.replit.app/ingest")
+    
+    try:
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            revenue_event = {
+                "source": "https://scholarship-api-jamarrlmayes.replit.app",
+                "app_id": "scholarship_api",
+                "metric": "REVENUE",
+                "event_type": "checkout.session.completed",
+                "status": "pass",
+                "amount_cents": amount_total,
+                "currency": currency,
+                "session_id": session_id,
+                "signature_verified": True,
+                "timestamp": datetime.utcnow().isoformat() + "Z"
+            }
+            
+            response = await client.post(a8_url, json=revenue_event)
+            
+            if response.status_code in (200, 201, 202):
+                logger.info(f"Revenue event emitted to A8: {amount_total} cents, session={session_id}")
+            else:
+                logger.warning(f"A8 ingest returned {response.status_code}: {response.text}")
+                
+    except Exception as e:
+        logger.warning(f"Failed to emit revenue event to A8 (non-blocking): {e}")
 
 
 async def handle_invoice_paid(invoice: Any) -> None:
