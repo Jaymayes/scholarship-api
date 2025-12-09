@@ -295,6 +295,101 @@ async def handle_subscription_cancelled(subscription: Any) -> None:
     logger.info(f"Subscription cancelled: {subscription_id}")
 
 
+class TestCheckoutRequest(BaseModel):
+    """Simplified request for revenue validation testing"""
+    amount: int = 100
+    currency: str = "usd"
+    success_url: Optional[str] = None
+    cancel_url: Optional[str] = None
+
+
+@router.post("/create-test-session")
+async def create_test_session(
+    request_data: TestCheckoutRequest,
+    request: Request
+) -> Dict[str, Any]:
+    """
+    Create a test checkout session for revenue validation
+    
+    This is a simplified endpoint for the validation sequence (G1-G3).
+    Creates a Stripe Checkout session with amount in cents.
+    
+    **Request Body:**
+    ```json
+    {"amount": 100, "currency": "usd"}
+    ```
+    
+    **Response:**
+    ```json
+    {
+        "checkout_url": "https://checkout.stripe.com/...",
+        "session_id": "cs_test_...",
+        "amount_cents": 100,
+        "test_mode": true
+    }
+    ```
+    """
+    try:
+        await configure_stripe()
+    except StripeConfigurationError as e:
+        logger.error(f"Stripe not configured: {e}")
+        raise HTTPException(
+            status_code=503,
+            detail={
+                "error": "stripe_not_configured",
+                "message": str(e),
+                "action": "Configure Stripe integration in Replit"
+            }
+        )
+    
+    app_base_url = os.environ.get("REPLIT_DEV_DOMAIN", "scholarship-api-jamarrlmayes.replit.app")
+    if not app_base_url.startswith("http"):
+        app_base_url = f"https://{app_base_url}"
+    
+    success_url = request_data.success_url or f"{app_base_url}/payment-success?session_id={{CHECKOUT_SESSION_ID}}"
+    cancel_url = request_data.cancel_url or f"{app_base_url}/payment-cancel"
+    
+    try:
+        session = stripe.checkout.Session.create(
+            line_items=[{
+                "price_data": {
+                    "currency": request_data.currency,
+                    "product_data": {
+                        "name": "Revenue Validation Test",
+                        "description": f"G1-G3 validation: ${request_data.amount / 100:.2f} test purchase"
+                    },
+                    "unit_amount": request_data.amount
+                },
+                "quantity": 1
+            }],
+            mode="payment",
+            success_url=success_url,
+            cancel_url=cancel_url,
+            metadata={
+                "validation_test": "true",
+                "app": "scholarship_api",
+                "amount_cents": str(request_data.amount)
+            }
+        )
+        
+        logger.info(f"Test checkout session created: {session.id} for ${request_data.amount / 100:.2f}")
+        
+        return {
+            "checkout_url": session.url,
+            "session_id": session.id,
+            "amount_cents": request_data.amount,
+            "test_mode": True,
+            "message": "Complete checkout to trigger webhook and record revenue"
+        }
+        
+    except stripe.StripeError as e:
+        logger.error(f"Stripe error: {e}")
+        raise HTTPException(status_code=500, detail=f"Stripe error: {str(e)}")
+    except Exception as e:
+        logger.error(f"Failed to create test session: {e}")
+        raise HTTPException(status_code=500, detail="Failed to create test session")
+
+
 @router.get("/status")
 async def payment_status() -> Dict[str, Any]:
     """

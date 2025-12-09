@@ -81,6 +81,9 @@ class WAFProtection(BaseHTTPMiddleware):
             "/api/events/single",  # Telemetry Contract v1.1: Single event write endpoint
             "/api/analytics/events",  # Telemetry Contract v1.1: Primary S2S event write (CSRF FIX 2025-11-30)
             "/api/analytics/events/raw",  # Protocol ONE TRUTH: Raw body fallback for 422 debugging
+            "/api/payment/create-checkout-session",  # Stripe checkout session (Operation Vital Signs)
+            "/api/payment/create-test-session",  # Revenue validation test endpoint
+            "/api/payment/webhook",  # Stripe webhook (signed payload)
         }
         
         # SECURITY: Regex patterns for dynamic routes that require WAF bypass
