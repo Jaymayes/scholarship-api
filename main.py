@@ -345,6 +345,42 @@ async def startup_telemetry():
     
     asyncio.create_task(heartbeat_loop())
     logger.info("💓 TELEMETRY: Heartbeat loop started (60s interval)")
+    
+    # PHASE 2 MANDATE: Command Center Heartbeat
+    async def send_command_center_heartbeat():
+        """Send heartbeat to auto_com_center per Global Mandate"""
+        import httpx
+        
+        command_center_url = os.getenv(
+            "COMMAND_CENTER_URL", 
+            "https://auto-com-center-jamarrlmayes.replit.app"
+        )
+        
+        try:
+            async with httpx.AsyncClient(timeout=5.0) as client:
+                payload = {
+                    "app_name": "scholarship_api",
+                    "status": "online",
+                    "url": "https://scholarship-api-jamarrlmayes.replit.app",
+                    "revenue_ready": True,
+                    "stripe_configured": True,
+                    "version": settings.api_version
+                }
+                
+                response = await client.post(
+                    f"{command_center_url}/api/heartbeat",
+                    json=payload
+                )
+                
+                if response.status_code in (200, 201, 202):
+                    logger.info(f"✅ COMMAND CENTER: Heartbeat sent successfully")
+                else:
+                    logger.warning(f"⚠️ COMMAND CENTER: Heartbeat returned {response.status_code}")
+                    
+        except Exception as e:
+            logger.warning(f"⚠️ COMMAND CENTER: Heartbeat failed (non-blocking): {e}")
+    
+    await send_command_center_heartbeat()
 
 # Mount static files
 app.mount("/static", StaticFiles(directory="static"), name="static")
