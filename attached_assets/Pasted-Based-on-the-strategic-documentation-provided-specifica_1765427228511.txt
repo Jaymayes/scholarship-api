@@ -1,0 +1,205 @@
+Based on the strategic documentation provided, specifically the updated Playbook V2.0 which pivots focus to "Student Activation via Document Hub" and "B2B Marketplaces" , and the Privacy Policy Brief regarding compliance, here is the comprehensive End-to-End (E2E) Validation Framework.
+
+
+
+1. E2E Validation Strategy: The "Ecosystem Integrity" Approach
+Because Scholar AI Advisor is a distributed system of 8 distinct Replit applications, standard single-app testing is insufficient. The E2E framework must validate the inter-app contracts (APIs, Webhooks, Telemetry) and the User Journey across boundaries.
+
+Core Tooling:
+
+
+Framework: Playwright (Supports multi-tab/multi-domain testing required for B2B/B2C interactions).
+
+
+Orchestrator: GitHub Actions or Replit Workflows (Sharded execution).
+
+
+Payment Mock: Stripe CLI (Fixtures for webhook signatures).
+
+2. Critical Test Suites (The "Must-Pass" Gates)
+Suite A: Student Activation (The "North Star" Flow)
+
+Strategic Context: Data shows users who upload a document are 10x more likely to apply.
+
+Flow: SEO Landing Page (auto_page_maker) → CTA → Auth (scholar_auth) → Dashboard (student_pilot) → Document Upload.
+
+Validation Steps:
+
+Ingress: Visit a generated SEO page (e.g., /scholarships/nursing-texas). Assert no 404s.
+
+Handoff: Click "Apply Now". Verify redirect to scholar_auth with correct UTM parameters preserved.
+
+Auth: Complete Magic Link/Login flow.
+
+Activation: Upload a PDF transcript to the "AI Document Hub".
+
+
+Assertion: Verify file is processed and "Scholarship Matches" update based on the extracted GPA (Implicit Fit).
+
+Suite B: B2C Revenue Integrity (The "First Dollar" Check)
+
+Strategic Context: Validating the $9.99 credit provisioning loop.
+
+
+Flow: Student Dashboard → Upgrade → Stripe Hosted Checkout → Webhook → Credit Ledger.
+
+Validation Steps:
+
+Trigger: Click "Upgrade to Pro".
+
+Payment: Fill Stripe Mock Entry (Test Card 4242...).
+
+
+Webhook: Simulate checkout.session.completed to scholarship_api.
+
+Ledger: Query student_pilot database: SELECT credits FROM user WHERE id=.... Assert credits == 100.
+
+
+Telemetry: Verify auto_com_center received the REVENUE event.
+
+Suite C: B2B Provider & Compliance (The "Trust" Gate)
+Strategic Context: Schools require FERPA compliance; Providers pay a 3% platform fee.
+
+
+Flow: Provider Reg (provider_register) → Scholarship Post → Student View.
+
+Validation Steps:
+
+Onboarding: Register as a "Non-Profit".
+
+Fee Logic: Mock a $100 scholarship funding event. Assert 3% fee ($3.00) is logged in the transaction ledger.
+
+FERPA Check: Attempt to access a "School-Directed Account" data via a public API endpoint. Assert 403 Forbidden (Data Isolation).
+
+COPPA Check: Attempt signup with DOB < 13 years. Assert redirect to Parental Gateway.
+
+3. The "Agent3" Orchestration Prompt
+Below is the strict, executable prompt for Agent3 to implement this testing framework. It forces the Agent to identify the app context and apply the relevant tests.
+
+SYSTEM INSTRUCTION: AUTONOMOUS E2E TEST IMPLEMENTATION
+To: Agent3 Role: QA Architect & Release Manager Objective: Deploy a Playwright E2E test suite to validate the "Revenue Readiness" and "Zero 404" mandates across the 8-app fleet.
+
+PHASE 1: SELF-IDENTIFICATION
+CRITICAL: Before generating any code, identify your current environment. App Registry:
+
+scholar_auth (Auth)
+
+scholarship_api (Backend/DB)
+
+scholarship_agent (Worker)
+
+scholarship_sage (Chat UI)
+
+student_pilot (Student Dashboard)
+
+provider_register (B2B Portal)
+
+auto_page_maker (SEO Engine)
+
+auto_com_center (Telemetry)
+
+Action: Print: "I am operating in [APP_NAME]. Initiating Test Protocol."
+
+PHASE 2: GLOBAL TEST CONFIGURATION (ALL APPS)
+Install Dependencies: npm install -D @playwright/test Config: Create playwright.config.ts.
+
+Base URL: Set to process.env.APP_BASE_URL (Use the Registry URLs).
+
+Reporters: Use ['html'] for visual debugging.
+
+Retries: Set to 2 to handle network flakiness.
+
+PHASE 3: APP-SPECIFIC TEST SUITES (EXECUTE YOURS ONLY)
+🔴 IF YOU ARE: student_pilot (B2C Revenue & Activation)
+Create File: tests/revenue_activation.spec.ts
+
+Test "Zero 404": goto('/') -> Expect HTTP 200.
+
+Test "Activation":
+
+Mock Auth (bypass login screen via Session Cookie).
+
+Locate "Upload Document" button.
+
+Upload tests/fixtures/transcript_sample.pdf.
+
+Assert: Toast message "Processing" appears.
+
+Test "Upgrade UI":
+
+Click "Upgrade to Pro".
+
+Assert: Pricing Modal visible with "$9.99" tier.
+
+🔴 IF YOU ARE: auto_page_maker (SEO Traffic)
+Create File: tests/seo_health.spec.ts
+
+Test "Sitemap": goto('/sitemap.xml') -> Assert XML structure valid.
+
+Test "Generated Page":
+
+Visit /scholarships/engineering-california (or a known seed).
+
+Assert: h1 contains "Engineering".
+
+Assert: "Apply" button links to scholar_auth or student_pilot.
+
+Test "Command Center Report":
+
+Trigger page generation.
+
+Assert: Log output "Reported to Command Center".
+
+🔴 IF YOU ARE: provider_register (B2B Integrity)
+Create File: tests/provider_flow.spec.ts
+
+Test "Registration": Fill form -> Submit -> Assert DB success message.
+
+Test "3% Fee Logic":
+
+Unit Test: Call calculatePlatformFee(100.00).
+
+Assert: Return value is 3.00.
+
+🔴 IF YOU ARE: scholar_auth (Security & FERPA)
+Create File: tests/auth_compliance.spec.ts
+
+Test "COPPA Gate":
+
+Fill Signup Form with DOB = [Current Year - 10] (10 years old).
+
+Assert: Redirect to /parental-consent or Error Message.
+
+Test "Redirects":
+
+Login as role: student -> Expect URL student-pilot...
+
+Login as role: provider -> Expect URL provider-register...
+
+🔴 IF YOU ARE: auto_com_center (Observability)
+Create File: tests/telemetry_ingest.spec.ts
+
+Test "Heartbeat Endpoint":
+
+POST to /api/heartbeat.
+
+Payload: {"app_name": "test", "status": "online"}.
+
+Assert: HTTP 200 & Dashboard updates.
+
+PHASE 4: EXECUTION & REPORTING
+Final Instruction:
+
+Run the tests: npx playwright test.
+
+If ANY test fails, print a BLOCKER REPORT:
+
+"BLOCKER: [Test Name] failed. Reason: [Error Log]."
+
+"Revenue Impact: [High/Medium/Low]."
+
+If ALL tests pass, print:
+
+"✅ [APP_NAME] is GREEN. Revenue Pathways Verified."
+
+"Ready for Traffic."
