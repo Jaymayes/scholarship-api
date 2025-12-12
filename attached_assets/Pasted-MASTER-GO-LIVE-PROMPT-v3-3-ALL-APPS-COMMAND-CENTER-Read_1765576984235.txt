@@ -1,0 +1,187 @@
+MASTER GO‑LIVE PROMPT v3.3 (ALL APPS + COMMAND CENTER)
+Read me carefully. Every app must:
+
+Only execute the instructions in the section labeled for its app.
+Identify itself first (app_name + APP_BASE_URL) in all console logs, events, and reports.
+Emit telemetry to the command center (A8) for monitoring and frontend display, with A2 as the fallback sink.
+Respect SLOs: 99.9% uptime; ~120ms P95 latency (A7 may exceed P95 during heavy generation).
+Comply with FERPA/COPPA, Responsible AI, no academic dishonesty, bias mitigation, and transparent explanations.
+APP REGISTRY
+
+A1 scholar_auth → https://scholar-auth-jamarrlmayes.replit.app
+A2 scholarship_api → https://scholarship-api-jamarrlmayes.replit.app
+A3 scholarship_agent → https://scholarship-agent-jamarrlmayes.replit.app
+A4 scholarship_sage → https://scholarship-sage-jamarrlmayes.replit.app
+A5 student_pilot → https://student-pilot-jamarrlmayes.replit.app
+A6 provider_register → https://provider-register-jamarrlmayes.replit.app
+A7 auto_page_maker → https://auto-page-maker-jamarrlmayes.replit.app
+A8 auto_com_center → https://auto-com-center-jamarrlmayes.replit.app
+GLOBAL TELEMETRY AND REPORTING (ALL APPS)
+
+Primary ingest (A8): POST https://auto-com-center-jamarrlmayes.replit.app/api/ingest
+Fallback ingest (A2): POST https://scholarship-api-jamarrlmayes.replit.app/api/analytics/events (A2 may also accept POST /api/events)
+Required headers: Content-Type: application/json; X-Idempotency-Key: <uuid-v4>
+Required fields in every event payload:
+event_type
+app_name (e.g., scholarship_agent)
+app_base_url (e.g., https://scholarship-agent-jamarrlmayes.replit.app)
+timestamp (ISO-8601 UTC)
+metadata (object; see per-event specs)
+Retry policy: If A8 is non-2xx, set telemetry_fallback=true and send the same event to A2. If A2 also fails, buffer locally with exponential backoff and retry every 30s until success. Always preserve idempotency keys to prevent duplicate counting.
+Frontend display requirement: A8 must render real-time dashboards from the ingested events (Fleet Health, Latency, Heartbeats, Lead Funnels, Revenue Signals, Traffic Sources, SEO Coverage). All apps must send events to feed these dashboards.
+EVENT TYPES (ALL APPS MUST USE THESE EXACT TYPES WHERE APPLICABLE)
+
+APP_ONLINE: announce startup and version.
+PREFLIGHT_CHECK: dependency status matrix relevant to the app.
+HEARTBEAT (60s): health pulse with critical counters, queue depths, dependency health summaries.
+KPI_SNAPSHOT (5m): short-window KPIs (leads, revenue signals, conversions).
+TRAFFIC (5m for A7; 5–15m for others): channel performance, SEO coverage, UTM breakdown.
+LEAD_STUDENT: student lead captured or routed (A3/A5 primary).
+LEAD_PROVIDER: provider lead captured or routed (A3/A6 primary).
+ALERT: critical state, kill switches, regulatory or security incidents.
+ERROR: exceptions and failure reports with stack/context.
+GO/NO-GO GATES (ALL APPS)
+
+Paid traffic must be disabled unless A5 stripe_mode == live and A8 ingest is 2xx OR A2 fallback is 2xx.
+Provider routing must be disabled unless A6 health == 200 AND provider_onboarding == active.
+If any dependency is degraded, continue organic-only mode, buffer events, and emit ALERT with remediation hint.
+DATA PRIVACY, ETHICS, AND SECURITY (ALL APPS)
+
+No PII in logs; PII goes only in secure payload fields intended for lead processing. Tokenize or hash when possible.
+Respect consent flags on all lead capture forms; include consent_version in lead events.
+AI transparency: include ai_model, model_version, and rationale_available for any AI-driven output events.
+APP-SPECIFIC INSTRUCTIONS
+
+A1 — scholar_auth (Auth gateway)
+
+Identify: app_name=scholar_auth, app_base_url=https://scholar-auth-jamarrlmayes.replit.app
+APP_ONLINE: include oauth_flows, pkce_enabled, jwt_minting.
+PREFLIGHT_CHECK: verify A8 ingest (and A2 fallback); include A5_stripe_mode probe result to help A3.
+HEARTBEAT: active_sessions_count, oauth_success_1m, oauth_errors_1m.
+KPI_SNAPSHOT: new_signups_5m, verified_emails_5m.
+On successful signup, emit LEAD_STUDENT (source=auth_signup) with consent_version and route hint target_app=A5.
+A2 — scholarship_api (Telemetry fallback + shared services)
+
+Identify: app_name=scholarship_api, app_base_url=https://scholarship-api-jamarrlmayes.replit.app
+Accept all event types from all apps; validate required fields plus X-Idempotency-Key.
+Persist timeseries for A8 mirroring; respond 200 fast-path to avoid backpressure.
+HEARTBEAT: ingest_qps, backlog_depth, last_a8_forward_status.
+Forwarding: attempt to forward to A8 if configured; do not drop on failure—buffer.
+A3 — scholarship_agent (Lead routing + campaign orchestration) — THIS SECTION IS FOR AGENT3 ONLY
+
+Identity and startup
+Immediately print and emit: app_name=scholarship_agent; app_base_url=https://scholarship-agent-jamarrlmayes.replit.app
+APP_ONLINE event payload must include:
+version: "v3.3"
+dep_mode: "organic_only_boot" unless A5 stripe_mode == live
+campaign_modes: {organic: true, paid: false}
+expected_sequence: ["APP_ONLINE","PREFLIGHT_CHECK","HEARTBEAT(60s)","KPI_SNAPSHOT(5m)","LEAD_* as captured/routed"]
+2. PREFLIGHT_CHECK (execute within 30s of boot; re-run on major state change)
+
+Probe and include status_matrix:
+A1_health, A1_oauth_operational
+A4_health, A4_services.ai_chat, A4_services.websocket
+A5_health, A5_stripe_mode
+A6_health, A6_provider_onboarding
+A7_health
+A8_health (note 200/403/404); set telemetry_fallback=true if A8 != 2xx
+Include recommended action flags:
+route_provider_leads = (A6_health == "200" AND A6_provider_onboarding == "active")
+enable_paid_traffic = (A5_stripe_mode == "live" AND (A8_health == "200" OR telemetry_fallback == true))
+lead_queue_mode = (A5_stripe_mode != "live")
+If route_provider_leads == true: note target POST https://provider-register-jamarrlmayes.replit.app/api/providers/register
+If lead_queue_mode == true: queue student leads locally and emit HEARTBEAT with lead_queue_depth
+3. Lead capture and routing logic
+
+Student leads:
+Primary route: A5 student_pilot intake endpoint (POST /api/leads or /api/checkout/init as configured).
+If A5_stripe_mode != live: do not start paid flows; queue with status=queued_unpaid; emit LEAD_STUDENT with status=queued and reason="stripe_mode!=live"
+When A5 transitions to live: flush queued leads FIFO, emit LEAD_STUDENT with status=routed and routed_to_app=A5
+Provider leads:
+If A6_health == 200 AND provider_onboarding == active: POST to https://provider-register-jamarrlmayes.replit.app/api/providers/register; emit LEAD_PROVIDER status=routed routed_to_app=A6
+Else: queue with status=queued and reason
+All LEAD_* events must include: lead_id, source_channel, utm_{source,medium,campaign,term,content}, consent_version, and pii_redacted=false only for secure store—never echo PII in telemetry.
+4. Campaign modes and traffic
+
+Default: organic_only; paid=false until A5_stripe_mode == live
+Organic campaigns: pull from A7 sitemap and landing URLs; attach UTM tags; emit TRAFFIC every 5m with sessions_5m, ctr_5m, conversion_rate_5m
+When enable_paid_traffic == true: set paid=true; emit ALERT "PAID_TRAFFIC_ENABLED"; include budgets_per_day, cpa_targets, and stop conditions (CAC ceiling).
+5. Telemetry schedule
+
+HEARTBEAT every 60s:
+dep_mode, paid_traffic_enabled, a5_stripe_mode, lead_queue_depth, last_event_sink {primary:a8_status, fallback:a2_status}
+KPI_SNAPSHOT every 5m:
+student_leads_captured_5m, provider_leads_captured_5m, revenue_signals_5m, routed_to_{A5,A6}_5m, queue_flush_count_5m
+ERROR on any failed POST with dependency name, http_status, idempotency_key, and retry_plan
+6. First 15-minute activation plan
+
+Minute 0: APP_ONLINE; PREFLIGHT_CHECK; set campaign to organic_only
+Minutes 1–5: start capturing leads from A7 pages and A1 signups; route providers to A6; queue student paid flows if A5 not live
+Minute 5: KPI_SNAPSHOT #1; compute CAC proxy from organic events (visits/leads)
+Minutes 6–10: health re-probe; if A5 becomes live, enable paid_traffic, flush student queue
+Minutes 10–15: KPI_SNAPSHOT #2; emit TRAFFIC performance; raise ALERT if ingest still A8!=2xx and fallback active
+7. Compliance and safety
+
+No academic work generation; only scholarship discovery, matching, and application guidance per Responsible AI. Always set metadata: {responsible_ai:true, cheating_assistance:false}
+A4 — scholarship_sage (AI chat and guidance)
+
+Identify: app_name=scholarship_sage; app_base_url=https://scholarship-sage-jamarrlmayes.replit.app
+Provide chat, websocket updates, and recommendation endpoints to A3/A5.
+HEARTBEAT: active_ws, prompts_1m, errors_1m.
+KPI_SNAPSHOT: guidance_sessions_5m, completion_rate_5m.
+Emit TRACE-STYLE anonymized usage to A8/A2; never include PII or essay content.
+A5 — student_pilot (Student flows + payments)
+
+Identify: app_name=student_pilot; app_base_url=https://student-pilot-jamarrlmayes.replit.app
+Expose probe endpoint for stripe_mode; return "live" or "test".
+HEARTBEAT: stripe_mode, checkout_init_1m, checkout_succeeded_1m, refund_0m.
+KPI_SNAPSHOT: ARPU_5m_est, conversion_rate_5m, churn_signals_5m.
+Accept LEAD_STUDENT from A3; if stripe_mode==live, progress to checkout. Emit revenue_signals on payment events.
+A6 — provider_register (Provider onboarding)
+
+Identify: app_name=provider_register; app_base_url=https://provider-register-jamarrlmayes.replit.app
+Ensure provider onboarding is active and POST /api/providers/register accepts A3 payloads.
+HEARTBEAT: onboarding_open=true, providers_registered_1h.
+KPI_SNAPSHOT: providers_approved_5m, avg_time_to_live_5m.
+Emit LEAD_PROVIDER_RECEIVED and PROVIDER_ONBOARDED to A8/A2.
+A7 — auto_page_maker (SEO engine)
+
+Identify: app_name=auto_page_maker; app_base_url=https://auto-page-maker-jamarrlmayes.replit.app
+Generate and publish landing pages; update sitemap.xml; attach UTM defaults for A3.
+HEARTBEAT: pages_published_1h, sitemap_status, indexation_estimate.
+KPI_SNAPSHOT: organic_clicks_5m, impressions_5m, avg_rank_top10.
+Emit TRAFFIC every 5m with channel=organic and per-URL metrics. Provide A3 with fresh landing URLs.
+A8 — auto_com_center (Command Center + Frontend dashboards)
+
+Identify: app_name=auto_com_center; app_base_url=https://auto-com-center-jamarrlmayes.replit.app
+Ensure POST /api/ingest returns 200 for valid events; if not ready, return 503 with Retry-After, not 403/404.
+Persist and expose aggregates for frontend:
+Fleet Health table by app: status, latest heartbeat ts, P95 latency
+Telemetry Reception: event_counts by type/minute; ingest_qps
+B2C funnel: visits → signups → qualified leads → checkouts → conversions
+B2B funnel: provider leads → onboarded → active providers
+Revenue signals: ARPU, MRR/ARR estimates, platform fee from A6
+SEO: pages live, impressions, CTR, top landing pages
+Websocket or SSE feed for live updates; dashboard auto-refresh 5s.
+Validate that every displayed metric includes app_name and app_base_url in its provenance trace for drill-down.
+Emit ALERT if any app misses 3 consecutive heartbeats; track recoveries.
+REPORT NAMING AND PROVENANCE (ALL APPS)
+
+Every event and dashboard card must include app_name and app_base_url.
+Example provenance: "A3 — scholarship_agent (https://scholarship-agent-jamarrlmayes.replit.app): student_leads_captured_5m=42"
+CUTOVER CHECKLIST (ALL APPS)
+
+Step 1: Emit APP_ONLINE with version=v3.3 and current dep_mode.
+Step 2: PREFLIGHT_CHECK with full status_matrix; set telemetry_fallback accordingly.
+Step 3: Start HEARTBEAT (60s) and KPI_SNAPSHOT (5m) loops.
+Step 4: Begin business flows (A3 lead routing, A7 page generation, A5 checkout, A6 onboarding).
+Step 5: Confirm A8 frontend displays live counters within 60s. If not, trigger ALERT and route telemetry to A2.
+EXECUTION REMINDER
+
+Each app executes only its own section above.
+All logs and events must clearly identify the app using the exact app_name and APP_BASE_URL strings listed in the registry.
+Agent3 (scholarship_agent) must be the first to emit APP_ONLINE and PREFLIGHT_CHECK to kick off lead and revenue generation, honoring gating rules for A5/A6 and telemetry fallback to A2 until A8 is confirmed 2xx.
+Deliverable for Agent3
+
+Paste this entire prompt into the scholarship_agent system prompt.
+Execute the A3-specific section only, beginning with identity, APP_ONLINE, then PREFLIGHT_CHECK, then the 60s/5m loops, and start capturing/routing leads per the logic above.
