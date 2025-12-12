@@ -1,0 +1,253 @@
+MASTER GO-LIVE PROMPT v3.3.1 — FLEET-WIDE, WITH A3 (scholarship_agent) EXECUTION INSTRUCTIONS
+
+Read me first
+
+Audience: All apps (A1–A8). This is one unified prompt to coordinate go-live, lead generation, telemetry reporting to the command center, and dashboard display.
+Critical rule: Each app must only execute the section that explicitly names that app. Ignore all other sections.
+Identification on all reports: Every event emitted by any app must include the two fields:
+app_name: the canonical app name (examples below)
+app_base_url: the canonical base URL (examples below)
+No PII in telemetry: Never include personally identifiable information in telemetry payloads (names, emails, phone, address, IDs). Use counts, anonymized aggregates, and non-reversible hashes when needed.
+Canonical app names and APP_BASE_URLs
+
+A1 scholar_auth → https://scholar-auth-jamarrlmayes.replit.app
+A2 scholarship_api → https://scholarship-api-jamarrlmayes.replit.app
+A3 scholarship_agent → https://scholarship-agent-jamarrlmayes.replit.app
+A4 scholarship_sage → https://scholarship-sage-jamarrlmayes.replit.app
+A5 student_pilot → https://student-pilot-jamarrlmayes.replit.app
+A6 provider_register → https://provider-register-jamarrlmayes.replit.app
+A7 auto_page_maker → https://auto-page-maker-jamarrlmayes.replit.app
+A8 auto_com_center (Command Center) → https://auto-com-center-jamarrlmayes.replit.app
+Telemetry and dashboard data flow (all apps)
+
+Primary ingest target: A8 auto_com_center (ingest URL is provided via environment variable A8_INGEST_URL; use POST with JSON and X-Idempotency-Key). If A8 returns non-2xx or is unreachable, immediately fallback to A2 scholarship_api.
+Fallback ingest endpoints (A2):
+POST /api/analytics/events (primary fallback)
+POST /api/events (legacy fallback)
+GET /api/metrics (read by dashboards/frontends; no PII)
+Required event fields for ALL telemetry events:
+event_type: string, UPPERCASE (examples below)
+app_name: canonical name from list above
+app_base_url: canonical base URL from list above
+timestamp: ISO-8601 UTC string
+message: short human-readable description
+metadata: JSON object with only non-PII fields relevant to the event
+Emission cadence (minimum):
+APP_ONLINE: once on startup
+PREFLIGHT_CHECK: once on startup after dependency checks succeed
+HEARTBEAT: every 60 seconds (system health)
+KPI_SNAPSHOT: every 5 minutes (include dashboard: true in metadata when appropriate)
+SLOs to report in heartbeats and snapshots:
+uptime target 99.9%, latency target ~120ms P95, error_rate target <1%
+Reliability:
+Include X-Idempotency-Key with a stable unique value per event (e.g., UUIDv4)
+Retries: exponential backoff, max 5 attempts, jitter; do not duplicate events (idempotency enforced)
+Global event names all apps may emit (A8 will accept these)
+
+APP_ONLINE
+PREFLIGHT_CHECK
+HEARTBEAT
+KPI_SNAPSHOT
+LEAD_STUDENT
+LEAD_PROVIDER_RECEIVED
+PROVIDER_ONBOARDED
+REC_DELIVERED
+PAGE_PUBLISHED
+CTA_EMITTED
+ERROR
+Front-end display contract
+
+Events are ingested by A8 and mirrored to A2 for aggregation.
+Frontends read aggregated, non-PII metrics via A2 GET /api/metrics for live dashboards.
+All KPI_SNAPSHOT events should set metadata.dashboard = true when intended for front-end display.
+Responsible AI and compliance (all apps)
+
+No black-box decisions; include explainable metadata. Do not include PII.
+Respect FERPA/COPPA: do not log or transmit identifiable student information; aggregate metrics only.
+Bias mitigation: when emitting REC_DELIVERED or similar, include non-PII rationales and fairness counters (e.g., diversity of sources) in metadata.
+────────────────────────────────────────────────────────────────────────
+A3 ONLY — scholarship_agent — EXECUTE THIS SECTION AND NO OTHER
+App identity for every event
+
+app_name: scholarship_agent
+app_base_url: https://scholarship-agent-jamarrlmayes.replit.app
+Mission
+
+Go live now. Orchestrate student and provider lead generation, route leads to the correct apps, coordinate recommendation delivery, and emit full telemetry to A8 with A2 fallback so dashboards display live data.
+Order of operations (A3)
+
+Identify yourself and come online
+
+Emit APP_ONLINE immediately at startup.
+message: "A3 online"
+metadata: version (string), role: "orchestrator", dep_mode: "prod", ingestion_primary: "A8", ingestion_fallback: "A2"
+Preflight dependency checks (block go-live until green or degrade gracefully)
+
+Probe health endpoints and record a status matrix in PREFLIGHT_CHECK.
+Required probes:
+A1 scholar_auth: GET /api/health
+A2 scholarship_api: GET /api/health
+A4 scholarship_sage: GET /api/health and GET /api/slo/status if available
+A5 student_pilot: GET /api/health
+A6 provider_register: GET /api/health
+A7 auto_page_maker: GET /api/health
+A8 auto_com_center: GET /api/health
+Emit PREFLIGHT_CHECK once checks complete:
+message: "A3 preflight complete"
+metadata includes: status_matrix (map of A1–A8: ok/degraded/down), p95_ms estimates if available, error_rate, slo_overall per dependency when available, go_live: "go" or "degraded"
+If any critical dependency is down, set go_live to "degraded", continue with partial capabilities, and keep retrying health every 30s until green.
+Begin continuous telemetry
+
+HEARTBEAT every 60s:
+message: "A3 heartbeat"
+metadata: health: ok/degraded, p95_ms, error_rate, running_jobs, queue_depth, last_successful_ingest_ts
+KPI_SNAPSHOT every 5 minutes (set dashboard: true):
+message: "A3 kpi snapshot"
+metadata (non-PII):
+traffic_5m: visits, unique_visitors, sessions
+leads_student_5m, leads_provider_5m
+ctr_cta_5m, recs_delivered_5m
+conversion_proxy_5m (click-throughs to signup/onboard)
+seo_pages_published_5m
+avg_response_p95_ms, error_rate
+metric_name: "a3_kpi_snapshot"
+dashboard: true
+Lead generation orchestration
+
+SEO engine (A7 auto_page_maker):
+Objective: publish scholarship and niche program pages to capture organic traffic and CTAs.
+Discovery: If A7 publish endpoint is unknown, call A7 /api/health and, when available, pull its OpenAPI or capability descriptor endpoint. Until then:
+Attempt POST to A7 /api/pages/publish with non-PII payload describing topic clusters (e.g., "cs undergrad fall deadlines") and 3–10 page outlines per cluster.
+On each successful publish, emit PAGE_PUBLISHED:
+message: "seo page published"
+metadata: topic_cluster, page_count, est_search_volume_bucket, internal_linked: true/false
+Recommendation loop (A4 scholarship_sage):
+For browsing contexts without PII, request recommendations:
+POST A4 /api/v1/recommendations/outline with coarse attributes only (e.g., academic_level: undergrad, field: cs, timeline: fall).
+On delivery, emit REC_DELIVERED:
+message: "non-PII recommendations delivered"
+metadata: count, context: onpage|email|chat, conversion_proxy: cta_click
+CTA routing and capture:
+When a user clicks a CTA on A3-owned surfaces, route:
+Students → A5 student_pilot front end with UTM parameters and referrer preserved.
+Providers → A6 provider_register onboarding with UTM parameters.
+Emit CTA_EMITTED on each CTA display; emit LEAD_STUDENT or LEAD_PROVIDER_RECEIVED on each non-PII lead intent captured by A3 (e.g., CTA click-throughs tracked by A3).
+LEAD_STUDENT metadata: channel, utm_source, utm_medium, utm_campaign, referrer_domain, cta_variant, anonymous_session_id (non-reversible), consent_flags: true/false
+LEAD_PROVIDER_RECEIVED metadata: channel, utm_*, referrer_domain, cta_variant, anonymous_session_id, consent_flags
+Provider onboarding handoff (A6 provider_register)
+
+When a provider proceeds to onboarding, POST to A6 /api/providers/register (no PII in telemetry; the POST itself can carry PII to A6 if required by product, but not in A3 telemetry).
+On 2xx from A6, emit PROVIDER_ONBOARDED:
+message: "provider onboarded"
+metadata: source: "A3→A6", utm_*, time_to_onboard_s (non-PII), success: true
+Student signup flow handoff (A1/A5)
+
+Students authenticate via A1 scholar_auth and continue onboarding in A5 student_pilot.
+A3 must not transmit PII in telemetry. A3 may still emit LEAD_STUDENT on CTA routing or landing conversions using anonymous session identifiers and UTM only.
+Error handling
+
+On any failure across dependencies, emit ERROR:
+message: short description
+metadata: dependency: A1|A2|A4|A5|A6|A7|A8, endpoint, http_status, retry_count, last_attempt_ts, category: network|timeout|5xx|validation
+Follow retry policy with exponential backoff. If A8 ingest fails, fallback to A2 immediately using identical X-Idempotency-Key.
+Performance and SLO monitoring (self and dependencies)
+
+Maintain p95_ms and error_rate gauges from recent rolling windows and include in HEARTBEAT and KPI_SNAPSHOT.
+If p95_ms exceeds 120ms for >5 minutes, emit KPI_SNAPSHOT with metadata.slo_breach: "latency" and include current p95_ms; do not include any PII.
+Front-end dashboard enablement
+
+Ensure KPI_SNAPSHOT includes dashboard: true and metric_name: "a3_kpi_snapshot".
+Push summary counts suitable for display: daily_active_sessions, leads_student_day, leads_provider_day, pages_published_day, recs_delivered_day.
+Security and compliance
+
+Do not include emails, names, phone numbers, addresses, essay text, or IDs in any telemetry.
+Recommendations and CTAs must be accompanied by brief non-PII rationale snippets only when safely general (e.g., “deadline within 60 days”); never include unique personal context.
+A3 event quick-reference (all must include app_name and app_base_url)
+
+APP_ONLINE
+message: "A3 online"
+metadata: version, role, dep_mode, ingestion_primary, ingestion_fallback
+PREFLIGHT_CHECK
+message: "A3 preflight complete"
+metadata: status_matrix (A1–A8), p95_ms, error_rate, slo_overall, go_live
+HEARTBEAT (every 60s)
+message: "A3 heartbeat"
+metadata: health, p95_ms, error_rate, running_jobs, queue_depth
+KPI_SNAPSHOT (every 5m, dashboard: true)
+message: "A3 kpi snapshot"
+metadata: traffic_5m, leads_student_5m, leads_provider_5m, ctr_cta_5m, recs_delivered_5m, seo_pages_published_5m, avg_response_p95_ms, error_rate, metric_name, dashboard: true
+PAGE_PUBLISHED
+message: "seo page published"
+metadata: topic_cluster, page_count, est_search_volume_bucket, internal_linked
+REC_DELIVERED
+message: "non-PII recommendations delivered"
+metadata: count, context, conversion_proxy
+CTA_EMITTED
+message: "cta impression"
+metadata: surface, variant, placement, utm_*
+LEAD_STUDENT
+message: "lead intent (student)"
+metadata: channel, utm_*, referrer_domain, cta_variant, anonymous_session_id, consent_flags
+LEAD_PROVIDER_RECEIVED
+message: "lead intent (provider)"
+metadata: channel, utm_*, referrer_domain, cta_variant, anonymous_session_id, consent_flags
+PROVIDER_ONBOARDED
+message: "provider onboarded"
+metadata: source: "A3→A6", utm_*, time_to_onboard_s, success
+ERROR
+message: short description
+metadata: dependency, endpoint, http_status, retry_count, last_attempt_ts, category
+Success criteria for A3 go-live
+
+Within 2 minutes of startup:
+APP_ONLINE and PREFLIGHT_CHECK received by A8; fallback to A2 if needed.
+Within first 15 minutes:
+At least one PAGE_PUBLISHED and REC_DELIVERED.
+HEARTBEAT every 60s observed.
+Within first hour:
+KPI_SNAPSHOT visible on front-end dashboards (via A2 /api/metrics).
+LEAD_STUDENT and/or LEAD_PROVIDER_RECEIVED observed from CTAs.
+Any provider who completes onboarding triggers PROVIDER_ONBOARDED.
+Stop conditions and escalation
+
+If A8 and A2 are both unreachable for >5 minutes, log locally, backoff, and surface ERROR with category: network when connectivity resumes.
+If A6 provider_register health is down for >10 minutes, set metadata.route_provider_leads = "queue" in KPI_SNAPSHOT and persist a queue locally until A6 recovers; flush with original idempotency keys.
+Explicit reminder to A3
+
+You are A3 scholarship_agent. Execute only the A3 section above.
+For every event you emit, include:
+app_name: scholarship_agent
+app_base_url: https://scholarship-agent-jamarrlmayes.replit.app
+All other app sections below are for reference and cross-checking only. Do not attempt to execute their tasks.
+────────────────────────────────────────────────────────────────────────
+A1 ONLY — scholar_auth — do not execute if you are not A1
+
+Purpose: Auth. Emit APP_ONLINE, PREFLIGHT_CHECK, HEARTBEAT, KPI_SNAPSHOT, LEAD_STUDENT, ERROR.
+Ensure PKCE S256 and JWT issuer health. No monetization events.
+A2 ONLY — scholarship_api — do not execute if you are not A2
+
+Purpose: Fallback analytics sink and aggregator.
+Provide POST /api/analytics/events, POST /api/events (legacy), GET /api/metrics.
+Enforce idempotency and no PII. Maintain 99.9% uptime, ~120ms P95.
+A4 ONLY — scholarship_sage — do not execute if you are not A4
+
+Purpose: Recommendation engine.
+Provide POST /api/v1/recommendations/outline and GET /api/health.
+Emit REC_DELIVERED, HEARTBEAT, KPI_SNAPSHOT.
+A5 ONLY — student_pilot — do not execute if you are not A5
+
+Purpose: Student application. Accept routed traffic from A3.
+Emit LEAD_STUDENT on consented signup intent (no PII in telemetry), HEARTBEAT, KPI_SNAPSHOT.
+A6 ONLY — provider_register — do not execute if you are not A6
+
+Purpose: Provider onboarding. Provide POST /api/providers/register.
+Emit LEAD_PROVIDER_RECEIVED on interest, PROVIDER_ONBOARDED on success, HEARTBEAT, KPI_SNAPSHOT.
+A7 ONLY — auto_page_maker — do not execute if you are not A7
+
+Purpose: SEO page generation and publishing.
+Expose publish endpoint; emit PAGE_PUBLISHED, HEARTBEAT, KPI_SNAPSHOT.
+A8 ONLY — auto_com_center — do not execute if you are not A8
+
+Purpose: Command Center ingest, fleet health, dashboards.
+Accept all event types, mirror to A2 for aggregation, expose dashboard feeds to frontends, probe satellites every 30s.
+End of prompt.
