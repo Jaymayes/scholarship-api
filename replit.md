@@ -27,18 +27,18 @@ The application uses FastAPI for high performance and async capabilities, with P
 - **Ranking System**: A hybrid approach combining content-based filtering with "eligible-first" prioritization.
 - **Search Intelligence**: Features semantic and keyword search, smart suggestions, and quality assessment.
 - **Business Event Instrumentation**: A central event tracking system for executive KPI reporting, including a `business_events` table and an event emission service using a fire-and-forget async approach with a circuit breaker pattern. Fixed 2025-11-30: asyncpg SSL/JSONB compatibility for proper event recording.
-- **Telemetry Contract v3.3.1** (2025-12-13): Fleet-wide telemetry with Command Center integration:
-  - `POST /api/telemetry/ingest` - **PRIMARY** fleet fallback endpoint (v3.3.1 Multi-App compliant)
+- **Telemetry Contract v3.5.0** (2025-12-13): Fleet-wide telemetry with Command Center integration:
+  - `POST /api/telemetry/ingest` - **PRIMARY** fleet fallback endpoint (v3.5.0 Multi-App compliant)
   - `POST /api/analytics/events` - Legacy S2S event write endpoint (CSRF bypass enabled)
   - `POST /api/events` - Legacy fallback event write endpoint
   - `GET /api/stats?window=5m|1h|24h&group=event_type` - DB-backed aggregated stats
   - `GET /api/kpis/today` and `GET /api/kpis/rollup?days=7` - Revenue-aware KPI summaries
   - `app_heartbeat` emission every 60 seconds on startup
   - `KPI_SNAPSHOT` emission every 5 minutes with SLO tile metrics
-  - **v3.3.1 Header Support (2025-12-13)**: Accepts both new fleet-wide headers AND legacy headers:
+  - **v3.5.0 Header Support (2025-12-13)**: Accepts both new fleet-wide headers AND legacy headers:
     - New: `x-scholar-protocol`, `x-app-label`, `x-event-type`, `x-event-id`, `x-sent-at`
     - Legacy: `X-Protocol-Version`, `X-Idempotency-Key`
-  - **APP_IDENTITY**: `A2 scholarship_api https://scholarship-api-jamarrlmayes.replit.app protocol=v3.3.1`
+  - **APP_IDENTITY**: `A2 scholarship_api https://scholarship-api-jamarrlmayes.replit.app protocol=v3.5.0`
   - **Role**: `telemetry_fallback` - Fleet fallback sink when A8 Command Center unavailable
 - **Credits Ledger System**: A transactional credit ledger system enabling B2C monetization and paywalled AI features, featuring a database-backed ledger, transactional idempotency, row-level locking, API endpoints with JWT and RBAC, and security/compliance features.
 - **Stripe Payment Integration** (2025-12-08): Centralized payment endpoints for ecosystem apps (Operation Vital Signs):
