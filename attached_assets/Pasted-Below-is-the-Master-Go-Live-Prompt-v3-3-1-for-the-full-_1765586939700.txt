@@ -1,0 +1,138 @@
+Below is the Master Go‑Live Prompt v3.3.1 for the full fleet (A1–A8), with an explicit, detailed runbook for Agent3 (scholarship_agent). Copy/paste into your orchestration console or each app’s prompt runner. Important: Each app must ONLY execute its own section. Agent3 must execute only SECTION A3.
+
+MASTER GO-LIVE PROMPT v3.3.1 — Fleet-Wide
+
+Global rules (apply to all apps)
+
+Identify first: Before any work, print a single-line self-identification exactly in this format: APP_IDENTITY: <APP_ID> <APP_NAME> <APP_BASE_URL> protocol=v3.3.1 Example for Agent3: APP_IDENTITY: A3 scholarship_agent https://scholarship-agent-jamarrlmayes.replit.app protocol=v3.3.1
+Telemetry ingest priority:
+Primary: POST https://auto-com-center-jamarrlmayes.replit.app/ingest
+Alias: POST https://auto-com-center-jamarrlmayes.replit.app/api/ingest
+Fallback (A2): POST https://scholarship-api-jamarrlmayes.replit.app/api/analytics/events, else POST /api/events Always include headers:
+X-Protocol-Version: v3.3.1
+X-App-ID: <APP_ID> (e.g., A3)
+X-Idempotency-Key: <uuid_v4> unique per event
+Dashboard visibility:
+Events intended for the Command Center frontend must set dashboard: true in metadata.
+HEARTBEAT events set dashboard: false.
+Idempotency and retries: If non-2xx from A8, retry once to A8 alias, then route to A2 with the same X-Idempotency-Key.
+PII and compliance: Do not include PII in telemetry. Emit aggregates only. Maintain FERPA/COPPA compliance. No academic dishonesty.
+SLO expectations: Target 99.9% uptime, ~120ms P95 latency. Emit SLO metrics in PREFLIGHT_CHECK and KPI_SNAPSHOT.
+Reporting label: Every event metadata must include app_label: "<APP_ID> <APP_NAME> <APP_BASE_URL>"
+App registry (IDs, base URLs, roles)
+
+A1 scholar_auth → https://scholar-auth-jamarrlmayes.replit.app (role: auth)
+A2 scholarship_api → https://scholarship-api-jamarrlmayes.replit.app (role: api_fallback_metrics)
+A3 scholarship_agent → https://scholarship-agent-jamarrlmayes.replit.app (role: marketing_orchestrator)
+A4 scholarship_sage → https://scholarship-sage-jamarrlmayes.replit.app (role: recommendations)
+A5 student_pilot → https://student-pilot-jamarrlmayes.replit.app (role: b2c_frontend)
+A6 provider_register → https://provider-register-jamarrlmayes.replit.app (role: provider_portal)
+A7 auto_page_maker → https://auto-page-maker-jamarrlmayes.replit.app (role: seo_pages)
+A8 auto_com_center → https://auto-com-center-jamarrlmayes.replit.app (role: command_center)
+Standard event types (for reference)
+
+APP_ONLINE: App is live. Include role, version, commit, region.
+PREFLIGHT_CHECK: Dependencies health and go/no-go. Include status_matrix, slo_overall ∈ {green|yellow|red}, go_live ∈ {go|hold}, dashboard: true.
+HEARTBEAT: Liveness metric at 60s cadence. Include uptime_s, p95_ms, error_rate, dashboard: false.
+KPI_SNAPSHOT: Aggregates by 5m window. Include dashboard:true and widget hints (tile).
+CTA_EMITTED: A CTA rendered or sent to a user/provider (no PII).
+LEAD_STUDENT: Student lead captured by A1/A5. A3 may attribute but must not send PII.
+LEAD_PROVIDER_RECEIVED: Provider lead received or registered via A6.
+PROVIDER_ONBOARDED: When provider completes onboarding via A6.
+REC_DELIVERED: Recommendations delivered by A4 to a student session.
+PAGE_PUBLISHED / PAGE_INDEXED: A7 publishing/indexing confirmation.
+SECTION A3 — scholarship_agent (Agent3) ONLY
+If you are not A3, do not execute this section.
+
+Identify yourself (print exactly once, then proceed)
+APP_IDENTITY: A3 scholarship_agent https://scholarship-agent-jamarrlmayes.replit.app protocol=v3.3.1
+
+Go‑Live steps for Agent3
+
+Emit APP_ONLINE: { "event": "APP_ONLINE", "app_id": "A3", "app_name": "scholarship_agent", "app_base_url": "https://scholarship-agent-jamarrlmayes.replit.app", "role": "marketing_orchestrator", "message": "A3 online and orchestrator ready", "metadata": { "app_label": "A3 scholarship_agent https://scholarship-agent-jamarrlmayes.replit.app", "version": "v3.3.1", "dashboard": true } }
+Perform PREFLIGHT_CHECK (dependencies: A4, A5, A6, A7, A8):
+Health probe each dependency with its /api/health or equivalent.
+Compute slo_overall = green if all 200 OK and p95_ms < 120 and error_rate < 1%; else yellow if minor, else red.
+route_provider_leads must be "active" if A6 POST /api/providers/register responds 200/201 to a dry-run no-PII test payload.
+Set go_live="go" if slo_overall is green and route_provider_leads active; else go_live="hold". Example: { "event": "PREFLIGHT_CHECK", "app_id": "A3", "app_name": "scholarship_agent", "app_base_url": "https://scholarship-agent-jamarrlmayes.replit.app", "status_matrix": { "A4": "ok", "A5": "ok", "A6": "ok", "A7": "ok", "A8": "ok" }, "slo_overall": "green", "go_live": "go", "route_provider_leads": "active", "metadata": { "app_label": "A3 scholarship_agent https://scholarship-agent-jamarrlmayes.replit.app", "dashboard": true } }
+3. Lead generation orchestration (B2C + B2B)
+
+SEO-first campaigns (coordinate with A7):
+Request A7 to publish pages for scholarship topics; include UTM tags utm_source=a3&utm_medium=seo&utm_campaign=<campaign_id>.
+On each page publish, A7 emits PAGE_PUBLISHED; when indexed, A7 emits PAGE_INDEXED. A3 should read/ingest counts via A8 and reflect in KPI_SNAPSHOT.
+CTAs:
+Student CTAs must link to A5 (student_pilot) flows and/or A1 sign-in/up.
+Provider CTAs must link to A6 registration funnel.
+When A3 injects, displays, emails, or posts a CTA, emit CTA_EMITTED with: { "event": "CTA_EMITTED", "app_id": "A3", "campaign_id": "<id>", "cta_type": "student|provider", "destination": "A5|A1|A6", "url": "<landing_url_with_utm>", "metadata": { "app_label": "A3 scholarship_agent https://scholarship-agent-jamarrlmayes.replit.app", "tile": "Growth", "dashboard": true } }
+Student leads (B2C):
+A1/A5 own LEAD_STUDENT emission. A3 must not transmit PII.
+A3 may attribute leads by listening to A8 dashboards/funnels and then include totals in KPI_SNAPSHOT (e.g., leads_student_5m, ctr_cta_5m).
+Provider leads (B2B) — mandatory routing:
+Route provider leads to A6: POST https://provider-register-jamarrlmayes.replit.app/api/providers/register
+On successful 2xx, emit LEAD_PROVIDER_RECEIVED: { "event": "LEAD_PROVIDER_RECEIVED", "app_id": "A3", "provider_source": "seo|direct|referral", "campaign_id": "<id>", "metadata": { "app_label": "A3 scholarship_agent https://scholarship-agent-jamarrlmayes.replit.app", "tile": "B2B", "dashboard": true } }
+When notified that provider completed onboarding (A6 emits), include in A3 KPI_SNAPSHOT counts as providers_onboarded_5m.
+4. Operational telemetry loops
+
+HEARTBEAT (every 60s): { "event": "HEARTBEAT", "app_id": "A3", "uptime_s": <int>, "p95_ms": <number>, "error_rate": <number>, "metadata": { "app_label": "A3 scholarship_agent https://scholarship-agent-jamarrlmayes.replit.app", "dashboard": false } }
+KPI_SNAPSHOT (every 5m): { "event": "KPI_SNAPSHOT", "app_id": "A3", "window": "5m", "metrics": { "ctr_cta_5m": <number>, "leads_student_5m": <int>, "leads_provider_5m": <int>, "providers_onboarded_5m": <int>, "pages_published_5m": <int>, "pages_indexed_5m": <int>, "organic_sessions_5m": <int>, "spend_paid_5m": 0 }, "metadata": { "app_label": "A3 scholarship_agent https://scholarship-agent-jamarrlmayes.replit.app", "tile": "Growth", "dashboard": true } }
+5. Error handling and fallback
+
+If A8 returns non-2xx for ingest:
+Retry once to /api/ingest.
+Then fallback to A2 at /api/analytics/events (or /api/events).
+Preserve X-Idempotency-Key.
+If A6 registration is unavailable:
+Emit PREFLIGHT_CHECK with route_provider_leads="hold" and go_live="hold".
+Backoff and recheck every 60s; resume go when A6 returns 200/201.
+6. Compliance and safety
+
+No PII in any telemetry payloads or logs.
+Bias/ethics: CTAs and campaigns must not target or exclude protected classes; content must be transparent and non-deceptive.
+7. Success definition for A3 (report via KPI_SNAPSHOT, tile=Growth)
+
+Daily goals: CTR ≥ 2.5%, student leads/day ≥ target, provider leads/day ≥ target, pages_indexed/day growing; spend_paid remains minimal (SEO-first).
+END SECTION A3
+
+SECTION A1 — scholar_auth (execute only if you are A1)
+
+Identify (APP_IDENTITY: A1 scholar_auth https://scholar-auth-jamarrlmayes.replit.app protocol=v3.3.1)
+Emit APP_ONLINE (role: auth), PREFLIGHT_CHECK (deps: A8, DB, OIDC), HEARTBEAT, KPI_SNAPSHOT.
+On student sign-up/sign-in success, emit LEAD_STUDENT with dashboard:true and app_label set to "A1 scholar_auth https://scholar-auth-jamarrlmayes.replit.app".
+Fallback ingest to A2 on A8 failure as per global rules.
+SECTION A2 — scholarship_api (execute only if you are A2)
+
+Identify (APP_IDENTITY: A2 scholarship_api https://scholarship-api-jamarrlmayes.replit.app protocol=v3.3.1)
+Operate as telemetry fallback and metrics aggregator.
+Support POST /api/analytics/events and POST /api/events for ingest.
+Emit APP_ONLINE, PREFLIGHT_CHECK (deps: DB), HEARTBEAT, KPI_SNAPSHOT.
+SECTION A4 — scholarship_sage (execute only if you are A4)
+
+Identify (APP_IDENTITY: A4 scholarship_sage https://scholarship-sage-jamarrlmayes.replit.app protocol=v3.3.1)
+Emit APP_ONLINE, PREFLIGHT_CHECK, HEARTBEAT, KPI_SNAPSHOT.
+Emit REC_DELIVERED when recommendations are served (dashboard:true, tile: B2C).
+SECTION A5 — student_pilot (execute only if you are A5)
+
+Identify (APP_IDENTITY: A5 student_pilot https://student-pilot-jamarrlmayes.replit.app protocol=v3.3.1)
+Emit APP_ONLINE (role: b2c_frontend), PREFLIGHT_CHECK (web uptime), HEARTBEAT, KPI_SNAPSHOT with ctr_cta_5m and leads_student_5m.
+On CTA render, emit CTA_EMITTED; on lead capture, emit LEAD_STUDENT (dashboard:true).
+SECTION A6 — provider_register (execute only if you are A6)
+
+Identify (APP_IDENTITY: A6 provider_register https://provider-register-jamarrlmayes.replit.app protocol=v3.3.1)
+Emit APP_ONLINE, PREFLIGHT_CHECK (Stripe/live status), HEARTBEAT, KPI_SNAPSHOT (providers_onboarded_5m, revenue_5m).
+Accept provider leads at POST /api/providers/register. On completion, emit PROVIDER_ONBOARDED (dashboard:true, tile: B2B).
+SECTION A7 — auto_page_maker (execute only if you are A7)
+
+Identify (APP_IDENTITY: A7 auto_page_maker https://auto-page-maker-jamarrlmayes.replit.app protocol=v3.3.1)
+Emit APP_ONLINE, PREFLIGHT_CHECK (sitemaps, indexing), HEARTBEAT, KPI_SNAPSHOT (pages_published_5m, pages_indexed_5m, organic_sessions_5m).
+Emit PAGE_PUBLISHED and PAGE_INDEXED as they occur (dashboard:true, tile: SEO).
+SECTION A8 — auto_com_center (execute only if you are A8)
+
+Identify (APP_IDENTITY: A8 auto_com_center https://auto-com-center-jamarrlmayes.replit.app protocol=v3.3.1)
+Accept ingest at /ingest and /api/ingest. Persist telemetry and power dashboard tiles: SLO, B2C, B2B, SEO, Growth, Trust, Finance.
+Emit APP_ONLINE, PREFLIGHT_CHECK (ingest_qps, backlog_size, dashboard_latency_ms), HEARTBEAT, KPI_SNAPSHOT.
+Final notes to all apps
+
+Only execute your section. Agent3 must execute only SECTION A3.
+Include app_label in all events as: "<APP_ID> <APP_NAME> <APP_BASE_URL>" so that all frontend widgets show the correct app name and base URL.
+All KPI_SNAPSHOT events should include a tile hint (e.g., Growth, SEO, B2C, B2B) to enable proper Command Center placement.
+This prompt is ready to paste. To bring Agent3 live, paste into the scholarship_agent runner and start execution.
