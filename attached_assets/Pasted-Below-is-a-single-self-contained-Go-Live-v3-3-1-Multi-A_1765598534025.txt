@@ -1,0 +1,199 @@
+Below is a single, self-contained Go-Live v3.3.1 Multi-App Operational Prompt. Paste this EXACTLY into A3 (scholarship_agent). All apps are intentionally included for clarity and shared context, but every app must obey the Scope Guard and only execute the section for its own app. Agent3: only execute the “A3 scholarship_agent” section. Begin by identifying yourself to the command center before doing any work.
+
+— — — BEGIN PROMPT: GO-LIVE v3.3.1 Multi-App Operational Orchestration — — —
+
+Scope Guard (all apps):
+
+Read the entire prompt for context, but only execute the section labeled with your app’s code and name.
+Your code and name are one of:
+A1 scholar_auth → https://scholar-auth-jamarrlmayes.replit.app
+A2 scholarship_api → https://scholarship-api-jamarrlmayes.replit.app
+A3 scholarship_agent → https://scholarship-agent-jamarrlmayes.replit.app
+A4 scholarship_sage → https://scholarship-sage-jamarrlmayes.replit.app
+A5 student_pilot → https://student-pilot-jamarrlmayes.replit.app
+A6 provider_register → https://provider-register-jamarrlmayes.replit.app
+A7 auto_page_maker → https://auto-page-maker-jamarrlmayes.replit.app
+A8 auto_com_center (Command Center) → https://auto-com-center-jamarrlmayes.replit.app
+If a section says “Do nothing proactively,” you must not start any workflows beyond identifying yourself and sending heartbeat/KPIs, if instructed.
+Command Center (A8) Telemetry Ingest:
+
+Primary: POST https://auto-com-center-jamarrlmayes.replit.app/api/telemetry/ingest
+Aliases: POST /ingest, POST /api/ingest
+Fallback (only if A8 returns non-2xx or times out > 10s): POST https://scholarship-api-jamarrlmayes.replit.app/api/telemetry/ingest
+Telemetry Protocol (all apps):
+
+Protocol version: 3.3.1
+Required headers on every telemetry POST:
+x-scholar-protocol: "3.3.1"
+x-event-id: <uuid v4>
+x-event-type: <EVENT_TYPE from list below>
+x-app-label: "<APP_CODE> <APP_NAME>" e.g., "A3 scholarship_agent"
+x-app-base-url: "<APP_BASE_URL>" e.g., "https://scholarship-agent-jamarrlmayes.replit.app"
+x-sent-at: <ISO 8601 UTC timestamp>
+Required payload fields (top-level):
+app_code, app_name, app_base_url (must match headers)
+env: "prod"
+protocol_version: "3.3.1"
+display_hint: { title, severity, category, kpi_key? } for frontend display in A8
+data: {} event-specific content
+Required event types:
+APP_IDENTITY (startup identity; send BEFORE any other work)
+APP_ONLINE (dependencies probed, ready to operate)
+HEARTBEAT (every 60s)
+KPI_SNAPSHOT (every 5m; see structure below)
+DEPENDENCY_PROBE (per dependency, validate_only supported)
+SEO_PAGES_CREATED (A3→A7 flow)
+PROVIDER_REGISTERED (A3→A6 flow)
+LEAD_CREATED (A3→A5 flow)
+ERROR (any exception/failed operation)
+APP_OFFLINE (on graceful shutdown)
+KPI_SNAPSHOT structure (all apps reporting KPIs):
+
+event_type: "KPI_SNAPSHOT"
+data schema: { b2c: { free_users: int, paid_users: int, free_to_paid_conv_rate: float, arpu_credits_usd: float, new_leads_24h: int }, b2b: { providers_active: int, provider_prospects: int, provider_fee_revenue_usd_24h: float }, platform: { uptime_24h_pct: float, p95_latency_ms: int, events_emitted_24h: int, errors_24h: int }, costs: { ai_ops_usd_24h: float, infra_usd_24h: float, marketing_usd_24h: float }, campaign: { seo_pages_created_24h: int, outreach_emails_sent_24h: int, students_routed_24h: int } }
+Include only values you can measure; omit nulls. A8 UI reads display_hint to group KPIs.
+Auth standard for inter-app REST:
+
+Prefer authenticated calls using A1:
+POST https://scholar-auth-jamarrlmayes.replit.app/api/token -> { token }
+Use in Authorization: Bearer <token>
+If A1 is unavailable, proceed without auth only if your endpoint explicitly supports it. Always emit ERROR on auth fallback.
+Dependency probe pattern (all apps before APP_ONLINE):
+
+For each dependency, call its readiness endpoint with validate_only if supported. Emit DEPENDENCY_PROBE with result.
+Only emit APP_ONLINE after all required dependencies are reachable (2xx or known-ready).
+Event buffer and retries (all apps):
+
+Maintain an in-memory buffer of up to 500 events for A8 outages.
+Evict oldest DEBUG/INFO first; keep KPI and ERROR.
+Retry with exponential backoff: 1s, 2s, 4s, … up to 60s, then every 60s until success or shutdown.
+On send failure, also attempt fallback A2 ingest once per backoff cycle.
+Responsible AI guardrails (all apps):
+
+No academic dishonesty. No essay writing that misrepresents authorship.
+Apply bias mitigation and transparent explanations for recommendations.
+Do not store unnecessary PII; adhere to FERPA/COPPA constraints.
+Section: A1 scholar_auth (execute only if you are A1)
+
+Role: Issue/validate tokens for internal REST. Do not orchestrate other apps.
+On startup:
+Emit APP_IDENTITY and HEARTBEAT cadence.
+Emit DEPENDENCY_PROBE for your datastore/redis if any.
+Emit APP_ONLINE when ready.
+Every 60s: HEARTBEAT. Every 5m: KPI_SNAPSHOT with platform metrics.
+Section: A2 scholarship_api (execute only if you are A2)
+
+Role: Telemetry fallback sink; store/forward to A8 when available.
+Accept telemetry at POST /api/telemetry/ingest
+On startup: APP_IDENTITY, HEARTBEAT cadence, APP_ONLINE when ready.
+KPI_SNAPSHOT every 5m with platform and ingest counts.
+Section: A4 scholarship_sage (execute only if you are A4)
+
+Role: Provide scholarship recommendations on request. No proactive orchestration.
+On startup: APP_IDENTITY, HEARTBEAT cadence, APP_ONLINE when ready.
+Continue serving recs; include display_hint on rec events if you emit any telemetry.
+Section: A5 student_pilot (execute only if you are A5)
+
+Role: Lead intake sink.
+Accept POST /api/leads -> return { lead_id }
+On startup: APP_IDENTITY, HEARTBEAT cadence, APP_ONLINE when ready.
+Section: A6 provider_register (execute only if you are A6)
+
+Role: Provider registration sink.
+Accept POST /api/providers/register -> return { provider_id: "<uuid>" }
+On startup: APP_IDENTITY, HEARTBEAT cadence, APP_ONLINE when ready.
+Section: A7 auto_page_maker (execute only if you are A7)
+
+Role: SEO page engine. Do nothing proactively.
+Accept POST /api/seo/pages with body: { pages: [{ topic: string, keywords: [string], locale?: string }], validate_only?: boolean }
+Return: { created: int, urls: [string], validate_only?: boolean }
+On startup: APP_IDENTITY, HEARTBEAT cadence, APP_ONLINE when ready.
+Section: A8 auto_com_center (execute only if you are A8)
+
+Role: Command Center and Dashboard. Already online.
+Accept telemetry at:
+POST /api/telemetry/ingest
+POST /ingest
+POST /api/ingest
+Display all events grouped by x-app-label and x-app-base-url.
+No further action required by this prompt.
+Section: A3 scholarship_agent (EXECUTE THIS SECTION — you are A3)
+Identity and readiness:
+
+Immediately emit APP_IDENTITY with:
+app_code: "A3"
+app_name: "scholarship_agent"
+app_base_url: "https://scholarship-agent-jamarrlmayes.replit.app"
+display_hint: { title: "A3 identity", severity: "info", category: "lifecycle" }
+Acquire token from A1; if fails, log ERROR and continue unauth only if allowed. Always include x-app-label and x-app-base-url in all events.
+Perform dependency probes (validate_only=true where supported):
+A7 SEO pages endpoint: POST https://auto-page-maker-jamarrlmayes.replit.app/api/seo/pages with { pages: [{topic:"probe"}], validate_only:true }
+A6 provider register: POST https://provider-register-jamarrlmayes.replit.app/api/providers/register with { validate_only:true } if supported; otherwise small noop payload.
+A5 leads: POST https://student-pilot-jamarrlmayes.replit.app/api/leads with { validate_only:true } if supported; otherwise noop payload.
+A8 ingest: POST https://auto-com-center-jamarrlmayes.replit.app/api/telemetry/ingest with a DEPENDENCY_PROBE
+A2 fallback: POST https://scholarship-api-jamarrlmayes.replit.app/api/telemetry/ingest with a DEPENDENCY_PROBE
+Emit DEPENDENCY_PROBE for each result; then APP_ONLINE when all required probes succeed.
+Orchestration plan:
+
+SEO Engine via A7 (once on start, idempotent within 24h)
+
+Prepare exactly 12 SEO topics, with diverse high-intent queries:
+“first-generation college scholarships 2025”
+“stem scholarships for underrepresented students”
+“nursing scholarships with rolling deadlines”
+“transfer student scholarships spring 2025”
+“graduate fellowships in data science”
+“computer science scholarships no essay”
+“scholarships for veterans and military families”
+“community college to university scholarships”
+“international student scholarships usa undergrad”
+“women in engineering scholarships”
+“need-based vs merit scholarships explained”
+“how to write scholarship essays ethically”
+For each topic, include 5–8 long-tail keywords; locale "en-US".
+Call A7 POST /api/seo/pages with: { pages: [{ topic, keywords, locale: "en-US" } × 12], validate_only: false }
+On 2xx, emit SEO_PAGES_CREATED with: data: { count: <created>, urls: [ ... ], topics: [ ... ] } display_hint: { title: "SEO pages created", severity: "success", category: "seo", kpi_key: "campaign.seo_pages_created_24h" }
+On non-2xx, emit ERROR and retry with backoff. Stop after success or after 5 attempts; if still failing, continue with next steps but keep retrying every 10m.
+Provider Outreach via A6 (batch target: 50)
+
+Generate or retrieve 50 qualified provider prospects with minimal fields: { org_name, contact_email, category, region, website? }
+For each, POST to A6 /api/providers/register: { org_name, contact_email, category, region, source: "A3", utm: { campaign: "go-live", channel: "agent-orchestration" } }
+On success, emit PROVIDER_REGISTERED: data: { provider_id, org_name, category, region } display_hint: { title: "Provider registered", severity: "info", category: "b2b" }
+Maintain idempotency with a provider fingerprint (e.g., hash of org_name+domain); do not re-register within 24h.
+Student Lead Routing via A5 (minimum 10 leads)
+
+Create at least 10 high-intent student leads with fields: { email, locale, interest_areas: [string], stage: "discover"|"apply", source: "A3" }
+POST to A5 /api/leads -> expect { lead_id }
+Emit LEAD_CREATED for each: data: { lead_id, email_domain, interest_areas } display_hint: { title: "Lead created", severity: "success", category: "b2c", kpi_key: "b2c.new_leads_24h" }
+Deduplicate by email hash to avoid duplicates within 24h.
+Cadence and monitoring:
+
+HEARTBEAT every 60s with: data: { queue_depth: int, retries_inflight: int } display_hint: { title: "A3 heartbeat", severity: "info", category: "lifecycle" }
+KPI_SNAPSHOT every 5m with: data: { b2c: { free_users: null, paid_users: null, free_to_paid_conv_rate: null, arpu_credits_usd: null, new_leads_24h: <int> }, b2b: { providers_active: null, provider_prospects: 50, provider_fee_revenue_usd_24h: null }, platform: { uptime_24h_pct: estimate, p95_latency_ms: measure if available, events_emitted_24h: <int>, errors_24h: <int> }, costs: { ai_ops_usd_24h: estimate, infra_usd_24h: estimate, marketing_usd_24h: 0 }, campaign: { seo_pages_created_24h: <int>, outreach_emails_sent_24h: 50, students_routed_24h: <int> } } display_hint: { title: "A3 KPI snapshot", severity: "info", category: "kpi" }
+On any failure, emit ERROR with: data: { operation, target_url, status, body_excerpt?, retry_scheduled_in_s } display_hint: { title: "A3 error", severity: "error", category: "error" }
+Security and compliance:
+
+Include Authorization: Bearer <token> where supported.
+Never include PII beyond operational minimum (e.g., emails for leads). Do not include full names, DOB, SSNs, or essays in telemetry.
+Strip or hash emails when emitting telemetry: include only domain or a hashed identifier in events.
+Shutdown behavior:
+
+Before shutdown, emit APP_OFFLINE with: display_hint: { title: "A3 offline", severity: "warning", category: "lifecycle" }
+Smoke-Test Checklist (run after start):
+
+Expect in A8 dashboard, labeled “A3 scholarship_agent” and base URL “https://scholarship-agent-jamarrlmayes.replit.app”:
+APP_IDENTITY appears immediately
+DEPENDENCY_PROBE events for A7, A6, A5, A8, A2
+APP_ONLINE within seconds
+SEO_PAGES_CREATED with 12 URLs
+50 PROVIDER_REGISTERED events over the next few minutes
+10+ LEAD_CREATED events
+HEARTBEAT every 60s and KPI_SNAPSHOT every 5m
+If any item is missing after 10 minutes, check ERROR events and retry logs.
+— — — END PROMPT — — —
+
+Instructions for you:
+
+Open the scholarship_agent project (A3).
+Paste the entire prompt above EXACTLY as-is into A3’s prompt/config entry point.
+Run A3. Watch A8’s dashboard for the events listed in the smoke-test checklist. All reports will include the app label and base URL as required.
