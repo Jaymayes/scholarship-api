@@ -1,0 +1,138 @@
+Below is the combined Master Go‑Live Prompt for the entire 8‑app fleet, tailored for Agent3 (A3 = scholarship_agent). Paste this entire prompt into the scholarship-agent Replit project. Agent3 must only execute the “A3‑ONLY” sections and ignore all other app sections. All events must self‑identify with app_name and app_base_url in the app_label field.
+
+MASTER GO‑LIVE PROMPT v3.3.1 (Agent3 Edition)
+
+0. Global protocol for all apps (read‑only context for A3; do not execute non‑A3 actions)
+
+Objective: All apps go live, start generating and capturing leads, and report telemetry to the Command Center with data visible on the frontend.
+Primary telemetry endpoint (A8 Command Center): POST https://auto-com-center-jamarrlmayes.replit.app/ingest Alias: POST https://auto-com-center-jamarrlmayes.replit.app/api/ingest
+Fallback telemetry endpoint (A2 Scholarship API): POST https://scholarship-api-jamarrlmayes.replit.app/telemetry/ingest
+Required headers on every S2S telemetry event: Content-Type: application/json X-Protocol-Version: v3.3.1 X-Idempotency-Key: <unique-per-event>
+Required envelope fields on every event: event_type: string (e.g., APP_ONLINE, HEARTBEAT, KPI_SNAPSHOT, CTA_EMITTED, LEAD_STUDENT, PROVIDER_OUTREACH, PROVIDER_ONBOARDED, REC_DELIVERED, PREFLIGHT_CHECK) app_id: string (A1..A8) app_name: string (e.g., scholarship_agent) app_base_url: string (the app’s base URL) app_label: string (exactly: “<app_id> <app_name> <app_base_url>”) role: string (per app, see registry below) tile: string (SLO, B2C, B2B, SEO, Growth, Trust, Finance) where applicable dashboard: boolean (true if intended for frontend widgets) metrics: object (event‑specific KPIs and SLO metrics) status_matrix: object (for PREFLIGHT_CHECK; service health map) metadata: object (optional; details per event)
+Scheduling standards: HEARTBEAT: every 60s, dashboard=false KPI_SNAPSHOT: every 5m, dashboard=true, tile appropriate to the KPI domain PREFLIGHT_CHECK: on startup and on schedule (e.g., every 10m) with status_matrix and slo_overall
+SLO targets: uptime >= 99.9% p95_ms ≈ 120ms error_rate <= 1%
+Tiles → example metrics: SLO: uptime_24h, p95_ms, error_rate B2C: leads_student_5m, ctr_cta_5m, recs_served_5m, rec_ctr_5m B2B: providers_onboarded_5m, providers_contacted_5m SEO: pages_published_5m, organic_clicks_5m, impressions_5m, seo_ctr_5m Growth: campaigns_active, campaigns_launched_5m, opt_ins_5m, cpl_5m, conv_rate_5m Trust: consent_rate_5m, privacy_incidents_24h, bias_flags_24h Finance: revenue_b2c_5m, revenue_b2b_5m, arpu_5m, gross_margin_5m
+App registry (reference for IDs, roles, and base URLs; A3 must only use its own row)
+A1 scholar_auth (role=auth_gateway) https://scholar-auth-jamarrlmayes.replit.app
+A2 scholarship_api (role=api_backend) https://scholarship-api-jamarrlmayes.replit.app
+A3 scholarship_agent (role=growth_orchestrator) https://scholarship-agent-jamarrlmayes.replit.app
+A4 scholarship_sage (role=recommendations) https://scholarship-sage-jamarrlmayes.replit.app
+A5 student_pilot (role=student_frontend) https://student-pilot-jamarrlmayes.replit.app
+A6 provider_register (role=provider_portal) https://provider-register-jamarrlmayes.replit.app
+A7 auto_page_maker (role=seo_engine) https://auto-page-maker-jamarrlmayes.replit.app
+A8 auto_com_center (role=command_center) https://auto-com-center-jamarrlmayes.replit.app
+2. A3‑ONLY: scholarship_agent go‑live and operations (execute these steps; ignore all non‑A3 sections)
+A3 identity (must happen before any work)
+
+Immediately emit a single‑line identity to logs/stdout and send APP_IDENTITY to telemetry.
+Log line (stdout): APP_IDENTITY: A3 scholarship_agent https://scholarship-agent-jamarrlmayes.replit.app protocol=v3.3.1
+APP_IDENTITY event (send to A8, fallback to A2 on error) event_type: "APP_IDENTITY" app_id: "A3" app_name: "scholarship_agent" app_base_url: "https://scholarship-agent-jamarrlmayes.replit.app" app_label: "A3 scholarship_agent https://scholarship-agent-jamarrlmayes.replit.app" role: "growth_orchestrator" metadata: { protocol: "v3.3.1", commit: "<git_sha_if_available>", region: "<region>" }
+A3 startup sequence
+
+APP_ONLINE (send once on boot; dashboard=false)
+event_type: "APP_ONLINE"
+app_id/app_name/app_base_url/app_label/role: as above
+dashboard: false
+metadata: { version: "v3.3.1", started_at: "<iso8601>", features: ["lead_orchestration","campaigns","attribution"] }
+
+PREFLIGHT_CHECK (send on boot, then every 10m; dashboard=false)
+
+Validate critical dependencies and produce status_matrix keys as “A8_ingest”, “A2_telemetry”, “A5_frontend”, “A6_provider”, “A7_pages”.
+Include slo_overall with values "green"|"yellow"|"red" based on checks. event_type: "PREFLIGHT_CHECK" tile: "SLO" dashboard: false metrics: { slo_overall: "green" } status_matrix: { A8_ingest: "ok"|"degraded"|"down", A2_telemetry: "ok"|"degraded"|"down", A5_frontend: "ok"|"degraded"|"down", A6_provider: "ok"|"degraded"|"down", A7_pages: "ok"|"degraded"|"down" } metadata: { oauth_ok: true, pkce_ok: true, jwks_ok: true }
+HEARTBEAT (every 60s; dashboard=false)
+event_type: "HEARTBEAT"
+tile: "SLO"
+dashboard: false
+metrics: { p95_ms: 120, error_rate: 0.01, uptime_24h: 99.9 }
+metadata: { queue_depth: "<int>", workers_active: "<int>" }
+
+KPI_SNAPSHOT (every 5m; dashboard=true; tile="Growth")
+
+Send A3 growth KPIs. You must include app_label on all reports. event_type: "KPI_SNAPSHOT" tile: "Growth" dashboard: true metrics: { campaigns_active: "<int>", campaigns_launched_5m: "<int>", opt_ins_5m: "<int>", leads_student_5m: "<int>", providers_contacted_5m: "<int>", ctr_cta_5m: "<float>", conv_rate_5m: "<float>", cpl_5m: "<float>" } metadata: { attribution_model: "last_touch|data_driven", notes: "A3 campaign snapshot" }
+A3 operational responsibilities (lead generation and attribution)
+A) Launch and manage campaigns (immediate on go‑live)
+
+Define up to 3 always‑on campaigns targeting top scholarship categories. Persist local schedule and cadence.
+For each campaign launch, emit: event_type: "CAMPAIGN_LAUNCHED" (tile="Growth", dashboard=true) metrics: { budget_daily: "<usd>", target_segment: "<string>" } metadata: { campaign_id: "<uuid>", channel: "seo|email|inapp", creatives: ["<id>"] }
+B) Coordinate student CTAs via A5
+
+For each campaign that targets students, create CTA intents and handoff to A5 (student_pilot) UI hooks. If A5 auto‑emits CTA_EMITTED, just attribute in A3.
+When a CTA is shown or triggered by your orchestration, emit: event_type: "CTA_EMITTED" (tile="B2C", dashboard=true) metrics: { ctr_cta_5m: "<float>" } metadata: { campaign_id: "<uuid>", placement: "A5", cta_id: "<id>" }
+C) Attribute student leads
+
+Upon receiving or detecting LEAD_STUDENT events emitted by A5, attribute to campaigns using last_touch by default.
+Emit an A3 attribution event to ensure Growth dashboard completeness: event_type: "LEAD_ATTRIBUTION" (tile="Growth", dashboard=true) metrics: { leads_student_5m: "<int>" } metadata: { lead_id: "<uuid>", campaign_id: "<uuid>", source_event: "LEAD_STUDENT" }
+D) Provider outreach coordination (B2B)
+
+If available, use A6 endpoints:
+POST /api/providers/register (idempotent) to capture provider signups.
+Optional: POST /api/providers/contact for outreach intents (only if implemented; otherwise skip gracefully).
+Every outreach batch and response must be reported: event_type: "PROVIDER_OUTREACH" (tile="B2B", dashboard=true) metrics: { providers_contacted_5m: "<int>" } metadata: { campaign_id: "<uuid>", contact_method: "email|form|inapp", status: "sent|bounced|replied" }
+E) Finance impact roll‑up (optional, if known to A3)
+
+If A3 tracks budget and conversions enough to estimate CPL/ARPU contribution, include in KPI_SNAPSHOT metrics: cpl_5m and conv_rate_5m. Leave finance KPIs to A8 Finance tile otherwise.
+A3 telemetry sending rules (critical)
+
+Always include app_label exactly: "A3 scholarship_agent https://scholarship-agent-jamarrlmayes.replit.app"
+Always prefer A8 /ingest; on non‑2xx, retry to A8 /api/ingest; on failure, fallback to A2 /telemetry/ingest.
+Include X-Idempotency-Key per event (uuid v4 or monotonic timestamp with scope).
+Respect backoff on retries: start 250ms exponential, cap 10s, max 5 attempts.
+Never block business logic on telemetry failure; queue and flush asynchronously.
+3. Non‑A3 sections (reference only; A3 must ignore and not execute)
+A1 scholar_auth (auth_gateway)
+
+APP_IDENTITY, APP_ONLINE, PREFLIGHT_CHECK with oauth_ok/pkce_ok/jwks_ok
+HEARTBEAT 60s; KPI_SNAPSHOT 5m (tile: SLO)
+Lead events: none generated directly; forward auth funnel metrics to SLO tile
+A2 scholarship_api (api_backend)
+
+Expose POST /telemetry/ingest (fallback for fleet)
+KPI_SNAPSHOT (tile: SLO) every 5m
+HEARTBEAT 60s; APP_IDENTITY, APP_ONLINE, PREFLIGHT_CHECK
+A4 scholarship_sage (recommendations)
+
+REC_DELIVERED events (tile: B2C) with scholarship_ids and rank
+KPI_SNAPSHOT 5m: recs_served_5m, rec_clicks_5m, rec_ctr_5m
+A5 student_pilot (student_frontend)
+
+Emits CTA_EMITTED and LEAD_STUDENT
+KPI_SNAPSHOT 5m: leads_student_5m, ctr_cta_5m
+A6 provider_register (provider_portal)
+
+POST /api/providers/register (idempotent)
+Emits PROVIDER_ONBOARDED (tile: B2B)
+Optional: POST /api/providers/contact for A3 outreach intents
+A7 auto_page_maker (seo_engine)
+
+Publishes landing pages and emits SEO tile metrics: pages_published_5m, organic_clicks_5m, impressions_5m, seo_ctr_5m
+A8 auto_com_center (command_center)
+
+POST /ingest and /api/ingest accepts all event types
+Displays widgets for tiles: SLO, B2C, B2B, SEO, Growth, Trust, Finance
+Emits KPI_SNAPSHOT 5m (tile: Finance) summarizing fleet if configured
+4. Display and dashboard rules (handled by A8; A3 provides data)
+
+Any event with dashboard=true and a tile value is eligible for frontend widgets.
+A3 must ensure KPI_SNAPSHOT (Growth) includes core growth KPIs; A8 will render “Growth” board tiles.
+HEARTBEAT and PREFLIGHT_CHECK populate fleet health dashboards (dashboard=false for heartbeats; A8 may surface summaries).
+5. Compliance, ethics, and SLO guardrails (A3 must enforce in campaigns)
+
+No academic dishonesty facilitation. Campaign copy must emphasize empowerment and application support.
+Respect privacy and consent (FERPA/COPPA). Record consent status in metadata if capturing PII.
+Bias mitigation: diversify targeting and surface transparent criteria in campaign metadata.
+SLO compliance: throttle campaign actions if p95_ms or error_rate breach targets; report “yellow/red” in slo_overall when degraded.
+A3 immediate execution checklist (run now)
+
+Emit APP_IDENTITY to stdout and to telemetry (with app_label).
+Send APP_ONLINE, then PREFLIGHT_CHECK with status_matrix for A8/A2/A5/A6/A7.
+Start HEARTBEAT (60s) and KPI_SNAPSHOT (5m) schedulers.
+Initialize 3 growth campaigns; emit CAMPAIGN_LAUNCHED for each.
+Begin CTA orchestration for A5 and emit CTA_EMITTED upon placements.
+Attribute any incoming LEAD_STUDENT to campaigns with LEAD_ATTRIBUTION.
+If A6 contact endpoint exists, initiate PROVIDER_OUTREACH and track providers_contacted_5m.
+Maintain retries and fallbacks for telemetry; never block operations on ingest failures.
+Reminder to Agent3
+
+Only execute the A3‑ONLY sections above. All other app sections are provided for context and must be ignored by A3.
+On every report, ensure app_label is exactly: A3 scholarship_agent https://scholarship-agent-jamarrlmayes.replit.app
+If you want, I can also produce a compact, copy‑paste “A3‑only” version stripped of the other app sections.
