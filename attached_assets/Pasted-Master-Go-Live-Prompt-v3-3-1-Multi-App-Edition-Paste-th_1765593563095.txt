@@ -1,0 +1,236 @@
+Master Go‑Live Prompt v3.3.1 — Multi‑App Edition
+Paste this prompt into the scholarship_agent (A3) project only. Every other app must ignore all instructions except the “Not Your App” rule below.
+
+Not Your App rule
+
+Before doing anything, each runtime must identify itself. If your app_id is not A3 (scholarship_agent), do nothing. Emit a NOTICE to your logs that this prompt is scoped to A3 and exit without any changes.
+App identity and base URLs
+
+A1 scholar_auth → https://scholar-auth-jamarrlmayes.replit.app
+A2 scholarship_api → https://scholarship-api-jamarrlmayes.replit.app
+A3 scholarship_agent → https://scholarship-agent-jamarrlmayes.replit.app
+A4 scholarship_sage → https://scholarship-sage-jamarrlmayes.replit.app
+A5 student_pilot → https://student-pilot-jamarrlmayes.replit.app
+A6 provider_register → https://provider-register-jamarrlmayes.replit.app
+A7 auto_page_maker → https://auto-page-maker-jamarrlmayes.replit.app
+A8 auto_com_center (Command Center) → https://auto-com-center-jamarrlmayes.replit.app
+Universal protocol and telemetry (applies to everyone, but A3 must enforce for its own events)
+
+Protocol version: v3.3.1
+Primary ingest endpoint: A8 POST /ingest (alias: POST /api/ingest)
+Required headers on every outbound event:
+x-scholar-protocol: v3.3.1
+x-app-label: "Ax app_name APP_BASE_URL" (example: "A3 scholarship_agent https://scholarship-agent-jamarrlmayes.replit.app")
+x-event-type: <EVENT_TYPE>
+x-event-id: <uuid-v4>
+x-sent-at: <ISO-8601 UTC timestamp>
+Required top-level fields in every event body:
+protocol_version: "v3.3.1"
+app_label: same value as the header
+event_type, event_id, sent_at
+app_id: "A1"…"A8" and app_name: e.g., "scholarship_agent"
+environment: "prod" (unless running in dev)
+A8 dashboard mappings (A8 already configured)
+APP_IDENTITY → fleet_health, telemetry
+APP_ONLINE → fleet_health, telemetry
+PREFLIGHT_CHECK → fleet_health, system_status
+HEARTBEAT → fleet_health, telemetry
+KPI_SNAPSHOT → kpi_dashboard, traffic, leads
+LEAD_STUDENT → leads, b2c_funnel
+LEAD_ATTRIBUTION → growth, b2c_funnel
+REC_DELIVERED → recommendations, engagement
+PROVIDER_ONBOARDED → b2b_funnel, conversions
+PROVIDER_CONTACTED → b2b_funnel, outreach
+PROVIDER_OUTREACH → b2b_funnel, outreach
+PAGE_PUBLISHED / SEO_PAGE_PUBLISHED → seo, content
+CTA_EMITTED → traffic, engagement, growth
+UTM_ROUTED → traffic, growth, seo
+CAMPAIGN_STARTED / CAMPAIGN_LAUNCHED / CAMPAIGN_RESULT → growth, campaigns
+ERROR_EVENT → trust, errors
+REVENUE → revenue, finance, monetization
+SLO expectations (all apps):
+Uptime ≥ 99.9%, P95 latency ~120ms
+HEARTBEAT every 60s includes uptime_s, queue_depth, error_count_5m, p95_ms_5m
+PREFLIGHT_CHECK on startup and after failures; include per-dependency objects:
+{ "<dep_label>": { "status": "up" | "down", "latency_ms": <number> } }
+KPI_SNAPSHOT every 5 minutes minimum
+Fallback telemetry:
+Primary: A8 /ingest
+If A8 fails (non-2xx or timeout), buffer and retry with backoff; optionally send to A2’s ingest if configured as fallback.
+Section A3 only — scholarship_agent go‑live plan
+A3 must perform all steps in this Section. Other sections are informational and must be ignored by A3.
+
+A3.0 Identify and announce
+
+Determine app_id and base URL at runtime.
+Immediately emit APP_IDENTITY with:
+app_id: "A3"
+app_name: "scholarship_agent"
+app_base_url: "https://scholarship-agent-jamarrlmayes.replit.app"
+role: "growth_orchestrator"
+version: the running version string
+readiness: { ready: false, reason: "preflight" }
+A3.1 Preflight checks (blocker if failing)
+
+Dependencies to probe in parallel:
+A1, A2, A4, A5, A6, A7, A8
+Emit PREFLIGHT_CHECK with:
+status_matrix:
+"A1 scholar_auth https://scholar-auth-jamarrlmayes.replit.app": {status, latency_ms}
+"A2 scholarship_api https://scholarship-api-jamarrlmayes.replit.app": {status, latency_ms}
+"A4 scholarship_sage https://scholarship-sage-jamarrlmayes.replit.app": {status, latency_ms}
+"A5 student_pilot https://student-pilot-jamarrlmayes.replit.app": {status, latency_ms}
+"A6 provider_register https://provider-register-jamarrlmayes.replit.app": {status, latency_ms}
+"A7 auto_page_maker https://auto-page-maker-jamarrlmayes.replit.app": {status, latency_ms}
+"A8 auto_com_center https://auto-com-center-jamarrlmayes.replit.app": {status, latency_ms}
+A3 readiness rule:
+Proceed only if A8 ingest is up AND at least A6 and A7 are up. If not, retry 3x with backoff, then emit ERROR_EVENT and pause.
+A3.2 Online announcement
+
+When preflight passes, emit APP_ONLINE:
+readiness: { ready: true, role: "growth_orchestrator" }
+routes_enabled: ["lead_b2c","lead_b2b","seo","campaigns"]
+A3.3 Lead generation strategy (immediate launch)
+
+B2C engine (students)
+Coordinate with A7 to publish at least 10 SEO landing pages targeting high-intent queries (“no essay scholarships”, “first-gen grants”, “STEM scholarships by state”, etc.).
+For each published page, A3 must emit SEO_PAGE_PUBLISHED and create a CTA funnel:
+CTA_EMITTED for every “Apply Now”, “Check Eligibility”, “Get Matches” rendered.
+UTM_ROUTED when incoming traffic has utm_source/medium/campaign.
+When a student submits email or begins onboarding (via A5), emit:
+LEAD_STUDENT with consent_version, source_page, utm, target_app: "A5".
+LEAD_ATTRIBUTION connecting the lead to the SEO page and campaign.
+B2B engine (providers)
+Outreach wave 1: 50 providers from A2 directory or curated list.
+For each attempt, emit PROVIDER_OUTREACH with channel, attempt_count, and handoff fields.
+When a provider completes the form at A6, emit PROVIDER_ONBOARDED with provider_id if available. If A3 programmatically initiates a lead on A6:
+POST to A6 /api/providers/register using service headers.
+On success, emit PROVIDER_CONTACTED and PROVIDER_ONBOARDED.
+Campaigns
+Emit CAMPAIGN_STARTED for “SEO Bootstrap v1”, “Provider Wave 1”, and “Welcome Drip v1”.
+Emit CAMPAIGN_LAUNCHED when creatives/flows are live.
+Emit CAMPAIGN_RESULT at end of first 24h and at 7d with metrics.
+A3.4 Event payloads A3 must send (include app_label on every event)
+
+APP_IDENTITY / APP_ONLINE
+role, version, readiness, environment
+PREFLIGHT_CHECK
+status_matrix per “A3.1”
+HEARTBEAT (every 60s)
+uptime_s, queue_depth, error_count_5m, p95_ms_5m
+KPI_SNAPSHOT (every 5m)
+tiles:
+b2c_funnel: impressions, clicks, cta, leads, conversion_rate
+b2b_funnel: outreach_count, responses, onboarded, conversion_rate
+traffic: sessions, bounce_rate, top_pages
+growth: active_campaigns, cost_to_date, cac_estimate
+LEAD_STUDENT
+student_id (if known), email_hash, consent_version, source_page, utm, target_app: "A5"
+LEAD_ATTRIBUTION
+lead_id or email_hash, source_app: "A3", campaign, page_url, utm, next_steps: ["route_to_A5","send_welcome_drip"]
+PROVIDER_OUTREACH / PROVIDER_CONTACTED / PROVIDER_ONBOARDED
+provider fields: name, email_domain, website, type
+attempt_count, channel, handoff: { to_app: "A6", method: "api"|"form" }
+PAGE_PUBLISHED / SEO_PAGE_PUBLISHED (from A7 handoff result)
+page_url, keyword, intent, status
+CTA_EMITTED / UTM_ROUTED
+cta_id, page_url, variant, utm, session_id
+CAMPAIGN_STARTED / CAMPAIGN_LAUNCHED / CAMPAIGN_RESULT
+campaign_id, name, objective, budget (if any), kpis, results
+ERROR_EVENT
+severity, code, message, context, last_action
+A3.5 Service-to-service conventions (critical for A6/A7)
+
+Always include:
+x-scholar-protocol: v3.3.1
+x-app-label: "A3 scholarship_agent https://scholarship-agent-jamarrlmayes.replit.app"
+A6 inter-service registration
+Endpoint: A6 POST /api/providers/register
+If CSRF/session required, include service headers; retry with backoff if 403; log ERROR_EVENT on persistent failure.
+A7 page publishing
+Endpoint: A7 POST /api/pages/publish (or current publish route)
+Include keyword, title, meta_description, CTA config, target_slug; confirm 200 OK then emit SEO_PAGE_PUBLISHED.
+A3.6 Frontend display guarantee
+
+All events must include app_label so A8 can render the app badge on tiles: "A3 scholarship_agent https://scholarship-agent-jamarrlmayes.replit.app".
+Ensure event_type values exactly match the mapping list so A8 routes to the correct widgets.
+A3.7 Initial execution steps (run now)
+
+Step 1: APP_IDENTITY and PREFLIGHT_CHECK.
+Step 2: APP_ONLINE on success.
+Step 3: Launch “SEO Bootstrap v1”:
+Request 10 pages from A7 with intents:
+“no essay scholarships”
+“first-gen college scholarships”
+“state scholarships [top 5 states by volume]”
+“STEM scholarships for women”
+“need-based vs merit-based scholarships”
+For each page: confirm publish → emit SEO_PAGE_PUBLISHED and CTA_EMITTED per CTA block (“Check Eligibility”).
+Step 4: Launch “Welcome Drip v1” for new leads; emit CAMPAIGN_STARTED/LAUNCHED.
+Step 5: Provider “Wave 1” outreach to 50 foundations; emit PROVIDER_OUTREACH and on responses PROVIDER_CONTACTED and PROVIDER_ONBOARDED.
+Step 6: Begin HEARTBEAT and KPI_SNAPSHOT schedule.
+Step 7: After 24h, emit CAMPAIGN_RESULT for all active campaigns.
+A3.8 KPIs to track and report (for Command Center)
+
+B2C: leads/day, CTR, CVR, CPA (target organic CAC → $0–$2), ARPU from credits.
+B2B: providers onboarded/day, outreach→response→onboarded conversion.
+Traffic: organic sessions from A7 pages, top 10 URLs, UTM mix.
+Reliability: uptime, P95 latency, error_count_5m.
+A3.9 Error handling and retries
+
+Any non-2xx on A8 ingest: queue event, exponential backoff (e.g., 1s/5s/15s/60s), max 10 attempts, then persist to dead-letter and emit ERROR_EVENT with summary counts.
+Any dependency down in PREFLIGHT_CHECK: retry 3x, then pause and emit ERROR_EVENT with dependency status_matrix.
+All errors include app_label and last_action fields.
+A3.10 Compliance and ethics
+
+Never auto-apply on behalf of students; only guide and assist.
+Include consent_version on LEAD_STUDENT.
+Honor opt-outs immediately; stop nurture sequences and emit KPI_SNAPSHOT noting updated counts.
+Section A1 guidance (ignore unless you are A1)
+
+Emit LEAD_STUDENT on signup with consent_version; target_app="A5".
+HEARTBEAT and KPI_SNAPSHOT with SLO tiles.
+Fallback telemetry to A8, then A2 if configured.
+Section A2 guidance (ignore unless you are A2)
+
+Accept v3.3.1 headers on /telemetry/ingest as fallback sink.
+Store and forward to A8 when available; maintain idempotency via x-event-id.
+Section A4 guidance (ignore unless you are A4)
+
+Emit REC_DELIVERED with scholarship_ids, ranks, rec_count.
+KPI_SNAPSHOT into b2c_funnel; include bias_check_performed.
+Section A5 guidance (ignore unless you are A5)
+
+Accept LEAD_STUDENT and LEAD_ATTRIBUTION; start onboarding flow.
+Emit CTA_EMITTED on in-app CTAs; emit KPI_SNAPSHOT for onboarding progression.
+Section A6 guidance (ignore unless you are A6)
+
+Ensure /api/providers/register supports inter-service calls with v3.3.1 headers.
+Emit PROVIDER_ONBOARDED on success; include provider_id and app_label.
+Section A7 guidance (ignore unless you are A7)
+
+Publish pages on request; emit SEO_PAGE_PUBLISHED with keyword, page_url.
+Provide page telemetry to A8: impressions, clicks, ctr.
+Section A8 guidance (ignore unless you are A8)
+
+Continue ingest on /ingest and /api/ingest.
+Display app_label on all tiles; ensure mappings above are active.
+Success criteria (what “GO LIVE” means for A3)
+
+Within 60 minutes of launch:
+≥10 SEO pages live with SEO_PAGE_PUBLISHED events.
+≥30 CTAs emitted; ≥15 UTM_ROUTED recorded.
+≥25 LEAD_STUDENT and matching LEAD_ATTRIBUTION events delivered to A8.
+Provider Wave 1 sent to 50 targets; ≥5 PROVIDER_CONTACTED, ≥2 PROVIDER_ONBOARDED.
+HEARTBEAT and KPI_SNAPSHOT visible in A8 with correct app_label.
+Stop conditions and rollback
+
+If PREFLIGHT_CHECK degrades for A8 or both A6 and A7 simultaneously:
+Pause campaigns, emit ERROR_EVENT, set readiness.ready=false in next HEARTBEAT.
+Resume automatically when preflight returns to GREEN.
+Final reminder to all apps
+
+App must identify itself before any action.
+If not your app, do nothing except emit one NOTICE in logs: “This prompt is scoped to A3 (scholarship_agent). No changes applied.”
+On every report and event, include your app_label in both headers and body exactly as: "Ax app_name APP_BASE_URL". Example for A3: "A3 scholarship_agent https://scholarship-agent-jamarrlmayes.replit.app".
+End of prompt.

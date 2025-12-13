@@ -142,30 +142,68 @@ async def telemetry_ingest(
     This is the mandated fallback endpoint per Master Go-Live Prompt:
     - POST https://scholarship-api-jamarrlmayes.replit.app/telemetry/ingest
     - Accepts single event or batch in v3.3.1 envelope format
-    - Enforces X-Protocol-Version and X-Idempotency-Key headers
     - Returns 200 on success per contract
     
-    Headers:
-    - X-Protocol-Version: v3.3.1 (required)
-    - X-Idempotency-Key: <uuid> (required for deduplication)
-    - Content-Type: application/json
+    Accepts BOTH header formats for backwards compatibility:
+    
+    New Fleet-Wide Headers (v3.3.1 Multi-App):
+    - x-scholar-protocol: v3.3.1
+    - x-app-label: "Ax app_name APP_BASE_URL"
+    - x-event-type: <EVENT_TYPE>
+    - x-event-id: <uuid-v4> (used for idempotency)
+    - x-sent-at: <ISO-8601>
+    
+    Legacy Headers:
+    - X-Protocol-Version: v3.3.1
+    - X-Idempotency-Key: <uuid>
     """
-    protocol_version = request.headers.get("X-Protocol-Version", "")
-    idempotency_key = request.headers.get("X-Idempotency-Key") or request.headers.get("Idempotency-Key")
+    protocol_version = (
+        request.headers.get("x-scholar-protocol") or 
+        request.headers.get("X-Scholar-Protocol") or
+        request.headers.get("X-Protocol-Version") or 
+        ""
+    )
+    
+    idempotency_key = (
+        request.headers.get("x-event-id") or
+        request.headers.get("X-Event-Id") or
+        request.headers.get("X-Idempotency-Key") or 
+        request.headers.get("Idempotency-Key")
+    )
+    
+    app_label_header = (
+        request.headers.get("x-app-label") or
+        request.headers.get("X-App-Label") or
+        ""
+    )
+    
+    event_type_header = (
+        request.headers.get("x-event-type") or
+        request.headers.get("X-Event-Type") or
+        ""
+    )
+    
+    sent_at_header = (
+        request.headers.get("x-sent-at") or
+        request.headers.get("X-Sent-At") or
+        ""
+    )
     
     if protocol_version != "v3.3.1":
         logger.warning(f"REPORT: app=scholarship_api | env=prod | v3.3.1 INGEST: Rejected - Invalid protocol: {protocol_version}")
         return JSONResponse(status_code=400, content={
             "error": "Invalid protocol version",
-            "detail": "X-Protocol-Version header must be 'v3.3.1'",
-            "received": protocol_version
+            "detail": "x-scholar-protocol or X-Protocol-Version header must be 'v3.3.1'",
+            "received": protocol_version,
+            "accepted_headers": ["x-scholar-protocol", "X-Protocol-Version"]
         })
     
     if not idempotency_key:
         logger.warning(f"REPORT: app=scholarship_api | env=prod | v3.3.1 INGEST: Rejected - Missing idempotency key")
         return JSONResponse(status_code=400, content={
             "error": "Missing idempotency key",
-            "detail": "X-Idempotency-Key header is required"
+            "detail": "x-event-id or X-Idempotency-Key header is required",
+            "accepted_headers": ["x-event-id", "X-Idempotency-Key"]
         })
     
     try:
@@ -194,19 +232,19 @@ async def telemetry_ingest(
         for event_data in events_to_process:
             try:
                 event_id = event_data.get("event_id") or event_data.get("idempotency_key") or idempotency_key or str(uuid.uuid4())
-                event_type = event_data.get("event_type") or event_data.get("type") or "unknown"
+                event_type = event_data.get("event_type") or event_data.get("type") or event_type_header or "unknown"
                 app_id = event_data.get("app_id") or event_data.get("app") or "unknown"
                 app_name = event_data.get("app_name") or ""
                 app_base_url = event_data.get("app_base_url") or ""
-                app_label = event_data.get("app_label") or f"{app_id} {app_name} {app_base_url}".strip()
+                app_label = event_data.get("app_label") or app_label_header or f"{app_id} {app_name} {app_base_url}".strip()
                 role = event_data.get("role") or ""
                 tile = event_data.get("tile") or ""
                 dashboard = event_data.get("dashboard", False)
                 status_matrix = event_data.get("status_matrix") or {}
                 metrics = event_data.get("metrics") or {}
                 metadata = event_data.get("metadata") or {}
-                env = event_data.get("env", "prod")
-                ts = event_data.get("ts") or event_data.get("ts_utc") or datetime.utcnow().isoformat()
+                env = event_data.get("env") or event_data.get("environment") or "prod"
+                ts = event_data.get("ts") or event_data.get("ts_utc") or event_data.get("sent_at") or sent_at_header or datetime.utcnow().isoformat()
                 
                 if isinstance(ts, str):
                     try:
