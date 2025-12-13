@@ -1,0 +1,217 @@
+Below is the single, comprehensive Go‑Live prompt you asked for. Paste this entire prompt into the scholarship_agent (A3) project. Every app will see its own section, but only A3 executes work; all other apps must no‑op per the Scope Guard. This prompt makes A3 identify itself clearly, generate leads, coordinate SEO pages, hand off provider registrations, and stream all telemetry to A8 Command Center with the app’s name and base APP_BASE_URL on every report.
+
+––––– BEGIN MULTI‑APP GO‑LIVE PROMPT v3.3.1 (Fleet: A1–A8) –––––
+
+Global Objective
+
+Execute fleet go‑live and begin dual‑engine growth:
+B2C: Acquire students through SEO + in‑app flows, capture leads, progress to conversions.
+B2B: Acquire providers through targeted outreach and handoff to provider registration.
+Report all events, metrics, and health to A8 Command Center for live frontend display.
+Success criteria to achieve within first operational window:
+SEO: 10+ pages published by A7 (auto_page_maker)
+B2C: 25+ student leads captured and reported
+B2B: 50+ provider outreach events logged (with handoffs to A6 when qualified)
+App Map (IDs → APP_BASE_URL)
+
+A1 scholar_auth → https://scholar-auth-jamarrlmayes.replit.app
+A2 scholarship_api → https://scholarship-api-jamarrlmayes.replit.app
+A3 scholarship_agent → https://scholarship-agent-jamarrlmayes.replit.app
+A4 scholarship_sage → https://scholarship-sage-jamarrlmayes.replit.app
+A5 student_pilot → https://student-pilot-jamarrlmayes.replit.app
+A6 provider_register → https://provider-register-jamarrlmayes.replit.app
+A7 auto_page_maker → https://auto-page-maker-jamarrlmayes.replit.app
+A8 auto_com_center (Command Center) → https://auto-com-center-jamarrlmayes.replit.app
+A8 Command Center (Ingest + Display)
+
+Status: FULLY READY
+Ingest endpoints:
+Primary: POST https://auto-com-center-jamarrlmayes.replit.app/ingest
+Secondary: POST https://auto-com-center-jamarrlmayes.replit.app/api/ingest
+Event routing to widgets: growth, b2c_funnel, b2b_funnel, seo, revenue, system_health
+Displays app_label on all tiles
+Tracks success criteria: 10+ SEO pages, 25+ leads, 50 outreach
+Telemetry Protocol v3.3.1
+
+Headers (send these on every event):
+x-scholar-protocol: v3.3.1
+x-event-id: <uuid-v4>
+x-app-id: <App ID, e.g., "A3">
+x-app-label: "<App ID> <app_name> <APP_BASE_URL>"
+Example for A3: "A3 scholarship_agent https://scholarship-agent-jamarrlmayes.replit.app"
+x-sent-at: <ISO-8601 UTC timestamp>
+Authorization / X-Auth-Token: <optional, send if configured>
+Event envelope (JSON body):
+event_type: string (see Event Types below)
+app_id: string (e.g., "A3")
+app_label: string (must include name + base URL)
+ts: ISO-8601 UTC timestamp
+session_id: string (optional)
+idempotency_key: string (optional but recommended)
+data: object (event-specific payload; never include raw passwords or sensitive auth tokens)
+tags: array[string] (e.g., ["seo","growth","b2c_funnel"])
+Event Types (v3.3.1 canonical)
+
+LIFECYCLE: APP_ONLINE, HEARTBEAT, NOTICE, ERROR
+SEO: SEO_PAGE_REQUESTED, SEO_PAGE_PUBLISHED
+B2C: LEAD_STUDENT, CONVERSION
+B2B: PROVIDER_OUTREACH, PROVIDER_ONBOARDED
+METRICS: METRIC (for QPS, backlog, latency, etc.)
+Routing Tags by Event Type
+
+seo: SEO_PAGE_REQUESTED, SEO_PAGE_PUBLISHED
+b2c_funnel: LEAD_STUDENT, CONVERSION
+b2b_funnel: PROVIDER_OUTREACH, PROVIDER_ONBOARDED
+growth: all demand-gen events (SEO + B2C + B2B)
+revenue: CONVERSION, METRIC (revenue_kpis)
+system_health: LIFECYCLE, ERROR, METRIC (ingest_qps, backlog_size, p95_ms)
+Success Criteria Progress
+
+Track internally and emit NOTICE upon each threshold crossed:
+SEO pages published ≥ 10
+Student leads ≥ 25
+Provider outreach ≥ 50
+When all three are met, emit NOTICE: "GO-LIVE TARGET MET"
+Scope Guard (Read Carefully)
+
+If app_id != your app, do nothing.
+Only A3 (scholarship_agent) is authorized to act on this prompt.
+Non-A3 apps must log NOTICE: "Prompt scoped to A3 only" and exit.
+A3 Scholarship Agent — ACTION SECTION (Only A3 executes)
+
+Identify Yourself Before Work
+Derive:
+app_id: "A3"
+app_name: "scholarship_agent"
+app_base_url: "https://scholarship-agent-jamarrlmayes.replit.app"
+app_label: "A3 scholarship_agent https://scholarship-agent-jamarrlmayes.replit.app"
+Immediately emit APP_ONLINE to A8 primary ingest; fallback to secondary; final fallback to A2:
+Primary: POST A8 /ingest
+Secondary: POST A8 /api/ingest
+Fallback of last resort: POST A2 /api/telemetry/ingest
+Include app_label exactly as above on all subsequent events.
+2. Initialize Health Telemetry Loop
+
+Send HEARTBEAT every 60s with METRIC payload:
+ingest_qps (observed), backlog_size (internal queue), p95_ms (internal request latency)
+tags: ["system_health"]
+On ingest failure: retry with exponential backoff (250ms, 500ms, 1s, 2s, 5s; max 5 attempts) and swap to secondary endpoint, then fallback to A2.
+Emit NOTICE on successful endpoint failover; emit ERROR if all fail.
+3. SEO Coordination with A7 (Auto Page Maker)
+
+Goal: Publish ≥ 10 SEO pages quickly, then continue pace sustainably.
+Request pages from A7:
+POST https://auto-page-maker-jamarrlmayes.replit.app/api/seo/pages
+Body: { topics: [ "<scholarship topic 1>", ..., "<topic N>" ], source_app: app_label }
+Start with at least 10 high-intent topics tied to scholarships, deadlines, eligibility criteria, and segments (first-gen, STEM, need-based, state/country-specific).
+For each successful page created/returned by A7:
+Emit SEO_PAGE_PUBLISHED with data: { page_id, url, topic, status: "published" }, tags: ["seo","growth"]
+If A7 returns async/task handles, poll respectfully (≤ 2 QPS total) until status=published.
+Rate limit: SEO page requests ≤ 2 QPS with ±20% jitter; backoff on 429/503.
+Do not create duplicate topics; maintain idempotency_key per topic.
+4. B2C Lead Generation and Handoff to A5 (Student Pilot)
+
+Lead capture strategy:
+Source leads from SEO pages and owned landing flows; never fabricate data.
+If A3 receives student interest (e.g., form submit), immediately post to A5.
+Create student lead:
+POST https://student-pilot-jamarrlmayes.replit.app/api/leads
+Body minimum: { name, email, intent: "scholarship_support", source: app_label, referrer_url }
+On 2xx, emit LEAD_STUDENT with data: { lead_id, email_domain, referrer_url }, tags: ["b2c_funnel","growth"]
+On 4xx/5xx, retry with backoff; after 5 fails, emit ERROR and buffer for later retry.
+Conversion tracking:
+When A5 signals a key milestone (account created, plan purchase, completed application support), emit CONVERSION with data: { lead_id, milestone, value_usd? }, tags: ["b2c_funnel","revenue","growth"]
+5. B2B Provider Outreach and Handoff to A6 (Provider Register)
+
+Outreach plan:
+Target ≥ 50 qualified providers; prioritize credible organizations (foundations, universities, scholarship programs).
+Outreach pacing: first 10 within first hour, the remainder within 24h; respect rate limits and email/API policies.
+Outreach event logging:
+Emit PROVIDER_OUTREACH with data: { provider_name, contact_channel, contact_status, notes? }, tags: ["b2b_funnel","growth"]
+Qualified provider handoff to A6:
+POST https://provider-register-jamarrlmayes.replit.app/api/providers/register
+Body minimum: { org_name, contact_email, program_url?, source: app_label }
+On success, emit PROVIDER_ONBOARDED with data: { provider_id, org_name }, tags: ["b2b_funnel","growth"]
+On failure, backoff and retry; after 5 fails, emit ERROR and schedule retry later.
+6. Success Criteria Tracking and Notice
+
+Maintain counters (in-memory + optional persistence) for:
+seo_pages_published, student_leads, provider_outreach_count
+Emit NOTICE on crossing thresholds:
+"SEO milestone hit: 10+ pages"
+"B2C milestone hit: 25+ leads"
+"B2B milestone hit: 50+ outreach"
+When all three reached, emit final NOTICE: "GO-LIVE TARGET MET" with tags: ["growth"]
+7. Data Hygiene, Privacy, and Security
+
+PII: Never log raw PII to public channels; only store minimum required for handoff. Hash or redact where appropriate in telemetry (e.g., derive email_domain, store lead_id).
+Compliance: Enforce FERPA/COPPA alignment; do not target or track minors; age gates where applicable.
+Secrets: Never place raw tokens in events; use Authorization header when configured.
+Responsible AI: No academic dishonesty; only empower students with guidance and opportunities.
+8. Reliability and Idempotency
+
+All POSTs include idempotency_key; dedupe on retry.
+Retries: 5 attempts with exponential backoff; switch ingest endpoints if telemetry fails.
+Rate limits: Honor 429/503; jitter requests; queue work when rate-limited.
+9. Dashboard Semantics (A8 Widgets)
+
+growth: summarize total SEO pages, student leads, provider outreach, weekly deltas.
+b2c_funnel: stages for student leads → accounts → paid conversions; show ARPU/CAC if available.
+b2b_funnel: outreach → responses → onboarded providers; show volume and conversion rate.
+seo: topic table, page URLs, publish timestamps, indexability hints.
+revenue: conversions by cohort, value_usd if provided.
+system_health: HEARTBEAT + METRIC (ingest_qps, backlog_size, p95_ms) and ERROR counts.
+10. First 60-Minute Go‑Live Plan (A3)
+
+Minute 0–2: Emit APP_ONLINE, start HEARTBEAT, send NOTICE "A3 starting go‑live run".
+Minute 2–10: Request 12–18 SEO pages from A7 across diversified high-intent topics.
+Minute 10–30: Begin provider outreach (10 contacts), log PROVIDER_OUTREACH, hand off qualified to A6.
+Minute 30–60: Ensure student lead capture is wired from SEO landing flows to A5; validate at least 5–10 leads.
+Throughout: Stream all events to A8; verify tiles show app_label with base URL.
+11. Error Handling Rules
+
+Any 4xx from partner apps:
+400/422: validate payloads; fix and retry once.
+401/403: check auth headers; pause until token configured; emit ERROR.
+5xx or network errors:
+Retry with backoff; after 5 fails, emit ERROR and schedule task retry.
+Emit NOTICE for resolved incidents.
+12. Live Checks (Self-Test)
+
+Telemetry: Send test NOTICE "A3 telemetry check" and confirm it appears in A8.
+SEO: Confirm at least 10 SEO_PAGE_PUBLISHED events flow to A8 and URLs resolve.
+B2C: Post a test lead to A5 (non-PII test entry) in staging only; in production, wait for real leads.
+B2B: Log 2–3 test outreach entries in staging only; in production, use real providers.
+End of A3 Action Section
+
+Non‑A3 Apps — NO‑OP Policy (for clarity and future reuse)
+
+A1 scholar_auth:
+Do nothing for this prompt. Log NOTICE "Prompt scoped to A3 only".
+If A3 later calls you, respond per your existing auth flows.
+A2 scholarship_api:
+Do nothing for this prompt. Log NOTICE "Prompt scoped to A3 only".
+Accept telemetry fallback at POST /api/telemetry/ingest, v3.3.1 headers allowed.
+A4 scholarship_sage:
+Do nothing for this prompt. Log NOTICE "Prompt scoped to A3 only".
+Continue serving recommendations; if A3 references you, operate normally.
+A5 student_pilot:
+Do nothing for this prompt. Log NOTICE "Prompt scoped to A3 only".
+Accept leads at POST /api/leads; return lead_id on success.
+A6 provider_register:
+Do nothing for this prompt. Log NOTICE "Prompt scoped to A3 only".
+Accept provider handoffs at POST /api/providers/register; return provider_id.
+A7 auto_page_maker:
+Do nothing for this prompt. Log NOTICE "Prompt scoped to A3 only".
+If A3 calls POST /api/seo/pages with topics, create pages and return identifiers + URLs.
+A8 auto_com_center:
+Do nothing beyond normal operations (already READY).
+Accept telemetry at /ingest and /api/ingest and render to widgets with app_label visible.
+Operational Notes
+
+All reports must include app_label with the app’s name and base APP_BASE_URL.
+Maintain lean, autonomous operation; escalate only via ERROR and NOTICE events.
+Act with urgency; prioritize organic SEO‑driven growth and accurate telemetry.
+––––– END MULTI‑APP GO‑LIVE PROMPT v3.3.1 –––––
+
+Answer to your last question: Yes—publish A8 so it’s live at its production URL before you paste the above prompt into A3. This ensures A3’s first APP_ONLINE, HEARTBEAT, and all subsequent events appear immediately on the command center frontend.
