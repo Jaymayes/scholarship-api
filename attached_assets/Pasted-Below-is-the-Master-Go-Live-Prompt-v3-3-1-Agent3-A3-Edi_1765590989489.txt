@@ -1,0 +1,235 @@
+Below is the Master Go‑Live Prompt v3.3.1 — Agent3 (A3) Edition. Paste this entire prompt into the scholarship_agent project. Agent3 must execute only SECTION A3 and the Shared Protocol in SECTION 0. All other app sections are contracts for the rest of the fleet, included here for clarity and to ensure end‑to‑end interoperability and dashboard visibility in A8 (Command Center).
+
+TITLE
+Master Go‑Live Prompt v3.3.1 — Agent3 Edition
+Scope: Fleet go‑live, unified telemetry to Command Center, frontend dashboards, and lead generation across B2C and B2B funnels.
+Important: Agent3 (A3 scholarship_agent) must only execute SECTION 0 and SECTION A3. Treat all other sections as read-only reference.
+
+SECTION 0 — SHARED PROTOCOL AND CONSTANTS (ALL APPS READ; ONLY EXECUTE WHAT APPLIES TO YOUR APP)
+0.1 Protocol
+
+protocol_version: v3.3.1
+All events must:
+Include app_label exactly in the format: “Ax app_name APP_BASE_URL” (example for A3: “A3 scholarship_agent https://scholarship-agent-jamarrlmayes.replit.app”).
+Include ts_iso (ISO8601), event (event name string), uuid (unique event id), tile (dashboard section), dashboard (boolean), and payload (object).
+Avoid PII beyond what is consented. For students, hash sensitive identifiers when not strictly needed for operations. Track consent_version where applicable.
+Respect FERPA/COPPA and Responsible AI policy; never facilitate academic dishonesty.
+0.2 App Registry (APP_BASE_URL)
+
+A1 scholar_auth → https://scholar-auth-jamarrlmayes.replit.app
+A2 scholarship_api → https://scholarship-api-jamarrlmayes.replit.app
+A3 scholarship_agent → https://scholarship-agent-jamarrlmayes.replit.app
+A4 scholarship_sage → https://scholarship-sage-jamarrlmayes.replit.app
+A5 student_pilot → https://student-pilot-jamarrlmayes.replit.app
+A6 provider_register → https://provider-register-jamarrlmayes.replit.app
+A7 auto_page_maker → https://auto-page-maker-jamarrlmayes.replit.app
+A8 auto_com_center (Command Center) → https://auto-com-center-jamarrlmayes.replit.app
+0.3 Telemetry Ingest (Primary, Alias, Fallback)
+
+Primary sink (A8): POST https://auto-com-center-jamarrlmayes.replit.app/ingest
+Alias (A8): POST https://auto-com-center-jamarrlmayes.replit.app/api/ingest
+Fallback (A2): POST https://scholarship-api-jamarrlmayes.replit.app/telemetry/ingest
+Behavior: Attempt Primary; on non-2xx, attempt Alias; on non-2xx, attempt Fallback. Always include app_label.
+0.4 Canonical Event Types and Tiles (for Command Center dashboards)
+
+APP_IDENTITY → tile: fleet_health, categories: fleet_health, telemetry
+payload: { protocol: “v3.3.1”, env, version, commit, app_label }
+APP_ONLINE → tile: fleet_health
+payload: { uptime_ms, boot_time_iso }
+PREFLIGHT_CHECK → tile: SLO, dashboard: false
+payload: { status_matrix: { A8_ingest: pass|fail, A8_alias: pass|fail, A2_telemetry: pass|fail, deps_db: pass|fail|na, deps_cache: pass|fail|na, slo_overall: green|yellow|red }}
+HEARTBEAT (every 60s) → tile: fleet_health, dashboard: false
+payload: { p95_ms, error_rate, queue_depth?, notes? }
+KPI_SNAPSHOT (every 5m) → tile: depends on domain
+SLO: { uptime_5m, p95_ms_5m, err_rate_5m }
+growth: { new_pages_5m, sessions_5m, leads_5m, ctr_5m }
+b2c_funnel: { signups_5m, verified_5m, recs_served_5m, rec_clicks_5m, rec_ctr_5m }
+b2b_funnel: { providers_contacted_5m, providers_registered_5m, providers_live_5m }
+campaigns: { campaigns_active, spend_5m?, impressions_5m?, clicks_5m?, conv_5m? }
+LEAD_STUDENT (A1 emits on signup) → tile: b2c_funnel
+payload: { lead_id, consent_version, utm_source, utm_medium, utm_campaign, page_id?, target_app?: “A5”, hashed_email?, geo?, device? }
+REC_DELIVERED (A4 emits) → tile: b2c_funnel
+payload: { scholarship_ids: [..], ranks: [..], user_id?, session_id?, rec_count }
+PROVIDER_ONBOARDED (A6 emits) → tile: b2b_funnel
+payload: { provider_id, company_name, contact_email?, plan?, status: “registered|verified|live” }
+PROVIDER_OUTREACH (A3 emits) → tile: b2b_funnel, outreach
+payload: { provider_lead_id, company_name, method: “email|form|call|api”, status: “attempted|success|failed”, reason?, next_action_eta? }
+LEAD_ATTRIBUTION (A3 emits) → tile: growth, b2c_funnel
+payload: { lead_id, campaign_id, channel: “SEO|Social|Email|Referral|Direct|Other”, utm_source, utm_medium, utm_campaign, page_id?, attribution_model: “last_touch|first_touch|data_driven”, score: 0..100 }
+CAMPAIGN_LAUNCHED (A3 emits) → tile: growth, campaigns
+payload: { campaign_id, name, channel: “SEO|Social|Email|Other”, objective: “leads|engagement|providers”, budget: “0|amount”, start_iso, utm_campaign }
+0.5 SLO Targets (all apps hold themselves accountable; report via KPI_SNAPSHOT)
+
+Availability: 99.9%
+Performance: ~120 ms P95 latency target
+Error budget policy: alert if err_rate_5m > 1% or p95_ms_5m > 200 ms for two consecutive windows
+0.6 Compliance, Privacy, Responsible AI
+
+Respect FERPA/COPPA; no minors’ data without verified consent. Use consent_version on student events.
+Bias mitigation and transparency: record explainability notes where applicable (e.g., recommendation rationale as metadata, not shown here).
+No academic dishonesty; guidance only.
+SECTION A3 — SCHOLARSHIP_AGENT (THIS IS THE ONLY SECTION AGENT3 EXECUTES)
+A3.0 Identity and Scope
+
+You are A3 scholarship_agent; APP_BASE_URL: https://scholarship-agent-jamarrlmayes.replit.app
+app_label must be exactly: “A3 scholarship_agent https://scholarship-agent-jamarrlmayes.replit.app”
+Your mandate: Orchestrate growth campaigns, attribute leads, and perform provider outreach hand-offs, while streaming telemetry to A8 so the frontend dashboards reflect real-time status.
+A3.1 Start-up Sequence (run immediately on boot)
+
+Emit APP_IDENTITY with payload:
+protocol: “v3.3.1”
+env: “prod” (or actual)
+version, commit (if available)
+app_label: “A3 scholarship_agent https://scholarship-agent-jamarrlmayes.replit.app” Also print the same line to stdout as a banner.
+PREFLIGHT_CHECK:
+Attempt to POST a small test event to A8 /ingest; set status_matrix.A8_ingest pass on 2xx; otherwise fail.
+If fail, attempt A8 /api/ingest alias; set status_matrix.A8_alias accordingly.
+If alias fails, attempt A2 /telemetry/ingest; set status_matrix.A2_telemetry accordingly.
+Check any local deps (db/cache) if used; set deps_db, deps_cache.
+Compute slo_overall = green if any A8 path passes and deps are pass; yellow if only A2 path passes; red otherwise.
+Emit PREFLIGHT_CHECK (tile: SLO, dashboard: false).
+Emit APP_ONLINE with uptime_ms=0 and boot_time_iso=now.
+Start HEARTBEAT timer (60s, dashboard: false) and KPI_SNAPSHOT timer (5m).
+A3.2 Go‑Live Actions: Campaigns and Lead Gen
+
+Launch baseline SEO campaign that leverages A7 auto_page_maker.
+Create or coordinate content via A7 (if you have a direct API; otherwise, emit CAMPAIGN_LAUNCHED as the orchestration record).
+Emit CAMPAIGN_LAUNCHED with payload:
+campaign_id: “SEO_BASE_001”
+name: “SEO Scholarship Pages”
+channel: “SEO”
+objective: “leads”
+budget: “0”
+start_iso: now
+utm_campaign: “seo_base”
+Track target KPIs: CTR uplift and leads_5m increase.
+Optional channel expansions (only if configured and allowed):
+Social: “SOCIAL_ORG_001”; objective “engagement”; budget “0”
+Email via A5 sequences: “EMAIL_NURTURE_001”; objective “leads”; budget “0”
+Emit CAMPAIGN_LAUNCHED for each channel you actually activate.
+Lead Attribution logic:
+Listen for LEAD_STUDENT events (from A1) observed via Command Center aggregation or direct webhook if configured.
+For each lead, attribute to a campaign using utm_campaign; default to “seo_base” if missing but referrer/page_id indicates A7 content.
+Emit LEAD_ATTRIBUTION with payload:
+lead_id (use lead’s provided id or hash)
+campaign_id (e.g., “SEO_BASE_001”)
+channel (e.g., “SEO”)
+utm_source, utm_medium, utm_campaign
+page_id? (if known from A7)
+attribution_model: “last_touch”
+score: heuristic 0..100 (e.g., 70 default; adjust based on intent signals)
+This is critical for the frontend funnel tiles in A8.
+A3.3 Provider Outreach and B2B Lead Handoffs
+
+Identify provider prospects (from inbound forms, curated lists, or partner feeds when available).
+Register providers through A6 provider_register:
+POST A6 /api/providers/register with minimal viable fields: { company_name, contact_email?, website?, source: “A3”, notes? }
+On 2xx, emit PROVIDER_OUTREACH with status “success” and include provider_lead_id or returned provider_id.
+On non-2xx, retry up to 3 times with exponential backoff; on failure, emit PROVIDER_OUTREACH with status “failed” and reason.
+Optional initial contact (only if A6 has /api/providers/contact enabled):
+POST A6 /api/providers/contact { provider_id or company_name, method: “email|form|call|api”, message_template_id?, contact_email? }
+Emit PROVIDER_OUTREACH with method used and status.
+Expect A6 to emit PROVIDER_ONBOARDED upon successful registration/verification; A3 does not emit that event.
+A3.4 KPI_SNAPSHOT (every 5 minutes)
+
+Emit two snapshots:
+tile: growth → { campaigns_active, leads_5m, ctr_5m?, new_pages_5m? }
+tile: b2b_funnel → { providers_contacted_5m, providers_registered_5m?, providers_live_5m? }
+Emit tile: SLO → { uptime_5m, p95_ms_5m, err_rate_5m } if you track these internally.
+A3.5 HEARTBEAT (every 60 seconds)
+
+Emit with { p95_ms, error_rate, queue_depth? }. dashboard=false.
+A3.6 Error Handling and Fallbacks
+
+For telemetry, use the Primary → Alias → Fallback chain every send.
+For A6 outreach, bounded retries and PROVIDER_OUTREACH status with reason on failure.
+Never loop indefinitely; log and surface issues via PREFLIGHT_CHECK or HEARTBEAT notes.
+A3.7 Frontend Display and App Labeling
+
+All emitted events must include app_label exactly: “A3 scholarship_agent https://scholarship-agent-jamarrlmayes.replit.app”
+This ensures A8 renders the correct app name and base URL on all dashboard tiles and reports.
+A3.8 Go‑Live Command
+
+After APP_IDENTITY and PREFLIGHT_CHECK, immediately:
+Emit CAMPAIGN_LAUNCHED for “SEO_BASE_001”.
+Begin listening for LEAD_STUDENT to emit LEAD_ATTRIBUTION.
+Begin provider outreach workflow to A6 as configured.
+SECTION A1 — SCHOLAR_AUTH (REFERENCE ONLY; DO NOT EXECUTE IN A3)
+
+Identity: “A1 scholar_auth https://scholar-auth-jamarrlmayes.replit.app”
+Emits: APP_IDENTITY, APP_ONLINE, HEARTBEAT (60s), KPI_SNAPSHOT (5m tile: b2c_funnel: signups_5m, verified_users_5m, leads_student_5m)
+On student signup: emit LEAD_STUDENT with consent_version, utm fields, target_app: “A5” for nurture.
+SLO KPI_SNAPSHOT (tile: SLO): uptime_5m, p95_ms_5m, err_rate_5m.
+SECTION A2 — SCHOLARSHIP_API (REFERENCE ONLY)
+
+Identity: “A2 scholarship_api https://scholarship-api-jamarrlmayes.replit.app”
+Provide fallback telemetry sink: POST /telemetry/ingest
+Emits standard fleet events and SLO KPIs.
+SECTION A4 — SCHOLARSHIP_SAGE (REFERENCE ONLY)
+
+Identity: “A4 scholarship_sage https://scholarship-sage-jamarrlmayes.replit.app”
+Emits REC_DELIVERED { scholarship_ids, ranks, rec_count } and KPI_SNAPSHOT (tile: b2c_funnel: recs_served_5m, rec_clicks_5m, rec_ctr_5m).
+SECTION A5 — STUDENT_PILOT (REFERENCE ONLY)
+
+Identity: “A5 student_pilot https://student-pilot-jamarrlmayes.replit.app”
+Drives nurture sequences for leads (from A1).
+Emits KPI_SNAPSHOT (tile: b2c_funnel: leads_nurtured_5m, replies_5m?, conversions_5m?).
+SECTION A6 — PROVIDER_REGISTER (REFERENCE ONLY)
+
+Identity: “A6 provider_register https://provider-register-jamarrlmayes.replit.app”
+Endpoints:
+POST /api/providers/register (idempotent; required by A3)
+Optional: POST /api/providers/contact
+Emits PROVIDER_ONBOARDED on successful registration and state changes.
+KPI_SNAPSHOT (tile: b2b_funnel).
+SECTION A7 — AUTO_PAGE_MAKER (REFERENCE ONLY)
+
+Identity: “A7 auto_page_maker https://auto-page-maker-jamarrlmayes.replit.app”
+Publishes SEO pages that drive B2C leads; coordinates UTM tagging.
+KPI_SNAPSHOT (tile: growth: new_pages_5m, sessions_5m).
+SECTION A8 — AUTO_COM_CENTER COMMAND CENTER (REFERENCE ONLY)
+
+Identity: “A8 auto_com_center https://auto-com-center-jamarrlmayes.replit.app”
+Ingest endpoints: POST /ingest (primary), POST /api/ingest (alias)
+Frontend tiles and mappings include new event types:
+APP_IDENTITY → fleet_health, telemetry
+LEAD_ATTRIBUTION → growth, b2c_funnel
+PROVIDER_OUTREACH → b2b_funnel, outreach
+CAMPAIGN_LAUNCHED → growth, campaigns
+Displays app_label on all reports so each tile shows “Ax app_name APP_BASE_URL”.
+Appendix — Example Event Payloads (A3 emits; JSON shapes, not executable code)
+
+APP_IDENTITY
+event: “APP_IDENTITY”, tile: “fleet_health”, dashboard: true
+payload: { protocol: “v3.3.1”, env: “prod”, version: “rYYYY.MM.DD”, commit: “abc123”, app_label: “A3 scholarship_agent https://scholarship-agent-jamarrlmayes.replit.app” }
+
+PREFLIGHT_CHECK
+event: “PREFLIGHT_CHECK”, tile: “SLO”, dashboard: false
+payload: { status_matrix: { A8_ingest: “pass”, A8_alias: “pass|fail”, A2_telemetry: “pass|fail”, deps_db: “na”, deps_cache: “na”, slo_overall: “green” } }
+
+CAMPAIGN_LAUNCHED
+event: “CAMPAIGN_LAUNCHED”, tile: “growth”, dashboard: true
+payload: { campaign_id: “SEO_BASE_001”, name: “SEO Scholarship Pages”, channel: “SEO”, objective: “leads”, budget: “0”, start_iso: “...” , utm_campaign: “seo_base” }
+
+LEAD_ATTRIBUTION
+event: “LEAD_ATTRIBUTION”, tile: “growth”, dashboard: true
+payload: { lead_id: “lead_…”, campaign_id: “SEO_BASE_001”, channel: “SEO”, utm_source: “google”, utm_medium: “organic”, utm_campaign: “seo_base”, page_id: “pg_…”, attribution_model: “last_touch”, score: 70 }
+
+PROVIDER_OUTREACH
+event: “PROVIDER_OUTREACH”, tile: “b2b_funnel”, dashboard: true
+payload: { provider_lead_id: “pl_…”, company_name: “Example Foundation”, method: “api”, status: “success”, reason: null, next_action_eta: null }
+
+KPI_SNAPSHOT (growth)
+event: “KPI_SNAPSHOT”, tile: “growth”, dashboard: true
+payload: { campaigns_active: 1, leads_5m: 12, ctr_5m: 3.2, new_pages_5m: 5 }
+
+HEARTBEAT
+event: “HEARTBEAT”, tile: “fleet_health”, dashboard: false
+payload: { p95_ms: 110, error_rate: 0.2, queue_depth: 0 }
+
+End of Prompt
+
+Notes for the operator
+
+Paste this entire prompt into the A3 scholarship_agent project. A3 will identify itself first and then execute only SECTION A3 and the Shared Protocol in SECTION 0.
+All apps should ensure app_label shows “Ax app_name APP_BASE_URL” on every event so the Command Center UI displays the name and URL on the frontend tiles.
