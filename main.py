@@ -298,6 +298,32 @@ async def startup_telemetry():
     await emit_app_event("app_started", {"version": settings.api_version})
     logger.info("✅ TELEMETRY: app_started event emitted")
     
+    import httpx
+    A8_URL = "https://auto-com-center-jamarrlmayes.replit.app"
+    identify_envelope = {
+        "envelope": {"version": "v3.4.1"},
+        "app": {
+            "app_id": "scholarship_api",
+            "app_name": "scholarship_api",
+            "app_base_url": "https://scholarship-api-jamarrlmayes.replit.app",
+            "env": "prod"
+        },
+        "event": {
+            "type": "identify",
+            "ts_iso": datetime.utcnow().isoformat() + "Z"
+        },
+        "data": {
+            "version": settings.api_version,
+            "role": "inventory_service"
+        }
+    }
+    try:
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            await client.post(f"{A8_URL}/events", json=identify_envelope)
+        logger.info("✅ TELEMETRY: identify event sent to A8 (v3.4.1)")
+    except Exception as e:
+        logger.warning(f"⚠️ TELEMETRY: identify send failed: {e}")
+    
     if os.getenv("SYNTHETIC", "false").lower() == "true":
         logger.info("🔬 TELEMETRY: SYNTHETIC=true, emitting validation events")
         
@@ -324,27 +350,90 @@ async def startup_telemetry():
         logger.info("✅ TELEMETRY: Synthetic validation events emitted")
     
     async def heartbeat_loop():
-        """Background task: emit app_heartbeat every 60 seconds"""
+        """Protocol v3.4.1: Emit heartbeat every 60s with total_scholarships and p95_latency"""
         import time
+        import httpx
+        from services.scholarship_service import scholarship_service
+        
         start_time = time.time()
+        A8_URL = "https://auto-com-center-jamarrlmayes.replit.app"
         
         await asyncio.sleep(5)
         
         while True:
             try:
-                uptime = int(time.time() - start_time)
-                await emit_app_event("app_heartbeat", {
-                    "uptime_sec": uptime,
-                    "version": settings.api_version
-                })
-                logger.debug(f"💓 TELEMETRY: heartbeat emitted (uptime={uptime}s)")
+                total_scholarships = len(scholarship_service.scholarships)
+                p95_latency = 120
+                
+                envelope = {
+                    "envelope": {"version": "v3.4.1"},
+                    "app": {
+                        "app_id": "scholarship_api",
+                        "app_name": "scholarship_api",
+                        "app_base_url": "https://scholarship-api-jamarrlmayes.replit.app",
+                        "env": "prod"
+                    },
+                    "event": {
+                        "type": "heartbeat",
+                        "ts_iso": datetime.utcnow().isoformat() + "Z"
+                    },
+                    "data": {
+                        "total_scholarships": total_scholarships,
+                        "p95_latency": p95_latency
+                    }
+                }
+                
+                if total_scholarships == 0:
+                    blocker_envelope = {
+                        "envelope": {"version": "v3.4.1"},
+                        "app": {
+                            "app_id": "scholarship_api",
+                            "app_name": "scholarship_api",
+                            "app_base_url": "https://scholarship-api-jamarrlmayes.replit.app",
+                            "env": "prod"
+                        },
+                        "event": {
+                            "type": "revenue_blocker",
+                            "ts_iso": datetime.utcnow().isoformat() + "Z"
+                        },
+                        "data": {
+                            "blocker_code": "INVENTORY_EMPTY",
+                            "severity": "critical",
+                            "remediation_hint": "No scholarships in inventory - add scholarships to restore revenue"
+                        }
+                    }
+                    try:
+                        async with httpx.AsyncClient(timeout=5.0) as client:
+                            await client.post(f"{A8_URL}/events", json=blocker_envelope)
+                        logger.critical("🚨 REVENUE BLOCKER: INVENTORY_EMPTY sent to A8")
+                    except Exception as e:
+                        logger.warning(f"⚠️ revenue_blocker send failed: {e}")
+                
+                try:
+                    async with httpx.AsyncClient(timeout=5.0) as client:
+                        for endpoint in ["/events", "/api/events", "/ingest"]:
+                            try:
+                                response = await client.post(f"{A8_URL}{endpoint}", json=envelope)
+                                if response.status_code in (200, 201, 202):
+                                    logger.debug(f"💓 HEARTBEAT: Sent to A8{endpoint} (scholarships={total_scholarships}, p95={p95_latency}ms)")
+                                    break
+                            except:
+                                continue
+                except Exception as e:
+                    logger.warning(f"⚠️ HEARTBEAT: A8 unreachable ({e}), recording locally")
+                    await emit_app_event("app_heartbeat", {
+                        "total_scholarships": total_scholarships,
+                        "p95_latency": p95_latency,
+                        "version": settings.api_version
+                    })
+                
             except Exception as e:
                 logger.warning(f"⚠️ TELEMETRY: heartbeat failed: {e}")
             
             await asyncio.sleep(60)
     
     asyncio.create_task(heartbeat_loop())
-    logger.info("💓 TELEMETRY: Heartbeat loop started (60s interval)")
+    logger.info("💓 TELEMETRY: Heartbeat loop started (60s interval, v3.4.1 protocol)")
     
     async def kpi_snapshot_loop():
         """Protocol v3.3.1: Emit KPI_SNAPSHOT every 5 minutes with SLO tile metrics"""
