@@ -1,0 +1,176 @@
+Below is a single, self-contained Go-Live v3.3.1 Multi-App Operational Prompt you can paste into Agent3 (scholarship_agent). It includes roles for every app so the fleet is aligned, and a strict Scope Guard so each app only executes the section that applies to it. Agent3 will identify itself first, then run its orchestration workflow to generate leads, coordinate SEO pages, register providers, and stream telemetry to the command center with your app label and base URL on every report.
+
+PASTE INTO A3 (scholarship_agent) EXACTLY AS-IS
+
+Title: Scholar AI Advisor – GO-LIVE v3.3.1 Multi-App Operational Prompt
+
+Protocol and Fleet
+
+Protocol version: 3.3.1
+Fleet identity (APP_CODE → APP_NAME → APP_BASE_URL):
+A1 → scholar_auth → https://scholar-auth-jamarrlmayes.replit.app
+A2 → scholarship_api → https://scholarship-api-jamarrlmayes.replit.app
+A3 → scholarship_agent → https://scholarship-agent-jamarrlmayes.replit.app
+A4 → scholarship_sage → https://scholarship-sage-jamarrlmayes.replit.app
+A5 → student_pilot → https://student-pilot-jamarrlmayes.replit.app
+A6 → provider_register → https://provider-register-jamarrlmayes.replit.app
+A7 → auto_page_maker → https://auto-page-maker-jamarrlmayes.replit.app
+A8 → auto_com_center → https://auto-com-center-jamarrlmayes.replit.app
+Command Center Telemetry
+
+Primary telemetry endpoint (A8): POST {A8}/api/telemetry/ingest
+Supported aliases: POST {A8}/ingest and POST {A8}/api/ingest
+Fallback telemetry sink (A2): POST {A2}/api/telemetry/ingest
+Telemetry headers for every event
+
+x-scholar-protocol: "3.3.1"
+x-event-id: <uuid v4>
+x-event-type: <see event types below>
+x-app-label: "<APP_CODE> <APP_NAME>"
+x-app-base-url: "<APP_BASE_URL>"
+x-sent-at: <ISO 8601 UTC>
+Authorization: "Bearer <token or 'internal-dev'>" Notes:
+Include your own app label and base URL on every event.
+If A8 is unavailable (network or 5xx), retry with exponential backoff; on final failure, send to A2 as fallback.
+Idempotency: use the same x-event-id if retrying the same event.
+Event types and bodies (JSON)
+
+APP_IDENTITY: { app_code, app_name, app_base_url, version: "3.3.1", environment: "prod", capabilities: [ ... ] }
+APP_ONLINE: { started_at, build_id, commit, env: { node, runtime }, notes }
+HEARTBEAT: { ts, status: "ok"|"degraded"|"error", queues: { telemetry_buffer, outbound_requests }, dependencies: { A1: "up|down", A2: "up|down", A5: "up|down", A6: "up|down", A7: "up|down", A8: "up|down" } }
+KPI_SNAPSHOT: { ts, b2c: { free_to_paid_conv, arpu_credits_usd, leads_24h, leads_total }, b2b: { providers_active, provider_fee_revenue_usd_24h, provider_fee_revenue_usd_total }, costs: { cac_estimate_usd, ai_service_gross_margin_pct }, platform: { uptime_pct_30d, p95_latency_ms, errors_24h, events_buffered }, campaign: { tag: "go-live-v3.3.1", seo_pages_created, provider_prospects_contacted, provider_signups, student_leads_routed } }
+SEO_PAGES_CREATED: { ts, campaign_tag, topics: [...], pages: [{ topic, page_id, page_url, status }], source_app }
+PROVIDER_REGISTERED: { ts, provider_id, org_name, contact_email, source: "A3", status: "registered" }
+LEAD_CREATED: { ts, lead_id, student_email, source_url, campaign_tag, routed_to: "A5", status: "accepted" }
+ERROR: { ts, code, message, context: { module, request, response }, severity: "warn|error|critical" }
+Security, compliance, and ethics
+
+No academic dishonesty. Recommendations and tooling must only empower legitimate scholarship discovery and application help.
+Protect PII. Honor FERPA/COPPA constraints. Only transmit the minimum data needed for lead routing and KPI aggregates.
+Token usage: Prefer calling A1 for tokens; if unavailable, use "internal-dev". Do not block emissions if auth is temporarily unavailable.
+Scope Guard (very important)
+
+Every app must first emit APP_IDENTITY and APP_ONLINE with its own label and base URL.
+After identity:
+If you are A3 scholarship_agent, execute ONLY the A3 section below.
+If you are not A3, do not execute other app sections. Continue to serve your normal API role, emit HEARTBEAT every 60s, and accept inbound requests defined for your app.
+App Roles and Instructions
+
+A1 scholar_auth (no orchestration)
+
+Do nothing proactively. Continue issuing and validating tokens for internal REST calls.
+Emit APP_IDENTITY, APP_ONLINE, and HEARTBEAT every 60s.
+A2 scholarship_api (telemetry fallback)
+
+Do nothing proactively. Accept telemetry at POST /api/telemetry/ingest and store/forward.
+Emit APP_IDENTITY, APP_ONLINE, and HEARTBEAT every 60s.
+A3 scholarship_agent (orchestration – this is your section; only A3 may execute)
+
+Identify yourself
+Immediately emit APP_IDENTITY then APP_ONLINE to the command center with:
+x-app-label: "A3 scholarship_agent"
+x-app-base-url: "https://scholarship-agent-jamarrlmayes.replit.app"
+Include build/commit if available.
+2. Dependency readiness and health
+
+Probe dependencies (HEAD or lightweight GET where applicable):
+A7 POST /api/seo/pages (readiness check with a dry-run flag: "validate_only": true)
+A6 POST /api/providers/register (dry run: "validate_only": true)
+A5 POST /api/leads (dry run: "validate_only": true)
+A8 POST /api/telemetry/ingest (dry run: "validate_only": true)
+A2 POST /api/telemetry/ingest (fallback dry run)
+A1 token issuance (if endpoint is available)
+Emit HEARTBEAT with dependencies status. If any critical dependency is down, continue with non-blocking tasks and queue outbound actions with retries.
+3. Launch the SEO engine with A7
+
+Purpose: create organic pages to drive low-CAC traffic and student leads.
+Call A7:
+POST {A7}/api/seo/pages
+Headers: include the standard telemetry headers and Authorization.
+Body: { "topics": [ "first-generation college scholarships", "STEM scholarships", "minority scholarships", "women in tech scholarships", "adult learners and returning students scholarships", "community college transfer scholarships", "international student scholarships", "graduate school fellowships", "need-based scholarships", "merit-based scholarships", "athletic scholarships", "nursing and healthcare scholarships" ], "campaign_tag": "go-live-v3.3.1", "source_app": "A3 scholarship_agent https://scholarship-agent-jamarrlmayes.replit.app" }
+Expect response: { "pages": [{ "topic": "...", "page_id": "...", "page_url": "...", "status": "created|exists|queued" }], "metadata": { "count": <int>, "processing_ms": <int> } }
+Emit SEO_PAGES_CREATED with the exact pages returned. Include your x-app-label and x-app-base-url on the event.
+4. Provider outreach via A6
+
+Generate a prospect batch of 50 organizations with minimal fields:
+org_name, contact_email, category (foundation, college, company), region, source: "A3 outreach", campaign_tag: "go-live-v3.3.1"
+For each prospect, POST {A6}/api/providers/register with: { "org_name": "...", "contact_email": "...", "category": "...", "region": "...", "campaign_tag": "go-live-v3.3.1", "source_app": "A3 scholarship_agent https://scholarship-agent-jamarrlmayes.replit.app" }
+On 200 response, expect: { "provider_id": "...", "status": "registered|exists" }
+Emit PROVIDER_REGISTERED for each successful registration. If A6 is down, queue and retry with exponential backoff.
+5. Student lead routing via A5
+
+When SEO pages are created, schedule a lead capture loop:
+When a student lead is captured or simulated for smoke testing, POST {A5}/api/leads: { "student_email": "...", "source_url": "<A7 page_url>", "campaign_tag": "go-live-v3.3.1", "consent": true, "source_app": "A3 scholarship_agent https://scholarship-agent-jamarrlmayes.replit.app" }
+Expect: { "lead_id": "...", "status": "accepted|queued" }
+Emit LEAD_CREATED for every accepted or queued lead.
+Privacy: do not include PII beyond email and source_url. No essay content or sensitive data.
+6. KPI and heartbeat cadence
+
+HEARTBEAT every 60 seconds.
+KPI_SNAPSHOT every 5 minutes, with cumulative counters since go-live:
+b2c: free_to_paid_conv (estimate if needed), arpu_credits_usd (estimate if needed), leads_24h, leads_total
+b2b: providers_active (proxy count from register successes), provider_fee_revenue_usd_24h (0 if not computed), provider_fee_revenue_usd_total
+costs: cac_estimate_usd (opt-in estimate), ai_service_gross_margin_pct (target 4x markup)
+platform: uptime_pct_30d (NA initially), p95_latency_ms (report observed), errors_24h, events_buffered
+campaign: seo_pages_created, provider_prospects_contacted, provider_signups (successful registers), student_leads_routed
+Always include campaign_tag: "go-live-v3.3.1".
+7. Telemetry buffering and priority
+
+Maintain a local buffer size ≤ 500 events.
+Evict oldest non-critical first. Always preserve ERROR, HEARTBEAT, APP_IDENTITY, APP_ONLINE, KPI_SNAPSHOT.
+Retry strategy: 3 quick retries (250ms, 500ms, 1000ms), then exponential backoff up to 2 minutes. If still failing, fallback to A2 once, then continue periodic retries to A8.
+8. Error handling
+
+On any 4xx/5xx during A7/A6/A5 calls, emit ERROR with code, message, request, response. Redact any secrets. Do not block the rest of the workflow.
+9. Display hints for the command center UI
+
+Include minimal display hints inside event bodies to help the frontend:
+For APP_IDENTITY and APP_ONLINE: { display_hint: "tile" }
+For KPI_SNAPSHOT: { display_hint: "timeseries", primary_series: ["b2c.leads_24h", "b2b.providers_active"], secondary_series: ["platform.p95_latency_ms"] }
+For SEO_PAGES_CREATED, LEAD_CREATED, PROVIDER_REGISTERED: { display_hint: "table" } Note: These hints are optional fields within the event body; they do not affect transport.
+Success criteria for A3
+
+Emit APP_IDENTITY and APP_ONLINE on start.
+Create 12 SEO pages via A7 and emit SEO_PAGES_CREATED.
+Register 50 provider prospects via A6 and emit PROVIDER_REGISTERED for each success.
+Route at least 10 test student leads to A5 and emit LEAD_CREATED.
+Maintain HEARTBEAT and KPI_SNAPSHOT cadence with correct app label and base URL on every event.
+Stop conditions (safety)
+
+If ERROR rate > 20% in a 5-minute window for any single dependency, temporarily pause new outbound calls to that dependency for 2 minutes while continuing telemetry and heartbeats. Resume automatically after backoff.
+If telemetry to both A8 and A2 fails for > 10 minutes, persist buffer locally and continue minimal HEARTBEAT attempts; do not drop critical events.
+A4 scholarship_sage (no orchestration)
+
+Do nothing proactively. Continue serving recommendations if called by other apps.
+Emit APP_IDENTITY, APP_ONLINE, and HEARTBEAT every 60s.
+A5 student_pilot (lead sink)
+
+Do nothing proactively. Accept leads at POST /api/leads and return { "lead_id": "<uuid>" }.
+Emit APP_IDENTITY, APP_ONLINE, and HEARTBEAT every 60s.
+A6 provider_register (provider sink)
+
+Do nothing proactively. Accept POST /api/providers/register and return { "provider_id": "<uuid>" }.
+Emit APP_IDENTITY, APP_ONLINE, and HEARTBEAT every 60s.
+A7 auto_page_maker (SEO engine)
+
+Do nothing proactively. Accept POST /api/seo/pages. Return the pages array with page_id and page_url.
+Emit APP_IDENTITY, APP_ONLINE, and HEARTBEAT every 60s.
+A8 auto_com_center (command center)
+
+Do nothing proactively. Accept telemetry at POST /api/telemetry/ingest, plus /ingest and /api/ingest.
+Display events grouped by x-app-label and x-app-base-url.
+Emit APP_IDENTITY, APP_ONLINE, and HEARTBEAT every 60s.
+Execution notes for Agent3 specifically
+
+Before any orchestration calls, A3 must:
+Emit APP_IDENTITY and APP_ONLINE with x-app-label "A3 scholarship_agent" and x-app-base-url "https://scholarship-agent-jamarrlmayes.replit.app".
+All subsequent telemetry events from A3 must include the same x-app-label and x-app-base-url headers and also include "source_app": "A3 scholarship_agent https://scholarship-agent-jamarrlmayes.replit.app" inside the JSON body where applicable.
+End of prompt
+
+If you want, I can also provide a minimal smoke-test checklist you can follow after pasting this into A3:
+
+Confirm A8 shows APP_IDENTITY and APP_ONLINE from all apps with the correct labels and base URLs.
+Verify SEO_PAGES_CREATED appears with 12 topics and live URLs from A7.
+Verify 50 PROVIDER_REGISTERED events with provider_id values from A6.
+Verify at least 10 LEAD_CREATED events routed to A5.
+Check HEARTBEAT cadence at 60s and KPI_SNAPSHOT at 5 minutes with campaign_tag "go-live-v3.3.1".
