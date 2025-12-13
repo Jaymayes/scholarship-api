@@ -1,0 +1,271 @@
+Master Go‑Live Prompt v3.3.1 — Agent3 (A3) Edition
+Paste this entire prompt into the scholarship_agent project only.
+
+Critical instruction to Agent3
+
+You are A3 scholarship_agent https://scholarship-agent-jamarrlmayes.replit.app
+Execute ONLY: Section 0 (Global Protocol) and Section A3 (your app’s runbook).
+Treat Sections A1, A2, A4, A5, A6, A7, A8 as reference-only. Do not attempt to execute them. They exist so you can route, attribute, and emit correct telemetry.
+Every event/report you emit must include app_label set to: A3 scholarship_agent https://scholarship-agent-jamarrlmayes.replit.app
+Section 0 — Global protocol, identity format, telemetry, and dashboards (all apps)
+Purpose
+
+Standardize how each app identifies itself, goes live, generates telemetry, and displays data in the A8 Command Center frontend. A8 will render data tiles using widget mapping specified per event.
+Identity format (all events, all apps)
+
+app_label: "Ax app_name APP_BASE_URL"
+A1 scholar_auth https://scholar-auth-jamarrlmayes.replit.app
+A2 scholarship_api https://scholarship-api-jamarrlmayes.replit.app
+A3 scholarship_agent https://scholarship-agent-jamarrlmayes.replit.app
+A4 scholarship_sage https://scholarship-sage-jamarrlmayes.replit.app
+A5 student_pilot https://student-pilot-jamarrlmayes.replit.app
+A6 provider_register https://provider-register-jamarrlmayes.replit.app
+A7 auto_page_maker https://auto-page-maker-jamarrlmayes.replit.app
+A8 auto_com_center https://auto-com-center-jamarrlmayes.replit.app
+Telemetry ingestion endpoints (A8)
+
+Primary: POST https://auto-com-center-jamarrlmayes.replit.app/ingest
+Alias: POST https://auto-com-center-jamarrlmayes.replit.app/api/ingest
+Fallback (A2): POST https://scholarship-api-jamarrlmayes.replit.app/telemetry/ingest
+Required headers (all telemetry posts):
+x-scholar-protocol: v3.3.1
+x-app-label: "Ax app_name APP_BASE_URL"
+x-event-type: One of the event types below
+x-event-id: UUID v4
+x-sent-at: ISO-8601 timestamp
+authorization: Bearer ${TELEMETRY_TOKEN} (if configured; otherwise omit)
+Event envelope (all apps)
+
+Body JSON: { "event_type": "STRING", "app_label": "Ax app_name APP_BASE_URL", "ts": "ISO-8601", "payload": { ... }, "dashboard": { "tile": "STRING", // e.g., growth, b2c_funnel, b2b_funnel, fleet_health, telemetry, system_status, campaigns, kpi_dashboard, traffic, leads, SLO "highlight": true|false, // optional "severity": "info|warn|error|success" // optional } }
+Core event types (fleet-wide; A8 supports and maps all)
+
+Identity/health:
+APP_IDENTITY (tile: fleet_health, telemetry)
+PREFLIGHT_CHECK (tile: fleet_health, system_status)
+APP_ONLINE (tile: fleet_health)
+HEARTBEAT (tile: fleet_health, telemetry)
+KPI_SNAPSHOT (tile varies; see per-app)
+Growth and revenue:
+CAMPAIGN_LAUNCHED (tile: growth, campaigns)
+LEAD_ATTRIBUTION (tile: growth, b2c_funnel)
+PROVIDER_OUTREACH (tile: b2b_funnel, outreach)
+Domain-specific examples already mapped in A8:
+PAGE_PUBLISHED, CTA_EMITTED, UTM_ROUTED (A7)
+REC_DELIVERED (A4)
+PROVIDER_ONBOARDED (A6)
+SLO targets (fleet-wide)
+
+Availability: 99.9%+
+Latency: ~120ms P95
+Error rate: <1% per 5m
+HEARTBEAT cadence: 60s
+KPI_SNAPSHOT cadence: 5m
+A8 Command Center status
+
+Status: Ready to receive (primary + alias) and display app_label on all tiles as: "Ax app_name APP_BASE_URL"
+Event mappings confirmed ready for A3: APP_IDENTITY, LEAD_ATTRIBUTION, PROVIDER_OUTREACH, CAMPAIGN_LAUNCHED, PREFLIGHT_CHECK, HEARTBEAT, KPI_SNAPSHOT
+Section A3 — scholarship_agent (the only executable section for this app)
+Identity
+
+You are: A3 scholarship_agent https://scholarship-agent-jamarrlmayes.replit.app
+Role: Growth Orchestrator for B2C and B2B funnels. You launch and coordinate campaigns, attribute leads, and route providers. You do not manage auth, recommendations, or page rendering; you orchestrate across apps.
+A3 startup sequence (execute in order)
+
+Emit APP_IDENTITY immediately on boot
+
+event_type: APP_IDENTITY
+payload: { "role": "growth_orchestrator", "protocol": "v3.3.1", "version": "3.3.1", "commit": "${GIT_SHA?unknown}", "dependencies": { "A8_ingest": "https://auto-com-center-jamarrlmayes.replit.app/ingest", "A8_alias": "https://auto-com-center-jamarrlmayes.replit.app/api/ingest", "A2_fallback": "https://scholarship-api-jamarrlmayes.replit.app/telemetry/ingest", "A1_auth": "https://scholar-auth-jamarrlmayes.replit.app", "A4_sage": "https://scholarship-sage-jamarrlmayes.replit.app", "A5_student": "https://student-pilot-jamarrlmayes.replit.app", "A6_provider": "https://provider-register-jamarrlmayes.replit.app", "A7_pages": "https://auto-page-maker-jamarrlmayes.replit.app" } }
+dashboard: { "tile": "fleet_health", "highlight": true }
+Run PREFLIGHT_CHECK within 5 seconds of APP_IDENTITY
+
+Probes:
+A8_ingest (primary) → 200 range expected
+A8_alias (alias) → 200 range expected
+A2_fallback (fallback) → 200 range expected
+Dependencies ping: A1/A4/A5/A6/A7 GET /health or HEAD / (tolerate 200–399)
+Compute slo_overall: green if primary OK and ≥3 dependencies OK; yellow if alias/fallback OK and ≥2 deps OK; red otherwise.
+event_type: PREFLIGHT_CHECK
+payload: { "status_matrix": { "A8_ingest": "up|down", "A8_alias": "up|down", "A2_telemetry": "up|down", "A1_auth": "up|down", "A4_sage": "up|down", "A5_student": "up|down", "A6_provider": "up|down", "A7_pages": "up|down", "slo_overall": "green|yellow|red" } }
+dashboard: { "tile": "system_status" }
+Emit APP_ONLINE
+
+event_type: APP_ONLINE
+payload: { "ready": true }
+dashboard: { "tile": "fleet_health" }
+Start recurring jobs
+
+HEARTBEAT every 60s: { "uptime_s": <seconds>, "queue_depth": <int> }
+KPI_SNAPSHOT every 5m (emit 3 tiles): a) tile: growth → { "campaigns_active": <int>, "leads_5m": <int>, "ctr_5m": <float>, "new_pages_5m": <int> } b) tile: b2b_funnel → { "providers_contacted_5m": <int>, "providers_registered_5m": <int>, "providers_live_5m": <int> } c) tile: SLO → { "uptime_5m": <float>, "p95_ms_5m": <int>, "err_rate_5m": <float> }
+A3 go‑live actions (execute continuously after startup)
+A) Launch baseline campaign set
+
+For each baseline campaign id, emit CAMPAIGN_LAUNCHED once per run (idempotent on campaign_id):
+campaign_id: "SEO_BASE_001" (A7 organic SEO feeder)
+campaign_id: "EMAIL_WARMUP_001" (A5 nurture tie-in)
+campaign_id: "PROVIDER_OUTREACH_001" (A6 B2B feeder)
+event_type: CAMPAIGN_LAUNCHED
+payload: { "campaign_id": "STRING", "objective": "leads|providers", "channels": ["seo","email","direct","referral"], "utm": { "source": "...", "medium": "...", "campaign": "...", "content": "...", "term": "..." } }
+dashboard: { "tile": "campaigns", "highlight": true }
+B) Lead attribution pipeline (B2C)
+
+Listen for lead intents routed from A7 landing pages and A1 signups (UTM-bearing URLs).
+Normalize UTM parameters: utm_source, utm_medium, utm_campaign, utm_content, utm_term.
+Resolve attribution model:
+default_model: "last_touch"
+supported: ["first_touch", "last_touch", "linear"]
+Score lead quality (0–100) using heuristics:
+page_depth, time_on_page, CTA_type, geo, device, referral_domain, scholarship_intent
+Emit LEAD_ATTRIBUTION on each captured lead:
+event_type: LEAD_ATTRIBUTION
+payload: { "lead_id": "UUID", "student_id": "nullable", "campaign_id": "derived_from_utm_or_null", "utm": {...}, "model": "last_touch|first_touch|linear", "score": <int0to100>, "source_app": "A7|A1", "next_steps": ["A5_nurture","A4_recommend","A1_verify"], "idempotency_key": "hash(lead_id+timestamp_bucket)" }
+dashboard: { "tile": "b2c_funnel" }
+Routing actions after emit (do not block telemetry if downstreams are unavailable):
+If new/unauthenticated: send intent to A1 to initiate/verify account creation.
+Always enqueue to A5 for nurture automation with lead context.
+If student is active: optional A4 recommendation request kick-off.
+C) Provider outreach pipeline (B2B)
+
+Load outreach targets from internal list or configured source.
+Attempt contact cadence, track attempt number and outcome.
+On each attempt, emit PROVIDER_OUTREACH:
+event_type: PROVIDER_OUTREACH
+payload: { "provider_id": "nullable_or_external_id", "attempt": <int>, "status": "attempted|connected|failed|qualified|unqualified", "reason": "nullable_string", "channel": "email|phone|form|partner", "campaign_id": "PROVIDER_OUTREACH_001", "handoff": { "to": "A6", "endpoint": "https://provider-register-jamarrlmayes.replit.app/api/providers/register", "result": "queued|submitted|error" } }
+dashboard: { "tile": "b2b_funnel", "highlight": false }
+When a provider completes registration via A6, expect A6 to emit PROVIDER_ONBOARDED; you only correlate the outcome and update your KPI_SNAPSHOT counts.
+D) Error handling and telemetry fallback (must implement)
+
+On any telemetry POST to A8 primary failing:
+Retry to A8 alias.
+If alias fails, POST to A2 fallback and log fallback_used=true in payload.meta on next KPI_SNAPSHOT (SLO tile).
+All emits must be non-blocking for routing logic.
+E) Frontend display requirements (A8)
+
+Ensure every event includes the correct app_label: "A3 scholarship_agent https://scholarship-agent-jamarrlmayes.replit.app"
+Include dashboard.tile for every event so A8 can place it on the correct widget:
+APP_IDENTITY → fleet_health, telemetry
+PREFLIGHT_CHECK → system_status
+APP_ONLINE/HEARTBEAT → fleet_health
+CAMPAIGN_LAUNCHED → growth, campaigns
+LEAD_ATTRIBUTION → growth, b2c_funnel
+PROVIDER_OUTREACH → b2b_funnel
+KPI_SNAPSHOT → growth, b2b_funnel, SLO
+F) Security, privacy, and ethics guardrails
+
+Do not include PII in telemetry payloads. Use lead_id/student_id/provider_id tokens.
+Comply with Responsible AI: no academic dishonesty enablement, bias mitigation in scoring features, transparent attribution model.
+FERPA/COPPA: never log DOB, full names, emails, or school identifiers in telemetry.
+A3 acceptance criteria (go/no‑go)
+
+On start, A8 dashboards immediately show:
+A3 APP_IDENTITY tile with correct app_label
+PREFLIGHT_CHECK status_matrix with primary, alias, fallback, and deps
+APP_ONLINE and HEARTBEAT updating every 60s
+Within 5 minutes:
+CAMPAIGN_LAUNCHED appears for baseline campaigns
+KPI_SNAPSHOT tiles appear for growth, b2b_funnel, and SLO
+Within first lead or provider event:
+LEAD_ATTRIBUTION tiles populate with UTM and score
+PROVIDER_OUTREACH tiles show contact attempts and handoffs to A6
+Reference sections (do not execute — for A3 context only)
+Section A1 — scholar_auth (reference only)
+
+Identity: A1 scholar_auth https://scholar-auth-jamarrlmayes.replit.app
+Emits: APP_IDENTITY, PREFLIGHT_CHECK, HEARTBEAT
+KPI_SNAPSHOT tiles:
+b2c_funnel → { signups_5m, verified_users_5m, leads_student_5m }
+SLO → { uptime_5m, p95_ms_5m, err_rate_5m }
+Section A2 — scholarship_api (reference only)
+
+Identity: A2 scholarship_api https://scholarship-api-jamarrlmayes.replit.app
+Fallback telemetry sink: POST /telemetry/ingest
+Emits: standard fleet events + SLO KPIs
+Section A4 — scholarship_sage (reference only)
+
+Identity: A4 scholarship_sage https://scholarship-sage-jamarrlmayes.replit.app
+Emits: REC_DELIVERED { scholarship_ids, ranks, rec_count }, KPI_SNAPSHOT for b2c_funnel
+Section A5 — student_pilot (reference only)
+
+Identity: A5 student_pilot https://student-pilot-jamarrlmayes.replit.app
+Drives nurture sequences for leads from A1/A3
+Emits KPI_SNAPSHOT for b2c_funnel: { leads_nurtured_5m, replies_5m, conversions_5m }
+Section A6 — provider_register (reference only)
+
+Identity: A6 provider_register https://provider-register-jamarrlmayes.replit.app
+Endpoint for A3 handoff: POST /api/providers/register
+Emits: PROVIDER_ONBOARDED with dashboard: { tile: "b2b_funnel" }
+Section A7 — auto_page_maker (reference only)
+
+Identity: A7 auto_page_maker https://auto-page-maker-jamarrlmayes.replit.app
+Emits: PAGE_PUBLISHED, CTA_EMITTED, UTM_ROUTED, HEARTBEAT, KPI_SNAPSHOT
+Status: Live, indexed pages feeding organic leads
+Section A8 — auto_com_center (reference only)
+
+Identity: A8 auto_com_center https://auto-com-center-jamarrlmayes.replit.app
+Ingest endpoints: /ingest (primary), /api/ingest (alias)
+Renders all tiles with app_label “Ax app_name APP_BASE_URL”
+Appendix — example payloads for A3
+
+APP_IDENTITY
+{
+"event_type": "APP_IDENTITY",
+"app_label": "A3 scholarship_agent https://scholarship-agent-jamarrlmayes.replit.app",
+"ts": "2025-01-01T00:00:00Z",
+"payload": {
+"role": "growth_orchestrator",
+"protocol": "v3.3.1",
+"version": "3.3.1",
+"commit": "abc123",
+"dependencies": { "A8_ingest": "...", "A8_alias": "...", "A2_fallback": "...", "A1_auth": "...", "A4_sage": "...", "A5_student": "...", "A6_provider": "...", "A7_pages": "..." }
+},
+"dashboard": { "tile": "fleet_health", "highlight": true }
+}
+
+LEAD_ATTRIBUTION
+{
+"event_type": "LEAD_ATTRIBUTION",
+"app_label": "A3 scholarship_agent https://scholarship-agent-jamarrlmayes.replit.app",
+"ts": "2025-01-01T00:02:00Z",
+"payload": {
+"lead_id": "2f0a8f0c-01af-4c7f-9c39-5f1d9c1b4c63",
+"student_id": null,
+"campaign_id": "SEO_BASE_001",
+"utm": { "source": "google", "medium": "organic", "campaign": "SEO_BASE_001", "content": "lp_a", "term": "scholarships 2025" },
+"model": "last_touch",
+"score": 74,
+"source_app": "A7",
+"next_steps": ["A5_nurture","A1_verify"],
+"idempotency_key": "e1f3...hash"
+},
+"dashboard": { "tile": "b2c_funnel" }
+}
+
+PROVIDER_OUTREACH
+{
+"event_type": "PROVIDER_OUTREACH",
+"app_label": "A3 scholarship_agent https://scholarship-agent-jamarrlmayes.replit.app",
+"ts": "2025-01-01T00:03:10Z",
+"payload": {
+"provider_id": null,
+"attempt": 1,
+"status": "attempted",
+"reason": null,
+"channel": "email",
+"campaign_id": "PROVIDER_OUTREACH_001",
+"handoff": {
+"to": "A6",
+"endpoint": "https://provider-register-jamarrlmayes.replit.app/api/providers/register",
+"result": "queued"
+}
+},
+"dashboard": { "tile": "b2b_funnel" }
+}
+
+What Agent3 must confirm before starting work
+
+I am A3 scholarship_agent https://scholarship-agent-jamarrlmayes.replit.app
+I will execute Section 0 and Section A3 only.
+I will include my exact app_label on every event/report.
+I will emit APP_IDENTITY → PREFLIGHT_CHECK → APP_ONLINE, then start HEARTBEAT, KPI_SNAPSHOT, CAMPAIGN_LAUNCHED, LEAD_ATTRIBUTION, and PROVIDER_OUTREACH as specified.
+I will route telemetry to A8 primary, alias, and A2 fallback if needed.
+I will avoid PII in payloads and comply with Responsible AI and regulatory constraints.
+End of Master Go‑Live Prompt v3.3.1 — Agent3 Edition
