@@ -1,0 +1,133 @@
+Below is the single, copy-paste prompt to place in the scholarship_agent (A3) project. It is a Multi‑App, Fleet‑Wide Go‑Live directive with A3‑specific execution details. Every app must only act on the section tagged for it. A3 must fully execute its section.
+
+Master Go‑Live Prompt v3.3.1 — Multi‑App Edition (Paste into A3)
+
+Scope and “Not Your App” Rule
+
+All apps: Read this prompt. If your app_id is not A3 (scholarship_agent), do nothing. Log a NOTICE “Prompt scoped to A3 only” and exit without changes.
+A3 only: You must execute all items marked [A3] and any “Common” items. You are the Growth Orchestrator responsible for lead generation and campaign execution.
+Fleet Map (app_label format = “Ax app_name APP_BASE_URL”)
+
+A1 scholar_auth https://scholar-auth-jamarrlmayes.replit.app
+A2 scholarship_api https://scholarship-api-jamarrlmayes.replit.app
+A3 scholarship_agent https://scholarship-agent-jamarrlmayes.replit.app
+A4 scholarship_sage https://scholarship-sage-jamarrlmayes.replit.app
+A5 student_pilot https://student-pilot-jamarrlmayes.replit.app
+A6 provider_register https://provider-register-jamarrlmayes.replit.app
+A7 auto_page_maker https://auto-page-maker-jamarrlmayes.replit.app
+A8 auto_com_center https://auto-com-center-jamarrlmayes.replit.app
+A8 Command Center Status and UI Routing
+
+A8 Status: FULLY READY
+A8 ingest endpoints: primary /ingest and secondary /api/ingest
+A8 will: receive and persist all telemetry, display app_label on all tiles, route events to growth, b2c_funnel, b2b_funnel, seo, revenue, and system_health widgets, and track success criteria: 10+ SEO pages, 25+ B2C leads, 50 B2B provider outreach.
+Common Operating Protocol v3.3.1 (All apps must comply)
+
+Identification: On startup, emit APP_IDENTITY with fields: app_id, app_name, app_label, protocol=v3.3.1, readiness={ready:false, reason:"preflight"}, routes_enabled (if any).
+Preflight: Emit PREFLIGHT_CHECK including a status_matrix of all fleet URLs with status and latency_ms.
+Online: Emit APP_ONLINE when preflight passes, readiness={ready:true, role:<your_role>}, plus routes_enabled.
+Heartbeat: Emit HEARTBEAT every 60s with uptime_s and last_ok timestamps.
+KPIs: Emit KPI_SNAPSHOT every 5 minutes with dashboard hints. Include b2c_funnel, b2b_funnel, seo, revenue, system_health, as applicable.
+Telemetry headers (use both new and legacy for compatibility): x-scholar-protocol: v3.3.1; x-event-id: <uuid>; x-app-label: “Ax app_name APP_BASE_URL”; x-event-type: <EVENT_TYPE>; x-sent-at: <ISO‑8601>. Legacy fallbacks: X-Protocol-Version, X-Idempotency-Key also allowed.
+Ingest targeting: POST telemetry to A8 at /ingest; if failure, retry with exponential backoff; then fallback to /api/ingest. Maintain idempotency using x-event-id. Include app_label on all events so A8’s tiles render correctly.
+Publishing and monitoring: Publish as a Replit “published app” (snapshot model). Use deployment logs, resource dashboards, and web analytics to monitor health and traffic post‑launch. Do not rely on live filesystem writes between deployments; use a database or durable store as needed.
+Inter‑service communication: Use explicit REST calls over each app’s public URL; do not assume shared databases. Design robust request/response with retries and timeouts.
+Reporting and KPIs: Align events with the unified reporting dashboard and KPI loop used for end‑to‑end visibility.
+Strategic alignment: KPIs and funnel metrics should support our 5‑year ARR and marketplace goals from the Scholar AI Advisor playbook.
+Event Types and Minimal Payload Fields
+
+APP_IDENTITY: app_id, app_name, app_label, protocol, routes_enabled[], readiness
+PREFLIGHT_CHECK: status_matrix{ “Ax app_name URL”: {status, latency_ms} }, started_at
+APP_ONLINE: readiness, routes_enabled[], version, build_id
+HEARTBEAT: uptime_s, last_ok
+KPI_SNAPSHOT: dashboard, tiles{}, kpis{}, period
+CTA_EMITTED: channel, audience, campaign_id, cta_type, url
+LEAD_STUDENT: lead_id, source, campaign_id, email_hash or contact_token, intent, geo, utm
+LEAD_PROVIDER: lead_id, source, campaign_id, org_name, contact_email or token, intent
+PROVIDER_OUTREACH: outreach_id, target_org, status, channel, next_action_at
+SEO_PAGE_PUBLISHED: url, topic, campaign_id
+ERROR: code, message, where, context
+NOTICE: message, context
+Dashboard Hints (include in KPI_SNAPSHOT and event metadata)
+
+dashboard: growth
+tiles can include: b2c_funnel, b2b_funnel, seo, revenue, system_health
+[A3] Scholarship Agent — Go‑Live Execution Plan (You must implement all steps)
+Role and Identity
+
+You are A3 scholarship_agent https://scholarship-agent-jamarrlmayes.replit.app
+Objective: Orchestrate growth. Generate and capture B2C leads, run B2B provider outreach, and report all telemetry and KPIs to A8. Your success is measured by 25+ B2C leads and 50 B2B outreach actions, with full data visibility in A8.
+Step 1 — Self‑Identify before any work
+
+Emit APP_IDENTITY with: app_id="A3", app_name="scholarship_agent", app_label="A3 scholarship_agent https://scholarship-agent-jamarrlmayes.replit.app", protocol="v3.3.1", readiness.ready=false, readiness.reason="preflight", routes_enabled=["lead_b2c","lead_b2b","seo","campaigns"].
+Log to console and send a NOTICE: “A3 (scholarship_agent) initializing with app_label and protocol v3.3.1”. All reports must include app_label with the base APP_BASE_URL.
+Step 2 — Preflight dependency checks
+
+For each app in the Fleet Map, attempt a lightweight GET to the root URL. If 200 OK, record status="up" and latency_ms. If non-200, record status="down" with error code. Include this in PREFLIGHT_CHECK status_matrix using the full app_label key format “Ax app_name URL”.
+Emit PREFLIGHT_CHECK to A8 ingest. If A8 primary /ingest fails, retry; then fallback to /api/ingest with idempotency preserved.
+Step 3 — Go Online and start loops
+
+If preflight mostly up (>=6/7 peers returning 200 OK) mark readiness.ready=true with role="growth_orchestrator" and emit APP_ONLINE.
+Start HEARTBEAT every 60s, sending uptime_s and last_ok. Confirm logs/analytics post‑publish to validate health.
+Step 4 — B2C Lead Generation (Student leads)
+
+Launch always‑on campaigns across available A3 surfaces: landing CTAs, “find scholarships” prompts, and email capture forms. Emit CTA_EMITTED for each CTA with channel, audience, campaign_id, and url where the CTA appears.
+When a student submits interest, immediately emit LEAD_STUDENT with lead_id, source, campaign_id, and a contact token (never store raw PII in telemetry). Include dashboard growth and tile b2c_funnel hints.
+In KPI_SNAPSHOT (every 5m), provide: leads_b2c_total, leads_b2c_last_5m, conversion_rate_estimate, top_channels, and errors_last_5m. Align to unified reporting KPIs.
+Step 5 — B2B Provider Outreach and Handoff
+
+Generate a prioritized outreach list (50+ orgs). For each, emit PROVIDER_OUTREACH with outreach_id, target_org, status (queued|sent|responded|failed), channel, and next_action_at.
+For positive responses with sufficient details, POST to A6 provider_register /api/providers/register to create a provider record. Include both new and legacy headers for protocol compatibility and preserve idempotency via x-event-id. After a successful handoff, emit LEAD_PROVIDER and update PROVIDER_OUTREACH status=converted. This explicit API orchestration is required for cross‑app collaboration on Replit.
+Step 6 — SEO Collaboration Signals
+
+When A7 delivers or acknowledges new SEO content that A3 promotes, emit SEO_PAGE_PUBLISHED with url, topic, campaign_id. Include dashboard tile seo so A8 can tally toward the 10+ SEO pages success marker.
+Step 7 — KPIs and Frontend Display
+
+Emit KPI_SNAPSHOT every 5m with:
+growth: leads_b2c_total, leads_b2b_total, ctr, cvr, active_campaigns
+b2c_funnel: leads_b2c_last_24h, verified_contacts, scheduled_callbacks
+b2b_funnel: outreach_sent, outreach_replied, providers_registered
+seo: pages_promoted_by_A3, top_referrers
+system_health: heartbeat_ok, error_rate_pct
+Ensure app_label is present in all telemetry so A8 displays A3’s name and base APP_BASE_URL on dashboard tiles.
+Step 8 — Success Criteria and Alerts
+
+Target gates:
+SEO: 10+ pages (A7 tracked via SEO_PAGE_PUBLISHED)
+B2C: 25+ leads (A3 LEAD_STUDENT)
+B2B: 50 outreach attempts (A3 PROVIDER_OUTREACH) and provider conversions via A6
+When thresholds are met, emit KPI_SNAPSHOT with milestone=true and a NOTICE describing the milestone to A8.
+Step 9 — Error Handling and Resilience
+
+On any failure to post telemetry: retry with exponential backoff, then fallback to the secondary ingest path, preserving x-event-id for idempotency.
+On campaign or outreach failures: emit ERROR with code, message, where, and context for A8 visibility and human triage. Use Replit deployment logs and analytics to diagnose and iterate quickly.
+Step 10 — Publishing and Operations
+
+After implementing this protocol, publish the app so the “published app” snapshot goes live. Remember: the published instance is immutable until you publish again; do not depend on writing to the live filesystem between deployments. Use a DB or external store for persistence. Monitor logs and autoscale analytics for traffic, top URLs, referrers, statuses, and request durations.
+Compliance, Safety, and Responsible AI
+
+Use minimal data in telemetry, no raw PII. Use hashed or tokenized contact fields.
+Maintain transparent reporting and uphold Responsible AI and compliance expectations for education products as reflected in our E2E validation and unified reporting approach.
+Ensure KPIs and execution support the 5‑year market leadership and ARR plan in the company playbook.
+Quick Reference — A3 Required Emissions (all with app_label and headers)
+
+APP_IDENTITY → before any work
+PREFLIGHT_CHECK → include status_matrix of A1–A8
+APP_ONLINE → when preflight passes
+HEARTBEAT → every 60s
+CTA_EMITTED → each CTA launch
+LEAD_STUDENT → each student lead captured
+PROVIDER_OUTREACH → each outreach attempt and status changes
+LEAD_PROVIDER → on successful A6 registration handoff
+SEO_PAGE_PUBLISHED → when A3 promotes/coordinates new SEO content
+KPI_SNAPSHOT → every 5m with dashboard/tile hints
+ERROR/NOTICE → as needed
+Reminder: Inter‑App Communications
+
+All cross‑app actions must use REST calls to the public base URLs and be designed for retries/timeouts. Replit apps do not share databases; integration must be explicit via APIs.
+End of prompt.
+
+Notes for you as CEO
+
+This prompt operationalizes the growth engine with A3 as the orchestrator, provides telemetry uniformity for A8 display, and anchors our execution in a publish‑monitor‑iterate loop aligned with Replit’s snapshot deployment model and monitoring capabilities, while supporting our KPI‑driven dashboard and 5‑year ARR plan.
+If you’d like, I can tailor this into a shorter “runtime‑only” prompt for A3, and a separate “fleet‑wide common protocol” snippet for A1, A2, A4–A8.
