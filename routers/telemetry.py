@@ -140,20 +140,20 @@ async def telemetry_ingest(
     Protocol v3.3.1: Primary fallback telemetry ingest endpoint for fleet.
     
     This is the mandated fallback endpoint per Master Go-Live Prompt:
-    - POST https://scholarship-api-jamarrlmayes.replit.app/telemetry/ingest
+    - POST https://scholarship-api-jamarrlmayes.replit.app/api/telemetry/ingest
     - Accepts single event or batch in v3.3.1 envelope format
     - Returns 200 on success per contract
     
-    Accepts BOTH header formats for backwards compatibility:
-    
-    New Fleet-Wide Headers (v3.3.1 Multi-App):
-    - x-scholar-protocol: v3.3.1
-    - x-app-label: "Ax app_name APP_BASE_URL"
+    Required Headers (v3.3.1 Multi-App per Go-Live Prompt):
+    - x-scholar-protocol: "3.3.1" or "v3.3.1"
+    - x-event-id: <uuid> (for idempotency)
     - x-event-type: <EVENT_TYPE>
-    - x-event-id: <uuid-v4> (used for idempotency)
-    - x-sent-at: <ISO-8601>
+    - x-app-label: <app name, e.g., scholarship_agent>
+    - x-app-base-url: <your base URL from Fleet Identity>
+    - x-sent-at: <ISO 8601 UTC>
+    - Authorization: Bearer <TELEMETRY_API_KEY> (optional)
     
-    Legacy Headers:
+    Legacy Headers (also supported):
     - X-Protocol-Version: v3.3.1
     - X-Idempotency-Key: <uuid>
     """
@@ -189,11 +189,17 @@ async def telemetry_ingest(
         ""
     )
     
-    if protocol_version != "v3.3.1":
+    app_base_url_header = (
+        request.headers.get("x-app-base-url") or
+        request.headers.get("X-App-Base-Url") or
+        ""
+    )
+    
+    if protocol_version not in ("v3.3.1", "3.3.1"):
         logger.warning(f"REPORT: app=scholarship_api | env=prod | v3.3.1 INGEST: Rejected - Invalid protocol: {protocol_version}")
         return JSONResponse(status_code=400, content={
             "error": "Invalid protocol version",
-            "detail": "x-scholar-protocol or X-Protocol-Version header must be 'v3.3.1'",
+            "detail": "x-scholar-protocol or X-Protocol-Version header must be '3.3.1' or 'v3.3.1'",
             "received": protocol_version,
             "accepted_headers": ["x-scholar-protocol", "X-Protocol-Version"]
         })
@@ -235,7 +241,7 @@ async def telemetry_ingest(
                 event_type = event_data.get("event_type") or event_data.get("type") or event_type_header or "unknown"
                 app_id = event_data.get("app_id") or event_data.get("app") or "unknown"
                 app_name = event_data.get("app_name") or ""
-                app_base_url = event_data.get("app_base_url") or ""
+                app_base_url = event_data.get("app_base_url") or app_base_url_header or ""
                 app_label = event_data.get("app_label") or app_label_header or f"{app_id} {app_name} {app_base_url}".strip()
                 role = event_data.get("role") or ""
                 tile = event_data.get("tile") or ""
