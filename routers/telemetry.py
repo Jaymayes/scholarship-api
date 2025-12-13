@@ -28,18 +28,28 @@ router = APIRouter()
 
 class TelemetryEvent(BaseModel):
     """
-    Telemetry event schema per Contract v1.2
+    Telemetry event schema per Contract v1.2 + v3.3.1 extension
     
-    Protocol ONE_TRUTH v1.2: Flexible field handling for satellite compatibility
+    Protocol v3.3.1 (2025-12-13): Extended for Master Go-Live fleet telemetry
     - Accepts both snake_case and camelCase field names
     - Auto-generates missing fields with sensible defaults
     - REQUIRES app_base_url on all events (v1.2 mandate)
+    - v3.3.1 additions: app_label, role, tile, status_matrix, metrics, dashboard, metadata, idempotency_key
     """
     event_id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     event_type: str = Field(..., description="Event type from catalog", validation_alias=AliasChoices("event_type", "event_name", "eventType", "eventName", "type", "name"))
-    ts_utc: datetime = Field(default_factory=datetime.utcnow)
+    ts_utc: datetime = Field(default_factory=datetime.utcnow, validation_alias=AliasChoices("ts_utc", "ts", "timestamp"))
     app_id: str = Field(..., description="Source app identifier", validation_alias=AliasChoices("app_id", "app_name", "appId", "appName", "app", "source"))
     app_base_url: Optional[str] = Field(default=None, description="v1.2: Required app base URL")
+    app_name: Optional[str] = Field(default=None, description="v3.3.1: App name")
+    app_label: Optional[str] = Field(default=None, description="v3.3.1: Full app label {app_id} {app_name} {app_base_url}")
+    role: Optional[str] = Field(default=None, description="v3.3.1: App role (e.g., growth_orchestrator, telemetry_fallback)")
+    tile: Optional[str] = Field(default=None, description="v3.3.1: Dashboard tile (SLO, B2C, B2B, SEO, Growth, Trust, Finance)")
+    dashboard: Optional[bool] = Field(default=None, description="v3.3.1: Render hint for Command Center")
+    status_matrix: Optional[Dict[str, str]] = Field(default=None, description="v3.3.1: Dependency status map")
+    metrics: Optional[Dict[str, Any]] = Field(default=None, description="v3.3.1: KPI metrics object")
+    metadata: Optional[Dict[str, Any]] = Field(default=None, description="v3.3.1: Event-specific metadata")
+    idempotency_key: Optional[str] = Field(default=None, description="v3.3.1: Stable idempotency key")
     env: str = Field(default="prod")
     version: Optional[str] = None
     session_id: Optional[str] = None
@@ -53,8 +63,8 @@ class TelemetryEvent(BaseModel):
     properties: Dict[str, Any] = Field(default_factory=dict)
     
     class Config:
-        extra = "allow"  # Accept extra fields from satellites
-        populate_by_name = True  # Accept field aliases
+        extra = "allow"
+        populate_by_name = True
 
 
 class TelemetryEventBatch(BaseModel):
@@ -119,6 +129,159 @@ def normalize_event_keys(event_dict: Dict[str, Any]) -> Dict[str, Any]:
         normalized[normalized_key] = value
     
     return normalized
+
+
+@router.post("/telemetry/ingest", tags=["Telemetry v3.3.1"])
+async def telemetry_ingest(
+    request: Request,
+    db=Depends(get_db)
+):
+    """
+    Protocol v3.3.1: Primary fallback telemetry ingest endpoint for fleet.
+    
+    This is the mandated fallback endpoint per Master Go-Live Prompt:
+    - POST https://scholarship-api-jamarrlmayes.replit.app/telemetry/ingest
+    - Accepts single event or batch in v3.3.1 envelope format
+    - Enforces X-Protocol-Version and X-Idempotency-Key headers
+    - Returns 200 on success per contract
+    
+    Headers:
+    - X-Protocol-Version: v3.3.1 (required)
+    - X-Idempotency-Key: <uuid> (required for deduplication)
+    - Content-Type: application/json
+    """
+    protocol_version = request.headers.get("X-Protocol-Version", "")
+    idempotency_key = request.headers.get("X-Idempotency-Key") or request.headers.get("Idempotency-Key")
+    
+    if protocol_version != "v3.3.1":
+        logger.warning(f"REPORT: app=scholarship_api | env=prod | v3.3.1 INGEST: Rejected - Invalid protocol: {protocol_version}")
+        return JSONResponse(status_code=400, content={
+            "error": "Invalid protocol version",
+            "detail": "X-Protocol-Version header must be 'v3.3.1'",
+            "received": protocol_version
+        })
+    
+    if not idempotency_key:
+        logger.warning(f"REPORT: app=scholarship_api | env=prod | v3.3.1 INGEST: Rejected - Missing idempotency key")
+        return JSONResponse(status_code=400, content={
+            "error": "Missing idempotency key",
+            "detail": "X-Idempotency-Key header is required"
+        })
+    
+    try:
+        raw_body = await request.body()
+        body_str = raw_body.decode('utf-8')
+        
+        try:
+            payload = json.loads(body_str)
+        except json.JSONDecodeError as e:
+            logger.error(f"REPORT: app=scholarship_api | v3.3.1 INGEST: Invalid JSON: {e}")
+            return JSONResponse(status_code=400, content={"error": "Invalid JSON", "detail": str(e)})
+        
+        events_to_process = []
+        if isinstance(payload, dict):
+            if "events" in payload and isinstance(payload["events"], list):
+                events_to_process = payload["events"]
+            else:
+                events_to_process = [payload]
+        elif isinstance(payload, list):
+            events_to_process = payload
+        
+        accepted = 0
+        failed = 0
+        event_ids = []
+        
+        for event_data in events_to_process:
+            try:
+                event_id = event_data.get("event_id") or event_data.get("idempotency_key") or idempotency_key or str(uuid.uuid4())
+                event_type = event_data.get("event_type") or event_data.get("type") or "unknown"
+                app_id = event_data.get("app_id") or event_data.get("app") or "unknown"
+                app_name = event_data.get("app_name") or ""
+                app_base_url = event_data.get("app_base_url") or ""
+                app_label = event_data.get("app_label") or f"{app_id} {app_name} {app_base_url}".strip()
+                role = event_data.get("role") or ""
+                tile = event_data.get("tile") or ""
+                dashboard = event_data.get("dashboard", False)
+                status_matrix = event_data.get("status_matrix") or {}
+                metrics = event_data.get("metrics") or {}
+                metadata = event_data.get("metadata") or {}
+                env = event_data.get("env", "prod")
+                ts = event_data.get("ts") or event_data.get("ts_utc") or datetime.utcnow().isoformat()
+                
+                if isinstance(ts, str):
+                    try:
+                        ts = datetime.fromisoformat(ts.replace("Z", "+00:00"))
+                    except:
+                        ts = datetime.utcnow()
+                
+                props = {
+                    "app_label": app_label,
+                    "role": role,
+                    "tile": tile,
+                    "dashboard": dashboard,
+                    "protocol_version": protocol_version,
+                    "status_matrix": status_matrix,
+                    "metrics": metrics,
+                    "metadata": metadata,
+                    **event_data.get("properties", {})
+                }
+                
+                validated_event_id = event_id
+                try:
+                    uuid.UUID(validated_event_id)
+                except (ValueError, TypeError):
+                    import hashlib
+                    validated_event_id = str(uuid.UUID(hashlib.md5(validated_event_id.encode()).hexdigest()))
+                
+                query = text("""
+                    INSERT INTO business_events 
+                    (request_id, app, env, event_name, ts, actor_type, actor_id, session_id, org_id, properties)
+                    VALUES 
+                    (CAST(:request_id AS uuid), :app, :env, :event_name, :ts, :actor_type, :actor_id, :session_id, :org_id, CAST(:properties AS jsonb))
+                    ON CONFLICT (request_id) DO NOTHING
+                """)
+                
+                result = db.execute(query, {
+                    "request_id": validated_event_id,
+                    "app": app_id,
+                    "env": env,
+                    "event_name": event_type,
+                    "ts": ts,
+                    "actor_type": "system",
+                    "actor_id": event_data.get("user_id_hash"),
+                    "session_id": event_data.get("session_id"),
+                    "org_id": event_data.get("account_id"),
+                    "properties": json.dumps(props)
+                })
+                
+                if result.rowcount > 0:
+                    accepted += 1
+                    event_ids.append(event_id)
+                    logger.info(f"REPORT: app=scholarship_api | v3.3.1 INGEST: {event_type} from {app_label} (tile={tile})")
+                else:
+                    logger.debug(f"REPORT: app=scholarship_api | v3.3.1 INGEST: Duplicate {event_id}")
+                    
+            except Exception as e:
+                logger.error(f"REPORT: app=scholarship_api | v3.3.1 INGEST ERROR: {e}")
+                failed += 1
+        
+        if accepted > 0:
+            db.commit()
+        
+        logger.info(f"REPORT: app=scholarship_api | app_base_url=https://scholarship-api-jamarrlmayes.replit.app | env=prod | v3.3.1 INGEST BATCH: accepted={accepted}, failed={failed}")
+        
+        return JSONResponse(status_code=200, content={
+            "status": "ok",
+            "accepted": accepted,
+            "failed": failed,
+            "event_ids": event_ids,
+            "protocol": "v3.3.1",
+            "sink": "A2_fallback"
+        })
+        
+    except Exception as e:
+        logger.error(f"REPORT: app=scholarship_api | v3.3.1 INGEST FATAL: {e}")
+        return JSONResponse(status_code=500, content={"error": str(e)})
 
 
 @router.post("/analytics/events/raw", tags=["Telemetry"])
