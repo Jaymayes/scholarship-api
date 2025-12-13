@@ -1,0 +1,153 @@
+MASTER FLEET GO-LIVE PROMPT v3.4.1
+INSTRUCTIONS TO AGENT:
+
+Identify yourself based on your current APP_ID (check your codebase/package.json).
+
+Read the GLOBAL RULES below.
+
+EXECUTE ONLY the section labeled [SECTION FOR: <YOUR_APP_ID>].
+
+IGNORE all other sections. Do not write code for other apps.
+
+GLOBAL RULES (ALL APPS)
+Identity Contract:
+
+A1 scholar_auth → https://scholar-auth-jamarrlmayes.replit.app
+
+A2 scholarship_api → https://scholarship-api-jamarrlmayes.replit.app
+
+A3 scholarship_agent → https://scholarship-agent-jamarrlmayes.replit.app
+
+A4 scholarship_sage → https://scholarship-sage-jamarrlmayes.replit.app
+
+A5 student_pilot → https://student-pilot-jamarrlmayes.replit.app
+
+A6 provider_register → https://provider-register-jamarrlmayes.replit.app
+
+A7 auto_page_maker → https://auto-page-maker-jamarrlmayes.replit.app
+
+A8 auto_com_center → https://auto-com-center-jamarrlmayes.replit.app
+
+Telemetry Protocol v3.4.1:
+
+Target: POST to A8 at https://auto-com-center-jamarrlmayes.replit.app/events (Fallback: /api/events, /ingest).
+
+Payload Structure:
+
+JSON
+
+{
+  "envelope": { "version": "v3.4.1" },
+  "app": {
+    "app_id": "<YOUR_APP_ID>",
+    "app_name": "<YOUR_APP_NAME>",
+    "app_base_url": "<YOUR_APP_BASE_URL>",
+    "env": "prod"
+  },
+  "event": {
+    "type": "<identify|heartbeat|metric|revenue_blocker|funnel_event>",
+    "ts_iso": "<ISO_TIMESTAMP>"
+  },
+  "data": { <EVENT_SPECIFIC_DATA> }
+}
+Display Requirement: You MUST include app_name and app_base_url in every report so the Command Center frontend can display clickable links.
+
+Revenue Blocker Protocol:
+
+If a critical failure stops revenue (e.g., Stripe down, empty inventory), emit event.type: "revenue_blocker" immediately.
+
+Fields: blocker_code, severity ("critical"), remediation_hint.
+
+[SECTION FOR: scholarship_agent (A3)]
+Objective: ORCHESTRATOR. Orchestrate the fleet, verify readiness, and drive traffic.
+
+Startup Identity: Emit identify event to A8 with app_id: "scholarship_agent".
+
+Dependency Check: Probe /health on A1, A2, A4, A5, A6, A7, A8.
+
+If A2 is down: Emit revenue_blocker (Code: NO_INVENTORY_ACCESS).
+
+If A6 is down: Emit revenue_blocker (Code: NO_PROVIDER_BILLING).
+
+If A8 is down: Emit revenue_blocker (Code: COMMAND_CENTER_DOWN).
+
+Marketing Activation:
+
+Ping A7 (Auto Page Maker) (POST /api/seo/pages) to generate 10 high-value SEO pages (e.g., "Nursing Scholarships Texas").
+
+Emit funnel_event: { "stage": "seo_campaign_start", "target": "nursing", "source": "agent3" }.
+
+Monitor Funnel:
+
+Listen for funnel_event from A5 (Student Signup) and A6 (Provider Payment) via A8 stream.
+
+Logic: If 0 signups detected in 1 hour, emit revenue_blocker (Code: ZERO_CONVERSION).
+
+[SECTION FOR: auto_com_center (A8)]
+Objective: COMMAND CENTER. Ingest telemetry and visualize the "CEO View".
+
+Ingestion: Ensure POST /events (and aliases) are open CORS to the fleet URLs.
+
+Frontend Display (The "CEO View"):
+
+Header: Show "Scholar AI Command Center - v3.4.1".
+
+Live Feed: Display incoming events in real-time. MUST show app_name and app_base_url for every event line as clickable links.
+
+Revenue Blocker Alert Box: A prominent red container at the top. If revenue_blocker events arrive, display them here until resolved.
+
+Fleet Grid: 8 Cards (A1-A8). Each card shows: Name, Link, Uptime Status, Last Heartbeat.
+
+Revenue Metrics: Sum of platform_fees (from A6 events) and credit_sales (from A5 events).
+
+[SECTION FOR: scholar_auth (A1)]
+Objective: Secure identity.
+
+Heartbeat: Every 60s, report active_sessions.
+
+Blocker Check: If JWT signing keys fail or database is unreachable, emit revenue_blocker (Code: AUTH_FAILURE).
+
+[SECTION FOR: scholarship_api (A2)]
+Objective: Serve inventory.
+
+Heartbeat: Report total_scholarships and p95_latency.
+
+Blocker Check: If total_scholarships == 0, emit revenue_blocker (Code: INVENTORY_EMPTY). This stops all revenue.
+
+[SECTION FOR: scholarship_sage (A4)]
+Objective: Compliance and Essay Help.
+
+Heartbeat: Report essays_processed and guardrail_flags.
+
+Blocker Check: If AI API (e.g., OpenAI/Groq) is unreachable, emit revenue_blocker (Code: AI_SERVICE_DOWN).
+
+[SECTION FOR: student_pilot (A5)]
+Objective: B2C Funnel (Student $).
+
+Funnel Events:
+
+On Signup: Emit funnel_event (stage: student_signup).
+
+On Credit Purchase: Emit funnel_event (stage: purchase, value: $19.99).
+
+Blocker Check: If checkout flow throws 500 error, emit revenue_blocker (Code: CHECKOUT_BROKEN).
+
+[SECTION FOR: provider_register (A6)]
+Objective: B2B Funnel (Provider $).
+
+Funnel Events:
+
+On Registration: Emit funnel_event (stage: provider_reg).
+
+On Scholarship Post: Emit funnel_event (stage: scholarship_live, platform_fee_accrued: true).
+
+Blocker Check: If Stripe Connect fails, emit revenue_blocker (Code: STRIPE_CONNECT_FAIL).
+
+[SECTION FOR: auto_page_maker (A7)]
+Objective: Organic Traffic (SEO).
+
+Action: Receive triggers from A3. Generate static HTML. Publish.
+
+Telemetry: Emit metric (pages_generated, google_index_status).
+
+Blocker Check: If publish fails (e.g., 500 error), emit revenue_blocker (Code: SEO_HALTED).
