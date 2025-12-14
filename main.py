@@ -261,9 +261,9 @@ async def startup_telemetry():
     from services.event_emission import EventEmissionService
     from models.business_events import BusinessEvent
     
-    print("APP_IDENTITY: A2 scholarship_api https://scholarship-api-jamarrlmayes.replit.app protocol=v3.5.0")
-    logger.info("APP_IDENTITY: A2 scholarship_api https://scholarship-api-jamarrlmayes.replit.app protocol=v3.5.0")
-    logger.info("📊 TELEMETRY: Starting telemetry emissions (Protocol v3.5.0)")
+    print("APP_IDENTITY: A2 scholarship_api https://scholarship-api-jamarrlmayes.replit.app protocol=v3.5.1")
+    logger.info("APP_IDENTITY: A2 scholarship_api https://scholarship-api-jamarrlmayes.replit.app protocol=v3.5.1")
+    logger.info("📊 TELEMETRY: Starting telemetry emissions (Protocol v3.5.1)")
     
     emitter = EventEmissionService()
     
@@ -301,7 +301,7 @@ async def startup_telemetry():
     import httpx
     A8_URL = "https://auto-com-center-jamarrlmayes.replit.app"
     identify_envelope = {
-        "envelope": {"version": "v3.5.0"},
+        "envelope": {"version": "v3.5.1"},
         "app": {
             "app_id": "scholarship_api",
             "app_name": "scholarship_api",
@@ -320,7 +320,7 @@ async def startup_telemetry():
     try:
         async with httpx.AsyncClient(timeout=5.0) as client:
             await client.post(f"{A8_URL}/events", json=identify_envelope)
-        logger.info("✅ TELEMETRY: identify event sent to A8 (v3.5.0)")
+        logger.info("✅ TELEMETRY: identify event sent to A8 (v3.5.1)")
     except Exception as e:
         logger.warning(f"⚠️ TELEMETRY: identify send failed: {e}")
     
@@ -350,7 +350,7 @@ async def startup_telemetry():
         logger.info("✅ TELEMETRY: Synthetic validation events emitted")
     
     async def heartbeat_loop():
-        """Protocol v3.5.0: Emit heartbeat every 60s with total_scholarships and p95_latency"""
+        """Protocol v3.5.1: Emit heartbeat every 60s with total_scholarships and p95_latency"""
         import time
         import httpx
         from services.scholarship_service import scholarship_service
@@ -366,7 +366,7 @@ async def startup_telemetry():
                 p95_latency = 120
                 
                 envelope = {
-                    "envelope": {"version": "v3.5.0"},
+                    "envelope": {"version": "v3.5.1"},
                     "app": {
                         "app_id": "scholarship_api",
                         "app_name": "scholarship_api",
@@ -385,7 +385,7 @@ async def startup_telemetry():
                 
                 if total_scholarships == 0:
                     blocker_envelope = {
-                        "envelope": {"version": "v3.5.0"},
+                        "envelope": {"version": "v3.5.1"},
                         "app": {
                             "app_id": "scholarship_api",
                             "app_name": "scholarship_api",
@@ -433,10 +433,10 @@ async def startup_telemetry():
             await asyncio.sleep(60)
     
     asyncio.create_task(heartbeat_loop())
-    logger.info("💓 TELEMETRY: Heartbeat loop started (60s interval, v3.5.0 protocol)")
+    logger.info("💓 TELEMETRY: Heartbeat loop started (60s interval, v3.5.1 protocol)")
     
     async def kpi_snapshot_loop():
-        """Protocol v3.5.0: Emit KPI_SNAPSHOT every 5 minutes with SLO tile metrics"""
+        """Protocol v3.5.1: Emit KPI_SNAPSHOT every 5 minutes with SLO tile metrics"""
         import time
         import httpx
         from sqlalchemy import text as sql_text
@@ -503,7 +503,7 @@ async def startup_telemetry():
                             json=kpi_payload,
                             headers={
                                 "Content-Type": "application/json",
-                                "X-Protocol-Version": "v3.5.0",
+                                "X-Protocol-Version": "v3.5.1",
                                 "X-Idempotency-Key": kpi_payload["idempotency_key"]
                             }
                         )
