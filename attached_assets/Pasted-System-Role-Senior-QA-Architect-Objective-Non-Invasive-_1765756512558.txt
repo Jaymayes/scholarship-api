@@ -1,0 +1,88 @@
+System Role: Senior QA Architect Objective: Non-Invasive E2E Revenue Blocker Audit for App v3.5.1
+
+Target: Scholar AI Advisor Production / Staging
+
+Task: Execute a read-only "Revenue Health Check" across the B2C (Student) and B2B (Provider) funnels. Identify any friction points that directly threaten the $10M ARR goal.
+
+Scope & Revenue Blockers to Verify:
+
+1. B2C Conversion & Activation (The "Cash Register")
+
+Magic Link Latency: Trigger a login email (using a test account).
+
+Blocker: Delivery > 60s or landing in Spam.
+
+Payment Gateway Liveness: Navigate to the "Buy Credits" page.
+
+Blocker: Stripe elements failing to load, currency mismatch, or JS errors.
+
+Onboarding Flow: Walk through the sign-up flow up to the first "Action" button.
+
+Blocker: Infinite spinners, broken "Next" buttons, or 400 errors on profile creation.
+
+2. Core Product Value (Retention)
+
+AI Inference Speed: Send a pre-canned, valid essay prompt to the AI.
+
+Blocker: Response time > 5s (P95 target is ~120ms token latency).
+
+Essay Upload: Open the upload modal.
+
+Blocker: Drag-and-drop zone unresponsive or file type validation errors.
+
+Mobile Responsiveness: View the "Dashboard" and "Essay Editor" on a simulated iPhone viewport.
+
+Blocker: Overlapping text, unclickable buttons (Critical for student demographic).
+
+3. B2B & Compliance (Trust Moat)
+
+FERPA/COPPA Flags: Inspect the "Settings" page for a user <13.
+
+Blocker: Missing parental consent UI or unblocked data sharing toggles.
+
+Provider Dashboard: Load the B2B analytics view.
+
+Blocker: "NO_DATA" states or broken CSV export buttons.
+
+Constraints:
+
+Do NOT submit a real credit card charge.
+
+Do NOT delete any user data.
+
+Do NOT send emails to real users.
+
+Output Report (JSON):
+
+JSON
+
+{
+  "test_run_id": "v3.5.1_revenue_audit",
+  "revenue_blockers_found": [
+    {
+      "severity": "CRITICAL",
+      "area": "B2C_Checkout",
+      "issue": "Stripe iframe failed to load within 3s",
+      "estimated_arr_impact": "High"
+    }
+  ],
+  "performance_metrics": {
+    "magic_link_delivery_ms": 450,
+    "ai_time_to_first_token_ms": 110,
+    "dashboard_lcp_ms": 800
+  },
+  "verdict": "GO / NO-GO"
+}
+KPI Impact (Estimate):
+
+CAC Efficiency: Catching a broken sign-up flow protects marketing spend.
+
+Churn Reduction: Ensuring AI latency is low protects the "Time-to-Value" metric for new users.
+
+Next Actions (Owner, Due Date):
+
+Execute: Run the prompt above.
+
+Review: If "CRITICAL" blockers are found, halt any new traffic acquisition immediately.
+
+Owner: QA Lead. Due: Today.
