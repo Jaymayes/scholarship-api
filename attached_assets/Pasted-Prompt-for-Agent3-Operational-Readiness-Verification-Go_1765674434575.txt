@@ -1,0 +1,335 @@
+Prompt for Agent3: Operational Readiness Verification & Go-Live Report
+Instructions for Agent3:
+
+Read the entire prompt below to understand the global context and reporting standards.
+
+Self-identify immediately. Determine which specific app you are operating within (e.g., scholar_auth, scholarship_api, etc.) based on your environment or by probing your own base URL.
+
+Execute ONLY the section of the playbook that corresponds to your identified app. Do not execute instructions for other apps.
+
+Produce the "Executive Ops Report" as your final output, strictly adhering to the format provided at the end of this prompt. Ensure every section of your report is labeled with your APP_NAME and APP_BASE_URL.
+
+— START OF PROMPT FOR AGENT3 —
+Role
+You are Agent3. Your job is to verify operational readiness across the Scholar AI Advisor ecosystem. This single prompt includes instructions for all apps. You must:
+
+Only execute the instructions for your app after you self-identify.
+
+Ignore all app sections that do not match your app.
+
+Produce a structured report that begins with your APP_NAME and APP_BASE_URL on every page/section of output.
+
+Supported Apps and Base URLs
+scholar_auth → https://scholar-auth-jamarrlmayes.replit.app
+
+scholarship_api → https://scholarship-api-jamarrlmayes.replit.app
+
+scholarship_agent → https://scholarship-agent-jamarrlmayes.replit.app
+
+scholarship_sage → https://scholarship-sage-jamarrlmayes.replit.app
+
+student_pilot → https://student-pilot-jamarrlmayes.replit.app
+
+provider_register → https://provider-register-jamarrlmayes.replit.app
+
+auto_page_maker → https://auto-page-maker-jamarrlmayes.replit.app
+
+auto_com_center → https://auto-com-center-jamarrlmayes.replit.app
+
+Prime Objective (for your app only)
+Confirm that:
+
+Pages are being generated (where applicable).
+
+The app is live and reachable.
+
+Leads are captured and attributed end-to-end.
+
+Revenue events are collected (only if your app participates in monetization).
+
+All telemetry is reporting to auto_com_center and is visible on a frontend dashboard.
+
+Findings are returned in the specified report format, clearly labeled by APP_NAME and APP_BASE_URL.
+
+Global Testing Rules and Conventions
+Self-identify before doing any work. Determine your app by using an environment variable, a passed-in context value, or (if necessary) by probing the base URLs. Once identified, STOP considering other apps and only use your app’s section below.
+
+Safety and test mode. When simulating leads or payments, use non-destructive, test-flagged data. Use a synthetic email of the form: agent3+{app}+{YYYYMMDDHHMMSS}@example.com. If payments are not safely testable, mark revenue as “Not Applicable” or “Blocked—No Sandbox”.
+
+Endpoint discovery. Prefer conventional endpoints when unknown: /health, /status, /version, /metrics, /openapi.json, /docs, /sitemap.xml, /robots.txt, /api/, /admin/, or links discoverable from the landing page.
+
+Telemetry events. When you perform test actions, emit these standardized event names to the command center if available:
+
+app_online
+
+page_generated_test
+
+lead_captured_test
+
+payment_succeeded_test
+
+event_roundtrip_verified
+
+Command center integration. Treat auto_com_center as source of truth for monitoring:
+
+Ingest: try POST /api/events or /events (JSON). If unknown, discover via /openapi.json or /docs on auto_com_center.
+
+Dashboard: verify that a dashboard or status UI reflects your app’s test events (look for an app filter, event timeline, or widgets that update after your test).
+
+Frontend verification. Confirm your test events are visible on some frontend surface: your app’s internal dashboard or the command center’s dashboard.
+
+Performance and reliability (light check). Verify that your app responds within ~120ms P95 on at least 10 requests to the main public endpoint or health endpoint if feasible. If insufficient tooling, provide best-effort latency observations.
+
+Reporting format. Output the “Executive Ops Report” exactly as specified at the end. Include your APP_NAME and APP_BASE_URL at the top of every section. Attach screenshots only if your runtime supports it; otherwise include the HTML title, response codes, and snippet of response bodies for evidence.
+
+Self-Identification (MANDATORY)
+Determine your app’s identity. Use one of:
+
+A provided runtime variable (e.g., APP_NAME).
+
+A controller instruction.
+
+If neither is provided, probe each base URL with a HEAD or GET /health or GET / to find the one you can reach and have context for. Choose the app whose base URL you can successfully access and/or matches your execution context.
+
+Once you identify your app, print: APP: <APP_NAME> | BASE_URL: <APP_BASE_URL>
+
+From this point, you must ignore all sections for other apps and only execute the section labeled for your app below.
+
+App-Specific Verification Playbooks
+Only execute the subsection that matches your identified app.
+
+1. scholar_auth (BASE: https://scholar-auth-jamarrlmayes.replit.app)
+
+Scope: Authentication, registration, session management, identity events.
+
+Tasks:
+
+Go-live status: Check /health or /status returns 200 and any version info via /version or headers. Capture response latency for 10 pings; estimate P95.
+
+Lead generation (auth as “lead”): Discover signup/login endpoints (e.g., /register, /login, /api/auth/*). Submit a test signup using a synthetic email with test=true if supported. If account creation is persistent, prefer a “dry run” or mark for cleanup. Confirm the signup triggers a lead_captured_test event (your app → auto_com_center). If not auto-emitted, attempt to POST a telemetry event yourself with payload {app, event, timestamp, email, test:true}. Validate that the event appears on a visible dashboard (your app’s admin or auto_com_center UI).
+
+Revenue: Not applicable (document as N/A).
+
+Data reporting: Verify your app emits app_online and auth-related events (auth_signup_success_test, auth_login_success_test if available). Confirm events are present in auto_com_center dashboards or event logs.
+
+Frontend display: Record the UI location that reflects new users or sign-ins (e.g., “Users count”, “Recent sign-ups”). Provide evidence: page title, path, timestamp, and visible counters.
+
+2. scholarship_api (BASE: https://scholarship-api-jamarrlmayes.replit.app)
+
+Scope: Scholarship search/listing APIs, filters, eligibility logic, provider data feeds.
+
+Tasks:
+
+Go-live status: Check /health, /status, /version, and /openapi.json.
+
+Page generation: Not applicable (document as N/A).
+
+Lead generation: Identify any endpoints that create or log interest/actions (e.g., POST /api/leads or tracking endpoints). If none exist, simulate a lead event to auto_com_center with a payload that includes scholarship_id, query_params, and test:true.
+
+Revenue: Typically N/A (document as N/A unless API monetizes usage credits—if so, test in sandbox).
+
+Data reporting: Confirm API usage metrics appear in auto_com_center (request counts, error rates if available).
+
+Frontend display: Verify search widgets or API usage dashboards are visible somewhere (either API docs dashboard or auto_com_center).
+
+3. scholarship_agent (BASE: https://scholarship-agent-jamarrlmayes.replit.app)
+
+Scope: Autonomous marketing and outreach campaigns, UTM-tracked landing experiences.
+
+Tasks:
+
+Go-live status: Check /health or base route, find /campaigns or /api/campaigns.
+
+Page generation (indirect via Auto Page Maker): Verify active campaigns produce or link to live landing pages (UTMs visible). Validate that at least one landing page resolves with correct metadata and UTM persistence to forms.
+
+Lead generation: Submit a test lead via a campaign landing page form (synthetic email with test flag). Confirm lead_captured_test appears in auto_com_center with source=scholarship_agent and UTM params.
+
+Revenue: Usually N/A here; if campaign triggers credit purchase, move revenue test to student_pilot section and mark as “cross-app dependency.”
+
+Data reporting: Ensure campaign events (impressions/clicks/leads) appear in the command center dashboard.
+
+Frontend display: Capture the campaign dashboard screen title and any counters that increment after your test.
+
+4. scholarship_sage (BASE: https://scholarship-sage-jamarrlmayes.replit.app)
+
+Scope: AI assistant for scholarship discovery/advice; consumes credits; performance and safety.
+
+Tasks:
+
+Go-live status: Check /health, /status, or base route; note model version if exposed.
+
+Lead generation: If first-time chat or “email capture” flow exists, submit a test lead.
+
+Revenue (if credits are consumed B2C): Attempt a sandbox credit purchase or deduction. If unavailable, document as “Blocked—No Sandbox”.
+
+Data reporting: Emit or confirm events: app_online, chat_started_test, credit_debited_test (if applicable). Verify visibility on auto_com_center dashboard.
+
+Frontend display: Confirm any user-facing session history or usage counters update after test.
+
+5. student_pilot (BASE: https://student-pilot-jamarrlmayes.replit.app)
+
+Scope: Student onboarding, funnel steps, credit checkout; primary B2C revenue.
+
+Tasks:
+
+Go-live status: Check /health and main onboarding page loads.
+
+Lead generation: Complete a test onboarding with synthetic email; confirm lead event in auto_com_center.
+
+Revenue: Attempt a test credit purchase using sandbox payments. Validate that payment_succeeded_test is emitted and captured by auto_com_center with amount, currency, and product_id. If sandbox not available, document as “Blocked—No Sandbox.”
+
+Data reporting: Verify conversion funnel metrics (step counts, drop-offs) appear in dashboard.
+
+Frontend display: Confirm purchase/credits balance surfaces update post-transaction (UI counters/screens).
+
+6. provider_register (BASE: https://provider-register-jamarrlmayes.replit.app)
+
+Scope: Scholarship provider onboarding, verification/KYC, provider-side monetization.
+
+Tasks:
+
+Go-live status: Check /health and the registration page workflow.
+
+Lead generation: Submit a test provider interest form (synthetic org name + email) with test flag; verify event in auto_com_center.
+
+Revenue: If providers pay fees or connect payouts, attempt a sandbox signup fee or a $0 authorization flow. Confirm payment_succeeded_test event and visibility on the dashboard. If not possible, document “Blocked—No Sandbox”. Confirm 3% platform fee configuration is visible in settings or logs.
+
+Data reporting: Check provider onboarding metrics and event flows in auto_com_center.
+
+Frontend display: Confirm provider dashboard shows status (e.g., “Verification Pending”, “Active”).
+
+7. auto_page_maker (BASE: https://auto-page-maker-jamarrlmayes.replit.app)
+
+Scope: SEO-first page generation engine for organic growth.
+
+Tasks:
+
+Go-live status: Check /health, /sitemap.xml availability, and base route loads with no errors.
+
+Page generation: Trigger generation of a test page (e.g., scholarship-name + timestamp) via UI or API (e.g., POST /api/pages). Ensure canonical URL is created and indexes on sitemap. Validate page renders with title tag, meta description, schema.org JSON-LD (if supported), and internal links. Emit page_generated_test to auto_com_center.
+
+Lead generation: If page includes a lead form, submit test lead and verify it round-trips to the dashboard with correct page URL attribution.
+
+Revenue: N/A (document as N/A).
+
+Data reporting: Confirm page generation, crawl stats (if available), and CTR metrics are visible in command center or local dashboard.
+
+Frontend display: Confirm the new page is listed in “Recent Pages” and appears on sitemap.xml.
+
+8. auto_com_center (BASE: https://auto-com-center-jamarrlmayes.replit.app)
+
+Scope: Central telemetry, reporting, monitoring, dashboards for all apps.
+
+Tasks:
+
+Go-live status: Check /health, /status, /version; confirm dashboards load.
+
+Data ingestion: Discover and document the ingest endpoint (e.g., POST /api/events). Submit a test event for your own app to confirm pipeline health.
+
+Cross-app visibility: Verify dashboards display events from your app (and if permissible, show event feeds across other apps but do not modify them).
+
+Frontend display: Confirm widget tiles/charts update within a reasonable delay after event ingestion (note the delay).
+
+Revenue: N/A (document as N/A).
+
+Performance: Note any P95 latency indicators if the dashboard reports them.
+
+Evidence Collection (for your app)
+For each check you perform, capture:
+
+Endpoint called, HTTP method, status code, and time-to-first-byte.
+
+Page titles and key UI labels for any screen you view relevant to the test.
+
+For generated pages: the URL, title, meta description (first 140 chars), and whether it appears in sitemap.xml.
+
+For leads: the synthetic email used, timestamp, UTM params (if any), and the event ID as shown in the command center.
+
+For revenue: the transaction ID, amount, currency, and sandbox indicator.
+
+For dashboard: the path to the dashboard, the widget names that updated, and the timestamp when the change was observed.
+
+Executive Ops Report (Required Output Format)
+Start every section with: APP: <APP_NAME> | BASE_URL: <APP_BASE_URL>
+
+1. Identity
+
+APP: <APP_NAME> | BASE_URL: <APP_BASE_URL>
+
+Test Window (UTC): <start_ts> to <end_ts>
+
+2. Go-Live Status
+
+Health endpoints checked: [list]
+
+Status: Live/Degraded/Down
+
+Version observed: <value or unknown>
+
+Latency sample (ms): [list of 10]; P95 (approx): <value>
+
+3. Page Generation (if applicable)
+
+Action: <trigger method>
+
+New page URL: <url>
+
+Title: <title>
+
+Meta description (first 140 chars): <text>
+
+Sitemap listed: Yes/No
+
+Event emitted: page_generated_test → Received at command center: Yes/No (timestamp)
+
+4. Lead Generation
+
+Lead source: <path or page>
+
+Synthetic email: <email>
+
+UTM params: <object or none>
+
+Command center event: lead_captured_test → Seen: Yes/No (event_id/timestamp)
+
+Frontend dashboard update: Path <path>, Widget(s) <list>, Observed change <description>
+
+5. Revenue (if applicable)
+
+Sandbox: Yes/No/Unknown
+
+Transaction: <id>, Amount: <amount> <currency>
+
+Command center event: payment_succeeded_test → Seen: Yes/No (event_id/timestamp)
+
+UI confirmation: <screen title/path>, Evidence: <note>
+
+6. Data Reporting & Monitoring
+
+Emitted events: [list: app_online, page_generated_test, lead_captured_test, payment_succeeded_test, event_roundtrip_verified]
+
+Command center ingest endpoint discovered: <url>
+
+Dashboard paths verified: <list>
+
+Cross-check: Event round-trip confirmed: Yes/No; Notes: <text>
+
+7. Exceptions & Risks
+
+Failures: [list with endpoint, status, error summary]
+
+Blockers (e.g., missing sandbox): [list]
+
+Security/Compliance notes (FERPA/COPPA data handling): <notes>
+
+8. Recommendations (high-ROI fixes only)
+
+[1–3 bullet points with owner and expected impact]
+
+9. Attachments/Evidence
+
+Response snippets (status/title/first 200 chars)
+
+Links to generated pages, dashboards, and sitemap entries
+
+Final rule: Do not perform actions for other apps. Only your app’s section is in scope. Every output section must be labeled with: APP: <APP_NAME> | BASE_URL: <APP_BASE_URL>.

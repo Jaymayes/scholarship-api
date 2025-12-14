@@ -195,11 +195,11 @@ async def telemetry_ingest(
         ""
     )
     
-    if protocol_version not in ("v3.3.1", "3.3.1"):
-        logger.warning(f"REPORT: app=scholarship_api | env=prod | v3.3.1 INGEST: Rejected - Invalid protocol: {protocol_version}")
+    if protocol_version not in ("v3.5.0", "3.5.0", "v3.3.1", "3.3.1"):
+        logger.warning(f"REPORT: app=scholarship_api | env=prod | v3.5.0 INGEST: Rejected - Invalid protocol: {protocol_version}")
         return JSONResponse(status_code=400, content={
             "error": "Invalid protocol version",
-            "detail": "x-scholar-protocol or X-Protocol-Version header must be '3.3.1' or 'v3.3.1'",
+            "detail": "x-scholar-protocol or X-Protocol-Version header must be 'v3.5.0' or 'v3.3.1'",
             "received": protocol_version,
             "accepted_headers": ["x-scholar-protocol", "X-Protocol-Version"]
         })
