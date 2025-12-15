@@ -1,0 +1,80 @@
+Go/No‑Go: GO with guardrails. We’ll execute a controlled soft launch to start revenue now while we burn down the auth defects within 24 hours.
+
+What I’m seeing from the evidence you shared
+
+A2 Scholarship API: healthy and serving endpoints.
+A3/A5 flows: blocked by A1 callback failures; /api/login returning AUTH_DEGRADED. Screens show “Authentication Failed” and “Login session expired,” consistent with OIDC callback/state or cookie scope issues.
+A6 Provider Register: OIDC 404 still present, but Replit Auth fallback works.
+A7 Auto Page Maker: live with 2,967 pages and valid sitemap.
+Operating decision
+
+Proceed with a Day‑1 soft launch focused on organic acquisition and provider onboarding in degraded-auth mode.
+Open all anonymous/guest browsing flows for students; gate authentication only at “save profile,” “apply,” and “purchase” steps using working fallback auth.
+Cold Start Protocol — execute now (Operator via A8)
+
+Turn on SEO pings
+Submit sitemap to Search Console.
+Trigger index-now/batch URL pings for the top 500 pages.
+Warm critical paths
+Run scripted hits of: A5 landing -> search -> scholarship detail -> CTA.
+Prime A2 caches with top 100 queries.
+Launch Scholarship Agent campaigns
+20 high-intent keywords, geo: US, device: mobile first.
+Provider seeding
+Send 50 invite links to pre-identified providers using A6 with Replit Auth fallback.
+Telemetry watch
+Keep A8 open on: traffic, login error rate, P95 latency, credit checkout funnel.
+Auth incident — declare and resolve within 24 hours
+Create incident: INC‑AUTH‑001 (SEV‑2, revenue-degraded but not blocked)
+
+Hypothesis from symptoms
+
+OIDC/PKCE state or nonce mismatch between A1 and A3/A5, or callback URL/host mismatch.
+Cross‑subdomain cookie scoping or SameSite misconfig (replit.app subdomains) dropping the session or code_verifier.
+Session TTL too short or server clock skew leading to “session expired” on callback.
+Required fixes (Engineering, P1—complete tomorrow)
+
+Redirect URIs
+Verify exact callbacks registered at IdP match deployed URLs:
+https://scholar-auth-<slug>.replit.app/auth/callback
+Post-logout redirect same host.
+Cookie/session settings (all apps)
+SameSite=None; Secure; HttpOnly; Domain=.replit.app; Path=/; TTL ≥ 60 minutes.
+Store PKCE code_verifier server-side (Redis/kv) keyed by state to avoid cross-origin/localStorage loss.
+State/nonce integrity
+Log and compare state sent vs. received; reject only on mismatch and emit structured error.
+Clock skew
+NTP/time sync; allow 120s leeway on token iat/exp validation.
+Health and degradation controls
+A1: add /auth/health and /auth/diag endpoints.
+A3/A5: if A1 unhealthy, auto-switch to Replit Auth fallback and banner “Login temporarily degraded.”
+Token whitelisting (already planned)
+Whitelist A1 service token in A2/A8 to stop 403s.
+Synthetic monitors (every 60s)
+Journeys: / -> login -> callback -> API call -> logout. Alert at >2% failure over 5 min.
+Business continuity (active now)
+
+Student flows: allow anonymous search/browse; enable checkout with magic link or Replit Auth fallback until OIDC fixed.
+Provider flows: default to Replit Auth fallback; capture provider profile and listing data; defer advanced console features requiring OIDC.
+Support: canned response + status page link; offer one-time 10% credit bonus if login fails and user retries within 24 hours.
+Launch KPIs to track hourly in A8
+
+Traffic: sessions, organic share, top 20 landing pages.
+B2C: CTR from A7 pages -> A5, signup rate, free->paid credit conversion, ARPU.
+B2B: provider signups, listings created, approval rate.
+Reliability: auth failure rate (% of login attempts), P95 latency, uptime.
+Revenue: MRR run-rate, credit sales, 3% provider fee run-rate.
+Targets for first 72 hours
+
+2,500 organic sessions, 150 student signups, 20 paid credit purchases, 15 provider registrations, <3% auth failure rate, P95 < 300 ms on A2.
+Owner assignments and deadlines
+
+Operator: Execute Cold Start in A8 now; confirm sitemap submission and cache warmers complete in 30 minutes.
+Eng Lead: Own INC‑AUTH‑001. Post root-cause notes and patch ETA in Command Center within 2 hours; final fix by 10:00 AM local tomorrow.
+Marketing Agent: Publish 3 launch posts and 2 provider case studies; push to social and email list today.
+Data/Finance: Stand up live KPI panel; send T+4h and T+24h reports with CAC, ARPU, and conversion.
+Compliance: Verify cookie banners and privacy copy reflect temporary auth fallback.
+Rollback criteria
+
+If auth failure rate >10% for 30 consecutive minutes or checkout errors >5%, pause paid acquisition and keep only organic traffic while Eng completes the fix.
+You have my go-ahead. Execute the Cold Start Protocol now and shift auth to degraded mode for the next 12–24 hours while Engineering lands the P1 fix. The objective remains unchanged: turn the SEO engine and live funnels into revenue today.
