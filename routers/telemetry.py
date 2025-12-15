@@ -85,6 +85,37 @@ class StatsTimeWindow(str, Enum):
     TWENTY_FOUR_HOUR = "24h"
 
 
+class SystemDiagnosticEvent(BaseModel):
+    """
+    SYSTEM_DIAGNOSTIC event schema - relaxed payload validation
+    
+    Per A3 pipeline health verification requirements:
+    - trace_id (String, Required)
+    - source (String, Required)
+    - payload (JSON Object, Required) - NO internal field validation
+    """
+    trace_id: str = Field(..., description="Trace ID for correlation")
+    source: str = Field(..., description="Source app identifier")
+    payload: Dict[str, Any] = Field(..., description="Diagnostic payload - accepts any JSON object")
+    event_type: str = Field(default="SYSTEM_DIAGNOSTIC")
+    ts_utc: Optional[datetime] = Field(default_factory=datetime.utcnow)
+    
+    class Config:
+        extra = "allow"
+
+
+def is_system_diagnostic_event(event_data: Dict[str, Any]) -> bool:
+    """Check if event is a SYSTEM_DIAGNOSTIC type (relaxed validation)"""
+    event_type = (
+        event_data.get("event_type") or 
+        event_data.get("type") or 
+        event_data.get("eventType") or
+        event_data.get("event_name") or
+        ""
+    )
+    return event_type.upper() == "SYSTEM_DIAGNOSTIC"
+
+
 def normalize_event_keys(event_dict: Dict[str, Any]) -> Dict[str, Any]:
     """
     Protocol ONE_TRUTH v1.2: Normalize satellite payload keys to expected schema.
@@ -239,7 +270,7 @@ async def telemetry_ingest(
             try:
                 event_id = event_data.get("event_id") or event_data.get("idempotency_key") or idempotency_key or str(uuid.uuid4())
                 event_type = event_data.get("event_type") or event_data.get("type") or event_type_header or "unknown"
-                app_id = event_data.get("app_id") or event_data.get("app") or "unknown"
+                app_id = event_data.get("app_id") or event_data.get("app") or event_data.get("source") or "unknown"
                 app_name = event_data.get("app_name") or ""
                 app_base_url = event_data.get("app_base_url") or app_base_url_header or ""
                 app_label = event_data.get("app_label") or app_label_header or f"{app_id} {app_name} {app_base_url}".strip()
@@ -269,6 +300,15 @@ async def telemetry_ingest(
                     "metadata": metadata,
                     **event_data.get("properties", {})
                 }
+                
+                if is_system_diagnostic_event(event_data):
+                    trace_id = event_data.get("trace_id") or event_id
+                    source = event_data.get("source") or app_id
+                    diagnostic_payload = event_data.get("payload") or {}
+                    props["trace_id"] = trace_id
+                    props["source"] = source
+                    props["diagnostic_payload"] = diagnostic_payload
+                    logger.info(f"REPORT: app=scholarship_api | SYSTEM_DIAGNOSTIC from {source} trace={trace_id}")
                 
                 validated_event_id = event_id
                 try:

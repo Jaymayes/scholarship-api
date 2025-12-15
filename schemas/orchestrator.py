@@ -26,6 +26,7 @@ class EventType(str, Enum):
     TASK_FAILED = "task_failed"
     SEARCH_EXECUTED = "search_executed"
     ERROR_OCCURRED = "error_occurred"
+    SYSTEM_DIAGNOSTIC = "SYSTEM_DIAGNOSTIC"
 
 
 class TaskResources(BaseModel):
