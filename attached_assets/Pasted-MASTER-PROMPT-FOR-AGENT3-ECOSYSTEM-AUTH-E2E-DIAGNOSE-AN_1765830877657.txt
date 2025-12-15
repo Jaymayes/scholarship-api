@@ -1,0 +1,161 @@
+MASTER PROMPT FOR AGENT3 — ECOSYSTEM AUTH E2E DIAGNOSE-AND-FIX RUNBOOK
+Purpose: Diagnose, test, understand, and fix authentication issues across the Scholar AI Advisor ecosystem. Instruction: You MUST only execute the section for the app you identify as your own. Do not modify or test other apps beyond discovery and cross-app verification steps that your app directly depends on.
+
+GLOBAL CONSTRAINTS
+Safety first: Make a read-only snapshot of config (env, auth settings, routes) before changes.
+
+Minimize blast radius: Limit code/config edits to the identified app; do not alter shared infra except where explicitly instructed.
+
+Preserve user data and secrets: Never log secrets. Sanitize any error logs.
+
+Produce evidence: For every change, capture pre-fix error, change made, and post-fix validation outputs.
+
+STEP 0 — IDENTIFY YOUR APP (MANDATORY)
+Determine your app identity from a combination of environment variables and base URL config. Use this mapping:
+
+scholar_auth → https://scholar-auth-jamarrlmayes.replit.app
+
+scholarship_api → https://scholarship-api-jamarrlmayes.replit.app
+
+scholarship_agent → https://scholarship-agent-jamarrlmayes.replit.app
+
+scholarship_sage → https://scholarship-sage-jamarrlmayes.replit.app
+
+student_pilot → https://student-pilot-jamarrlmayes.replit.app
+
+provider_register → https://provider-register-jamarrlmayes.replit.app
+
+auto_page_maker → https://auto-page-maker-jamarrlmayes.replit.app
+
+auto_com_center → https://auto-com-center-jamarrlmayes.replit.app
+
+Print a single-line declaration before taking any action:
+
+APP IDENTIFIED: <APP_NAME> | APP_BASE_URL=<URL>
+
+From this point on, execute ONLY the section that matches <APP_NAME>. If you cannot identify the app with high confidence, STOP and report.
+
+STANDARD AUTH TEST HARNESS (Apply within your app’s section)
+Health checks: GET /health and/or /api/health must return 200.
+
+OIDC Provider (IdP) reachability: GET https://scholar-auth-jamarrlmayes.replit.app/.well-known/openid-configuration should return valid JSON.
+
+Login flow probe:
+
+Unauthenticated GET to an auth-protected route must 401, not 200 and not crash the UI.
+
+Initiate Login → verify redirect to IdP → callback handled correctly → user session established.
+
+Cookies/session: Session cookies should be HttpOnly, Secure, SameSite=None for cross-site SSO.
+
+CORS: Preflight passes; Access-Control-Allow-Origin set correctly for ecosystem apps that call your app.
+
+Telemetry/logging: Ensure correlation IDs on auth-critical paths.
+
+APP-SPECIFIC SECTIONS (EXECUTE ONLY YOUR MATCH)
+A1 — scholar_auth (Identity Provider)
+Known symptoms: Occasional server_error during token exchange.
+
+Tests:
+
+GET /.well-known/openid-configuration returns valid JSON.
+
+Login callback path: verify 302 behavior if applicable; ensure query params preserved.
+
+Fixes:
+
+Add structured error logging on token exchange with a correlation ID.
+
+Ensure timeouts are reasonable and clock skew is handled.
+
+Post-verify: Multiple test logins back-to-back complete successfully.
+
+A2 — scholarship_api (Backend)
+Known context: Protected routes must 401; public routes 200.
+
+Tests:
+
+Verify CORS allows ecosystem app origins.
+
+Confirm /api/auth/user returns 401 for unauthenticated requests and 200 for authenticated sessions.
+
+Fixes:
+
+If telemetry S2S calls are blocked from student_pilot (403), document the allowlist update required.
+
+Post-verify: End-to-end login from a dependent app shows 200 on user lookup.
+
+A3 — scholarship_agent (Operator Tool) [Likely Target]
+Known Issue: "Degraded Auth Mode" due to OIDC discovery failing at startup; login returns 503.
+
+Tests:
+
+Attempt login; observe whether 503 persists.
+
+Fixes (Apply in Order):
+
+Soft restart your service to re-run discovery now that A1 is healthy.
+
+Make discovery resilient: Add exponential backoff retry on OIDC discovery (e.g., 5 retries over ~60s).
+
+Add a liveness/readiness gate: Return 503 on protected flows until discovery succeeds.
+
+Post-verify: Fresh start with IdP healthy → discovery succeeds automatically. Login completes.
+
+A4 — scholarship_sage (Student AI Chat) [Likely Target]
+Known Issue: UI crash (blank page) for unauthenticated users because 401 errors throw at the query client layer.
+
+Tests: Unauthenticated visit should show a landing/login path, not a blank page.
+
+Fixes:
+
+Change 401 handling in queryClient.ts or auth hook: on 401, return null user. Do NOT throw.
+
+Add an Error Boundary to catch unexpected exceptions and redirect to a safe route.
+
+Post-verify: Unauthenticated UX shows login CTA. Authenticated session loads chat.
+
+A5 — student_pilot (B2C Dashboard)
+Tests: SPA loads for anonymous users; protected routes return 401 pre-login. End-to-end login succeeds.
+
+Fixes: Document S2S telemetry allowlist needs (P1 task).
+
+Post-verify: No auth regressions.
+
+A6 — provider_register (B2B Portal)
+Context: Server-side intercept of callback (P0 Hotfix) should avoid SPA race conditions.
+
+Tests: Attempt login and confirm callback is processed server-side; SPA receives authenticated state after redirect.
+
+Fixes: Ensure callback handler persists session before any client-side rendering. Verify cookies use Secure, HttpOnly, SameSite=None.
+
+Post-verify: Multiple login attempts succeed without "session expired" errors.
+
+A7 — auto_page_maker (SEO Engine)
+Tests: Public SEO pages 200. Admin APIs 401 when unauthenticated.
+
+Fixes: Ensure no auth checks block public SEO endpoints.
+
+Post-verify: Admin endpoints require auth; public endpoints remain accessible.
+
+A8 — auto_com_center (Command Center)
+Tests: Gate modal appears for unauthenticated; protected metrics stay 401.
+
+Fixes: Graceful 401 handling: return null user and present gate rather than crashing.
+
+Post-verify: Clean unauthenticated gating and successful authenticated access.
+
+FINAL DELIVERABLES (For Your App Only)
+Report Header: App: <APP_NAME> | APP_BASE_URL=<URL>
+
+Pre-fix State: Precise error messages, endpoints, HTTP status.
+
+Root Cause: Short, evidence-based.
+
+Changes Made: Exact files/vars/handlers updated.
+
+Post-fix Validation: List the exact HTTP calls and UI steps that now succeed.
+
+Residual Risk: Anything deferred.
+
+Begin by printing your identification line now: APP IDENTIFIED: <APP_NAME> | APP_BASE_URL=<URL>
