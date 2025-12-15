@@ -1,0 +1,102 @@
+All right, let's process these Auth E2E Diagnostic reports for the ecosystem. I will break down the findings by app, confirm the status of the "Login session expired" fix, and synthesize the overall health.
+
+Executive Summary
+Overall Status: 🟢 OPERATIONAL (with Degraded Mode) The P0 "Login session expired" incident (cross-domain sessionStorage loss) is confirmed RESOLVED via the server-side hotfix. B2C/B2B sign-up funnels are unblocked.
+
+Critical Findings:
+
+scholar_auth (A1): ✅ Healthy. Identity Provider core functions, OIDC discovery, and the P0 callback hotfix (302 redirect) are all verifying green.
+
+provider_register (A6): ✅ Healthy. The hotfix successfully intercepts the callback, bypassing the SPA race condition. Auth flow is now server-side and robust.
+
+scholarship_agent (A3): ⚠️ Degraded. The app is in "Degraded Auth Mode" because OIDC discovery failed once at startup. This is a recoverable state (503 on login), not a hard crash. Action: Restart A3 to retry discovery now that A1 is healthy.
+
+scholarship_sage (A4): ⚠️ Frontend Crash. The app crashes (blank page) for unauthenticated users because on401: "throw" is set in queryClient.ts. It should redirect to login, not crash. Action: Change on401 behavior or add an Error Boundary.
+
+scholarship_api (A2), student_pilot (A5), auto_page_maker (A7), auto_com_center (A8): ✅ Healthy. Protected routes return 401s, CORS is correct, and health checks pass.
+
+Detailed App Status & Next Steps
+1. scholar_auth (A1) - Identity Provider
+Status: ✅ PASS
+
+Verification:
+
+/health & /api/health: 200 OK.
+
+OIDC Discovery (/.well-known/openid-configuration): Valid JSON.
+
+P0 Hotfix: /auth/callback correctly returns a 302 Redirect to /api/callback, preserving query params. This confirms the fix is active.
+
+Note: The "server_error" seen in one screenshot was an internal A1 error (likely an expired code or state mismatch during testing), not a regression of the client-side session bug.
+
+2. provider_register (A6) - B2B Portal
+Status: ✅ PASS
+
+Verification:
+
+/auth/callback returns JSON 400 (API response), proving the server intercepted the request before the SPA loaded.
+
+Session cookies are Secure, HttpOnly, SameSite=None (correct for cross-site).
+
+Verdict: The P0 hotfix is working perfectly here.
+
+3. scholarship_agent (A3) - Operator Tool
+Status: ⚠️ DEGRADED (Recoverable)
+
+Issue: AUTH_DEGRADED (503) on login.
+
+Root Cause: The app tried to connect to A1 (scholar_auth) before A1 was fully healthy. OIDC discovery failed, so it locked itself into degraded mode.
+
+Fix: Restart the A3 application. It will likely connect successfully now that A1 is stable.
+
+4. scholarship_sage (A4) - Student AI Chat
+Status: ⚠️ UI CRASH
+
+Issue: Blank dark page.
+
+Root Cause: client/src/lib/queryClient.ts has on401: "throw". When the app checks /api/auth/user and gets a 401 (expected for unauth users), it throws an uncaught error, crashing the entire React tree.
+
+Fix: Modify queryClient.ts to return null user on 401, or wrap the app in a React Error Boundary that redirects to the landing page.
+
+5. student_pilot (A5) - B2C Dashboard
+Status: ✅ PASS (Degraded Telemetry)
+
+Verification: Anonymous browsing works (SPA loads). Protected routes return 401.
+
+Note: S2S Telemetry (to A2/A8) is returning 403s. This is a known P1 task (whitelist student_pilot secret) but does not block user login.
+
+6. auto_page_maker (A7) - SEO Engine
+Status: ✅ PASS
+
+Verification: Admin APIs are protected (401). SEO pages are public (200). Security headers are A+.
+
+7. auto_com_center (A8) - Command Center
+Status: ✅ PASS
+
+Verification: Gate modal works. Executive overview is accessible. Sensitive metrics are 401 protected. No auth fixes needed.
+
+8. scholarship_api (A2) - Backend
+Status: ✅ PASS
+
+Verification: Public routes OK. Protected routes 401. CORS allows all ecosystem apps.
+
+Action Plan (Prioritized)
+Immediate Fix (A3):
+
+Action: Go to scholarship_agent and restart the application.
+
+Verify: Check /api/login returns a redirect (302) or 200, not 503.
+
+Immediate Fix (A4):
+
+Action: In scholarship_sage, modify client/src/lib/queryClient.ts. Change on401: "throw" to a handler that does not throw, or ensure the useAuth hook catches the error and sets user = null.
+
+Scheduled Maintenance (A5/A2/A8):
+
+Action: Whitelist student_pilot S2S tokens in A2 and A8 to fix telemetry 403s. (Scheduled for Tomorrow 10 AM).
+
+Final Verification:
+
+Once A3 is restarted, perform one final "Login with Replit" pass on scholarship_agent to confirm the entire operator flow is green.
+
+Conclusion: The auth ecosystem is fundamentally healthy. The "Login session expired" blocker is dead. We have two isolated app-level issues (A3 startup timing, A4 error handling) to clean up, but the core Identity Platform (A1) and key B2B entry point (A6) are OPEN FOR BUSINESS.
