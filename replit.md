@@ -27,7 +27,8 @@ The application uses FastAPI for high performance and async capabilities, with P
 - **Ranking System**: A hybrid approach combining content-based filtering with "eligible-first" prioritization.
 - **Search Intelligence**: Features semantic and keyword search, smart suggestions, and quality assessment.
 - **Business Event Instrumentation**: A central event tracking system for executive KPI reporting, including a `business_events` table and an event emission service using a fire-and-forget async approach with a circuit breaker pattern. Fixed 2025-11-30: asyncpg SSL/JSONB compatibility for proper event recording.
-- **Telemetry Contract v3.5.1** (2025-12-14): Fleet-wide telemetry with Command Center integration:
+- **Telemetry Contract v3.5.1** (2025-12-15): Fleet-wide telemetry with Command Center integration:
+  - **SYSTEM_DIAGNOSTIC Support (2025-12-15)**: Accepts diagnostic events from A3 with relaxed payload validation
   - `POST /api/telemetry/ingest` - **PRIMARY** fleet fallback endpoint (v3.5.1 Multi-App compliant)
   - `POST /api/analytics/events` - Legacy S2S event write endpoint (CSRF bypass enabled)
   - `POST /api/events` - Legacy fallback event write endpoint
