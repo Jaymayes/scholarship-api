@@ -1,0 +1,135 @@
+MASTER PROMPT FOR AGENT3 — AUTH E2E DIAGNOSTIC & TESTING
+Role: You are a QA Automation Engineer and Security Researcher. Task: Perform a rigorous End-to-End (E2E) Authentication test for the specific application you are currently operating within. Context: The user is reporting an inability to log in to most apps in the ecosystem. Your goal is to verify the auth flow, identify broken links/redirects, audit cookies, and report blockers.
+
+🛑 CRITICAL INSTRUCTION: SELECT YOUR SCOPE
+You have been provided with instructions for 8 different apps. Do not execute them all.
+
+Identify which app you are currently in by checking your environment, package.json, or directory structure.
+
+Find the matching BEGIN APP: {YOUR_APP_NAME} section below.
+
+Execute ONLY that section and the Universal Rules. Ignore all other app sections.
+
+🟢 UNIVERSAL RULES (Apply to ALL Apps)
+1. Pre-Flight Identification
+Before doing anything else, output this exact header to confirm you know where you are:
+
+ID: {YOUR_APP_NAME} | APP_BASE_URL: {YOUR_APP_URL}
+
+2. Deliverables & Reporting Standard
+Every file, log, or text block you generate must start with:
+
+App: {APP_NAME} | URL: {APP_BASE_URL}
+
+Required Artifacts:
+
+Auth E2E Report (Markdown): A structured log of your manual/automated attempts.
+
+Structure: Test Case # -> Steps -> Expected -> Observed -> Result (PASS/FAIL).
+
+HAR File (Simulated): A text representation or actual HAR export of the network requests during the login flow (Redact actual secrets). Name: {APP_NAME}_auth_trace.har.
+
+Cookie & Header Audit: A table listing every cookie received. Columns: Name, Domain, Secure, HttpOnly, SameSite. Highlight any missing Secure/HttpOnly flags.
+
+Issues List: A prioritized list of bugs found (Critical/High/Medium).
+
+cURL Reproductions:
+
+One cURL command to hit the login endpoint.
+
+One cURL command to hit a protected endpoint (showing the 401/403 failure).
+
+3. Verification Checklist (The "What" to Test)
+Redirect Chains: Does hitting / redirect to /login? Does /login redirect to scholar_auth?
+
+Session Persistence: Does the session survive a page reload?
+
+Cross-Domain Handoff: If the app redirects to scholar_auth and back, is the session cookie successfully set on the return trip?
+
+Security Headers: Are Access-Control-Allow-Origin and X-Frame-Options blocking valid flows?
+
+📂 APP-SPECIFIC SECTIONS (Execute ONLY your match)
+🟦 BEGIN APP: scholar_auth
+APP_NAME: scholar_auth APP_BASE_URL: https://scholar-auth-jamarrlmayes.replit.app Objective: Validate the Identity Provider (IdP) core functions. Steps:
+
+Health Check: cURL /health and /api/health.
+
+Login UI: Access /login. Verify the form loads.
+
+Credential Test: Attempt login with a test user (create one via CLI script if needed/possible, or use a known test credential if present in env).
+
+Cookie Generation: Upon success, verify the auth_session (or equivalent) cookie is set. Crucial: Check if SameSite=None and Secure are set (required for cross-site auth).
+
+OIDC Discovery: Verify /.well-known/openid-configuration returns JSON.
+
+Redirect Validation: Manually construct a redirect URL (like a client app would use) and verify scholar_auth redirects back with a code parameter.
+
+🟦 BEGIN APP: scholarship_api
+APP_NAME: scholarship_api APP_BASE_URL: https://scholarship-api-jamarrlmayes.replit.app Objective: Validate API Bearer Token/Cookie acceptance. Steps:
+
+Public Route: cURL / or /health. Expect 200 OK.
+
+Protected Route (Negative): cURL /api/scholarships (or similar) without creds. Expect 401 Unauthorized.
+
+CORS Check: Send an OPTIONS request to a protected endpoint simulating a request from student_pilot. Verify Access-Control-Allow-Origin headers.
+
+Token Validation: If you can generate a token from scholar_auth, use it here to verify 200 OK.
+
+🟦 BEGIN APP: scholarship_agent
+APP_NAME: scholarship_agent APP_BASE_URL: https://scholarship-agent-jamarrlmayes.replit.app Objective: Validate Operator Dashboard access. Steps:
+
+Access Control: Load homepage. If it requires auth, verify redirect to scholar_auth.
+
+Callback Handling: Check the /api/auth/callback (or equivalent) route. Does it process the code and set a local session cookie?
+
+Asset Loading: Ensure JS/CSS assets are not returning 401s (common misconfiguration).
+
+🟦 BEGIN APP: scholarship_sage
+APP_NAME: scholarship_sage APP_BASE_URL: https://scholarship-sage-jamarrlmayes.replit.app Objective: Validate Student Chat Interface auth. Steps:
+
+Entry Point: Access /. Expect login prompt.
+
+Chat Protection: Try to POST to the chat API endpoint without a session. Expect 401.
+
+Flow: Simulate the login redirect loop. Does it land back on the Chat UI or get stuck?
+
+🟦 BEGIN APP: student_pilot
+APP_NAME: student_pilot APP_BASE_URL: https://student-pilot-jamarrlmayes.replit.app Objective: Validate Student Dashboard login. Steps:
+
+Redirect: Visit /. Expect immediate redirect to scholar_auth.
+
+Return Trip: When returning from Auth, does the app flash and reload (infinite loop) or settle on the dashboard?
+
+User Profile: Attempt to fetch /api/user/me (or equivalent). Verify it returns JSON, not HTML (which indicates an auth redirect error on API fetch).
+
+🟦 BEGIN APP: provider_register
+APP_NAME: provider_register APP_BASE_URL: https://provider-register-jamarrlmayes.replit.app Objective: Validate B2B Provider Portal auth. Steps:
+
+Portal Access: Visit /. Expect login/signup landing page.
+
+Registration Flow: If a "Sign Up" form exists locally, test it. If it redirects to scholar_auth, verify the redirect_uri parameter is correctly URL-encoded.
+
+Session Scope: Ensure a student login session doesn't accidentally grant access to Provider tools (Role Based Access Control check).
+
+🟦 BEGIN APP: auto_page_maker
+APP_NAME: auto_page_maker APP_BASE_URL: https://auto-page-maker-jamarrlmayes.replit.app Objective: Validate Admin/SEO Console auth. Steps:
+
+Route Protection: Access /admin or /dashboard. Expect 401/Redirect.
+
+Generation API: cURL the page generation endpoint. Ensure it is NOT publicly accessible.
+
+🟦 BEGIN APP: auto_com_center
+APP_NAME: auto_com_center APP_BASE_URL: https://auto-com-center-jamarrlmayes.replit.app Objective: Validate Ops/Telemetry Dashboard auth. Steps:
+
+Dashboard Access: Visit /. This should be heavily protected. Verify redirect.
+
+Websocket/Stream: If this app uses websockets for live logs, verify the WS connection handshake requires authentication/cookies.
+
+🏁 FINAL INSTRUCTIONS
+After executing your specific section:
+
+Compile your Issues List (Blockers are highest priority).
+
+Generate the Summary KPI Snapshot (Availability, Latency, Error Rate).
+
+Provide the specific Next Step to fix the most critical error found (e.g., "Update CORS origin list in scholarship_api").
