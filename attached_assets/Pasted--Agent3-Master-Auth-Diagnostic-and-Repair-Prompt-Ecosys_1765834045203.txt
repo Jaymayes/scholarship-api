@@ -1,0 +1,199 @@
+# Agent3 Master Auth Diagnostic and Repair Prompt (Ecosystem-Wide)
+
+## Global intent
+**Objective:** Restore reliable login/authentication for your app by testing, understanding, and fixing all auth errors and bugs.
+**Scope discipline:** You must only execute the section labeled for your app. Do not take actions intended for other apps.
+
+## Identification step (required before any work)
+1.  Read your configured base URL (`APP_BASE_URL`). If not available via environment, infer it from your server config or public origin.
+2.  Match your `APP_BASE_URL` to exactly one of the known entries below.
+3.  **Announce identification:** “I am {APP_NAME} ({APP_BASE_URL}). Executing my section only.”
+
+## Reporting standard (all outputs and tickets)
+* **Always include:** `App: {APP_NAME} | Base URL: {APP_BASE_URL}`
+* **Include:** current status (Healthy/Degraded/Fail), root cause, fixes applied, verification evidence (HTTP status codes, headers, and screenshots/links if available), next steps.
+
+## Guardrails
+1.  **Never log secrets** (CLIENT_SECRET, SESSION_SECRET, private keys, tokens).
+2.  Use redaction for any tokens or session IDs in logs.
+
+## Success criteria (must all pass)
+1.  **OIDC discovery succeeds** against the platform IdP.
+2.  `/api/login` (or app’s login entry) returns 302 to IdP or a 200 with an actionable login flow.
+3.  **Callback handler completes** the OIDC code flow without 5xx errors; session cookie is set with `Secure`, `HttpOnly`, `SameSite=None`.
+4.  **Protected routes return 200** when authenticated and 401 when unauthenticated; no SPA crashes on 401.
+5.  **CORS preflight succeeds** for authorized origins; no cross-domain session-loss regressions.
+
+## Verification toolkit (use these checks; equivalent framework methods are fine)
+* **HTTP checks:** GET/HEAD for health, GET OIDC well-known, GET JWKS, GET/POST login and callback endpoints.
+* **Cookie checks:** Verify `Set-Cookie` flags `Secure`, `HttpOnly`, `SameSite=None`; verify cookie domain aligns with the app’s host.
+* **Config checks:** `ISSUER_URL`, `CLIENT_ID`, `CLIENT_SECRET`, `REDIRECT_URI`, `BASE_URL`/`APP_BASE_URL`, `COOKIE_DOMAIN`, `SESSION_SECRET` present and correct.
+* **SPA resilience:** 401 handlers should not crash; unauth flows should render a login CTA, not a blank/blocked screen.
+
+## Standard fix patterns (apply only if your diagnostics fail)
+1.  **ISSUER_URL mismatch:** It must be exactly `https://scholar-auth-jamarrlmayes.replit.app/oidc` (no trailing slash unless your OIDC library requires one; include `/oidc`).
+2.  **Redirect URI mismatch:** The app’s `REDIRECT_URI` must exactly match the registered callback in the IdP client; update either side for parity.
+3.  **Cookie issues:** For cross-app auth on `*.replit.app`, set `SameSite=None; Secure; HttpOnly`; and `COOKIE_DOMAIN` to the app’s host when required by your framework.
+4.  **SPA race conditions:** Handle callback server-side. Avoid relying on `sessionStorage` alone. Ensure the server finalizes the session before rendering app state.
+5.  **401 UX:** Catch 401s and return null/placeholder plus a visible “Sign in” action instead of throwing/crashing.
+6.  **CORS:** Explicitly allow ecosystem origins for browser requests to protected APIs; ensure preflight (OPTIONS) includes required headers.
+7.  **Restart/redeploy** after config changes; re-run full verification.
+
+## Identity Provider (reference for all apps)
+* **IdP (A1) scholar_auth base:** `https://scholar-auth-jamarrlmayes.replit.app`
+* **Required ISSUER_URL for all RPs:** `https://scholar-auth-jamarrlmayes.replit.app/oidc`
+* **Expected discovery endpoint:** `https://scholar-auth-jamarrlmayes.replit.app/oidc/.well-known/openid-configuration`
+* **JWKS endpoint:** As returned by discovery (verify reachable and key set present).
+
+## Known apps and their APP_BASE_URL
+* **A1 scholar_auth** → `https://scholar-auth-jamarrlmayes.replit.app`
+* **A2 scholarship_api** → `https://scholarship-api-jamarrlmayes.replit.app`
+* **A3 scholarship_agent** → `https://scholarship-agent-jamarrlmayes.replit.app`
+* **A4 scholarship_sage** → `https://scholarship-sage-jamarrlmayes.replit.app`
+* **A5 student_pilot** → `https://student-pilot-jamarrlmayes.replit.app`
+* **A6 provider_register** → `https://provider-register-jamarrlmayes.replit.app`
+* **A7 auto_page_maker** → `https://auto-page-maker-jamarrlmayes.replit.app`
+* **A8 auto_com_center** → `https://auto-com-center-jamarrlmayes.replit.app`
+
+---
+
+## **Per-App Sections (execute only the section matching your APP_BASE_URL)**
+
+### **A1 scholar_auth (IdP)**
+* **App:** scholar_auth | **Base URL:** `https://scholar-auth-jamarrlmayes.replit.app`
+* **Purpose:** Identity Provider; ensure OIDC discovery and token exchange are operational.
+* **Tests:**
+    * `GET /oidc/.well-known/openid-configuration` returns 200 with issuer = `https://scholar-auth-jamarrlmayes.replit.app/oidc`
+    * `GET JWKS URI` returns 200 with at least one key.
+    * Security headers present (at minimum: Content-Security-Policy, X-Frame-Options, Referrer-Policy).
+* **Fix patterns:**
+    * If discovery fails, verify server routing for `/oidc` prefix and webpack/SSR rewrites.
+    * Ensure client registrations include correct redirect URIs for A2–A8.
+* **Deliverable:** Status PASS with evidence; list any client registrations changed.
+
+### **A2 scholarship_api**
+* **App:** scholarship_api | **Base URL:** `https://scholarship-api-jamarrlmayes.replit.app`
+* **Purpose:** Protected API; correct 401 behavior and CORS for ecosystem.
+* **Tests:**
+    * Unauthed GET to protected route returns 401 with `WWW-Authenticate` or appropriate JSON error.
+    * `OPTIONS` preflight returns 204/200 with `Access-Control-Allow-*` for apps A3–A8.
+    * If telemetry ingest exists, validate allowlist for S2S tokens from A5/A8.
+* **Fix patterns:**
+    * Add or update allowed origins list with A3–A8 base URLs.
+    * Whitelist `student_pilot` (A5) S2S tokens if 403 on telemetry; ensure `Authorization: Bearer` parsing is correct.
+* **Deliverable:** PASS with CORS matrix and telemetry allowlist summary.
+
+### **A3 scholarship_agent**
+* **App:** scholarship_agent | **Base URL:** `https://scholarship-agent-jamarrlmayes.replit.app`
+* **Purpose:** Agent UI/API; ensure OIDC discovery and login work.
+* **Tests:**
+    * `GET /api/login` returns 302 to IdP or 200 with a login flow; it must not return 5xx or 503.
+    * `GET /api/auth/mode` (if present) should show expected auth mode.
+    * OIDC discovery using `ISSUER_URL` secret must succeed: fetch discovery and JWKS.
+* **Likely root cause to confirm:**
+    * `ISSUER_URL` secret misconfigured. It must be exactly: `https://scholar-auth-jamarrlmayes.replit.app/oidc` (no trailing slash; include `/oidc`; no spaces).
+* **Fix patterns:**
+    * Update `ISSUER_URL` secret to the exact value above.
+    * Verify `CLIENT_ID`/`CLIENT_SECRET` match registration in A1. Verify `REDIRECT_URI` matches what A1 has on record.
+    * Restart the app after updating secrets.
+* **Post-fix verification:**
+    * `/api/login` → 302/200 expected.
+    * Auth callback completes; session cookie set with `Secure`, `HttpOnly`, `SameSite=None`.
+    * Authenticated route returns 200; unauthenticated returns 401 without SPA crash.
+* **Deliverable:** Status and evidence including before/after HTTP codes and Set-Cookie flags (no secret values).
+
+### **A4 scholarship_sage**
+* **App:** scholarship_sage | **Base URL:** `https://scholarship-sage-jamarrlmayes.replit.app`
+* **Purpose:** Frontend SPA plus API calls; ensure unauth flows do not crash on 401.
+* **Tests:**
+    * Landing page renders for unauthenticated users with a visible “Sign in” CTA; no blank page.
+    * 401 handling path returns null/placeholder and does not throw.
+    * Login redirects to IdP and returns authenticated session.
+* **Fix patterns:**
+    * In query client/network layer, wrap 401s to return null and surface CTA.
+    * Verify callback finalizes server session before hydration to avoid race.
+* **Deliverable:** PASS with screenshots/HTML evidence of unauth and post-login states.
+
+### **A5 student_pilot**
+* **App:** student_pilot | **Base URL:** `https://student-pilot-jamarrlmayes.replit.app`
+* **Purpose:** Student app; ensure auth is solid and telemetry S2S is allowed.
+* **Tests:**
+    * Login round-trip with A1 works; verify cookies and protected views.
+    * Telemetry calls return 200; if 403, note token audience/scope.
+* **Fix patterns:**
+    * Coordinate with A2/A8 to whitelist S2S tokens used by `student_pilot` telemetry.
+    * Ensure `SameSite=None; Secure` on session cookie.
+* **Deliverable:** PASS and telemetry verification notes.
+
+### **A6 provider_register**
+* **App:** provider_register | **Base URL:** `https://provider-register-jamarrlmayes.replit.app`
+* **Purpose:** Provider onboarding; ensure server-side callback intercept avoids SPA races.
+* **Tests:**
+    * `/api/login` returns 302 to IdP.
+    * Callback handler finalizes session on server; no dependency on `sessionStorage`.
+    * Cookies set with `Secure`, `HttpOnly`, `SameSite=None`; protected page loads post-login.
+* **Fix patterns:**
+    * Ensure callback is server-side and writes the session prior to redirecting to SPA.
+    * Confirm cookie domain and flags are correct.
+* **Deliverable:** PASS with callback route evidence and Set-Cookie inspection.
+
+### **A7 auto_page_maker**
+* **App:** auto_page_maker | **Base URL:** `https://auto-page-maker-jamarrlmayes.replit.app`
+* **Purpose:** SEO engine; admin APIs protected; public SEO pages open.
+* **Tests:**
+    * Public SEO pages return 200 unauthenticated.
+    * Admin endpoints return 401 when unauth; 200 when authenticated.
+    * CORS for admin UI origins configured.
+* **Fix patterns:**
+    * Tighten admin route guards; keep SEO pages public.
+* **Deliverable:** PASS with sample public and admin checks.
+
+### **A8 auto_com_center**
+* **App:** auto_com_center | **Base URL:** `https://auto-com-center-jamarrlmayes.replit.app`
+* **Purpose:** Ops dashboard; ensure no UI gate blocks access when unauth or after login.
+* **Tests:**
+    * Dashboard reachable; any “Proceed to monitoring” control is enabled appropriately.
+    * Auth redirect and callback succeed; no gate deadlocks based on A3 state.
+* **Fix patterns:**
+    * Remove UI conditions that block access based on other apps’ states.
+    * Keep 401 UX non-blocking; show actionable CTA.
+* **Deliverable:** PASS with UI interaction notes and response samples.
+
+---
+
+## **Execution order and flow (for each app, within its section)**
+1.  **Identify:** Announce “I am {APP_NAME} ({APP_BASE_URL}). Executing my section only.”
+2.  **Preflight:**
+    * Verify network reachability for IdP and your own endpoints.
+    * Load critical secrets: `ISSUER_URL`, `CLIENT_ID`, `CLIENT_SECRET`, `REDIRECT_URI`, `SESSION_SECRET`, `COOKIE_DOMAIN` (if used). **Do not print values.**
+3.  **OIDC discovery:**
+    * Fetch discovery from `ISSUER_URL` + “/.well-known/openid-configuration”
+    * Validate issuer equals `ISSUER_URL`; JWKS endpoint reachable.
+4.  **Login flow:**
+    * Call your login entry (e.g., `/api/login`) and ensure 302/200.
+    * Follow callback; ensure server finalizes session and sets cookies with `Secure`, `HttpOnly`, `SameSite=None`.
+5.  **Protected-route checks:**
+    * Unauth → 401; Auth → 200. No SPA crashes on 401.
+6.  **CORS and preflight:**
+    * Verify `OPTIONS` for cross-origin flows responds properly with allowed methods/headers and your ecosystem origins.
+7.  **Apply fixes** (only if a check fails), then restart/redeploy as needed.
+8.  **Re-run full verification** until all success criteria pass.
+9.  **Produce final report:**
+    * Header: `App: {APP_NAME} | Base URL: {APP_BASE_URL}`
+    * Status: Healthy/Degraded/Fail
+    * Root cause summary
+    * Fixes applied
+    * Evidence: key HTTP status codes, headers (with secrets redacted), sample endpoints tested
+    * Residual risks and next actions
+
+## **App-specific quick notes from recent diagnostics (use as hints; still re-verify everything)**
+* **A3 scholarship_agent:** Most likely cause is incorrect `ISSUER_URL` secret. Must be exactly `https://scholar-auth-jamarrlmayes.replit.app/oidc`. After correction, restart and confirm `/api/login` returns 302/200 and discovery passes.
+* **A4 scholarship_sage:** Ensure 401 handling returns null/placeholder, not a thrown error.
+* **A6 provider_register:** Keep server-side callback intercept; avoid SPA race on session creation.
+* **A8 auto_com_center:** Ensure gate modal logic never blocks legitimate access.
+
+## **Escalation**
+If you cannot achieve **Healthy** after two full verification cycles, pause changes and produce a report with your current findings, hypotheses, and the minimal reproducible scenario so the CEO can authorize next steps.
+
+**Begin by printing your identification line now:**
+`APP IDENTIFIED: <APP_NAME> | APP_BASE_URL=<URL>`
