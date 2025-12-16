@@ -89,6 +89,7 @@ from routers.debug_routes import router as debug_routes_router
 from routers.docs_workaround import router as docs_workaround_router
 from routers.legal_pages import router as legal_pages_router
 from routers.payments import router as payments_router
+from routers.data_sync import router as data_sync_router
 from schemas.error_responses import ERROR_RESPONSES
 from utils.logger import setup_logger
 
@@ -780,6 +781,7 @@ from routers.credits_ledger import router as credits_ledger_router
 
 app.include_router(external_billing_router, tags=["External Billing"])
 app.include_router(payments_router, tags=["Payments"])
+app.include_router(data_sync_router, tags=["Data Sync"])
 app.include_router(credits_ledger_router, tags=["Credits Ledger (Master Prompt Spec)"])
 app.include_router(credit_aliases_router, tags=["Credit Ledger (Ecosystem API)"])
 app.include_router(monetization_router, tags=["Monetization"])
