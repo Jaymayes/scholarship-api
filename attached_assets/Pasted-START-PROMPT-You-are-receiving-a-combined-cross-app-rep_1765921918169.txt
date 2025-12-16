@@ -1,0 +1,253 @@
+START PROMPT
+You are receiving a combined cross-app reporting request from the CEO of Scholar AI Advisor.
+
+## Objective
+Produce a standardized “Since Go-Live” operational report for your app only. This report must cover:
+1.  What work your app has done since going live
+2.  How many leads your app has brought in (and how)
+3.  What is currently stopping revenue
+4.  What is missing for your app to fully do its job
+5.  What you recommend we do next (actionable, with owners and timelines)
+
+## Critical directives
+1.  Only use the part of this prompt that relates to your app. Ignore all other app sections.
+2.  Before doing any work, identify your app with both its `app_name` and `APP_BASE_URL`. This identification must appear at the top of every output and in the machine-readable JSON.
+3.  Follow the global output format exactly (JSON first, then a concise human-readable summary).
+4.  If any data is missing, return "unknown" and include a short “how_to_get” plan.
+5.  Observe our SLOs: 99.9% uptime and ~120ms P95 latency. Report compliance or gaps.
+6.  Definitions of “leads” and expected revenue paths are specified per-app below; use your app’s definitions precisely.
+
+## Global output format (all apps must follow this)
+Produce your output in two parts, in this exact order:
+
+**Part A: MACHINE_READABLE_JSON (single JSON object on one line)**
+Fields required:
+* `app_name`: string
+* `app_base_url`: string
+* `environment`: string (prod, staging, etc.)
+* `timestamp_utc`: ISO8601
+* `go_live_date`: ISO8601 or "unknown"
+* `version_or_release_tag`: string or "unknown"
+* `work_done_since_go_live`: list of strings (features shipped, migrations, integrations, optimizations, incidents handled, etc.)
+* `usage_kpis`: object containing keys relevant to your app (see your section)
+* `lead_metrics`: object
+    * `total_leads`: integer (as defined in your section)
+    * `leads_by_source`: object {source: count}
+    * `attribution_method`: short string
+* `revenue_path_status`: object
+    * `expected_revenue_mechanism`: short string (per your section)
+    * `current_blockers_to_revenue`: list of strings (technical, product, compliance, GTM, data, etc.)
+    * `current_enablers`: list of strings (what’s already in place)
+* `slo_and_quality`: object
+    * `uptime_percent`: number or "unknown"
+    * `p95_latency_ms`: number or "unknown"
+    * `error_rate_percent`: number or "unknown"
+    * `security_incidents_since_go_live`: integer
+* `dependencies_and_gaps`: object
+    * `missing_capabilities`: list of strings
+    * `external_dependencies`: list of strings (teams, systems, approvals)
+    * `data_gaps`: list of strings (what data is missing and why)
+* `recommendations_next_30_days`: list of objects
+    * `{action: string, owner: string, eta_days: integer, expected_impact: string, priority: P0|P1|P2}`
+* `evidence_and_sources`: list of strings (log paths, dashboards, endpoints queried)
+* `notes`: string
+
+**Part B: HUMAN_SUMMARY (concise)**
+1.  App identification (name and base URL)
+2.  Since go-live: 3–6 bullets highlighting delivered value and key learnings
+3.  Leads: total and top sources
+4.  What’s stopping revenue: top 3, with 1-line diagnosis each
+5.  What’s missing to do the job: top 3
+6.  Next steps: top 5 actions with owners and ETAs
+
+**If you cannot compute a metric:**
+* Put "unknown" in the JSON field.
+* Add a short step-by-step in notes describing how to retrieve it (e.g., “Query table X, join Y on Z, 7-day window, group by …”).
+
+## App identification and base URLs (use yours only)
+* scholar_auth → `https://scholar-auth-jamarrlmayes.replit.app`
+* scholarship_api → `https://scholarship-api-jamarrlmayes.replit.app`
+* scholarship_agent → `https://scholarship-agent-jamarrlmayes.replit.app`
+* scholarship_sage → `https://scholarship-sage-jamarrlmayes.replit.app`
+* student_pilot → `https://student-pilot-jamarrlmayes.replit.app`
+* provider_register → `https://provider-register-jamarrlmayes.replit.app`
+* auto_page_maker → `https://auto-page-maker-jamarrlmayes.replit.app`
+* auto_com_center → `https://auto-com-center-jamarrlmayes.replit.app`
+
+## Cross-app common KPIs (apply only those relevant to your app)
+* Uptime (%), P95 latency (ms), error rates (%), unique users, active users, sessions, conversion events, API RPS.
+* **Leads:** B2C = prospective students captured (e.g., sign-ups, started application). B2B = providers initiated onboarding or completed activation. If your app’s section redefines “lead,” use that override.
+* **Revenue paths:** B2C credits/subscriptions; B2B 3% provider fee; 4x markup on AI services. Your section clarifies which apply.
+
+---
+
+## PER-APP SECTIONS (use your own section only)
+
+### BEGIN SECTION: scholar_auth
+**App:** scholar_auth
+**APP_BASE_URL:** `https://scholar-auth-jamarrlmayes.replit.app`
+**Primary mission:** Secure, reliable authentication and identity for students and providers.
+**Lead definition for this app:** Count of new verified accounts created (students and providers). Treat successful account creation as a lead event.
+**Expected revenue path:** Indirect. Reduces friction in the B2C and B2B funnels, increasing conversions downstream.
+**Report-specific usage_kpis to include:**
+* `signups_total`, `signups_by_segment` {student, provider}, `login_success_rate_percent`, `password_reset_success_rate_percent`
+* `mfa_adoption_percent` (if applicable), `oauth/linkage_counts`, `active_sessions_7d`, `token_issuance_rate`, `unique_users_7d/30d`
+* `uptime_percent`, `p95_latency_ms`, `4xx_rate_percent`, `5xx_rate_percent`
+**What’s stopping revenue to investigate:**
+* High drop-off at signup or email verification
+* Missing SSO/MFA, social login gaps, password reset friction
+* Rate limits or token expiry causing session churn
+**What’s missing for app to do its job:**
+* MFA or passkeys, social SSO, device trust, robust fraud/bot protection
+**Data sources (examples):**
+* Auth logs, token service metrics, error dashboards, user table
+### END SECTION: scholar_auth
+
+### BEGIN SECTION: scholarship_api
+**App:** scholarship_api
+**APP_BASE_URL:** `https://scholarship-api-jamarrlmayes.replit.app`
+**Primary mission:** Aggregate, normalize, and expose scholarship data.
+**Lead definition:** Count of unique students who request scholarship search results (API consumers initiating discovery).
+**Expected revenue path:** Indirect for B2C; enables discovery that feeds credits/subscriptions. For B2B, enables inventory and provider exposure (supports 3% fee downstream).
+**usage_kpis to include:**
+* `scholarships_total_indexed`, `active_scholarships`, `freshness_days_avg`, `update_frequency_per_day`
+* `api_requests_total`, `requests_by_endpoint`, `cache_hit_rate_percent`
+* `p95_latency_ms`, `4xx/5xx rates`
+* `students_querying_7d/30d`
+**What’s stopping revenue:**
+* Low coverage/freshness, poor relevance ranking, missing filters
+* Latency causing drop-offs
+**What’s missing:**
+* New sources, deduplication improvements, eligibility-matching quality, monitoring for stale data
+**Data sources:**
+* Ingestion logs, API gateway, index stats, relevance metrics
+### END SECTION: scholarship_api
+
+### BEGIN SECTION: scholarship_agent
+**App:** scholarship_agent
+**APP_BASE_URL:** `https://scholarship-agent-jamarrlmayes.replit.app`
+**Primary mission:** Run autonomous marketing campaigns and funnel orchestration.
+**Lead definition:** Marketing Qualified Leads (MQLs) captured via forms, landing pages, or campaign interactions that include contact details.
+**Expected revenue path:** B2C conversions to credits/subscriptions; assists B2B provider outreach.
+**usage_kpis:**
+* `mqls_total`, `mqls_by_channel` {SEO, email, social, referrals, partners}, `CAC_estimate`, `campaign_ROI_estimates`
+* `landing_page_cvrs`, `email_open_rate`, `email_ctr`, `sms_reply_rate`
+* `attribution`: first-touch/last-touch/multi-touch breakdown
+**What’s stopping revenue:**
+* Underindexed SEO pages, low CVR forms, deliverability issues
+**What’s missing:**
+* Better audience segmentation, lead scoring, nurture journeys, A/B test coverage
+**Data sources:**
+* Analytics, CRM/MAP event logs, attribution dashboards
+### END SECTION: scholarship_agent
+
+### BEGIN SECTION: scholarship_sage
+**App:** scholarship_sage
+**APP_BASE_URL:** `https://scholarship-sage-jamarrlmayes.replit.app`
+**Primary mission:** AI-driven guidance to help students find, plan, and apply for scholarships responsibly.
+**Lead definition:** Students who initiate a session and complete at least one guided action (save scholarship, draft essay outline, checklist creation).
+**Expected revenue path:** B2C credits and subscription upsells tied to premium guidance features.
+**usage_kpis:**
+* `sessions_total`, `unique_students`, `avg_session_length`, `guided_actions_per_session`
+* `essay_outlines_created`, `checklists_created`, `saved_scholarships`
+* `conversion_to_credits_or_subscriptions`
+* `NPS_or_CSAT` if available
+**What’s stopping revenue:**
+* Gaps in premium feature gating, unclear upsell moments, hallucination/quality concerns
+**What’s missing:**
+* Robust progress tracking, template libraries, transparency affordances, bias mitigation checks surfaced to users
+**Data sources:**
+* Session logs, feature flags, payment events
+### END SECTION: scholarship_sage
+
+### BEGIN SECTION: student_pilot
+**App:** student_pilot
+**APP_BASE_URL:** `https://student-pilot-jamarrlmayes.replit.app`
+**Primary mission:** Student-facing workspace to manage scholarship discovery, tasks, document prep, and submissions.
+**Lead definition:** Students who create an account and complete onboarding or add first scholarship to their pipeline.
+**Expected revenue path:** Direct B2C purchases (credits, subscriptions), 4x markup on AI services.
+**usage_kpis:**
+* `new_users`, `onboarding_completion_rate`, `active_users_7d/30d`
+* `scholarships_added_to_pipeline`, `tasks_created`, `documents_generated`
+* `checkout_initiated`, `checkout_completed`, `ARPU`, `churn_30d`
+**What’s stopping revenue:**
+* Checkout friction, unclear value props, broken attribution from SEO → signup → purchase
+**What’s missing:**
+* Trial-to-paid nudges, cart recovery, in-app paywalls, referral loop
+**Data sources:**
+* App analytics, payments, funnel analytics
+### END SECTION: student_pilot
+
+### BEGIN SECTION: provider_register
+**App:** provider_register
+**APP_BASE_URL:** `https://provider-register-jamarrlmayes.replit.app`
+**Primary mission:** Onboard scholarship providers and set them up to list/manage scholarships.
+**Lead definition:** Providers who start onboarding (B2B lead) and Providers who complete onboarding (B2B activated).
+**Expected revenue path:** 3% provider fee on disbursements or transactions facilitated by the platform.
+**usage_kpis:**
+* `providers_started_onboarding`, `providers_completed_onboarding`, `activation_rate_percent`
+* `time_to_activation_days`, `required_fields_completion_rate`
+* `listings_created`, `listings_active`
+**What’s stopping revenue:**
+* KYC/verification friction, unclear pricing/terms, missing payout hooks
+**What’s missing:**
+* Billing setup flows, analytics for providers, SLA/terms workflow
+**Data sources:**
+* Onboarding DB, KYC logs, provider listings
+### END SECTION: provider_register
+
+### BEGIN SECTION: auto_page_maker
+**App:** auto_page_maker
+**APP_BASE_URL:** `https://auto-page-maker-jamarrlmayes.replit.app`
+**Primary mission:** Generate SEO-optimized scholarship pages to drive organic traffic and low-CAC growth.
+**Lead definition:** Visitors who click through to signup or start the discovery process from generated pages (SEO-attributed).
+**Expected revenue path:** Indirect B2C via SEO → signup → credits/subscriptions; supports B2B visibility.
+**usage_kpis:**
+* `pages_published_total`, `pages_indexed_total`, `indexation_rate_percent`
+* `impressions`, `clicks`, `CTR`, `avg_position` (Search Console or equivalent)
+* `sessions_landing_on_SEO_pages`, `signup_starts_from_SEO`, `verified_signups_from_SEO`
+* `crawl_errors`, `time_to_index_days`
+**What’s stopping revenue:**
+* Low indexation, weak internal linking, thin content duplication
+**What’s missing:**
+* Programmatic interlinking, schema enhancements, FAQ markup, sitemap health, content QA
+**Data sources:**
+* Build logs, sitemaps, analytics, search console exports
+### END SECTION: auto_page_maker
+
+### BEGIN SECTION: auto_com_center
+**App:** auto_com_center
+**APP_BASE_URL:** `https://auto-com-center-jamarrlmayes.replit.app`
+**Primary mission:** Centralized outbound/inbound communications (email/SMS/in-app), nudges, and lifecycle automation.
+**Lead definition:** Contacts who respond/engage meaningfully (reply, click-through to key actions like signup, complete profile, start checkout).
+**Expected revenue path:** Improves B2C and B2B conversion via lifecycle nudges; enables retention and upsell.
+**usage_kpis:**
+* `emails_sent`, `sms_sent`, `in_app_prompts_shown`
+* `deliverability_rate_percent`, `open_rate_percent`, `click_rate_percent`, `reply_rate_percent`
+* `nudge_to_action_conversion_rate` (e.g., email → checkout)
+**What’s stopping revenue:**
+* Deliverability, rate limits, compliance flags, template relevance
+**What’s missing:**
+* Event-driven journeys, suppression logic, dynamic personalization, A/B testing framework
+**Data sources:**
+* Comm logs, templates, engagement analytics
+### END SECTION: auto_com_center
+
+---
+
+## Execution steps (do this in order)
+1.  **Identify yourself:** Output your `app_name` and `APP_BASE_URL` (both in the JSON and human summary).
+2.  **Establish go_live_date:** Use your earliest production artifact if unknown; otherwise return "unknown" and add how_to_get in notes.
+3.  **Compile your work_done_since_go_live:** List major releases, features, migrations, incident fixes, and integrations.
+4.  **Compute usage_kpis and lead_metrics** as defined in your section.
+5.  **Assess revenue_path_status:** Identify current blockers and enablers aligned to our B2C/B2B model.
+6.  **Report SLOs:** uptime, P95 latency, error rates; note any breaches and their causes.
+7.  **List dependencies_and_gaps:** What’s missing for you to fully do your job; include external dependencies and data gaps.
+8.  **Recommend actions:** 30-day plan with owners, ETAs, expected impact, and priority.
+9.  **Provide evidence_and_sources:** URLs, dashboards, log locations, or endpoints you used.
+
+## Validation
+* Ensure the JSON is valid, single-line, and includes all required fields.
+* Ensure the human summary is consistent with the JSON.
+* Ensure your `app_name` and `APP_BASE_URL` appear at the top of both outputs.
+END PROMPT
