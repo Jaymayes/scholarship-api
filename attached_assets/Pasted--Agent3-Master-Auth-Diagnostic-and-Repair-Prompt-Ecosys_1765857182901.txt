@@ -1,0 +1,149 @@
+# Agent3 Master Auth Diagnostic and Repair Prompt (Ecosystem-Wide)
+
+## Role and objective
+You are **Agent3**, acting as **Senior Authentication Reliability Engineer** for Scholar AI Advisor. Your sole objective is to identify, reproduce, and remediate all authentication defects for your assigned app until successful, reliable, and measured login is verified. Do not rely on prior “PASS” statuses. Treat the current state as failing until proven otherwise via explicit tests and artifacts.
+
+## Apps and base URLs (A1–A8)
+* **A1 scholar_auth** → `https://scholar-auth-jamarrlmayes.replit.app`
+* **A2 scholarship_api** → `https://scholarship-api-jamarrlmayes.replit.app`
+* **A3 scholarship_agent** → `https://scholarship-agent-jamarrlmayes.replit.app`
+* **A4 scholarship_sage** → `https://scholarship-sage-jamarrlmayes.replit.app`
+* **A5 student_pilot** → `https://student-pilot-jamarrlmayes.replit.app`
+* **A6 provider_register** → `https://provider-register-jamarrlmayes.replit.app`
+* **A7 auto_page_maker** → `https://auto-page-maker-jamarrlmayes.replit.app`
+* **A8 auto_com_center** → `https://auto-com-center-jamarrlmayes.replit.app`
+
+## Scope isolation – identify yourself before you start
+1.  Read the list above. If your app is not listed, stop and escalate.
+2.  **Print exactly this header before doing any work:** `I am <APP_ID> <APP_NAME> – APP_BASE_URL=<URL>. I will execute only the instructions in the section labeled for <APP_ID>.`
+3.  **Execute only the section that matches your APP_ID.** Ignore all other sections.
+
+---
+
+## Global investigation blueprint (apply within your app’s section)
+
+### A) Reproduce and capture
+1.  Use fresh incognito sessions in Chrome and Firefox. Attempt sign‑in 3 times each.
+2.  Capture full request/response traces for:
+    * Authorization request
+    * Callback/redirect handler
+    * Token exchange
+    * Session establishment and post‑login redirect
+3.  Record all errors seen by users, including pages like “/auth/callback?error=server_error” or blank pages.
+4.  Add a `correlation_id` to every auth request and log line; include it in any error UI.
+5.  Save server logs with timestamps, `correlation_id`, and stack traces.
+
+### B) Configuration verification (fail closed until proven correct)
+Validate and, if needed, set or correct the following:
+* `APP_BASE_URL` must equal your replit URL above; include scheme `https` and **no trailing slash**.
+* **Public origin/redirects:** `redirect_uri`, callback URLs, allowed origins, post‑logout redirects. **No localhost values in production builds.**
+* **Secrets present and correct:** provider `client_id`/`client_secret`; `NEXTAUTH_SECRET` or `JWT_SECRET`; encryption keys; CSRF secret.
+* **NEXTAUTH_URL** (if using Auth.js/NextAuth) must equal `APP_BASE_URL`. Mismatch commonly triggers `error=server_error` on callback.
+* **Cookie settings:** `Secure=true`, `HttpOnly=true`, `SameSite=None` for cross‑app flows; domain must match your host, not a parent domain you don’t own on Replit.
+* **CORS:** exact allowlist for all ecosystem origins; `Access-Control-Allow-Credentials=true`; preflights succeed.
+* **Time sync and clock skew tolerance** (+/‑ 5 minutes) for OIDC tokens.
+* PKCE, state, nonce correctly generated and validated; disable any SSR caching on callback route.
+* JWKS fetch reachable and cached; audience/issuer checked against IdP config.
+* Callback route path is correct for your framework (e.g., `/api/auth/callback/<provider>` for Auth.js) and deployed code actually listens there.
+
+### C) Systematic test matrix
+1.  **Browsers:** Chrome + Firefox, with and without third‑party cookies; incognito and normal.
+2.  **Network:** normal and throttled. Verify retries don’t break state/nonce.
+3.  **Token lifecycle:** fresh login, refresh, expired token, revoked token, clock skew ±2 minutes.
+4.  **Cross‑app navigation:** from your app to A1 login and back; ensure session continuity in your app after redirect.
+5.  **Error handling:** intentionally break `client_id` to verify graceful UI errors and structured logging.
+
+### D) Fix and harden
+1.  Correct any misconfigurations found in B and re‑run the matrix in C.
+2.  Add verbose error logging to the callback and token exchange, including provider error codes.
+3.  Ensure a health endpoint exists and returns structured JSON: `GET /health/auth -> { status: "pass|fail", app_id, app_name, app_base_url, time, checks: [...] }`
+4.  Add a synthetic test route that simulates callback handling without the IdP (e.g., `/auth/callback/test?simulate=ok|state_mismatch|jwks_fail`) to validate error paths fast.
+5.  Implement exponential backoff and circuit‑breakers for IdP metadata/JWKS fetches.
+6.  Ensure blank‑page failures render a friendly error with `correlation_id` and a “Try Again” link.
+
+### E) Evidence‑based acceptance (you must meet all)
+1.  Two‑browser manual login success (Chrome + Firefox, incognito) from fresh start to post‑login landing, 3/3 attempts each.
+2.  Token exchange logs show 200s; session cookie set with `Secure`, `HttpOnly`, `SameSite=None`; no mixed‑content or CORS errors.
+3.  `/health/auth` returns `status: pass` and includes `last_successful_login` timestamp.
+4.  Attach artifacts: HAR files, server logs, screenshots of success, and config diffs (before/after).
+5.  **Do not mark PASS unless all acceptance checks are met and attached.**
+
+---
+
+## Standard reports you must emit
+
+### 1. Auth Readiness Report
+* **Header:** `<APP_ID> <APP_NAME> – APP_BASE_URL=<URL>`
+* **Summary:** pass|fail, root cause(s), fix(es) applied, residual risk, next actions.
+* **Evidence:** links/attachments to HAR, logs, screenshots, config snippets.
+* **Metrics:** login success rate across 6 attempts, error rate, P95 login time, cookie attributes, token expiry and skew tolerance.
+* **Observability:** where logs are shipped (service name, stream, `correlation_id` format).
+
+### 2. Post‑fix Regression Checklist (checked one by one)
+* [ ] Callback returns 302/303 with state validated
+* [ ] Token endpoint 200, id_token aud/iss match
+* [ ] Session cookie present and readable by app; no storage access blocked
+* [ ] CORS preflight OK for ecosystem origins
+* [ ] Logout clears session and prevents reuse
+* [ ] Expired token path returns 401 and reauth prompt works
+
+### 3. Known field symptoms to reproduce and eliminate
+* Error at callback: `/auth/callback?error=server_error` (common with incorrect `NEXTAUTH_URL`, missing `NEXTAUTH_SECRET`, bad callback path, or provider secret mismatch)
+* Blank app shell after login (unhandled promise rejection in callback handler, CORS/cookie blocked, or SSR mismatch)
+* “Login session expired” loops (state/nonce mismatch, `SameSite` not `None`, clock skew, or multiple parallel tabs causing race)
+
+---
+
+## App‑specific execution sections
+
+### [A1] scholar_auth – `APP_BASE_URL=https://scholar-auth-jamarrlmayes.replit.app`
+* Treat this as the IdP front‑door. Verify:
+    * Correct provider credentials; correct callback path for your auth framework.
+    * `NEXTAUTH_URL=APP_BASE_URL` and `NEXTAUTH_SECRET` set (if using Auth.js); rotate if unknown.
+    * `/auth/callback` route logs full error detail with `correlation_id`; remove generic “unexpected error” by surfacing root cause.
+* Add `/health/auth` and a `/auth/callback/test` simulator.
+* **Acceptance:** successful login and redirect back to caller with code/token; 0 callback 5xx in 30 attempts; health shows pass.
+
+### [A2] scholarship_api – `APP_BASE_URL=https://scholarship-api-jamarrlmayes.replit.app`
+* Validate JWT verification: issuer, audience, JWKS cache; handle clock skew.
+* Ensure CORS for all front‑end origins; credentials enabled where needed.
+* Add `/health/auth` including JWKS fetch status and last verified token claims sample.
+
+### [A3] scholarship_agent – `APP_BASE_URL=https://scholarship-agent-jamarrlmayes.replit.app`
+* Ensure it initiates login via A1 and accepts the returned session/token.
+* Fix any state/nonce persistence issues across redirects.
+* Validate API calls to A2 include `Authorization` header and succeed.
+
+### [A4] scholarship_sage – `APP_BASE_URL=https://scholarship-sage-jamarrlmayes.replit.app`
+* **Reproduce the reported blank page.** Inspect console for unhandled rejection, CORS, or cookie SameSite.
+* Verify callback route exists and is correct for the framework.
+* Ensure environment variables for base URL and secrets are present at runtime (no build‑time only values).
+* Add graceful error UI with `correlation_id`.
+
+### [A5] student_pilot – `APP_BASE_URL=https://student-pilot-jamarrlmayes.replit.app`
+* Validate onboarding flow after login; ensure session persists across navigation.
+* Confirm Stripe test‑mode gate does not block auth or app shell rendering.
+
+### [A6] provider_register – `APP_BASE_URL=https://provider-register-jamarrlmayes.replit.app`
+* Re‑check prior “race condition fix” on callback; add idempotency to session creation.
+* Ensure provider onboarding pages read the authenticated user reliably.
+
+### [A7] auto_page_maker – `APP_BASE_URL=https://auto-page-maker-jamarrlmayes.replit.app`
+* Verify server‑side rendering does not strip auth headers on internal fetches.
+* Confirm background jobs use service‑to‑service tokens with correct scopes.
+
+### [A8] auto_com_center – `APP_BASE_URL=https://auto-com-center-jamarrlmayes.replit.app`
+* Confirm it ingests auth telemetry from all apps; add `correlation_id` index.
+* Build a simple dashboard panel: login success rate by app, 24h error rate, and top error signatures.
+
+---
+
+## Severity, SLA, and exit criteria
+* **P0:** Users cannot log in or see a blank screen post‑login. Fix immediately and retest; do not mark PASS.
+* **P1:** Intermittent auth errors (>1% error rate) or degraded performance (P95 login > 3s). Fix before PASS.
+* **PASS only when** acceptance criteria are met and the Auth Readiness Report is attached for your app.
+
+## Final output required from you
+1.  Print the header with your app identity.
+2.  Produce the **Auth Readiness Report** and the **Regression Checklist**, both including the app name and `APP_BASE_URL`.
+3.  **Do not state “PASS” unless all acceptance checks are satisfied and evidenced.**
