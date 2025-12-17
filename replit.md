@@ -10,6 +10,12 @@ The business vision is to create a comprehensive, intelligent platform that conn
 
 **Readiness Status**: PRODUCTION READY - Autonomous operation, all endpoints secured
 
+**Security Hardening Status** (2025-12-17): Fleet-wide security remediation complete
+- SEC-03 Fix: Dedicated `SERVICE_AUTH_SECRET` enforced (no key reuse with JWT_SECRET_KEY)
+- Token Revocation: `revoked_tokens` PostgreSQL table with JTI-based blocklist checks
+- Auth Middleware: RS256 (JWKS) + HS256 (legacy) tokens validated against revocation list
+- Production Enforcement: Startup fails without required security secrets
+
 # User Preferences
 
 Preferred communication style: Simple, everyday language.
