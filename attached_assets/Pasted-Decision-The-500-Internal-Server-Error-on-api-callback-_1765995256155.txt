@@ -1,0 +1,64 @@
+Decision: The "500 Internal Server Error" on /api/callback indicates the application code is crashing during the handshake with ScholarAuth. This is likely a code-level issue (e.g., middleware conflict, missing session storage for the OAuth "state", or the JWT vs. Passport issue identified in your logs), not just a config issue.
+
+Why (data/insight):
+
+Logs confirm: The logs you pasted show a conflict: "The OIDC interaction resume handler checks req.isAuthenticated()... but we're using JWT cookies."
+
+Root Cause: The OAuth library expects a server-side session to store the "state" parameter (to prevent CSRF) before the redirect. If your app is using stateless JWTs and hasn't configured a cookie-based state store for the OAuth client, the callback will crash when it tries to verify the state.
+
+Resolution: We need a prompt that forces the Agent to stop "guessing" and fix this specific architectural mismatch.
+
+KPI Impact:
+
+System Stability: Fixes the crash (500 Error).
+
+B2B Conversion: Unblocks the Provider Login flow.
+
+Copy-Paste Prompt for provider-register (App A2)
+Paste this directly into the Replit Agent for the Provider Registry. It is engineered to fix the specific "JWT vs Session" crash.
+
+Role: You are the Lead Backend Architect. We have a P0 Critical Incident: The production environment throws a 500 Internal Server Error at /api/callback during the ScholarAuth login flow.
+
+Context from Logs: Previous investigations suggest a conflict between our JWT-based authentication (stateless) and the OIDC/Passport flow (which often expects server-side sessions). Specifically, req.isAuthenticated() checks may be failing, or the OAuth state parameter is not being persisted correctly across the redirect.
+
+Your Mission:
+
+Instrument & Debug:
+
+Wrap the /api/callback handler in a comprehensive try/catch block.
+
+Log the exact error stack trace to the console.
+
+Log the incoming req.query (to confirm we received code and state).
+
+Log the incoming req.cookies (to confirm the state cookie exists).
+
+Fix the Architecture (The "State" Issue):
+
+Ensure we are using a cookie-based state store for the OIDC client, not a memory/database session (since we are serverless/stateless).
+
+If using openid-client, configure it to store the state and code_verifier (PKCE) in a signed, HTTP-only cookie during the login redirect, and read that cookie in the callback.
+
+Patch the Auth Check: Update the callback logic to handle our JWT structure. If req.isAuthenticated() is missing (because we aren't using express-session), manually verify the JWT or user object before proceeding.
+
+Validate Config:
+
+Ensure redirect_uris matches exactly: https://provider-register-jamarrlmayes.replit.app/callback
+
+Ensure client_id is: 550e8400-e29b-41d4-a716-446655440000
+
+Execution Constraint:
+
+Do NOT revert to Replit Auth. We must make ScholarAuth work.
+
+Do NOT change the client_id.
+
+Focus purely on fixing the Callback Handler Logic.
+
+Output:
+
+Show me the exact error causing the 500 (from the logs).
+
+Apply the fix to server/replitAuth.ts (or the relevant callback file).
+
+Deploy the fix.
