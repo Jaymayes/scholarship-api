@@ -1,0 +1,110 @@
+# 🚨 MASTER EXECUTION PROMPT: UNBLOCK REVENUE & BUILD MISSING CAPABILITIES
+
+**Context:** The "Since Go-Live" reports identified specific gaps preventing revenue flow and user value realization.
+**Goal:** Implement the "Missing Capabilities" or fix "Revenue Blockers" identified in the operational audit.
+**Agent3 Directive:** Read the section matching your `APP_BASE_URL` and execute the code changes immediately. Ignore other sections.
+
+---
+
+## 🛑 STEP 1: IDENTIFY & EXECUTE
+
+### 🟦 A1 scholar_auth
+**URL:** `https://scholar-auth-jamarrlmayes.replit.app`
+**Blocker:** M2M telemetry blocked by WAF (403s on A2/A8).
+**Objective:** Ensure JWKS endpoint is robust and accessible.
+**Action:**
+1.  Verify `/oidc/.well-known/jwks.json` is publicly accessible (no auth middleware).
+2.  Add a `CORS` header to the JWKS endpoint specifically allowing `*` or the ecosystem domains.
+3.  **Verify:** `curl -I https://scholar-auth-jamarrlmayes.replit.app/oidc/.well-known/jwks.json` (Expect 200 OK).
+
+### 🟦 A2 scholarship_api
+**URL:** `https://scholarship-api-jamarrlmayes.replit.app`
+**Missing:** Search analytics (Zero queries recorded).
+**Objective:** Enable frontend tracking of search intent.
+**Action:**
+1.  Create a specific endpoint `POST /api/analytics/search_event` that accepts `{ query, filters, result_count, user_id }`.
+2.  Ensure this endpoint writes to the `search_analytics` table.
+3.  **Verify:** `curl -X POST` a dummy search event and confirm it appears in the DB.
+
+### 🟦 A3 scholarship_agent
+**URL:** `https://scholarship-agent-jamarrlmayes.replit.app`
+**Blocker:** Email sending blocked (Account Limits) & Missing Lead Capture.
+**Objective:** Capture leads even if email is stalled.
+**Action:**
+1.  **Build Lead Capture API:** Create `POST /api/leads/capture` accepting `{ email, source, interest }`.
+2.  **Database:** Ensure it saves to a `leads` table with `status='pending_nurture'`.
+3.  **Frontend:** Create a simple embeddable HTML form snippet in `client/public/form-embed.js` that allows A7 (SEO pages) to POST to this endpoint.
+4.  **Verify:** Submit a lead via curl.
+
+### 🟦 A4 scholarship_sage
+**URL:** `https://scholarship-sage-jamarrlmayes.replit.app`
+**Missing:** Progress Tracking Dashboard (Retention Driver).
+**Objective:** Give users a reason to return (Retention = LTV).
+**Action:**
+1.  **Create "My Tracker" View:** Add a simple dashboard page showing:
+    * "Scholarships Saved" (Count)
+    * "Essays Drafted" (Count)
+    * "Applications In Progress" (Count)
+2.  **Backend:** Ensure these counts pull from `business_events` or specific tables.
+3.  **Verify:** Navigate to `/dashboard/tracker` and see metrics (even if zero).
+
+### 🟦 A5 student_pilot
+**URL:** `https://student-pilot-jamarrlmayes.replit.app`
+**Missing:** Checkout Abandonment Recovery (Revenue Leaking).
+**Objective:** Capture intent to buy.
+**Action:**
+1.  **Track Checkout Start:** Ensure clicking "Upgrade" emits a `checkout_initiated` event to A8 *before* redirecting to Stripe.
+2.  **UI Nudge:** If a user visits `/upgrade` but doesn't purchase, show a toast/banner on their next dashboard visit: "Complete your upgrade to unlock unlimited AI."
+3.  **Verify:** Click upgrade, cancel, return to dashboard.
+
+### 🟦 A6 provider_register
+**URL:** `https://provider-register-jamarrlmayes.replit.app`
+**Missing:** Provider Analytics (Value Prop).
+**Objective:** Incentivize providers to finish onboarding.
+**Action:**
+1.  **Create "Impact Preview" Widget:** On the dashboard, show a card: "Potential Reach: 500+ Students" (Hardcoded or based on A5 user count).
+2.  **Blur Data:** Show "Views: [Locked]" and "Applications: [Locked]" with a tooltip "Complete Stripe Setup to unlock analytics."
+3.  **Verify:** Dashboard displays the incentive card.
+
+### 🟦 A7 auto_page_maker
+**URL:** `https://auto-page-maker-jamarrlmayes.replit.app`
+**Missing:** Rich Snippets (SEO CTR).
+**Objective:** Increase organic traffic.
+**Action:**
+1.  **Inject JSON-LD:** Modify the scholarship page template to include `application/ld+json` Schema.org data for `Scholarship`.
+    * Fields: `name`, `description`, `amount`, `deadline`.
+2.  **Verify:** Generate a page and check source for `<script type="application/ld+json">`.
+
+### 🟦 A8 auto_com_center
+**URL:** `https://auto-com-center-jamarrlmayes.replit.app`
+**Missing:** Event-Driven Journeys.
+**Objective:** Automate the "Nudge".
+**Action:**
+1.  **Create Trigger Logic:** In `server/services/automation.ts` (or similar), write a listener for `user_signed_up`.
+2.  **Action:** If `user_signed_up` > 24 hours ago AND `trial_credits_used` == 0: Schedule "Welcome/Nudge" email (even if delivery is currently blocked, queue it).
+3.  **Verify:** Simulate a signup event and check the `notification_queue` table.
+
+---
+
+## 📝 MANDATORY REPORTING FORMAT
+*Output this EXACT format after execution:*
+
+**APP:** [Your App Name]
+**URL:** [Your Base URL]
+**STATUS:** [🟢 BUILT | 🔴 FAILED]
+
+**1. WORK COMPLETED:**
+* [ ] Feature: [Name of feature built]
+* [ ] Files Modified: [List files]
+* [ ] Database Changes: [Tables added/modified]
+
+**2. REVENUE IMPACT:**
+* **Blocker Removed:** [Describe how this removes the blocker]
+* **Capability Added:** [Describe the new capability]
+
+**3. VERIFICATION:**
+* [ ] Curl/Test Command: `[Command used]`
+* [ ] Result: `[Output/Screenshot description]`
+
+**4. NEXT STEP:**
+* [ ] [Immediate next action for human or system]

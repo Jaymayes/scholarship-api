@@ -81,6 +81,8 @@ class WAFProtection(BaseHTTPMiddleware):
             "/api/events/single",  # Telemetry Contract v1.1: Single event write endpoint
             "/api/analytics/events",  # Telemetry Contract v1.1: Primary S2S event write (CSRF FIX 2025-11-30)
             "/api/analytics/events/raw",  # Protocol ONE TRUTH: Raw body fallback for 422 debugging
+            "/api/analytics/search_event",  # Search analytics: Frontend tracking (Master Prompt Dec 2025)
+            "/api/v1/analytics/search_event",  # Search analytics: v1 endpoint (Master Prompt Dec 2025)
             "/api/telemetry/ingest",  # Protocol v3.3.1: Master Go-Live fleet fallback ingest
             "/api/payment/create-checkout-session",  # Stripe checkout session (Operation Vital Signs)
             "/api/payment/create-test-session",  # Revenue validation test endpoint

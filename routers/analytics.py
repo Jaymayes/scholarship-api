@@ -1,12 +1,93 @@
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+import uuid
+from datetime import datetime
+from typing import Any, Optional
 
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from pydantic import BaseModel, Field
+
+from database.session_manager import get_session
 from middleware.auth import User, require_admin
 from services.analytics_service import analytics_service
 from utils.logger import get_logger
 
 logger = get_logger(__name__)
 router = APIRouter()
+
+
+class SearchEventRequest(BaseModel):
+    query: str = Field(..., description="The search query string")
+    filters: Optional[dict[str, Any]] = Field(default=None, description="Applied filters")
+    result_count: int = Field(..., ge=0, description="Number of results returned")
+    user_id: Optional[str] = Field(default=None, description="User ID if authenticated")
+    session_id: Optional[str] = Field(default=None, description="Session ID for tracking")
+    response_time_ms: Optional[float] = Field(default=None, description="API response time in ms")
+
+
+class SearchEventResponse(BaseModel):
+    status: str
+    event_id: str
+    message: str
+
+
+@router.post("/analytics/search_event", response_model=SearchEventResponse, tags=["Search Analytics"])
+async def record_search_event(
+    event: SearchEventRequest,
+    request: Request
+):
+    """
+    Record a search event for analytics tracking.
+    
+    This endpoint enables frontend tracking of search intent and behavior.
+    Writes directly to the search_analytics table for funnel analysis.
+    """
+    try:
+        from sqlalchemy import text
+        db = get_session()
+        
+        event_id = str(uuid.uuid4())
+        timestamp = datetime.utcnow()
+        user_agent = request.headers.get("user-agent", "")[:255]
+        ip_address = request.client.host if request.client else None
+        
+        import json as json_lib
+        filters_json = json_lib.dumps(event.filters) if event.filters else "{}"
+        
+        insert_query = text("""
+            INSERT INTO search_analytics 
+            (id, search_query, filters_applied, results_count, user_id, 
+             response_time_ms, session_id, user_agent, ip_address, timestamp)
+            VALUES 
+            (:id, :query, CAST(:filters AS json), :result_count, :user_id,
+             :response_time_ms, :session_id, :user_agent, :ip_address, :timestamp)
+        """)
+        
+        db.execute(insert_query, {
+            "id": event_id,
+            "query": event.query,
+            "filters": filters_json,
+            "result_count": event.result_count,
+            "user_id": event.user_id,
+            "response_time_ms": event.response_time_ms,
+            "session_id": event.session_id,
+            "user_agent": user_agent,
+            "ip_address": ip_address,
+            "timestamp": timestamp
+        })
+        db.commit()
+        db.close()
+        
+        logger.info(f"Search event recorded: {event_id} | query='{event.query}' | results={event.result_count}")
+        
+        return SearchEventResponse(
+            status="recorded",
+            event_id=event_id,
+            message="Search event recorded successfully"
+        )
+        
+    except Exception as e:
+        logger.error(f"Error recording search event: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Error recording search event: {str(e)}")
 
 @router.get("/analytics/summary")
 async def get_analytics_summary(
