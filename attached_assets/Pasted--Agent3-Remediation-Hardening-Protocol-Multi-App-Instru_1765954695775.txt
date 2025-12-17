@@ -1,0 +1,114 @@
+# Agent3 — Remediation & Hardening Protocol (Multi-App)
+
+**Instructions to Agent:**
+You are **Agent3**, acting as a Senior Security Engineer and Full-Stack Developer. You have received the findings from a comprehensive security audit. Your goal is to **fix specific vulnerabilities and implement hardening measures** identified in the audit.
+
+**CRITICAL CONSTRAINT:** You are currently running in **one** specific application environment. You must strictly isolate your code changes to the section of this prompt that corresponds to your current app.
+
+---
+
+### **1. Self-Identification Protocol (MANDATORY — EXECUTE FIRST)**
+
+**Step S0.1:** Determine your current application identity by matching your runtime `APP_BASE_URL` to the **App-to-URL Mapping** table below.
+* If you cannot determine your app with certainty, **STOP** and request clarification.
+* If your URL does not match exactly, check for environment variables indicating the app name.
+
+**Step S0.2:** Immediately print the following identification header. You must also include this header at the very top of **every** report, artifact, or log you produce:
+> **APP_ID: <your_app_name> | APP_BASE_URL: <matching_url>**
+
+**Step S0.3:** From this point onward, **IGNORE** all sections (A–H) that do not explicitly match your identified `APP_ID`. You **MUST NOT** execute instructions for any other app.
+
+#### **App-to-URL Mapping**
+| APP_ID | APP_BASE_URL |
+| :--- | :--- |
+| **scholar_auth** | `https://scholar-auth-jamarrlmayes.replit.app` |
+| **scholarship_api** | `https://scholarship-api-jamarrlmayes.replit.app` |
+| **scholarship_agent** | `https://scholarship-agent-jamarrlmayes.replit.app` |
+| **scholarship_sage** | `https://scholarship-sage-jamarrlmayes.replit.app` |
+| **student_pilot** | `https://student-pilot-jamarrlmayes.replit.app` |
+| **provider_register** | `https://provider-register-jamarrlmayes.replit.app` |
+| **auto_page_maker** | `https://auto-page-maker-jamarrlmayes.replit.app` |
+| **auto_com_center** | `https://auto-com-center-jamarrlmayes.replit.app` |
+
+---
+
+### **2. Global Execution Standards**
+
+1.  **Do Not Break The Build:** Ensure all changes validate against current TypeScript/Python types.
+2.  **Redact Secrets:** Never print actual API keys or secrets in your output logs.
+3.  **Defensive Coding:** When adding middleware, ensure you handle errors gracefully (e.g., `try/catch` or passing to `next(err)`).
+4.  **Logging:** Use structured logging where possible. Do not use `console.log` for errors; use `console.error` or the app's logger instance.
+
+---
+
+### **3. App-Specific Remediation Tasks (EXECUTE ONLY YOUR SECTION)**
+
+#### **Section A — scholar_auth**
+*(Priority: Hardening Token Security)*
+**Tasks:**
+1.  **Separate Token Storage:** Modify the login flow. Instead of embedding full access/refresh tokens in the JWT cookie, store them in a secure server-side store (Redis or Postgres) and only include the `sub` (User ID) in the cookie.
+2.  **Migrate to RS256:** Update the user JWT signing mechanism to use RS256 (Asymmetric) instead of HS256. Ensure `kid` is set in the header.
+3.  **Implement JTI:** Add a unique `jti` (UUID) claim to every minted token to support future revocation/replay defense.
+
+#### **Section B — scholarship_api**
+*(Priority: Secret Hygiene & Revocation)*
+**Tasks:**
+1.  **Dedicated Service Secret:** Locate `middleware/service_auth.py`. Change `SERVICE_AUTH_SECRET` assignment. Do not default to `jwt_secret_key`. Use `os.getenv("SERVICE_AUTH_SECRET")` and raise an error if not set in production.
+2.  **Token Revocation Check:** Create `services/token_blocklist.py`. Implement a function `is_token_revoked(jti: str)` that checks a Redis set (or DB table) for revoked tokens. Integrate this check into the auth middleware.
+3.  **Redis Rate Limiting:** Replace in-memory rate limiting with a Redis-backed implementation to support horizontal scaling.
+
+#### **Section C — scholarship_agent**
+*(Priority: Resilience & Fail-Secure)*
+**Tasks:**
+1.  **Redis Token Cache:** Modify `server/lib/s2s-auth-client.ts`. Replace the in-memory token cache with a Redis-based cache (using `ioredis`) to ensure authentication persists across container restarts.
+2.  **Fail-Secure Webhooks:** In `server/webhook-security.ts`, modify the Redis nonce check. If Redis is unavailable, the request must throw an error (Fail Secure) rather than returning `false` or allowing the request (Fail Open).
+3.  **Standardize Logging:** Scan the codebase for `console.error('JWT validation error'...)`. Replace with the structured `logger.error` to ensure alerts are captured properly.
+
+#### **Section D — scholarship_sage**
+*(Priority: Configuration & CSRF)*
+**Tasks:**
+1.  **Fix JWKS Config:** Ensure the `AUTH_JWKS_URL` environment variable logic points explicitly to `https://scholar-auth-jamarrlmayes.replit.app/.well-known/jwks.json` in production context.
+2.  **Implement CSRF:** Install and configure the `csurf` (or equivalent) middleware for all state-changing endpoints (POST/PUT/DELETE) that rely on session cookies.
+3.  **Rate Limit Auth:** Add `express-rate-limit` to `/api/user/progress` and login-related routes to prevent enumeration.
+
+#### **Section E — student_pilot**
+*(Priority: Session Security)*
+**Tasks:**
+1.  **CSRF for Mutations:** In `server/replitAuth.ts`, implement CSRF protection. Ensure `app.post('/api/credits/purchase'...)` validates a CSRF token.
+2.  **Session Revocation Endpoint:** Add a new endpoint `POST /api/session/revoke-all`. It should accept an authenticated request and invalidate all sessions for that `sub` in the database.
+3.  **Key Rotation Prep:** Create a utility script (or code path) that accepts an array of secrets for `SESSION_SECRET` to allow rotation without downtime.
+
+#### **Section F — provider_register**
+*(Priority: Role Enforcement)*
+**Tasks:**
+1.  **Explicit Provider Check:** In `server/routes.ts`, locate `app.post("/api/scholarships"...)`. Add the `requireProvider` middleware to the chain *after* `isAuthenticated`. Do not rely solely on the session role existing; enforce it explicitly.
+2.  **Admin Role Check:** Verify `server/routes/canary.ts`. Ensure the admin check looks like: `if (!req.user?.roles?.includes("admin")) return res.status(403)...`.
+3.  **Strict Cookie Config:** Verify session configuration. Explicitly comment in code that `sameSite: "none"` is an accepted risk for OAuth but mitigated by `__Host-` prefix and HTTPS-only.
+
+#### **Section G — auto_page_maker**
+*(Priority: Access Control)*
+**Tasks:**
+1.  **Admin Role Enforcement:** In `server/routes.ts`, create a `requireAdmin` middleware. It must check `req.user.claims.email` against the `ADMIN_EMAILS` env var. Apply this middleware to `/api/v1/pages/generate` and `/api/v1/rebuild`.
+2.  **Redis Nonce Cache:** Migrate the in-memory nonce cache used for HMAC verification to Upstash Redis to prevent replay attacks across container restarts.
+
+#### **Section H — auto_com_center**
+*(Priority: Locking down S2S)*
+**Tasks:**
+1.  **Enforce S2S Auth:** Open `server/middleware/s2s-auth.ts`. Remove any "Phase 1 / Scaffolding" logic that allows requests without tokens. Uncomment or add logic to strictly enforce `Authorization: Bearer` and validate the JWT against the `scholar_auth` JWKS.
+2.  **Protect Messaging:** In `server/routes/messaging.ts`, ensure `router.post('/send'...)` uses the `s2sAuthMiddleware`.
+3.  **Configure Webhook Secret:** Check if `POSTMARK_WEBHOOK_SECRET` is present. If not, log a critical warning on startup (do not crash, but alert). Add logic to verify the `X-Postmark-Signature` header if the secret is available.
+
+---
+
+### **4. Verification & Reporting**
+
+After applying the fixes for your specific app:
+
+1.  **Run the Test:** Execute the `cURL` test relevant to the specific fix you applied (e.g., try accessing an admin route as a user to verify the new middleware blocks it).
+2.  **Print Success Report:**
+    > **REMEDIATION COMPLETE | APP_ID: <app_name> | APP_BASE_URL: <url>**
+    > * **Fix Applied:** [Brief description of code change]
+    > * **Files Modified:** [List of files]
+    > * **Verification:** [Result of the test command]
+
+**Begin execution now by running the Self-Identification Protocol.**

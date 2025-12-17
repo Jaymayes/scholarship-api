@@ -20,11 +20,44 @@ from config.settings import settings
 logger = logging.getLogger(__name__)
 
 # Service authentication secret (shared between provider_register and scholarship_api)
-# TODO: Store in Replit secrets as SERVICE_AUTH_SECRET
-SERVICE_AUTH_SECRET = settings.jwt_secret_key or "INSECURE_DEFAULT_SECRET_REPLACE_IN_PRODUCTION"  # Temporary: Use JWT secret until SERVICE_AUTH_SECRET is provisioned
+# SEC-03 REMEDIATION: Dedicated secret, do not reuse JWT_SECRET_KEY
+import os
 
-if not settings.jwt_secret_key:
-    logger.warning("⚠️ SERVICE_AUTH_SECRET not configured - using insecure default. Configure JWT_SECRET_KEY in production!")
+_SERVICE_AUTH_SECRET_RAW = os.getenv("SERVICE_AUTH_SECRET")
+
+def _get_service_auth_secret() -> str:
+    """
+    Get SERVICE_AUTH_SECRET with STRICT production enforcement.
+    
+    SEC-03: Dedicated service secret prevents key reuse vulnerability.
+    In production, SERVICE_AUTH_SECRET MUST be explicitly set - NO FALLBACK.
+    In development, falls back to JWT_SECRET_KEY with warning.
+    """
+    if _SERVICE_AUTH_SECRET_RAW:
+        return _SERVICE_AUTH_SECRET_RAW
+    
+    # Production enforcement: HARD ERROR if dedicated secret not set
+    if settings.environment.value == "production":
+        error_msg = (
+            "🚨 SEC-03 SECURITY VIOLATION: SERVICE_AUTH_SECRET not configured in production! "
+            "Service-to-service authentication requires a dedicated secret. "
+            "Set SERVICE_AUTH_SECRET in Replit Secrets (separate from JWT_SECRET_KEY)."
+        )
+        logger.critical(error_msg)
+        # NO FALLBACK IN PRODUCTION - key reuse is a security risk
+        raise RuntimeError(error_msg)
+    
+    # Development: Allow fallback with warning
+    if settings.jwt_secret_key:
+        logger.warning(
+            "⚠️ DEV MODE: SERVICE_AUTH_SECRET not set, using JWT_SECRET_KEY fallback. "
+            "Configure SERVICE_AUTH_SECRET before production deployment."
+        )
+        return settings.jwt_secret_key
+    
+    raise RuntimeError("Neither SERVICE_AUTH_SECRET nor JWT_SECRET_KEY configured")
+
+SERVICE_AUTH_SECRET = _get_service_auth_secret()
 
 # Replay protection: Track used request IDs with TTL (in-memory, migrate to Redis for horizontal scaling)
 # Structure: {request_id: expiry_timestamp}

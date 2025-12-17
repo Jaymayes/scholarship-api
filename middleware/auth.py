@@ -273,6 +273,20 @@ async def decode_token(token: str) -> TokenData | None:
                 if payload:
                     user_id = payload.get("sub")
                     roles = payload.get("roles", [])
+                    jti = payload.get("jti")
+                    
+                    # SEC-05: Check token revocation if JTI present
+                    if jti:
+                        try:
+                            from services.token_blocklist import is_token_revoked
+                            if await is_token_revoked(jti):
+                                import logging
+                                logging.warning(f"RS256 token revoked: jti={jti[:8]}...")
+                                metrics_service.record_token_operation("validate", "revoked")
+                                return None
+                        except Exception as e:
+                            import logging
+                            logging.warning(f"Token blocklist check failed: {e}")
                     
                     # Ensure valid types
                     if not user_id or not isinstance(user_id, str):
@@ -341,6 +355,20 @@ async def decode_token(token: str) -> TokenData | None:
                     user_id = payload.get("sub")
                     if not user_id or not isinstance(user_id, str) or len(user_id.strip()) == 0:
                         continue
+                    
+                    # SEC-05: Check token revocation if JTI present
+                    jti = payload.get("jti")
+                    if jti:
+                        try:
+                            from services.token_blocklist import is_token_revoked
+                            if await is_token_revoked(jti):
+                                import logging
+                                logging.warning(f"HS256 token revoked: jti={jti[:8]}...")
+                                metrics_service.record_token_operation("validate", "revoked")
+                                continue  # Try next key or fail
+                        except Exception as e:
+                            import logging
+                            logging.warning(f"Token blocklist check failed: {e}")
 
                     roles = payload.get("roles", [])
 
