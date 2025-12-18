@@ -1,0 +1,73 @@
+**CONTEXT: FULL SCHOLARSHIP AI ECOSYSTEM**
+We are executing a coordinated "Go-Live" sequence across all 8 applications. You are **Agent3 (scholarship_agent)**.
+
+**APP REGISTRY (Reference Only):**
+* **A1** `scholar_auth` → `https://scholar-auth-jamarrlmayes.replit.app`
+* **A2** `scholarship_api` → `https://scholarship-api-jamarrlmayes.replit.app`
+* **A3** `scholarship_agent` → `https://scholarship-agent-jamarrlmayes.replit.app` **(YOU)**
+* **A4** `scholarship_sage` → `https://scholarship-sage-jamarrlmayes.replit.app`
+* **A5** `student_pilot` → `https://student-pilot-jamarrlmayes.replit.app`
+* **A6** `provider_register` → `https://provider-register-jamarrlmayes.replit.app`
+* **A7** `auto_page_maker` → `https://auto-page-maker-jamarrlmayes.replit.app`
+* **A8** `auto_com_center` → `https://auto-com-center-jamarrlmayes.replit.app`
+
+---
+
+**⚠️ CRITICAL INSTRUCTION FOR AGENT3:**
+You must **ONLY** execute the tasks in the "A3 ONLY" section below. Do not attempt to modify other apps. Your primary goal is to establish yourself as the **System Orchestrator**, secure your connections, and begin reporting valid telemetry to A8.
+
+---
+
+### **A3 ONLY — scholarship_agent — EXECUTION PLAN**
+
+**1. IDENTITY & CONFIGURATION (Immediate Action)**
+* **Self-Identify:** Before any network request, set your identity constants:
+    * `APP_ID`: `scholarship_agent`
+    * `APP_BASE_URL`: `https://scholarship-agent-jamarrlmayes.replit.app`
+    * `VERSION`: `v3.4.1`
+* **Secure Configuration (Check Replit Secrets):**
+    * Verify `A8_INGEST_TOKEN` is present (do not log value).
+    * Verify `SHARED_SECRET` is present.
+    * **Fix Redis:** Detect if `REDIS_URL` is set to localhost (`127.0.0.1`). If so, **HALT** and request a valid `UPSTASH_REDIS_URL` or similar managed Redis connection string to prevent `ECONNREFUSED` errors.
+
+**2. TELEMETRY PROTOCOL v3.4.1 (Strict Enforcement)**
+* Configure all outgoing requests to `auto_com_center` (A8) to include these **mandatory** headers:
+    * `X-Protocol-Version`: `v3.4.1`
+    * `X-App-ID`: `scholarship_agent`
+    * `Authorization`: `Bearer ${A8_INGEST_TOKEN}`
+    * `X-Shared-Secret`: `${SHARED_SECRET}`
+* **Payload Requirement:** Every JSON payload sent to A8 **MUST** include an `app_label` field formatted exactly as:
+    * `"app_label": "scholarship_agent https://scholarship-agent-jamarrlmayes.replit.app"`
+    * *Rationale:* This fixes the "Unknown source app" error in A8 logs and enables clickable tiles in the dashboard.
+
+**3. ORCHESTRATION & MONITORING LOOPS**
+Implement the following asynchronous loops to drive the ecosystem:
+
+* **Initialization (Once on Start):**
+    * Send `APP_IDENTIFY` event to A8 `/ingest`.
+    * Data: `{ "status": "BOOTING", "config_check": "PASS" }`
+
+* **Inventory Guard (Every 10m):**
+    * Query **A2** (`scholarship_api`) for `total_scholarships`.
+    * **Logic:**
+        * If `total > 0`: Emit `FUNNEL_EVENT` -> `inventory_active` to A8.
+        * If `total == 0` or Error: Emit `REVENUE_BLOCKER` -> `code: NO_INVENTORY_ACCESS`, `data: { "reason": "A2 returned 0 or failed", "recommended_action": "Check A2 DB / A6 Provider inputs" }`.
+
+* **SEO Activation (Every 12h):**
+    * Send a `POST` request to **A7** (`auto_page_maker`) at `/api/seo/pages` to trigger generation.
+    * On success, emit `FUNNEL_EVENT` -> `seo_campaign_start` to A8 with `pages_generated` count.
+    * *Display Hint:* `dashboard_row: "B2C Funnel"`, `link_url: "https://auto-page-maker-jamarrlmayes.replit.app"`.
+
+* **System Heartbeat (Every 60s):**
+    * Send `HEARTBEAT` event to A8.
+    * Include `p95_latency_snapshot` of your own internal routes.
+    * *Display Hint:* `dashboard_row: "Infra & SLOs"`, `metric_key: "orchestrator_health"`, `value: 1`.
+
+**4. ERROR HANDLING & RESILIENCY**
+* **401/403 Handling:** If A8 returns a 401/403, log "AUTH_FAILURE: Check A8_INGEST_TOKEN in Secrets" and back off for 5 minutes. Do not crash.
+* **Dependency Failures:** If A2 or A7 requests fail, log the error locally and emit a `REVENUE_BLOCKER` event to A8 (if reachable) detailing the dependency failure.
+
+**5. EXECUTE**
+* Apply these changes to your codebase (`src/telemetry.ts`, `src/orchestrator.ts` or equivalent).
+* Deploy/Restart the application.
+* **Verify:** Check A8 logs for your `APP_IDENTIFY` event with the correct `app_label`.
