@@ -729,6 +729,7 @@ app.include_router(agent3_v1_router, tags=["Agent3 V1"])
 # Master Prompt compliance endpoints (standard /api endpoints)
 app.include_router(master_prompt_router, tags=["Master Prompt"])
 app.include_router(scholarships_router, prefix="/api/v1", tags=["scholarships"])
+app.include_router(scholarships_router, prefix="/api", tags=["scholarships"])  # Alias for cross-app compatibility
 app.include_router(applications_router, prefix="/api/v1", tags=["applications"])
 app.include_router(prompts_router, tags=["System Prompts"])
 

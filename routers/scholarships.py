@@ -1,6 +1,8 @@
 from datetime import datetime
+from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
+from pydantic import BaseModel
 
 from middleware.auth import User, optional_auth, require_auth
 from middleware.enhanced_rate_limiting import general_rate_limit, search_rate_limit
@@ -32,6 +34,26 @@ logger = get_logger(__name__)
 router = APIRouter()
 
 event_emitter = EventEmissionService()
+
+
+class PublicScholarshipItem(BaseModel):
+    """Safe public fields for scholarship data"""
+    id: str
+    title: str
+    amount_min: Optional[float] = None
+    amount_max: Optional[float] = None
+    deadline: Optional[datetime] = None
+    provider_name: Optional[str] = None
+    tags: list[str] = []
+    description: Optional[str] = None
+
+
+class PublicScholarshipFeed(BaseModel):
+    """Response model for public scholarship feed"""
+    items: list[PublicScholarshipItem]
+    total: int
+    page: int
+    limit: int
 
 @router.get("/scholarships", response_model=SearchResponse)
 @search_rate_limit()  # CEO v2.3: 600 rpm per origin for reads
@@ -172,6 +194,74 @@ async def smart_search_scholarships(
     except Exception as e:
         logger.error(f"Error in smart search: {str(e)}")
         raise HTTPException(status_code=500, detail="Internal server error during smart search")
+
+
+@router.get("/scholarships/public", response_model=PublicScholarshipFeed)
+async def get_public_scholarships(
+    request: Request,
+    response: Response,
+    page: int = Query(1, ge=1, description="Page number"),
+    limit: int = Query(20, ge=1, le=100, description="Items per page"),
+):
+    """
+    Public Scholarship Feed - No authentication required.
+    
+    Returns published scholarships with active deadlines.
+    Only safe fields are exposed: id, title, amount, deadline, provider, tags.
+    
+    Rate limited to 60 requests/minute for abuse protection.
+    """
+    try:
+        offset = (page - 1) * limit
+        
+        filters = SearchFilters(
+            keyword=None,
+            fields_of_study=[],
+            min_amount=None,
+            max_amount=None,
+            scholarship_types=[],
+            states=[],
+            min_gpa=None,
+            citizenship=None,
+            deadline_after=datetime.now(),
+            deadline_before=None,
+            limit=limit,
+            offset=offset
+        )
+        
+        result = scholarship_service.search_scholarships(filters)
+        
+        safe_items = []
+        for scholarship in result.scholarships:
+            desc = getattr(scholarship, 'description', None)
+            safe_item = PublicScholarshipItem(
+                id=scholarship.id,
+                title=scholarship.name,
+                amount_min=scholarship.amount,
+                amount_max=scholarship.amount,
+                deadline=scholarship.application_deadline,
+                provider_name=scholarship.organization,
+                tags=[],
+                description=desc[:200] if desc else None
+            )
+            safe_items.append(safe_item)
+        
+        response.headers["Cache-Control"] = "public, max-age=60, s-maxage=60"
+        response.headers["Vary"] = "Accept, Origin"
+        
+        logger.info(f"Public feed: returned {len(safe_items)} scholarships (page {page})")
+        
+        return PublicScholarshipFeed(
+            items=safe_items,
+            total=result.total_count,
+            page=page,
+            limit=limit
+        )
+        
+    except Exception as e:
+        logger.error(f"Error in public scholarship feed: {str(e)}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
 
 @router.get("/scholarships/{scholarship_id}", response_model=Scholarship)
 @search_rate_limit()  # CEO v2.3: 600 rpm per origin for reads

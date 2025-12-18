@@ -18,12 +18,12 @@ def run_connectivity_test():
     print("Supply-Demand Bridge Verification")
     print("=" * 60)
     
-    a2_url = os.environ.get("PROVIDER_REGISTRY_URL") or os.environ.get("API_URL")
+    a2_url = os.environ.get("SCHOLARSHIP_API_URL") or os.environ.get("API_URL")
     url_source = "environment"
     
     if not a2_url:
-        a2_url = "https://provider-register-jamarrlmayes.replit.app"
-        url_source = "default"
+        a2_url = "http://localhost:5000"
+        url_source = "default (local)"
     
     a2_url = a2_url.rstrip("/")
     
@@ -76,8 +76,8 @@ def run_connectivity_test():
             start_time = time.time()
             
             endpoints_to_try = [
+                "/api/v1/scholarships/public",
                 "/api/scholarships/public",
-                "/api/scholarships",
                 "/api/v1/scholarships",
                 "/api/v1/scholarships/search"
             ]
