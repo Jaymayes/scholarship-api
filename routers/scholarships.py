@@ -202,34 +202,46 @@ async def get_public_scholarships(
     response: Response,
     page: int = Query(1, ge=1, description="Page number"),
     limit: int = Query(20, ge=1, le=100, description="Items per page"),
+    q: Optional[str] = Query(None, max_length=200, description="Keyword search (title/description)"),
+    min_amount: Optional[float] = Query(None, ge=0, description="Minimum scholarship amount"),
+    tags: Optional[str] = Query(None, description="Comma-separated tags to filter by"),
+    deadline_before: Optional[datetime] = Query(None, description="Filter scholarships with deadline before this date"),
 ):
     """
-    Public Scholarship Feed - No authentication required.
+    Public Scholarship Feed with Smart Search - No authentication required.
+    
+    Query Parameters:
+    - q: Keyword search across title and description (case-insensitive)
+    - min_amount: Minimum scholarship value filter
+    - tags: Comma-separated list of tags (matches ANY tag) - reserved for future use
+    - deadline_before: Filter scholarships with deadline before this date
     
     Returns published scholarships with active deadlines.
     Only safe fields are exposed: id, title, amount, deadline, provider, tags.
-    
-    Rate limited to 60 requests/minute for abuse protection.
     """
     try:
         offset = (page - 1) * limit
         
         filters = SearchFilters(
-            keyword=None,
+            keyword=q,
             fields_of_study=[],
-            min_amount=None,
+            min_amount=min_amount,
             max_amount=None,
             scholarship_types=[],
             states=[],
             min_gpa=None,
             citizenship=None,
             deadline_after=datetime.now(),
-            deadline_before=None,
+            deadline_before=deadline_before,
             limit=limit,
             offset=offset
         )
         
         result = scholarship_service.search_scholarships(filters)
+        
+        tag_list = []
+        if tags:
+            tag_list = [t.strip().lower() for t in tags.split(",") if t.strip()]
         
         safe_items = []
         for scholarship in result.scholarships:
@@ -246,6 +258,13 @@ async def get_public_scholarships(
             )
             safe_items.append(safe_item)
         
+        etag = generate_etag({"items": len(safe_items), "total": result.total_count, "page": page})
+        if_none_match = request.headers.get("If-None-Match")
+        
+        if etag_matches(etag, if_none_match):
+            return Response(status_code=304, headers={"ETag": etag, "Cache-Control": "public, max-age=60"})
+        
+        response.headers["ETag"] = etag
         response.headers["Cache-Control"] = "public, max-age=60, s-maxage=60"
         response.headers["Vary"] = "Accept, Origin"
         
