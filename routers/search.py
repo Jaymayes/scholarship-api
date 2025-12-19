@@ -2,14 +2,16 @@ import time
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, Query, Request
+from sqlalchemy.orm import Session
 
 from middleware.auth import User, optional_auth, require_auth
 from middleware.simple_rate_limiter import search_rate_limit
+from models.database import get_db
 from models.scholarship import FieldOfStudy, ScholarshipType, SearchFilters
 from services.analytics_service import analytics_service
+from services.database_service import DatabaseService
 from services.scholarship_service import scholarship_service
 
-# from routers.interaction_wrapper import log_interaction  # Will implement if needed
 from utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -47,7 +49,9 @@ async def execute_search(
     deadline_before: datetime | None = None,
     limit: int = 20,
     offset: int = 0,
-    user_id: str | None = None
+    user_id: str | None = None,
+    db: Session | None = None,
+    request: Request | None = None
 ) -> dict:
     """Execute search logic shared between GET and POST endpoints"""
     if states is None:
@@ -91,6 +95,25 @@ async def execute_search(
         # Calculate processing time
         took_ms = int((time.time() - start_time) * 1000)
 
+        # Log to database for persistent search analytics (P0 Revenue Unblock)
+        if db:
+            try:
+                db_service = DatabaseService(db)
+                user_agent = request.headers.get("user-agent") if request else None
+                client_ip = request.client.host if request and request.client else None
+                db_service.log_search_analytics(
+                    search_query=keyword,
+                    filters_applied=filters.model_dump(),
+                    results_count=result.total_count,
+                    user_id=user_id,
+                    response_time_ms=float(took_ms),
+                    user_agent=user_agent,
+                    ip_address=client_ip
+                )
+                logger.debug(f"Search analytics logged to DB: query='{keyword}', results={result.total_count}")
+            except Exception as db_err:
+                logger.warning(f"Failed to log search analytics to DB: {db_err}")
+
         # Return metadata-rich response matching expected format
         return {
             "items": result.scholarships,
@@ -113,7 +136,8 @@ async def execute_search(
 async def search_scholarships_post(
     request: Request,
     request_data: SearchRequest,
-    current_user: User = Depends(require_auth()),  # HOTFIX: Always require authentication
+    current_user: User = Depends(require_auth()),
+    db: Session = Depends(get_db),
     _rate_limit: bool = Depends(search_rate_limit)
 ):
     """
@@ -122,7 +146,6 @@ async def search_scholarships_post(
 
     Returns metadata-rich response with items, total, pagination info, and timing.
     """
-    # Authentication enforced by dependency injection - no additional check needed
     user_id = current_user.user_id
 
     return await execute_search(
@@ -138,7 +161,9 @@ async def search_scholarships_post(
         deadline_before=request_data.deadline_before,
         limit=request_data.limit,
         offset=request_data.offset,
-        user_id=user_id
+        user_id=user_id,
+        db=db,
+        request=request
     )
 
 @router.get("/search")
@@ -157,7 +182,8 @@ async def search_scholarships_get(
     deadline_before: datetime | None = Query(None, description="Deadlines before this date"),
     limit: int = Query(20, ge=1, le=100, description="Number of results to return"),
     offset: int = Query(0, ge=0, description="Number of results to skip"),
-    current_user: User | None = Depends(optional_auth)  # PUBLIC ACCESS for auto_page_maker, scholarship_sage, student_pilot
+    current_user: User | None = Depends(optional_auth),
+    db: Session = Depends(get_db)
 ):
     """
     Public search endpoint for scholarship discovery.
@@ -185,5 +211,7 @@ async def search_scholarships_get(
         deadline_before=deadline_before,
         limit=limit,
         offset=offset,
-        user_id=user_id
+        user_id=user_id,
+        db=db,
+        request=request
     )

@@ -792,4 +792,5 @@ async def get_segment_value_propositions():
         }
     }
 
+
 logger.info("🏢 B2B Partner Portal router loaded - Self-service onboarding ready")

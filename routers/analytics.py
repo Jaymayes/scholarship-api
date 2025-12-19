@@ -309,3 +309,87 @@ async def get_search_trends(
     except Exception as e:
         logger.error(f"Error analyzing search trends: {str(e)}")
         raise HTTPException(status_code=500, detail="Error analyzing search trends")
+
+
+@router.get("/analytics/search-summary", tags=["Search Analytics"])
+async def get_search_summary(
+    days: int = Query(7, ge=1, le=90, description="Number of days to analyze"),
+    request: Request = None
+):
+    """
+    Get database-backed search analytics summary for revenue insights.
+    
+    P0 Revenue Unblock: This endpoint provides non-zero query counts to demonstrate
+    search activity and user engagement. Used by A8 Command Center dashboards.
+    
+    Returns:
+    - Total searches from database
+    - Top search queries
+    - Average response times
+    - Zero-result rate
+    """
+    try:
+        from sqlalchemy import text, func
+        from datetime import timedelta
+        
+        db = get_session()
+        cutoff = datetime.utcnow() - timedelta(days=days)
+        
+        total_searches = db.execute(
+            text("SELECT COUNT(*) FROM search_analytics WHERE timestamp >= :cutoff"),
+            {"cutoff": cutoff}
+        ).scalar() or 0
+        
+        unique_queries = db.execute(
+            text("SELECT COUNT(DISTINCT search_query) FROM search_analytics WHERE timestamp >= :cutoff AND search_query IS NOT NULL"),
+            {"cutoff": cutoff}
+        ).scalar() or 0
+        
+        avg_response_time = db.execute(
+            text("SELECT AVG(response_time_ms) FROM search_analytics WHERE timestamp >= :cutoff AND response_time_ms IS NOT NULL"),
+            {"cutoff": cutoff}
+        ).scalar() or 0
+        
+        zero_results = db.execute(
+            text("SELECT COUNT(*) FROM search_analytics WHERE timestamp >= :cutoff AND results_count = 0"),
+            {"cutoff": cutoff}
+        ).scalar() or 0
+        
+        top_queries = db.execute(
+            text("""
+                SELECT search_query, COUNT(*) as count 
+                FROM search_analytics 
+                WHERE timestamp >= :cutoff AND search_query IS NOT NULL AND search_query != ''
+                GROUP BY search_query 
+                ORDER BY count DESC 
+                LIMIT 10
+            """),
+            {"cutoff": cutoff}
+        ).fetchall()
+        
+        zero_result_rate = (zero_results / total_searches * 100) if total_searches > 0 else 0
+        
+        return {
+            "period_days": days,
+            "total_searches": total_searches,
+            "unique_queries": unique_queries,
+            "avg_response_time_ms": round(float(avg_response_time), 2) if avg_response_time else 0,
+            "zero_result_rate_percent": round(zero_result_rate, 2),
+            "top_queries": [{"query": q[0], "count": q[1]} for q in top_queries],
+            "data_source": "database",
+            "status": "healthy" if total_searches > 0 else "no_data"
+        }
+        
+    except Exception as e:
+        logger.error(f"Error getting search summary: {str(e)}")
+        return {
+            "period_days": days,
+            "total_searches": 0,
+            "unique_queries": 0,
+            "avg_response_time_ms": 0,
+            "zero_result_rate_percent": 0,
+            "top_queries": [],
+            "data_source": "database",
+            "status": "error",
+            "error": str(e)
+        }
