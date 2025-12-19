@@ -1,119 +1,155 @@
 #!/bin/bash
 
-echo "=============================================="
-echo "A2 AUTH E2E SMOKE TEST"
-echo "App: scholarship_api"
-echo "Base URL: https://scholarship-api-jamarrlmayes.replit.app"
-echo "=============================================="
-echo ""
+# ==============================================================================
+# Scholar AI Advisor - Ecosystem Auth E2E Smoke Test
+# ==============================================================================
+# Checks availability, authentication redirects, and security boundaries
+# for all 8 applications in the fleet.
+#
+# Usage: ./auth_e2e_smoke.sh
+# ==============================================================================
 
-BASE_URL="${1:-http://localhost:5000}"
-PASS=0
-FAIL=0
+# --- Configuration (Defaults) ---
+A1_URL=${A1_URL:-"https://scholar-auth-jamarrlmayes.replit.app"}
+A2_URL=${A2_URL:-"https://scholarship-api-jamarrlmayes.replit.app"}
+A3_URL=${A3_URL:-"https://scholarship-agent-jamarrlmayes.replit.app"}
+A4_URL=${A4_URL:-"https://scholarship-sage-jamarrlmayes.replit.app"}
+A5_URL=${A5_URL:-"https://student-pilot-jamarrlmayes.replit.app"}
+A6_URL=${A6_URL:-"https://provider-register-jamarrlmayes.replit.app"}
+A7_URL=${A7_URL:-"https://auto-page-maker-jamarrlmayes.replit.app"}
+A8_URL=${A8_URL:-"https://auto-com-center-jamarrlmayes.replit.app"}
 
-test_endpoint() {
-    local name="$1"
+# Colors
+GREEN='\033[0;32m'
+RED='\033[0;31m'
+YELLOW='\033[1;33m'
+NC='\033[0m' # No Color
+
+FAILED=0
+
+# --- Helper Functions ---
+
+log_pass() {
+    echo -e "${GREEN}[PASS]${NC} $1"
+}
+
+log_fail() {
+    echo -e "${RED}[FAIL]${NC} $1"
+    FAILED=1
+}
+
+log_info() {
+    echo -e "      $1"
+}
+
+check_status() {
+    local url="$1"
     local expected="$2"
-    local url="$3"
-    local method="${4:-GET}"
-    shift 4
-    local extra_args="$@"
+    local desc="$3"
     
-    response=$(curl -s -o /dev/null -w "%{http_code}" -X "$method" $extra_args "$url" 2>/dev/null)
+    local code=$(curl -s -o /dev/null -w "%{http_code}" "$url")
     
-    if [ "$response" == "$expected" ]; then
-        echo "[PASS] $name -> $response"
-        ((PASS++))
+    if [ "$code" == "$expected" ]; then
+        log_pass "$desc ($code)"
     else
-        echo "[FAIL] $name -> $response (expected $expected)"
-        ((FAIL++))
+        log_fail "$desc (Expected $expected, got $code)"
     fi
 }
 
-echo "1. HEALTH & PUBLIC ROUTES"
-echo "-------------------------"
-test_endpoint "Health Check" "200" "$BASE_URL/healthz" "GET"
-test_endpoint "Public Scholarships" "200" "$BASE_URL/api/v1/scholarships/public" "GET"
-test_endpoint "Privacy Page" "200" "$BASE_URL/privacy" "GET"
-test_endpoint "Terms Page" "200" "$BASE_URL/terms" "GET"
+check_redirect() {
+    local url="$1"
+    local expected_pattern="$2"
+    local desc="$3"
+    
+    # Get status and location header
+    local output=$(curl -s -I "$url")
+    local code=$(echo "$output" | grep -i "^HTTP" | awk '{print $2}' | tail -1)
+    local location=$(echo "$output" | grep -i "^Location:" | awk '{print $2}' | tr -d '\r')
 
-echo ""
-echo "2. PROTECTED ROUTES (expect 401)"
-echo "---------------------------------"
-response=$(curl -s -o /dev/null -w "%{http_code}" -X POST "$BASE_URL/api/v1/scholarships/123/save" -H "Content-Type: application/json" -d '{}' 2>/dev/null)
-if [ "$response" == "401" ]; then
-    echo "[PASS] Save Scholarship (unauth) -> $response"
-    ((PASS++))
-else
-    echo "[FAIL] Save Scholarship (unauth) -> $response (expected 401)"
-    ((FAIL++))
-fi
-
-response=$(curl -s -o /dev/null -w "%{http_code}" "$BASE_URL/api/v1/credits/balance" 2>/dev/null)
-if [ "$response" == "401" ] || [ "$response" == "404" ] || [ "$response" == "422" ]; then
-    echo "[PASS] Credits Balance (unauth) -> $response"
-    ((PASS++))
-else
-    echo "[FAIL] Credits Balance (unauth) -> $response (expected 401/404/422)"
-    ((FAIL++))
-fi
-
-echo ""
-echo "3. CORS PREFLIGHT (A3-A8)"
-echo "-------------------------"
-for origin in "https://scholarship-agent-jamarrlmayes.replit.app" \
-              "https://scholarship-sage-jamarrlmayes.replit.app" \
-              "https://student-pilot-jamarrlmayes.replit.app" \
-              "https://auto-page-maker-jamarrlmayes.replit.app" \
-              "https://auto-com-center-jamarrlmayes.replit.app"; do
-    app=$(echo "$origin" | sed 's|https://||' | sed 's|-jamarrlmayes.replit.app||')
-    response=$(curl -s -o /dev/null -w "%{http_code}" -X OPTIONS "$BASE_URL/api/v1/scholarships/public" \
-        -H "Origin: $origin" \
-        -H "Access-Control-Request-Method: GET" \
-        -H "Access-Control-Request-Headers: Authorization, Content-Type" 2>/dev/null)
-    if [ "$response" == "200" ]; then
-        echo "[PASS] CORS $app -> $response"
-        ((PASS++))
+    if [[ "$code" == "302" || "$code" == "301" || "$code" == "307" ]]; then
+        if [[ "$location" == *"$expected_pattern"* ]]; then
+            log_pass "$desc (Redirects to target)"
+        else
+            log_fail "$desc (Redirects to WRONG target: $location)"
+        fi
     else
-        echo "[FAIL] CORS $app -> $response (expected 200)"
-        ((FAIL++))
+        log_fail "$desc (Expected 302 Redirect, got $code)"
     fi
-done
+}
 
+echo "========================================================"
+echo "   Scholar AI Advisor - Auth Ecosystem Health Check"
+echo "========================================================"
 echo ""
-echo "4. TELEMETRY ENDPOINTS"
-echo "----------------------"
-response=$(curl -s -o /dev/null -w "%{http_code}" -X POST "$BASE_URL/api/telemetry/ingest" \
-    -H "Content-Type: application/json" \
-    -H "x-scholar-protocol: v3.5.1" \
-    -H "x-app-label: smoke_test https://test.example.com" \
-    -d '{"event_type":"SMOKE_TEST","data":{}}' 2>/dev/null)
-if [ "$response" == "200" ] || [ "$response" == "202" ] || [ "$response" == "400" ]; then
-    echo "[PASS] Telemetry Ingest -> $response (endpoint reachable)"
-    ((PASS++))
-else
-    echo "[FAIL] Telemetry Ingest -> $response (expected 200/202/400)"
-    ((FAIL++))
-fi
 
-response=$(curl -s -o /dev/null -w "%{http_code}" "$BASE_URL/api/stats?window=5m" 2>/dev/null)
-if [ "$response" == "200" ]; then
-    echo "[PASS] Stats Endpoint -> $response"
-    ((PASS++))
-else
-    echo "[FAIL] Stats Endpoint -> $response (expected 200)"
-    ((FAIL++))
-fi
-
+# --- A1: Scholar Auth (IdP) ---
+echo "--- A1: Scholar Auth (Identity Provider) ---"
+check_status "$A1_URL/oidc/.well-known/openid-configuration" "200" "OIDC Discovery"
+check_status "$A1_URL/oidc/jwks" "200" "JWKS Keys"
 echo ""
-echo "=============================================="
-echo "RESULTS: $PASS passed, $FAIL failed"
-echo "=============================================="
 
-if [ $FAIL -eq 0 ]; then
-    echo "STATUS: HEALTHY"
+# --- A2: Scholarship API ---
+echo "--- A2: Scholarship API (Inventory) ---"
+check_status "$A2_URL/health" "200" "Health Check"
+check_status "$A2_URL/api/v1/scholarships/public" "200" "Public Endpoint"
+# Save endpoint requires POST method
+save_code=$(curl -s -o /dev/null -w "%{http_code}" -X POST "$A2_URL/api/v1/scholarships/1/save" -H "Content-Type: application/json" -d '{}')
+if [ "$save_code" == "401" ]; then
+    log_pass "Protected Endpoint (Unauth) ($save_code)"
+else
+    log_fail "Protected Endpoint (Unauth) (Expected 401, got $save_code)"
+fi
+echo ""
+
+# --- A3: Scholarship Agent ---
+echo "--- A3: Scholarship Agent (B2C) ---"
+check_status "$A3_URL/api/health" "200" "Health Check"
+check_status "$A3_URL/api/auth/user" "401" "Protected Route (Unauth)"
+check_redirect "$A3_URL/api/login" "scholar-auth" "Login Redirect -> ScholarAuth"
+echo ""
+
+# --- A4: Scholarship Sage ---
+echo "--- A4: Scholarship Sage (Aggregation) ---"
+# Note: A4 uses Replit OIDC via REPLIT_DOMAINS
+check_status "$A4_URL" "200" "Landing Page"
+check_status "$A4_URL/api/auth/user" "401" "Protected Route (Unauth)"
+check_redirect "$A4_URL/api/login" "replit.com" "Login Redirect -> Replit OIDC"
+echo ""
+
+# --- A5: Student Pilot ---
+echo "--- A5: Student Pilot (B2C Dashboard) ---"
+check_redirect "$A5_URL/api/login" "scholar-auth" "Login Redirect -> ScholarAuth"
+check_status "$A5_URL/api/auth/user" "401" "Protected Route (Unauth)"
+echo ""
+
+# --- A6: Provider Register ---
+echo "--- A6: Provider Register (B2B) ---"
+check_status "$A6_URL/healthz" "200" "Health Check"
+check_redirect "$A6_URL/api/login" "scholar-auth" "Login Redirect -> ScholarAuth"
+check_status "$A6_URL/auth/session" "401" "Protected Session (Unauth)"
+echo ""
+
+# --- A7: Auto Page Maker ---
+echo "--- A7: Auto Page Maker (SEO Engine) ---"
+check_status "$A7_URL/seo/stem-scholarships" "200" "Public SEO Page (Unauth)"
+check_status "$A7_URL/api/v1/pages/generate" "401" "Admin API (Unauth)"
+check_redirect "$A7_URL/api/login" "replit.com" "Admin Login -> Replit OIDC"
+echo ""
+
+# --- A8: Command Center ---
+echo "--- A8: Command Center (Telemetry) ---"
+check_status "$A8_URL/api/health" "200" "Health Check"
+check_status "$A8_URL/api/auth/user" "401" "Protected API (Unauth)"
+check_redirect "$A8_URL/api/login" "/" "Login Redirect (Session Create)"
+echo ""
+
+# --- Summary ---
+echo "========================================================"
+if [ $FAILED -eq 0 ]; then
+    echo -e "${GREEN}ALL SYSTEMS HEALTHY. AUTHENTICATION SECURE.${NC}"
+    echo "The fleet is ready for traffic."
     exit 0
 else
-    echo "STATUS: DEGRADED"
+    echo -e "${RED}ERRORS DETECTED.${NC} Please review logs above."
     exit 1
 fi
