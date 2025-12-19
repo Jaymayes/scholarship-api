@@ -1,0 +1,122 @@
+Markdown
+
+# MASTER INSTRUCTION SET: "ALL GREEN" SMOKE TEST & VERIFICATION
+# CONTEXT: MULTI-AGENT ECOSYSTEM (A1-A8)
+
+You are one agent in a fleet of eight. Your goal is to verify full operational readiness for revenue. You must strictly follow the scope for YOUR specific app and ignore instructions for others.
+
+---
+
+### STEP 0: SELF-IDENTIFICATION (REQUIRED)
+**Before analyzing any code, you must execute this logic immediately:**
+
+1.  **Read** your environment variable `APP_BASE_URL` (or infer from your Replit configuration).
+2.  **Match** it against the list below to determine your identity:
+    * `scholar_auth` → `https://scholar-auth-jamarrlmayes.replit.app`
+    * `scholarship_api` → `https://scholarship-api-jamarrlmayes.replit.app`
+    * `scholarship_agent` → `https://scholarship-agent-jamarrlmayes.replit.app`
+    * `scholarship_sage` → `https://scholarship-sage-jamarrlmayes.replit.app`
+    * `student_pilot` → `https://student-pilot-jamarrlmayes.replit.app`
+    * `provider_register` → `https://provider-register-jamarrlmayes.replit.app`
+    * `auto_page_maker` → `https://auto-page-maker-jamarrlmayes.replit.app`
+    * `auto_com_center` → `https://auto-com-center-jamarrlmayes.replit.app`
+
+3.  **PRINT** this exact line as your *very first output*:
+    `APP: <your_app_name> | APP_BASE_URL: <your_app_base_url> | AGENT: Active`
+
+---
+
+### GLOBAL SMOKE TEST RULES
+1.  **Compliance:** No spam. Use seed/internal data only.
+2.  **Telemetry:** Send test events to A8 with `test_run_id: "smoke_2025_launch"`.
+3.  **Secrets:** Use production secrets (do not rotate).
+4.  **Pass/Fail:** All health endpoints must be 200. Zero auth 5xx errors. A8 must accept events.
+
+### STANDARD REPORT FORMAT
+**Part A: JSON (Machine Readable)**
+```json
+{
+  "app_name": "string",
+  "app_base_url": "string",
+  "timestamp_utc": "ISO8601",
+  "actions_taken": ["Executed smoke test suite"],
+  "test_results": [
+    {"test": "name", "status": "PASS/FAIL", "details": "HTTP 200"}
+  ],
+  "kpis": {
+    "latency_p95": 0,
+    "error_rate": 0.0,
+    "telemetry_sent": 0
+  },
+  "status": "GREEN | YELLOW | RED"
+}
+Part B: Human Summary
+
+5 lines summarizing pass/fail status and readiness for traffic.
+
+APP-SPECIFIC SMOKE TESTS (EXECUTE ONLY YOUR SECTION)
+1. IF YOU ARE: A1 (scholar_auth)
+Test 1: GET /.well-known/openid-configuration -> Expect 200.
+
+Test 2: GET /health -> Expect 200.
+
+Test 3: Issue a client_credentials token and POST a canary event to A8 -> Expect 200.
+
+Pass Criteria: Zero 403s on A8 ingest; JWKS accessible.
+
+2. IF YOU ARE: A2 (scholarship_api)
+Test 1: GET /api/v1/search?q=stem -> Expect 200 + results. Verify search_analytics increments.
+
+Test 2: GET /api/v1/analytics/search-summary -> Expect incremented counts.
+
+Pass Criteria: Search works; telemetry writes to DB; no WAF blocks on A1/A8 tokens.
+
+3. IF YOU ARE: A3 (scholarship_agent)
+Test 1: POST /api/campaigns (seed list) -> Expect ID.
+
+Test 2: POST /api/campaigns/:id/send -> Expect 202 Accepted.
+
+Test 3: Simulate SendGrid webhook (delivered) -> Verify forwarding to A8.
+
+Pass Criteria: Email sent (or mocked if limits hit); webhook event reaches A8.
+
+4. IF YOU ARE: A4 (scholarship_sage)
+Test 1: User with 0 credits -> Attempt draft -> Verify paywall_shown event sent to A8.
+
+Test 2: Check logs for Redis errors -> Expect none.
+
+Pass Criteria: Telemetry fires; no Redis connection refused errors.
+
+5. IF YOU ARE: A5 (student_pilot)
+Test 1: Simulate landing with ?utm_source=test -> Verify capture.
+
+Test 2: Simulate payment_succeeded event -> Verify sent to A8 with UTM.
+
+Pass Criteria: A8 receives payment event with attribution data.
+
+6. IF YOU ARE: A6 (provider_register)
+Test 1: Generate Stripe Connect Link -> Expect 200/URL.
+
+Test 2: Simulate provider_connected webhook -> Verify sent to A8.
+
+Pass Criteria: Onboarding link generates; A8 receives provider event.
+
+7. IF YOU ARE: A7 (auto_page_maker)
+Test 1: GET /seo/stem-scholarships -> Expect 200.
+
+Test 2: POST /api/telemetry/page-view -> Verify A8 accepts.
+
+Test 3: Verify GSC verification file is reachable.
+
+Pass Criteria: SEO pages live; telemetry flowing.
+
+8. IF YOU ARE: A8 (auto_com_center)
+Test 1: Check App Registry -> Ensure A1-A7 are allowed.
+
+Test 2: Receive synthetic canary from A1 -> Expect 200 OK.
+
+Test 3: Check Ingest Logs -> Expect 0 "Unknown source app" errors in last 5 mins.
+
+Pass Criteria: 100% acceptance of valid tokens; valid ingestion from all apps.
+
+Step 1 Action: Identify yourself now, execute your smoke tests, and report status.
