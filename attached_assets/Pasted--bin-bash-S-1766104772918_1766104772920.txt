@@ -1,0 +1,149 @@
+#!/bin/bash
+
+# ==============================================================================
+# Scholar AI Advisor - Ecosystem Auth E2E Smoke Test
+# ==============================================================================
+# Checks availability, authentication redirects, and security boundaries
+# for all 8 applications in the fleet.
+#
+# Usage: ./auth_e2e_smoke.sh
+# ==============================================================================
+
+# --- Configuration (Defaults) ---
+A1_URL=${A1_URL:-"https://scholar-auth-jamarrlmayes.replit.app"}
+A2_URL=${A2_URL:-"https://scholarship-api-jamarrlmayes.replit.app"}
+A3_URL=${A3_URL:-"https://scholarship-agent-jamarrlmayes.replit.app"}
+A4_URL=${A4_URL:-"https://scholarship-sage-jamarrlmayes.replit.app"}
+A5_URL=${A5_URL:-"https://student-pilot-jamarrlmayes.replit.app"}
+A6_URL=${A6_URL:-"https://provider-register-jamarrlmayes.replit.app"}
+A7_URL=${A7_URL:-"https://auto-page-maker-jamarrlmayes.replit.app"}
+A8_URL=${A8_URL:-"https://auto-com-center-jamarrlmayes.replit.app"}
+
+# Colors
+GREEN='\033[0;32m'
+RED='\033[0;31m'
+YELLOW='\033[1;33m'
+NC='\033[0m' # No Color
+
+FAILED=0
+
+# --- Helper Functions ---
+
+log_pass() {
+    echo -e "${GREEN}[PASS]${NC} $1"
+}
+
+log_fail() {
+    echo -e "${RED}[FAIL]${NC} $1"
+    FAILED=1
+}
+
+log_info() {
+    echo -e "      $1"
+}
+
+check_status() {
+    local url="$1"
+    local expected="$2"
+    local desc="$3"
+    
+    local code=$(curl -s -o /dev/null -w "%{http_code}" "$url")
+    
+    if [ "$code" == "$expected" ]; then
+        log_pass "$desc ($code)"
+    else
+        log_fail "$desc (Expected $expected, got $code)"
+    fi
+}
+
+check_redirect() {
+    local url="$1"
+    local expected_pattern="$2"
+    local desc="$3"
+    
+    # Get status and location header
+    local output=$(curl -s -I "$url")
+    local code=$(echo "$output" | grep -i "^HTTP" | awk '{print $2}' | tail -1)
+    local location=$(echo "$output" | grep -i "^Location:" | awk '{print $2}' | tr -d '\r')
+
+    if [[ "$code" == "302" || "$code" == "301" || "$code" == "307" ]]; then
+        if [[ "$location" == *"$expected_pattern"* ]]; then
+            log_pass "$desc (Redirects to target)"
+        else
+            log_fail "$desc (Redirects to WRONG target: $location)"
+        fi
+    else
+        log_fail "$desc (Expected 302 Redirect, got $code)"
+    fi
+}
+
+echo "========================================================"
+echo "   Scholar AI Advisor - Auth Ecosystem Health Check"
+echo "========================================================"
+echo ""
+
+# --- A1: Scholar Auth (IdP) ---
+echo "--- A1: Scholar Auth (Identity Provider) ---"
+check_status "$A1_URL/oidc/.well-known/openid-configuration" "200" "OIDC Discovery"
+check_status "$A1_URL/oidc/jwks" "200" "JWKS Keys"
+echo ""
+
+# --- A2: Scholarship API ---
+echo "--- A2: Scholarship API (Inventory) ---"
+check_status "$A2_URL/healthz" "200" "Health Check"
+check_status "$A2_URL/api/v1/scholarships/public" "200" "Public Endpoint"
+check_status "$A2_URL/api/v1/scholarships/1/save" "401" "Protected Endpoint (Unauth)"
+echo ""
+
+# --- A3: Scholarship Agent ---
+echo "--- A3: Scholarship Agent (B2C) ---"
+check_status "$A3_URL/api/health" "200" "Health Check"
+check_status "$A3_URL/api/auth/user" "401" "Protected Route (Unauth)"
+check_redirect "$A3_URL/api/login" "scholar-auth" "Login Redirect -> ScholarAuth"
+echo ""
+
+# --- A4: Scholarship Sage ---
+echo "--- A4: Scholarship Sage (Aggregation) ---"
+# Note: A4 uses Replit OIDC via REPLIT_DOMAINS
+check_status "$A4_URL" "200" "Landing Page"
+check_status "$A4_URL/api/auth/user" "401" "Protected Route (Unauth)"
+check_redirect "$A4_URL/api/login" "replit.com" "Login Redirect -> Replit OIDC"
+echo ""
+
+# --- A5: Student Pilot ---
+echo "--- A5: Student Pilot (B2C Dashboard) ---"
+check_redirect "$A5_URL/api/login" "scholar-auth" "Login Redirect -> ScholarAuth"
+check_status "$A5_URL/api/auth/user" "401" "Protected Route (Unauth)"
+echo ""
+
+# --- A6: Provider Register ---
+echo "--- A6: Provider Register (B2B) ---"
+check_status "$A6_URL/healthz" "200" "Health Check"
+check_redirect "$A6_URL/api/login" "scholar-auth" "Login Redirect -> ScholarAuth"
+check_status "$A6_URL/auth/session" "401" "Protected Session (Unauth)"
+echo ""
+
+# --- A7: Auto Page Maker ---
+echo "--- A7: Auto Page Maker (SEO Engine) ---"
+check_status "$A7_URL/seo/stem-scholarships" "200" "Public SEO Page (Unauth)"
+check_status "$A7_URL/api/v1/pages/generate" "401" "Admin API (Unauth)"
+check_redirect "$A7_URL/api/login" "replit.com" "Admin Login -> Replit OIDC"
+echo ""
+
+# --- A8: Command Center ---
+echo "--- A8: Command Center (Telemetry) ---"
+check_status "$A8_URL/api/health" "200" "Health Check"
+check_status "$A8_URL/api/auth/user" "401" "Protected API (Unauth)"
+check_redirect "$A8_URL/api/login" "/" "Login Redirect (Session Create)"
+echo ""
+
+# --- Summary ---
+echo "========================================================"
+if [ $FAILED -eq 0 ]; then
+    echo -e "${GREEN}ALL SYSTEMS HEALTHY. AUTHENTICATION SECURE.${NC}"
+    echo "The fleet is ready for traffic."
+    exit 0
+else
+    echo -e "${RED}ERRORS DETECTED.${NC} Please review logs above."
+    exit 1
+fi
