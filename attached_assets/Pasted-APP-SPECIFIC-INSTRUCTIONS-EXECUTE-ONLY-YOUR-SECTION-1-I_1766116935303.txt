@@ -1,0 +1,142 @@
+APP-SPECIFIC INSTRUCTIONS (EXECUTE ONLY YOUR SECTION)
+1. IF YOU ARE: A1 (scholar_auth)
+What’s stopping revenue: M2M telemetry to A2/A8 intermittently 403 (WAF); downstream analytics blind spots. Missing Social SSO hurts conversion. What’s missing: Google/GitHub SSO, passkeys, fraud protection.
+
+P0 (Next 24h):
+
+Register scholar_auth JWKS with A2/A8 allowlists.
+
+Verify COMMAND_CENTER_SHARED_SECRET trust path.
+
+Emit test events to A8 until 403s cease.
+
+P1 (7-10d): Add Google/GitHub SSO; hCaptcha; TOTP/WebAuthn for admins.
+
+Interfaces: /health, /.well-known/openid-configuration, /metrics/auth.
+
+Acceptance: A8 shows user_signed_up events; SSO buttons render; zero 403s.
+
+2. IF YOU ARE: A2 (scholarship_api)
+What’s stopping revenue: search_analytics empty; no A5 integration; zero provider listings. What’s missing: Real-time search tracking, listing activation, semantic relevance.
+
+P0 (Next 24h):
+
+Add /api/search telemetry to write to search_analytics.
+
+Allowlist A1/A8 tokens (fix WAF blocking).
+
+Publish SDK snippet for A5.
+
+P1 (7-10d): Embeddings relevance; dashboard endpoint for A8.
+
+Interfaces: /api/search, /api/analytics/search-summary, /api/listings/activate.
+
+Acceptance: Non-zero queries in analytics; at least one A6 listing visible.
+
+3. IF YOU ARE: A3 (scholarship_agent)
+What’s stopping revenue: No email sends (SendGrid/credits); Campaign UI missing; SHARED_SECRET missing for A8 (logs show 403). What’s missing: Campaign creation, lead capture, SendGrid webhooks -> A8.
+
+P0 (Next 24h):
+
+Verify SENDGRID_API_KEY & SENDGRID_FROM_EMAIL (SPF/DKIM).
+
+CRITICAL: If "Maximum credits exceeded", report blocker immediately and prep SMTP fallback.
+
+Implement minimal Campaign send (Welcome).
+
+Register SendGrid Event Webhook -> A8.
+
+P1 (7-10d): Lead capture snippet for A7; segmentation.
+
+Interfaces: POST /api/campaigns/send, POST /api/leads.
+
+Acceptance: ≥1 delivered email recorded in A8; ≥10 leads captured.
+
+4. IF YOU ARE: A4 (scholarship_sage)
+What’s stopping revenue: Redis ECONNREFUSED 127.0.0.1 logs; inconsistent paywall. What’s missing: Stable cache, visible credits balance, paywall gating.
+
+P0 (Next 24h):
+
+CRITICAL: Replace local Redis with REDIS_URL or implement graceful in-memory fallback to stop crashes.
+
+Implement Credits Badge and Paywall Modal for premium actions.
+
+Emit ai_assist_attempt and paywall_shown to A8.
+
+P1 (7-10d): Trial-to-paid nudges; templates library.
+
+Interfaces: GET /api/credits/balance, POST /api/assist/draft.
+
+Acceptance: Users with 0 credits see paywall; valid users consume credits; logs free of Redis connection errors.
+
+5. IF YOU ARE: A5 (student_pilot)
+What’s stopping revenue: A8 telemetry 403 loops; no checkout sessions; UTM attribution broken. What’s missing: UTM capture, trial-to-paid nudges, checkout recovery.
+
+P0 (Next 24h):
+
+Fix A8 ingest auth (COMMAND_CENTER_SHARED_SECRET).
+
+Verify payment_succeeded and trial_credits_granted reach A8.
+
+Capture UTMs on landing -> signup -> purchase.
+
+P1 (7-10d): Checkout abandonment recovery; referral loop.
+
+Interfaces: POST /api/checkout/session, POST /api/telemetry/purchase.
+
+Acceptance: ≥1 successful live payment posted to A8; UTMs present on purchase.
+
+6. IF YOU ARE: A6 (provider_register)
+What’s stopping revenue: 0% Stripe Connect activation; logs show 401s on API. What’s missing: Onboarding nudges, listing wizard.
+
+P0 (Next 24h):
+
+Add "Complete Stripe Setup" banner.
+
+Fix 401s on /api/applications (check auth middleware).
+
+Emit provider_connected on Stripe webhook success.
+
+P1 (7-10d): Automated reminders via A8; provider dashboard.
+
+Interfaces: GET /api/stripe/connect/status, POST /api/providers/listings.
+
+Acceptance: ≥1 real provider completes Stripe Connect; listings creatable.
+
+7. IF YOU ARE: A7 (auto_page_maker)
+What’s stopping revenue: Missing 5 required env vars (logs); Redis URL invalid; SEO blind (no GSC). What’s missing: Env config, GSC verification, attribution A7->A5.
+
+P0 (Next 24h):
+
+CRITICAL: Set AUTH_API_BASE_URL, SERVICE_NAME, PROVIDER_REGISTER_BASE_URL, STUDENT_PILOT_BASE_URL.
+
+Fix Redis URL error (handle Upstash format or disable cache).
+
+Add GSC verification file/meta.
+
+Wire server-side page_view to A8 with UTM.
+
+P1 (7-10d): Generate Year-1 pages; internal linking; FAQ schema.
+
+Interfaces: /sitemap.xml, POST /api/telemetry/page-view.
+
+Acceptance: GSC verifies; A8 receives page views; Logs clear of "Missing variable" errors.
+
+8. IF YOU ARE: A8 (auto_com_center)
+What’s stopping revenue: "Unknown source app" logs; "Missing authentication token" logs; zero email visibility. What’s missing: Ingest auth registry, webhook ingestion, simple journeys.
+
+P0 (Next 24h):
+
+App Registry: Maintain allowlist of app_name ↔ secret. Reject unknown apps with clear 403 logs.
+
+Ingest: Integrate SendGrid/Postmark webhooks and normalize.
+
+Rules: If user_signed_up -> Trigger A3 Welcome Email.
+
+P1 (7-10d): A/B testing; SMS channel; personalization.
+
+Interfaces: POST /ingest (authenticated), POST /webhooks/email.
+
+Acceptance: Ingest accepts from all 7 apps without "Unknown source" errors; at least one journey fires.
+
+Step 1 Action: Identify yourself now and begin P0 execution.
