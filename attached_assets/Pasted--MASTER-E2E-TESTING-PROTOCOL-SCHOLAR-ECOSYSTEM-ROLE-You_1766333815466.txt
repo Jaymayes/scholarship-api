@@ -1,0 +1,203 @@
+# MASTER E2E TESTING PROTOCOL: SCHOLAR ECOSYSTEM
+
+ROLE: You are the Lead SDET (Software Development Engineer in Test) for a microservices ecosystem.  
+OBJECTIVE: Execute a comprehensive End-to-End (E2E) test suite for the single application you are currently assigned to.
+
+-------------------------------------------------------------------------------
+
+## 🛑 PHASE 1: MANDATORY INITIALIZATION (READ FIRST)
+
+CRITICAL INSTRUCTION: You have instructions for 8 different applications. You must NOT test them all.
+
+1) DETECT (Exactly one app)
+   - Resolve your current App ID using any of:
+     - Environment variables: APP_ID, APP_NAME, APP_BASE_URL
+     - package.json name/homepage or repo folder name
+     - Framework config (Next.js basePath, server origin, .env.*)
+     - Deployed origin in logs/config (preferred)
+   - Match your detected base URL to the Application Registry table below.
+
+2) LOCK (Isolate your scope)
+   - Once identified, IGNORE all instructions related to the other 7 apps.
+   - If you detect multiple matches or no match: STOP and output an error that includes the candidate values you inspected.
+
+3) HANDSHAKE (Must output exactly before any test)
+   - Print the following verbatim, replacing bracketed fields:
+
+> 🔍 AGENT IDENTITY CONFIRMED  
+> CURRENT APP ID: [Insert Detected ID]  
+> TARGET URL: [Insert Detected URL]  
+> ACTION: Locking context. Executing test suite for [Insert ID] only.
+
+If you cannot determine your app with confidence, print:
+> ❌ ABORT: Unable to determine single App ID with confidence. No tests executed.
+
+-------------------------------------------------------------------------------
+
+## 📂 APPLICATION REGISTRY (USE TO IDENTIFY YOUR SINGLE APP)
+
+| APP ID               | BASE URL (APP_BASE_URL)                                      | TYPE                |
+|----------------------|---------------------------------------------------------------|---------------------|
+| scholar_auth         | https://scholar-auth-jamarrlmayes.replit.app                 | Identity Provider   |
+| scholarship_api      | https://scholarship-api-jamarrlmayes.replit.app              | Backend API         |
+| scholarship_agent    | https://scholarship-agent-jamarrlmayes.replit.app            | AI Worker           |
+| scholarship_sage     | https://scholarship-sage-jamarrlmayes.replit.app             | Search Engine       |
+| student_pilot        | https://student-pilot-jamarrlmayes.replit.app                | Student Dashboard   |
+| provider_register    | https://provider-register-jamarrlmayes.replit.app            | Provider Frontend   |
+| auto_page_maker      | https://auto-page-maker-jamarrlmayes.replit.app              | CMS Tool            |
+| auto_com_center      | https://auto-com-center-jamarrlmayes.replit.app              | Messaging Hub       |
+
+-------------------------------------------------------------------------------
+
+## 🧷 TEST GUARDRAILS (APPLY TO ALL SUITES)
+
+- Non-destructive first: Prefer GET/read-only checks. Use write operations only if clearly isolated, labeled “E2E Test,” and cleaned up.
+- Redact everything sensitive in logs: tokens, secrets, cookies, emails, Tax IDs → ****
+- Rate limits: Max 1 RPS unless otherwise safe; back off on 429.
+- Environment safety:
+  - If NODE_ENV=production and no test account is configured, skip destructive test steps and mark as SKIPPED with rationale.
+  - Use test data prefixes: E2E-[timestamp]-[AppID]
+- Evidence capture in every step: HTTP method, URL, status code, key headers (Set-Cookie flags), response time, and an assertion note.
+- Pass criteria: Documented expected behavior must match observed; otherwise FAIL with captured evidence.
+
+-------------------------------------------------------------------------------
+
+## 📝 PHASE 2: REPORTING HEADER (REQUIRED ON EVERY OUTPUT)
+
+Start every report/log with this exact header:
+
+E2E TEST REPORT
+===============
+APP ID: [Insert Your App ID]
+APP_BASE_URL: [Insert Your Base URL]
+TIMESTAMP: [ISO8601]
+--------------------------------------------------
+
+-------------------------------------------------------------------------------
+
+## ⚙️ PHASE 3: EXECUTION SUITES (EXECUTE ONLY ONE — YOUR APP)
+
+Select the section that matches your CURRENT APP ID. Execute ONLY that section. If a step is not possible in your environment, mark it SKIPPED with a short reason and proceed.
+
+### 🔴 SUITE 1: scholar_auth (Identity Provider — Auth, Tokens, Security)
+1) Frontend Sanity
+   - Load Login and Signup pages; assert 200; console has no errors ≥ warn.
+2) Discovery & JWKS
+   - GET /oidc/.well-known/openid-configuration → 200; issuer/jwks_uri present
+   - GET jwks_uri → 200; ≥ 1 key present
+3) Registration Flow (Non-destructive mode if prod)
+   - Register new user (E2E unique email). Expect redirect to success/dashboard or a confirmation step. Capture Set-Cookie flags: Secure, HttpOnly, SameSite=None.
+   - Negative: Re-register same email → Expect 409 with clear error.
+4) Login Mechanics
+   - Valid login: Expect 302/200 path; authenticated session established (cookie or token).
+   - Invalid password: Expect 401 with clear message; no session cookie set.
+5) Security Inputs
+   - Attempt SQLi string in email/username: "' OR 1=1 --"
+   - Assert sanitized/blocked; 4xx response; no server error.
+
+### 🟠 SUITE 2: scholarship_api (Backend API — CRUD, Latency, Headers)
+1) Health
+   - GET /health → 200; body indicates DB "UP".
+2) Authorization
+   - GET /scholarships without Bearer → 401
+3) CRUD (Use E2E test entity; cleanup at end)
+   - POST /scholarships {title:"E2E Test"} → 201; capture id
+   - GET /scholarships/{id} → 200; verify title
+   - PUT /scholarships/{id} {deadline:"2099-12-31"} → 200; verify update
+   - DELETE /scholarships/{id} → 204; subsequent GET → 404
+4) Performance
+   - 5 sequential GETs on /scholarships; compute avg latency < 500ms
+
+### 🟡 SUITE 3: scholarship_agent (AI Worker — Jobs, Queues, Resilience)
+1) Service Status
+   - GET /health or equivalent → 200; “worker: active” (or logs endpoint shows running).
+2) Job Processing
+   - Trigger “Match Student” job (API/Webhook). Poll status until Completed with backoff. States: Queued → Processing → Completed.
+3) Integration
+   - Confirm agent fetches from scholarship_api successfully (check API call evidence or job output).
+4) Resilience
+   - Submit malformed JSON job; expect 4xx and graceful error logging; worker remains healthy.
+
+### 🟢 SUITE 4: scholarship_sage (Search — UI, Responsiveness, Context)
+1) UI Load
+   - Homepage shows “Sage” avatar and search input; no console errors.
+2) Search Logic
+   - Query: “Find me scholarships for engineering.” → Response non-empty text.
+3) Context Retention
+   - Follow-up: “What about for nursing?” → Response reflects context shift.
+4) Mobile View
+   - 375px width: input/Send button visible and usable; layout intact.
+
+### 🔵 SUITE 5: student_pilot (Student Dashboard — Forms, State)
+1) Dashboard
+   - “My Applications” + “Recommended” widgets present; no console errors.
+2) Profile
+   - Change GPA to 3.8; Save; hard refresh; value persists as 3.8.
+3) Application Flow
+   - Pick a scholarship; click Apply; complete modal; submit → status shows “Pending”.
+4) Auth Redirect
+   - While logged out: open dashboard route → redirected to scholar_auth.
+
+### 🟣 SUITE 6: provider_register (Onboarding — Validation, Uploads)
+1) Validation
+   - Submit empty form → “Required” on Org Name + Email
+   - Enter invalid Tax ID → inline validation error
+2) File Upload
+   - Upload Verification.pdf → progress completes; success icon
+3) Submission
+   - Complete wizard with valid data → redirected to “Pending Approval”
+
+### 🟤 SUITE 7: auto_page_maker (CMS — Generation, Rendering)
+1) Generator
+   - Create page: Title “E2E Test Page”, Body “Lorem Ipsum content.” → Publish OK
+2) Verify
+   - Visit generated URL; 200; <title>E2E Test Page</title> present; no 404s for assets
+3) Cleanup
+   - Delete page → visiting URL now returns 404
+
+### ⚫ SUITE 8: auto_com_center (Messaging — API, Real-time)
+1) API Gateway
+   - POST /send-message {to:"sandbox", body:"E2E ping"} → 200
+2) Inbox UI
+   - Load Message Center; verify message appears in log table
+3) Real-Time
+   - Keep Inbox open; trigger another message via API → new row appears without manual refresh (WebSocket/Polling)
+
+-------------------------------------------------------------------------------
+
+## 🧪 PHASE 4: EVIDENCE & ASSERTIONS (FOR EACH STEP)
+
+For every step you run:
+- Log: Method, URL, Status, Duration (ms)
+- Key headers: For auth flows, capture Set-Cookie flags (Secure/HttpOnly/SameSite), CORS headers where relevant
+- Assertion: One sentence stating the expected vs observed
+- Redact: Any tokens, secrets, cookie values → ****
+
+-------------------------------------------------------------------------------
+
+## 🏁 PHASE 5: FINAL OUTPUT (REQUIRED SUMMARY TABLE)
+
+After executing your selected suite, output a summary table:
+
+| Test Case                               | Status    | Notes / Error Log (Redacted)                          |
+|-----------------------------------------|-----------|-------------------------------------------------------|
+| [Name/ID of the step]                   | PASS/FAIL | Key evidence (status codes, assertions, timings, etc) |
+
+If any critical step FAILs, include a short “Next Actions” list with hypotheses and the minimal repro steps.
+
+-------------------------------------------------------------------------------
+
+## 🚫 ABORT CONDITIONS (FAIL FAST)
+
+- Multiple or zero App ID matches after DETECT → print the ABORT message and stop.
+- Production environment + no safe test account for destructive ops → SKIP destructive steps and continue read-only checks; mark as SKIPPED with reason.
+- Repeated 5xx on critical path (>2 times) → stop further writes; proceed with read-only checks and mark the rest as SKIPPED.
+
+-------------------------------------------------------------------------------
+
+## ✅ COMPLETION CHECK
+
+Your run is complete when:
+- You printed the Identity Handshake exactly.
+- You executed ONLY the suite for your identified app.
+- You produced the required header and the final summary table with PASS/FAIL decisions.
