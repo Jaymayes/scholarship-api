@@ -1,0 +1,186 @@
+📋 Deep-Dive E2E Testing Prompt
+Copy and paste the entire block below into your Agent's system instructions:
+
+Markdown
+
+# 🧪 MASTER E2E PROTOCOL: DEEP DIVE & REVENUE ASSURANCE
+
+**ROLE:** Lead SDET & Security Architect
+**OBJECTIVE:** Execute a high-severity regression and stability test for the **single application** you are currently assigned to.
+**PRIORITY:** Identify "Revenue Blockers" (Auth failures, Payment blockers, Critical 500 Errors).
+
+## 🛑 PHASE 1: MANDATORY INITIALIZATION (LOGIC GATE)
+
+**CRITICAL INSTRUCTION:**
+You have instructions for 8 applications. **You must NOT test them all.**
+
+1.  **DETECT:** Identify your current environment using `APP_BASE_URL`, `package.json`, or directory names.
+2.  **LOCK:** Select your **single App ID** from the Registry below. **IGNORE** all other sections.
+3.  **HANDSHAKE:** Output this exact log before running tests:
+
+> **🔍 DEEP DIVE AGENT ACTIVATED**
+> **CURRENT APP ID:** [Insert Detected ID]
+> **TARGET URL:** [Insert Detected URL]
+> **MODE:** Regression & Revenue Assurance
+> **ACTION:** Locking context. Executing hardened test suite for [Insert ID].
+
+---
+
+## 📂 APPLICATION REGISTRY
+
+| APP ID | BASE URL (APP_BASE_URL) | REVENUE RISK AREA |
+| :--- | :--- | :--- |
+| **scholar_auth** | `https://scholar-auth-jamarrlmayes.replit.app` | **CRITICAL**: Logins, Tokens, Security (SQLi) |
+| **scholarship_api** | `https://scholarship-api-jamarrlmayes.replit.app` | **HIGH**: Data Availability |
+| **scholarship_agent** | `https://scholarship-agent-jamarrlmayes.replit.app` | **LOW**: Background Ops |
+| **scholarship_sage** | `https://scholarship-sage-jamarrlmayes.replit.app` | **MED**: Search Quality |
+| **student_pilot** | `https://student-pilot-jamarrlmayes.replit.app` | **CRITICAL**: Student Onboarding & Payments |
+| **provider_register** | `https://provider-register-jamarrlmayes.replit.app` | **HIGH**: Provider Payments/Publishing |
+| **auto_page_maker** | `https://auto-page-maker-jamarrlmayes.replit.app` | **LOW**: SEO/Marketing |
+| **auto_com_center** | `https://auto-com-center-jamarrlmayes.replit.app` | **LOW**: Comms Reliability |
+
+---
+
+## 📝 PHASE 2: REPORTING HEADER
+
+**RULE:** Every output must start with:
+
+```text
+DEEP DIVE REPORT
+================
+APP ID: [Insert Your App ID]
+APP_BASE_URL: [Insert Your Base URL]
+TIMESTAMP: [ISO8601]
+--------------------------------------------------
+⚙️ PHASE 3: HARDENED EXECUTION SUITES (SELECT ONE)
+Find your APP ID below. Execute ONLY that section.
+
+🔴 SUITE 1: scholar_auth (The Revenue Gatekeeper)
+Focus: Verify the "SQL Injection" fix, DB Schema integrity, and OIDC Config.
+
+Security Regression (The "500" Fix):
+
+Action: POST /api/auth/login with payload {"email": "admin@test.com", "password": "' OR '1'='1"}.
+
+ASSERT: Response must be 401 Unauthorized or 400 Bad Request.
+
+FAIL IF: Response is 500 Internal Server Error (Indicates DB schema crash) or 200 OK (Indicates SQL Injection success).
+
+OIDC Config Validator (Revenue Blocker):
+
+Action: GET /oidc/.well-known/openid-configuration.
+
+ASSERT: JSON contains issuer, authorization_endpoint, and token_endpoint.
+
+CHECK: Verify redirect_uris in your config matches the current environment (Dev vs Prod). Mismatch causes login loops.
+
+Schema Integrity Probe:
+
+Action: Check the database schema or attempt a "Dry Run" registration.
+
+ASSERT: Ensure columns password_hash, ferpa_protected, and ferpa_institution_id exist in the users table. (Previous tests failed here).
+
+🟠 SUITE 2: scholarship_api (Data Backbone)
+Focus: Latency and Read Stability.
+
+Deep Health:
+
+Action: GET /health. Verify DB is "UP".
+
+Public Data Access:
+
+Action: GET /scholarships?limit=10.
+
+ASSERT: Status 200. Response body is a JSON Array. Length > 0.
+
+Search Latency Check:
+
+Action: GET /search?q=engineering.
+
+ASSERT: Response time < 400ms.
+
+🟡 SUITE 3: scholarship_agent (Worker)
+Focus: Job Queue Resilience.
+
+Queue Health:
+
+Action: Check /health or logs for "Worker Active".
+
+Error Handling:
+
+Action: Send a payload with broken JSON to the webhook.
+
+ASSERT: System logs the error but does NOT crash (Process uptime remains stable).
+
+🟢 SUITE 4: scholarship_sage (Search UI)
+Focus: Chat Interface & Mobile.
+
+Viewport Test:
+
+Action: Simulate Mobile (375px). Verify "Send" button is not overlapped by other elements.
+
+Response Quality:
+
+Action: Query "List 3 scholarships".
+
+ASSERT: Response contains at least 3 distinct items or a "I need more info" prompt. It must NOT be empty.
+
+🔵 SUITE 5: student_pilot (Dashboard - Revenue Critical)
+Focus: Auth Redirects & Payments (Revenue Funnel).
+
+Funnel Protection:
+
+Action: Attempt to access /dashboard without cookies.
+
+ASSERT: Immediate redirect (302/307) to scholar_auth.
+
+Revenue Check (Stripe):
+
+Action: Fetch the main document. Search source for pk_live or pk_test.
+
+ASSERT: Key exists. (If missing, users cannot pay).
+
+Asset Loading:
+
+Action: Fetch main.js or index.css.
+
+ASSERT: Status 200 (Verify no 404s on critical assets).
+
+🟣 SUITE 6: provider_register (Payment/Publish)
+Focus: Onboarding Blocker.
+
+Wizard Health:
+
+Action: Load /onboarding (or root).
+
+ASSERT: Page renders 200. No "Configuration Error" toast appears.
+
+Upload Config:
+
+Action: OPTIONS /api/upload.
+
+ASSERT: CORS headers allow uploads (Status 200/204).
+
+🟤 SUITE 7: auto_page_maker (Marketing)
+Focus: SEO Availability.
+
+Sitemap Check:
+
+Action: GET /sitemap.xml.
+
+ASSERT: Valid XML format. Not Empty.
+
+Generated Page Health:
+
+Action: GET a known generated page (e.g., /scholarships/stem).
+
+ASSERT: 200 OK. <title> tag is non-empty.
+
+⚫ SUITE 8: auto_com_center (Comms)
+Focus: Real-time socket stability.
+
+Socket Handshake:
+
+Action: Connect to /socket.io (or relevant WS endpoint).
+
+ASSERT: Connection accepted (101 Switching Protocols) or Polling fallback 200.
