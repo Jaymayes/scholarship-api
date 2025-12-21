@@ -1,0 +1,48 @@
+Markdown# 🔧 MASTER PROTOCOL: CRITICAL REMEDIATION & VERIFICATION (v2.0)
+
+**ROLE:** Senior DevOps Engineer & Security Architect
+**OBJECTIVE:** Resolve production blockers (specifically OIDC Auth failures and deployment crashes) and verify the "Golden Path" for the single application you are assigned to.
+
+## 🛑 PHASE 1: MANDATORY INITIALIZATION (LOGIC GATE)
+
+**CRITICAL INSTRUCTION:**
+You have instructions for 8 applications. **You must NOT execute them all.**
+
+1.  **DETECT:** Analyze your environment (`APP_BASE_URL`, `package.json`, directory) to identify your **ONE** App ID.
+2.  **LOCK:** Select your specific **Suite** below. **IGNORE** all others.
+3.  **HANDSHAKE:** Output this log before acting:
+
+> **🔧 REMEDIATION AGENT ONLINE**
+> **CURRENT APP ID:** [Insert Detected ID]
+> **TARGET URL:** [Insert Detected URL]
+> **ACTION:** Applying P0 Fixes and verifying production status.
+
+---
+
+## 📂 APPLICATION REGISTRY & KNOWN ISSUES
+
+| APP ID | BASE URL | KNOWN ISSUE (FIX THIS) |
+| :--- | :--- | :--- |
+| **scholar_auth** | `https://scholar-auth-jamarrlmayes.replit.app` | **CRITICAL:** Login returns "Server Error" (OIDC Param Missing). |
+| **scholarship_api** | `https://scholarship-api-jamarrlmayes.replit.app` | **WARN:** High Search Latency (>900ms). |
+| **provider_register** | `https://provider-register-jamarrlmayes.replit.app` | **CRITICAL:** Prod returns 500 (Out of sync). |
+| **student_pilot** | `https://student-pilot-jamarrlmayes.replit.app` | **PASS:** Revenue Config Check. |
+| *(All Others)* | `...` | **PASS:** Run Sanity Check. |
+
+---
+
+## 📝 PHASE 2: REPORTING HEADER
+
+**RULE:** Start every output with:
+
+```text
+REMEDIATION REPORT
+==================
+APP ID: [Insert ID]
+TIMESTAMP: [ISO8601]
+--------------------------------------------------
+⚙️ PHASE 3: FIX & VERIFY SUITES (EXECUTE ONLY ONE)Find your APP ID below. Execute ONLY that section.🔴 SUITE 1: scholar_auth (The Revenue Gatekeeper)Step 1: Fix OIDC Callback Error (P0 - CRITICAL)Context: Users receive "Server Error" after clicking "Allow" on the Replit Consent screen.Root Cause: The OIDC Token Exchange is missing the redirect_uri parameter. Replit requires this to match the initial authorization request exactly.Action: Locate the OIDC callback handler (likely in src/routes/auth.ts or src/controllers/authController.ts).Fix: Update the token exchange call (e.g., client.callback or client.authorizationCodeGrant). You MUST explicitly add the redirect_uri to the parameters object.Required Change:JavaScript// Ensure this parameter is present in the token exchange call:
+{
+  redirect_uri: '[https://scholar-auth-jamarrlmayes.replit.app/api/auth/callback](https://scholar-auth-jamarrlmayes.replit.app/api/auth/callback)'
+}
+Verify: Add console.error('OIDC Error:', error) to the catch block to log specific error details from Replit.Step 2: Fix Publishing Blocker (Stripe Removal)Action: Scan package.json for stripe.Fix: If present, remove the dependency or comment out usage. CRITICAL: Advise the user to "Disconnect Stripe Integration" in the Replit UI (Tools > Integrations) if it persists.Step 3: Database Schema RepairAction: Verify if password_hash and ferpa_protected columns exist in the users table.Fix: If missing, execute ALTER TABLE users ADD COLUMN... commands immediately.Step 4: VerificationAction: GET /health. ASSERT: Status 200.🟣 SUITE 6: provider_register (Deployment Repair)Step 1: Production SyncAction: GET https://provider-register-jamarrlmayes.replit.app/healthz (External URL).Condition: If Status is 500 or 404, the production build is stale.Fix Action: Run npm run build locally to verify the build succeeds.Output: "⚠️ ACTION REQUIRED: Manual Republish needed in Replit UI to sync fixes."Step 2: VerificationAction: GET /. ASSERT: Status 200 (Load the homepage).🟠 SUITE 2: scholarship_api (Performance)Step 1: Latency FixAction: Check Database Indexes.Fix: Add CREATE INDEX IF NOT EXISTS idx_scholarships_title ON scholarships(title); and CREATE INDEX IF NOT EXISTS idx_scholarships_description ON scholarships(description);.Step 2: VerificationAction: GET /search?q=engineering. ASSERT: Time < 900ms.🔵 SUITE 5: student_pilot (Revenue Check)Step 1: Revenue ConfigAction: Scan for VITE_STRIPE_PUBLIC_KEY.ASSERT: Key exists and starts with pk_live_ or pk_test_.Step 2: VerificationAction: GET /api/checkout (Unauth). ASSERT: Status 401.⚪ OTHER APPS (scholarship_agent, scholarship_sage, auto_page_maker, auto_com_center)Step 1: Golden Path VerificationAction: GET /health. ASSERT: Status 200.Action: GET /. ASSERT: Status 200.🏁 PHASE 4: FINAL SIGN-OFFINSTRUCTION: Output the final status table.App IDStatusFix Applied?[Your ID]PASS / FAIL[Yes (Details) / No]If manual intervention is required:⚠️ MANUAL ACTION REQUIRED: Please click 'Publish' in the Replit UI to deploy these fixes.
