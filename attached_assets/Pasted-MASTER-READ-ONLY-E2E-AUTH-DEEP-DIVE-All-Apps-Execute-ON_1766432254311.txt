@@ -1,0 +1,163 @@
+MASTER READ-ONLY E2E AUTH DEEP-DIVE (All Apps; Execute ONLY Your Section)
+
+Role and objective
+Role: Lead SDET (Read-Only Incident Investigator)
+Objective: System Auth is not working. Perform a full E2E deep-dive across frontend and backend for your single assigned application to find all auth errors. Do not make any changes.
+
+Hard guardrails
+1. Read-Only: Do NOT edit code, env, DNS, secrets, or deployments. Collect evidence only.
+2. One-App Scope: Execute only the section for your app. Do not touch other app sections.
+3. Evidence-First: Every finding must cite concrete evidence (HTTP status, headers summary, log snippets). Redact sensitive values (tokens, cookies, secrets) as ****.
+4. No assumptions: If a check can’t be verified, mark N/A and state why.
+
+Phase 1 — Identity handshake (mandatory)
+1. Detect which single app you are in (from APP_BASE_URL env, package.json name/homepage, server config, or deployment origin).
+2. Lock to that app’s suite. Ignore all others.
+3. Print this line exactly before any tests:
+   ✅ DIAGNOSTIC INITIATED FOR: [APP_ID] ([app_name]) | URL: [APP_BASE_URL]
+
+If you cannot determine your app, print:
+   ❌ ABORT: Unable to determine single App ID with confidence. No diagnostics executed.
+
+Fleet manifest (for identification only)
+scholar_auth        → https://scholar-auth-jamarrlmayes.replit.app
+scholarship_api     → https://scholarship-api-jamarrlmayes.replit.app
+scholarship_agent   → https://scholarship-agent-jamarrlmayes.replit.app
+scholarship_sage    → https://scholarship-sage-jamarrlmayes.replit.app
+student_pilot       → https://student-pilot-jamarrlmayes.replit.app
+provider_register   → https://provider-register-jamarrlmayes.replit.app
+auto_page_maker     → https://auto-page-maker-jamarrlmayes.replit.app
+auto_com_center     → https://auto-com-center-jamarrlmayes.replit.app
+
+Global evidence rules (applies to all suites)
+For each step, capture:
+- Method, URL, Status, Duration (ms)
+- Key headers summary (no values): Set-Cookie flags (Secure/HttpOnly/SameSite), CORS headers (Allow-Origin/Methods/Credentials), Location (redirect target)
+- One-line assertion comparing expected vs observed
+- Redact: **** for any secrets, tokens, cookie values.
+
+Phase 2 — Execute ONLY your per-app diagnostic suite
+
+➡️ Suite A1 — scholar_auth (Identity Provider; OIDC core)
+Focus: Discovery/JWKS; login initiation; callback integrity; token exchange; cookie flags; CORS/CSP; scopes; domain variants.
+1. Health & discovery
+   - GET /health → 200
+   - GET /oidc/.well-known/openid-configuration → 200; issuer/authorization_endpoint/token_endpoint/jwks_uri present (names only)
+   - GET jwks_uri → 200; confirm RS256 key(s)
+2. Login initiation (read-only)
+   - Trigger public login initiation (e.g., GET /api/login or UI start). Inspect auth URL parameters (names only):
+     - redirect_uri should be https://scholar-auth-jamarrlmayes.replit.app/api/callback (canonical)
+     - scope includes openid email profile (no offline_access)
+     - response_type=code; code_challenge_method=S256
+3. Callback integrity
+   - After consent (or by reviewing captured flows/logs), confirm the browser returns to /api/callback (canonical).
+   - If /auth/callback appears, note whether it 3xx forwards to /api/callback and flag mismatch risk.
+4. Token exchange outcome (logs only)
+   - Note any invalid_grant, redirect_uri_mismatch, or server_error entries.
+5. Cookies & headers security
+   - Confirm Secure/HttpOnly/SameSite=None on session cookies; HSTS and CSP present on main HTML response.
+6. CORS allowlist
+   - Read config/headers to verify both https://scholaraiadvisor.com and https://www.scholaraiadvisor.com are allowed.
+7. Negative payload
+   - POST /api/auth/login with password="' OR '1'='1" → expect 401/400; confirm no 500
+
+➡️ Suite A2 — scholarship_api (Protected API)
+Focus: Health; authorization boundary; CORS allowlist; issuer alignment; search latency.
+1. Health: GET /health → 200; DB=UP
+2. Auth boundary: GET protected route without Bearer → 401; note WWW-Authenticate if present
+3. CORS: OPTIONS preflight using origin=https://scholaraiadvisor.com (and https://www.scholaraiadvisor.com) → Access-Control-Allow-Origin must be exact; no wildcard+credentials
+4. Issuer linkage: Config references SCHOLAR_AUTH issuer exactly as https://scholar-auth-jamarrlmayes.replit.app/oidc (names only)
+5. Latency: GET /search?q=engineering ×3 → average; flag > 400 ms
+
+➡️ Suite A3 — scholarship_agent (Worker/Agent)
+Focus: Worker health; OIDC discovery linkage (if any); m2m headers; resilience.
+1. Health: GET /health → 200
+2. Discovery linkage: Verify ISSUER_URL contains /oidc exactly; note any 503
+3. Telemetry headers: If sending to A8, assert Authorization: Bearer **** and X-App-ID present (names only)
+4. Resilience: Trigger read-only malformed job if safe → expect 4xx; process remains healthy
+5. Any redirect_uri_mismatch logs if a browser login exists
+
+➡️ Suite A4 — scholarship_sage (Search UI)
+Focus: No blank page; login CTA correctness; unauth handling; mobile.
+1. UI: GET / → 200; no fatal console errors; “Sign in” visible if unauth
+2. Unauth search: Attempt a query → if 401, UI must not blank-crash; display CTA
+3. Login CTA: Inspect the generated auth URL; redirect_uri must match this app’s canonical callback (typically /api/callback on its own host)
+4. Mobile: 375px viewport; ensure Send button accessible
+
+➡️ Suite A5 — student_pilot (Public site on custom domain; revenue funnel)
+Focus: Blank page; assets/CSP/CORS; login redirect; checkout guard; domain variants.
+1. Document load: GET https://scholaraiadvisor.com → 200; check main.js/index.css → 200 (no 404)
+2. Console/network: Look for CSP connect-src/CORS blocks to A1/A2; mixed-content warnings
+3. Domain variants (critical): Validate backends allow both https://scholaraiadvisor.com and https://www.scholaraiadvisor.com
+4. Auth redirect: Access /dashboard unauth → expect 302/307 to A1; inspect generated auth URL (names only); redirect_uri must be https://scholaraiadvisor.com/api/callback (canonical for this app)
+5. Checkout guard: POST /api/checkout unauth → 401
+
+➡️ Suite A6 — provider_register (Provider onboarding)
+Focus: Auth redirect; callback route correctness; protected routes; upload preflight.
+1. Auth redirect: GET /api/login → 302 to A1
+2. Callback route: Confirm configured redirect_uri matches this app’s canonical callback (e.g., /auth/callback or /api/callback consistently)
+3. Protected routes: GET /api/organizations unauth → 401
+4. Upload CORS: OPTIONS /api/upload → 204/200 with exact origins and required headers (no wildcard+credentials)
+
+➡️ Suite A7 — auto_page_maker (CMS/SEO)
+Focus: SEO endpoints; admin guard; telemetry; dev vs prod auth routes.
+1. SEO: GET /sitemap.xml and one /seo/* page → 200; non-empty title
+2. Admin guard: GET /admin unauth → expect 401/403 (if 200, note SPA guard reliance)
+3. Auth routes (read-only):
+   - /api/login and /api/callback status (note any “unknown strategy” in dev that differs from prod)
+4. Telemetry: POST /api/telemetry/page-view → accepted; note CORS if applicable
+
+➡️ Suite A8 — auto_com_center (Comms/telemetry hub)
+Focus: Health; SSE/WS; ingest; S2S auth (no end-user OIDC).
+1. Health: GET /healthz → 200
+2. SSE/WS: Connect to /api/telemetry/stream (or /socket) → initial event received
+3. Ingest: POST webhook test (read-only/safe) → 200; note persistence evidence from logs
+
+Phase 3 — Report (required format; per app)
+
+Start every report with the header and include the app name and base URL.
+
+E2E TEST REPORT
+APP ID: [Your App ID] ([App Name])
+APP_BASE_URL: [Your Base URL]
+TIMESTAMP: [ISO8601]
+
+1. CONFIGURATION & LINKAGE
+- Issuer/Discovery reachable: [Yes/No/N/A]
+- Canonical redirect_uri in Authorization Request (observed): [Value or N/A]
+- Token exchange redirect_uri (server perspective): [Value or Unknown]
+- Cookie flags (Secure/HttpOnly/SameSite=None on auth flows): [Yes/No/N/A]
+- CORS includes scholaraiadvisor.com and www variant: [Yes/No/N/A]
+- Scopes request includes offline_access: [Yes/No]
+
+2. E2E FINDINGS (Frontend + Backend)
+- Frontend load (no blank page): [PASS/FAIL] | Evidence
+- Auth initiation URL params (names only): [List]
+- Callback path observed after consent: [Path] | Mismatch risk [Yes/No]
+- Unauth protected endpoints return 401: [PASS/FAIL]
+- SSE/WS or webhook tests (if supported): [PASS/FAIL/N/A]
+- Negative login SQLi returns 401/400 (no 500): [PASS/FAIL/N/A]
+
+3. LOG INSIGHTS (last 50 lines; summarize)
+- redirect_uri_mismatch / invalid_grant / server_error: [Summary]
+- CORS/CSP violations affecting auth endpoints: [Summary]
+- Crash loops/restarts: [Summary]
+
+4. ROOT CAUSE HYPOTHESIS (read-only)
+- From this app’s perspective, why is Auth failing? Provide the most likely cause, supported by the evidence above.
+- Example: “Authorization request used /auth/callback while token exchange expects /api/callback; IdP rejects token exchange with invalid_grant.”
+
+5. CROSS-APP DEPENDENCIES (read-only)
+- List any dependencies (A1–A8) implicated and what they must verify (e.g., “A1 must ensure both www and non-www origins are allowed in CORS; A5 initiates login with non-www domain.”)
+
+Status scale
+GREEN: No auth defects found in this app’s flow.
+YELLOW: Issues found but not auth-blocking (e.g., slow search, SPA-guarded admin).
+RED: Auth-blocking defect (e.g., redirect mismatch, token exchange failure, 500 on login, CORS blocks on prod domain).
+
+Abort conditions
+- Multiple or zero App ID matches → print ABORT and stop.
+- Any diagnostic would require a change → do not change; record the needed fix as read-only observation.
+- Sensitive data exposure risk → redact and proceed with summaries only.
+
+End of prompt.
