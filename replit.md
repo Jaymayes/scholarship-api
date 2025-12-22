@@ -16,6 +16,12 @@ The business vision is to create a comprehensive, intelligent platform that conn
 - Auth Middleware: RS256 (JWKS) + HS256 (legacy) tokens validated against revocation list
 - Production Enforcement: Startup fails without required security secrets
 
+**CORS Fix** (2025-12-22): Custom domain support added
+- Added `https://scholaraiadvisor.com` to CORS allowed origins
+- Added `https://www.scholaraiadvisor.com` to CORS allowed origins
+- Added `X-App-ID`, `X-Protocol-Version`, `X-Request-ID` to CORS allowed headers
+- All 10 origins now supported (8 Replit apps + 2 custom domains)
+
 # User Preferences
 
 Preferred communication style: Simple, everyday language.

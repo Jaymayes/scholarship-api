@@ -225,7 +225,7 @@ class Settings(BaseSettings):
         alias="ALLOWED_METHODS"
     )
     cors_allow_headers: list[str] = Field(
-        ["Authorization", "Content-Type", "If-None-Match"],
+        ["Authorization", "Content-Type", "If-None-Match", "X-App-ID", "X-Protocol-Version", "X-Request-ID"],
         alias="ALLOWED_HEADERS"
     )
     cors_max_age: int = Field(600, alias="MAX_AGE")  # 10 minutes
@@ -233,8 +233,9 @@ class Settings(BaseSettings):
     @property
     def get_cors_origins(self) -> list[str]:
         """
-        Master Prompt CORS Configuration: All 8 ScholarshipAI apps
+        Master Prompt CORS Configuration: All 8 ScholarshipAI apps + custom domains
         Restricts cross-origin requests to only the allowed ecosystem apps
+        CORS FIX 2025-12-22: Added scholaraiadvisor.com custom domain variants
         """
         return [
             "https://scholar-auth-jamarrlmayes.replit.app",
@@ -245,6 +246,8 @@ class Settings(BaseSettings):
             "https://provider-register-jamarrlmayes.replit.app",
             "https://auto-page-maker-jamarrlmayes.replit.app",
             "https://auto-com-center-jamarrlmayes.replit.app",
+            "https://scholaraiadvisor.com",
+            "https://www.scholaraiadvisor.com",
         ]
 
     @property
