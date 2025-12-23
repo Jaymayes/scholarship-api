@@ -1,0 +1,211 @@
+# 🚨 P0 HOTFIX PROMPT — AUTH CALLBACK STILL FAILING (missing_parameters)
+STATUS: Not fixed. You must (1) prove why a real browser wasn’t used previously, (2) run a forced Playwright/Chromium E2E from scholaraiadvisor.com through callback, and (3) self‑identify your app and execute ONLY its repair mission + E2E. Then publish A1 if config changes were made and re‑verify in production.
+
+0) SAFETY, SCOPE, REDACTION
+- Modify ONLY your current app. For cross‑app issues, open a ticket with evidence.
+- Redact secrets/tokens/state/codes/cookies → ****
+- Non‑destructive by default; label any write “E2E Test” and clean up.
+- Rate limit: ≤ 1 RPS; exponential backoff on 429/503.
+
+──────────────────────────────────────────────────────────────────────────────
+
+PHASE 0 — COMPLIANCE INTERROGATION (MANDATORY)
+1) Why wasn’t a REAL browser used previously for scholaraiadvisor.com?
+   - Provide the exact reason and the command/error proof (e.g., Playwright not installed, headed blocked, wrong target).
+
+2) What changed so a browser WILL be used now?
+   - Steps: npm i -D playwright; npx playwright install chromium; headed vs headless; xvfb if needed.
+
+3) Print EXACTLY:
+ACK: HTTP-only testing is forbidden for this run. I will use Playwright/Chromium.
+
+If you cannot guarantee a browser, STOP and print:
+> ABORT: Browser unavailable. Reason: [detail]. Remediation: [commands/settings]. Request approval to retry.
+
+──────────────────────────────────────────────────────────────────────────────
+
+PHASE 1 — ENFORCED BROWSER E2E (scholaraiadvisor.com)
+Install/Provision:
+- npm i -D playwright && npx playwright install chromium
+
+Launch (headed preferred):
+- 1280×900, en-US. If headed fails, headless=true with justification.
+
+PRINT BEFORE LAUNCH:
+BROWSER RUN: Playwright/Chromium | headed=[true/false] | reason=[if false]
+
+Collect artifacts (./artifacts/):
+- ConsoleAndNetwork.har (Home + Sign‑in + callback)
+- Screenshots: home.png, auth-click.png, callback-error.png
+- AuthFlowReport.json
+
+Steps:
+1) Open https://scholaraiadvisor.com → 200; save home.png; capture console errors.
+2) Click “Sign in / Log in” → wait idle → save auth-click.png. Record HTTP chain and final domain.
+3) Click “Continue with [Provider]” WITHOUT real creds; allow redirect back to A1 callback.
+   - If /auth|/api/callback?error=missing_parameters (or server_error) → save callback-error.png and HAR.
+
+AuthFlowReport.json schema:
+{
+  "ctaText": "...",
+  "startURL": "https://scholaraiadvisor.com",
+  "authEntryURL": "https://scholar-auth-.../oidc/interaction/...",
+  "finalCallbackURL": "https://scholar-auth-.../auth|api/callback?...",
+  "httpChain": ["..."],
+  "visibleLoginUI": true/false,
+  "errors": ["missing_parameters"|"server_error"|"..."],
+  "observations": ["sanitized notes"]
+}
+
+──────────────────────────────────────────────────────────────────────────────
+
+PHASE 2 — CALLBACK TRIAGE (WHY ARE code/state MISSING?)
+A) HAR: Find callback request; record hasCode/hasState booleans + lengths only; note referrer and the last 302 Location (host+path only).
+
+B) Redirect URI parity:
+- Extract the redirect_uri used in the initial authorization request (host+path only).
+- Compare with registered redirect_uris and configured callback path:
+  - Host mismatch? Path mismatch (/auth/callback vs /api/callback)? Trailing slash?
+
+C) Cookies/SameSite on callback:
+- Was session cookie sent? Must have Secure; HttpOnly; SameSite=None; Domain matches callback host.
+
+D) PKCE/state persistence:
+- Confirm server‑side storage or stateless scheme that survives redirects.
+- If client‑only state/PKCE (sessionStorage/localStorage) → code/state will be lost cross‑domain.
+
+E) Middleware expectations:
+- If resume handler checks req.isAuthenticated(), ensure JWT middleware sets req.isAuthenticated = () => !!req.user (Passport compatibility).
+
+──────────────────────────────────────────────────────────────────────────────
+
+PHASE 3 — SELF‑IDENTIFICATION (STRICT LOGIC GATE)
+APP REGISTRY
+A1 = scholar_auth        → https://scholar-auth-jamarrlmayes.replit.app
+A2 = scholarship_api     → https://scholarship-api-jamarrlmayes.replit.app
+A3 = scholarship_agent   → https://scholarship-agent-jamarrlmayes.replit.app
+A4 = scholarship_sage    → https://scholarship-sage-jamarrlmayes.replit.app
+A5 = student_pilot       → https://student-pilot-jamarrlmayes.replit.app
+A6 = provider_register   → https://provider-register-jamarrlmayes.replit.app
+A7 = auto_page_maker     → https://auto-page-maker-jamarrlmayes.replit.app
+A8 = auto_com_center     → https://auto-com-center-jamarrlmayes.replit.app
+
+PRINT EXACTLY:
+DETECTED APP ID: [A# / app name]
+APP BASE URL: [exact URL from registry]
+ACTION: Locking context. Executing only [this app] repair + E2E.
+
+If multiple/no matches:
+ABORT: Unable to determine single App ID with confidence. No actions executed.
+
+──────────────────────────────────────────────────────────────────────────────
+
+PHASE 4 — REPAIR MISSIONS (EXECUTE ONLY YOUR APP SECTION)
+
+🔷 A1 scholar_auth — OIDC GATEKEEPER & CALLBACK DIAGNOSTICS
+- Callback diagnostics (CRITICAL): Ensure /auth|/api/callback logs hasCode/hasState booleans, code/state length, referer, hostname, protocol, queryKeys (names only). Never log raw values.
+- CORS allowlist: Include EXACT origins:
+  - https://scholaraiadvisor.com, https://www.scholaraiadvisor.com
+  - All 8 app URLs from registry
+  - Allow credentials; preflight OPTIONS correct (ACAO, ACAC, ACAH includes Authorization, Content-Type, X-App-ID)
+- OIDC discovery/JWKS: 200 OK; RS256 only.
+- req.isAuthenticated polyfill: Middleware should set req.isAuthenticated = () => !!req.user if the resume handler expects it.
+- NOTE: If you changed config, PUBLISH A1 and re‑run browser E2E on production.
+
+🔷 A2 scholarship_api — CORS + SEARCH LATENCY
+- CORS: allow scholaraiadvisor.com & www; OPTIONS ACAH includes Authorization, Content-Type, X-App-ID.
+- Latency: /search?q=engineering < 400ms; if ≥ 900ms add indexes/full‑text.
+
+🔷 A3 scholarship_agent — OIDC + TELEMETRY
+- ISSUER_URL EXACT to A1 /oidc; /api/login → 302/200.
+- Telemetry to A8: Authorization: Bearer ****; X-App-ID: scholarship_agent.
+
+🔷 A4 scholarship_sage — SCOPE + 401 UX
+- Scope: ['openid','email','profile'] only; remove offline_access.
+- 401 UX: show clear “Sign in” CTA.
+
+🔷 A5 student_pilot — REVENUE FUNNEL
+- AUTH_ISSUER_URL → A1 /oidc; Stripe pk_live_ or pk_test_ present (redacted).
+- /api/checkout (unauth) → 401; telemetry hits A8 /ingest.
+
+🔷 A6 provider_register — HEALTH + AUTH + CORS
+- /healthz → 200; if 404/500, build & advise republish.
+- /api/login → 302 to A1; OPTIONS /api/upload → 200/204.
+
+🔷 A7 auto_page_maker — ADMIN SECURITY
+- /admin unauth → 401/403 (server-side guard); /sitemap.xml & /robots.txt → 200.
+
+🔷 A8 auto_com_center — JWKS + REAL‑TIME
+- JWKS retry/backoff for A1; SSE/WS stable ≥ 2s; webhook ingest 200.
+
+──────────────────────────────────────────────────────────────────────────────
+
+PHASE 5 — QUICK PRE‑FLIGHT (COMMON)
+- GET /health or /healthz → 200
+- Secrets presence (SET/MISSING only)
+- APP_BASE_URL matches deployed origin.
+
+──────────────────────────────────────────────────────────────────────────────
+
+PHASE 6 — APP E2E (EXECUTE ONLY YOUR SUITE)
+REPORT HEADER
+E2E TEST REPORT
+===============
+APP ID: [Your App ID]
+APP_BASE_URL: [Your Base URL]
+TIMESTAMP: [ISO8601]
+--------------------------------------------------
+
+- Log each step: METHOD URL | status=___ | time=___ms | assertion=[expected vs observed]
+- Include headers snapshots for security/CORS (no cookie values).
+
+A1 scholar_auth
+- / → 200; discovery → 200; JWKS → 200
+- OPTIONS (Origin: https://scholaraiadvisor.com, https://www.scholaraiadvisor.com) → 200/204
+- Confirm callback diagnostic logs present (recent lines)
+
+A2–A8: Run per your app’s section above.
+
+──────────────────────────────────────────────────────────────────────────────
+
+PHASE 7 — FINAL REVENUE BLOCKER CHECK
+| Check                         | Status (PASS/FAIL/SKIP) | Risk | Notes (Redacted)               |
+|------------------------------|--------------------------|------|--------------------------------|
+| Callback receives code/state |                          | High | A1 diag logs / HAR evidence    |
+| OIDC/JWKS Integrity          |                          | High | RS256 keys present             |
+| CORS for Frontends           |                          | Med  | scholaraiadvisor.com & www     |
+| Stripe/Revenue Keys          |                          | High | A5/A6 keys present             |
+| Critical Assets (JS/CSS)     |                          | Med  | main.js/index.css 200          |
+
+VERDICT: [READY FOR TRAFFIC / BLOCKED]
+If BLOCKED: attach AuthFlowReport.json + HAR row indices, list precise RCs (redirect_uri mismatch, SameSite, PKCE/state, polyfill), and link tickets.
+
+──────────────────────────────────────────────────────────────────────────────
+
+PHASE 8 — AUTONOMOUS REPAIR REPORT (REQUIRED)
+🏁 AUTONOMOUS REPAIR REPORT
+APP ID: [Your ID]
+ACTION TAKEN: [Files/config modified or "None"]
+VERIFICATION: [Key health checks / E2E assertions]
+STATUS: [FIXED / STABLE]
+
+──────────────────────────────────────────────────────────────────────────────
+
+PHASE 9 — TICKETS (CROSS‑APP)
+- Auth Callback — missing_parameters (Production; A1 owner)
+  - Evidence (sanitized): finalCallbackURL; redirect_uri (host+path); cookie flags at callback; HAR row indexes.
+  - Fix: Align redirect_uri; SameSite=None; server‑side PKCE/state; isAuthenticated polyfill; env guards; PUBLISH A1 and re‑test.
+
+- A2 CORS Allowlist — scholaraiadvisor.com/www
+  - Evidence: OPTIONS/GET missing ACAO.
+
+- A8 Telemetry Allowlist — Bearer + X-App-ID
+  - Evidence: 403 on /api/report or /ingest.
+
+──────────────────────────────────────────────────────────────────────────────
+
+PHASE 10 — PUBLISH & RE‑VERIFY (A1 ONLY if changed)
+- If A1 config changed (CORS or callback diagnostics), PUBLISH scholar_auth.
+- Re‑run PHASE 1 browser E2E on production and confirm callback receives code/state and token exchange succeeds.
+
+END OF PROMPT — Execute now in MAX Autonomous mode.
