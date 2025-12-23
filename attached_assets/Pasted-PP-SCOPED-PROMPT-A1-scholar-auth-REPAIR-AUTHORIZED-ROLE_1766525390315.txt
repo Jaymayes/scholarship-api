@@ -1,0 +1,189 @@
+PP‑SCOPED PROMPT — A1 (scholar_auth) REPAIR AUTHORIZED
+ROLE: A1 Owner — Senior DevOps/SDET
+AUTHORIZED ACTIONS: May modify A1 code/config, restart/publish. Must not modify other apps.
+
+PHASE 1 — LOGIC GATE
+
+DETECT your app (env/repo/origin). If not A1, ❌ ABORT.
+HANDSHAKE (print exactly): 🔍 AGENT IDENTITY CONFIRMED CURRENT APP ID: A1 / scholar_auth TARGET URL: https://scholar-auth-jamarrlmayes.replit.app ACTION: Locking context. Executing remediation + E2E for A1 only.
+PHASE 2 — REPORT HEADER E2E TEST REPORT APP ID: A1 / scholar_auth APP_BASE_URL: https://scholar-auth-jamarrlmayes.replit.app TIMESTAMP: [ISO8601]
+PHASE 3 — REMEDIATION (A1 only)
+
+OIDC sanity: GET /oidc/.well-known/openid-configuration → issuer, authorization_endpoint, token_endpoint present.
+redirect_uris parity: Ensure A5 callback https://student-pilot-jamarrlmayes.replit.app/api/callback is registered.
+Cookies/CORS:
+Cookies: Secure, HttpOnly, SameSite=None; trust proxy enabled.
+CORS allowlist: scholaraiadvisor.com + www; credentials true; OPTIONS → 204.
+SQLi regression: POST /api/auth/login {"email":"e2e@test.com","password":"' OR '1'='1"} → expect 401/400; if 500 then add users.password_hash, users.ferpa_protected, users.ferpa_institution_id and rerun.
+JWT: JWKS RS256 only; zero HS256 fallback.
+Callback diagnostics: Ensure logging hasCode/hasState + error codes active.
+PHASE 4 — E2E (A1)
+
+Frontend / → 200; Discovery/JWKS → 200
+Login invalid/valid boundary → 401 (no 500)
+CORS preflight scholaraiadvisor.com and www → 204
+iOS/Safari Step: Manual device required. If blocked by reCAPTCHA, SKIP and note “Manual iOS validation pending.”
+PHASE 5 — EVIDENCE
+
+Log method/URL/status/duration, Set-Cookie flags, and CORS headers (no values). Redact secrets with ****.
+PHASE 6 — FINAL TABLES
+
+Test Summary + Revenue‑Blocker (Auth/SQLi, DB, OIDC/JWKS, CORS, Headers)
+PHASE 7 — TICKETS (only if needed; then STOP)
+
+A1 CORS & Cookie Alignment — scholaraiadvisor.com
+A1 Client Registration Update — student_pilot (Include redacted evidence and timestamps)
+COMPLETION CHECK
+
+Handshake printed; Only A1 changes; Final tables; VERDICT
+APP‑SCOPED PROMPT — A5 (student_pilot) REPAIR AUTHORIZED
+ROLE: A5 Owner — Senior DevOps/SDET
+AUTHORIZED ACTIONS: May modify A5 code/config, restart/publish. Must not modify other apps.
+
+PHASE 1 — LOGIC GATE
+
+DETECT = A5, else ❌ ABORT.
+HANDSHAKE (exact): 🔍 AGENT IDENTITY CONFIRMED CURRENT APP ID: A5 / student_pilot TARGET URL: https://student-pilot-jamarrlmayes.replit.app ACTION: Locking context. Executing remediation + E2E for A5 only.
+PHASE 2 — REPORT HEADER (same format)
+
+PHASE 3 — REMEDIATION (A5 only)
+
+PKCE/state: Server‑side storage; no sessionStorage; low clock skew.
+Cookies: Secure/HttpOnly/SameSite=None; trust proxy enabled; callback route /api/callback active.
+Stripe/Assets: pk_live_ or pk_test_ present; /assets/index.css & main.js → 200.
+Unauth guard: /api/auth/user → 401; /api/checkout → 401 unauth.
+PHASE 4 — E2E (A5)
+
+/health → 200; assets 200; protected → 401
+iOS/Safari Step: Manual device; flow A5 → A1 → IdP → back to A5. Expect code/state restored and session. If failed, open A1 + A5 ticket and STOP.
+PHASE 5/6 — EVIDENCE & FINAL TABLES (as A1)
+
+PHASE 7 — TICKETS (if needed; STOP)
+
+A1 Client Registration Update — student_pilot
+A1 CORS & Cookie Alignment — scholaraiadvisor.com
+COMPLETION CHECK (as A1)
+
+APP‑SCOPED PROMPT — A2 (scholarship_api) TICKET‑ONLY
+ROLE: A2 Observer — Ticket‑Only
+AUTHORIZED ACTIONS: No code changes. Sanity check + ticket if needed.
+
+PHASE 1 — LOGIC GATE
+
+DETECT = A2, else ❌ ABORT.
+HANDSHAKE: 🔍 AGENT IDENTITY CONFIRMED CURRENT APP ID: A2 / scholarship_api TARGET URL: https://scholarship-api-jamarrlmayes.replit.app ACTION: Locking context. Executing sanity checks for A2 only.
+PHASE 2 — REPORT HEADER
+
+PHASE 3 — SANITY CHECKS (read‑only)
+
+GET /health → 200
+GET /search?q=engineering (3x) → avg < 400ms; record timings
+CORS: preflight shows exact origins (no wildcard with credentials)
+If ingest endpoints exist: ensure they accept fleet tokens (no 403)
+PHASE 4 — EVIDENCE & SUMMARY
+
+PHASE 5 — TICKETS (if any; STOP)
+
+A2 Search Latency Optimization (if avg > 400ms)
+A2 Ingest Trust (if 403/WAF) — allow A1 JWT via JWKS and disable CSRF for ingestion
+COMPLETION CHECK
+
+APP‑SCOPED PROMPT — A3 (scholarship_agent) TICKET‑ONLY
+ROLE: A3 Observer — Ticket‑Only
+
+PHASE 1 — LOGIC GATE & HANDSHAKE (A3)
+
+PHASE 2 — REPORT HEADER
+
+PHASE 3 — SANITY CHECKS
+
+/health → 200; OIDC discovery from A1 → 200
+/api/login → 302/200 (not 5xx)
+Submit malformed job → 4xx; verify worker remains healthy
+Telemetry headers: X‑App‑ID present; Authorization: Bearer **** present
+PHASE 4 — EVIDENCE & SUMMARY
+
+PHASE 5 — TICKETS (if needed; STOP)
+
+A1 Discovery/ISSUER alignment (if discovery fails)
+A8 Telemetry Allowlist (if 403) — include redacted headers
+COMPLETION CHECK
+
+APP‑SCOPED PROMPT — A4 (scholarship_sage) TICKET‑ONLY
+ROLE: A4 Observer — Ticket‑Only
+
+PHASE 1 — LOGIC GATE & HANDSHAKE (A4)
+
+PHASE 2 — REPORT HEADER
+
+PHASE 3 — SANITY CHECKS
+
+GET / → 200 (desktop + 375px); input and Send visible; no fatal console errors
+Chat “List 3 scholarships” returns list or clarifying response
+If you detect “Cannot set headers after they are sent” crashes: document with endpoint path and time (do not fix)
+PHASE 4 — EVIDENCE & SUMMARY
+
+PHASE 5 — TICKETS (if needed; STOP)
+
+A4 Double‑response Guard Needed — attach evidence/time window
+COMPLETION CHECK
+
+APP‑SCOPED PROMPT — A6 (provider_register) TICKET‑ONLY
+ROLE: A6 Observer — Ticket‑Only
+
+PHASE 1 — LOGIC GATE & HANDSHAKE (A6)
+
+PHASE 2 — REPORT HEADER
+
+PHASE 3 — SANITY CHECKS
+
+GET /healthz → expect 200; if 404/500, note “republish required”
+GET / → 200
+OPTIONS /api/upload → 200/204; CORS headers correct
+/api/login → 302 to A1; protected endpoints unauth → 401
+PHASE 4 — EVIDENCE & SUMMARY
+
+PHASE 5 — TICKETS (if needed; STOP)
+
+A6 Republish Required — provider_register (if /healthz not 200) with evidence
+COMPLETION CHECK
+
+APP‑SCOPED PROMPT — A7 (auto_page_maker) TICKET‑ONLY
+ROLE: A7 Observer — Ticket‑Only
+
+PHASE 1 — LOGIC GATE & HANDSHAKE (A7)
+
+PHASE 2 — REPORT HEADER
+
+PHASE 3 — SANITY CHECKS
+
+GET /sitemap.xml and /robots.txt → 200
+Sample SEO page → 200 with non‑empty <title>
+POST /api/telemetry/page-view → 200/accepted
+PHASE 4 — EVIDENCE & SUMMARY
+
+PHASE 5 — TICKETS (if needed; STOP)
+
+A7 SEO Endpoint Degradation — include failing URLs and status codes
+COMPLETION CHECK
+
+APP‑SCOPED PROMPT — A8 (auto_com_center) TICKET‑ONLY
+ROLE: A8 Observer — Ticket‑Only
+
+PHASE 1 — LOGIC GATE & HANDSHAKE (A8)
+
+PHASE 2 — REPORT HEADER
+
+PHASE 3 — SANITY CHECKS
+
+GET /healthz → 200
+Connect SSE/WS (/api/telemetry/stream or /socket.io) → initial event; stable ≥ 2s
+POST webhook ingest → 200; verify exec overview returns 200
+PHASE 4 — EVIDENCE & SUMMARY
+
+PHASE 5 — TICKETS (if needed; STOP)
+
+A8 Telemetry Allowlist — include redacted Authorization/X‑App‑ID headers and endpoint path
+COMPLETION CHECK
+
+If you want these prompts delivered as eight separate files for the agents (or embedded with lightweight Slack-ready checklists for each), say “Export prompts” and I’ll package them.
