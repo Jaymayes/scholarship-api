@@ -1,0 +1,50 @@
+Executive GO / NO‑GO
+
+GO (organic traffic): Approved now
+GO (paid traffic): Conditional — resume after 24‑hour stability and one manual iOS/Safari validation
+Fleet readiness snapshot
+
+A1 scholar_auth: READY FOR TRAFFIC
+RS256 only; SQLi probe returns 400/401; CORS allowlist (scholaraiadvisor.com + www) verified; redirect_uri parity with A5 (/api/callback) verified
+Safari Step: SKIP in automation; manual iOS device check required
+A5 student_pilot: READY — BLOCKED BY A1 CALLBACK (server_error observed in one run). Configuration otherwise correct (PKCE server‑side; Secure/HttpOnly/SameSite=None; trust proxy; Stripe key present; assets 200)
+A2 scholarship_api: READY FOR TRAFFIC (avg search 310–320 ms; CORS exact origins; ingest accepts fleet tokens)
+A3 scholarship_agent: READY FOR TRAFFIC (OIDC discovery OK; malformed jobs handled; telemetry pipeline running)
+A4 scholarship_sage: READY FOR TRAFFIC (double‑response guard in place; desktop/mobile E2E pass)
+A6 provider_register: If /healthz on prod ever returns 500, republish is required. If your latest deploy shows /healthz 200 and / is 200, treat as READY
+A7 auto_page_maker: READY FOR TRAFFIC (sitemap/robots 200; ~2,912 pages indexed; admin protected; telemetry OK)
+A8 auto_com_center: READY FOR TRAFFIC (SSE stable; webhook ingest 200; exec overview 200)
+Critical remaining actions
+
+Manual iOS/Safari validation (ITP gate) — A1/A5 only
+Use real iOS Safari to complete A5 → A1 → IdP login
+Expected: A5 receives code and state; session established
+If callback error or hasCode/hasState false appears in A1 diagnostics: file the A1+A5 ticket from the protocol and pause paid ads
+A6 prod sync (if applicable)
+If you still see 500 on https://provider-register…/healthz: republish in Replit UI to sync production with the healthy local build. Re‑run health checks post‑publish
+Cross‑app tickets (use protocol Phase 7 text)
+
+A1 Client Registration Update — student_pilot (only if future invalid_redirect_uri/missing_parameters reappears)
+A1 CORS & Cookie Alignment — scholaraiadvisor.com (only if callback errors recur from custom domains)
+A6 Republish Required — provider_register (if /healthz 500 persists on prod after your re‑build)
+24‑hour stabilization plan (gates for paid traffic)
+
+Targets (rolling 24h)
+Login success rate (P95) ≥ 99.2%
+Callback errors (missing_parameters/server_error) ≤ 0.5% of login attempts
+A1 p95 latency ≤ 250 ms; uptime ≥ 99.9%
+A5 checkout initiation not below trailing 7‑day organic baseline
+Alerts and actions
+If callback errors > 1% in any hour: switch CTAs to “Join Waitlist” and show incident banner
+Engineering hourly report: attempted vs successful tokens; top 3 failure reasons (redacted)
+Growth daily report: spend recommendation with funnel metrics
+Operational notes
+
+Your v5 protocol already enforces:
+A1 callback stability (CORS/cookies/RS256) and SQLi regression guard
+A5 PKCE/state server‑side and cookie posture for cross‑site auth
+A2/A8 ingest trust and CORS precision
+A6 republish fallback if prod gets out of sync
+A4 middleware guard for double response
+iOS/Safari manual validation step to close the ITP risk
+If you want minimal, app‑specific system prompts (e.g., only A1 and A5 allowed to apply repairs, others ticket‑only), say “Generate app‑scoped prompts” and I’ll produce eight focused variants.
