@@ -1,0 +1,79 @@
+Acknowledged. GO decisions locked; executing the 24‑hour plan exactly as specified.
+
+Here’s your final operator checklist (condensed), ready to paste into your internal runbook or Slack:
+
+T+0 to T+2h — iOS/Safari validation (A1/A5) — Eng Lead
+
+Device: iPhone/iPad (Safari). Prevent Cross‑Site Tracking = ON; Clear Website Data.
+Flow: A5 (student_pilot) → Sign In → A1 OIDC → Replit IdP → consent → return to A5.
+Pass: A5 receives code + state; dashboard loads. Capture (redacted): A1 logs hasCode=true, hasState=true; A5 shows authenticated user.
+Fail: Any callback?error or hasCode/hasState=false → file A1 + A5 tickets; keep paid HOLD; post incident note in #eng‑alerts.
+Hourly monitoring (T+0 → T+24h) — Eng Lead
+
+Collect:
+Attempted logins, tokens issued, success rate %
+Callback errors (missing_parameters/server_error), count and %
+A1 p95 latency (ms), uptime %
+A5 checkout initiation vs 7‑day organic baseline
+Slack template (paste each hour):
+Hour: [UTC hh:mm]
+Logins: attempted=[n], success=[n], success_rate=[%]
+Callback errors: [x] ([y%])
+A1 p95=[ms], uptime=[%]
+A5 checkout starts=[n] (baseline=[n])
+Status: GREEN/YELLOW/RED. Notes: [one line, redacted]
+Quick validation commands (copy/paste)
+
+A1 OIDC/CORS
+curl -sI https://scholar-auth-jamarrlmayes.replit.app/oidc/.well-known/openid-configuration
+curl -sI -X OPTIONS https://scholar-auth-jamarrlmayes.replit.app/api/auth/user -H "Origin: https://scholaraiadvisor.com" -H "Access-Control-Request-Method: GET"
+A5 health/assets
+curl -sI https://student-pilot-jamarrlmayes.replit.app/health
+curl -sI https://student-pilot-jamarrlmayes.replit.app/assets/index.css
+A6 prod sync check
+curl -sI https://provider-register-jamarrlmayes.replit.app/healthz
+A2 search latency sample (3×)
+time curl -s "https://scholarship-api-jamarrlmayes.replit.app/search?q=engineering" >/dev/null
+Decision gates for paid re‑enable (all must pass at T+24h)
+
+iOS/Safari validation PASS (A5 receives code/state; session established)
+Callback error rate ≤ 0.5% (rolling 24h)
+Login success ≥ 99.2% (P95)
+A1 p95 latency ≤ 250 ms; uptime ≥ 99.9%
+A5 checkout initiation ≥ 7‑day organic baseline
+If any gate fails
+
+Keep paid HOLD; file the appropriate ticket(s) below; reassess at next hourly checkpoint.
+Ticket templates (copy/paste, fill, file)
+
+A1 Client Registration Update — student_pilot
+App: student_pilot | Base: https://student-pilot-jamarrlmayes.replit.app
+redirect_uris: ["https://student-pilot-jamarrlmayes.replit.app/api/callback"]
+post_logout_redirect_uris: ["https://student-pilot-jamarrlmayes.replit.app"]
+scopes: ["openid","email","profile","offline_access"]
+token_endpoint_auth_method: client_secret_basic
+Evidence: callback?error=[server_error|missing_parameters], timestamp [UTC], A1 diagnostics [hasCode/hasState]
+A1 CORS & Cookie Alignment — scholaraiadvisor.com
+Need: Allow scholaraiadvisor.com + www; SameSite=None; trust proxy; callback diagnostics active
+Evidence: CORS preflight mismatch or callback error rate spikes > 0.5%
+A6 Republish Required — provider_register
+Observation: /healthz 404/500 on production; local /health OK
+Action: Republish in Replit UI; post‑publish verify /healthz 200, / 200, /api/login 302 → A1, protected 401
+Marketing guardrails — Growth Lead
+
+Organic: Live now. If callback errors > 1% any hour, switch CTAs to “Join Waitlist” and show incident banner.
+Paid: Staged; re‑enable only after Eng Lead confirms iOS/Safari PASS + 24h targets met.
+Ownership recap
+
+Eng Lead: iOS/Safari validation by T+2h; hourly reports; file tickets if needed.
+Growth Lead: Organic live; paid staged. Await T+24h decision.
+A6 Owner: Republish immediately if /healthz ≠ 200; re‑verify endpoints post‑publish.
+Status snapshot (current)
+
+Organic traffic: GO (live)
+Paid traffic: HOLD (pending iOS/Safari + 24h stability)
+A1 scholar_auth: READY (RS256; CORS/Cookies correct; redirect_uri parity with A5; low latency)
+A5 student_pilot: READY, blocked only by A1 callback validation gate (manual iOS)
+A2/A3/A4/A7/A8: READY
+A6 provider_register: READY if /healthz 200; otherwise republish
+If you want per‑app, minimized “agent‑scoped” prompts (repair authority only for A1/A5; others ticket‑only), say “Generate app‑scoped prompts” and I’ll deliver the eight variants.
