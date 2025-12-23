@@ -1,0 +1,72 @@
+Confirmed. Execute as planned. Below is the tight, operator-ready runbook for the next 24 hours with templates, commands, and decision gates.
+
+What to do now (T+0 to T+2h)
+
+Manual iOS/Safari validation (A1/A5)
+Device: iPhone/iPad (Safari). Settings > Safari > Prevent Cross‑Site Tracking = ON. Clear Website Data.
+Flow: A5 (student-pilot) → Sign In → A1 OIDC → Replit IdP → consent → back to A5.
+Pass criteria: A5 receives code + state; user sees dashboard.
+Evidence to capture (redacted): A1 logs hasCode=true, hasState=true; A5 shows authenticated user.
+Fail path: Any callback?error or hasCode/hasState=false → file A1 + A5 ticket (templates below), keep paid HOLD, post incident note.
+How to monitor (hourly, T+0 → T+24h)
+
+Collect
+Attempted logins (count), successful tokens issued (count), failure rate (%)
+Top 3 failure reasons (redacted)
+A1 p95 latency and uptime
+A5 checkout initiation count vs 7‑day organic baseline
+Report template (paste into Slack)
+Hour: [UTC hh:mm]
+Logins: attempted=[n], success=[n], success_rate=[%]
+Callback errors (missing_parameters/server_error): [count] ([% of attempts])
+A1 p95 latency=[ms], uptime=[%]
+A5 checkout starts=[n] (baseline=[n])
+Status: GREEN/YELLOW/RED. Notes: [one line redacted]
+Quick validation commands (copy/paste)
+
+A1 OIDC/CORS
+curl -sI https://scholar-auth-jamarrlmayes.replit.app/oidc/.well-known/openid-configuration
+curl -sI -X OPTIONS https://scholar-auth-jamarrlmayes.replit.app/api/auth/user -H "Origin: https://scholaraiadvisor.com" -H "Access-Control-Request-Method: GET"
+A5 health/assets
+curl -sI https://student-pilot-jamarrlmayes.replit.app/health
+curl -sI https://student-pilot-jamarrlmayes.replit.app/assets/index.css
+A6 prod sync check
+curl -sI https://provider-register-jamarrlmayes.replit.app/healthz
+A2 search latency sample (run 3x; note total time)
+time curl -s "https://scholarship-api-jamarrlmayes.replit.app/search?q=engineering" >/dev/null
+Decision gates for paid re‑enable (all must be true at T+24h)
+
+iOS/Safari validation PASS (A5 receives code/state; session established)
+Callback error rate ≤ 0.5% (rolling 24h)
+Login success ≥ 99.2% (P95)
+A1 p95 latency ≤ 250 ms; uptime ≥ 99.9%
+A5 checkout initiation ≥ 7‑day organic baseline
+If any gate fails
+
+Keep paid HOLD. File ticket(s). Reassess at next hourly checkpoint.
+Ticket templates (copy/paste, fill, file)
+
+A1 Client Registration Update — student_pilot
+App: student_pilot | Base: https://student-pilot-jamarrlmayes.replit.app
+redirect_uris: ["https://student-pilot-jamarrlmayes.replit.app/api/callback"]
+post_logout_redirect_uris: ["https://student-pilot-jamarrlmayes.replit.app"]
+scopes: ["openid","email","profile","offline_access"]
+token_endpoint_auth_method: client_secret_basic
+Evidence: callback?error=[server_error|missing_parameters] (redacted), timestamp [UTC], A1 diagnostics [hasCode/hasState flags]
+A1 CORS & Cookie Alignment — scholaraiadvisor.com
+Need: Allow scholaraiadvisor.com + www; SameSite=None; trust proxy; callback diagnostics active
+Evidence: CORS preflight mismatch or callback error rate spikes > 0.5% (redacted)
+A6 Republish Required — provider_register
+Observation: /healthz 404/500 on production; local /health OK
+Action: Republish in Replit UI; post‑publish verify /healthz 200, / 200, /api/login 302 → A1, protected 401
+One‑liners for executive updates
+
+Green (hourly): “A1 p95=XXXms; uptime=100%; logins: attempted [n], success [n] ([%]); callback errors [x] ([y%]); A5 checkout starts [n] vs [baseline]. Status GREEN.”
+Yellow: “A1 p95=XXXms OK; callback errors at [0.7%]; monitoring next hour; paid remains HOLD.”
+Red: “Callback errors [>1%] or iOS/Safari FAIL; pausing paid ramp; ticket filed [ID]; incident note posted.”
+Ownership recap
+
+Eng Lead: iOS/Safari validation (T+2h), hourly reports, ticket filing if needed
+Growth Lead: Organic live now; paid staged; re‑enable only after Eng Lead confirms both iOS/Safari pass + 24h targets
+A6 Owner: Republish if /healthz ≠ 200
+You’re greenlit for organic, and the paid-traffic re‑enable is one successful iOS/Safari validation + 24 hours of clean telemetry away.
