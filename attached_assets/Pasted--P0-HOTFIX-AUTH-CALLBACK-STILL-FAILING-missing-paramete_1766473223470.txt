@@ -1,0 +1,194 @@
+# 🚨 P0 HOTFIX — AUTH CALLBACK STILL FAILING (missing_parameters)
+GOAL: Ship a production hotfix that (a) proves a real browser run was attempted, (b) reproduces the failure with Playwright/Chromium from scholaraiadvisor.com, and (c) fixes the callback chain by executing ONLY your app’s mission (A1 or A5). If you’re not A1 or A5, open a ticket and STOP.
+
+0) SAFETY, SCOPE, REDACTION
+- Modify ONLY your current app. For cross‑app needs, open a ticket with evidence.
+- Redact all secrets/tokens/state/codes/cookies in logs/output → ****
+- Non‑destructive by default; label any write “E2E Test” and clean up.
+- Rate limit: ≤ 1 RPS; exponential backoff on 429/503.
+
+──────────────────────────────────────────────────────────────────────────────
+
+PHASE 0 — COMPLIANCE INTERROGATION (MANDATORY; ANSWER FIRST)
+1) Why wasn’t a REAL browser used previously for scholaraiadvisor.com?
+   - Provide exact reason and the command/error proof (e.g., Playwright not installed; headed blocked; wrong target domain).
+
+2) What changed so a browser WILL be used now?
+   - Steps: npm i -D playwright; npx playwright install chromium; headed vs headless; xvfb if needed; “App testing” toggle state.
+
+3) Print EXACTLY:
+ACK: HTTP-only testing is forbidden for this run. I will use Playwright/Chromium.
+
+If you cannot guarantee a browser, STOP and print:
+> ABORT: Browser unavailable. Reason: [detail]. Remediation: [commands/settings]. Request approval to retry.
+
+──────────────────────────────────────────────────────────────────────────────
+
+PHASE 1 — ENFORCED BROWSER E2E (scholaraiadvisor.com → callback)
+Install/Provision:
+- npm i -D playwright && npx playwright install chromium
+
+Launch (headed preferred; headless only if needed):
+- 1280×900, en-US
+
+PRINT BEFORE LAUNCH:
+BROWSER RUN: Playwright/Chromium | headed=[true/false] | reason=[if false]
+
+Capture artifacts to ./artifacts/:
+- ConsoleAndNetwork.har (Home + Sign‑in + callback)
+- Screenshots: home.png, auth-click.png, callback-error.png
+- AuthFlowReport.json
+
+Steps:
+1) Open https://scholaraiadvisor.com → assert 200; save home.png; record console errors.
+2) Click “Sign in / Log in” (or “Get My Matches”) → wait idle → save auth-click.png; record 200/302 chain + final domain.
+3) Click “Continue with [Provider]” WITHOUT real creds; allow redirect back to A1 callback.
+   - If /auth|/api/callback?error=missing_parameters (or server_error): save callback-error.png + HAR.
+   - If blocked by Google/IdP (reCAPTCHA), stop there, attach artifacts, and proceed to PHASE 2 (server-side triage).
+
+AuthFlowReport.json:
+{
+  "ctaText": "...",
+  "startURL": "https://scholaraiadvisor.com",
+  "authEntryURL": "https://scholar-auth-.../oidc/interaction/...",
+  "finalCallbackURL": "https://scholar-auth-.../auth|api/callback?...",
+  "httpChain": ["..."],
+  "visibleLoginUI": true/false,
+  "errors": ["missing_parameters"|"server_error"|"..."],
+  "observations": ["sanitized notes"]
+}
+
+──────────────────────────────────────────────────────────────────────────────
+
+PHASE 2 — CALLBACK TRIAGE (WHY ARE code/state MISSING?)
+A) HAR (sanitized):
+- Find callback request; record hasCode/hasState booleans + lengths only.
+- Note referrer + last 302 Location (host+path only).
+
+B) Redirect URI parity:
+- Extract redirect_uri (host+path only) from initial authorization request.
+- Compare with registered redirect_uris + configured callback path:
+  - Host mismatch? Path mismatch (/auth/callback vs /api/callback)? Trailing slash mismatch?
+
+C) Cookies/SameSite at callback:
+- Was session/state cookie sent? It MUST be: Secure; HttpOnly; SameSite=None; Domain matches callback host.
+
+D) PKCE/state persistence:
+- Confirm server‑side persistence or stateless scheme that survives cross‑site redirects.
+- Client‑only persistence (sessionStorage/localStorage) will lose code/state.
+
+E) Middleware expectation:
+- If resume handler checks req.isAuthenticated(), ensure middleware sets req.isAuthenticated = () => !!req.user.
+
+──────────────────────────────────────────────────────────────────────────────
+
+PHASE 3 — SELF‑IDENTIFICATION (STRICT LOGIC GATE)
+APP REGISTRY
+A1 = scholar_auth        → https://scholar-auth-jamarrlmayes.replit.app
+A5 = student_pilot       → https://student-pilot-jamarrlmayes.replit.app
+(Other apps: A2/A3/A4/A6/A7/A8)
+
+PRINT EXACTLY:
+DETECTED APP ID: [A# / app name]
+APP BASE URL: [exact URL from registry]
+ACTION: Locking context. Executing only [this app] repair + E2E.
+
+If multiple/no matches:
+ABORT: Unable to determine single App ID with confidence. No actions executed.
+
+──────────────────────────────────────────────────────────────────────────────
+
+PHASE 4 — REPAIR MISSIONS (EXECUTE ONLY YOUR APP SECTION)
+
+🔷 IF A1 (scholar_auth) — OIDC GATEKEEPER & CALLBACK DIAGNOSTICS
+- Callback diagnostics: Ensure /auth|/api/callback logs hasCode/hasState booleans, lengths, referer, hostname, protocol, queryKeys (names only). Never log raw values.
+- CORS allowlist: Include EXACT origins → https://scholaraiadvisor.com and https://www.scholaraiadvisor.com plus all 8 app URLs. Allow credentials. Preflight OPTIONS returns ACAO + ACAC + ACAH (Authorization, Content-Type, X-App-ID).
+- OIDC discovery/JWKS: 200 OK; RS256 only.
+- req.isAuthenticated polyfill: If resume handler expects it, set req.isAuthenticated = () => !!req.user in JWT middleware.
+- PUBLISH A1 if you changed CORS/diagnostics; re‑run PHASE 1 on PRODUCTION and confirm preflight → 204 for scholaraiadvisor.com & www.
+
+🔷 IF A5 (student_pilot) — CLIENT COOKIE & CALLBACK HARDENING
+- Session/State cookie: MUST be Secure; HttpOnly; SameSite=None; correct Domain for callback host.
+- trust proxy: app.set('trust proxy', 1) so Secure cookies work behind proxy.
+- PKCE/state: MUST be persisted server-side (or secure, HttpOnly temp cookie). Do NOT rely on sessionStorage/localStorage across domains.
+- Callback route: Verify path EXACTLY matches the A1‑registered redirect_uri (e.g., /api/callback vs /auth/callback).
+- PUBLISH A5 if config changed; re‑run PHASE 1 and confirm the chain reaches A1 callback with code/state (or that A1 token exchange succeeds).
+
+🔷 IF A2/A3/A4/A6/A7/A8 (NOT A1/A5)
+- Do NOT change auth flow. Run brief health/CORS checks, then open a cross‑app ticket to A1/A5 with your evidence and STOP.
+
+──────────────────────────────────────────────────────────────────────────────
+
+PHASE 5 — QUICK PRE‑FLIGHT (COMMON)
+- GET /health or /healthz → 200
+- Secrets presence: print SET/MISSING only
+- APP_BASE_URL matches deployed origin
+
+──────────────────────────────────────────────────────────────────────────────
+
+PHASE 6 — APP E2E (EXECUTE ONLY YOUR SUITE)
+REPORT HEADER
+E2E TEST REPORT
+===============
+APP ID: [Your App ID]
+APP_BASE_URL: [Your Base URL]
+TIMESTAMP: [ISO8601]
+--------------------------------------------------
+
+- Log each step: METHOD URL | status=___ | time=___ms | assertion=[expected vs observed]
+- Include security/CORS header snapshots (no cookie values).
+
+A1:
+- / → 200; discovery → 200; JWKS → 200
+- OPTIONS (Origin: https://scholaraiadvisor.com & https://www.scholaraiadvisor.com) → 200/204
+- Confirm callback diagnostics are logging (recent lines)
+
+A5:
+- /health → 200
+- Set-Cookie flags observed on session/state endpoints: Secure; HttpOnly; SameSite=None (flags only)
+- Verify callback path EXACTLY equals A1‑registered redirect_uri
+- Verify PKCE/state persisted server‑side
+
+Others:
+- Run your short suite; if unrelated to auth callback, skip browser and open ticket to A1/A5.
+
+──────────────────────────────────────────────────────────────────────────────
+
+PHASE 7 — FINAL REVENUE BLOCKER CHECK
+| Check                         | Status (PASS/FAIL/SKIP) | Risk | Notes (Redacted)               |
+|------------------------------|--------------------------|------|--------------------------------|
+| Callback receives code/state |                          | High | HAR + A1 diag logs             |
+| OIDC/JWKS Integrity          |                          | High | RS256 keys present             |
+| CORS for Frontends           |                          | Med  | scholaraiadvisor.com & www     |
+| Stripe/Revenue Keys (A5/A6)  |                          | High | pk_live_/pk_test_ present      |
+| Critical Assets (JS/CSS)     |                          | Med  | main.js/index.css 200          |
+
+VERDICT: [READY FOR TRAFFIC / BLOCKED]
+If BLOCKED: attach AuthFlowReport.json + HAR row indices, list exact RCs (redirect_uri mismatch; SameSite; PKCE/state; req.isAuthenticated polyfill), and link tickets.
+
+──────────────────────────────────────────────────────────────────────────────
+
+PHASE 8 — AUTONOMOUS REPAIR REPORT (REQUIRED)
+🏁 AUTONOMOUS REPAIR REPORT
+APP ID: [Your ID]
+ACTION TAKEN: [Files/config modified or "None"]
+VERIFICATION: [Key health checks / E2E assertions]
+STATUS: [FIXED / STABLE]
+
+──────────────────────────────────────────────────────────────────────────────
+
+PHASE 9 — CROSS‑APP TICKETS (TEMPLATES)
+- A1: Auth Callback — missing_parameters (Production)
+  - Evidence (sanitized): finalCallbackURL; redirect_uri (host+path); cookie flags at callback; HAR row indices.
+  - Fix: Align redirect_uri; SameSite=None; server‑side PKCE/state; isAuthenticated polyfill; publish and re‑test.
+
+- A5: Enforce SameSite=None + server‑side PKCE/state
+  - Evidence: callback loads with no code/state; or no session cookie at callback.
+  - Fix: Secure; HttpOnly; SameSite=None; trust proxy; persist PKCE/state server‑side.
+
+──────────────────────────────────────────────────────────────────────────────
+
+PHASE 10 — PUBLISH & RE‑VERIFY (A1/A5 ONLY IF CHANGED)
+- If A1/A5 changed config/cookies/CORS/callback handlers, PUBLISH, then re‑run PHASE 1 against PRODUCTION and confirm callback receives code/state and token exchange succeeds.
+
+END OF PROMPT — Execute now in MAX Autonomous mode.
