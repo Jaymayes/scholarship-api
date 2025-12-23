@@ -1,0 +1,244 @@
+🤖 SYSTEM RESTORE + E2E: FEDERATED AUTH RECOVERY (MAX AUTONOMOUS)
+SEVERITY: CRITICAL — FIX ALL ISSUES, VERIFY NO REVENUE BLOCKERS
+MODE: MAX AUTONOMOUS (Self‑Identify → Repair → E2E Verify)
+
+PURPOSE
+- One prompt for all 8 apps in the Scholar ecosystem. The Agent MUST self‑identify and execute ONLY its app’s repair mission + E2E suite.
+- Targets: A1 dev crash (EADDRINUSE), A2 CORS, A7 admin auth, plus ecosystem‑wide auth/connectivity and revenue readiness.
+- Output: Final “Ready for Traffic” verdict with evidence and a repair report.
+
+0) SAFETY, SCOPE, REDACTION (APPLY TO EVERYTHING)
+- Scope: Modify ONLY your current app. If another app needs changes, open a ticket (Phase 7) and STOP cross‑app edits.
+- Redact in output: tokens, cookies, keys, IDs → ****
+- Production safety: Prefer read‑only checks; destructive ops must be isolated, labeled “E2E Test,” cleaned up; use E2E‑[timestamp] prefixes.
+- Rate limiting: ≤ 1 RPS; use exponential backoff on 429/503.
+
+──────────────────────────────────────────────────────────────────────────────
+
+1) PHASE 1 — SELF‑IDENTIFICATION (STRICT LOGIC GATE)
+TASK: Inspect package.json (name), environment (APP_ID/APP_NAME/APP_BASE_URL/REPL_SLUG), or directory to determine your App ID.
+
+APP REGISTRY
+A1 = scholar_auth        → https://scholar-auth-jamarrlmayes.replit.app
+A2 = scholarship_api     → https://scholarship-api-jamarrlmayes.replit.app
+A3 = scholarship_agent   → https://scholarship-agent-jamarrlmayes.replit.app
+A4 = scholarship_sage    → https://scholarship-sage-jamarrlmayes.replit.app
+A5 = student_pilot       → https://student-pilot-jamarrlmayes.replit.app
+A6 = provider_register   → https://provider-register-jamarrlmayes.replit.app
+A7 = auto_page_maker     → https://auto-page-maker-jamarrlmayes.replit.app
+A8 = auto_com_center     → https://auto-com-center-jamarrlmayes.replit.app
+
+REQUIRED HANDSHAKE (PRINT EXACTLY BEFORE ANY ACTIONS)
+DETECTED APP ID: [A# / app name]
+APP BASE URL: [exact URL from registry]
+ACTION: Locking context. Executing only [this app] repair + E2E.
+
+If multiple/no matches:
+ABORT: Unable to determine single App ID with confidence. No actions executed.
+
+──────────────────────────────────────────────────────────────────────────────
+
+2) PHASE 2 — REPAIR MISSIONS (EXECUTE ONLY YOUR APP SECTION)
+
+🔷 A1 scholar_auth (DEV CRASH + GLOBAL OIDC/CORS GATEKEEPER)
+- Fix Dev Crash (EADDRINUSE)
+  - If dev port (e.g., 3000/8080) is occupied → kill orphan process (e.g., fuser -k 3000/tcp or kill specific PID).
+  - Restart dev server; verify local /health → 200.
+- OIDC Discovery (must pass)
+  - GET /oidc/.well-known/openid-configuration → 200; issuer = https://scholar-auth-jamarrlmayes.replit.app/oidc
+  - GET jwks_uri → 200; ≥1 key; alg RS256 only (no HS256).
+- CORS Allowlist (ecosystem + custom domains)
+  - Ensure EXACT origins allowed:
+    - All 8 app URLs from registry
+    - https://scholaraiadvisor.com
+    - https://www.scholaraiadvisor.com
+  - Allow credentials (cookie flows); correct OPTIONS headers.
+- SQLi Regression Guard
+  - POST /api/auth/login with {"email":"e2e@test.com","password":"' OR '1'='1"} → expect 401/400 (no 500).
+  - If 500: ensure DB columns exist: users.password_hash, users.ferpa_protected, users.ferpa_institution_id; retest.
+- Cookies/Headers (prod)
+  - Set-Cookie must be Secure; HttpOnly; SameSite=None; trust proxy enabled.
+  - Enforce CSP, HSTS, frame-ancestors 'none'/X-Frame-Options, and nosniff.
+
+🔷 A2 scholarship_api (CORS DEFECT + SEARCH LATENCY)
+- CORS Fix
+  - Allow EXACT origins: https://scholaraiadvisor.com, https://www.scholaraiadvisor.com, plus all 8 app URLs.
+  - OPTIONS must include Access-Control-Allow-Headers: Authorization, Content-Type, X-App-ID (and any custom headers); allow credentials if required.
+- Search Latency
+  - GET /search?q=engineering target < 400ms; if ≥ 900ms → add/verify indexes (e.g., scholarships(title), scholarships(description) or full‑text); retest.
+
+🔷 A3 scholarship_agent (OIDC + TELEMETRY)
+- OIDC Discovery Failures
+  - ISSUER_URL must be EXACT: https://scholar-auth-jamarrlmayes.replit.app/oidc (include /oidc; no trailing slash/spaces).
+  - Restart; verify /api/login → 302/200 (not 5xx).
+- Telemetry 403 (A8)
+  - Headers: Authorization: Bearer ****; X-App-ID: scholarship_agent; X-Protocol-Version: v3.5.1 (or current).
+  - Retry/backoff + circuit breaker.
+
+🔷 A4 scholarship_sage (SCOPE + UI)
+- Scope
+  - OIDC scope MUST be ['openid','email','profile'] only. Remove offline_access; redeploy.
+- UI
+  - Ensure 401 shows a “Sign in” CTA (no blank/blocked page). Ignore localhost 500s in dev login.
+
+🔷 A5 student_pilot (REVENUE FUNNEL)
+- Env
+  - AUTH_ISSUER_URL = https://scholar-auth-jamarrlmayes.replit.app/oidc
+- Stripe
+  - Ensure pk_live_ or pk_test_ exists (redact in outputs). Checkout MUST require auth (401 unauthenticated).
+- Telemetry
+  - Confirm events reach A8 /ingest.
+
+🔷 A6 provider_register (PROD 500 / OUT‑OF‑SYNC)
+- External Health
+  - GET https://provider-register-jamarrlmayes.replit.app/healthz → 200 expected.
+  - If 404/500: run local build (npm run build). Then OUTPUT:
+    - "⚠️ ACTION REQUIRED: Republish in Replit UI to sync production with healthy build."
+  - After publish, GET / → 200; no “Application Error”.
+- Auth & Upload
+  - /api/login → 302 to A1; callback finalizes session server‑side (no SPA race).
+  - OPTIONS /api/upload → 200/204 with correct CORS.
+
+🔷 A7 auto_page_maker (ADMIN SECURITY)
+- Harden /admin (server‑side)
+  - Add SSR middleware guard: if !authenticated → 401/403. Do NOT rely on client‑side redirects.
+  - Verify SEO endpoints intact: /sitemap.xml, /robots.txt, known SEO pages → 200.
+
+🔷 A8 auto_com_center (JWKS BACKOFF + REAL‑TIME)
+- JWKS Backoff
+  - Ensure retry/backoff; re‑fetch https://scholar-auth-jamarrlmayes.replit.app/oidc/jwks.
+- Real‑time
+  - SSE/WS endpoints stable ≥ 2s; webhook ingest 200; executive overview 200.
+
+──────────────────────────────────────────────────────────────────────────────
+
+3) PHASE 3 — QUICK PRE‑FLIGHT (COMMON)
+- GET /health or /healthz → 200
+- Secrets presence (print SET/MISSING only; never values)
+  - ISSUER_URL, CLIENT_ID/SECRET, SESSION_SECRET, STRIPE keys (A5/A6 if applicable)
+- Confirm APP_BASE_URL matches deployed origin.
+
+──────────────────────────────────────────────────────────────────────────────
+
+4) PHASE 4 — E2E TESTING (EXECUTE ONLY YOUR APP’S SUITE)
+
+REPORT HEADER (prepend to logs)
+E2E TEST REPORT
+===============
+APP ID: [Your App ID]
+APP_BASE_URL: [Your Base URL]
+TIMESTAMP: [ISO8601]
+--------------------------------------------------
+
+A1 scholar_auth (Auth, Tokens, Security)
+- Load / and login page → 200; no console errors ≥ warn
+- OIDC/JWKS: discovery 200; JWKS ≥1 RS256 key
+- Registration (non‑destructive): unique email → success/confirmation; Set‑Cookie flags ok
+- Login valid → session established; invalid → 401 (no cookie)
+- SQLi payload → 401/400 (no 500)
+- CORS preflight spot‑check for ecosystem origins
+
+A2 scholarship_api (Read, Latency, CORS)
+- /health → 200; DB=UP
+- GET /scholarships without Bearer → 401 if protected, else document public posture
+- /scholarships?limit=10 → 200; array; avg (3x) < 500ms
+- /search?q=engineering → record latency (< 400ms target)
+- CORS headers present (no wildcard with credentials)
+
+A3 scholarship_agent (Jobs Resilience)
+- /health → 200; worker active
+- Trigger job → Queued→Processing→Completed (poll with backoff)
+- Malformed job → 4xx; process healthy after
+- Telemetry to A8 → accepted
+
+A4 scholarship_sage (Search UI)
+- / → 200; input visible; no fatal errors
+- “Find me scholarships for engineering” → non‑empty response
+- Follow‑up “What about nursing?” → context shift understood
+- 375px mobile: Send button visible/usable
+
+A5 student_pilot (Dashboard/Payments)
+- Unauth /dashboard → 302/307 to A1
+- Stripe key present (redacted)
+- main.js/index.css → 200; no 404
+- POST /api/checkout unauth → 401
+
+A6 provider_register (Onboarding/Uploads)
+- Root → 200; no “Application Error”
+- /api/login → 302 to A1; callback completes (session)
+- OPTIONS /api/upload → 200/204 with correct CORS
+
+A7 auto_page_maker (CMS/SEO)
+- /sitemap.xml → 200; non‑empty
+- /robots.txt → 200; includes Sitemap
+- Known SEO page → 200; non‑empty <title>
+- /admin unauth → 401/403 (server‑side guard)
+
+A8 auto_com_center (Comms)
+- /healthz → 200 (healthy)
+- SSE/WS handshake → initial event; stable ≥ 2s
+- Webhook ingest → 200; persistence confirmed (if readable)
+
+EVIDENCE (FOR EACH STEP)
+- Log: Method, URL, Status, Duration(ms)
+- Headers: capture Set‑Cookie flags, CORS headers (no values)
+- Assertion: one‑line expected vs observed
+- Redact all secrets/tokens/cookie values → ****
+
+──────────────────────────────────────────────────────────────────────────────
+
+5) PHASE 5 — FINAL REVENUE BLOCKER CHECK (REQUIRED TABLE)
+
+| Check                      | Status (PASS/FAIL/SKIP) | Risk | Notes (Redacted)                         |
+|---------------------------|--------------------------|------|------------------------------------------|
+| Auth/Security (SQLi)      |                          | High | A1 SQLi regression result                |
+| DB Connectivity           |                          | High | /health DB=UP                            |
+| Stripe/Revenue Key        |                          | High | pk_live/pk_test present (A5/A6)          |
+| Critical Assets (JS/CSS)  |                          | Med  | main.js/index.css 200                    |
+| OIDC/JWKS Integrity       |                          | High | Discovery OK; RS256 keys present         |
+| CORS for Frontends        |                          | Med  | Exact origins; credentials as required   |
+VERDICT: [READY FOR TRAFFIC / BLOCKED]
+
+──────────────────────────────────────────────────────────────────────────────
+
+6) PHASE 6 — AUTONOMOUS REPAIR REPORT (REQUIRED FORMAT)
+
+🏁 AUTONOMOUS REPAIR REPORT
+APP ID: [Your ID]
+ACTION TAKEN: [Files/config modified or "None"]
+VERIFICATION: [Key health checks / E2E assertions]
+STATUS: [FIXED / STABLE]
+
+──────────────────────────────────────────────────────────────────────────────
+
+7) PHASE 7 — ABORT & TICKETS
+
+ABORT (fail fast)
+- Multiple/no App ID matches → ABORT with candidate list.
+- ≥2 repeated 5xx on critical path → stop writes; continue read‑only checks; mark remaining as SKIPPED.
+
+CROSS‑APP TICKET TEMPLATES
+- A1 Client Registration Update — [Your App]
+  - App: [Your App] | Base: [Your URL]
+  - redirect_uris: ["[Your URL]/api/callback"]
+  - post_logout_redirect_uris: ["[Your URL]"]
+  - scopes: ["openid","email","profile"]
+  - token_endpoint_auth_method: [client_secret_basic | none (PKCE)]
+  - Evidence: invalid_redirect_uri / discovery mismatch (redacted)
+
+- A2 CORS Allowlist — Add Custom/Ecosystem Origins
+  - Origins to add: [exact list]
+  - Evidence: OPTIONS/GET missing Access-Control-Allow-Origin (redacted)
+
+- A8 Telemetry Allowlist — Accept X-App-ID + Bearer
+  - Need: Allow X-App-ID “[Your App]”; Authorization: Bearer ****
+  - Evidence: 403 on /api/report or /ingest (redacted)
+
+──────────────────────────────────────────────────────────────────────────────
+
+8) PHASE 8 — ROLLBACK (IF NEEDED)
+- Revert last config commit or deployment snapshot.
+- Disable new env flags; restart service.
+- Confirm rollback with /health and main route (200).
+
+END OF PROTOCOL
