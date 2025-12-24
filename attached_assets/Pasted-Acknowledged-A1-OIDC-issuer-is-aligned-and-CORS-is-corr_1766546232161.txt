@@ -1,0 +1,59 @@
+Acknowledged. A1 OIDC issuer is aligned and CORS is correct. We remain GREEN with paid HOLD until T+24h.
+
+About the “server_error” screenshot after Replit consent
+
+What it means: This error occurs in A1 while exchanging the authorization code with the upstream IdP (Replit). It is independent of A1’s role as provider to A5 and explains why some desktop tests can still fail even when the overall flow succeeds on iOS. Given telemetry shows success >99% and errors ~0.18–0.20%, this is likely intermittent rather than systemic.
+Targeted 10‑minute deep‑dive (A1 upstream OIDC)
+Run these checks to isolate the exact cause, without changing behavior:
+
+Log the upstream token exchange failure (no secrets)
+Enable scoped logging around the callback handler to capture:
+err.name, err.message, err.error, err.error_description
+token_endpoint response status/body (redacted)
+Confirm the upstream client configuration in A1 env:
+REPLIT_CLIENT_ID, REPLIT_CLIENT_SECRET (don’t print values)
+token_endpoint_auth_method (client_secret_basic vs post)
+redirect_uri for upstream = https://scholar-auth-jamarrlmayes.replit.app/auth/callback
+2. Validate upstream client registration (in Replit’s OAuth settings)
+
+“Redirect URI” must exactly equal: https://scholar-auth-jamarrlmayes.replit.app/auth/callback
+If PKCE is enabled, confirm A1 is generating/storing/verifying the code_verifier for this upstream flow.
+Check time skew: confirm system clock is correct (large skew can trigger invalid_grant).
+3. Frequency analysis (determine if systemic vs transient)
+
+In A1 logs (last 60 minutes), count occurrences of callback?error=server_error and group by user‑agent.
+If error is heavily desktop‑weighted and rare (<0.5% overall), proceed with stabilization; if frequent (>0.5%), we should treat as a P1.
+Common root causes to confirm
+
+invalid_client / unauthorized_client: bad client_secret or token_endpoint_auth_method
+invalid_grant: redirect_uri mismatch, stale/used code, code_verifier mismatch, clock skew
+network/transient: upstream TLS/transient timeouts
+Quick patch (optional, no behavior change)
+
+Add a one‑line “Upstream OIDC error reason” in the A1 callback error UI (redacted), so operators can see err.error/err.error_description without reading raw logs.
+Communication lines for Slack (use one)
+
+GREEN (intermittent; success > 99%)
+Hour: [UTC hh:mm]
+A1 upstream OIDC: intermittent server_error observed on desktop; success > 99%
+Action: Added diagnostic logging; continuing stabilization
+Status: GREEN (watch)
+
+YELLOW (if hourly server_error > 0.5%)
+Hour: [UTC hh:mm]
+A1 upstream OIDC: server_error rate [x%] (>0.5%)
+Action: Investigating invalid_grant/invalid_client; upstream config and PKCE verified in progress
+Status: YELLOW (paid HOLD continues)
+
+Next steps in the stabilization window
+
+You’ve already verified A1 issuer alignment and CORS (PASS).
+Please have the A2 owner set STRIPE_SECRET_KEY in A2 secrets and restart; we’ll verify readiness immediately after.
+I’ll continue hourly monitoring, post GREEN/YELLOW/RED updates, and alert if any metric crosses thresholds.
+Decision gates for T+24h (unchanged)
+
+Callback errors ≤ 0.5% (rolling 24h)
+Login success ≥ 99.2%
+A1 p95 latency ≤ 250 ms; uptime ≥ 99.9%
+A5 checkout initiation ≥ 7‑day baseline
+If you want, I can generate a tiny A1 “Upstream OIDC diagnostics” patch snippet (logs + user‑safe error surface) you can drop in now, alongside a rollback note.
