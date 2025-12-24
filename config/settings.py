@@ -111,7 +111,7 @@ class Settings(BaseSettings):
         alias="SCHOLAR_AUTH_JWKS_URL"
     )
     scholar_auth_issuer: str = Field(
-        "https://scholar-auth-jamarrlmayes.replit.app",
+        "https://scholar-auth-jamarrlmayes.replit.app/oidc",
         alias="SCHOLAR_AUTH_ISSUER"
     )
     jwks_cache_ttl_seconds: int = Field(300, alias="JWKS_CACHE_TTL_SECONDS", gt=0)  # 5 min fresh
