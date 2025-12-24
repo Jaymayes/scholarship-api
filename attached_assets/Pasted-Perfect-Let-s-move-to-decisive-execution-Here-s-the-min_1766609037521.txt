@@ -1,0 +1,43 @@
+Perfect. Let’s move to decisive execution. Here’s the minimal, high‑signal plan.
+
+Recommended next action: Publish A1 now
+
+Why: CSP propagation is the only pending item; the bridge is stable. Publishing makes the Clerk domains live in prod.
+Post‑publish verification (run immediately):
+curl -sI https://scholar-auth-jamarrlmayes.replit.app | grep -i content-security-policy # must include clerk.accounts.dev & img.clerk.com
+curl -s https://scholar-auth-jamarrlmayes.replit.app/oidc/.well-known/openid-configuration | jq '.issuer,.jwks_uri' # issuer ends /oidc
+curl -s https://scholar-auth-jamarrlmayes.replit.app/oidc/jwks | jq '.keys | length' # ≥ 1
+Watch (first 30 min): callback_success_rate, p95, bucket=unknown
+Next 48–72 hours (in parallel)
+
+Paid Plan re‑enable (canary)
+Gate: Start at 1% of logged‑in A5 users (or invite link), ramp 1% → 10% → 50% → 100%.
+Pre‑flight: Stripe live keys present; webhooks verified (2xx within 5 min), /api/checkout 401 unauth and 200 auth, refunds path tested in test mode.
+Success KPIs: checkout success ≥ 98%, webhook delivery ≥ 99%/5min, p95 checkout API ≤ 500 ms, decline rate normal for card mix.
+Rollback: Hide plan flag and pause canary immediately if failures > 2% or webhooks < 97% (15 min).
+2. Idempotent upsert (A1) – open PR
+
+DB: Add unique index users(provider_user_id) and (optionally) users(email) if policy allows; wrap user creation in a transaction.
+Logic: Upsert by provider_user_id only after successful token exchange; commit right before session finalize; no writes on retry attempts until success.
+Tests:
+Two concurrent callbacks → one user row.
+Retry after transient error → no duplicates.
+invalid_grant after 5xx → no partial rows; clean restart path.
+Acceptance: 0 dup rows under stress; 0 partial sessions after failed exchange.
+3. CI observability (wire the Jest suite)
+
+You already have: tests/scholar-auth.health.spec.ts
+Add GitHub Actions (if desired; I can generate yaml on request) to run on push + nightly:
+Install deps → start app (or use BASE_URL mode) → run this spec
+Fail pipeline on discovery/JWKS/CSP regression
+Go/No‑Go gates (daily)
+
+Green: success ≥ 99%, p95 ≤ 250 ms, unknown ≈ 0, RP verification OK (401 unauth, 200 with A1 token)
+Yellow: upstream_temporarily_unavailable/server_error > 0.5% for >10 min (investigate upstream; retries should mask most)
+Red: RP issuer mismatches, callback 5xx, or CSP blocking Clerk → halt ramp, fix, re‑publish
+Your options now
+
+Proceed to publish A1 (recommended): I’ll run the post‑publish CSP and OIDC checks.
+Generate GitHub Actions workflow for the Jest suite (so CI guards remain active).
+Open the Idempotent Upsert PR scaffolding (migration + tests template).
+Tell me which you want first: “Publish A1 now,” “Generate Actions workflow,” or “Open Upsert PR.”
