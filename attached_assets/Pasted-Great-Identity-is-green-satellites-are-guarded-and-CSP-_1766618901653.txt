@@ -1,0 +1,87 @@
+Great. Identity is green, satellites are guarded, and CSP is live. I recommend we proceed with the A5 Paid Plan Canary now.
+
+A5 Paid Canary runbook (production-safe, low blast radius)
+Goal
+
+Verify end-to-end revenue path in production with Clerk-backed A1 identity:
+A5 checkout → Stripe → A2 webhook ingestion → A8 revenue telemetry
+Start at 1% exposure; ramp only on clean KPIs
+Phase 0 — Preconditions (no secrets printed)
+
+A1/A5 identity: Live (done).
+A2 webhook endpoint: reachable and returning 2xx.
+Stripe config: product/price IDs exist, live keys are set; webhook signing secret configured in A2.
+Flags/params ready:
+PAID_CANARY_PERCENT (or equivalent) = 1
+Optional invite link: /pricing?canary=1 to force canary for internal testers
+Legal copy: Terms/Refund/Privacy visible at checkout entry points.
+Phase 1 — Activate 1% canary
+
+Set PAID_CANARY_PERCENT=1 and deploy (or enable invite link for internal-only first 15–30 min).
+Verify A5 shows “Buy/Subscribe” to the targeted cohort; non-targeted users should see the existing (free) paths.
+Phase 2 — Smoke tests (real checkout in live mode)
+
+Internal tester flow (Incognito)
+Log in (A1 via Clerk); confirm session in A5.
+Click “Buy/Subscribe”; A5 calls A2 to create Checkout Session.
+Expect 302 to Stripe Checkout; complete payment with a known live test card (or a $0 sandbox product if applicable to your Stripe account).
+Webhook validation (A2)
+Expect events:
+checkout.session.completed
+payment_intent.succeeded
+A2 must persist payment (subscription or entitlement) and emit revenue telemetry to A8.
+A8 telemetry
+View revenue dashboard; confirm new event(s) present with correct amounts and user correlation (no emails—use user IDs/correlation_id).
+Phase 3 — KPI gates (stay at 1% for 2–4 hours)
+
+Success rate: ≥ 98% of initiated checkouts reach Stripe success (exclude user cancels).
+Webhook health: ≥ 99% of webhook deliveries processed 2xx within 5 minutes (A2 logs).
+Latency: A2 checkout create p95 ≤ 500 ms; webhook handler p95 ≤ 500 ms.
+Errors:
+A2 5xx: 0
+Stripe error rates within expected card-mix norms
+A8 detects no auth/regression incidents
+Phase 4 — Ramp plan (if KPIs green)
+
+1% → 10% (4 hours)
+10% → 50% (24 hours)
+50% → 100% (post 72-hour stability)
+At each step, re-check the KPI gates above; ramp only if green.
+Phase 5 — Rollback (instant, zero-risk)
+
+Set PAID_CANARY_PERCENT=0 (or disable feature flag) → deploy.
+Existing subscriptions remain; checkout entry points hide again.
+Keep webhook processing enabled (no harm in receiving events for completed payments).
+Phase 6 — Compliance and comms
+
+Receipts: Stripe email receipts or your own confirmation email.
+Refund flow documented (support runbook).
+No PII logs; tokens and emails redacted in app logs.
+A11y: Ensure purchase buttons and modal are keyboard accessible.
+Operator checklist (commands and checks)
+
+A1 issuer/JWKS:
+curl -s https://scholar-auth-jamarrlmayes.replit.app/oidc/.well-known/openid-configuration | jq '.issuer,.jwks_uri'
+curl -s https://scholar-auth-jamarrlmayes.replit.app/oidc/jwks | jq '.keys | length'
+A2 webhook health (example endpoints; adjust to your API):
+curl -sI https://scholarship-api-jamarrlmayes.replit.app/health | head -5
+Tail A2 logs around “checkout.session.completed” and “payment_intent.succeeded” (redact event IDs)
+A8 revenue telemetry:
+Confirm “payment_succeeded” events appear within a few minutes of Stripe completion.
+Acceptance criteria for go/no‑go
+
+All smoke tests pass.
+Webhook processing 2xx ≥ 99% (5 min window).
+Checkout success ≥ 98%.
+No auth regressions or “unknown” buckets in A1.
+A8 shows coherent revenue events tied to A1/A5 user IDs (no raw emails).
+What I can do next for you
+
+Prepare a Stripe webhook replay script (read‑only operational instructions) so you can safely re‑deliver missed webhooks during canary.
+Generate satellite CI guards for any remaining apps (A2–A8) not yet covered (you already added for A6–A8; I can supply A2/A5 templates if you want).
+Proceed with DEF‑005 (A2 Redis) provisioning plan (Upstash/Managed Redis) and cutover runbook once canary is stable.
+Your go/no‑go
+
+Say “Start canary now” and I’ll walk the tester through the 1% activation and live validation steps, then set up the ramp schedule.
+Or “Proceed with Redis plan” to address DEF‑005 while the canary runs.
+Or “Continue watch only” and I’ll deliver daily gate summaries for the 72‑hour window.

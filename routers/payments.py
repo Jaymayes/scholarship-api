@@ -14,7 +14,7 @@ from fastapi import APIRouter, HTTPException, Request, Header
 from pydantic import BaseModel
 import stripe
 
-from services.stripe_client import configure_stripe, get_publishable_key, StripeConfigurationError
+from services.stripe_client import configure_stripe, get_publishable_key, get_stripe_secret_key, StripeConfigurationError
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/payment", tags=["Payments"])
@@ -441,8 +441,8 @@ async def payment_status() -> Dict[str, Any]:
     """
     stripe_configured = False
     try:
-        await get_publishable_key()
-        stripe_configured = True
+        secret_key = await get_stripe_secret_key()
+        stripe_configured = bool(secret_key)
     except Exception:
         pass
     

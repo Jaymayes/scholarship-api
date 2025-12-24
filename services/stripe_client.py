@@ -21,25 +21,39 @@ class StripeConfigurationError(Exception):
 
 async def get_stripe_credentials() -> Tuple[str, str]:
     """
-    Fetch Stripe credentials from Replit Connector API
+    Fetch Stripe credentials from environment variables or Replit Connector API
+    
+    Priority: Environment variables > Connector API
+    This ensures Python FastAPI apps work without requiring the JS-only connector.
     
     Returns:
         Tuple of (publishable_key, secret_key)
     
     Raises:
-        StripeConfigurationError: If credentials cannot be fetched (connector not configured)
+        StripeConfigurationError: If credentials cannot be fetched
     """
     global _cached_credentials
     
     if _cached_credentials:
         return _cached_credentials["publishable"], _cached_credentials["secret"]
     
+    secret_key = os.environ.get("STRIPE_SECRET_KEY")
+    publishable_key = os.environ.get("STRIPE_PUBLISHABLE_KEY")
+    
+    if secret_key:
+        logger.info("Using STRIPE_SECRET_KEY from environment variables (preferred for Python apps)")
+        _cached_credentials = {
+            "publishable": publishable_key or "",
+            "secret": secret_key
+        }
+        return publishable_key or "", secret_key
+    
     hostname = os.environ.get("REPLIT_CONNECTORS_HOSTNAME")
     
     if not hostname:
-        logger.error("REPLIT_CONNECTORS_HOSTNAME not set - Stripe connector unavailable")
+        logger.error("No STRIPE_SECRET_KEY and no connector hostname available")
         raise StripeConfigurationError(
-            "Stripe connector not available. Please configure Stripe integration via Replit."
+            "Stripe not configured. Set STRIPE_SECRET_KEY or configure Stripe integration."
         )
     
     repl_identity = os.environ.get("REPL_IDENTITY")
@@ -88,6 +102,17 @@ async def get_stripe_credentials() -> Tuple[str, str]:
     secret = settings.get("secret")
     
     if not publishable or not secret:
+        env_secret = os.environ.get("STRIPE_SECRET_KEY")
+        env_publishable = os.environ.get("STRIPE_PUBLISHABLE_KEY")
+        
+        if env_secret:
+            logger.info("Connector returned incomplete data, using STRIPE_SECRET_KEY from environment")
+            _cached_credentials = {
+                "publishable": env_publishable or "",
+                "secret": env_secret
+            }
+            return env_publishable or "", env_secret
+        
         raise StripeConfigurationError(
             f"Stripe {target_environment} connection not found or incomplete. "
             "Please configure the Stripe integration in Replit."
