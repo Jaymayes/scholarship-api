@@ -1,0 +1,56 @@
+Acknowledged. Clerk→A1 OIDC bridge is in place, satellites remain on A1 as issuer, and the ecosystem is green. Here is the compact, copy/paste on‑call console checklist plus final KPIs and rollback levers for the next 72 hours.
+
+On‑call console checklist (copy/paste)
+
+A1 discovery/JWKS
+curl -s https://scholar-auth-jamarrlmayes.replit.app/oidc/.well-known/openid-configuration | jq '.issuer,.authorization_endpoint,.token_endpoint,.jwks_uri'
+curl -s https://scholar-auth-jamarrlmayes.replit.app/oidc/jwks | jq '.keys | length'
+A1 callback health (non-invasive)
+curl -sI https://scholar-auth-jamarrlmayes.replit.app/api/callback | sed -n '1,20p' # expect 302/405/404, not 5xx
+A1 headers (sanity)
+curl -sI https://scholar-auth-jamarrlmayes.replit.app | sed -n '1,20p' # HSTS/CSP/frame-ancestors none
+A5 error buckets (UI spot checks)
+Open (Incognito):
+/auth/error?reason=upstream_temporarily_unavailable&cid=1234abcd9876wxyz
+/auth/error?reason=access_denied
+/auth/error?reason=expired_auth_code
+Satellite issuer alignment
+Confirm RPs are using issuer = https://scholar-auth-jamarrlmayes.replit.app/oidc
+If any RP shows root issuer (no /oidc), file ticket: “[APP] OIDC Issuer/JWKS mismatch; set issuer to …/oidc and jwks to …/oidc/jwks”
+What “good” looks like (KPIs to watch)
+
+A1 callback_success_rate ≥ 99%
+A1 callback_retries_total low and stable; bucket=unknown ≈ 0
+A1 callback p95 latency ≤ 250 ms
+A5 /auth/error impressions trending down; “Try again” CTR ≥ 60%
+RPs (A2–A8) protected endpoints: unauth 401; with A1 token 200
+No spike in upstream_temporarily_unavailable or upstream_server_error (>0.5% for >10 min)
+Feature flags and rollback levers
+
+A1 retry logic: OIDC_RETRY_ENABLED=false (disables retries; keeps classification)
+CSP: keep Clerk domains only on A1; do not expand in other apps
+If an RP fails issuer check:
+Temporary mitigation: relax claim check (aud only) in staging; DO NOT change in prod
+Proper fix: update issuer to /oidc and jwks to /oidc/jwks (ticket; small PR)
+Common failure → action mapping
+
+Users see “We hit a snag” on A5 with cid=…:
+Check A1 logs for [OIDC_CALLBACK] correlation_id (redact), confirm bucket
+If bucket is transient → expect retry attempts (≤4) and eventual success
+If non‑retryable (access_denied/invalid_grant/pkce_mismatch) → no retry; UI should show specific message
+RP token verification fails:
+Verify iss claim matches …/oidc
+Verify JWKS path is …/oidc/jwks (not legacy)
+If still failing, fetch A1 JWKS and check kid rollover (stale JWKS cache)
+CSP warnings in dev:
+Expected in report‑only; verify no production blocks
+Open tickets to track (if not already closed)
+
+A2: OIDC issuer/JWKS path alignment to …/oidc and …/oidc/jwks (confirm merged and deployed)
+A1 (optional next sprint): Idempotent upsert + transaction around user sync (prevents duplicate rows under retries)
+Final go/no‑go gate (daily)
+
+Green if: success ≥ 99%, unknown ≈ 0, p95 ≤ 250 ms, no RP issuer mismatches surfaced
+Yellow if: transient buckets > 0.5% for >10 min; investigate provider status
+Red if: callback 5xx or widespread RP verification failures; disable retries (flag) and triage
+You’re set. I’ll remain on watch for the next 72 hours and can generate a minimal Jest file for CI observability (no behavior changes) or a one‑page ops runbook if you want it in PDF.
