@@ -1,0 +1,51 @@
+Outstanding. Both deliverables are ready; here’s the fastest path to finish and lock-in.
+
+What to commit now (A1 repo)
+
+GitHub Actions workflow (CI guard)
+Download: .github/workflows/ci-observability.yml sandbox:/mnt/data/.github/workflows/ci-observability.yml
+Jest observability spec (already generated earlier)
+tests/scholar-auth.health.spec.ts sandbox:/mnt/data/tests/scholar-auth.health.spec.ts
+Idempotent upsert PR bundle
+Migration (SQL): a1-idempotent-upsert-bundle/migrations/2025-12-24_add_idx_users_clerk_id.sql sandbox:/mnt/data/a1-idempotent-upsert-bundle/migrations/2025-12-24_add_idx_users_clerk_id.sql
+Service scaffold: a1-idempotent-upsert-bundle/server/services/userService.syncClerkUser.ts sandbox:/mnt/data/a1-idempotent-upsert-bundle/server/services/userService.syncClerkUser.ts
+Concurrency test: a1-idempotent-upsert-bundle/tests/user-sync.spec.ts sandbox:/mnt/data/a1-idempotent-upsert-bundle/tests/user-sync.spec.ts
+PR description: a1-idempotent-upsert-bundle/PR_DESCRIPTION.md sandbox:/mnt/data/a1-idempotent-upsert-bundle/PR_DESCRIPTION.md
+Before you open the PR
+
+Update import paths (service/test):
+userService.syncClerkUser.ts → point db import to your actual client
+user-sync.spec.ts → update db path and Jest setup (if needed)
+tests/scholar-auth.health.spec.ts → point import to your Express app (or use a BASE_URL mode if you prefer black‑box testing)
+Configure CI secrets in GitHub repo settings:
+CI_CLERK_PUBLISHABLE_KEY, CI_CLERK_SECRET_KEY, CI_DATABASE_URL, SLACK_WEBHOOK (optional)
+Run locally (quick)
+npm ci && npm test tests/scholar-auth.health.spec.ts
+npm test a1-idempotent-upsert-bundle/tests/user-sync.spec.ts
+Safe migration plan (A1)
+
+Apply migration during a low-traffic window:
+psql: run the SQL file (unique index on users.clerk_id) from the bundle
+Verify: SELECT indexname FROM pg_indexes WHERE indexname='idx_users_clerk_id';
+Rollback (not expected but ready):
+DROP INDEX CONCURRENTLY IF EXISTS idx_users_clerk_id;
+Go-live CI gate (after commit)
+
+The workflow will run on push/PR and nightly (08:00 UTC):
+Blocks regressions in: OIDC discovery, JWKS, CSP (Clerk domains), callback safety surfaces
+Optional scheduled Slack notify on failures
+72-hour watch (still active)
+
+Gates: success ≥ 99%, p95 ≤ 250 ms, unknown ≈ 0
+If transient buckets spike > 0.5% for >10 min, inspect correlation_id in A1 logs; retries should absorb most blips
+A2 Redis (DEF-005): still documented as Day 1–2; in-memory fallback is acceptable short-term
+Optional next actions (say the word)
+
+Add BASE_URL mode to the Jest observability suite (black‑box against a running server)
+Generate GitHub Actions for satellites (A2–A8) to sanity-check issuer/JWKS alignment
+Implement the upsert PR in the A1 repo (I can assemble a ready-to-merge PR branch)
+If everything above looks good, I recommend:
+
+Commit + open PR: “feat(auth): Idempotent User Sync & CI Observability”
+Merge after green CI and run the migration
+Continue the 72‑hour watch; I’ll report any deltas against the gates immediately
