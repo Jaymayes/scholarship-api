@@ -1,0 +1,95 @@
+Acknowledged. T+6h stabilization is GREEN (latency watch). Proceeding with ticketed remediations for the dashboard discrepancies so executive visibility is fully restored before T+24h.
+
+Tickets to file now (copy/paste)
+
+A3 — Orchestration Initialization (Revenue Blocker)
+Title: A3 Orchestration Initialization — Clear “Revenue Blocked” Banner
+App/Owner: scholarship_agent (A3) — A3 Owner
+Priority: P1 (revenue path visibility)
+Summary: Scholar AI Command Center shows “REVENUE BLOCKED” and “Run Orchestration” for A3 while agent health is green. Orchestrator not initialized in production.
+Evidence (redacted): A8 screenshots showing red banner “Revenue Blocked” and “Action Required: Run Orchestration,” A3 tile green but 0 active jobs.
+Hypothesis: Campaign Orchestrator service not started or paused; orchestration state flag not set in Redis/DB.
+Actions (A3 only):
+Initialize orchestrator with v1.4 unified prompt/config.
+Ensure background jobs registered (cron/queue names present).
+Verify Redis/DB orchestration flag set to “active”.
+Restart worker if needed; confirm no 5xx on startup.
+Acceptance Criteria:
+Dashboard: A3 banner disappears; “Revenue Blocked” cleared.
+A8: “Campaign Orchestrator: running” with 1+ active workers; 0 critical alerts.
+No 5xx in A3 logs for 15 minutes; uptime increasing.
+Rollback: Stop orchestrator; set state flag “paused”; post note in #eng-alerts.
+2. A7 — Database Restoration (Organic Visibility)
+
+Title: A7 DB Restoration — Clear “DB: Degraded / 0 Pages” on Dashboard
+App/Owner: auto_page_maker (A7) — A7 Owner
+Priority: P2 (organic visibility risk)
+Summary: Dashboard shows “DB: Degraded” and “0 Pages Indexed (0/10 connections)” while HTTP health is green. Likely stale/broken DB pool or metrics exporter outage.
+Evidence (redacted): A8 screenshots showing A7 “DB Degraded,” pages=0.
+Hypothesis: Orm/pool exhaustion, idle timeout, or exporter disconnected; API health check not covering DB pool metrics.
+Actions (A7 only):
+Restart A7 service to reinitialize pool; confirm DB connections > 0/10.
+Verify sitemap indexing count via internal query; reconcile to ~2,912 pages.
+Ensure exporter pushing DB metrics to A8; fix credentials if needed.
+Acceptance Criteria:
+Dashboard: A7 tile green; DB: Healthy; Pages ~2,912; Connections >0/10.
+A7 logs: no pool exhaustion warnings for 30 minutes.
+Rollback: Revert to previous build; disable exporter temporarily; open P1 if degraded persists.
+3. A8 — Telemetry Ingest / Auth Posture
+
+Title: A8 Telemetry Ingest — Restore Auth Posture % (0.0% → Expected)
+App/Owner: auto_com_center (A8) — A8 Owner
+Priority: P1 (executive visibility)
+Summary: Dashboard shows “Auth Posture: 0.0% / 0 sessions,” conflicting with fleet guardrails (success rate ~99.8%). Ingest not attributing A1/A5 events.
+Evidence (redacted): A8 screenshots showing Auth Posture “0% Success, 0 Sessions,” while A1/A5 telemetry reports passes.
+Hypothesis: A8 allowlist missing App IDs (A1/A5), or parsing change dropped session attribution fields.
+Actions (A8 only):
+Confirm allowlist contains X-App-ID: scholar_auth, student_pilot; Authorization: Bearer **** validated.
+Validate ingest schema (fields: status, code, state, session_id, app_id).
+Replay last 15 minutes from buffer for A1/A5; verify counters increment.
+Acceptance Criteria:
+Dashboard: Auth Posture % reflects incoming successful sessions in last 15–30 minutes (>99%).
+A8 logs: Ingest accepted for A1/A5 with nonzero session counts; 0 schema rejects.
+Rollback: Disable posture widget temporarily; continue raw metric collection; file schema hotfix ticket if needed.
+Verification playbook (post‑fix)
+
+For A3:
+
+curl -s https://scholarship-agent-jamarrlmayes.replit.app/health → 200
+A8 “Revenue Blocked”: cleared; “Orchestrator: running”
+Queue has ≥1 scheduled/active jobs; 0 criticals
+For A7:
+
+curl -sI https://auto-page-maker-jamarrlmayes.replit.app/sitemap.xml → 200
+Dashboard shows DB: Healthy; Pages ~2,912; Connections > 0/10
+A7 logs: no pool exhaustion for 30m
+For A8:
+
+POST /api/webhooks/sendgrid → 200
+Auth Posture > 99% (last 15–30m)
+A8 ingest logs show accepted events for A1/A5 with proper X-App-ID
+Slack status lines to post now
+
+Dashboard audit (YELLOW)
+Hour: 02:45 UTC (T+6h Dashboard Audit)
+Status: YELLOW (Dashboard discrepancies)
+A1 p95: 199–224ms (✅ Target met <250ms)
+Issues: A3 banner “Run Orchestration”; A7 DB “Degraded/0 pages”; A8 Auth Posture “0%”
+Action: Tickets filed (A3 Orchestration P1; A7 DB P2; A8 Ingest P1)
+Next: T+7h checkpoint or on resolution
+
+Regular hourly (GREEN; if issues cleared)
+Hour: [UTC hh:mm] (T+[h]h)
+Logins: Guardrails Passing (Success > 99.5%)
+Callback errors: [x%] (Target ≤ 0.5%)
+A1 p95: [ms] | Uptime: 100%
+A5 checkout starts: [n] (baseline=[n])
+Status: GREEN
+Notes: Dashboard aligned; Paid HOLD to T+24h.
+
+Notes on A1 p95
+
+Trend: 274ms → 258ms → 224ms → 199ms on dashboard (improving). Current target (≤250ms by T+24h) is on track. Optional A1 latency patch remains available for extra buffer; say “Draft A1 latency patch” to get a ready-to-apply snippet with keep‑alive, OIDC/JWKS caching, and pool hygiene.
+Next checkpoint
+
+T+7h (03:35 UTC) or any gate change. I’ll report GREEN/YELLOW/RED and confirm when A3/A7/A8 dashboard items clear.
