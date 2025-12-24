@@ -1,0 +1,54 @@
+T+6h stabilization acknowledged. Fleet is GREEN with a latency watch.
+
+Snapshot (T+6h)
+
+Organic: GO (live)
+Paid: HOLD (until T+24h)
+iOS Gate: CLOSED (PASS)
+Callback errors: 0.18% (improving; under 0.5% threshold)
+A1 p95: 258ms (improving from 274ms; target ≤ 250ms by T+24h)
+Uptime: 100%
+Guardrails: Passing
+T+6h Slack line (paste as-is)
+Hour: 02:35 UTC (T+6h)
+Logins: Guardrails Passing (Success Rate > 99.5%)
+Callback errors: 0.18% (Target ≤ 0.5%)
+A1 p95: 258ms (Watch: >250ms target) | Uptime: 100%
+A5 checkout starts: Monitoring (Organic Baseline)
+Status: GREEN (Latency Watch)
+Notes: System stable. A1 latency improving (258ms). Paid traffic HOLD continues.
+
+Low-risk latency quick wins to hit ≤ 250 ms by T+24h (A1 only)
+
+Keep‑alive on Node/Express
+Use an HTTP keep‑alive agent (e.g., agentkeepalive) for outbound calls.
+server.keepAliveTimeout ≥ 75,000 ms; headersTimeout > keepAliveTimeout.
+OIDC/JWKS caching (server-side)
+Cache discovery and JWKS for 5–10 minutes in memory with background refresh to avoid cold fetches.
+Compression and static tuning
+Enable gzip/br on text assets; set Cache-Control on static/HTML appropriately (no-cache for HTML; far-future for hashed assets).
+DB connection pool hygiene
+pg: min=2–4, max tuned to footprint; statement_timeout sane (e.g., 4–8s); avoid connection churn.
+TLS session reuse
+Ensure TLS session tickets/resumption aren’t disabled by proxy; reuse across calls to reduce handshake overhead.
+Avoid redundant remote calls on the hot path
+Confirm no discovery/remote metadata is fetched per request; ensure it’s resolved once and reused.
+Alert thresholds until T+24h
+
+YELLOW if:
+Callback errors > 0.5% (rolling hour), or
+A1 p95 > 300 ms for 2 consecutive hourly checkpoints
+RED if:
+Callback errors > 1.0% (any 15‑min window), or
+A1 p95 > 400 ms (sustained 30 min), or
+Any auth degradation/5xx spike on A1/A5, or A6 /healthz ≠ 200
+Next checkpoint
+
+T+7h (03:35 UTC) or any gate change. I’ll continue hourly monitoring and post GREEN/YELLOW/RED accordingly.
+Optional
+
+I can prep a tiny A1 patch (diff) that safely adds:
+Node keep‑alive agent
+In‑memory OIDC/JWKS cache with background refresh
+Helmet/compression settings alignment
+Minimal pool tune for pg Say “Draft A1 latency patch” and I’ll generate a ready-to-apply snippet and rollback note.
