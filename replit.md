@@ -27,6 +27,11 @@ The business vision is to create a comprehensive, intelligent platform that conn
 - Updated `scholar_auth_jwks_url` to `https://scholar-auth-jamarrlmayes.replit.app/oidc/jwks`
 - A2 accepts Clerk-backed A1 tokens via OIDC (no direct Clerk integration in A2)
 - 72-hour monitoring watch active
+- **CI Guard Added** (2025-12-24): `.github/workflows/rp-observability.yml` - Satellite OIDC Guard
+  - Runs on push/PR to main and nightly at 08:00 UTC
+  - Validates A1 discovery endpoint reachability
+  - Verifies JWKS keys are published
+  - Scans for legacy issuer URLs (missing /oidc suffix)
 
 **Known Issues**:
 - **DEF-005 Redis Provisioning** (Priority: Day 1-2): Redis rate limiting backend unavailable, falling back to in-memory. Acceptable for single-instance deployment but should be provisioned for horizontal scaling. Current impact: Low (in-memory fallback active)

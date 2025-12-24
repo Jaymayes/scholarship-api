@@ -1,0 +1,72 @@
+name: Satellite OIDC Guard
+
+on:
+  push:
+    branches: [ "main", "master" ]
+  pull_request:
+    branches: [ "main", "master" ]
+  schedule:
+    - cron: '0 8 * * *' # Daily sanity check at 8 AM UTC
+
+env:
+  # The Source of Truth (A1)
+  CANONICAL_ISSUER: "https://scholar-auth-jamarrlmayes.replit.app/oidc"
+  JWKS_URI: "https://scholar-auth-jamarrlmayes.replit.app/oidc/jwks"
+
+jobs:
+  trust-verification:
+    name: 🔗 Verify OIDC Trust
+    runs-on: ubuntu-latest
+    steps:
+      - name: 🔍 Check Upstream (A1) Availability
+        run: |
+          echo "Verifying A1 Discovery Endpoint..."
+          # Ensure A1 is online and serving the OIDC config
+          HTTP_CODE=$(curl -o /dev/null -s -w "%{http_code}\n" "${{ env.CANONICAL_ISSUER }}/.well-known/openid-configuration")
+          
+          if [ "$HTTP_CODE" -ne "200" ]; then
+            echo "::error::Critical: A1 OIDC Discovery is down! (HTTP $HTTP_CODE)"
+            exit 1
+          fi
+          echo "✅ A1 Discovery Endpoint is reachable."
+
+      - name: 🔑 Verify Upstream JWKS
+        run: |
+          echo "Verifying A1 Key Rotation..."
+          # Ensure A1 is actually publishing keys for validation
+          KEYS=$(curl -s ${{ env.JWKS_URI }} | jq '.keys | length')
+          
+          if [[ "$KEYS" -lt 1 ]]; then
+            echo "::error::Critical: A1 is not publishing any keys for verification!"
+            exit 1
+          fi
+          echo "✅ A1 is publishing $KEYS active signing key(s)."
+
+      - name: 🛡️ Validate Local Config (Static Analysis)
+        # Check out code to scan for hardcoded legacy URLs
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          
+      - name: Scan for Legacy Issuer
+        run: |
+          # This safeguards against the "Missing /oidc" regression.
+          # It scans the codebase for the domain WITHOUT the /oidc suffix.
+          echo "Scanning for legacy configuration..."
+          
+          # Grep finds the domain, excludes .git/workflows/node_modules, and alerts if /oidc is missing
+          GREP_OUT=$(grep -r "scholar-auth-jamarrlmayes.replit.app" . \
+            --exclude-dir={.git,.github,node_modules,venv,__pycache__} \
+            --exclude="rp-observability.yml" \
+            | grep -v "/oidc" \
+            | grep -v "#" || true)
+          
+          if [ ! -z "$GREP_OUT" ]; then
+            echo "::warning::⚠️ Potential Legacy Issuer URL detected (missing /oidc):"
+            echo "$GREP_OUT"
+            echo "::warning::Please ensure all Auth Configs point to .../oidc"
+            # Uncomment the next line to block builds on this error
+            # exit 1 
+          else
+            echo "✅ Local configuration appears aligned with canonical issuer."
+          fi
