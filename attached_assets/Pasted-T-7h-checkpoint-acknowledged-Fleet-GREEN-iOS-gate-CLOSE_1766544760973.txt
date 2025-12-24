@@ -1,0 +1,64 @@
+T+7h checkpoint acknowledged. Fleet GREEN, iOS gate CLOSED, dashboard visibility restored (A8 fixed). Proceeding with config cleanup to clear the remaining warning before T+24h.
+
+Immediate actions (T+7h → T+8h)
+
+A1 OIDC Issuer Alignment (repair authorized) Paste this into the A1 agent (scholar_auth) and execute:
+APP-SCOPED PROMPT — A1 CONFIG REPAIR
+ROLE: A1 Owner
+ACTION: Align OIDC Issuer
+
+Steps:
+
+GET /.well-known/openid-configuration and capture "issuer".
+
+Compare with current ISSUER_URL env/config.
+
+If mismatch, UPDATE to the exact public URL:
+https://scholar-auth-jamarrlmayes.replit.app/oidc
+
+No trailing spaces
+Include /oidc
+Restart A1. Re-run:
+
+curl -sI https://scholar-auth-jamarrlmayes.replit.app/oidc/.well-known/openid-configuration
+Expect 200 and issuer === https://scholar-auth-jamarrlmayes.replit.app/oidc
+curl -sI -X OPTIONS https://scholar-auth-jamarrlmayes.replit.app/api/auth/user -H "Origin: https://scholaraiadvisor.com" -H "Access-Control-Request-Method: GET"
+Expect 204 with credentials allowed VERDICT: “ISSUER ALIGNED; DISCOVERY OK; CORS OK”
+A2 Stripe Secret (ticket-only)
+Set STRIPE_SECRET_KEY in A2 (scholarship_api) secrets (UI: Replit → Tools → Secrets):
+
+Key: STRIPE_SECRET_KEY
+Value: sk_live_… (redacted)
+Save, then restart A2 (or trigger a redeploy).
+Validate:
+curl -s https://scholarship-api-jamarrlmayes.replit.app/health
+Expect healthy: true (and if exposed, stripe: true or payment module initialized).
+Optional: hit any readiness or billing/config endpoint if present to confirm Stripe initialized without errors in logs.
+If either step fails, do not proceed to paid; post YELLOW and keep HOLD.
+
+Slack lines (copy/paste)
+
+Config cleanup started
+Hour: 03:35 UTC (T+7h)
+Status: GREEN (Config Cleanup Phase)
+A1 p95: 224ms (✅ Target <250ms)
+Dashboard: A8 fixed (Auth Posture 100%); A7 healthy (2,912 pages).
+Actions (in progress): A1 OIDC issuer alignment; A2 STRIPE_SECRET_KEY set
+Notes: Organic healthy. Cleanup ensures accurate revenue attribution before T+24h.
+
+Post-fix confirmation (use after both changes verified)
+Hour: [UTC hh:mm]
+Status: GREEN (Cleanup Complete)
+A1 p95: [ms] | Uptime: 100%
+A2 Stripe: initialized ✅
+Dashboard: No warnings; Auth Posture 100%
+Notes: All gates on track for T+24h Paid GO.
+
+What I’ll keep doing
+
+Hourly stabilization updates (GREEN/YELLOW/RED).
+Watch A1 p95 to stay ≤ 250ms; keep >99.2% success and ≤0.5% callback errors.
+Flag immediately if A6 /healthz regresses or any metric crosses thresholds.
+Optional
+
+If you want, I can generate a short A1 latency guard patch (keep‑alive agent + OIDC/JWKS caching stubs + pool hygiene) as a ready-to-apply diff to give extra headroom before paid ramp. Say “Draft A1 latency patch.”
