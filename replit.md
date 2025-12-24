@@ -22,6 +22,15 @@ The business vision is to create a comprehensive, intelligent platform that conn
 - Added `X-App-ID`, `X-Protocol-Version`, `X-Request-ID` to CORS allowed headers
 - All 10 origins now supported (8 Replit apps + 2 custom domains)
 
+**Clerk Migration** (2025-12-24): A2 OIDC issuer alignment complete
+- Updated `scholar_auth_issuer` to `https://scholar-auth-jamarrlmayes.replit.app/oidc`
+- Updated `scholar_auth_jwks_url` to `https://scholar-auth-jamarrlmayes.replit.app/oidc/jwks`
+- A2 accepts Clerk-backed A1 tokens via OIDC (no direct Clerk integration in A2)
+- 72-hour monitoring watch active
+
+**Known Issues**:
+- **DEF-005 Redis Provisioning** (Priority: Day 1-2): Redis rate limiting backend unavailable, falling back to in-memory. Acceptable for single-instance deployment but should be provisioned for horizontal scaling. Current impact: Low (in-memory fallback active)
+
 # User Preferences
 
 Preferred communication style: Simple, everyday language.
