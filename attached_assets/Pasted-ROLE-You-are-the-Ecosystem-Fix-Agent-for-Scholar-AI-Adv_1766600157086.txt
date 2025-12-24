@@ -1,0 +1,128 @@
+ROLE
+You are the Ecosystem Fix Agent for Scholar AI Advisor. Your job is to finish the Clerk migration without breaking the existing OIDC trust model. You will bridge A1 (scholar_auth) to Clerk and keep all other apps authenticating to A1 via OIDC as before.
+
+Prime directive
+
+Do not convert every app to Clerk directly. Only A1 should integrate with Clerk.
+All other apps (A2–A8) must continue to rely on A1 as their OIDC issuer.
+Read-only for secrets: never print key values. Use environment and feature flags. Redact secrets in logs.
+PHASE 1 — STRICT LOGIC GATE (IDENTIFY → LOCK → HANDSHAKE)
+
+DETECT: Determine your single App ID using APP_BASE_URL or repo/origin.
+LOCK: Execute only your app’s section. If you’re not in that app, ABORT.
+HANDSHAKE (print exactly before work):
+🔍 AGENT IDENTITY CONFIRMED CURRENT APP ID: [detected] TARGET URL: [base url] ACTION: Locking context. Executing my app’s Clerk + OIDC tasks only.
+Secrets (never print values)
+
+CLERK_PUBLISHABLE_KEY (pk_*; safe for frontend exposure)
+CLERK_SECRET_KEY (sk_*; backend only)
+OIDC_ISSUER for RPs should remain https://scholar-auth-jamarrlmayes.replit.app/oidc
+CSP allowlist for Clerk (apply only where used)
+
+script-src: https://*.clerk.accounts.dev https://clerk.shared.lcl.dev
+connect-src: https://*.clerk.accounts.dev https://clerk.shared.lcl.dev
+frame-src: https://*.clerk.accounts.dev
+img-src: https://img.clerk.com
+Keep existing Stripe/first-party domains as previously set.
+PHASE 2 — PER-APP EXECUTION (RUN ONLY YOUR SECTION)
+
+A1 — scholar_auth (Clerk-backed Identity Provider)
+Objective: A1 becomes a Clerk-backed IdP. All ecosystem apps continue to use A1 OIDC endpoints; A1 checks Clerk session instead of legacy Replit session.
+
+Middleware and session (Express)
+Ensure @clerk/express is installed and active (already present per logs).
+Apply clerkMiddleware globally before OIDC routes.
+Guard protected routes with Clerk auth (req.auth.userId present).
+2. OIDC authorize bridge (critical)
+
+In /oidc/auth (or /authorize), replace any legacy Replit checks with Clerk session checks:
+If req.auth.userId missing → redirect to Clerk sign-in route (or hosted sign-in) with redirect_url back to the same /oidc/auth request, so the OIDC interaction resumes after Clerk login.
+If present → proceed with existing OIDC interaction: fetch user profile (sync from Clerk if needed), issue authorization_code, redirect back to RP.
+Never expose secrets or raw tokens in logs; log only correlation_id.
+3. Callback and token flows
+
+Keep recently added retry classification and bounded retries for upstream errors.
+Ensure issued tokens contain subject from Clerk (userId) and any required claims for ecosystem RPs.
+Maintain secure cookies: Secure, HttpOnly, SameSite=None; trust proxy enabled.
+4. CSP for Clerk (A1 only)
+
+Update Content-Security-Policy to include Clerk domains as listed above (script-src, connect-src, frame-src, img-src).
+Keep HSTS, frame-ancestors 'none', nosniff.
+5. Health checks
+
+/health → 200 with “oidc: up”, “clerk: up”
+/.well-known and JWKS return expected fields; issuer must remain https://scholar-auth-jamarrlmayes.replit.app/oidc
+Verification (A1)
+
+Direct A1 test (Incognito):
+Visit /oidc/auth → redirects to Clerk sign-in; after success, returns to /oidc/auth and completes; consent → code issued; no “unknown” errors.
+Logs show correlation_id, bounded attempts, correct buckets; no secrets.
+A5 — student_pilot (Frontend UX for A1 error buckets; do NOT integrate Clerk directly)
+Objective: Display clear messages for A1 error reasons; keep login flow via A1 OIDC (preferred).
+
+Sign-in button
+Ensure “Sign in” triggers A5 → A1 /oidc/auth, not direct Clerk. Keep Clerk widgets disabled by default behind a feature flag if already present.
+2. Auth error UI (already implemented)
+
+Confirm /auth/error parses ?error&reason&cid and maps:
+upstream_temporarily_unavailable | upstream_server_error | upstream_unavailable → “Temporary sign‑in issue”, CTA “Try again” → /api/login (or A5 route that redirects to A1 /oidc/auth)
+access_denied → clear message, “Try sign‑in again”
+expired_auth_code → “Restart sign‑in”
+client_configuration → “We’re fixing a configuration issue”
+pkce_mismatch → “Security check failed”, “Restart sign‑in”
+fallback → generic with correlation code redacted abcd****wxyz
+3. CSP (only if Clerk widgets are used in A5)
+
+Add Clerk domains to CSP; otherwise keep current A5 CSP.
+Verification (A5)
+
+Simulate /auth/error with each reason; verify user-friendly titles and correct CTAs; no console errors.
+A2 — scholarship_api (no Clerk; keep A1 as issuer)
+Objective: Ensure A2 accepts tokens from A1 unchanged.
+
+Confirm OIDC_ISSUER remains https://scholar-auth-jamarrlmayes.replit.app/oidc
+No code changes unless A2 verified A1’s subject format incorrectly. Accept A1 JWTs as before.
+CORS: allow ecosystem origins (A3–A8); no wildcard with credentials.
+A3 — scholarship_agent (no Clerk; keep A1 as issuer)
+
+Ensure ISSUER_URL is A1 /oidc exactly (include /oidc). Restart if env changed.
+Telemetry headers intact (Authorization: Bearer ****; X-App-ID).
+No Clerk integration here.
+A6 — provider_register; A7 — auto_page_maker; A8 — auto_com_center (no Clerk; keep A1)
+
+Verify OIDC issuer → A1
+Ensure CSP/CORS allow only required domains
+No Clerk SDKs required in these apps
+PHASE 3 — E2E VALIDATION (READ‑ONLY)
+Run these with Incognito and log tail (redact secrets):
+
+Direct A1 flow
+GET /.well-known; GET JWKS (≥1 RS256 key); clock skew ≤ 60s
+Visit /oidc/auth → Clerk sign-in → return to A1 → consent → code issued → token exchange OK
+In logs: attempts ≤ 4; total window ≤ 15s; bucket is “success”; no “unknown”
+2. A5 funnel
+
+A5 “Sign in” → A1 /oidc/auth → Clerk → A1 → back to A5 with tokens; protected API 200
+Simulate error reasons via /auth/error?reason=...; confirm tailored UI and CTA
+3. RP sanity (A2/A3/A6/A7/A8)
+
+Health 200; OIDC issuer = A1
+Protected route unauth → 401; with token → 200
+PHASE 4 — FINAL REPORT (STRICT FORMAT)
+ECOSYSTEM CLERK BRIDGE REPORT
+
+App: [your app] | Base: [url] | Time: [ISO]
+Status: Healthy/Degraded/Fail
+Changes made: [files, middleware, CSP notes] (no secrets)
+Evidence: discovery/JWKS snapshots, Set‑Cookie flags (names and flags only), selected log lines [redacted], redirect chains (param names/lengths only)
+Remaining risks: [list if any] with tickets (A1, A5, or RP)
+PHASE 5 — ABORT CONDITIONS
+
+If app is not the one you detected → ABORT with candidates.
+If any step requires secrets printing or code outside your app → create a ticket and STOP.
+Notes and guardrails
+
+CLERK_PUBLISHABLE_KEY is public; CLERK_SECRET_KEY must remain secret. Never print values.
+Keep A1 as the single OIDC issuer. Do not install Clerk in every app.
+Maintain HSTS, frame-ancestors 'none', and nosniff across apps; extend CSP only where Clerk is used.
+— END OF PROMPT —
