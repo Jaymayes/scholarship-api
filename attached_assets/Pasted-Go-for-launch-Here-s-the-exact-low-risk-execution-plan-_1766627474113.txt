@@ -1,0 +1,80 @@
+Go for launch. Here’s the exact, low‑risk execution plan to deploy A2 and start the A5 Paid Canary at 1%. I’ll keep it surgical, with clear gates and instant rollbacks.
+
+Step 1 — Deploy A2 (scholarship_api) with Stripe fix
+Goal: Ensure backend can create sessions and process webhooks in prod.
+
+Pre‑flight (A2)
+
+Secrets: confirm these exist (don’t print values)
+STRIPE_SECRET_KEY (live)
+STRIPE_WEBHOOK_SECRET (live)
+DATABASE_URL
+Stripe client: prefer env vars first (already implemented); connector fallback disabled/guarded.
+Deploy A2 (production)
+
+Publish/redeploy the A2 app (the version with env‑first Stripe client).
+Sanity checks:
+Health: curl -s https://scholarship-api-jamarrlmayes.replit.app/health | jq
+Expect: status=ok, stripe_configured=true (based on secret key presence)
+Webhook route registered: curl -sI https://scholarship-api-jamarrlmayes.replit.app/api/stripe/webhook | head -5
+Expect 200/405 depending on method guard (not 5xx)
+Stripe webhook test (optional, safe)
+
+If you use the Stripe CLI for live or test replays, do not expose secrets; verify HTTP 2xx responses for replayed events.
+Go/No‑Go gate for A2
+
+Proceed if: health=ok, stripe_configured=true, no 5xx in recent logs.
+Step 2 — Calibrate A5 canary to 1%
+Goal: Limit blast radius while we observe.
+
+Change in A5 (student_pilot)
+
+Set SECRET: BILLING_ROLLOUT_PERCENTAGE=1
+Publish/redeploy A5.
+Verification
+
+A5 health returns OK.
+Only ~1% of new sessions see “Upgrade/Checkout” entry point (or use your hash bucketing diagnostic if present).
+If you need deterministic testing for staff:
+Use the invite link fallback (e.g., /pricing?canary=1) or temporarily set 10% for your session only, then revert to 1%.
+Step 3 — Live smoke test (internal)
+From a fresh Incognito session:
+
+Login via A1 (Clerk) → ensure A5 shows authenticated state.
+Trigger checkout (if assigned to canary cohort or via invite link).
+Expect redirect to Stripe Checkout; complete a small‑amount live transaction (or a $0 promo if configured).
+Observe:
+A2 logs: checkout.session.completed and payment_intent.succeeded (2xx webhook)
+A8 dashboard: new REVENUE event ingested within a few minutes
+No auth regression on A1 (no bucket=unknown)
+KPI gate (stay at 1% for 2–4 hours)
+
+Success rate (initiated → completed): ≥ 98% (exclude user cancels)
+Webhook 2xx within 5 minutes: ≥ 99%
+Latency: A2 checkout/session create p95 ≤ 500 ms; webhook p95 ≤ 500 ms
+Errors: A2 5xx=0; Stripe errors within expected norms
+Step 4 — Ramp plan (only if green)
+
+1% → 10% (after 2–4 hours)
+10% → 50% (after 24 hours)
+50% → 100% (after the 72‑hour stability window)
+Re‑check the same KPI gate at each step; proceed only if green.
+Rollbacks (instant, zero user-visible breakage)
+
+A5: set BILLING_ROLLOUT_PERCENTAGE=0; redeploy. Checkout entry points hide; existing subscriptions unaffected.
+A2: keep webhook ingestion enabled even if A5 is paused; no harm receiving late events.
+What I’ll watch during the canary (A8 and A1 integrated)
+
+A1: callback_success_rate ≥ 99%, p95 ≤ 250 ms, unknown ≈ 0
+A2: webhook 2xx rate ≥ 99%, API 5xx=0, p95 ≤ 500 ms
+A8: REVENUE events appear consistently; auth posture remains green
+Optional hardening (parallel)
+
+A2 DEF‑005 Redis (Day 1–2): acceptable to defer until after canary; in-memory limiter is OK for single instance. I can stage a Redis cutover runbook when you’re ready.
+Ready to execute
+
+Say “Deploy A2 and start canary at 1%” and I will:
+Confirm A2 deploy gates in production
+Confirm A5 secret change and redeploy
+Run the live smoke test checklist
+Report KPI status at +30m and +2h gates
