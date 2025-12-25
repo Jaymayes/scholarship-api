@@ -1,0 +1,44 @@
+Acknowledged. Canary is live at 1%, A2 is deployed with the env-first Stripe client, and A8 monitoring is in place.
+
+What I will do next (default)
+
++30m KPI check: I’ll report checkout success, webhook 2xx, A2 p95, A1 auth posture, and A8 revenue events.
++2h gate review: Ramp/no‑ramp decision based on gates.
+Right now (quick operator checks you can run any time)
+
+A2 health and Stripe readiness
+curl -s https://scholarship-api-jamarrlmayes.replit.app/health | jq
+curl -s https://scholarship-api-jamarrlmayes.replit.app/api/payment/status | jq # stripe_configured should be true
+curl -sI -X POST https://scholarship-api-jamarrlmayes.replit.app/api/payment/webhook | head -5 # expect 400/405 (route present), not 5xx
+A1 discovery/JWKS (sanity)
+curl -s https://scholar-auth-jamarrlmayes.replit.app/oidc/.well-known/openid-configuration | jq '.issuer,.jwks_uri'
+curl -s https://scholar-auth-jamarrlmayes.replit.app/oidc/jwks | jq '.keys | length'
+A8 revenue telemetry watch
+Confirm first REVENUE event appears within minutes of a successful Stripe payment_intent.succeeded
+Live triage (if anything looks off)
+
+No revenue after successful payment:
+A2 logs: verify payment_intent.succeeded and checkout.session.completed were received (2xx) and that telemetry emit to A8 ran (redacted correlation_id).
+If webhook 400/401/403: verify STRIPE_WEBHOOK_SECRET and handler signature verification; ensure POST method and raw body parsing are enabled.
+If webhook 5xx: revert canary to 0% while investigating.
+Checkout failures > 2%:
+Inspect payment_intent outcomes in Stripe dashboard (insufficient_funds vs integration_error)
+A2 /create-checkout-session p95 > 500 ms: check DB and Stripe API timeouts; retry logic if present.
+Auth regressions:
+A1 bucket=unknown > 0.05% for >10 minutes → check correlation_id in A1 logs (redacted) and verify bucket classification; retries should mask transient upstream issues.
+Ramp plan (only if KPIs green)
+
+1% → 10% after 2–4 hours of clean metrics
+10% → 50% after 24h
+50% → 100% after the 72‑hour stability window
+Always re-check: checkout success ≥ 98%, webhook 2xx ≥ 99%, A2 p95 ≤ 500 ms, A1 success ≥ 99%, unknown ≈ 0
+Rollback (instant, no disruption)
+
+Set A5 BILLING_ROLLOUT_PERCENTAGE=0 and redeploy (hides entry points).
+Keep A2 webhooks enabled; no harm receiving in-flight events.
+Optional, say the word
+
+Archive images: I can store the uploaded screenshots as T+0 evidence in docs with timestamps.
+Stripe webhook replay guide: I’ll produce a short, read‑only CLI playbook to safely re‑deliver events (no secrets printed).
+A2 Redis plan (DEF‑005): provision plan + cutover steps after canary clears.
+I’ll report back at +30 minutes with the KPI snapshot and any incidents detected.
