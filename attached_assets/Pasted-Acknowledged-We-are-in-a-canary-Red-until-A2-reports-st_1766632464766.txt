@@ -1,0 +1,51 @@
+Acknowledged. We are in a canary “Red” until A2 reports stripe_configured: true in production. Here’s the exact, low‑risk sequence and instant mitigation.
+
+Immediate mitigation (prevent user errors now)
+
+In A5: set BILLING_ROLLOUT_PERCENTAGE=0 and redeploy (hides checkout CTA for all users). Keep it at 0% until A2 is green.
+Deploy A2 to production (env‑first Stripe client)
+
+Confirm production secrets (do not print values)
+STRIPE_SECRET_KEY (live)
+STRIPE_WEBHOOK_SECRET (live)
+DATABASE_URL
+2. Redeploy A2
+
+Replit Deployments → “Redeploy/Promote to Production”
+3. Post‑deploy checks (must all pass)
+
+Health: curl -s https://scholarship-api-jamarrlmayes.replit.app/health | jq
+Expect: "status":"healthy"
+Stripe status: curl -s https://scholarship-api-jamarrlmayes.replit.app/api/payment/status | jq
+Expect: "stripe_configured": true, "webhook_secret_configured": true
+Webhook route presence (method guard ok):
+curl -sI -X POST https://scholarship-api-jamarrlmayes.replit.app/api/payment/webhook | head -5
+Expect: 400/405 (not 5xx)
+If stripe_configured remains false after redeploy
+
+Likely causes and quick checks:
+Secrets in “deployment” context not set: confirm Replit Deployments has STRIPE_SECRET_KEY in the Production environment, not just the workspace.
+Env var name mismatch: code expects STRIPE_SECRET_KEY; verify capitalization/spelling.
+Config cache: ensure the process picked up new env; hard restart deployment.
+Connector interference: confirm code path prefers env-first and doesn’t throw on connector failure (already fixed; ensure prod build includes the fix).
+Re‑enable canary after A2 is green
+
+In A5: set BILLING_ROLLOUT_PERCENTAGE=1 and redeploy (or use your invite link for staff tests).
+Run smoke test:
+A5 → Login via A1 (Clerk) → Upgrade → Stripe Checkout → complete small live payment
+A2 logs: checkout.session.completed + payment_intent.succeeded (2xx)
+A8: REVENUE event appears within a few minutes
+KPI gates (stay at 1% for 2–4 hours)
+
+Checkout success ≥ 98%
+Webhook 2xx ≥ 99% (within 5 minutes)
+A2 checkout p95 ≤ 500 ms; A2 5xx = 0
+A1 auth success ≥ 99%; bucket=unknown ≈ 0
+Rollback (instant)
+
+A5: set BILLING_ROLLOUT_PERCENTAGE=0 and redeploy (hide entry points)
+Keep A2 webhooks enabled (safe to receive in‑flight events)
+Your next step
+
+Please redeploy A2 with the env‑first Stripe client and confirm STRIPE_SECRET_KEY is set in Production secrets.
+Reply “Deployed” and I’ll re‑run the production checks (health, /api/payment/status, webhook route) and—if green—walk you through re‑enabling the 1% canary.
