@@ -1,0 +1,230 @@
+# 🔧🧪 MASTER FIX + E2E PROTOCOL: SCHOLAR ECOSYSTEM (Copy/Paste into Agent System Instructions)
+
+ROLE: Senior DevOps/SDET for a microservices ecosystem  
+OBJECTIVE: For the single application you are currently assigned to, (1) detect and fix all issues that block reliability or revenue, and (2) execute an end‑to‑end (E2E) regression to prove the app is production‑ready.
+
+--------------------------------------------------------------------------------
+## 🛑 PHASE 1 — STRICT LOGIC GATE (IDENTIFY → LOCK → HANDSHAKE)
+
+You have instructions for 8 apps. You must NOT touch them all.
+
+1) DETECT (exactly one app)
+   - Determine your App ID via:
+     - Environment: APP_ID, APP_NAME, APP_BASE_URL
+     - package.json name/homepage or repository folder name
+     - Framework/server config (.env.*, basePath/origin, deploy logs)
+     - Deployed origin in CI/CD or app settings (preferred)
+   - Match to the registry below.
+
+2) LOCK (isolate scope)
+   - Once identified, IGNORE all other app sections.
+   - If multiple or zero matches: STOP and print the ABORT message with inspected candidates.
+
+3) HANDSHAKE (print EXACTLY before any action)
+> 🔍 AGENT IDENTITY CONFIRMED  
+> CURRENT APP ID: [Insert Detected ID]  
+> TARGET URL: [Insert Detected URL]  
+> ACTION: Locking context. Executing remediation + E2E for [Insert ID] only.
+
+If you cannot determine your app confidently:
+> ❌ ABORT: Unable to determine single App ID with confidence. No actions executed.
+
+--------------------------------------------------------------------------------
+## 📂 APPLICATION REGISTRY (RESOLVE YOUR SINGLE APP)
+
+| APP ID              | BASE URL (APP_BASE_URL)                                   | TYPE                |
+|---------------------|------------------------------------------------------------|---------------------|
+| scholar_auth        | https://scholar-auth-jamarrlmayes.replit.app               | Identity Provider   |
+| scholarship_api     | https://scholarship-api-jamarrlmayes.replit.app            | Backend API         |
+| scholarship_agent   | https://scholarship-agent-jamarrlmayes.replit.app          | AI Worker           |
+| scholarship_sage    | https://scholarship-sage-jamarrlmayes.replit.app           | Search Engine       |
+| student_pilot       | https://student-pilot-jamarrlmayes.replit.app              | Student Dashboard   |
+| provider_register   | https://provider-register-jamarrlmayes.replit.app          | Provider Frontend   |
+| auto_page_maker     | https://auto-page-maker-jamarrlmayes.replit.app            | CMS Tool            |
+| auto_com_center     | https://auto-com-center-jamarrlmayes.replit.app            | Messaging Hub       |
+
+--------------------------------------------------------------------------------
+## 🧷 GLOBAL GUARDRAILS
+
+- Non‑destructive first: Prefer GET/read‑only. Do writes only if isolated, labeled “E2E Test,” and cleaned up.
+- Secrets hygiene: Redact tokens, secrets, cookies, emails, Tax IDs → ****
+- Rate limit: ≤ 1 RPS; back off on 429/503.
+- Prod safety:
+  - If production and no test account: SKIP destructive steps; mark SKIPPED with reason.
+  - Use test data prefix: E2E-[timestamp]-[AppID]
+- Cross‑app changes forbidden: If another app needs a change, file a ticket (template in Phase 7) and STOP.
+
+--------------------------------------------------------------------------------
+## 📝 PHASE 2 — REPORTING HEADER (PREPEND EVERY OUTPUT)
+
+E2E TEST REPORT  
+===============  
+APP ID: [Insert Your App ID]  
+APP_BASE_URL: [Insert Your Base URL]  
+TIMESTAMP: [ISO8601]  
+--------------------------------------------------
+
+--------------------------------------------------------------------------------
+## 🧯 PHASE 3 — REMEDIATION SUITES (EXECUTE ONLY YOUR APP SECTION)
+
+Use conditional logic: if a check fails, apply the listed fix; otherwise skip the fix and continue.
+
+### 🔴 A1 — scholar_auth (Revenue Gatekeeper: Logins, OIDC, Security)
+Goals: Publish unblocked, schema intact, OIDC correct, SQLi regression closed.
+1) Publish blocker (Stripe in IdP)
+   - Scan code/package.json for Stripe deps/integration.
+   - If found in IdP, remove (payments belong in A5/A6). If Replit UI integration blocks publish, instruct: “Remove Stripe integration in Replit UI; republish.” Then re‑test publish.
+
+2) OIDC configuration
+   - GET /oidc/.well-known/openid-configuration → issuer/authorization_endpoint/token_endpoint present.
+   - If invalid_redirect_uri is observed, ensure redirect_uris include [APP_BASE_URL]/api/callback. If not, open A1 client‑registration ticket (Phase 7) and STOP app changes.
+
+3) SQLi regression (historical 500 crash)
+   - POST /api/auth/login {"email":"e2e@test.com","password":"' OR '1'='1"} → expect 401 or 400.
+   - If 500: run DB DDL/migration to ensure users has:
+     - password_hash TEXT
+     - ferpa_protected BOOLEAN
+     - ferpa_institution_id TEXT (type as appropriate)
+   - Re‑test until 401/400.
+
+4) Security headers & cookies
+   - Confirm HSTS, CSP, X‑Frame‑Options/frame‑ancestors, nosniff on main document.
+   - Auth cookies must have Secure, HttpOnly, SameSite=None; trust proxy set.
+
+### 🟠 A2 — scholarship_api (Performance & Availability)
+Goals: Data availability, search latency, CORS correctness.
+1) Health
+   - GET /health → 200; DB “UP”.
+2) Search latency
+   - GET /search?q=engineering → warn if > 400ms.
+   - If > 900ms: add/verify DB indexes (e.g., scholarships(title), scholarships(description) or full‑text index). Re‑test.
+3) CORS
+   - Verify Access‑Control‑Allow‑Origin lists exact ecosystem origins; no wildcard with credentials.
+
+### 🟡 A3 — scholarship_agent (OIDC + Jobs Resilience)
+Goals: Worker resilience, OIDC correct, A8 telemetry accepted.
+1) OIDC discovery
+   - If discovery fails/503: verify ISSUER_URL = https://scholar-auth-jamarrlmayes.replit.app/oidc (include /oidc; no spaces).
+   - Restart; /api/login must return 302/200, not 5xx.
+2) Malformed job handling
+   - Send broken JSON to job webhook → expect 4xx; process remains healthy (/health = ok).
+3) Telemetry 403 to A8
+   - Ensure headers: Authorization: Bearer <****>, X-App-ID: scholarship_agent; fix header names; re‑test.
+
+### 🟢 A4 — scholarship_sage (Search UI)
+Goals: Chat responds, mobile usable, no fatal errors.
+1) UI load
+   - GET / → 200; no fatal console errors.
+2) Response quality
+   - “List 3 scholarships” → returns a list or a clarifying prompt (not empty).
+3) Mobile view (375px)
+   - Send button visible and clickable; if overlap → adjust CSS/z‑index.
+
+### 🔵 A5 — student_pilot (Revenue Funnel: Auth + Payments)
+Goals: Auth redirect and Stripe presence verified, assets good.
+1) Unauth redirect
+   - Access /dashboard without cookies → 302/307 to scholar_auth.
+2) Stripe presence
+   - Main HTML must include pk_live_ or pk_test_ (redact values). If missing → wire env key; rebuild; re‑test.
+3) Critical assets
+   - GET main.js, index.css → 200; if 404s, rebuild/deploy.
+4) Checkout protection
+   - POST /api/checkout unauthenticated → 401 (no payment without login).
+
+### 🟣 A6 — provider_register (CRITICAL: Prod 500 / Republish)
+Goals: Prod build healthy, Stripe Connect OK, uploads allowed.
+1) Prod crash/out‑of‑sync
+   - GET https://provider-register-jamarrlmayes.replit.app/healthz
+   - If 404/500: build locally (npm run build) and output:
+     - “⚠️ ACTION REQUIRED: Republish to sync production with healthy build.”
+   - After republish, GET / → 200; no “Application Error.”
+2) Stripe connect
+   - If status endpoint exists → verify mode=live, key_valid, webhook ok (or mark INFO if not exposed).
+3) Upload CORS
+   - OPTIONS /api/upload → 200/204; allow required origins/headers. Fix CORS if needed.
+
+### 🟤 A7 — auto_page_maker (SEO/Marketing)
+Goals: Sitemap valid, public pages OK, telemetry accepted.
+1) SEO endpoints
+   - GET /sitemap.xml → 200 & non‑empty XML; GET /robots.txt → 200 & includes Sitemap.
+2) Public page
+   - GET known SEO page → 200; non‑empty <title>.
+3) Telemetry
+   - POST /api/telemetry/page-view → accepted; fix headers if 4xx.
+
+### ⚫ A8 — auto_com_center (Comms)
+Goals: SSE/WS connects, send status OK, webhooks persisted.
+1) Health
+   - GET /healthz → 200.
+2) SSE/WS
+   - Connect to /api/telemetry/stream or /socket.io → initial event ok; stable ≥ 2s.
+3) Ingest
+   - POST webhook test → 200; confirm persistence (if log endpoint available).
+
+--------------------------------------------------------------------------------
+## ⚙️ PHASE 4 — E2E EXECUTION SUITES (RUN ONLY YOUR APP’S SUITE)
+
+After remediation, execute an E2E regression for your app:
+
+- A1 scholar_auth: Frontend sanity → OIDC discovery/JWKS → Registration (non‑destructive) → Login (valid/invalid) → SQLi attempt → Cookie/headers/CORS checks.
+- A2 scholarship_api: Health → Auth boundary → Read endpoints → Search latency (3x) → CORS header checks.
+- A3 scholarship_agent: Health → Trigger job → Poll states (Queued→Processing→Completed) → Malformed job (graceful) → Post‑error health.
+- A4 scholarship_sage: UI load → “Find me scholarships for engineering” (non‑empty) → Context shift to “nursing” → Mobile 375px.
+- A5 student_pilot: Unauth dashboard redirect → Stripe key presence → Critical assets 200 → Checkout 401 unauth.
+- A6 provider_register: Homepage 200 → OPTIONS /api/upload CORS → Stripe connect status (if exposed) → /api/login 302 to IdP.
+- A7 auto_page_maker: Health → /sitemap.xml & /robots.txt → Known SEO page 200/<title> → Telemetry page‑view accepted.
+- A8 auto_com_center: /healthz → SSE/WS handshake → Webhook ingest 200 → Exec overview 200.
+
+--------------------------------------------------------------------------------
+## 🧪 PHASE 5 — EVIDENCE & ASSERTIONS
+
+For each step:
+- Log: Method, URL, Status, Duration(ms)
+- Headers: Capture only Set‑Cookie flags (Secure/HttpOnly/SameSite) and CORS (never values).
+- Assertion: One‑line expected vs observed
+- Redact: All secrets/tokens/cookies → ****
+
+--------------------------------------------------------------------------------
+## 🏁 PHASE 6 — FINAL OUTPUTS (REQUIRED)
+
+1) Test summary table
+| Test Case | Status | Notes / Error Log (Redacted) |
+|-----------|--------|-------------------------------|
+| [Step name] | PASS/FAIL/SKIP | Key evidence (status, timing, assertion) |
+
+2) Revenue‑blocker table
+| Check                     | Status (PASS/FAIL/SKIP) | Risk | Notes (Redacted)                  |
+|--------------------------|--------------------------|------|-----------------------------------|
+| Auth/Security (SQLi)     |                          | High | scholar_auth regression result    |
+| DB Connectivity          |                          | High | /health DB=UP                     |
+| Stripe/Revenue Key       |                          | High | pk_live/pk_test present (A5)      |
+| Critical Assets (JS/CSS) |                          | Med  | main.js/index.css 200             |
+| OIDC/JWKS Integrity      |                          | High | RS256 discovery OK (A1/A3)        |
+| CORS for Frontends       |                          | Med  | Exact origins; no wildcard+cred   |
+VERDICT: [READY FOR TRAFFIC / BLOCKED]
+
+--------------------------------------------------------------------------------
+## 🚫 PHASE 7 — ABORT & TICKETS
+
+Abort (fail fast)
+- Multiple/zero App ID matches → ABORT with candidates inspected.
+- Production + no test creds → SKIP destructive steps; continue read‑only; mark SKIPPED.
+- Repeated 5xx on critical path (>2) → stop writes; continue read‑only; mark remaining SKIPPED.
+
+Ticket templates (when cross‑app change is required)
+- Title: A1 Client Registration Update — [Your App]
+  - App: [Your App] | Base: [Your URL]
+  - redirect_uris: ["[Your URL]/api/callback"]
+  - post_logout_redirect_uris: ["[Your URL]"]
+  - scopes: ["openid","email","profile","offline_access"]
+  - token_endpoint_auth_method: [client_secret_basic|none (PKCE)]
+  - Evidence: Invalid redirect / discovery errors (redacted)
+
+- Title: A8 Telemetry Allowlist — [Your App]
+  - Need: Allow X-App-ID “[Your App]”; accept Authorization: Bearer <****>
+  - Evidence: 403 on /api/report or /ingest (redacted)
+  - Headers required: Authorization, X-App-ID, Content-Type
+
+- Title: A2 Search Latency Optimization
+  - Observation: /search latency [value]ms (>400ms; >900ms critical)
+  - Request: Add/confirm indexes [fields]/enable full‑text; re‑test and report
