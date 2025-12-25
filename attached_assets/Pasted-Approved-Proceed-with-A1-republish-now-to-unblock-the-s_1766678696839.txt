@@ -1,0 +1,50 @@
+Approved. Proceed with A1 republish now to unblock the smoke test.
+
+A1 republish runbook (5–10 minutes)
+
+Confirm code state (already done in dev)
+security.ts: crossOriginEmbedderPolicy=false, crossOriginOpenerPolicy=false
+Keep: HSTS, CSP, X-Frame-Options/frame-ancestors, nosniff
+Optional sanity: Ensure CSP allows required Clerk assets (if used): script-src/style-src/connect-src for Clerk CDN(s)
+2. Publish
+
+Replit → Publish new snapshot for scholar_auth
+No env changes required
+3. Post-publish verification (production)
+
+Headers: curl -I https://scholar-auth... | confirm COEP/COOP are absent; HSTS/CSP present
+OIDC: GET /.well-known/openid-configuration (200) and JWKS (≥1 RS256 key)
+Clerk UI: Visit /sign-in → form renders; no blank page
+4. Golden-path smoke (immediately after verification)
+
+A5 (incognito): Login via A1 → Upgrade → Stripe Checkout (live test charge)
+Expect:
+A2: checkout.session.completed and payment_intent.succeeded (2xx)
+A5: credits/entitlement updated for the user
+A8: REVENUE event ingested (visible in overview)
+KPI gates
+
+Checkout success ≥ 98%
+Webhook 2xx ≥ 99%
+A2 p95 ≤ 500 ms
+A1 auth success ≥ 99%
+Rollback (if needed)
+
+Replit → Revert to previous snapshot (instant)
+If rollback occurs: open ticket to reintroduce COOP/COEP only on routes that don’t embed Clerk; keep them disabled on /sign-in and OIDC interaction pages
+Copy/paste agent prompt for A1 (to execute now)
+
+Begin with the identity handshake, then run:
+E2E TEST REPORT
+APP ID: scholar_auth APP_BASE_URL: https://scholar-auth-jamarrlmayes.replit.app TIMESTAMP: [ISO8601]
+Headers: COEP/COOP absent; HSTS/CSP present → PASS/FAIL
+OIDC discovery + JWKS → PASS/FAIL
+Clerk UI /sign-in renders → PASS/FAIL
+SQLi regression (password "' OR '1'='1") → expect 401/400 → PASS/FAIL
+Cookie flags on auth routes: Secure/HttpOnly/SameSite=None → PASS/FAIL
+Then run the golden-path smoke via A5 and return:
+
+A2 webhook 2xx (list event ids redacted)
+A5 user credits incremented (before/after)
+A8 REVENUE event received (event id redacted)
+Reply “smoke test complete” with the three confirmations above (ids redacted) or the first failure encountered.
