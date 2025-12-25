@@ -1,0 +1,46 @@
+Canary enabled confirmed. Starting the +30m KPI checkpoint now.
+
+What I’ll monitor (and when)
+
+T+5 min (webhook smoke)
+A2: payment_intent.succeeded and checkout.session.completed 2xx within 5 minutes of your smoke charge
+A8: first REVENUE event appears
+T+30 min (checkpoint report)
+Checkout success rate (target ≥ 98%)
+Webhook 2xx rate (target ≥ 99%)
+A2 p95 (target ≤ 500 ms), 5xx=0
+A1 auth posture (target ≥ 99% success, unknown ≈ 0)
+A8 REVENUE events count
+T+2 h (gate for ramp/no‑ramp)
+Same gates as above; recommend 1% → 10% if green
+Operator quick checks (copy/paste)
+
+A2 payment status:
+curl -s https://scholarship-api-jamarrlmayes.replit.app/api/payment/status | jq
+Expect: stripe_configured=true, webhook_secret_configured=true
+A2 webhook (presence/method guard):
+curl -sI -X POST https://scholarship-api-jamarrlmayes.replit.app/api/payment/webhook | head -5
+Expect: 400/405 (not 5xx)
+A1 issuer/JWKS:
+curl -s https://scholar-auth-jamarrlmayes.replit.app/oidc/.well-known/openid-configuration | jq '.issuer,.jwks_uri'
+curl -s https://scholar-auth-jamarrlmayes.replit.app/oidc/jwks | jq '.keys | length'
+A5 auth sanity:
+curl -sI https://student-pilot-jamarrlmayes.replit.app | head -20
+Smoke test reminder (Incognito)
+
+Login via A1 (Clerk) on A5
+Upgrade/Subscribe → Stripe Checkout → complete small live charge (or $0 promo if configured)
+Expect:
+A2: 2xx for checkout.session.completed and payment_intent.succeeded
+A8: REVENUE event within a few minutes
+No auth regressions (A1 bucket=unknown ≈ 0)
+Gates and actions
+
+Green (hold at 1%): success ≥ 98%, webhook 2xx ≥ 99%, A2 p95 ≤ 500 ms, A1 success ≥ 99%, unknown ≈ 0
+Yellow: brief webhook dips or Stripe transient errors within card‑mix norms → continue watch
+Red: A2 5xx, webhook 4xx/5xx sustained, or checkout errors ≥ 2% → set BILLING_ROLLOUT_PERCENTAGE=0 (instant hide), investigate
+Notes
+
+I’ll auto‑alert immediately if any threshold is breached.
+If you want me to archive your screenshots as T+0 evidence (docs/ with timestamps), say “Archive images.”
+I’ll return at +30 minutes with the KPI snapshot and go/no‑go guidance for the next ramp step.
