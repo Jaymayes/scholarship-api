@@ -1,0 +1,194 @@
+# MASTER LOGIN-ROUTING FIX + E2E TEST PROTOCOL (A1 Internal Only; Users → A5/A6)
+
+ROLE: Senior SDET/DevOps  
+OBJECTIVE: For the single application you are currently assigned to, (1) verify and fix login routing so end-users land ONLY in A5 (Student) or A6 (Provider) and are blocked from A1, and (2) run an E2E test to prove there are no loops, no A1 exposure, and no revenue blockers.
+
+--------------------------------------------------------------------------------
+## 🛑 PHASE 1 — STRICT LOGIC GATE (IDENTIFY → LOCK → HANDSHAKE)
+
+You have instructions for three apps. You must NOT touch them all.
+
+1) DETECT (exactly one app)
+   - Determine your App ID via:
+     - Environment: APP_ID, APP_NAME, APP_BASE_URL
+     - package.json name/homepage or repository folder name
+     - Server config (.env.*, basePath/origin, deploy logs)
+     - Deployed origin in settings (preferred)
+   - Match to the registry below.
+
+2) LOCK (isolate scope)
+   - Once identified, IGNORE all other app sections.
+   - If multiple or zero matches: STOP and print the ABORT message with inspected candidates.
+
+3) HANDSHAKE (print EXACTLY before any action)
+> 🔍 AGENT IDENTITY CONFIRMED  
+> CURRENT APP ID: [Insert Detected ID]  
+> TARGET URL: [Insert Detected URL]  
+> ACTION: Locking context. Executing login-routing remediation + E2E for [Insert ID] only.
+
+If you cannot determine your app confidently:
+> ❌ ABORT: Unable to determine single App ID with confidence. No actions executed.
+
+--------------------------------------------------------------------------------
+## 📂 APPLICATION REGISTRY (SCOPE FOR THIS TASK)
+
+| APP ID           | BASE URL (APP_BASE_URL)                                   | ROLE               |
+|------------------|------------------------------------------------------------|--------------------|
+| A1 scholar_auth  | https://scholar-auth-jamarrlmayes.replit.app               | INTERNAL ONLY      |
+| A5 student_pilot | https://student-pilot-jamarrlmayes.replit.app              | PUBLIC (Students)  |
+| A6 provider_register | https://provider-register-jamarrlmayes.replit.app      | PUBLIC (Providers) |
+
+Constraint: End‑users must only use A5 or A6. A1 is restricted to internal/admin/service accounts.
+
+--------------------------------------------------------------------------------
+## 🧷 GLOBAL GUARDRAILS
+
+- Non‑destructive first: Prefer GET/read‑only. Writes only if isolated, labeled “E2E Test,” and cleaned up.
+- Redact tokens, secrets, cookies, emails → ****
+- Rate limit ≤ 1 RPS; back off on 429/503.
+- Cross‑app changes forbidden: If another app needs change, file a ticket (templates in Phase 6) and STOP.
+
+--------------------------------------------------------------------------------
+## 🧯 PHASE 2 — REMEDIATION SUITES (EXECUTE ONLY YOUR APP SECTION)
+
+Use conditional logic: if a check fails, apply the listed fix; otherwise skip the fix and continue.
+
+### 🔴 A1 — scholar_auth (INTERNAL ONLY; must not be a user landing surface)
+Fix goals: Non‑admin users cannot use A1; successful auth returns users to A5/A6 only; no “stuck on Authorize” loops.
+
+1) Internal‑only gate (RBAC)
+   - Try to access A1 / or /dashboard as an unauthenticated user → must NOT render internal UI.
+   - If accessible:
+     - Add middleware: if user.role ∉ {admin, service} then 403 or 302 → A5_BASE_URL (preferred: 302 to A5).
+     - Re‑test access (must be denied or redirected).
+
+2) OIDC client registrations (callback routing)
+   - Verify registered redirect_uris and post_logout_redirect_uris include ONLY:
+     - A5: https://student-pilot-jamarrlmayes.replit.app/api/callback
+     - A6: https://provider-register-jamarrlmayes.replit.app/api/callback
+   - If A1 URLs are present as user-facing callbacks → open ticket to remove/disable them (Phase 6), STOP local changes.
+
+3) Default after‑sign‑in routing (env)
+   - Ensure AFTER_SIGN_IN_URL / DEFAULT_POST_LOGIN_URL points to A5 (or A6 for provider flows).
+   - If missing/wrong → set:
+     - A1_DEFAULT_AFTER_SIGN_IN_URL=https://student-pilot-jamarrlmayes.replit.app
+     - A1_DEFAULT_AFTER_SIGN_UP_URL=https://student-pilot-jamarrlmayes.replit.app
+   - Re‑test login: must return to A5, not A1.
+
+4) “Authorize Application” loop detector (fix‑if)
+   - Symptoms: Browser stuck on consent/authorize or bounce between A1/A5.
+   - Fix checks:
+     - Redirect URI exact match (scheme/host/path, no trailing slash drift).
+     - PKCE: code_verifier stored server‑side/session cookie (not sessionStorage); S256 enabled.
+     - Cookies: Secure, HttpOnly, SameSite=None; trust proxy set.
+     - CORS: allow A5/A6 exact origins with credentials; no wildcard+credentials.
+   - Re‑test: no loop; completes within ≤ 8s.
+
+### 🔵 A5 — student_pilot (PUBLIC STUDENT)
+Fix goals: All user logins land here; manual A1 navigation blocked; no routing loops.
+
+1) Login button target
+   - Inspect login button/link configs: must send users to A1 authorize with redirect_uri=A5/api/callback.
+   - If not → update env/UI to use A5 callback and A1 issuer.
+
+2) Post‑login route
+   - Ensure AFTER_SIGN_IN_URL (or equivalent) routes to A5 dashboard/home.
+   - If missing/wrong → set NEXT_PUBLIC_AFTER_SIGN_IN_URL=/dashboard (or absolute A5 URL if required by stack).
+
+3) Manual A1 access block (user perspective)
+   - While authenticated in A5, open A1 base URL: must 403 or 302 back to A5.
+   - If not → open A1 RBAC ticket (Phase 6).
+
+### 🟣 A6 — provider_register (PUBLIC PROVIDER)
+Fix goals: Providers land here post‑auth; A1 remains internal.
+
+1) Login target and callback
+   - Ensure login initiates A1 authorize with redirect_uri=A6/api/callback.
+   - If wrong → update env/UI to A6 callback.
+
+2) Post‑login route
+   - Ensure AFTER_SIGN_IN_URL= /onboarding or provider dashboard in A6.
+
+3) Manual A1 access block (user perspective)
+   - While authenticated in A6, open A1: must 403 or 302 to A5/A6.
+   - If not → open A1 RBAC ticket.
+
+--------------------------------------------------------------------------------
+## ⚙️ PHASE 3 — E2E TESTS (RUN ONLY YOUR APP’S SUITE)
+
+All tests must start in a fresh Incognito/private session. Capture method, URL, status, duration, and a one‑line assertion per step (redact secrets).
+
+A) Student flow (A5 as the system of record)
+1) Start at A5 / → page renders 200 (no fatal console errors).
+2) Click “Sign in” → A1 authorize screen appears (1 hop); continue with Google.
+3) Callback lands at A5 /dashboard (NOT A1) within ≤ 8s; document.origin is A5.
+4) Manually open A1 base URL → expect 403 or 302 back to A5 (assert internal gate works).
+5) Logout → returns to A5 public home.
+
+B) Provider flow (A6 as the system of record)
+1) Start at A6 / → page renders 200 (no fatal console errors).
+2) Click “Sign in” → A1 authorize; continue.
+3) Callback lands at A6 /onboarding (NOT A1) within ≤ 8s.
+4) Manually open A1 base → 403 or 302 back to A6/A5 (internal gate works).
+5) Logout → returns to A6 landing.
+
+C) Loop sentinel (must not be stuck)
+- If you observe repeated “Authorize Application” screen or bouncing:
+  - Record status/headers from callback.
+  - Run the fix‑if list in A1 step 4 (PKCE/cookies/CORS/redirect exactness).
+  - Re‑run flow until loop disappears.
+
+--------------------------------------------------------------------------------
+## 🧪 PHASE 4 — EVIDENCE & ASSERTIONS
+
+- Evidence for each step: Method, URL, Status, Duration(ms), and assertion.
+- Headers: Only record Set‑Cookie flags (Secure/HttpOnly/SameSite) and CORS (no values).
+- Redact: All tokens/secrets/cookies → ****
+
+--------------------------------------------------------------------------------
+## 🏁 PHASE 5 — REQUIRED OUTPUTS
+
+1) Test summary table
+| Test Case                                   | Status | Notes / Error Log (Redacted)                  |
+|---------------------------------------------|--------|-----------------------------------------------|
+| A5 login lands at A5 (not A1)               |        |                                               |
+| A6 login lands at A6 (not A1)               |        |                                               |
+| A1 manual access (non‑admin) blocked        |        |                                               |
+| Loop sentinel (no stuck authorize screen)   |        |                                               |
+
+2) Routing‑risk verdict
+| Check                                | Status (PASS/FAIL) | Risk | Notes (Redacted)                           |
+|--------------------------------------|--------------------|------|--------------------------------------------|
+| A5 default after‑sign‑in correct     |                    | High |                                            |
+| A6 default after‑sign‑in correct     |                    | High |                                            |
+| A1 RBAC gate (non‑admin blocked)     |                    | High |                                            |
+| Callback exactness (URIs match)      |                    | High |                                            |
+| PKCE/cookies/CORS alignment          |                    | Med  |                                            |
+VERDICT: [SAFE — USERS CONFINED TO A5/A6] or [BLOCKED — ACTIONS REQUIRED]
+
+--------------------------------------------------------------------------------
+## 🚫 PHASE 6 — ABORT & TICKETS (WHEN CROSS‑APP CHANGES ARE NEEDED)
+
+Abort (fail fast)
+- Multiple/zero App ID matches → ABORT with candidates inspected.
+- Production + no test creds → SKIP destructive steps; continue read‑only; mark SKIPPED.
+- Repeated 5xx on auth critical path (>2) → stop writes; proceed read‑only; mark SKIPPED.
+
+Ticket templates (copy, fill, and attach evidence)
+- Title: A1 RBAC Gate — Block Non‑Admin Access
+  - App: scholar_auth (A1)
+  - Need: Middleware to 403/302 non‑admin users away from A1
+  - Evidence: A1 accessible to student/provider (screens + headers)
+
+- Title: A1 Client Registration — Correct Redirect URIs
+  - App: scholar_auth (A1)
+  - Redirect URIs:
+    - https://student-pilot-jamarrlmayes.replit.app/api/callback
+    - https://provider-register-jamarrlmayes.replit.app/api/callback
+  - Post‑logout URIs: A5/A6 home
+  - Evidence: invalid_redirect_uri or misrouted landings
+
+- Title: A5/A6 After‑Sign‑In URL — Route to App Home
+  - App: [A5 or A6]
+  - Need: Set AFTER_SIGN_IN_URL to /dashboard (A5) or /onboarding (A6)
+  - Evidence: Landing at A1 or stuck on authorize
