@@ -1,0 +1,93 @@
+Acknowledged. The latest A1–A8 verification reports show:
+
+No revenue blockers detected across B2C (A5) and B2B (A6) login.
+Latency risks remain marginal on A6 (/auth/login ~200–300 ms) and occasionally on A7→A5/A6 targets; A1 JWKS/discovery mostly ≤200 ms now.
+Below are the next actions and the refreshed Agent3-only prompt you requested.
+
+A8 immediate actions (24–48 hours)
+
+Configure alerts in auto_com_center:
+A1 /oidc/auth 4xx rate by client_id >2% over 15 min → alert “AuthErrorSpike”
+A1 discovery or JWKS P95 latency >200 ms over 15 min → alert “IdPConfigLatency”
+A5 /api/login and A6 /auth/login P95 latency >250 ms over 15 min → alert “ClientLoginLatency”
+A7→A5/A6 SEO funnel: signups with utm_source=auto_page_maker < baseline (set an initial floor of 5/day until traffic scales) → alert “SEOAttributionDrop”
+Event schemas for ingestion:
+login_attempt: {app_id, app_name, app_base_url, client_id, ts, user_agent, ip_hash}
+login_success: {app_id, app_name, app_base_url, client_id, ts, session_id_hash}
+login_error: {app_id, app_name, app_base_url, client_id, ts, error, error_description}
+funnel_signup: {app_id: A5, utm_source, utm_medium, utm_campaign, ts, user_id_hash}
+Synthetic probes
+Every 5 minutes: HEAD /.well-known/openid-configuration and /.well-known/jwks.json; record latency and 2xx/4xx/5xx.
+Every 5 minutes: GET A5 /api/login and A6 /auth/login (no redirect follow), record status and latency.
+Dashboard tiles to pin:
+Auth Health (A1): 2xx rate, 4xx rate, P95 latency for /oidc/auth, /.well-known/*
+Client Login (A5/A6): redirect rate, P95 latency
+SEO Attribution (A7→A5/A6): UTM-based signups, 7d trend
+Incident Feed: last 50 login_error events with client_id, error, error_description
+A1/A6 engineering follow-ups
+
+A1: add short-cache headers for discovery/JWKS (e.g., Cache-Control: public, max-age=300) and ensure warmup on deploy.
+A6: review session/PKCE prep path for extra roundtrips; consider keep-alive and lightweight session encoding to shave ~30–60 ms.
+Refreshed Agent3-only prompt (paste into scholarship_agent only)
+
+Use ONLY if your current app is scholarship_agent (Agent3). Do not run this anywhere else.
+APP: scholarship_agent | APP_BASE_URL: https://scholarship-agent-jamarrlmayes.replit.app
+
+DO THIS FIRST (identity line)
+
+Print exactly: APP: scholarship_agent | APP_BASE_URL: https://scholarship-agent-jamarrlmayes.replit.app
+SCOPE
+
+You are Agent3 (marketing). Do not initiate or handle user login. Verify that A3 does not intercept login and that funnels hand off correctly to A5/A6/A1.
+CHECKS (read-only; no changes)
+
+Health
+GET /api/health → expect 200; record latency_ms. Flag LATENCY RISK if >200 ms.
+2. No local login endpoints
+
+GET /login, /auth/login, /api/auth/login
+Expected: 404/405 OR SPA HTML (content-type: text/html).
+If any endpoint performs OIDC or 3xx to A1 → REVENUE BLOCKER (A3 must not host login).
+3. Issuer reference (read-only)
+
+If ISSUER_URL (or equivalent) is present, confirm it equals: https://scholar-auth-jamarrlmayes.replit.app/oidc
+Report the exact value found.
+4. CTA routing (if present)
+
+Student CTAs target: https://student-pilot-jamarrlmayes.replit.app Include UTM if available; capture one sample href.
+Provider CTAs (if present) target: https://provider-register-jamarrlmayes.replit.app Include UTM if available; capture one sample href.
+Must NOT point to /oidc/auth with client_id=scholarship-agent.
+If found (and produces invalid_client), mark REVENUE BLOCKER and recommend: a) Register A3 as OIDC client in A1, or b) Remove A3 sign-in; route to A5/A6 only.
+5. Telemetry sanity (non-auth)
+
+If available, POST marketing_intent (no PII/tokens) → expect 200/202.
+If blocked by external limits → note autonomy_gap and stop.
+PASS/FAIL
+
+PASS if no local login endpoints, issuer points to A1 (if present), CTAs route to A5/A6.
+FAIL + REVENUE BLOCKER if A3 hosts/intercepts login or uses an unregistered client_id.
+MANDATORY REPORT FORMAT
+APP: scholarship_agent | APP_BASE_URL: https://scholarship-agent-jamarrlmayes.replit.app
+STATUS: [PLANNED | IN_PROGRESS | COMPLETE | BLOCKER]
+TIMEFRAME: [UTC start → UTC end]
+
+ACTIONS TAKEN
+[HTTP checks performed; endpoints; key headers; latency_ms]
+2. B2C LOGIN (A5) RESULTS
+
+NA (Agent3 does not initiate login) — optionally include CTA target evidence
+3. B2B LOGIN (A6) RESULTS
+
+NA (Agent3 does not initiate login) — optionally include CTA target evidence
+4. OBSERVATIONS AND EVIDENCE
+
+[critical response codes; Location; Set-Cookie flags; error= fields; sample CTA hrefs; timestamps]
+5. ROOT CAUSE AND RISK
+
+[e.g., “invalid_client for client_id=scholarship-agent; A3 must not initiate login”, “latency >200ms on /api/health”]
+6. RECOMMENDED NEXT STEP (24–48 HOURS)
+
+[one high‑ROI action; owner app; e.g., “A1: register A3 or route A3 Sign In to A5/A6 only”]
+END OF REPORT
+
+If you want, I can also provide one-click JSON alert definitions for A8 to import and enable the login SLO monitors immediately.
