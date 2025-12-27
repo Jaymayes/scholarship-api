@@ -1,0 +1,61 @@
+Acknowledged. A8’s alerting, probes, and dashboards are now in place and working, and the fleet’s B2C/B2B login posture remains green. Below are final executive directives plus the precise Agent3-only verification prompt you can reuse as needed.
+
+Executive confirmation
+
+Status: GO. No revenue blockers across A5 (B2C) and A6 (B2B) login. A1 PKCE + cookies correct. A7 funnel routing correct. A8 telemetry + alerts operational.
+Latency risks: Marginal on A6 (/auth/login ~200–300ms) and occasional A7→A5/A6 target checks. Not blocking, but monitor via A8 alerts.
+24–48 hour actions (owners)
+
+A8 (now): Enable the alert pack you deployed and keep probes at 5-minute intervals. Add two alerts:
+invalid_client rate >0.1% by client_id over 1h (critical)
+interaction_cookie_missing >0.5% over 15 min (warning)
+A1 (next window): Add Cache-Control: public, max-age=300 on discovery/JWKS and pre-warm on deploy.
+A6 (after 72h stability): Trim 30–60ms via connection keep‑alive + session/PKCE prep micro-optimizations.
+A7: Continue UTM funnel checks; once Search Console token is ready, wire GSC to A7 and A8.
+A5: Keep P95 login <200ms; if A8 shows sustained >200ms, review middleware/redirect chain.
+Runbook (when an alert fires)
+
+AuthErrorSpike (A1 /oidc/auth 4xx >2%/15m): Check A8 sample logs → confirm client_id distribution; if one client dominates, verify that app’s redirect_uri + PKCE; if broad, inspect A1 release diff + JWKS health.
+IdPConfigLatency (A1 discovery/JWKS P95 >200ms/15m): Verify probe latency vs server; if both high, scale/edge-cache; if probe only, network/regional variance.
+ClientLoginLatency (A5/A6 P95 >250ms/15m): Confirm app warm; check session store and outbound DNS/TLS; review code for extra redirects.
+SEOAttributionDrop (<5/day): Confirm A7 → A5 UTMs in A8; if OK, check Search Console indexation/coverage.
+SLIs to pin in A8 (tiles)
+
+A1: /oidc/auth 2xx, 4xx, P95; discovery+JWKS P95
+A5/A6: login redirect rate and P95
+Funnel: utm_source=auto_page_maker signups/day
+Errors: invalid_client, interaction_cookie_missing counts
+Final Agent3 (scholarship_agent) prompt — copy/paste into Agent3 only
+
+Agent3 must run only this and include the identity line on every report.
+APP: scholarship_agent | APP_BASE_URL: https://scholarship-agent-jamarrlmayes.replit.app
+
+DO THIS FIRST
+
+Print exactly: APP: scholarship_agent | APP_BASE_URL: https://scholarship-agent-jamarrlmayes.replit.app
+SCOPE
+
+You are Agent3 (marketing). Do not authenticate users and do not initiate login. Verify A3 does not intercept login and funnels hand off to A5/A6/A1.
+CHECKS
+
+Health: GET /api/health → expect 200; record latency_ms; flag LATENCY RISK if >200ms.
+No local login: GET /login, /auth/login, /api/auth/login → expect 404/405 or SPA HTML (text/html). If any performs OIDC or 3xx to A1 → REVENUE BLOCKER.
+Issuer reference (read-only): If ISSUER_URL present, it must equal https://scholar-auth-jamarrlmayes.replit.app/oidc; report exact value.
+CTA routing (if present): Student CTAs → https://student-pilot-jamarrlmayes.replit.app (UTM if applicable); Provider CTAs → https://provider-register-jamarrlmayes.replit.app (UTM if applicable). No CTA to /oidc/auth with client_id=scholarship-agent; if found and causes invalid_client → REVENUE BLOCKER with recommendation to register A3 as a client or route to A5/A6 only.
+Telemetry sanity (non-auth): If available, POST marketing_intent (no PII/tokens) → expect 200/202; if blocked by external limits → autonomy_gap.
+PASS/FAIL
+
+PASS: No local login; issuer points to A1 (if present); CTAs route to A5/A6.
+FAIL + REVENUE BLOCKER: A3 hosts/intercepts login or uses unregistered client_id to A1.
+REPORT FORMAT
+APP: scholarship_agent | APP_BASE_URL: https://scholarship-agent-jamarrlmayes.replit.app
+STATUS: [PLANNED | IN_PROGRESS | COMPLETE | BLOCKER]
+TIMEFRAME: [UTC start → UTC end]
+
+ACTIONS TAKEN
+B2C LOGIN (A5) RESULTS
+B2B LOGIN (A6) RESULTS
+OBSERVATIONS AND EVIDENCE
+ROOT CAUSE AND RISK
+RECOMMENDED NEXT STEP (24–48 HOURS) END OF REPORT
+If you want, I can convert the alert pack you drafted into a single importable file plus a 5‑minute cron probe spec so you can deploy/rollback the monitoring with one click.
