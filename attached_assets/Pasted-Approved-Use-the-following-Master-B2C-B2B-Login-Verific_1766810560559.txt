@@ -1,0 +1,84 @@
+Approved. Use the following Master B2C/B2B Login Verification prompt across all apps. Then run the Agent3-only prompt in A3. Each agent must print its identity line first and execute only its own section. All reports must include the app name and APP_BASE_URL at the top.
+
+Master prompt (all apps)
+
+Purpose: Verify B2C (A5) and B2B (A6) login initiation and hand-off to A1; prove PKCE/S256 and redirect_uri correctness; confirm cookies survive redirects; ensure non-auth apps don’t intercept login.
+System registry:
+A1 scholar_auth → https://scholar-auth-jamarrlmayes.replit.app
+A2 scholarship_api → https://scholarship-api-jamarrlmayes.replit.app
+A3 scholarship_agent → https://scholarship-agent-jamarrlmayes.replit.app
+A4 scholarship_sage → https://scholarship-sage-jamarrlmayes.replit.app
+A5 student_pilot → https://student-pilot-jamarrlmayes.replit.app
+A6 provider_register → https://provider-register-jamarrlmayes.replit.app
+A7 auto_page_maker → https://auto-page-maker-jamarrlmayes.replit.app
+A8 auto_com_center → https://auto-com-center-jamarrlmayes.replit.app
+Global rules for all agents:
+Identity first: print exactly “APP: <app_name> | APP_BASE_URL: <base_url>” before any work.
+Scope discipline: execute only your app’s section.
+Read-only: no code/config changes; if blocked (e.g., CAPTCHA, external limit), capture evidence and stop.
+Evidence to capture: HTTP method (must use GET for login), status codes, Location headers, Set-Cookie flags (SameSite, Secure), and any error fields.
+B2C = A5 → A1; B2B = A6 → A1.
+Reporting: use the Mandatory Report Format at the end.
+Per‑app sections (execute only your own)
+
+A1 scholar_auth (Identity Provider): Discovery/JWKS checks; dry-run authorize for A5 and A6 with PKCE S256; record cookies and any invalid_request or Session Expired evidence; PASS/FAIL criteria included.
+A5 student_pilot (B2C): Verify /api/auth/login (or documented route) 302→A1 with PKCE S256 and correct redirect_uri; error callback safety; optional session smoke; PASS/FAIL criteria included.
+A6 provider_register (B2B): Verify /api/auth/login 302→A1 with PKCE S256 and correct redirect_uri; error callback safety; PASS/FAIL criteria included.
+A7 auto_page_maker (Funnel): Confirm CTAs to A5/A6 with utm_source=auto_page_maker; targets reachable; no local auth handlers (SPA fallback OK).
+A2 scholarship_api (Support API): Health OK; no login routes; protected endpoints reject unauthenticated; no PII leakage.
+A4 scholarship_sage (Support app): Defers identity to A1; if no login entry, mark N/A and confirm no local auth handlers.
+A8 auto_com_center (Telemetry): Health OK; ingest accepts test event; no login endpoints.
+A3 scholarship_agent (Agent3) — STRICT SCOPE: see Agent3-only prompt below.
+Mandatory Report Format (all apps)
+
+Start with identity line.
+STATUS: [PLANNED | IN_PROGRESS | COMPLETE | BLOCKED]
+TIMEFRAME: [UTC start → UTC end]
+ACTIONS TAKEN
+2. B2C LOGIN (A5) RESULTS
+3. B2B LOGIN (A6) RESULTS
+4. OBSERVATIONS AND EVIDENCE
+5. ROOT‑CAUSE AND RISK (IF ANY)
+6. RECOMMENDED NEXT STEP (24–48 HOURS)
+END OF REPORT
+Agent3-only execution prompt (paste this in A3)
+
+Identity line to print before work:
+APP: scholarship_agent | APP_BASE_URL: https://scholarship-agent-jamarrlmayes.replit.app
+Scope rule: You are A3. Execute only the A3 tasks below. Do not attempt A1/A5/A6 login validation from this app.
+Goal:
+Prove A3 does NOT handle login.
+Confirm any CTAs hand off to A5 (B2C) or A6 (B2B), never to a local login path.
+Confirm issuer reference (if present) points to A1 and that telemetry events are non-auth (e.g., marketing_intent).
+Tests to run:
+Health: GET /api/health → expect 200.
+No login endpoints: Probe /api/auth/login, /auth/login, /login. Expect 404/405/401. If 200 with text/html, note SPA fallback shell (not an auth handler).
+Issuer reference (read-only): If an env/config value exists, confirm it equals https://scholar-auth-jamarrlmayes.replit.app/oidc.
+Funnel links: If A3 renders any CTAs, verify href targets A5 and/or A6; include UTM when applicable; must not target local login.
+Telemetry sanity: POST a “marketing_intent” or equivalent non-auth event if the test endpoint exists; verify 200/202. Confirm A3 does not originate login events.
+Pass/Fail:
+PASS: No local login endpoints; issuer=A1; CTAs route to A5/A6; telemetry is non-auth.
+FAIL: Any local login handler; misrouted CTAs; issuer ≠ A1.
+Report using the Mandatory Report Format above and include:
+Evidence of 404/SPA fallback on any /login paths.
+Evidence of issuer=A1 (if present).
+Evidence of CTAs pointing to A5/A6 (show representative hrefs).
+Evidence that telemetry event accepted (non-auth).
+Executive directives and owner assignments
+
+Critical fix: Redeploy A1 (scholar_auth) to production to resolve A5 “invalid_redirect_uri” in prod.
+Owner: A1 lead. Deadline: same day.
+Acceptance: A1 dry‑run authorize for A5 returns 303 (not 400); interaction cookie set with SameSite=None; Secure; HttpOnly.
+After redeploy: Re-run A1 and A5 sections; post the two reports to A8.
+Monitoring: A8 owner to set alerts for:
+login_attempt and login_success spikes by app_id (A5/A6)
+A1 4xx rate > 2% over 15 minutes on /oidc/auth or /oidc/interaction endpoints
+Evidence capture standard (all apps):
+Always use GET for login initiation checks (not HEAD), so redirects and Set‑Cookie are observable.
+Include timestamps and any error=… fields.
+Note cookie flags SameSite=None; Secure if visible in responses.
+What you do next
+
+Run this Master prompt in each app’s agent.
+Run the Agent3-only prompt in A3.
+Share each app’s report (with the identity line) to the Command Center.
