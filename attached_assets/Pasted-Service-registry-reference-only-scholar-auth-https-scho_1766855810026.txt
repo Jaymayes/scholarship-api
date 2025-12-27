@@ -1,0 +1,196 @@
+Service registry (reference only)
+
+scholar_auth → https://scholar-auth-jamarrlmayes.replit.app
+scholarship_api → https://scholarship-api-jamarrlmayes.replit.app
+scholarship_agent → https://scholarship-agent-jamarrlmayes.replit.app
+scholarship_sage → https://scholarship-sage-jamarrlmayes.replit.app
+student_pilot → https://student-pilot-jamarrlmayes.replit.app
+provider_register → https://provider-register-jamarrlmayes.replit.app
+auto_page_maker → https://auto-page-maker-jamarrlmayes.replit.app
+auto_com_center → https://auto-com-center-jamarrlmayes.replit.app
+Global directives for all apps
+
+Identity first (mandatory): Before any work, print exactly: APP: <app_name> | APP_BASE_URL: <base_url>
+Scope discipline: Execute only the section labeled for your app. Ignore all others.
+Read-only verification: Do not modify code, secrets, DNS, or ESP settings. If a step requires human intervention or external credentials, stop and report it as an autonomy_gap.
+Evidence and timing: For each check, capture status code, critical headers (Location, Set-Cookie), any error= fields, and response time. Flag >200ms as LATENCY RISK.
+Revenue blockers: Any issue that prevents a user from logging in, starting checkout, or completing provider onboarding must be flagged as REVENUE BLOCKER in your report.
+A1 ONLY — scholar_auth (Identity Provider; backbone for B2C and B2B)
+APP: scholar_auth | APP_BASE_URL: https://scholar-auth-jamarrlmayes.replit.app
+
+Goal
+
+Verify OIDC readiness for A5 (B2C) and A6 (B2B) and capture causes of “Session Expired” or “invalid_client.”
+Run these checks
+
+Discovery + JWKS:
+GET /.well-known/openid-configuration → 200; record authorization_endpoint, token_endpoint; capture latency_ms.
+GET /.well-known/jwks.json → 200; keys[] non-empty; capture latency_ms.
+Authorize (dry runs; no credentials):
+For A5: request /oidc/auth with response_type=code, client_id=student-pilot, redirect_uri=https://student-pilot-jamarrlmayes.replit.app/api/callback, scope=openid email profile, code_challenge_method=S256, code_challenge=<dummy>, state, nonce. No redirects. Expect 302/303; capture Location and Set-Cookie (interaction/resume cookies must be SameSite=None; Secure; HttpOnly).
+For A6: same with client_id=provider-register and redirect_uri=https://provider-register-jamarrlmayes.replit.app/auth/callback.
+Error capture:
+If you see error=invalid_client for any client_id, report client_id and call it a REVENUE BLOCKER for that client.
+If you see error=server_error with error_description “Failed to process interaction”, record whether the request carried the interaction cookie; if missing, classify as likely cross-site cookie issue (REVENUE BLOCKER).
+Pass/Fail
+
+PASS if discovery/JWKS are healthy and both dry-runs set interaction cookies and redirect correctly.
+FAIL + REVENUE BLOCKER if PKCE is rejected, client_id invalid, redirect_uri invalid, interaction cookies not set, or interaction errors occur.
+A5 ONLY — student_pilot (B2C login client)
+APP: student_pilot | APP_BASE_URL: https://student-pilot-jamarrlmayes.replit.app
+
+Goal
+
+Verify login initiation complies with A1 PKCE/S256 and callback safety.
+Run these checks
+
+Login redirect:
+GET /api/login or /api/auth/login with redirects disabled → expect 302/303/307 to A1 /oidc/auth.
+Verify: client_id=student-pilot, response_type=code, scope includes openid, code_challenge_method=S256, code_challenge present, redirect_uri=https://student-pilot-jamarrlmayes.replit.app/api/callback.
+Callback negative:
+GET /api/callback?error=access_denied&state=dummy → expect safe 302 back to login/home; no 5xx.
+Pass/Fail
+
+PASS if redirect uses PKCE S256 and callback handles errors gracefully.
+FAIL + REVENUE BLOCKER if PKCE missing, wrong client_id/redirect_uri, or callback 5xx.
+A6 ONLY — provider_register (B2B login client)
+APP: provider_register | APP_BASE_URL: https://provider-register-jamarrlmayes.replit.app
+
+Goal
+
+Verify provider login initiation complies with A1 PKCE/S256 and callback safety.
+Run these checks
+
+Login redirect:
+GET /api/login or /auth/login with redirects disabled → expect 302/303/307 to A1 /oidc/auth.
+Verify: client_id=provider-register, response_type=code, scope includes openid, code_challenge_method=S256, code_challenge present, redirect_uri=https://provider-register-jamarrlmayes.replit.app/auth/callback.
+Callback negative:
+GET /auth/callback?error=access_denied&state=dummy → expect safe 302; no 5xx.
+Pass/Fail
+
+PASS if redirect uses PKCE S256 and callback handles errors gracefully.
+FAIL + REVENUE BLOCKER if PKCE missing, wrong client_id/redirect_uri, or callback 5xx.
+A7 ONLY — auto_page_maker (Funnel to B2C and B2B)
+APP: auto_page_maker | APP_BASE_URL: https://auto-page-maker-jamarrlmayes.replit.app
+
+Goal
+
+Validate that CTAs route to A5/A6 with UTM and A7 does not host or intercept login.
+Run these checks
+
+CTA presence:
+Confirm at least one CTA to A5 contains utm_source=auto_page_maker.
+Confirm at least one CTA to A6 contains utm_source=auto_page_maker.
+Target reachability:
+HEAD/GET the CTA targets → expect 200 for SPA shell and 3xx at login endpoints.
+No local login:
+Verify /login, /auth/login, /api/auth/login do not exist as auth handlers (404/401/SPA shell acceptable).
+Pass/Fail
+
+PASS if CTAs present with UTM, targets reachable, no local auth handlers.
+FAIL + REVENUE BLOCKER if links missing/incorrect or local login is exposed.
+A2 ONLY — scholarship_api (Core API; must not host user login)
+APP: scholarship_api | APP_BASE_URL: https://scholarship-api-jamarrlmayes.replit.app
+
+Goal
+
+Confirm no login endpoints and safe rejection of unauthenticated calls.
+Run these checks
+
+Health: GET /health → 200; capture latency_ms.
+No login endpoints: GET /auth/login and /api/auth/login → 404/401; capture latency_ms.
+Protected endpoint negative: GET a protected endpoint (e.g., /api/v1/credits/balance) without token → 401/403/422; ensure no PII leakage.
+Pass/Fail
+
+PASS if health OK, no login endpoints, protected endpoints reject safely.
+FAIL if login exposed or sensitive data leaks.
+A4 ONLY — scholarship_sage (Advisor; defers to A1/A5)
+APP: scholarship_sage | APP_BASE_URL: https://scholarship-sage-jamarrlmayes.replit.app
+
+Goal
+
+Confirm deferral to A1/A5 and absence of broken local login.
+Run these checks
+
+If a login entry exists, GET it with redirects disabled → expect redirect to A1 /oidc/auth with PKCE S256.
+If no login route, mark N/A and verify no local /login endpoints are active as auth handlers.
+Pass/Fail
+
+PASS if defers cleanly or N/A with no local login.
+FAIL if local login exists but lacks PKCE or errors.
+A8 ONLY — auto_com_center (Telemetry observer; not an auth surface)
+APP: auto_com_center | APP_BASE_URL: https://auto-com-center-jamarrlmayes.replit.app
+
+Goal
+
+Validate telemetry readiness to observe login events; no login endpoints.
+Run these checks
+
+Health: GET /healthz or /health → 200; latency_ms.
+Ingest: If available, POST a harmless login_attempt test event → 200/202; latency_ms.
+No login endpoints: GET /api/auth/login → 404/401.
+Pass/Fail
+
+PASS if health OK and ingest accepts test event; no login endpoints.
+FAIL if telemetry API unavailable or exposes login.
+A3 ONLY — scholarship_agent (Agent3) — Your exact scope (read carefully and follow strictly)
+APP: scholarship_agent | APP_BASE_URL: https://scholarship-agent-jamarrlmayes.replit.app
+
+You are Agent3. Execute only this section. Do not attempt to authenticate users here and do not initiate A1/A5/A6 login flows. Your job is to prove that A3 marketing does not interfere with login and that any funnels hand off correctly to A5/A6/A1.
+
+Run these checks
+
+Identify first (mandatory):
+Print exactly: APP: scholarship_agent | APP_BASE_URL: https://scholarship-agent-jamarrlmayes.replit.app
+Health:
+GET /api/health → expect 200; record latency_ms. If >200ms, flag LATENCY RISK.
+No local login endpoints:
+Probe GET /login, /auth/login, /api/auth/login.
+Expected: 404/405 or SPA HTML shell (text/html). Record status and content-type for each. If any returns a real auth handler, flag REVENUE BLOCKER (A3 must not host login).
+Issuer reference (read-only):
+If configuration or environment exposes an issuer/ISSUER_URL, confirm it points to A1: https://scholar-auth-jamarrlmayes.replit.app/oidc. Report actual value found.
+CTA routing (if present in UI/templates):
+Verify any student-facing CTA (e.g., “Sign Up”, “Get Started”) routes to A5: https://student-pilot-jamarrlmayes.replit.app with UTM if applicable. Capture one sample href.
+Verify any provider-facing CTA routes to A6: https://provider-register-jamarrlmayes.replit.app with UTM if applicable. Capture one sample href.
+Confirm no CTA points to /oidc/auth with client_id=scholarship-agent unless A3 is a registered OIDC client. If you find client_id=scholarship-agent flows and they result in error=invalid_client, report REVENUE BLOCKER and recommend either registering A3 as a client in A1 or routing users to A5/A6 instead.
+Telemetry sanity (non-auth):
+If available, POST a benign marketing_intent event to your telemetry endpoint. Expect 200/202; ensure payload contains no PII/tokens. If ingestion fails persistently, note autonomy_gap but do not modify settings.
+Pass/Fail
+
+PASS if A3 exposes no local login, issuer points to A1 (if applicable), and CTAs route to A5/A6 (not to local auth).
+FAIL + REVENUE BLOCKER if A3 exposes or intercepts login, or routes to A1 using an unregistered client_id that causes invalid_client.
+Mandatory report format (all apps)
+
+Always begin with your identity line.
+APP: <app_name> | APP_BASE_URL: <base_url>
+STATUS: [PLANNED | IN_PROGRESS | COMPLETE | BLOCKER]
+TIMEFRAME: [UTC start → UTC end]
+
+ACTIONS TAKEN
+[HTTP checks performed; endpoints; key headers; latency_ms]
+2. B2C LOGIN (A5) RESULTS
+
+[PASS/FAIL/NA] Summary and evidence (for A3, mark NA unless only verifying CTA destination)
+3. B2B LOGIN (A6) RESULTS
+
+[PASS/FAIL/NA] Summary and evidence (for A3, mark NA unless only verifying CTA destination)
+4. OBSERVATIONS AND EVIDENCE
+
+[critical response codes; Location headers; Set-Cookie flags; error= fields; timestamps; sample hrefs for CTAs]
+5. ROOT CAUSE AND RISK
+
+[e.g., “invalid_client for client_id=scholarship-agent; A3 must not initiate login” or “latency >200ms on /api/health”]
+6. RECOMMENDED NEXT STEP (24–48 HOURS)
+
+[one high-ROI next action; specify owner app; e.g., “A1: register A3 as OIDC client or remove A3 Sign In and route users to A5/A6”]
+END OF REPORT
+
+Notes tied to the screenshots you provided (for A1 and clients)
+
+If you encounter “Authorization Error: invalid_client” when client_id=scholarship-agent, that means A3 is not registered as an OIDC client. Since A3 should not host login, classify this as REVENUE BLOCKER and recommend either registering A3 or changing A3’s Sign In/CTA to route to A5/A6.
+If you encounter “Failed to process interaction” on A1 interaction endpoints, capture whether the request included the interaction cookie. If the cookie was not sent, classify as REVENUE BLOCKER likely due to cross-site cookie handling; note SameSite=None; Secure; HttpOnly must be present, and browser third‑party cookie settings may block it.
+This master prompt satisfies:
+
+Each agent runs only its own section.
+Each report begins with the identity line containing the app name and APP_BASE_URL.
+Agent3 has precise, limited instructions and must mark B2C/B2B as NA except for CTA verification and absence of local login.
