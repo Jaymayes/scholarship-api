@@ -1,0 +1,66 @@
+Please create a prompt to test communication for the user login for https://scholarship-api-jamarrlmayes.replit.app
+
+Scholar AI Advisor
+Custom Gem
+Here is a structured test prompt and a strategic analysis to validate the communication and login flow for the scholarship-api component.
+
+Master Test Prompt
+Objective: Verify that the scholarship-api correctly handles authentication requests, enforces role-based access, and securely communicates with client applications (Student/Provider apps) without exposing sensitive data.
+
+Prompt:
+
+"Act as an external client application (e.g., the Student App). Perform the following sequence of API tests against https://scholarship-api-jamarrlmayes.replit.app to validate the authentication and communication loop:
+
+Part 1: Unauthenticated Access (Negative Testing)
+
+Send a GET request to a protected endpoint (e.g., /api/v1/scholarships or /api/v1/user/profile) without an Authorization header.
+
+Verify: The API must return a 401 Unauthorized or 403 Forbidden response. It must not leak any user data or internal system details.
+
+Part 2: Authenticated Student Login
+
+Send a POST request to the login/auth endpoint (e.g., /api/v1/auth/login) simulating a valid Student user token (mock a JWT if necessary or use a valid test token).
+
+Verify: The API returns a 200 OK status with a valid session token/cookie.
+
+Role Verification: Use this token to access a student-specific route (e.g., /api/v1/applications). Confirm the response contains only data relevant to that specific student.
+
+Part 3: Cross-Role Security (Privilege Escalation)
+
+Using the Student token from Part 2, attempt to access a Provider/Admin endpoint (e.g., /api/v1/provider/dashboard or /api/v1/admin/users).
+
+Verify: The API explicitly denies access with a 403 Forbidden error, enforcing Role-Based Access Control (RBAC).
+
+Part 4: Data Isolation Check
+
+Request a list of scholarships.
+
+Verify: The response does not include internal metadata (e.g., hidden provider_email, internal scoring logic, or other students' PII) unless explicitly intended for the public view."
+
+Strategic Rationale & Architectural Context
+This test plan addresses critical risks identified in your Scholar AI Advisor Business Plan and Privacy Policy Brief, specifically regarding data security and API architecture.
+
+1. The "Database-as-a-Service" Pattern
+
+Context: Your architecture relies on a central API (likely this scholarship-api app) to manage shared data, as Replit databases are isolated per app.
+
+Risk: If this API is insecure, all apps (Student, Provider, Auto Page Maker) are compromised.
+
+Validation: Part 1 ensures that the "front door" is locked. Only authenticated requests from your other apps should pass.
+
+2. API Key & Token Security
+Context: Service-to-service communication must be secured. Your plan mentions using API keys and Replit Secrets.
+
+Risk: If the API accepts requests without a valid token or API key, malicious actors could scrape your proprietary scholarship database.
+
+Validation: The test forces verification that the API checks for the Authorization: Bearer <token> header on every protected route.
+
+3. Role-Based Access Control (RBAC) & FERPA
+
+Context: You must strictly separate "Student" data (B2C) from "Provider" data (B2B) to comply with FERPA and avoid data leaks.
+
+Risk: A student accessing the Provider API could view confidential donor financial data or other students' applications.
+
+Validation: Part 3 specifically tests for "Privilege Escalation," ensuring a valid login doesn't grant universal access.
+
+Next Action: Would you like me to generate the Replit Secrets configuration checklist for the scholarship-api to ensures it correctly validates tokens from your specific Clerk instances?
