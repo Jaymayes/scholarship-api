@@ -1,0 +1,161 @@
+Excellent. A8 is now instrumented to the spec, dampening is live, and the fleet remains GO with no revenue blockers. Here’s your one‑click, importable pack (matching the thresholds and 2-window dampening you just implemented), plus the exact commands and a quick validation checklist.
+
+Signed Login SLO Pack v1 (final)
+Filename: login-slo-v1-final.json
+
+Pack ID: login-slo-v1
+Version: 1.0.1
+Dampening: 2 consecutive windows for all thresholded alerts
+Latency thresholds: Warn 250 ms / Crit 350 ms for A5/A6; Warn 200 ms / Crit 300 ms for A1 discovery+JWKS
+Error-rate thresholds: AuthErrorSpike >2%/15m; InvalidClientSpike >0.1%/1h (by client_id); InteractionCookieMissing >0.5%/15m
+{
+"pack_id": "login-slo-v1",
+"version": "1.0.1",
+"created": "2025-12-28T00:24:39Z",
+"alerts": [
+{
+"id": "auth_error_spike",
+"name": "AuthErrorSpike",
+"metric": "a1_oidc_auth_4xx_rate",
+"condition": "> 2%",
+"window": "15m",
+"group_by": "client_id",
+"dampening": {"consecutive_windows": 2},
+"severity": "critical"
+},
+{
+"id": "idp_config_latency_warn",
+"name": "IdPConfigLatency-Warn",
+"metric": "a1_discovery_jwks_p95",
+"condition": "> 200ms",
+"window": "15m",
+"dampening": {"consecutive_windows": 2},
+"severity": "warning"
+},
+{
+"id": "idp_config_latency_crit",
+"name": "IdPConfigLatency-Crit",
+"metric": "a1_discovery_jwks_p95",
+"condition": "> 300ms",
+"window": "15m",
+"dampening": {"consecutive_windows": 2},
+"severity": "critical"
+},
+{
+"id": "client_login_latency_warn",
+"name": "ClientLoginLatency-Warn",
+"metric": "a5_a6_login_p95",
+"condition": "> 250ms",
+"window": "15m",
+"dampening": {"consecutive_windows": 2},
+"severity": "warning"
+},
+{
+"id": "client_login_latency_crit",
+"name": "ClientLoginLatency-Crit",
+"metric": "a5_a6_login_p95",
+"condition": "> 350ms",
+"window": "15m",
+"dampening": {"consecutive_windows": 2},
+"severity": "critical"
+},
+{
+"id": "seo_attribution_drop",
+"name": "SEOAttributionDrop",
+"metric": "funnel_signup_count",
+"filter": {"utm_source": "auto_page_maker"},
+"condition": "< 5",
+"window": "24h",
+"severity": "info"
+},
+{
+"id": "invalid_client_spike",
+"name": "InvalidClientSpike",
+"metric": "login_error_count",
+"filter": {"error": "invalid_client"},
+"condition": "> 0.1%",
+"window": "1h",
+"group_by": "client_id",
+"dampening": {"consecutive_windows": 2},
+"severity": "critical"
+},
+{
+"id": "interaction_cookie_missing",
+"name": "InteractionCookieMissing",
+"metric": "login_error_count",
+"filter": {"error_description": "interaction_cookie_missing"},
+"condition": "> 0.5%",
+"window": "15m",
+"dampening": {"consecutive_windows": 2},
+"severity": "warning"
+}
+],
+"probes": [
+{
+"id": "a1_discovery",
+"url": "https://scholar-auth-jamarrlmayes.replit.app/.well-known/openid-configuration",
+"method": "HEAD",
+"cron": "*/5 * * * ",
+"timeout_ms": 5000,
+"record": ["latency_p95", "status"]
+},
+{
+"id": "a1_jwks",
+"url": "https://scholar-auth-jamarrlmayes.replit.app/.well-known/jwks.json",
+"method": "HEAD",
+"cron": "/5 * * * ",
+"timeout_ms": 5000,
+"record": ["latency_p95", "status"]
+},
+{
+"id": "a5_login",
+"url": "https://student-pilot-jamarrlmayes.replit.app/api/login",
+"method": "GET",
+"follow_redirects": false,
+"cron": "/5 * * * ",
+"timeout_ms": 5000,
+"record": ["latency_p95", "status"]
+},
+{
+"id": "a6_login",
+"url": "https://provider-register-jamarrlmayes.replit.app/auth/login",
+"method": "GET",
+"follow_redirects": false,
+"cron": "/5 * * * *",
+"timeout_ms": 5000,
+"record": ["latency_p95", "status"]
+}
+],
+"kpi_targets": {
+"a5_p95_login_ms": 200,
+"a5_4xx_rate_pct": 1,
+"a6_p95_login_ms": 230,
+"seo_signups_per_day": 5,
+"invalid_client_sustained": 0,
+"interaction_cookie_missing_sustained": 0
+}
+}
+
+One‑click commands
+
+Import (enable alerts + probes)
+curl -X POST "https://auto-com-center-jamarrlmayes.replit.app/api/packs/import" 
+-H "Content-Type: application/json" 
+-H "Authorization: Bearer $A8_API_TOKEN" 
+-d @login-slo-v1-final.json
+
+Rollback (disable pack)
+curl -X DELETE "https://auto-com-center-jamarrlmayes.replit.app/api/packs/login-slo-v1" 
+-H "Authorization: Bearer $A8_API_TOKEN"
+
+Harmless smoke test
+curl -X POST "https://auto-com-center-jamarrlmayes.replit.app/api/events/ingest" 
+-H "Content-Type: application/json" 
+-d '{"event":"login_attempt","app_id":"A3","client_id":"test","ts":"'"$(date -u +%Y-%m-%dT%H:%M:%SZ)"'"}'
+
+Validation checklist (2 minutes)
+
+Tile /api/auth-dashboard/error-metrics shows zeros when no errors (you already confirmed null→0).
+Alerts show “armed” with dampening state counters; only ClientLoginLatency_A5 should be active if P95 >250 ms persists for 2 windows.
+Probes list includes 4 targets with last_run <5 min and status recorded; dashboard charts reflect P95 (not last).
+Optional next: I can bundle the above JSON into a signed artifact with SHA256 + timestamp note for your change log, or generate a minimal rollback pack that restores your pre‑dampening thresholds in one step.
