@@ -1,0 +1,153 @@
+APP: Scholar AI Advisor | APP_BASE_URL: https://www.scholaraiadvisor.com
+
+STATUS: GO | Delivering your final, identity‑aware prompts and runbooks
+
+Below are two deliverables you asked for to finish the go‑live watch cleanly:
+
+A T+24h Pulse Report Master Prompt (identity‑aware; each app only executes its own section).
+A1 cache‑header change ticket template (copy‑ready).
+You can paste either block directly into the Agent. Every section forces the app to self‑identify first and to include its app name and base URL on all reports.
+
+––––––––––––––––––––––––––––––––––––
+T+24h Pulse Report — Identity‑Aware Master Prompt
+Paste this into the Agent. Each app must run ONLY its section.
+
+GLOBAL
+
+Before any work, print exactly: APP: <app_name> | APP_BASE_URL: <base_url>
+Execute only your section below. Ignore all other sections.
+Read-only checks. Do not change code/infra.
+Evidence to capture: HTTP status, latency_ms, key headers (Location, Set-Cookie), and any error fields. Use tags: LATENCY RISK (>200ms), REVENUE BLOCKER.
+Required report format at the end.
+Service Registry
+
+scholar_auth → https://scholar-auth-jamarrlmayes.replit.app
+scholarship_api → https://scholarship-api-jamarrlmayes.replit.app
+scholarship_agent → https://scholarship-agent-jamarrlmayes.replit.app
+scholarship_sage → https://scholarship-sage-jamarrlmayes.replit.app
+student_pilot → https://student-pilot-jamarrlmayes.replit.app
+provider_register → https://provider-register-jamarrlmayes.replit.app
+auto_page_maker → https://auto-page-maker-jamarrlmayes.replit.app
+auto_com_center → https://auto-com-center-jamarrlmayes.replit.app
+A1 scholar_auth (Identity Provider)
+
+GET /.well-known/openid-configuration and /.well-known/jwks.json → 200; record latency_ms.
+Dry-run /oidc/auth for A5 and A6 (redirects disabled). Confirm 302/303 with PKCE S256 and interaction/resume cookies (SameSite=None; Secure; HttpOnly).
+Output: 2xx/3xx rates, P95 latency (Discovery, JWKS), any invalid_client or server_error counts.
+Risk: if discovery or JWKS P95 >300ms → LATENCY RISK.
+A2 scholarship_api (Stateless API)
+
+GET /health → 200; record latency_ms.
+Confirm no login endpoints (/login, /auth/login, /api/auth/login → 404/401).
+Protected negative test (one route) → 401/403/422; no PII.
+Output: health latency, endpoint posture, error sample (masked).
+A3 scholarship_agent (Marketing; no login surface)
+
+GET /api/health → 200; latency_ms.
+Confirm /login, /auth/login, /api/auth/login are SPA shell/404 (not auth).
+Report ISSUER_URL (read-only). List 1 student CTA href (A5) and, if present, 1 provider CTA href (A6).
+Output: latency, CTA evidence, no local login confirmation.
+A4 scholarship_sage (Advisor; defers auth)
+
+GET /api/health → 200; latency_ms.
+Verify no local login handler; /login should be SPA shell/404; /api/login → 401 expected.
+Output: latency, deferral confirmation.
+A5 student_pilot (B2C login client)
+
+GET /api/login (redirects disabled) → expect 302/303/307 to A1 /oidc/auth with PKCE S256. Capture Location params and latency_ms.
+GET /api/callback?error=access_denied → expect safe 302; no 5xx.
+Output: /api/login P95 vs target <200ms; any invalid_client count.
+A6 provider_register (B2B login client)
+
+GET /api/login and /auth/login (redirects disabled) → expect 302/303/307 to A1 with PKCE S256. Capture params and latency_ms.
+GET /auth/callback?error=access_denied → 302; no 5xx.
+Output: /auth/login P95 vs target <230ms; PKCE S256 present.
+A7 auto_page_maker (SEO funnel)
+
+Confirm at least 1 CTA to A5 and 1 to A6 with ?utm_source=auto_page_maker.
+HEAD/GET CTA targets; record latency_ms; note any >200ms LATENCY RISK.
+Confirm no local login handler (SPA shell/404 is ok).
+Output: CTA href samples; target reachability.
+A8 auto_com_center (Telemetry)
+
+GET /healthz → 200; record latency_ms.
+Summarize last 24h SLOs from alerts/probes (warn/crit counts, current status).
+Report P95 for: A1 discovery/JWKS; A5 /api/login; A6 /auth/login. Summarize invalid_client and interaction_cookie_missing counts (should be 0).
+Output: overall verdict (GO/N0‑GO), active alerts, recommended actions if any.
+REQUIRED REPORT FORMAT
+APP: <app_name> | APP_BASE_URL: <base_url>
+STATUS: [GO | NO-GO | BLOCKER]
+TIMEFRAME: [UTC start → UTC end]
+
+ACTIONS TAKEN
+
+[endpoint, status, latency_ms, key headers/params, counts]
+FINDINGS
+
+[evidence bullets per check]
+LATENCY
+
+[endpoints with >200 ms tagged LATENCY RISK and measured ms]
+REVENUE BLOCKERS
+
+[None | blockers with specific evidence]
+NEXT STEP
+
+[One actionable item aligned to your app]
+END OF PULSE REPORT
+––––––––––––––––––––––––––––––––––––
+
+A1 Cache Headers Change Ticket — Copy‑Ready Template
+Use this to schedule the cache optimization safely.
+
+APP: scholar_auth | APP_BASE_URL: https://scholar-auth-jamarrlmayes.replit.app
+
+STATUS: PLANNED CHANGE (A1-CHG-2025-001)
+
+Change summary
+Add Cache-Control: public, max-age=300 to:
+/.well-known/openid-configuration
+/.well-known/jwks.json
+Add deploy pre‑warm to touch both endpoints on start.
+Goal: reduce discovery/JWKS P95 to ≤150 ms post‑deploy.
+2. Business justification
+
+Lower login funnel latency to protect conversion. JWKS/discovery called frequently by clients; caching reduces cold-start spikes.
+3. Scope and components
+
+A1 web server config/routes for the two endpoints.
+No schema/data changes; no dependency version changes.
+4. Pre‑checks (must be Green before starting)
+
+Current A1 health green; no active incidents.
+A8 alerts: IdPConfigLatency* not firing.
+Probes: last run <5 min; success.
+5. Implementation plan (20‑minute window)
+
+Step 1: Enable headers on both endpoints.
+Step 2: Deploy to a single instance; run pre‑warm script (HEAD both endpoints x3).
+Step 3: Verify headers present (Cache-Control), status 200, and latency ≤150 ms.
+Step 4: Roll out to remaining instances.
+Step 5: Monitor A8 tiles for 30 minutes (IdPConfigLatency).
+6. Validation / Acceptance criteria
+
+Discovery and JWKS return 200 with Cache-Control: public, max-age=300.
+P95 latency for both ≤150 ms over 30 minutes.
+No increase in /oidc/auth 4xx; no invalid_client spikes.
+7. Rollback plan
+
+Revert header config commit; redeploy.
+Pre‑warm again to restore prior behavior.
+Confirm P95 settles to pre‑change levels; no incidents.
+8. Risk assessment
+
+Low risk. Read-only response header change. Mitigations: pre‑warm, staged rollout, immediate rollback.
+9. Communications
+
+Notify #ops and #security 15 min before change and at completion with validation snapshot.
+10. Schedule / Ownership
+
+Schedule: within the next 48 hours, off‑peak.
+Owner: A1 on‑call
+Approver: CEO/CTO (one‑click)
+If you want, I can also produce a staging‑first A/B validation plan (5%/25%/100%) and a short post‑change observation script you can run from A8 to confirm the P95 improvement automatically.
