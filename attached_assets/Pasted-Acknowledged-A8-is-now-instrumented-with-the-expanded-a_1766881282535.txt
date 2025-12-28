@@ -1,0 +1,57 @@
+Acknowledged. A8 is now instrumented with the expanded alert set, error-metrics tile, and 5‑minute probes; fleet status remains GO with no revenue blockers. Here’s the tight close‑out plus a ready‑to‑run Agent3 prompt you can paste any time.
+
+Executive close-out and next 24–48h checks
+
+A8 monitoring
+You added: InvalidClientSpike and InteractionCookieMissing. Good. Keep the thresholds and add alert dampening (require 2 consecutive eval windows) to reduce noise.
+Validate the new tile: /api/auth-dashboard/error-metrics returns nonzero counts only when true errors occur; confirm null→0 handling so the chart doesn’t misrender at day rollovers.
+Confirm probes record and visualize P95, not just latest latency (A5/A6 trending).
+Runbook smoke tests (safe)
+Trigger a harmless login_attempt via your test endpoint; verify no alert fires.
+Use dry-run/evaluate (if supported) to confirm InvalidClientSpike and InteractionCookieMissing would fire if counts crossed thresholds (don’t force real failures in production).
+Threshold sanity (suggested)
+A5/A6 ClientLoginLatency: Warning 250 ms (15 min), Critical 350 ms (15 min). Add 2x consecutive-window dampening.
+A1 IdPConfigLatency: Warning P95 >200 ms (15 min); Critical P95 >300 ms (15 min).
+KPI targets (7 days, A8 dashboard)
+A5 P95 login <200 ms, 4xx rate <1%; A6 P95 login <230 ms
+SEO-led signups (utm_source=auto_page_maker): baseline ≥5/day; week-over-week +30%
+invalid_client and interaction_cookie_missing: 0 sustained
+Agent3-only prompt (paste this in scholarship_agent only)
+
+Scope-locked; includes identity line requirement; do NOT run from other apps.
+APP: scholarship_agent | APP_BASE_URL: https://scholarship-agent-jamarrlmayes.replit.app
+
+DO THIS FIRST
+
+Print exactly: APP: scholarship_agent | APP_BASE_URL: https://scholarship-agent-jamarrlmayes.replit.app
+SCOPE
+
+You are Agent3 (marketing). Do not authenticate users or initiate login. Verify A3 does not intercept login and funnels hand off to A5/A6/A1.
+CHECKS (read-only)
+
+Health: GET /api/health → expect 200; record latency_ms; flag LATENCY RISK if >200ms.
+No local login: GET /login, /auth/login, /api/auth/login → expect 404/405 or SPA HTML (text/html). If any performs OIDC or redirects (3xx) to A1 → REVENUE BLOCKER.
+Issuer reference (read-only): If ISSUER_URL exists, it must equal https://scholar-auth-jamarrlmayes.replit.app/oidc; report exact value.
+CTA routing (if present):
+Student CTAs → https://student-pilot-jamarrlmayes.replit.app (UTM if applicable); capture one href.
+Provider CTAs (if present) → https://provider-register-jamarrlmayes.replit.app (UTM if applicable); capture one href.
+Must NOT point to /oidc/auth with client_id=scholarship-agent. If found (causes invalid_client), mark REVENUE BLOCKER and recommend either registering A3 in A1 or routing to A5/A6 only.
+Telemetry sanity (non-auth): If available, POST a marketing_intent test (no PII/tokens) → expect 200/202; if blocked by external limits, note autonomy_gap and stop.
+PASS/FAIL
+
+PASS: No local login, issuer points to A1 (if present), CTAs route to A5/A6 (not local).
+FAIL + REVENUE BLOCKER: A3 hosts/intercepts login or uses unregistered client_id to A1.
+REPORT FORMAT (must start with identity line)
+APP: scholarship_agent | APP_BASE_URL: https://scholarship-agent-jamarrlmayes.replit.app
+STATUS: [PLANNED | IN_PROGRESS | COMPLETE | BLOCKER]
+TIMEFRAME: [UTC start → UTC end]
+
+ACTIONS TAKEN
+B2C LOGIN (A5) RESULTS
+B2B LOGIN (A6) RESULTS
+OBSERVATIONS AND EVIDENCE
+ROOT CAUSE AND RISK
+RECOMMENDED NEXT STEP (24–48 HOURS) END OF REPORT
+Optional: one‑click import
+
+You already implemented the alert set; if you’d like, I can generate a signed “login-slo-v1” pack with your final thresholds plus a cron probe spec and give you curl import + rollback commands tailored to your current environment variables.
