@@ -1,0 +1,142 @@
+Executive directive: proceed on all three fronts. Below are precise, copy‑and‑run prompts for each app/agent to execute. Each section is identity‑aware: the agent must run only its own section and begin every output with the identity line.
+
+System registry (reference)
+
+A1 scholar_auth → https://scholar-auth-jamarrlmayes.replit.app
+A2 scholarship_api → https://scholarship-api-jamarrlmayes.replit.app
+A3 scholarship_agent → https://scholarship-agent-jamarrlmayes.replit.app
+A4 scholarship_sage → https://scholarship-sage-jamarrlmayes.replit.app
+A5 student_pilot → https://student-pilot-jamarrlmayes.replit.app
+A6 provider_register → https://provider-register-jamarrlmayes.replit.app
+A7 auto_page_maker → https://auto-page-maker-jamarrlmayes.replit.app
+A8 auto_com_center → https://auto-com-center-jamarrlmayes.replit.app
+Global rules for all agents
+
+Identity line (print first, exactly): APP: <app_name> | APP_BASE_URL: <base_url>
+Scope discipline: Execute only your app’s section. Ignore all others.
+Read-only unless explicitly instructed to change headers/content in your section.
+Latency guardrail: Flag any endpoint >200ms as LATENCY RISK; >350ms as CRITICAL.
+Report format: Use the MANDATORY REPORT FORMAT at the end.
+A1 ONLY — scholar_auth (execute change ticket A1-CHG-2025-001)
+APP: scholar_auth | APP_BASE_URL: https://scholar-auth-jamarrlmayes.replit.app
+
+Objective
+
+Reduce IdP contribution to fleet login latency by caching discovery and JWKS responses.
+Authorized change (A1-CHG-2025-001)
+
+Add HTTP headers on these endpoints:
+/.well-known/openid-configuration
+/.well-known/jwks.json
+Required headers:
+Cache-Control: public, max-age=300, s-maxage=300
+ETag: strong (or Last-Modified if ETag infra unavailable)
+Content-Type: application/json; charset=utf-8
+Do NOT add Vary headers that would defeat caching. Do NOT set no-store on these two endpoints.
+Canary rollout: 15 minutes. If A8 probes detect p95 >150ms or 4xx spikes >2% on either endpoint, rollback immediately.
+Validation steps
+
+Before/after: record p95 latency for discovery and JWKS (A8 probe tiles).
+curl checks (expect 200 and presence of headers):
+curl -s -D - https://scholar-auth-jamarrlmayes.replit.app/.well-known/openid-configuration -o /dev/null
+curl -s -D - https://scholar-auth-jamarrlmayes.replit.app/.well-known/jwks.json -o /dev/null
+Success criteria (T+30m):
+A1 discovery p95 ≤150ms
+A1 JWKS p95 ≤150ms
+No increase in 4xx on /oidc/auth
+A5 ONLY — student_pilot (Code Red: investigate and fix /api/login p95=1235ms)
+APP: student_pilot | APP_BASE_URL: https://student-pilot-jamarrlmayes.replit.app
+
+Objective
+
+Reduce /api/login p95 from 1235ms to ≤200ms within 24 hours.
+Phase 1: trace and isolate (no code changes yet)
+
+Collect 50 samples with timestamps:
+curl -s -w "dns:%{time_namelookup} tls:%{time_connect} ttfb:%{time_starttransfer} total:%{time_total}\n" -o /dev/null https://student-pilot-jamarrlmayes.replit.app/api/login
+Log split:
+Instrument timing around:
+PKCE generation (start → end)
+Session creation/signing (start → end)
+Remote call to A1 discovery/JWKS (should be none at login; if any, note it)
+Redirect response write
+Report the median and p95 for dns/tls/ttfb/total.
+Phase 2: rapid mitigations (apply in order; stop when target met)
+
+Reuse OIDC metadata/JWKS client in-memory singletons; forbid on-demand discovery in /api/login path.
+Enable HTTP keep-alive on outbound agent (if any); ensure Node/HTTP agent is reused.
+Prewarm on deploy: call /api/login internally 3 times to mitigate cold starts.
+Optimize session signing:
+Use a single HMAC key in memory; avoid per-request key loads
+Ensure cookie serialization is not awaiting I/O
+Ensure /api/login handler avoids DB reads/writes; it should compute PKCE and redirect only.
+Validation
+
+Re-run 50-sample curl. Target:
+total p95 ≤200ms
+ttfb p95 ≤120ms
+A8 probe tile for A5 /api/login returns to green.
+A3 ONLY — scholarship_agent (add missing B2B CTA; keep strict scope)
+APP: scholarship_agent | APP_BASE_URL: https://scholarship-agent-jamarrlmayes.replit.app
+
+Objective
+
+Close the B2B loop by adding a Provider CTA that routes to A6 with UTM attribution; ensure no local login endpoints are introduced and telemetry is compliant.
+Implementation requirements
+
+UI placement: Global footer and/or top nav menu.
+Provider CTA target:
+https://provider-register-jamarrlmayes.replit.app/?utm_source=scholarship_agent&utm_medium=cta&utm_campaign=provider_acquisition
+Student CTA target (confirm existing):
+https://student-pilot-jamarrlmayes.replit.app/?utm_source=scholarship_agent&utm_medium=cta&utm_campaign=student_acquisition
+Telemetry (non-PII):
+On click, emit marketing_intent event with fields: {app_id:"A3", app_name:"scholarship_agent", app_base_url:"https://scholarship-agent-jamarrlmayes.replit.app", action:"cta_click", audience:"provider"|"student", href, utm_source, utm_medium, utm_campaign, timestamp}
+Do not attach tokens or emails.
+Validation
+
+GET /api/health → 200 (<200ms)
+Confirm /login, /auth/login, /api/auth/login remain 404/SPA shell (no local auth).
+Static scan: Ensure exactly one or more A6 CTA hrefs present, and existing A5 CTA remains intact.
+Fire two test clicks (programmatic or simulated), confirm telemetry accepted (200/202).
+A8 ONLY — auto_com_center (monitoring updates)
+APP: auto_com_center | APP_BASE_URL: https://auto-com-center-jamarrlmayes.replit.app
+
+Objective
+
+Guardrail and visibility during A1 and A5 changes.
+Actions
+
+Alerts:
+A1 discovery p95 >150ms for 2 consecutive windows → warning; >200ms → critical
+A5 /api/login p95 >200ms for 2 windows → warning; >350ms → critical
+Dashboards:
+Add tiles for A5 dns/tls/ttfb/total medians and p95 (from A5-emitted timing logs)
+Evidence capture:
+Record first green window after A5 drops under 200ms.
+MANDATORY REPORT FORMAT (all agents)
+
+Always start with your identity line.
+APP: <app_name> | APP_BASE_URL: <base_url>
+STATUS: [PLANNED | IN_PROGRESS | COMPLETE | BLOCKER]
+TIMEFRAME: [UTC start → UTC end]
+
+ACTIONS TAKEN
+[bulleted steps with endpoints, files changed (if any), and timing numbers]
+2. FINDINGS
+
+[key facts, pass/fail on each check, including PKCE, cookies, headers, CTA presence]
+3. LATENCY
+
+[endpoint, measured p95/median, thresholds, risk flag]
+4. REVENUE BLOCKERS
+
+[list any blockers; “None” if clear]
+5. NEXT STEP (24–48 HOURS)
+
+[one-line owner + action + target metric]
+Decision and owner assignments
+
+A1-CHG-2025-001: APPROVED. Owner: A1 agent. Canary 15m, full 45m. Target p95 ≤150ms on discovery/JWKS.
+A5 latency investigation: CODE RED. Owner: A5 agent. Deliver root cause and p95 ≤200ms within 24h.
+A3 provider CTA: APPROVED. Owner: A3 agent. Add CTA + telemetry, no auth surfaces added. Deliver within 8h.
+If you want me to prioritize one deliverable first: I recommend starting with A5 latency trace now (highest revenue impact), while A1 and A3 changes proceed in parallel under the canary and UI-only risk profile.
