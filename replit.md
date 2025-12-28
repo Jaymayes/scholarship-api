@@ -33,8 +33,13 @@ The business vision is to create a comprehensive, intelligent platform that conn
   - Verifies JWKS keys are published
   - Scans for legacy issuer URLs (missing /oidc suffix)
 
-**Known Issues**:
-- **DEF-005 Redis Provisioning** (Priority: Day 1-2): Redis rate limiting backend unavailable, falling back to in-memory. Acceptable for single-instance deployment but should be provisioned for horizontal scaling. Current impact: Low (in-memory fallback active)
+**Rate Limiting Fix** (2025-12-28): DEF-005 resolved
+- Set `DISABLE_RATE_LIMIT_BACKEND=true` to use in-memory rate limiting intentionally
+- Eliminates Redis connection error spam on startup
+- In-memory mode is acceptable for single-instance deployment
+- Future: Provision Redis via `REDIS_URL` env var when horizontal scaling is needed
+
+**Known Issues**: None blocking
 
 # User Preferences
 

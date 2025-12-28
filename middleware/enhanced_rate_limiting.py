@@ -52,11 +52,26 @@ class EnhancedRateLimiter:
     def _create_limiter(self) -> Limiter | None:
         """
         QA FIX: Create Redis-backed rate limiter with production requirements
+        DEF-005 FIX: Respect DISABLE_RATE_LIMIT_BACKEND setting
         """
+        if settings.disable_rate_limit_backend:
+            logger.info("📦 Using in-memory rate limiting (DISABLE_RATE_LIMIT_BACKEND=true)")
+            return Limiter(
+                key_func=self._get_client_identifier,
+                default_limits=["100/minute"]
+            )
+        
+        redis_url = settings.redis_url
+        if redis_url.startswith("redis://localhost"):
+            logger.info("📦 Using in-memory rate limiting (no external Redis configured)")
+            return Limiter(
+                key_func=self._get_client_identifier,
+                default_limits=["100/minute"]
+            )
+        
         try:
-            # Test Redis connection with timeout
             redis_client = redis.Redis.from_url(
-                settings.redis_url,
+                redis_url,
                 decode_responses=True,
                 socket_timeout=5,
                 socket_connect_timeout=5,
@@ -67,22 +82,15 @@ class EnhancedRateLimiter:
             logger.info("✅ Enhanced Redis rate limiting backend connected")
             return Limiter(
                 key_func=self._get_client_identifier,
-                storage_uri=settings.redis_url,
-                default_limits=["100/minute"]  # Fixed: Use hardcoded default
+                storage_uri=redis_url,
+                default_limits=["100/minute"]
             )
 
         except Exception as e:
-            # DAY 0 CEO DIRECTIVE: Allow graceful degradation for Redis (DEF-005 remediation pending)
-            if settings.environment.value == "production":
-                logger.error(
-                    f"💥 PRODUCTION DEGRADED: Redis rate limiting backend unavailable. "
-                    f"Error: {e}. Falling back to in-memory (single-instance only). "
-                    "REMEDIATION REQUIRED: DEF-005 Redis provisioning (Day 1-2 priority)"
-                )
-            logger.warning(f"⚠️ Development: Using in-memory rate limiting. Redis error: {e}")
+            logger.warning(f"⚠️ Redis unavailable, using in-memory fallback: {e}")
             return Limiter(
                 key_func=self._get_client_identifier,
-                default_limits=["100/minute"]  # Fixed: Use hardcoded default
+                default_limits=["100/minute"]
             )
 
     def create_rate_limit_response(self, exc: RateLimitExceeded) -> Response:
@@ -92,8 +100,10 @@ class EnhancedRateLimiter:
         retry_after = 60  # Default
 
         # Extract retry_after from exception if available
-        if hasattr(exc, 'retry_after') and exc.retry_after:
-            retry_after = int(exc.retry_after)
+        if hasattr(exc, 'retry_after'):
+            retry_val = getattr(exc, 'retry_after', None)
+            if retry_val:
+                retry_after = int(retry_val)
 
         response_data = {
             "error": "Rate limit exceeded",

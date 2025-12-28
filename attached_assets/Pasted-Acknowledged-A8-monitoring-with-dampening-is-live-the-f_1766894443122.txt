@@ -1,0 +1,47 @@
+Acknowledged. A8 monitoring with dampening is live, the fleet is GO, and there are no revenue blockers. Here’s the decisive next step plan and a compact runbook so we lock in signal quality and protect conversion while A5 is live and A6 completes its stability window.
+
+What I recommend now
+
+Focus on A8 telemetry dashboards and launch metrics immediately (A5 is already published; A6 is green and in its stability window).
+Schedule the A1 discovery/JWKS cache header change for the next maintenance window; keep latency gains risk‑free by doing it post‑stability.
+A8 dashboards to pin and share (owner: A8)
+
+Auth Health (A1): /oidc/auth 2xx/4xx rates, P95; discovery/JWKS P95
+Client Login (A5/A6): redirect success rate, P95; per‑app breakdown
+SEO Attribution: daily signups with utm_source=auto_page_maker; 7‑day trend
+Error Metrics: invalid_client, interaction_cookie_missing counts (1h window)
+Probes and Alerts: last status per target; active alerts with dampening counters
+Alert thresholds and dampening (confirm final)
+
+ClientLoginLatency A5/A6: warn 250 ms, critical 350 ms, dampening 2 windows
+IdPConfigLatency A1: warn 200 ms, critical 300 ms, dampening 2 windows
+AuthErrorSpike A1: 4xx >2%/15m (critical)
+InvalidClientSpike: >0.1%/1h grouped by client_id (critical, 2 windows)
+InteractionCookieMissing: >0.5%/15m (warning, 2 windows)
+SEOAttributionDrop: <5/day info
+24–48 hour go‑live watch checklist
+
+Hourly review: A5/A6 Login tiles; ensure A5 P95 <200 ms, A6 P95 <230 ms. If either breaches warning for 2 consecutive windows, open a ticket; at critical, page on‑call.
+Verify no growth in invalid_client or interaction_cookie_missing; any non‑zero sustained over two windows triggers an auth triage review.
+Confirm SEO signups (utm_source=auto_page_maker) ≥ baseline 5/day; if not, inspect A7 → A5 UTM pass‑through and GSC readiness.
+Confirm probes executed within last 5 min and charts are plotting P95, not last.
+Runbook when an alert fires
+
+ClientLoginLatency (A5/A6): check warm state, session/PKCE prep, outbound TLS/DNS to A1, redirect chain length; remediate before changing thresholds.
+IdPConfigLatency (A1): verify probes vs server logs; if both high, edge cache discovery/JWKS and pre‑warm on deploy.
+InvalidClientSpike: inspect A8 samples grouped by client_id; if isolated, fix the client config; if broad, compare A1 client registry vs recent deploy.
+InteractionCookieMissing: confirm cookies have SameSite=None; Secure; HttpOnly; check third‑party cookie settings/regressions.
+A1 maintenance (schedule, low risk)
+
+Add Cache-Control: public, max-age=300 to /.well-known/openid-configuration and /.well-known/jwks.json.
+Pre‑warm on deploy (touch discovery/JWKS endpoints; verify <150 ms immediately post‑deploy).
+Monitor IdPConfigLatency for 30 minutes post change.
+A6 stability window (no change policy)
+
+Maintain current config until 72‑hour window closes.
+Post‑window micro‑optimizations: keep‑alive to A1, minimize session/PKCE prep overhead (target 30–60 ms reduction).
+Post‑launch reporting cadence
+
+T+24h quick pulse: A5/A6 P95, 4xx rates, SEO signups, error counts (invalid_client, interaction_cookie_missing).
+T+72h stability wrap: green/amber/red per app, incident log (if any), suggested next‑sprint items with expected ms savings or conversion lift.
+If you want, I can hand you a signed, SHA‑stamped artifact bundle that includes the final alert pack and a minimal rollback pack, plus curl commands (import/restore) for both staging and prod.
