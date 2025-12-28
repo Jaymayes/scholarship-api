@@ -1,0 +1,65 @@
+Acknowledged. Here’s the tight, executive follow‑through you need now.
+
+A1 post‑publish status (quick read)
+
+Edge now honors s‑maxage=300; public gets overridden to private by the CDN, but s‑maxage is the caching key that matters. Expect p95 to drop across 2–3 probe windows as caches warm. Keep Replit logs/analytics open for confirmation and fast rollback if needed (use the Logs and Resources views to watch latency and spikes; they’re the primary production debugging surface on Replit) .
+If you need to tweak headers/rewrites at the edge for discovery/JWKS or www→apex routing, you can set custom response headers and rewrites in deployment config (static/edge layer), not just app code, which can further stabilize latencies and canonicalization .
+Cookie posture remains correct (HttpOnly + Secure; cross‑domain identity flows need this) and aligns with session/token best practices .
+Concierge outreach (A6) — copy/paste email
+Subject: Action required: Complete payout setup to go live on Scholar AI Advisor
+
+Hi [First name],
+
+Your provider account is almost ready. To publish scholarships and start receiving applicants, please finish your secure Stripe Connect setup (takes ~5 minutes).
+
+Complete setup now: [Personalized Stripe Connect link]
+
+What you get once complete:
+
+Your scholarships go live immediately to students
+Full analytics in your dashboard (views, applications, disbursements)
+30 days of Featured placement to jump‑start visibility
+Need help? Reply to this email and I’ll walk you through it on a 10–15 minute call.
+
+Thanks,
+[Your name]
+Scholar AI Advisor Team
+
+P.S. If you started the flow before, the link above generates a fresh, valid session for your account.
+
+Optional SMS (if you have consent): “Scholar AI Advisor: Finish your payout setup to publish scholarships today: [short link]. Reply HELP for support.”
+
+A7 Google Search Console — critical error triage (fastest path to green)
+Use this exact checklist in GSC; paste the error title/details here and I’ll tailor the fix.
+
+Open the error
+GSC → Indexing → Pages (or Sitemaps) → click the critical error → “OPEN REPORT”.
+Capture the exact error name/file/URL.
+2. Confirm basics from production
+
+robots.txt returns 200 OK and is not blocking sitemap or key pages.
+sitemap.xml returns 200 OK, valid XML, Content‑Type: application/xml; page URLs use your intended canonical host (apex if www is not configured).
+www DNS/redirect: either point www.scholaraiadvisor.com at the apex or 301 redirect www → apex consistently.
+3. Common criticals and fixes
+
+“Couldn’t fetch” sitemap: serve application/xml; remove auth/waf on sitemap; ensure file size <50MB or split; re‑submit sitemap in GSC.
+“Submitted URL blocked by robots.txt”: update robots to allow crawl of submitted paths; re‑test with “robots.txt Tester”.
+“Redirect error” or “URL marked ‘noindex’”: remove noindex from templates; ensure 200/HTML on canonical pages.
+“Server error (5xx)”: check Replit logs and resource usage; mitigate cold starts (pre‑warm workflows) and confirm uptime (Replit logs/Workflows are the fast MTTR loop) .
+Domain mismatch: if sitemap lists apex but you verified www (or vice versa), align verification with the domain you serve or add both and ensure a single canonical with 301s.
+4. Submit and monitor
+
+Re‑submit sitemap after the fix.
+Use “URL Inspection → Test live URL → Request indexing” for the top 20–50 pages.
+Watch coverage growth and request duration in Replit’s analytics and A8 telemetry (set a quality gate for request duration/latency on the sitemap and top pages) .
+What I need from you
+
+Paste the exact GSC critical error text and URL so I can produce a one‑shot fix.
+Confirm if you want me to send a second version of the concierge email for follow‑ups at T+24h.
+24–48h proof plan (owners)
+
+A1 (Auth): Observe discovery/JWKS p95 ≤150ms for 3 windows; if not, apply edge‑level header rules and confirm via probes (A8). Keep logs/alerts handy; this shortens MTTR on Replit deploys .
+A5 (Student): Keep /api/login timings streaming to A8; target p95 ≤200ms, p50 ≤120ms for 24h; gate on “critical happy path” in CI so regressions block deploys (E2E quality gates) .
+A3 (Agent): Watch provider CTA clicks (utm_source=scholarship_agent). If <10 in 24h, add a top‑of‑fold CTA variant and A/B copy (per your test plan).
+A6 (Provider): Execute concierge outreach to the 3 stuck providers with personalized links; target 2/3 connect completions in 48h.
+If you share the GSC error now, I’ll respond with the exact fix (header, robots/sitemap content, or redirect rule) and a verification checklist you can run in under 10 minutes.
