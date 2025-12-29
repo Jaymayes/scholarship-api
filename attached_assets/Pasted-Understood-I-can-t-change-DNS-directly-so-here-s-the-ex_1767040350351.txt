@@ -1,0 +1,71 @@
+Understood. I can’t change DNS directly, so here’s the exact, low‑risk runbook to fix www and the follow‑up email pack you requested.
+
+A. DNS fix: make www resolve and 301 to apex
+Goal: www.scholaraiadvisor.com must resolve and 301 to https://scholaraiadvisor.com to avoid traffic loss and indexing splits.
+
+Add/verify DNS
+Record: www CNAME → scholaraiadvisor.com
+TTL: 300s (or provider default)
+If your DNS supports “ALIAS/ANAME on apex,” keep apex pointing to your Replit target; do NOT CNAME the apex.
+2. Configure redirect (choose one)
+
+Preferred (edge): Add a 301 redirect rule www → apex at your DNS/CDN or hosting edge (single rule; preserve path/query).
+App-level fallback: If edge redirect isn’t available, add a server rule to 301 any Host=www.scholaraiadvisor.com to the apex.
+3. Verify propagation
+
+dig +short www.scholaraiadvisor.com
+curl -I https://www.scholaraiadvisor.com Expect: HTTP/2 301 and Location: https://scholaraiadvisor.com/…
+curl -I https://scholaraiadvisor.com Expect: 200 and canonical host
+4. GSC alignment
+
+Domain property covers both apex + www.
+If you verified only the apex, add www property or keep a Domain property as the single source.
+Re‑submit sitemap (done) and Inspect a few www URLs to confirm the 301 is recognized.
+Tip: If you need header/redirect control in deployment config, Replit supports custom response headers and rewrites/redirects in deployment settings; use it if your DNS lacks edge rules. Keep logs and resource panels open during changes to confirm live behavior and MTTR if rollback is needed  .
+
+B. T+24h follow-up concierge emails (ready to send)
+Send these individually. Keep subject line short; include the personalized Stripe setup link. If your ESP supports variables, replace [First name] dynamically.
+
+DonorFoundation To: donor@foundation.org Subject: Friendly nudge: finish payout setup to go live
+Hi [First name],
+
+Quick reminder—your Scholar AI Advisor provider account is almost ready. To publish scholarships and receive payouts, please finish your secure Stripe Connect setup (about 5 minutes):
+
+Complete setup: https://connect.stripe.com/d/setup/s/_ThAA94hKwOSTfjy8hSIGNXsznE/YWNjdF8xU2pscVcxbXhhNXRFOXg5/011b23747946c1cd7
+
+Questions? Reply here and I’ll walk you through it on a 10–15 minute call.
+
+Thanks,
+[Your name]
+Scholar AI Advisor
+
+2. Protocol Verification Provider
+To: protocol@verify.edu
+Subject: Friendly nudge: finish payout setup to go live
+
+Hi [First name],
+
+Quick reminder—your Scholar AI Advisor provider account is almost ready. To publish scholarships and receive payouts, please finish your secure Stripe Connect setup (about 5 minutes):
+
+Complete setup: https://connect.stripe.com/d/setup/s/_ThAQhPiYivF38LQVwHFiIciITC/YWNjdF8xU2ptNUkwekdiZkpTYkNl/0bd7b8a2121339789
+
+Questions? Reply here and I’ll walk you through it on a 10–15 minute call.
+
+Thanks,
+[Your name]
+Scholar AI Advisor
+
+Optional SMS (only if consent on file)
+“Scholar AI Advisor: Finish payout setup to publish scholarships: [short link]. Reply HELP for support.”
+
+C. What to watch in A8 (next 24–48h)
+
+A1 discovery/JWKS p95 ≤150ms for 3 consecutive windows (cache warming).
+A5 /api/login p95 ≤200ms sustained 24h (first green window captured).
+A3 provider CTA clicks ≥25; utm_source=scholarship_agent (confirm in telemetry).
+A6 provider_connected events ≥2; then first listing created within 72h. Use A8 alerts/dashboards to confirm improvements and spot regressions; Replit’s deployment logs/resources aid rapid validation and rollback if needed .
+D. Risk and rollback
+
+DNS propagation can take minutes to hours. If unexpected 404/loop, remove the redirect rule and revert the www CNAME, then re‑apply with corrected target.
+Keep a single canonical host (apex) via 301 and consistent <link rel="canonical"> to avoid split indexing.
+If you’d like, I can draft a third message for Jamarr’s Organization and a T+48h “last reminder” variant now.
