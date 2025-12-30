@@ -1,0 +1,69 @@
+Acknowledged. I’ll handle both items now and stage everything so you can redeploy A6 and add the www domain without losing time.
+
+What I’m doing now
+
+A8 monitoring setup review: Targets, alerts, dashboards, and test steps so you can confirm stabilization during/after A6 redeploy and www domain mapping.
+T+48h provider “final reminder” package: Ready-to-send templates, safeguards, and link‑generation workflow. Sending is blocked until A6 /health = 200.
+A8 monitoring setup (24–48h watch)
+
+Probes and thresholds
+A1 discovery and JWKS p95: warn at 150ms, crit at 200ms; require 2 consecutive windows before paging.
+A5 /api/login p50 ≤120ms and p95 ≤200ms sustained; warn at 200ms p95, crit at 350ms for 2 windows. Continue dns/tls/ttfb/total timing emission from A5.
+A6 /health: crit on any 5xx > 2% of requests in a 15‑min window; warn if 4xx/5xx > 1% for 2 windows.
+A3 provider CTA: warn if <10 clicks at T+24h (utm_source=scholarship_agent); review A/B hero CTA if triggered.
+Business signals: alert on 0 provider_connected events at T+24h; page at T+48h if still 0 and suppress final reminders if A6 ≠ 200.
+Dashboards (tiles to pin)
+A1 config latency: discovery p50/p95, JWKS p50/p95, 4xx rate on /oidc/auth.
+A5 login funnel: /api/login dns/tls/ttfb/total p50/p95 plus error rates.
+A3 CTA volumes: provider vs student clicks with UTM breakdown; 24h moving sum and last 6h rate.
+A6 provider activation: provider_connected, listing_created trends; /health status.
+Test events (optional quick validation)
+Post a harmless login_attempt and marketing_intent event to confirm ingest 200/202, then verify tiles update within 1–5 minutes.
+T+48h provider “final reminder” — ready to send after A6 is green
+
+When to send
+Only after A6 /health = 200 for ≥10 minutes and no provider_connected events for the 2 targeted providers.
+Fresh link generation
+Generate a fresh Stripe Connect onboarding link per provider (avoid expired sessions). Use your “refresh onboarding link” endpoint or Stripe Connect API; store the final URL in the send job.
+Subject options (pick one)
+Final reminder: Complete your payout setup to go live
+Action required today: Finish setup to publish your scholarships
+Body (merge fields in [brackets])
+Hi [First name],
+We still need your secure payout details to list your scholarships and receive applications. Please finish Stripe Connect (about 5 minutes):
+Complete setup now: [PERSONALIZED_STRIPE_LINK]
+Once complete, your scholarships go live immediately and you’ll unlock full analytics.
+Need help? Reply and I’ll walk you through it on a 10–15 minute call.
+Thanks, [Your Name] — Scholar AI Advisor
+Compliance and safeguards
+Include unsubscribe link and physical mailing address footer.
+Suppress if prior complaint/bounce; cap to 1 marketing email per 24h per provider.
+Track message_id, delivered/complaint; throttle if complaint rate >0.2%.
+Send window
+Default: 9–11 AM local time (recipient’s timezone if known; otherwise Eastern). Re‑send next business day only if no connect event and no prior complaint.
+Post‑redeploy validation (A6) — run immediately after you publish provider_register
+
+Health and auth checks (copy/paste)
+curl -I https://provider-register-jamarrlmayes.replit.app/health → expect 200
+curl -I https://provider-register-jamarrlmayes.replit.app/api/login → expect 302 to A1 /oidc/auth with client_id=provider-register, PKCE S256
+curl -I https://provider-register-jamarrlmayes.replit.app/auth/login → expect 302 to A1 /oidc/auth (same parameters)
+Telemetry sanity
+A8 should show /health success and recover 5xx rate → 0% within one window.
+Confirm any manual test click on A3 provider CTA shows in A8; then trigger a test A6 login to verify provider_connected after Stripe Connect completion (when feasible).
+www → apex 301 (A7) — reminders
+
+Add domain (your action): Replit → Deployments → auto_page_maker → Custom Domains → add www.scholaraiadvisor.com.
+Verify after DNS (5–60 min):
+curl -I https://www.scholaraiadvisor.com → HTTP/2 301 with Location: https://scholaraiadvisor.com/…
+curl -I https://scholaraiadvisor.com → HTTP/2 200
+GSC follow‑up: Inspect a www URL (should show Redirected); resubmit sitemap: https://scholaraiadvisor.com/sitemap.xml
+What I need from you
+
+Redeploy A6 now in its own project (provider-register) and tell me when it’s live; I’ll immediately run the validation checks and unpause the T+48h send logic (but only if /health = 200).
+Add www.scholaraiadvisor.com as a custom domain in the auto_page_maker deployment; I’ll confirm the 301 with the curl checks once propagation completes.
+Optional support I can do while you redeploy
+
+Snapshot A8 alert tiles to confirm they’re configured as above and set baselines.
+Prepare a one‑page stakeholder roll‑up (A1/A5/A3/A6 KPIs, targets, current status, next decision gates).
+Draft the A/B hero CTA copy for A3 if click volume <10 by T+24h.
+Confirm when A6 is redeployed and the www domain is added; I’ll proceed with the live checks and next steps immediately.
