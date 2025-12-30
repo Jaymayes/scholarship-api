@@ -1,0 +1,48 @@
+Acknowledged. Domain added received.
+
+I will verify and then confirm green-light for GSC and traffic.
+
+What I will check now (and the evidence I’ll capture)
+
+301 and apex reachability
+curl -I https://www.scholaraiadvisor.com → expect HTTP/2 301 with Location: https://scholaraiadvisor.com/…
+curl -I https://scholaraiadvisor.com → expect HTTP/2 200
+curl -I http://www.scholaraiadvisor.com → expect 301 → https (no mixed HTTP)
+curl -I https://www.scholaraiadvisor.com/path?q=1 → Location must preserve /path?q=1
+SSL termination
+Certificate CN/SAN includes www.scholaraiadvisor.com and scholaraiadvisor.com
+No TLS errors; HTTP → HTTPS enforced at edge
+A7 application health on apex
+GET https://scholaraiadvisor.com/ → 200 OK (HTML shell)
+GET https://scholaraiadvisor.com/sitemap.xml → 200 OK, Content-Type: application/xml
+GET https://scholaraiadvisor.com/robots.txt → 200 OK; no disallow for sitemap or key pages
+CTA functional smokes (via apex pages)
+Student CTA → lands on A5 and /api/login 302 → A1 /oidc/auth with PKCE S256, correct redirect_uri back to A5
+Provider CTA → lands on A6 and /auth/login 302 → A1 /oidc/auth with PKCE S256, correct redirect_uri back to A6
+Canonicalization and SEO hygiene
+rel=canonical on apex pages points to https://scholaraiadvisor.com/… (not www)
+No 200 on www content (must be 301)
+No chained redirects (www → apex in one hop)
+A8 monitoring updates
+Add www reachability probe: expect 301 for 2 windows; alert if non-301
+Record “first green window” timestamp for www 301 and apex 200
+Keep A1 config p95 and A5 /api/login p50/p95 tiles in view
+What you’ll see from me after verification
+
+A short Verification Report with:
+301 check: PASS/FAIL + Location header sample
+Apex 200: PASS/FAIL + status and content-type
+SSL: PASS/FAIL + CN/SAN note
+CTA smokes: PASS/FAIL for A5/A6 redirects (PKCE present)
+A8 probe status: first green window timestamps
+GSC next step: property/coverage confirmation and sitemap resubmission
+GSC actions I will request right after a clean 301/200
+
+If your GSC property is Domain property (recommended), no extra www verification needed; otherwise add a URL prefix for https://www.scholaraiadvisor.com.
+Re-submit sitemap: https://scholaraiadvisor.com/sitemap.xml
+Use URL Inspection on a few www pages to confirm “Redirected” to apex.
+Monitor Coverage and Page indexing for steady growth; watch for any “Submitted URL blocked by robots.txt” or “Couldn’t fetch” errors.
+Open item I’ll confirm during verification
+
+HTTP → HTTPS force on www and apex (no mixed-mode routes)
+Please proceed with your normal usage; I’ll return with the Verification Report as soon as the checks complete. If you want me to include any specific URLs in the test (e.g., a top landing page), paste them and I’ll include them in the run.
