@@ -1,0 +1,60 @@
+Perfect. While DNS propagates and you add www.scholaraiadvisor.com to the Replit deployment, here’s the fast follow-through on the two items you mentioned plus one critical hotfix runbook for A6.
+
+A8 monitoring review (what to watch for the next 24–48h)
+
+A1 post‑publish cache benefits
+Probes: /.well-known/openid-configuration and /.well-known/jwks.json p95 ≤150ms for 3 consecutive windows.
+If p95 degrades >150ms for 2 windows: page a warning; check edge cache and headers; roll back header changes only if 4xx spikes also occur. Use Replit Logs/Resources to confirm no platform anomalies; this is your fastest MTTR loop on Replit .
+A5 login stability
+Probes: /api/login p50 ≤120ms, p95 ≤200ms sustained for 24h. Continue streaming dns/tls/ttfb/total timings into A8 tiles. If p95 >350ms for 2 windows, trigger critical.
+A3 provider CTA effectiveness
+Metric: ≥25 provider CTA clicks in 24–48h with utm_source=scholarship_agent; alert if <10 by T+24h to consider hero CTA variant.
+A6 provider activation
+Metric: ≥2 provider_connected events in 48h; alert if none by T+24h after nudges. Add a simple probe for A6 /health returning 200; page on 5xx spikes (see A6 runbook below).
+A6 hotfix runbook (production 500s) — do this before more providers click links
+
+Redeploy immediately
+Replit → Deployments → provider_register → Publish/Redeploy now.
+Reason: production instance shows 500 while local is healthy; a fresh publish typically clears stale artifacts or edge inconsistencies. Use Replit Logs to confirm start-up success and watch Resources for CPU/memory anomalies during warm-up .
+Validate within 2 minutes
+curl -s -I https://provider-register-jamarrlmayes.replit.app/health → expect 200.
+curl -s -I https://provider-register-jamarrlmayes.replit.app/api/login → 302 to A1 /oidc/auth with PKCE S256; then curl -s -I https://provider-register-jamarrlmayes.replit.app/auth/login → 302 to A1 /oidc/auth (correct client_id and redirect_uri).
+Telemetry sanity
+Ensure provider_connected and error counts appear in A8 within 5–10 minutes (ingest OK).
+If 500 persists after redeploy
+Check secrets/environment in deployment vs local; fix mismatches and republish.
+If still failing: roll back to last known-good image; keep Logs/Resources open during the rollback to minimize downtime (standard Replit incident loop) .
+T+48h “final reminder” provider email template (ready to send automatically)
+
+Subject options (pick one)
+Final reminder: Complete your payout setup to go live
+Action required: Finish setup to publish your scholarships
+Body (pasteable; personalize link)
+Hi [First name],
+We still need your secure payout details to list your scholarships and receive applications. Please finish Stripe Connect (about 5 minutes):
+Complete setup now: [PERSONALIZED_STRIPE_LINK]
+Once complete, your scholarships go live immediately and you’ll unlock full analytics.
+Need help? Reply and I’ll walk you through it on a 10–15 minute call.
+Thanks, [Your Name] — Scholar AI Advisor
+Operational notes
+Generate fresh links just‑in‑time (avoid expired onboarding sessions).
+Track message IDs and delivery/complaint metrics; throttle if complaint rate >0.2%.
+If no response after T+48h, escalate to phone outreach (if available) and place account in on‑hold state until Connect completion.
+www → apex 301 verification (after you add the domain in Replit)
+
+Add domain: Replit → Deployments → auto_page_maker → Custom Domains → add www.scholaraiadvisor.com (edge needs this mapping to route and trigger your 301).
+Verify after propagation (5–60 min)
+curl -I https://www.scholaraiadvisor.com → expect HTTP/2 301, Location: https://scholaraiadvisor.com/…
+curl -I https://scholaraiadvisor.com → expect HTTP/2 200
+GSC follow‑up
+Inspect a www URL; it should show Redirected to apex.
+Re‑submit sitemap: https://scholaraiadvisor.com/sitemap.xml
+If GSC still shows a critical error, paste the exact error and example URL; I’ll give a one‑shot fix (headers/robots/sitemap/redirect). If you need edge‑level headers or rewrites on Replit’s deployment config, that’s supported without code changes .
+Security/cookie posture (quick confirmation)
+
+Cross‑domain login flows rely on HttpOnly + Secure cookies and strict token handling; your current posture aligns with best practice. Keep JWKS/discovery cached and avoid per‑request discovery on login to protect latency and stability .
+Tell me which you want me to do now:
+
+Redeploy A6 and confirm /health and login redirects (recommended first).
+Configure the A8 alert tiles exactly as listed and snapshot baselines.
+Queue the T+48h emails with fresh Stripe Connect links and a send time.
