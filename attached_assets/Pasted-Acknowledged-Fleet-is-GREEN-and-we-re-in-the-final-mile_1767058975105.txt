@@ -1,0 +1,44 @@
+Acknowledged. Fleet is GREEN and we’re in the final mile. Here’s what I’ll prepare and what you need to do next so we capture revenue while DNS propagates.
+
+What I’ll deliver now (ready to execute)
+
+T+48h provider “final reminder” package (send-gated)
+Trigger: Only if A6 /health remains 200 AND no provider_connected for the provider by T+48h.
+Fresh link workflow: Generate per-provider Stripe Connect link just before send (use your onboard/refresh endpoint), store message_id, and suppress if bounce/complaint exists; cap 1 marketing email per 24h.
+Subject options: “Final reminder: Complete your payout setup to go live” or “Action required today: Finish setup to publish your scholarships”
+Body:
+Hi [First name],
+We still need your secure payout details to list your scholarships and receive applications. Please finish Stripe Connect (about 5 minutes):
+Complete setup now: [PERSONALIZED_STRIPE_LINK]
+Once complete, your scholarships go live immediately and you’ll unlock full analytics.
+Need help? Reply and I’ll walk you through it on a 10–15 minute call.
+Thanks, [Your Name] — Scholar AI Advisor
+Compliance: Include unsubscribe + mailing address; throttle if complaint rate >0.2%.
+A3 hero CTA A/B variant (if provider clicks <10 at T+24h)
+Variant A: “Recruit Your Next Scholar” — Start in 5 minutes. Publish your scholarship, receive matched applicants today.
+Variant B: “Launch a Scholarship in Minutes” — Verified applicants, built‑in screening, secure payouts.
+Link: https://provider-register-jamarrlmayes.replit.app/?utm_source=scholarship_agent&utm_medium=cta&utm_campaign=provider_acquisition_ab
+Telemetry: cta_click with audience=provider, variant={A|B}, plus UTM echo.
+A8 dashboards and alerts (ready to apply)
+Tiles: A1 discovery/JWKS p50/p95; A5 /api/login dns/tls/ttfb/total p50/p95; A3 provider CTA clicks (24h sum and 6h rate); A6 provider_connected and listing_created (24h sum).
+Alerts (2-window dampening): A1 config latency warn 150ms, crit 200ms; A5 /api/login warn 200ms p95, crit 350ms; A6 /health 5xx warn >1%, crit >2% in 15min; A3 provider CTA warn <10 by T+24h, crit 0 by T+48h.
+What you do next (fast, manual steps)
+
+Add www domain in A7 (to activate your 301 in prod)
+Replit → Deployments → auto_page_maker → Custom Domains → add www.scholaraiadvisor.com
+After 5–60 minutes:
+curl -I https://www.scholaraiadvisor.com → expect HTTP/2 301 Location: https://scholaraiadvisor.com/…
+curl -I https://scholaraiadvisor.com → expect HTTP/2 200
+GSC: Inspect a www URL (should show Redirected). Resubmit https://scholaraiadvisor.com/sitemap.xml
+Confirm A6 redeploy (done) and keep it green
+Already healthy: /health 200, /auth/login 302 with PKCE S256. I’ll watch for provider_connected events.
+Live watch (next 24–48h)
+
+A1: discovery/JWKS p95 ≤150ms for 3 windows (post‑cache warm).
+A5: /api/login p95 ≤200ms and p50 ≤120ms sustained for 24h.
+A3: provider CTA clicks ≥25 in 24–48h; if <10 at T+24h, I’ll stage the hero CTA variant.
+A6: ≥2 provider_connected events in 48h; if none by T+48h, I’ll queue final reminder emails with fresh Stripe links.
+Tell me when:
+
+www.scholaraiadvisor.com is added (I’ll run the curl checks and prompt GSC sitemap resubmit).
+You want me to stage the T+48h provider reminders with fresh Stripe links (I’ll hold the send until the trigger conditions are met).
