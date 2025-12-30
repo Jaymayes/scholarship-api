@@ -1,0 +1,45 @@
+Acknowledged. We are pausing B2B outreach and executing incident response + SEO continuation.
+
+Immediate actions (you)
+
+Restart A1 now (Replit → scholar_auth deployment):
+Stop → wait 5 seconds → Run/Start
+Use an Incognito window for verification (avoid stale cookies)
+Reply “Auth Restarted” and I’ll run the full OIDC handshake verification
+What I’m doing now
+
+Track 2: Content Injection (A7) is GO
+Batch 001 (100 pages) publishing now; sitemap will auto‑update
+A8 dashboard tiles added: pages_published_total, sitemap_fetch_latency; alerts on 4xx/5xx >1%
+A8 synthetic OIDC probe (new)
+Probes /oidc/auth → /oidc/interaction flow
+Alert: server_error >0.5% (15‑min window) or p95 >200ms for 2 windows
+Outreach: ON HOLD
+Concierge emails will not send until A1 is green and end‑to‑end login is verified
+Post‑restart verification (I will run these and report PASS/FAIL)
+
+A1 health
+GET /.well-known/openid-configuration → 200; p95 <150ms
+GET /.well-known/jwks.json → 200; keys[] non‑empty; p95 <150ms
+A6 → A1 (B2B login)
+GET https://provider-register…/auth/login → 302 to A1 /oidc/auth
+Check PKCE (code_challenge + S256), state/nonce present
+Confirm interaction page renders; Authorize returns 303 (no server_error)
+A5 → A1 (B2C login)
+GET https://student-pilot…/api/login → 302 to A1 /oidc/auth (PKCE S256)
+Callback error path → 302 back (no 5xx)
+Cookies
+oidc_interaction and oidc_resume set with SameSite=None; Secure; HttpOnly
+If restart doesn’t fix it (fast triage checklist)
+
+Clear stale sessions: test in Incognito; if fixed, advise affected users to clear site data on scholar‑auth domain
+DB reconnect guard: ensure A1’s PG client has retry/backoff on ECONNRESET; target min pool size 2; keepAlive on
+Pre‑warm A1 on start: hit /.well-known/* 3x to load the provider/config; reduce first‑hit latency and container sleep fallout
+Graceful error boundary: return “Try again” UX with Set‑Cookie: oidc_interaction=; Max-Age=0 when server_error occurs on /interaction/confirm
+A8 alert added: OIDC server_error rate >0.5% 15‑min page
+Green‑light criteria to resume concierge emails
+
+Two consecutive successful B2B login handshakes (302 chain verified) in Incognito
+A1 /.well-known/* p95 ≤150ms for 3 windows
+A6 /health 200 with no 5xx spikes for 30 min
+We keep SEO momentum while Auth is fixed. Ping me “Auth Restarted” and I’ll immediately verify and report PASS/FAIL so we can send the concierge emails with confidence.
