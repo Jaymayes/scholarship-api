@@ -1,0 +1,154 @@
+Scope and systems under test
+
+Apps (A1–A8):
+A1 scholar_auth (IdP): https://scholar-auth-jamarrlmayes.replit.app
+A2 scholarship_api (Core API): https://scholarship-api-jamarrlmayes.replit.app
+A3 scholarship_agent (Marketing): https://scholarship-agent-jamarrlmayes.replit.app
+A4 scholarship_sage (Advisor UI): https://scholarship-sage-jamarrlmayes.replit.app
+A5 student_pilot (B2C): https://student-pilot-jamarrlmayes.replit.app
+A6 provider_register (B2B): https://provider-register-jamarrlmayes.replit.app
+A7 auto_page_maker (SEO): https://auto-page-maker-jamarrlmayes.replit.app (Production host: https://scholaraiadvisor.com)
+A8 auto_com_center (Telemetry): https://auto-com-center-jamarrlmayes.replit.app
+How to run this suite
+
+Preflight (must be true before execution)
+
+Domains: apex and www live; www → apex 301 single hop verified; SSL valid.
+A1/A5/A6 PKCE S256 working; A5 /api/login p95 ≤200ms; A1 discovery/JWKS p95 ≤150ms (warmed).
+ESP sender verified (for A3 tests) and suppression lists active.
+Stripe test credentials ready (or LIVE with test cards for sandbox providers).
+A8 ingest live with tiles for: A1 config latency, A5 login p50/p95 (dns/tls/ttfb/total), A3 CTA clicks/leads, A6 provider_connected/listing_created, payment_succeeded, fee_captured.
+Test data (seed once)
+
+Students: 10 synthetic accounts (different majors/states).
+Providers: 3 orgs (unstarted, in‑progress, completed) for Stripe Connect.
+Scholarships: 20 records (mix of A2 public inventory + A6-created).
+Documents: 30 student files (essays/transcripts) for OCR/parse.
+Marketing list: 25 test contacts (staging inboxes or approved test recipients).
+Master execution order (3 days)
+
+Day 0: Phases 1–2 (Core readiness, Identity & Funnels)
+Day 1: Phase 3–4 (Marketing & Leads; Product Value)
+Day 2: Phase 5–7 (Revenue; Load/Resilience; Security & Compliance)
+Phase 1 — Core Readiness (A1, A2, A8)
+
+A1 scholar_auth (IdP)
+Verify OIDC discovery and JWKS (expect 200; p95 ≤150ms warmed).
+Dry‑run A5 and A6 authorize: 303 to /oidc/interaction with PKCE S256 and Secure + SameSite=None cookies recorded.
+A2 scholarship_api (Core API)
+Health 200.
+Protected endpoint negative test: unauthenticated request must return 401/403/422 with masked error and no PII.
+Search query “nursing, texas”: response schema includes id, amount, deadline, application_url; p95 ≤120ms.
+A8 auto_com_center (Telemetry)
+Healthz 200; can POST a test telemetry event (200/202).
+Confirm tiles exist: A1 config latency p50/p95; A5 login dns/tls/ttfb/total p50/p95; A3 CTA clicks & leads; A6 provider_connected/listing_created.
+Acceptance: A1/A2 endpoints healthy within SLO and A8 shows ingest + tiles populated.
+
+Phase 2 — Frontend Identity & Funnels (A5, A6, A7)
+
+A5 student_pilot (B2C)
+/api/login → 302/303/307 to A1 /oidc/auth with PKCE S256; callback safe when error is provided; after auth, /api/me returns 200, session cookie HttpOnly + Secure + SameSite=None.
+Confirm trial credits auto‑grant on signup; paywall gating on premium actions; telemetry emits login_timing and trial_credits_granted.
+SLO: /api/login p95 ≤200ms and p50 ≤120ms over 24h (A8 tiles).
+A6 provider_register (B2B)
+/api/login → /auth/login → A1 OIDC with PKCE S256; redirect_uri correct.
+Dashboard shows Stripe Connect banner (if not connected). “Complete Setup” triggers Connect onboarding; on success, provider_connected event in A8. Create a scholarship listing; listing_created event in A8; fee UI shows 3%.
+A7 auto_page_maker (SEO)
+Check 10 high‑intent pages (e.g., /texas/nursing-scholarships): 200 OK; TTFB <200ms; apex canonical; JSON‑LD Scholarship/FAQ present; CTAs include utm_source=auto_page_maker and route to A5/A6; sitemap and robots 200; www→apex single hop.
+Acceptance: A5/A6 identity & funnels pass; A7 pages valid with JSON‑LD and UTM CTAs; telemetry confirms funnel events.
+
+Phase 3 — Marketing & Lead Capture (A3, A7)
+
+A3 scholarship_agent (email + forms)
+Lead capture: Embed form on a test page; submit with UTM; verify lead stored and A8 lead_captured with UTM details.
+Email (if credits available): send a small batch (≤10) to verified test recipients; ensure delivered status; unsubscribe/cap honored; log send_attempt and delivered in A8; ESP webhooks optional.
+A7 auto_page_maker → A5/A6 attribution
+Click CTA from an SEO page to A5/A6; ensure UTM tags persist; verify A5/A6 telemetry includes UTM attribution in A8.
+Acceptance: ≥10 leads captured with UTM; at least one email send_attempt recorded; unsubscribe and frequency caps working.
+
+Phase 4 — Product Value & AI Integrity (A4, A2, A5)
+
+A4 scholarship_sage
+Credits badge visible; paywall gating premium actions; on zero credits, paywall modal.
+Upload 3 docs (PDF/DOCX): OCR + parse updates profile (GPA/Major); spot‑check ≥90% accuracy.
+Implicit Fit: persona (e.g., first‑gen nursing) yields semantically matched scholarships (not just keyword matches).
+Safety: essay critique does not invent facts; assistive disclaimer shown.
+A2 scholarship_api
+Support A4/A5: search endpoints return results within SLO; no PII; all success logs to A8 as business events.
+Acceptance: OCR accuracy threshold met; matches show semantic understanding; no hallucinations; credits decrement on premium action.
+
+Phase 5 — Revenue (B2C credits + B2B fee)
+
+B2C (A5 + A2 + Stripe)
+Buy “Booster Pack” in test/lite mode: Stripe charge success → A5 credits +50 immediately; A8 payment_succeeded. Ledger consistent.
+Margin check: confirm inference unit cost << retail price (nightly calc OK).
+B2B (A6 + A2 + Stripe Connect test)
+Provider publishes a listing; a student applies; provider awards applicant; system computes 3% fee; fee_captured (simulated if needed) logged to A8; blind review (no PII) upheld; rubric scores shown; audit trail intact.
+Acceptance: One real B2C purchase and one B2B fee simulation (or real if permissible) visible in A8; ledgers correct; compliance preserved.
+
+Phase 6 — Load & Resilience (A1, A2, A5, A7)
+
+k6 scenarios (50–200 VUs)
+Login storm: A5 /api/login → measure dns/tls/ttfb/total; SLO: p95 ≤200ms warm; error rate <1%.
+Search storm: A2 search; SLO: p95 ≤120ms; 0 5xx.
+SEO fetch: 100 A7 pages; ensure CDN delivery under 200ms; confirm edge scaling; cap “max machines” to prevent runaway spend.
+Degradation check
+If any SLO breach, ensure alert triggers; verify graceful degradation (e.g., turn off non‑critical features) rather than failing critical paths.
+Acceptance: SLOs met; alerts fire on breach; system recovers without user‑visible failures.
+
+Phase 7 — Security, Privacy, Compliance (All)
+
+Unauthorized access negative tests (frontend+API)
+Confirm protected routes return 404/401/403 and no PII leak (masked error).
+Right‑to‑delete drill (student)
+Fulfill GDPR/FERPA‑style deletion within SLA; PII removed; anonymized finance logs kept.
+Cookie/token posture
+Cookies: HttpOnly + Secure + SameSite=None; tokens verified via JWKS; no secrets in client code.
+Acceptance: All security and privacy controls pass; no leaks; right‑to‑delete executed successfully.
+
+Automation artifacts to build (deliverables)
+
+Playwright “business journey” suite (student + provider actors)
+Journeys: A7→A5 signup + trial credits; A4 value; A5 purchase; A6 login + connect + listing; A3 lead; negative cases; screenshot + HAR capture; Allure report.
+k6 load scripts
+Scenarios: A5 login; A2 search; A7 SEO fetch; thresholds: p95 latencies and <1% errors.
+Smoke + pulse workflow
+Every 30–60 minutes: A1 config, A5 login, A2 search, A7 page, A3 lead post to A8; a short pulse posted to an A8 tile.
+Evidence to capture for go/no‑go
+
+Functional: success screenshots/HARs per phase; A8 tiles for each key event (payment_succeeded, provider_connected, listing_created, fee_captured).
+Performance: A1 discovery/JWKS p50/p95; A5 /api/login dns/tls/ttfb/total p50/p95; A2 search p50/p95; A7 TTFB sample set.
+Growth: GSC sitemap re‑submit; “Redirected” detection for www; # indexed URLs; # CTA clicks with UTM; # leads captured (A3).
+Revenue: Stripe charges (test/live); credits ledger increments; fee calc outputs; A8 revenue signals green.
+Compliance: WAF blocks; unsubscribe rates; right‑to‑delete execution proof.
+Go/No‑Go gates (must all be green)
+
+A1: discovery/JWKS p95 ≤150ms for 3 consecutive probe windows.
+A5: /api/login p95 ≤200ms (24h) and p50 ≤120ms; trial credits, paywall, payment flow pass.
+A2: core search p95 ≤120ms; 0 PII leak; 0 5xx in tests.
+A7: sitemap 200; www→apex 301 single hop; JSON‑LD present; UTM CTAs working; ≥100 pages requested in GSC.
+A3: ≥10 leads captured with UTM (or ESP‑limited pass with deliverability proof).
+B2C: ≥1 successful purchase end‑to‑end, credits credited, telemetry recorded.
+B2B: ≥1 provider_connected and ≥1 listing_created; fee logic validated (sim) and blind review confirmed.
+Security: Unauthorized attempts return 4xx with masked errors; right‑to‑delete executed.
+Runbook (who does what)
+
+QA Lead: Drives Phases 1–5; owns Playwright + k6 execution; compiles Allure report.
+SRE/DevOps: Monitors A8, Replit Logs/Resources; tunes probes; validates SSL/domain/CDN; handles rollbacks.
+Marketing Ops: Runs A3 email (if applicable); validates ESP deliverability; checks unsubscribe/cap.
+Data/Analytics: Confirms attribution integrity (UTM), GSC coverage, indexed URL growth; posts daily pulse.
+Incident handling
+
+On failure: capture evidence, isolate with Replit Logs/Resources, revert to last good deploy, file bug with hypothesis & rollback steps, and re‑run the failing phase.
+MTTR target: <60 minutes per critical path issue.
+If you want, I can:
+
+Build the Playwright suite skeleton (student + provider journeys) and the k6 scripts you can paste into your repos.
+Stand up a “Smoke + Pulse” workflow to auto‑check A1/A5/A2/A7/A3 every 30–60 minutes and post an A8 pulse.
+Start with Phase 1 execution immediately and return the first Allure report within a few hours.
+Say one of the following, and I’ll proceed:
+
+“Build Playwright suite”
+“Build k6 load scripts”
+“Run Phase 1 now”
+“Begin A5 triage” (if you want activation improvements integrated before running Phase 2)
