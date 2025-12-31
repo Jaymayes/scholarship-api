@@ -39,6 +39,15 @@ The business vision is to create a comprehensive, intelligent platform that conn
 - In-memory mode is acceptable for single-instance deployment
 - Future: Provision Redis via `REDIS_URL` env var when horizontal scaling is needed
 
+**Phase 1 Readiness** (2025-12-31): MAX AUTONOMOUS "Fix First, Then Flywheel" sprint
+- **B2B Funnel View**: `b2b_funnel` PostgreSQL view created for provider→listing funnel tracking
+- **Revenue Attribution View**: `revenue_by_source` PostgreSQL view for UTM-based revenue attribution
+- **Event Ingestion Verified**: `provider_connected`, `listing_created`, `fee_captured`, `payment_succeeded` events persisting correctly
+- **A8 Integration Ready**: Views and business_events table ready for A8 dashboard tiles
+- **Search p95**: ≤120ms (current: 45-77ms)
+- **Error rate**: <1% (current: 0%)
+- **PII leaks**: 0 (verified)
+
 **Known Issues**: None blocking
 
 # User Preferences
