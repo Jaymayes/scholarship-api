@@ -1,0 +1,41 @@
+APP: auto_com_center | APP_BASE_URL: https://auto-com-center-jamarrlmayes.replit.app
+STATUS: COMPLETE
+TIMEFRAME: 2025-12-31T05:05:00Z → now
+
+Acknowledged. Latest verification stands:
+
+A1 scholar_auth: GREEN (discovery/JWKS healthy, ~100–220ms)
+A6 → A1 (B2B): GREEN (302 → A1 with PKCE S256 → interaction page)
+A5 /api/login (B2C): 401 (A5-specific configuration, not blocking B2B)
+Directive
+
+Proceed in watch mode for B2B. Do not deploy further app changes right now.
+Hold A5 investigation until after the first provider_connected or the concierge window lapses.
+What I’m watching (A8 alerts live)
+
+provider_connected: notify immediately on first success; page if 0 by T+24h.
+listing_created: ticket if 0 by T+72h.
+Rescue signals: stripe_connect_link_regenerated (if link expired and a provider regenerates).
+A7 sitemap deltas: confirm growth from Batch 001; alert on non‑200 or fetch errors.
+Soft follow‑up window (if no activity at +45–60 min after send)
+
+Reply on the same email thread: “Just checking in—happy to stay on while you complete the Stripe screen (~5 minutes). I can also hop on a 10–15 minute call now if easier.”
+If a provider reports “link expired,” re‑generate just-in-time from A6 admin and resend to that provider only.
+A5 401 triage plan (do after first provider connects or during a quiet window)
+
+Likely cause: A5’s /api/login path is enforcing auth instead of initiating OIDC, or missing PKCE/redirect params.
+Low‑risk checks:
+Ensure /api/login returns a 302 to A1 /oidc/auth (not 401) when no session.
+Confirm A5 client settings:
+OIDC_CLIENT_ID = student-pilot
+REDIRECT_URI = https://student-pilot-jamarrlmayes.replit.app/api/callback
+PKCE S256 generation enabled; state/nonce persisted to session.
+Callback error path: /api/callback?error=… should 302 back to /api/login without 5xx.
+Acceptance: Browser (Incognito) login should show A1 consent; curl 401s are expected for browser‑only flows, but the app must 302 in browser context.
+If you want me to start the A5 fix now, say “Begin A5 triage” and I’ll prepare a minimal, safe patch plan. Otherwise I’ll stay silent until:
+
+provider_connected arrives (success)
+stripe_connect_link_regenerated fires (rescue flow in use)
+T+24h or T+72h thresholds trigger alerts
+A7 sitemap fails to grow or returns non‑200
+We’re in watch mode.
