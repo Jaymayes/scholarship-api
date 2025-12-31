@@ -1,0 +1,162 @@
+End-to-End System Test Report (A1–A8) — Frontend, Backend, Marketing, Leads, Revenue
+
+Objective
+
+Execute a single, comprehensive evaluation across all eight apps to identify errors, bugs, and revenue blockers.
+No changes were made; this is a diagnostic-only, evidence-based report.
+Executive Summary (Go/No-Go)
+
+Overall: NO-GO for full revenue launch.
+Infrastructure backbone (A1/A2/A8): Green. Latency and core endpoints within SLOs; telemetry active.
+Funnels (A5/A6/A7): Mixed. B2C appears healthy now but showed prior 401s; B2B funnel is not producing provider_connected or listing_created; SEO attribution is impaired (missing JSON-LD and UTM CTAs).
+Marketing (A3): Lead capture pathway ready; email channel configured but not validated at scale and prior credit limits observed.
+Primary revenue blockers:
+A6 B2B activation: No provider_connected/listing_created events yet (revenue path via 3% fee blocked).
+A7 SEO attribution: Missing JSON-LD and UTM CTAs (growth driver impaired; CAC tracking blind).
+A3 email deliverability: Not proven at scale; risk of “sends with no engagement” until verified.
+A5 historical 401 on /api/login (intermittent): Current state appears green; must be monitored due to funnel risk.
+Test Matrix and Results (by Phase)
+
+Phase 1 — Core Readiness (Infrastructure)
+
+A1 scholar_auth (IdP): PASS
+OIDC discovery: 200 (148 ms), ≤150 ms SLO (PASS)
+JWKS: 200 (117 ms), ≤150 ms SLO (PASS)
+A2 scholarship_api (Core API): PASS
+/health: 200 (164 ms)
+/api/scholarships: 200 (382 ms), 18 records; schema includes id, title, description, amount, deadline, provider (PASS, but latency is borderline-watch under load)
+Search latency observed elsewhere at 49–53 ms (well under p95 ≤120 ms SLO)
+A8 auto_com_center (Telemetry): PASS
+/health: 200 (88 ms)
+Note: /healthz returns 404 (inconsistency; minor bug)
+Fleet health snapshot (indicative; health endpoints unless noted):
+A1: 200 (148 ms) ✓
+A2: 200 (164 ms) ✓
+A3: 200 (119 ms) ✓
+A4: (pending Phase 4 tests)
+A5: 200 (307 ms) ✓ (see Phase 2 for funnel tests)
+A6: 200 (170 ms) ✓
+A7: 200 (626 ms) ✓ (SEO infra; content TTFB measured separately)
+A8: 200 (88 ms) ✓
+A7 SEO infra checks (infra only)
+Sitemap: 200 (784 ms); ~2,911–2,912 URLs
+www → apex 301: Single hop (89 ms), SSL verified later
+Verdict: PASS. Infrastructure solid; telemetry live; one minor endpoint naming mismatch (/healthz vs /health).
+Phase 2 — Identity & Funnels
+
+A5 student_pilot (B2C): CONDITIONAL PASS
+Current SLOs: /api/login p95 ~185 ms (≤200 ms), p50 ~78 ms (≤120 ms)
+Trial credits grant and paywall gating present.
+Note: Prior 401 Unauthorized on /api/login was reported in earlier diagnostics; current state green. REVENUE RISK: Intermittent auth failures can choke the funnel; requires watch.
+A6 provider_register (B2B): PASS (Flow operational), but performance is “No Outcome Yet”
+PKCE S256 redirect → A1: Verified
+Stripe Connect banner and links: Operational
+provider_connected: Awaiting real completions (concierge outreach sent earlier)
+listing_created: Pending provider action
+REVENUE BLOCKER: No provider_connected → no B2B listings → 3% fee path blocked
+A7 auto_page_maker (SEO): PARTIAL FAIL (Marketing readiness)
+Performance (TTFB): Excellent (~72 ms on content pages)
+Canonical tags: Present and correct (apex)
+www → apex 301: Verified single hop; SSL provisioned; HSTS present
+JSON-LD schema: MISSING (FAIL) — harms rich result eligibility and organic CTR
+UTM CTAs to A5/A6: MISSING (FAIL) — breaks attribution loop (SEO → signup → purchase)
+Verdict: Funnels technically work, but growth and attribution are impaired. B2B requires provider action; B2C must be monitored due to prior 401 observation.
+Phase 3 — Marketing & Lead Capture
+
+A3 scholarship_agent: PASS (functional readiness; scale unproven)
+Lead capture POST with UTM: PASS (stored + telemetry ingested)
+Journey engine triggers: PASS (non-PII marketing_intent recorded)
+Email send_attempt: Configured; deliverability not proven at scale; prior rate/credits limits were observed historically (risk)
+Compliance: Unsubscribe and frequency caps implemented
+Verdict: Can capture leads and emit telemetry. Deliverability and engagement must be validated with a controlled test to remove risk.
+Phase 4 — Product Value & AI Integrity (Advisor)
+
+A4 scholarship_sage: NOT FULLY EXECUTED (environmental dependency on active B2C flows)
+Health: 200 (~121–123 ms)
+Feature set reported: Credits badge + paywall, OCR/parse, Implicit Fit matching, hallucination guard + disclaimer
+Not validated in this pass: OCR accuracy ≥90% on 3 test docs; Implicit Fit semantic relevance; hallucination refusal in critique scenarios
+Verdict: Requires execution to confirm “first value moment” and AI integrity; blocked earlier by A5 funnel variability; now viable to run but not yet executed.
+Phase 5 — Revenue (B2C + B2B)
+
+B2C credits (A5 + Stripe): NOT EXECUTED in this pass
+Expected: “Booster Pack” purchase → payment_succeeded in A8; credits +50 in ledger
+Status: Not performed; B2C conversion remains unproven in this run
+B2B fees (A6 + Stripe Connect): NOT EXECUTED in this pass
+Expected: listing_created → award → 3% fee calculation and (simulated) capture event in A8
+Status: Not performed; depends on provider_connected and a listing lifecycle
+Verdict: Revenue flows remain unvalidated in this pass. B2B remains blocked on provider action; B2C purchase test pending.
+Phase 6 — Load & Resilience
+
+Not executed in this pass (k6 scenarios pending build)
+Targets:
+A5 /api/login: p95 ≤200 ms under concurrency
+A2 search: p95 ≤120 ms under 50–200 VUs
+A7 page fetches: CDN delivery <200 ms
+Alerts: Should fire on SLO breaches; verify graceful degradation
+Verdict: Defer. Baseline performance appears strong at low volume, but concurrency behavior untested.
+Phase 7 — Security, Privacy, Compliance
+
+Negative access checks: PASS (protected routes return 4xx; prior evidence shows masked errors and no PII leakage)
+Cookies/tokens: PASS (HttpOnly + Secure + SameSite=None confirmed)
+Right-to-delete (FERPA-like): NOT EXECUTED (should be performed once a test student exists with PII and a purchase ledger)
+Verdict: No immediate security failures observed; one compliance scenario (deletion) pending explicit validation.
+Errors, Bugs, and Revenue Blockers (ranked)
+
+P0 — Critical
+
+None confirmed now. (Note: Intermittent A5 /api/login 401 was reported historically. Current readings are green; treat as a “watch” because it would instantly become P0 if it recurs at user scale.)
+P1 — High (must address before opening funnels)
+
+A6: Zero provider_connected and listing_created events
+Impact: B2B revenue path (3% platform fee) is blocked until providers finish Connect and publish listings.
+Evidence: Concierge links and banner present, but no events observed.
+A7: Missing JSON-LD Schema on scholarship pages
+Impact: Lower SEO CTR; rich results unlikely; impairs traffic growth.
+Evidence: Audit shows no application/ld+json present on tested pages.
+A7: Missing UTM parameters on CTAs to A5/A6
+Impact: SEO → signup → purchase attribution is blind; CAC/ROI tracking broken.
+Evidence: CTAs found without utm_source=auto_page_maker on tested pages.
+A3: Email deliverability not proven at scale; prior send-credits issues observed
+Impact: Marketing channel may silently fail or underperform; risk of “false green.”
+Evidence: Configured, but no end-to-end proof for delivered/open/click webhooks in this pass.
+P2 — Medium (important, not immediately blocking)
+5) A8: /healthz 404
+
+Impact: Confusing health checks; use /health. Minor endpoint inconsistency.
+Evidence: /health OK; /healthz returns 404.
+A2: /api/scholarships 382 ms (watch)
+Impact: Latency borderline on one endpoint; search endpoints consistently faster (~49–53 ms). Watch under load.
+A5: Activation UX — “Start free (5 credits)” hero CTA and empty-state guidance (observational gap)
+Impact: Potentially increased bounce without explicit prompts; not a functional bug but likely conversion drag.
+KPI Snapshot (readiness vs target)
+
+A1 discovery/JWKS p95: ~148/117 ms warmed → PASS (≤150 ms)
+A5 /api/login p95/p50: ~185 ms / ~78 ms → PASS (≤200/≤120 ms), monitor intermittent 401s
+A2 search p95: ~49–53 ms → PASS (≤120 ms)
+A7 TTFB: ~72 ms; www→apex 301 single hop; HSTS present → PASS (SEO infra)
+A3 leads: Lead capture works; lead volume not exercised here → UNKNOWN at scale
+B2C payment: NOT EXECUTED
+B2B fee: NOT EXECUTED
+Compliance: Unsubscribe/cap present; right-to-delete NOT EXECUTED
+Observability and Monitoring Notes
+
+A8: Telemetry ingestion OK; key tiles exist (A1, A5 latency; A3 CTAs/leads; A6 provider events)
+Gaps:
+Add tiles for: A7 GSC coverage (indexed URLs, clicks/CTR), A3 email deliverability (delivered/open/click if webhooks configured), revenue signals (payment_succeeded, fee_captured)
+Normalize health endpoints (prefer /health; document /healthz behavior)
+Go/No-Go Decision
+
+Decision: NO-GO for full Go-To-Market because:
+B2B revenue path is blocked (no provider_connected/listing_created).
+SEO attribution and rich snippets are impaired (A7 JSON-LD and UTM missing).
+Email channel has not demonstrated deliverability/engagement at production thresholds.
+B2C purchase flow not validated in this pass (blocked earlier by funnel risk; now feasible to test).
+Appendix: Targeted Follow-Up Tests (no code changes — validation only)
+
+B2C: Execute one controlled Stripe purchase (test card if sandbox) → verify payment_succeeded in A8; credits +50; ledger integrity.
+B2B: Drive one provider through Connect completion → expect provider_connected and listing_created; simulate award to verify 3% fee ledger event (test mode).
+A4 value: Run OCR/parse on 3 docs → verify ≥90% field accuracy; run Implicit Fit and hallucination guard scenario → confirm behaviors; decrement credits for premium action.
+A7 SEO: Confirm JSON-LD and UTM presence once available; recheck rich result eligibility (Google Rich Results Test) and that CTAs include utm_source=auto_page_maker.
+A3 email: Send a low-volume campaign to test recipients; verify delivered/open/click via webhooks/ESP; confirm suppression and frequency caps honored.
+A8 telemetry: Ensure all above produce events in A8 with app_name/app_base_url identifiers; take screenshots of tiles for the evidence pack.
+This report is final for the current system state. It lists every error/bug/revenue blocker detected without making any changes.
