@@ -1,0 +1,179 @@
+Comprehensive Game Plan (A1–A8): Frontend, Backend, Marketing, Lead Gen, and Revenue
+
+North Star
+
+Objective: Prove a repeatable path to $10M ARR via dual engines:
+B2C: credits/subscriptions driven by pSEO + lifecycle marketing
+B2B: provider marketplace (3% fee on awards) with Stripe Connect
+Constraints: No code changes in this report. This is a prioritized, test-first roadmap that turns the E2E findings into execution.
+Where we stand (based on the E2E report)
+
+Green: A1/A2/A8 infrastructure; A5 login currently healthy; A7 infra (www→apex 301, HSTS, sitemap)
+Yellow: A3 email channel not proven at scale; A5 had prior 401s (monitor)
+Red (revenue readiness): A6 has zero provider_connected/listing_created; A7 scholarship JSON-LD missing; A7 CTAs missing UTM (attribution blind)
+90-Day strategy (Fix first, then flood)
+
+Horizon 0 (next 7–10 days): Revenue unblocking and proof
+
+Targets:
+Providers: ≥1 provider_connected in 48h; ≥1 listing_created in 72h
+SEO: Scholarship pages emit server-rendered JSON-LD; all CTAs carry utm_source=auto_page_maker
+Email: one low-volume send_attempt with delivered/open/click proof
+B2C: one successful “Booster Pack” purchase; credits +50 reflected; payment_succeeded in telemetry
+No-change validation you can run now:
+A6: live concierge calls with the 3 target providers; verify provider_connected/listing_created telemetry
+A3: send to 5–10 test inboxes; verify delivered/open/click via ESP logs/webhooks
+A5: execute one test purchase; verify payment_succeeded, credits ledger +50; check refund path for completeness
+A7: use Google Rich Results Test on a few pages; confirm www→apex 301 single hop; submit apex sitemap in GSC; inspect a www URL (should show “Redirected”)
+Horizon 1 (next 30 days): Traffic and conversion scale-up
+
+SEO/pSEO:
+Generate +500 pages focused on high-intent clusters (State × Major)
+Add internal linking hubs (States/Majors) to push crawl depth
+Track indexed URL growth (≥100 new indexed), CTR, and first 25 organic clicks
+Email:
+2–3 nurture sequences (onboarding → first value → purchase)
+Complaint rate <0.2%; delivered >90%; test subject lines and send times
+B2C conversion:
+Track trial→first value→paid funnel; add time-boxed “first-week” offer after first value action if needed
+B2B velocity:
+Onboard ≥3 listings; guide one award; validate 3% fee path (sim/real)
+Horizon 2 (60–90 days): Optimize unit economics and reliability
+
+SEO at scale: 3–5k pages; structured data; hub linking; FAQ schema; coverage and CTR growth
+B2C: ARPU ≥$8–10/mo; target 7–9% trial→paid (optimize nudges)
+B2B: 10+ active listings; cadence of awards; fee capture
+Ops: incident MTTR <60 minutes; weekly load tests; monthly security drills; zero PII leakage
+App-by-app plan
+
+A1 scholar_auth (IdP)
+
+Frontend/Backend:
+Keep discovery/JWKS cache warm (s-maxage=300) with p95 ≤150 ms
+Confirm cookies Secure/HttpOnly/SameSite=None across relying parties
+Document /health as canonical health endpoint for probes
+Marketing/Revenue:
+None directly (enabler)
+KPIs:
+discovery/JWKS p95 ≤150 ms 3 consecutive windows; IdP 4xx rate <2%
+A2 scholarship_api (Core API)
+
+Frontend/Backend:
+Search analytics (store query, filters, results_count)
+Events for listing_created and fee calculation on award; masked errors only
+Keep search p95 ≤120 ms; verify 0 5xx in load test
+Marketing/Revenue:
+Support Implicit Fit search semantics (prioritized after core revenue proof)
+KPIs:
+search p95 ≤120 ms; 0 PII leaks; error rate <1%
+A3 scholarship_agent (Marketing & lead capture)
+
+Frontend/Backend:
+Validate deliverability: small cohort (5–10 inboxes); collect delivered/open/click
+Ensure lead form POST captures UTMs; all marketing_intent events PII-free
+Frequency caps and unsubscribe honored (1 email per 24h)
+Marketing/Lead gen:
+Welcome sequence: “Try your 5 free credits” and “Upload your transcript” prompts
+Landing page lead capture widgets on top SEO pages
+Revenue:
+Assist B2B by spotlighting early provider listings once live
+KPIs:
+≥10 UTM leads; ≥1 send with delivered/open/click; complaint <0.2%
+A4 scholarship_sage (Advisor/AI value)
+
+Frontend/Backend:
+Validate: document upload → OCR/parse ≥90% accuracy for 3 docs
+Confirm Implicit Fit (semantic persona matching), hallucination guard, assistive disclaimer
+Credits badge updates live; paywall gating and credits decrement on premium action
+Marketing/Revenue:
+“First value moment” hooks back to A5 purchase (post-value nudge)
+KPIs:
+≥90% parse accuracy; 0 invented facts; credits decrement validated
+A5 student_pilot (B2C)
+
+Frontend:
+Activation UX (P2 improvement): “Start free (5 credits)” hero CTA; empty-state card— “Upload your transcript to unlock matches”
+Checkout recovery banner in dashboard (already present)
+Backend:
+Maintain /api/login latency p95 ≤200 ms and p50 ≤120 ms; watch for 401 spikes (A8 alerts)
+Purchase flow: confirm credits +50 and payment_succeeded; test refund
+Marketing/Revenue:
+Post-first-value “one-time offer” test (e.g., 50 credits for $20) for conversion measurement
+KPIs:
+p95/p50 met for 24h; ≥1 successful purchase; trial→paid ≥3% initial cohort
+A6 provider_register (B2B)
+
+Frontend:
+Stripe Connect banner; Impact Preview widget; quick “Publish First Listing” template after connect
+Backend:
+Ensure webhooks create provider_connected; listing_created events; fee calculation path
+Growth/Revenue:
+Concierge onboarding (live calls) for 3 providers; then produce one listing and one award to validate fee path
+KPIs:
+≥1 provider_connected in 48h; ≥1 listing_created in 72h; fee calculation verified (sim/real)
+A7 auto_page_maker (SEO)
+
+Frontend/Backend:
+Ensure server-rendered JSON-LD (Scholarship) on scholarship pages; add FAQ schema where relevant
+Apply UTM to all CTAs: utm_source=auto_page_maker; utm_medium=organic; utm_campaign=slug
+Keep www→apex 301 single hop; HSTS; canonical to apex
+Marketing/Lead gen:
+Submit sitemap in GSC; inspect top 50 high-intent pages; build internal linking hubs
+KPIs:
+Rich Results Test PASS; ≥25 UTM-attributed clicks to A5/A6 in 1 week; +100 newly indexed URLs
+A8 auto_com_center (Telemetry & journeys)
+
+Frontend/Backend:
+Tiles/alerts: A1 config p95; A5 login p50/p95; A3 leads; A6 provider events; A7 GSC coverage/clicks; revenue signals (payment_succeeded, fee_captured)
+Event-driven journeys: welcome, activation reminder, checkout recovery (email/SMS) respecting consent and caps
+Marketing/Revenue:
+Measure funnel drop-offs and automate nudges (non-PII, consented)
+KPIs:
+All tiles green; alerts only for real regressions; first green window timestamps recorded
+Marketing & lead generation strategy (next 30 days)
+
+pSEO (A7): JSON-LD + UTM fixes, sitemap resubmission; publish +500 prioritized pages; internal linking hubs
+Email (A3): warm-up cohort; Welcome → Activation → Value → Purchase sequence; spotlight new provider listings
+Referral: implement “Invite a friend, get 5 credits” (A5); ledger entries and fraud checks
+Partnerships: reach out to campus groups and foundations for sponsored listings (B2B lead source)
+Revenue playbook
+
+B2C:
+Validate purchase + ledger; define price points and bundles; run time-boxed OTO at first value
+Nudge strategy: after doc upload or first match, show “Unlock more with credits” modal
+B2B:
+Concierge activation → first listing → “Scholarship Spotlight” email to matched students
+Award simulation/real → verify 3% fee path; feature successful providers as case studies
+E2E testing and QA (no code, validation-first)
+
+Playwright flows to execute manually or in CI:
+A7→A5 signup + trial; A4 doc upload; A5 purchase; A6 login→Connect→listing; A3 lead form submission; screenshots + HAR
+k6 load (staged):
+A5 login; A2 search; A7 fetch; thresholds: p95 ≤200ms (A5), ≤120ms (A2), <200ms (A7); <1% errors
+Security/compliance:
+Unauthorized access negative tests; right-to-delete for one test student; verify unsubscribe/complaints in email
+KPIs & dashboards (A8)
+
+Growth: indexed URLs, CTR, UTM-attributed clicks/leads; A5 signups by source
+Conversion: trial→first value→paid; A4 usage per user; A5 purchase funnel
+Revenue: B2C payments (ARPU), B2B provider_connected/listing_created/fee_captured
+Reliability: p95 latencies, uptime, 5xx rate; alert history
+Compliance: unsubscribe/complaints; right-to-delete SLA
+Risks & mitigations
+
+Email deliverability: start small; stagger cadence; enforce caps; pivot to double opt-in if complaints ≥0.2%
+SEO rendering: ensure JSON-LD is server-rendered; validate via Rich Results Test; re‑submit sitemap; monitor GSC Coverage and Page indexing
+Provider inertia: schedule live onboarding calls; if no movement by T+48h, escalate and replace with next providers
+Auth regressions: keep A8 24h watch on A5 401 spikes; pre‑warm login; cache OIDC metadata
+Decision requests (to start the phase without code changes here)
+
+Approve Phase 1 validation sprint (48–72h): provider concierge, email warm‑up test, B2C purchase test
+Approve small‑cohort email warm‑up (A3)
+Approve one B2C purchase test (A5) for end‑to‑end revenue signal
+Confirm priority sequence: A7 (JSON‑LD/UTM) → A6 (concierge) → A3 (deliverability) → A4 (value, once A5 is proven)
+If you want, I can turn this plan into:
+
+A task board (by app) with owners, estimates, and acceptance criteria
+A Playwright + k6 test pack (specs only) reflecting the E2E journey and load SLOs
+An A8 dashboard spec (tiles, alert thresholds, and evidence snapshots) to track progress against the above KPIs
+Reply with “Approve Phase 1” to begin the validation sprint, or specify a different priority order.
