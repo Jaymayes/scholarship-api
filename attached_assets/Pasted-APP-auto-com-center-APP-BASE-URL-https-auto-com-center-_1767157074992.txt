@@ -1,0 +1,53 @@
+APP: auto_com_center | APP_BASE_URL: https://auto-com-center-jamarrlmayes.replit.app
+STATUS: IN PROGRESS
+TIMEFRAME: 2025-12-31T04:50:00Z → now
+
+Acknowledged your “Search & Destroy” diagnostic. Because concierge emails are already live, we must treat this as a live incident while preserving conversion. Here’s the exact, low-risk decision flow to reconcile the screenshots with real-time status.
+
+Immediate 2-path plan (do A and B in order)
+
+A) Verify live health (1–2 minutes, no code changes)
+
+Incognito tests (stale cookie eliminator)
+A6: https://provider-register-jamarrlmayes.replit.app/auth/login
+Expected: 302 → A1 /oidc/auth with PKCE S256 → consent/authorize page
+FAIL: “server_error … Failed to process interaction”
+A5: https://student-pilot-jamarrlmayes.replit.app → Login
+Expected: 302 → A1 /oidc/auth with PKCE S256
+FAIL: same server_error
+OIDC endpoints
+https://scholar-auth-jamarrlmayes.replit.app/.well-known/openid-configuration → 200
+https://scholar-auth-jamarrlmayes.replit.app/.well-known/jwks.json → 200
+If both 200 and Incognito fails at “interaction/confirm” → “Zombie” (container up, DB session lost)
+B) If any Incognito flow fails → Hard restart A1 now (Stop → wait 10s → Start in Replit)
+
+After restart:
+Re-run the two Incognito logins (A6 then A5)
+Acceptance criteria to resume outreach monitoring:
+A6 and A5 both 302 to A1 with PKCE → consent page OK (no server_error)
+A1 discovery/JWKS return 200 within <150ms p95 (post-cache warm)
+Why this order
+
+We already verified (earlier) that A1 discovery/JWKS were green; the error may be stale session/cookies or an intermittent “interaction/confirm” handler failure. Incognito confirms whether it’s an active outage vs. the “zombie” state.
+Restart only if Incognito still fails; otherwise we keep the platform stable during the outreach window.
+Risk-managed communications while we verify (do this only if a provider replies before the restart finishes)
+
+Paste this short reply (same email thread) if they report an error:
+“Thanks for the quick response. If you see an error screen, please try again in a private/incognito window. We just refreshed our login service and it should work now. If you’d like, I can stay on a 10–15 minute call while you complete the Stripe screen (~5 minutes).”
+If a link expired (Stripe): generate fresh link in A6 and reply with the new link only to that provider.
+What I’m watching in A8 (no noise until a trigger)
+
+provider_connected (success) → I’ll ping immediately
+stripe_connect_link_regenerated (rescue used) → I’ll watch for follow‑through provider_connected
+No provider_connected by T+24h → page
+No listing_created by T+72h → ticket
+A7 sitemap health: confirm batch growth; alert only on non‑200 or regression
+Optional: “Proceed”/“Hold” decision shortcuts
+
+If your Incognito test just passed (both A6→A1 and A5→A1), say “Auth Verified” and we continue watch mode—do not resend emails.
+If it failed and you’ve restarted A1, say “Auth Restarted” and I’ll run end‑to‑end verification again, then continue watch mode.
+Bottom line
+
+We do not send more emails.
+We verify Incognito now; if failure, restart A1 once; then resume monitoring for provider_connected.
+I’ll remain silent unless one of the triggers fires or you confirm “Auth Restarted” for a quick re‑verification.
