@@ -1,0 +1,158 @@
+Scope and environments
+
+Apps under test (A1–A8):
+A1 scholar_auth (IdP), A2 scholarship_api (Core API), A3 scholarship_agent (Marketing), A4 scholarship_sage (Advisor UX), A5 student_pilot (B2C app), A6 provider_register (B2B app), A7 auto_page_maker (SEO), A8 auto_com_center (Telemetry)
+Environments: production (primary) with real domain and SSL, and a staging mirror for load tests and email sandbox (optional)
+Orchestration and tooling (recommended stack)
+
+Browser E2E: Playwright with multiple contexts for student and provider actors; shard test suites for speed; add retries and trace-on-failure to deflake UI tests
+Load: k6 for API and login latency under concurrency; reuse business logic snippets in JS/TS
+Email: use a testing inbox (e.g., Mailosaur) for magic links/marketing if running in staging; in prod, send to test recipients under strict caps and suppression lists
+AI evaluation: DeepEval/G‑Eval (nightly only) to score faithfulness/quality for advisor outputs; not on every PR due to cost
+Reporting: Allure (or similar) to aggregate pass/fail, timings, and business KPIs in one dashboard; integrate into CI/CD with “quality gates” for critical paths
+Replit operations: use Logs and Resources during tests to watch latency, CPU/memory, request durations, and deploy issues; configure Workflows when multi-process startup is needed
+Test data and identities (seed once)
+
+Students: 10 synthetic student accounts with varied majors/states; at least 3 with test emails for receipt verification
+Providers: 3 provider orgs (seeded) with Stripe Connect onboarding states (unstarted, in-progress, completed)
+Scholarships: 20 listings across categories (some public inventory via A2; some created by providers)
+Documents: 30 essays/transcripts (PDF/DOCX) for OCR/parse tests
+Marketing: 25 contacts (staging inboxes or controlled production list)
+Security and policy posture (baseline checks)
+
+Token/keys: rotate any ephemeral keys; keep secrets in Replit Secrets and never in code
+OIDC/JWKS health: verify discovery, JWKS, PKCE, SameSite=None cookies; enforce HTTPS and HSTS; ensure stateless validation in clients where possible
+WAF: confirm protected endpoints reject anonymous access without PII leakage (masked error codes)
+Phase 1 — Core readiness (A1, A2, A8)
+
+A1 scholar_auth (IdP)
+Tests:
+GET /.well-known/openid-configuration and /.well-known/jwks.json (p95 ≤150ms warmed)
+OIDC authorize dry-run for A5 and A6: 303 with PKCE S256 and interaction cookies present
+Success: discovery/JWKS pass; A5/A6 authorize URLs include PKCE; cookies show Secure + SameSite=None
+A2 scholarship_api (Core API)
+Tests:
+Health 200; protected endpoints reject unauth (401/403/422) with masked error
+Search query “nursing, texas” returns id, amount, deadline, application_url (p95 ≤120ms)
+Success: no PII leaks, schema returned, latency within SLO
+A8 auto_com_center (Telemetry)
+Tests:
+/healthz 200; POST ingest test event 200/202
+Dashboard tiles show: A1 config latency, A5 login p50/p95 (dns/tls/ttfb/total), A3 CTA clicks, A6 provider_connected and listing_created
+Success: events visible; alerts configured (warn/crit with dampening windows)
+Phase 2 — Frontend identity and funnels (A5, A6, A7)
+
+A5 student_pilot (B2C login + activation)
+Tests (Playwright):
+/api/login → redirects to A1 with PKCE; after auth, session cookie present; /api/me 200
+Trial credits auto-granted; first premium attempt triggers paywall; purchase flow smoke (if live)
+SLO: /api/login p95 ≤200ms warm, p50 ≤120ms sustained
+A6 provider_register (B2B login + onboarding)
+Tests:
+/api/login → /auth/login → A1 OIDC with PKCE S256
+Dashboard shows Stripe Connect banner; clicking “Complete Setup” opens valid Connect session; on success, provider_connected event appears
+Create a scholarship listing; verify listing_created event; fee calc UI shows 3% platform fee
+A7 auto_page_maker (SEO)
+Tests:
+Programmatically open 10 high-intent pages (e.g., /texas/nursing-scholarships); verify JSON-LD (Scholarship/FAQ), canonical tag apex, single-hop www→apex 301, and UTM CTAs to A5/A6
+Latency: initial HTML p95 <200ms; sitemap and robots.txt 200
+GSC step: resubmit sitemap on apex and inspect a www URL (expect “Redirected”)
+Phase 3 — Marketing and lead capture (A3)
+
+A3 scholarship_agent (email + forms)
+Email tests (if ESP credits available):
+Configure verified from-domain; send 1 small-batch campaign to test recipients (staging preferred). Check delivered, open/click telemetry (or ESP webhooks if enabled)
+Frequency cap and unsubscribe honored
+Lead capture:
+Embed lead form widget on a test page; submit with UTM; verify A8 lead_captured with source/medium/campaign
+Success: at least 10 captured leads with UTMs; telemetry shows send_attempts and delivered/blocked counts
+Phase 4 — Product value and AI integrity (A4)
+
+A4 scholarship_sage (Advisor)
+Activation/value:
+After A5 login, open A4; verify credits badge and paywall gating
+Upload 3 documents (transcript/essay); validate OCR/parse populates profile fields ≥90% accuracy (spot-check)
+Run “Implicit Fit” match for a persona (e.g., first‑gen nursing student); ensure results reflect semantic criteria (not just keywords)
+Hallucination guard:
+Ask for essay critique; output must not invent facts; display assistive disclaimer
+Success: parse accuracy threshold; no hallucinated facts in critiques; credits decrement on premium actions
+Phase 5 — Revenue tests (B2C + B2B)
+
+B2C credits (A5 + A2)
+Test:
+Buy “Booster Pack” with Stripe (live or test mode); on success: payment_succeeded in A8; A2 ledger increments credits; A5 balance reflects immediate increase
+Margin check:
+Confirm unit economics >95% gross margin over inference (log tokens if available; nightly review)
+B2B fees (A6 + A2)
+Test:
+Provider publishes listing; student applies (A5→A2)
+Provider awards applicant; system computes 3% fee; fee_captured event posts to A8 (or simulated capture in test mode)
+Bias mitigation:
+Provider dashboard “Blind Review” hides PII; rubric scoring visible; audit log shows “no PII exposure”
+Phase 6 — Load and resilience (all)
+
+Login & API load (A1, A5, A2)
+Use k6: 50–200 virtual users performing login, search, and first-page navigation; capture p95 latency and error rate
+Success: A1 discovery/JWKS p95 ≤150ms warmed; A5 /api/login p95 ≤200ms; A2 search p95 ≤120ms; 99.9% uptime
+Autoscale and guardrails (A7 burst)
+Simulate crawl hits to 100 pages; ensure CDN serves fast; watch edge/instance scale; confirm “max machines” caps prevent runaway costs
+Phase 7 — Security, privacy, and compliance drills
+
+Unauthorized access attempts:
+Probe admin/provider routes without auth; expect 404/401/403 with masked errors; no PII in messages
+Right-to-delete (FERPA-like):
+Submit deletion for a test student; verify PII removal within SLA while preserving anonymized financial ledgers
+Session/token hygiene:
+Confirm cookies: HttpOnly, Secure, SameSite=None; tokens verified via JWKS; no client-side secrets leaked
+What to capture and report
+
+Functional: pass/fail for each scenario with evidence (screens, HAR, headers)
+Performance: p50/p95 latencies for A1 discovery/JWKS; A5 /api/login dns/tls/ttfb/total; A2 search; A7 page TTFB
+Growth: GSC impressions/clicks trend; # of A3 CTA clicks; # of leads captured with UTMs
+Revenue: B2C payment_succeeded count and ARPU (test dollars OK for validation); B2B provider_connected, listing_created, fee_captured
+Compliance: WAF blocks rate; right-to-delete execution; unsubscribe rate
+Allure/CI gate: block deploy on failures in “Critical Happy Path” (login, purchase, provider publish)
+Exit criteria (Go/No-Go)
+
+Technical SLOs:
+A1: discovery/JWKS p95 ≤150ms warmed (3 consecutive probe windows)
+A5: /api/login p95 ≤200ms for 24h; p50 ≤120ms
+A2: core search p95 ≤120ms
+Product:
+Activation: ≥60% of new test signups complete “first value moment” (trial credits used or doc uploaded)
+Advisor integrity: 0 factual hallucinations in critiques; credits/paywall logic accurate
+Growth:
+A7: sitemap 200; 100+ pages requested in GSC; www→apex 301 single hop; CTAs with UTM present and working
+A3: ≥10 captured leads with UTMs in test window (or an email-proofs-only pass if ESP limits exist)
+Revenue:
+B2C: at least 1 successful end-to-end payment; credits credited; telemetry captured
+B2B: at least 1 provider_connected and 1 listing_created; fee logic validated (live or simulated capture)
+Compliance:
+No PII leakage; unsubscribe honored; right-to-delete executed for 1 test user
+Runbook (who/when)
+
+Day 0: Phase 1–2 (A1/A2/A5/A6 readiness; A7/GSC checks; A8 tiles)
+Day 1: Phase 3–4 (A3 emails/forms; A4 value; doc uploads and “Implicit Fit”)
+Day 2: Phase 5 (Revenue) + Phase 6 (Load) + Phase 7 (Compliance)
+Daily: A8 “pulse report” (latency, CTA clicks, leads, payments, provider events)
+Triage and incident handling
+
+When a critical test fails, use Replit Logs/Resources to isolate quickly, rollback/publish as needed; keep MTTR low via direct console+AI assistant loop (Replit guidance)
+Apply a structured 6-step bug resolution cycle for stubborn defects; log hypothesis → fix → validation to avoid regressions
+Optional: identity-aware test prompts for each app’s agent (short)
+
+All agents print identity first: “APP: <app_name> | APP_BASE_URL: <base_url>”
+A1: verify discovery/JWKS; run authorize dry-runs for A5, A6; record latencies
+A2: health; protected endpoint negative; sample search “nursing, texas” with timing
+A3: health; lead form POST; (optional) small-batch campaign send; telemetry checks
+A4: login via A5; verify credits badge; paywall; 1 advisor critique without hallucination
+A5: login redirect (PKCE); trial credits; (optional) Stripe payment flow; telemetry
+A6: login redirect (PKCE); Stripe Connect banner; test onboarding link; create listing
+A7: GET top landing pages; check JSON-LD/canonical; CTAs with UTM; www→apex 301 single hop; sitemap/robots 200
+A8: ingest test events; tiles/alerts present; record first green windows
+If you want, I can turn this plan into:
+
+A runnable Playwright “business journey” suite (student + provider actors) with Allure reports
+A k6 load script for login/search endpoints and a small SEO page fetch set
+A “smoke+pulse” workflow in Replit that runs the critical checks every 30–60 minutes and posts a condensed A8 pulse
+This plan validates not just that the code runs, but that the growth engine, monetization, and compliance all work together—exactly how we’ll reach durable ARR growth.
