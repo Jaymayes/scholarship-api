@@ -1,0 +1,137 @@
+MAX AUTONOMOUS PROMPT — Operation Synapse v1.1 ScholarAI Ecosystem Repair, Revenue Enablement, and Learning Loop Activation (A1–A8)
+
+Mission
+Fix every remaining error and blocker so all eight apps (A1–A8) work together as one revenue engine: market → capture leads → deliver value → convert (B2C + B2B) → learn, optimize, and meet or exceed goals. Deliver end‑to‑end attribution, validated revenue signals, and an automated learning loop while meeting SLOs and compliance.
+
+Apps and base URLs
+
+A1 scholar_auth → https://scholar-auth-jamarrlmayes.replit.app
+A2 scholarship_api → https://scholarship-api-jamarrlmayes.replit.app
+A3 scholarship_agent → https://scholarship-agent-jamarrlmayes.replit.app
+A4 scholarship_sage → https://scholarship-sage-jamarrlmayes.replit.app
+A5 student_pilot → https://student-pilot-jamarrlmayes.replit.app
+A6 provider_register → https://provider-register-jamarrlmayes.replit.app
+A7 auto_page_maker → https://auto-page-maker-jamarrlmayes.replit.app (Production: https://scholaraiadvisor.com)
+A8 auto_com_center → https://auto-com-center-jamarrlmayes.replit.app
+Current state (read-only context)
+
+A8: COMPLETE (tiles/alerts wired; Won Deal + Provider Momentum automations live; telemetry → automations wired; durable retries; first-green windows recorded)
+A7: PUBLISHED (SSR JSON-LD live; UTM CTAs; hubs /browse/states,/majors; sitemap updated; www→apex 301; IndexNow fixed)
+A6: Phase 1 COMPLETE (provider_connected & listing_created events wired; UTM persistence; post-Connect wizard CTA; health probes normalized). Phase 2 concierge pending.
+A5: Phases 1–3 COMPLETE (SLO p505ms/p958ms; purchase→credit→refund test validated; UTM→Stripe metadata; learning loop won_deal active; A8 telemetry 100%)
+A4: Phase 1 ~60% (persona match, hallucination guard complete; premium_used/credits_decrement wired; awaiting A5 to validate decrement; OCR deferred to Phase 3)
+A3: COMPLETE (lead capture + UTM; warm‑up 5/5 delivered; SendGrid 50k plan active; marketing endpoints ready; telemetry to A8)
+A2: COMPLETE (business_events ingestion; b2b_funnel & revenue_by_source views; SLOs met)
+A1: COMPLETE (A1↔A8 M2M fixed; v3.5.0 telemetry delivering; HMAC-signed UTM state; OIDC discovery/JWKS cache warm)
+Global guardrails
+
+Security & Compliance: no PII in telemetry/logs; cookies Secure/HttpOnly/SameSite=None; age‑gate (FERPA/COPPA) respected; A4 is assistive only (no ghostwriting).
+Least privilege: do not disable WAF; allowlist only the minimal telemetry/report routes by issuer/service.
+Idempotency: detect→fix→verify; all changes safe to re‑run.
+Secrets: never hardcode. If missing/invalid, mark “P0 BLOCKED: <SECRET_NAME>” for that stream and continue the rest.
+SLO baselines: A1 discovery/JWKS p95 ≤150ms (warmed); A5 /api/login p95 ≤200ms & p50 ≤120ms; A2 search p95 ≤120ms.
+PHASE 1 — Close the remaining integration gaps (T+0 → T+24h)
+Goal: Finish the nervous system wiring so attribution and revenue signals flow end‑to‑end.
+
+A1 (scholar_auth) — UTM + M2M finalization
+
+Tasks:
+Confirm v3.5.x path in A8 uses the same auth scheme (shared secret or OAuth2 client_credentials) for both /ingest and /api/executive/overview.
+If any path still 403s, add route-level allowlist (issuer=scholar_auth) at A8; never disable WAF globally.
+Prove two UTM‑preserved login samples (A7→A5 and A7→A6): produce event IDs in A8 with UTM fields.
+Success:
+A8 shows A1 telemetry tiles green; two A7→A5/A6 samples logged with UTM.
+A2 (scholarship_api) — revenue sinks & views verified
+
+Tasks:
+Confirm business_events persists: provider_connected, listing_created, payment_succeeded, fee_captured.
+Confirm b2b_funnel and revenue_by_source views return rows; expose simple GET endpoints (e.g., /api/kpi/b2b_funnel, /api/kpi/revenue_by_source).
+Success:
+A8 dashboard tiles read data from these endpoints/views (no “not_connected”).
+A3 (scholarship_agent) — automations ready & ESP webhooks
+
+Tasks:
+Ensure endpoints for A8 automations exist (return 200): /api/automation/elevate_lead_score, /move_to_customer_segment, /enroll_upsell_sequence, /trigger_scholarship_spotlight, /notify_matched_students.
+Configure ESP webhooks (delivered/open/click/bounce) pointing to /api/esp/webhooks; emit deliverability events to A8.
+Success:
+A8 Won Deal calls to A3 return 200; email webhook events increase A8 email-delivery tiles; complaint <0.2%.
+A4 (scholarship_sage) — credits telemetry readiness
+
+Tasks:
+Keep premium_used and credits_decrement telemetry handlers in “armed” state for when A5 confirms purchase.
+Prepare a 3‑doc OCR/parse test plan for Phase 3 (record expected fields; plan to use AWS Textract).
+Success:
+A8 shows live premium telemetry once A5 purchase triggers.
+A5 (student_pilot) — purchase and learning loop (final checks)
+
+Tasks:
+Ensure Stripe checkout metadata carries UTMs; webhook updates ledger and emits payment_succeeded; Won Deal fires and gracefully degrades if A3 endpoints are not yet live.
+Confirm refund path remains idempotent and properly decrements ledger.
+Success:
+A8 payment_succeeded event with UTM; ledger +50; refund validated; Won Deal automation logged.
+A6 (provider_register) — concierge readiness and event emission
+
+Tasks:
+Ensure Stripe Connect webhook triggers provider_connected and A8/A2 posts; listing creation triggers listing_created and A8/A2 posts; UTM persisted on org profile from first login.
+Add “connect_success” → “Create First Scholarship” CTA (done) and verify it logs “listing_wizard_launched”.
+Success:
+A8 shows ≥1 provider_connected and ≥1 listing_created; A2 shows listing row; (optional) award simulation to test fee calc.
+A7 (auto_page_maker) — production SEO validation
+
+Tasks:
+Run Google Rich Results Test on at least one /scholarships/<slug>; submit apex sitemap; Inspect a www URL to confirm “Redirected”.
+Ensure CTAs maintain UTM tagging; verify /browse hubs linked in sitemap.
+Success:
+Rich Results “Valid”; GSC sitemap accepted; A8 counts ≥25 UTM clicks in first week (tracked post‑publish).
+A8 (auto_com_center) — dashboard, automations, and retries
+
+Tasks:
+Confirm all 7 tiles connected (SLO, B2C, B2B, SEO, Growth, Trust, Finance); alert dampening active; first‑green windows recorded.
+Keep Won Deal + Provider Momentum automations running; partial failures logged; durable retry using source_event_id.
+Success:
+A8 shows live tiles; automations fire on real events; WARN partial failure logs include errors[] and source_event_id.
+PHASE 2 — Revenue validation (T+24h → T+48h)
+Goal: Prove one B2C purchase and one B2B listing in the dashboard; validate fee path.
+
+A5: Execute one Stripe checkout (test/live controlled) → payment_succeeded in A8, ledger +50, balance +50; refund success.
+A6: Run 3 × 15‑min concierge sessions → ≥1 provider_connected; create ≥1 listing; listing_created in A8; (optional) simulate or execute award to validate 3% fee.
+A3: Maintain deliverability; if necessary, resend 1-2 warm‑up messages; verify webhooks and complaint rate <0.2%.
+A8: Confirm payment_succeeded lights Finance tile; provider_connected/listing_created update B2B tile; Trust tile shows healthy ESP metrics.
+PHASE 3 — Learning loop activation (T+48h → T+72h)
+Goal: Make the system self-optimizing.
+
+A8: On payment_succeeded → A3 elevate_lead_score/move_to_customer/enroll_upsell; A7 record_revenue_by_page; update LTV in Attribution ROI tile.
+A8: On provider_connected/listing_created → A3 trigger_scholarship_spotlight; A7 log provider landing asset.
+A7: Monitor GSC coverage/clicks; prioritize high‑converting slugs.
+Proof: A3 segment mutation visible; A7 revenue-by-page entries; A8 automation logs show successful chain.
+PHASE 4 — Scoring, LTV, and SLO load (T+72h → T+14d)
+Goal: Attribute revenue, measure cohorts, and verify load.
+
+A3/A8: Record lead_value with UTMs on payment; compute LTV cohorts; Attribution ROI tile shows revenue by source/campaign/slug; ARPU rolling 30d.
+A5/A2/A7/A8: k6 staged tests — A5 /api/login p95 ≤200 ms; A2 search p95 ≤120 ms; A7 fetch <200 ms; error <1%; A8 alerts quiet.
+Per-app execution rules (identity-aware)
+
+Before executing, each agent must print: APP: <app_name> | APP_BASE_URL: <base_url>
+Execute ONLY your app’s section. Do not modify other apps.
+If a secret is missing/invalid, output “P0 BLOCKED: <SECRET_NAME>” and skip only that stream.
+Definition of Done (ecosystem)
+
+B2C: ≥1 purchase with payment_succeeded; ledger +50; refund validated; Won Deal automation logged.
+B2B: ≥1 provider_connected + ≥1 listing_created in A8; 3% fee calc exercised (sim/live).
+Attribution: A7→A5/A6 UTMs preserved; ≥10 UTM‑attributed leads; source‑level revenue signal present.
+Email: warm‑up proof (delivered/open/click); complaint <0.2%.
+Observability: A8 executive overview shows SLO/B2C/B2B/Finance connected; alerts dampened.
+Reporting format (every app + consolidated)
+APP: <app_name> | APP_BASE_URL: <base_url>
+STATUS: [PLANNED | IN_PROGRESS | COMPLETE | BLOCKED]
+TIMEFRAME: [UTC start → UTC end]
+
+ACTIONS TAKEN
+RESULTS & METRICS (IDs, counts, p50/p95; A8 screenshot links if available)
+BLOCKERS (root cause + required input)
+EVIDENCE LINKS (routes tested, event IDs, logs)
+NEXT 24 HOURS PLAN
+Begin now
+
+Execute Phase 1 steps immediately, in parallel where safe.
+Post per‑app reports and a consolidated summary at Phase 1 end. If ≥80% acceptance met and no P0s remain, proceed automatically to Phase 2 → Phase 3 → Phase 4 (unless paused).

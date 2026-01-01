@@ -48,6 +48,12 @@ The business vision is to create a comprehensive, intelligent platform that conn
 - **Error rate**: <1% (current: 0%)
 - **PII leaks**: 0 (verified)
 
+**KPI REST Endpoints** (2026-01-01): A8 Dashboard Integration
+- `GET /api/kpi/b2b_funnel?limit=100` - B2B provider→listing funnel for A8 B2B tile
+- `GET /api/kpi/revenue_by_source?limit=100` - UTM revenue attribution for A8 Finance tile
+- Both endpoints query PostgreSQL views directly for real-time data
+- **Note**: Requires republishing to production deployment to be accessible via external URL
+
 **Known Issues**: None blocking
 
 # User Preferences

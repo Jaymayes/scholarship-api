@@ -1388,3 +1388,136 @@ async def get_central_stats(
     except Exception as e:
         logger.error(f"REPORT: app=scholarship_api | app_base_url=https://scholarship-api-jamarrlmayes.replit.app | env=prod | Central stats query failed: {e}")
         raise HTTPException(status_code=500, detail=f"Central stats query failed: {str(e)}")
+
+
+@router.get("/kpi/b2b_funnel")
+async def get_b2b_funnel(
+    limit: int = Query(100, ge=1, le=1000, description="Max rows to return"),
+    db=Depends(get_db)
+):
+    """
+    GET /api/kpi/b2b_funnel - B2B Provider Funnel View for A8 Dashboard
+    
+    Returns provider→listing funnel data from b2b_funnel PostgreSQL view.
+    Used by A8 Command Center B2B tile.
+    """
+    try:
+        query = text("""
+            SELECT 
+                provider_id, provider_name, segment, provider_status, contact_email,
+                provider_created_at, first_listing_date, listings_count, applications_received,
+                dpa_signed, revenue_generated, listing_id, listing_title, listing_amount,
+                listing_deadline, listing_views, listing_applications, listing_active,
+                listing_created_at, funnel_stage
+            FROM b2b_funnel
+            ORDER BY provider_created_at DESC
+            LIMIT :limit
+        """)
+        result = db.execute(query, {"limit": limit})
+        rows = result.fetchall()
+        
+        def safe_float(val):
+            """Safely convert Decimal/numeric to float, handling None and zero values"""
+            return float(val) if val is not None else None
+        
+        def safe_float_or_zero(val):
+            """Safely convert Decimal/numeric to float, returning 0.0 for None"""
+            return float(val) if val is not None else 0.0
+        
+        funnel_data = []
+        for row in rows:
+            funnel_data.append({
+                "provider_id": row[0],
+                "provider_name": row[1],
+                "segment": row[2],
+                "provider_status": row[3],
+                "contact_email": row[4],
+                "provider_created_at": row[5].isoformat() if row[5] else None,
+                "first_listing_date": row[6].isoformat() if row[6] else None,
+                "listings_count": int(row[7]) if row[7] is not None else 0,
+                "applications_received": int(row[8]) if row[8] is not None else 0,
+                "dpa_signed": row[9],
+                "revenue_generated": safe_float_or_zero(row[10]),
+                "listing_id": row[11],
+                "listing_title": row[12],
+                "listing_amount": safe_float(row[13]),
+                "listing_deadline": row[14].isoformat() if row[14] else None,
+                "listing_views": int(row[15]) if row[15] is not None else 0,
+                "listing_applications": int(row[16]) if row[16] is not None else 0,
+                "listing_active": row[17],
+                "listing_created_at": row[18].isoformat() if row[18] else None,
+                "funnel_stage": row[19]
+            })
+        
+        logger.info(f"B2B funnel query returned {len(funnel_data)} rows")
+        
+        return {
+            "tile": "B2B",
+            "data_source": "b2b_funnel_view",
+            "row_count": len(funnel_data),
+            "rows": funnel_data,
+            "generated_at": datetime.utcnow().isoformat()
+        }
+    except Exception as e:
+        logger.error(f"B2B funnel query failed: {e}")
+        raise HTTPException(status_code=500, detail=f"B2B funnel query failed: {str(e)}")
+
+
+@router.get("/kpi/revenue_by_source")
+async def get_revenue_by_source(
+    limit: int = Query(100, ge=1, le=1000, description="Max rows to return"),
+    db=Depends(get_db)
+):
+    """
+    GET /api/kpi/revenue_by_source - UTM Revenue Attribution View for A8 Dashboard
+    
+    Returns revenue attribution by UTM source/campaign from revenue_by_source PostgreSQL view.
+    Used by A8 Command Center Finance/Attribution tiles.
+    """
+    try:
+        query = text("""
+            SELECT 
+                utm_source, utm_campaign, utm_medium, page_slug, event_name,
+                source_app, event_count, total_revenue, first_event, last_event
+            FROM revenue_by_source
+            ORDER BY total_revenue DESC NULLS LAST, last_event DESC
+            LIMIT :limit
+        """)
+        result = db.execute(query, {"limit": limit})
+        rows = result.fetchall()
+        
+        def safe_float_or_zero(val):
+            """Safely convert Decimal/numeric to float, returning 0.0 for None"""
+            return float(val) if val is not None else 0.0
+        
+        revenue_data = []
+        total_revenue = 0.0
+        for row in rows:
+            rev = safe_float_or_zero(row[7])
+            total_revenue += rev
+            revenue_data.append({
+                "utm_source": row[0],
+                "utm_campaign": row[1],
+                "utm_medium": row[2],
+                "page_slug": row[3],
+                "event_name": row[4],
+                "source_app": row[5],
+                "event_count": int(row[6]) if row[6] is not None else 0,
+                "total_revenue": rev,
+                "first_event": row[8].isoformat() if row[8] else None,
+                "last_event": row[9].isoformat() if row[9] else None
+            })
+        
+        logger.info(f"Revenue by source query returned {len(revenue_data)} rows, total ${total_revenue:.2f}")
+        
+        return {
+            "tile": "Finance",
+            "data_source": "revenue_by_source_view",
+            "row_count": len(revenue_data),
+            "total_revenue_dollars": total_revenue,
+            "rows": revenue_data,
+            "generated_at": datetime.utcnow().isoformat()
+        }
+    except Exception as e:
+        logger.error(f"Revenue by source query failed: {e}")
+        raise HTTPException(status_code=500, detail=f"Revenue by source query failed: {str(e)}")
