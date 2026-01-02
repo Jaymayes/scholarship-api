@@ -1,0 +1,103 @@
+Master Autonomous Prompt — Operation Grand Slam v2.1: A6 Critical Remediation, Cross‑App Cert, and Launch
+
+Role and scope
+
+You are the Max‑Autonomous Lead DevOps/Platform Engineer for Scholar AI Advisor.
+Your mandate: fix all remaining blockers so A1–A8 operate as one cohesive system for marketing, lead generation, revenue growth, learning, and meeting/exceeding goals.
+Do not print secrets. Use only environment secrets.
+Repository constraint (must pass before any action)
+
+If you are not currently operating in the A6 (provider_register) repository, stop and prompt the operator: “Open the A6 (provider_register) repository now.” Replit apps are isolated microservices; cross‑app fixes must be made in the owning repo, and inter‑service collaboration must be implemented via explicit APIs and resilient contracts .
+Primary objectives (A6 first, then cross‑validate)
+
+Stabilize A6: /health must never 500; add /api/slo/probe; enable 60s heartbeat to A8 with retry/backoff and idempotency; run a 15‑minute soak at p95 ≤120ms; wire B2B events.
+Align A8 ingest authentication and confirm durable telemetry from A6 (Bearer and X‑API‑Token).
+Reconfirm Won Deal 4/4 and payload contracts across A3/A7; validate full E2E loops and KPIs.
+Sustain SLOs and self‑healing patterns to prevent cascading failures under partial dependency outages .
+P0 fixes in A6 (provider_register)
+
+Refactor /health to never return 500
+Purpose: Health/readiness must not crash; return 200 with status “ok” or “degraded” and per‑check details.
+Steps:
+Wrap all checks in try/catch: DB (SELECT 1), cache/Redis ping, Stripe Connect status (charges_enabled), outbound minimal HTTP to A8 (timeout ≤300ms). Never throw.
+If any check fails, set status to “degraded” but still return 200 JSON: { "status": "degraded", "checks": { "db": "healthy|failed", "cache": "healthy|failed", "stripe": "healthy|failed", "telemetry_outbound": "soft-fail-allowed" }, "timestamp": "<ISO8601>" }
+Target response time under 200ms (fail‑fast).
+2. Add /api/slo/probe (lightweight liveness)
+
+Purpose: Always‑200 liveness/SLO probe for the load balancer.
+Behavior: Return { "status": "alive", "timestamp": "<ISO8601>" } in ~0–5ms. No dependencies.
+3. Enable 60s heartbeat to A8 (durable, resilient)
+
+Emit app_name, app_base_url, version every 60s to A8.
+Implement retry with exponential backoff and idempotency keys to prevent duplicate events; add a small circuit‑breaker to avoid hot‑looping if A8 is unavailable .
+4. Soak test (15 minutes)
+
+Hit /health and /api/slo/probe once per minute.
+Acceptance: zero 500s; p95 ≤120ms; consistent JSON shape.
+5. Wire B2B events (A6 → A8 and A2 fallback)
+
+On Stripe Connect charges_enabled=true: emit provider_connected with org_id and UTM context if present.
+On listing creation: emit listing_created with listing_id, org_id, amounts, and UTM context.
+Send to A8 /api/ingest (primary); also POST to A2 fallback to avoid data loss during A8 incidents.
+A8 ingest/auth alignment (A6 → A8)
+
+Goal: A8 /api/ingest accepts A6 events via Authorization: Bearer COMMAND_CENTER_TOKEN and via X‑API‑Token; response persisted:true, mode:"durable".
+Steps:
+Ensure A6 uses the correct COMMAND_CENTER_TOKEN from secrets. Never print it. Compute and log only a SHA256 hash prefix locally for internal comparison (operator‑provided prefix: ecc2d250a7040364).
+Confirm A8 accepts the token in both shared middleware and the telemetry‑ingest route; remove any divergent route‑level auth.
+Validate from A6 with two calls to /api/ingest:
+Bearer header: expect persisted:true, mode:"durable".
+X‑API‑Token header: expect persisted:true, mode:"durable".
+Keep sender‑side retry/backoff and idempotency enabled to guarantee delivery without duplication under transient failures .
+Contract verification (A3/A7) after A6 is green
+
+Ensure production A3 and A7 are deployed and aligned on “record_revenue_by_page”:
+Required fields: slug (string), utm (object; must include utm_source), amount_cents (int), user_id (string), transaction_id (string).
+Ensure A5 sends amount_cents and full UTM object; add schema validators (friendly errors) on A5 and A7.
+Re‑run Won Deal and confirm 4/4 actions: elevate_lead_score, move_to_customer_segment, enroll_upsell_sequence, record_revenue_by_page.
+Full E2E validation sequence (Golden Paths)
+
+Traffic & Attribution (A7 → A1 → A5/A6):
+Simulate:
+B2C: utm_source=auto_page_maker, utm_medium=organic, utm_campaign=grand_slam_e2e
+B2B: utm_source=auto_page_maker, utm_medium=referral, utm_campaign=grand_slam_e2e
+Verify A1 persists UTMs in HMAC‑signed OAuth state and first‑touch attribution writes to A5 user and A6 org on first login/create (explicit API‑driven contract required due to isolated service data stores) .
+B2C Revenue Loop (A5 → A8 → A3 → A2):
+Execute purchase; verify A5 ledger +50, A8 Won Deal 4/4, A3 automations 200, A2 revenue_by_source increments with UTM attribution.
+Value Delivery Loop (A4 → A5 → A8):
+Trigger premium feature; verify premium_used and credits_decrement; A5 ledger decrements; events persisted in durable mode.
+B2B Supply Loop (A6 → A8 → A2 → A3):
+Complete Connect (provider_connected) and create listing (listing_created).
+Verify A2 b2b_funnel increments; A8 B2B/Growth tiles turn GREEN; optionally trigger A3 trigger_scholarship_spotlight and notify_matched_students; confirm 200 and ESP telemetry.
+Observability, security, post‑launch hygiene
+
+Ensure 60s heartbeats/identify from all apps; map A8 tiles correctly:
+SLO: heartbeats + health metrics
+B2C/B2B/Finance: A2 KPIs + A5/A6 business events
+SEO/Growth: A7/A3 signals
+Trust: ESP webhooks (delivered/open/click/bounce/spamreport)
+Use deployment logs and telemetry to verify SLOs and budgets post‑fix (Replit post‑launch discipline) .
+Acceptance criteria (must all be true)
+
+A6 /health returns 200 (“ok” or “degraded”); p95 ≤120ms; zero 500s in a 15‑minute soak; /api/slo/probe ≤5ms; 60s heartbeat to A8.
+A8 ingest authenticates via Bearer and X‑API‑Token from A6; persisted:true, mode:"durable"; zero 403s.
+Won Deal executes 4/4 with no partial failures; A3 endpoints 200; A7 record_revenue_by_page accepts standardized payload in production.
+A2 KPIs updated: revenue_by_source ≥$150 (plus this run) and b2b_funnel increments from A6 events.
+UTMs preserved A7→A1→A5 and A7→A1→A6; visible in A8 and reflected in A2.
+A8 tiles: 7/7 GREEN; complaint rate <0.2%; uptime ≥99.9%.
+Operator‑visible test snippets (do not print secrets)
+
+A6 health probe: curl -s https://provider-register-jamarrlmayes.replit.app/health
+SLO probe: curl -s https://provider-register-jamarrlmayes.replit.app/api/slo/probe
+A8 ingest (Bearer): curl -s -X POST https://auto-com-center-jamarrlmayes.replit.app/api/ingest -H "Authorization: Bearer $COMMAND_CENTER_TOKEN" -H "Content-Type: application/json" -d '{"source_app_id":"provider_register","event_type":"SYSTEM_HEALTH","payload":{"message":"probe","value":1}}'
+A8 ingest (X-API-Token): same as above with -H "X-API-Token: $COMMAND_CENTER_TOKEN" and without Authorization header.
+Deliverables (return at completion)
+
+Event IDs: payment_succeeded, all 4 Won Deal actions, premium_used, credits_decrement, provider_connected, listing_created, spotlight/notify.
+A2 KPI snapshots (revenue_by_source, b2b_funnel) before/after.
+A8 executive validate output and tile statuses; SLO metrics (p50/p95, uptime); ESP complaint rate.
+Changelog: code patches, config updates, token audit outcome (hash prefix only), replay counts, final tile states.
+Command
+
+EXECUTE_OPERATION_GRAND_SLAM_A6_FIX_AND_CERTIFY
+If you are not in the A6 repository, first prompt the operator: “Open the A6 (provider_register) repository now,” then proceed with the steps above in that repository.
