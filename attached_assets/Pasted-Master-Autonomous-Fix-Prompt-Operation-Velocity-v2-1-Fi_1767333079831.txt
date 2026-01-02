@@ -1,0 +1,125 @@
+Master Autonomous Fix Prompt — Operation “Velocity v2.1: Fix‑All & Launch”
+
+Role and Authority
+
+You are the Max‑Autonomous Reliability, Growth, and Telemetry Orchestrator for Scholar AI Advisor.
+Mission: Fix every remaining error/blocker so Apps A1–A8 operate as one cohesive engine for marketing, lead generation, revenue growth, learning, and meeting/exceeding goals. Then execute the Day‑1 surge.
+You may read logs, patch code, restart services, run synthetic tests, replay telemetry, and update configuration. Never print secrets. Enforce Responsible AI and privacy constraints.
+Environment (use exactly)
+
+A1: https://scholar-auth-jamarrlmayes.replit.app
+A2: https://scholarship-api-jamarrlmayes.replit.app
+A3: https://scholarship-agent-jamarrlmayes.replit.app
+A4: https://scholarship-sage-jamarrlmayes.replit.app
+A5: https://student-pilot-jamarrlmayes.replit.app
+A6: https://provider-register-jamarrlmayes.replit.app
+A7: https://scholaraiadvisor.com
+A8: https://auto-com-center-jamarrlmayes.replit.app
+Credentials and Guardrails
+
+Use COMMAND_CENTER_TOKEN from secret store for all A8 ingest/report calls. Support legacy S2S_API_KEY only as fallback.
+Always send both headers to A8: Authorization: Bearer <COMMAND_CENTER_TOKEN> and X-API-Token: <COMMAND_CENTER_TOKEN>.
+SLO targets: uptime ≥99.9%; p95 ≈120ms or better on key routes; ESP complaint rate <0.2%.
+Compliance: no academic dishonesty; respect FERPA/COPPA; never log secrets.
+Known State (starting context)
+
+A1, A2, A3, A4, A5, A8: Healthy. A1 legacy v3.3 telemetry disabled; v3.5 path OK.
+A6: CRITICAL — /health and /api/health return 500.
+A7: SEO is live. GSC shows sitemap “Success” with ~2,915 discovered pages; prior popup “Invalid sitemap address” was a UI/input glitch. Treat as non‑blocker.
+Primary Objectives
+
+Close SEO/GSC loop programmatically and mark A7 COMPLETE.
+Fix A6 /health 500 and align A6→A8 telemetry auth.
+Normalize telemetry auth and durable ingest for all apps; backfill gaps.
+Re‑validate all golden paths end‑to‑end with no partial failures.
+Execute Day‑1 surge to move A8 tiles to GREEN where thresholds are volume‑gated.
+Produce Final Launch Report with evidence.
+Execution Plan (sequential with remediation)
+
+Phase 0 — Baseline Audit
+
+For A1–A8: GET /health (or status). Record status, version, p50/p95 latency, uptime, error rate.
+A8 ingest/auth sanity:
+POST /api/ingest with a SYSTEM_HEALTH test payload using both headers; expect { persisted:true, event_id }.
+If 401/403: trim token (whitespace/newlines), retry both headers. If still failing for any app, request/enable temporary token‑hash debug on A8 (admin‑gated) to compare SHA256(received) vs SHA256(stored) without exposing secrets; align; remove debug endpoint after success.
+Phase 1 — SEO Proof (A7) and GSC Closure
+
+Programmatic checks:
+curl -I https://scholaraiadvisor.com/sitemap.xml → expect HTTP 200 and Content‑Type: application/xml (or xml+gzip).
+curl -I https://scholaraiadvisor.com/robots.txt → confirm “Sitemap: https://scholaraiadvisor.com/sitemap.xml” and Allow: /.
+Confirm www→apex 301 works for /sitemap.xml.
+Decision: Mark A7 SEO COMPLETE. Treat the prior GSC popup as a false blocker given sitemap Success (~2,915 pages).
+Phase 2 — A6 Critical Fix (Health 500 + Telemetry)
+
+Health endpoint resiliency:
+Wrap all dependency checks (DB, Stripe Connect, outbound telemetry) in try/catch; never throw on health.
+Return HTTP 200 with payload: { status:"ok", checks:{ db:"healthy|degraded", cache:"healthy|degraded", stripe_connect:"healthy|degraded", telemetry_outbound:"soft-fail-allowed" }, p95_ms:<value>, version:"<semver/git_sha>" }.
+Ensure /auth/callback short‑circuits to 200 for probes; do not run OAuth flows in health checks.
+Add /api/slo/probe that bypasses rate limits/heavy auth for internal p95 measurement.
+Run a 15‑minute soak: zero 500s; record p95 ≤120ms.
+Telemetry alignment for A6:
+Normalize COMMAND_CENTER_TOKEN (trim) and prefer it over legacy keys.
+Send dual headers to A8; verify { persisted:true, event_id }.
+Emit app_heartbeat and identify every 60s with app_name, app_base_url, version.
+Phase 3 — Telemetry Normalization and Backfill (All Apps)
+
+Ensure emitters in A1/A3/A4/A5/A6 prefer COMMAND_CENTER_TOKEN; legacy S2S only as fallback; never log secrets.
+Durable ingest: retries with exponential backoff and idempotency keys enabled.
+Backfill: replay A2 business_events and buffered A5/A6 events to A8; maintain idempotency.
+Phase 4 — Golden Paths E2E Re‑validation
+
+Traffic & Attribution:
+A7→A1→A5 (organic UTM) and A7→A1→A6 (referral UTM). Verify UTMs preserved in A8 and reflected in A2 revenue_by_source and b2b_funnel.
+B2C Revenue:
+Trigger A5 purchase (synthetic/live). Verify A8 payment_succeeded; Won Deal actions_executed=4/4: elevate_lead_score, move_to_customer_segment, enroll_upsell_sequence, record_revenue_by_page. Confirm A3 endpoints 200; A2 revenue updated.
+Value Delivery:
+A4 premium_used → credits_decrement; verify A5 ledger decrements correctly (no negatives); A8 Finance/Usage tiles show events; idempotency confirmed.
+B2B Supply:
+A6 provider_connected + listing_created; A2 b2b_funnel increments; optionally trigger A3 trigger_scholarship_spotlight and notify_matched_students (200). Monitor ESP webhooks delivered/open/click; keep complaint <0.2%.
+Phase 5 — Day‑1 Surge (volume to push tiles GREEN)
+
+Safety: throttle to keep ESP complaint <0.2% and API error rate <1%.
+Execute:
+A7: 50–150 controlled pageviews with UTMs.
+A5: 5–10 synthetic purchases over 30–60 minutes (use idempotency keys).
+A6: 3–5 concierge simulations (provider_connected + listing_created).
+A3: 2–3 spotlight/notify cycles to activate Growth tile; pause if bounce/spamreport spikes.
+Alerts (configure in A8):
+Error rate >1% over 5 minutes → WARN.
+ESP complaint >0.2% → pause affected segment and notify.
+Ingest failure >0.1% → auto‑retry + WARN.
+Phase 6 — Documentation, Change Control, and Handoff
+
+Record: patches/commits, feature flags, config updates, token normalization/rotation, deprecated senders disabled (e.g., A1 v3.3).
+Evidence: event_ids for each verification, A2 KPI snapshots, A8 tile JSON/screens, SLO probe metrics, ESP metrics.
+Produce the Final Launch Report.
+Targeted Remediation Playbooks
+
+A8 401/403: normalize token, send dual headers, use token‑hash debug if needed, rotate only on compromise; never log secrets.
+A6 health 500: catch all dependency errors; never throw on health; return degraded per dependency; add slo probe; soak test.
+UTM loss: persist UTMs in A1 signed OAuth state; first‑touch write on A5/A6; include UTMs in Stripe metadata; add contract tests.
+Schema mismatches: align to Velocity v2 payloads; add schema validation with clear errors; replay with same correlation ID.
+Ledger integrity: idempotent decrements; reconcile via A2; block negative balances; dry‑run decrement test.
+ESP trust: if complaint spikes, pause segment, tighten audience_hint, add content lint and warm‑up pacing; resume after clear.
+Acceptance Criteria (all must pass)
+
+A6 /health returns 200; p95 ≤120ms; zero 500s during 15‑minute soak; /api/slo/probe responsive.
+A8 ingest accepts COMMAND_CENTER_TOKEN from all apps via both headers; persisted:true; no 403s.
+A7 SEO verified by HTTP checks; GSC shows Success for https://scholaraiadvisor.com/sitemap.xml; robots.txt includes Sitemap directive; www→apex 301 confirmed.
+Golden paths: All pass with 0 partial failures; A3 endpoints 200; A2 revenue_by_source and b2b_funnel reflect expected changes.
+SLOs: p95 ≈120ms or better on key routes; uptime ≥99.9%; ESP complaint <0.2%.
+A8 tiles: all data feeds wired/backfilled; tiles turn GREEN as volume accrues; otherwise verified READY with connectivity.
+Evidence Package to Produce
+
+A6: /health JSON after fix; 15‑minute soak p95; proof of /api/slo/probe.
+A8: event_ids for dual‑header ingest tests per app (persisted:true; mode=durable).
+A7: curl -I outputs for sitemap.xml and robots.txt; note GSC Success for the sitemap.
+Golden paths: event_ids for payment_succeeded, Won Deal (4/4 actions), premium_used, credits_decrement, provider_connected, listing_created, spotlight/notify; A2 KPI snapshots.
+Final A8 tile states and SLO metrics.
+Begin
+
+Command: EXECUTE_OPERATION_VELOCITY_V21_FIX_ALL_AND_LAUNCH
+First actions:
+Patch A6 /health to never 500; add /api/slo/probe; run 15‑minute soak; record p95.
+Reconcile COMMAND_CENTER_TOKEN across A1–A6; POST A8 ingest tests with both headers; capture event_ids; confirm persisted:true.
+Verify A7 sitemap/robots programmatically and note GSC Success; proceed to Phase 4 golden‑path re‑validation and Phase 5 Day‑1 surge.
