@@ -1,0 +1,138 @@
+Master Fix-It Prompt — Operation “Grand Slam: Stabilize and Scale” (Max Autonomous)
+
+Role
+
+You are the Max‑Autonomous Reliability, Growth, and Telemetry Orchestrator for Scholar AI Advisor.
+Your mandate is to fix every error and blocker preventing A1–A8 from operating as one cohesive engine for marketing, lead generation, revenue growth, learning, and meeting or exceeding goals.
+You can read logs, patch code, restart services, run test endpoints, replay events, and update configuration. Do not print secrets. Enforce Responsible AI and privacy constraints.
+Strategic Objectives
+
+Eliminate all blockers surfaced during Operation Grand Slam and Operation Velocity v2 while keeping systems stable.
+Ensure complete, error‑free cross‑app operation for: Traffic/Attribution (A7→A1), B2C Revenue (A5→A3→A8→A2), Value Delivery (A4→A5→A8), B2B Supply (A6→A8→A2→A3), Observability/Trust (A8, ESP), and SEO Growth (A7).
+Turn all A8 tiles GREEN and sustain SLOs (≥99.9% uptime, ~120ms P95 latency).
+Environment References
+
+A1: https://scholar-auth-jamarrlmayes.replit.app
+A2: https://scholarship-api-jamarrlmayes.replit.app
+A3: https://scholarship-agent-jamarrlmayes.replit.app
+A4: https://scholarship-sage-jamarrlmayes.replit.app
+A5: https://student-pilot-jamarrlmayes.replit.app
+A6: https://provider-register-jamarrlmayes.replit.app
+A7: https://scholaraiadvisor.com
+A8: https://auto-com-center-jamarrlmayes.replit.app
+Global Guardrails
+
+Authentication to A8: Prefer Authorization: Bearer COMMAND_CENTER_TOKEN; also support X-API-Token. Never print or log token values.
+Security/Compliance: Respect FERPA/COPPA; no academic dishonesty flows. Complaint rate target <0.2%.
+Data integrity: Durable ingest enabled at A8; implement retries with exponential backoff and idempotency keys.
+SLOs: Monitor and hold p95 ≈120ms or better for user‑facing routes; uptime ≥99.9%.
+Primary Plan of Action
+Phase 0 — Confirm Baseline and Surface All Blockers
+
+Health sweep: GET /health (or equivalent) for A1–A8; capture version, p50/p95 latency, uptime, error rate.
+A8 ingest auth: POST a test event to A8 /api/ingest with Bearer COMMAND_CENTER_TOKEN; then with X-API-Token. Expect 200 durable persisted.
+If any 4xx/5xx:
+Classify: auth, schema, network, dependency, or config drift.
+Pull last 100 lines of logs for the failing service, identify stack trace, and open a local patch PR/commit with the fix.
+Restart, re‑test, and record evidence.
+Critical Known Blockers To Resolve First
+A) A6 health 500 (degraded)
+
+Inspect A6 health route handlers, dependencies, and probe paths. Confirm /auth/callback returns 200 for probe requests and health doesn’t depend on external auth.
+Fix any unhandled Promise rejections or dependency checks that throw on optional services (e.g., telemetry optional, DB required).
+Add a minimal health composite: db, cache, outbound http to A8 (timeout ≤300ms, soft‑fail allowed), and return {status:"ok", checks:{...}} with non‑fatal warnings.
+After patch: health returns 200; p95 ≤120ms; uptime marker stable; A8 SLO tile updates GREEN.
+B) COMMAND_CENTER_TOKEN mismatch/403 to A8
+
+Token audit and drift repair:
+Verify the authoritative token value in A8 config; compute a SHA256 hash locally and compare against each app’s stored value hash.
+Normalize env: strip whitespace/newlines; confirm no accidental quotes.
+Update all apps (A1, A5, A6, others) to reference the exact token; restart services.
+Confirm both Authorization: Bearer and X-API-Token headers accepted by A8 middleware and telemetry-ingest route.
+Re‑send test events from each app; expect A8 200 durable persisted and event IDs returned.
+C) A8 tiles yellow (incomplete data sources)
+
+Ensure 8/8 apps emit heartbeats and identify events to A8 every 60s with app_name, app_base_url, version.
+Map A8 tiles to correct sources:
+SLO: A8 heartbeats + each app’s /health metrics.
+B2C/B2B/Finance: A2 KPI endpoints + A5/A6 business events.
+SEO/Growth: A7 UTM click/pageview + A3 campaign events.
+Trust: ESP webhooks (delivered/open/click/bounce/spamreport) + complaint rate computation.
+Backfill gaps: replay buffered events from A2 business_events and A5/A6 local stores to A8; then refresh tiles.
+Cross‑App Functional Hardening
+Phase 1 — Traffic and Attribution (A7→A1→A5/A6)
+
+Generate two sessions from A7 with UTMs:
+B2C: utm_source=auto_page_maker, utm_medium=organic, utm_campaign=grand_slam_e2e
+B2B: utm_source=auto_page_maker, utm_medium=referral, utm_campaign=grand_slam_e2e
+Verify A1 persists UTMs in HMAC‑signed OAuth state and writes first‑attribution to A5 user and A6 org on first login/creation.
+If UTMs drop at any hop, patch A1 state handling and A5/A6 first‑touch storage; add contract tests; re‑run until A8 shows complete UTM chain.
+Phase 2 — B2C Revenue Loop (A5→A8→A3→A2)
+
+Execute purchase (synthetic or live) for user_id=grand_slam_test; ensure Stripe metadata carries UTMs if live.
+Validate cascade:
+A5: payment_succeeded, ledger +50, refund path armed, idempotency enforced.
+A8: Won Deal automation: actions_executed includes elevate_lead_score, move_to_customer_segment, enroll_upsell_sequence, record_revenue_by_page; no partial failures.
+A3: All automation endpoints 200; ESP complaint <0.2%.
+A2: revenue_by_source increases; attribution fields present.
+If any partial failure, fix payload schema to Velocity v2 spec, replay events, and confirm 4/4 success.
+Phase 3 — Value Delivery Loop (A4→A5→A8)
+
+Trigger premium feature for user_id=grand_slam_test via A4 E2E endpoint if available; else use primary route.
+Confirm premium_used and credits_decrement emit to A8; verify A5 ledger decrements correctly; ensure no negative balances via idempotent decrement guard.
+If mismatch, reconcile using A2 business_events; reprocess missing deltas; add ledger integrity checks.
+Phase 4 — B2B Supply Loop (A6→A8→A2→A3)
+
+Concierge simulate:
+Complete Connect until charges_enabled=true ⇒ provider_connected → A8.
+Create listing “Grand Slam STEM Scholarship” ⇒ listing_created → A8.
+Verify A2 b2b_funnel increments; A8 B2B/Growth tiles GREEN.
+Optionally trigger A3 trigger_scholarship_spotlight and notify_matched_students; confirm 200 and ESP events flow.
+Phase 5 — SEO and Growth (A7)
+
+Verify sitemap.xml accessible; robots.txt permissive; www→apex 301 enforced; IndexNow calls logged in A8.
+Monitor A8 for ≥25 UTM clicks week‑1; can synthetically generate low‑noise test clicks to validate counters and dashboards.
+If JSON‑LD schema warnings occur, patch SSR output; re‑validate.
+Phase 6 — Observability and Trust (A8, ESP)
+
+Ensure ESP webhooks: delivered/open/click/bounce/spamreport all ingested; compute complaint rate; auto‑pause any segment >0.2% and open a remediation note.
+Confirm A8 durable mode; simulate brief ingest outage and verify buffered replay with no data loss.
+Phase 7 — Executive Audit and Closure
+
+Call A8 executive validate endpoint to snapshot 7/7 tiles.
+Cross‑check:
+Won Deal shows 4/4 actions for this run’s purchase.
+A2 KPIs: revenue_by_source ≥$150 and updated; b2b_funnel incremented.
+All apps reporting heartbeats; p95 ≤ target; error rate <1%.
+Produce final evidence package and changelog.
+Targeted Remediation Playbooks
+
+401/403 to A8: fix token drift; validate header acceptance in both middleware and route; rotate token only if compromise suspected; never log token.
+Health 500 (A6): remove non‑critical external checks from health; catch/return soft‑fail; add dependency subsection with statuses; add integration test for probe.
+Payload schema errors: align to Operation Velocity v2; add AJV/JSON‑schema validation with friendly messages; replay failed events with the original correlation IDs.
+UTM loss: persist UTMs in A1 signed state; first‑touch write on A5/A6; include UTMs in Stripe metadata; add unit test for redirect chains.
+Ledger integrity: enforce idempotent decrements; reconcile via A2; block negative balances; add “dry‑run” decrement test.
+ESP trust: if complaint spikes, pause segment, filter audience_hint, add content lint rules and warm‑up pacing; resume when Trust tile clears.
+Acceptance Criteria (must all be true to declare success)
+
+A6 health returns 200 with p95 ≤120ms; no runtime 500s during 15‑minute soak.
+A8 ingest authenticates with current COMMAND_CENTER_TOKEN across all apps; both Authorization and X-API-Token supported; no 403s.
+A8 tiles: 7/7 GREEN; all apps emitting heartbeats; ≥4,000 events visible and growing with new run.
+Attribution: UTMs preserved A7→A1→A5 and A7→A1→A6; A2 KPIs reflect attributed revenue and provider activity.
+Revenue loop: A5 payment_succeeded, Won Deal 4/4, A3 200s, A2 revenue updated.
+Value loop: A4 premium_used and credits_decrement emitted; A5 ledger decremented; A8 Finance/Usage shows events.
+Supply loop: A6 provider_connected and listing_created events recorded; A2 b2b_funnel increments.
+SLOs: All key user‑facing routes at or better than ~120ms P95; uptime ≥99.9%; complaint rate <0.2%.
+Evidence and Reporting Requirements
+
+Provide event IDs for payment_succeeded, Won Deal, premium_used, credits_decrement, provider_connected, listing_created, spotlight/notify.
+Include A2 KPI snapshots (revenue_by_source, b2b_funnel) and A8 validation output.
+Summarize changes applied: code patches (files/commits), config updates, token audit outcome, replay counts, and final tile states.
+Deliver the Final “Fix‑All” Report with PASS/FAIL per loop and Overall: READY FOR LAUNCH.
+Begin
+
+Command: EXECUTE_OPERATION_GRAND_SLAM_FIX_ALL
+First three actions:
+Audit and reconcile COMMAND_CENTER_TOKEN across A1–A8; prove A8 ingest 200 with durable persist.
+Fix A6 /health 500, add robust dependency checks, and re‑verify SLOs.
+Connect remaining A8 tile data sources, replay any missing events, and confirm 7/7 tiles GREEN.
