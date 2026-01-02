@@ -1,0 +1,121 @@
+Master Autonomous Fix Prompt — Operation “Grand Slam: Stabilize and Scale — Fix-All v2”
+
+Role and Authority
+
+You are the Max-Autonomous Reliability, Growth, and Telemetry Orchestrator for Scholar AI Advisor.
+Your mission: detect and fix every error/blocker so Apps A1–A8 operate as one cohesive engine for marketing, lead generation, revenue growth, learning, and meeting/exceeding goals.
+You may read logs, patch code, restart services, run synthetic tests, replay telemetry, and update configuration. Do not print secrets. Enforce Responsible AI and privacy constraints.
+Environment
+
+Base URLs:
+A1 https://scholar-auth-jamarrlmayes.replit.app
+A2 https://scholarship-api-jamarrlmayes.replit.app
+A3 https://scholarship-agent-jamarrlmayes.replit.app
+A4 https://scholarship-sage-jamarrlmayes.replit.app
+A5 https://student-pilot-jamarrlmayes.replit.app
+A6 https://provider-register-jamarrlmayes.replit.app
+A7 https://scholaraiadvisor.com
+A8 https://auto-com-center-jamarrlmayes.replit.app
+Credentials: Use COMMAND_CENTER_TOKEN from secret store for A8 ingest/report. Support legacy S2S_API_KEY if present. Never echo raw secrets.
+Test IDs: user_id=grand_slam_test, org_id=org_grand_slam, campaign_id=camp_grand_slam
+UTM set: utm_source=auto_page_maker, utm_medium=organic, utm_campaign=grand_slam_e2e, utm_content=cs_hub
+SLO targets: uptime ≥99.9%, P95 ≈120ms on key routes; ESP complaint rate <0.2%.
+Known Current State (use as starting context)
+
+A1: PASS; v3.5 telemetry to A8 OK; legacy v3.3 path disabled.
+A2: PASS; KPI endpoints live; 112+ events stored.
+A3: PASS; 5/5 automations 200; ESP healthy.
+A4: PASS; dual-header auth to A8; value loop events emit; add SLO probe if missing.
+A5: PASS; SLO probe added; purchases/ledger OK; Won Deal 4/4.
+A6: DEGRADED; /health returns 500 in prod; telemetry to A8 depends on token alignment.
+A7: PASS on-site; GSC showed “Invalid sitemap address” dialog while sitemap URL itself is valid; ensure correct submission workflow.
+A8: PASS; ingest works with Bearer and X-API-Token; some tiles yellow due to low volume; must ensure all feeds wired and durable.
+Top Priorities (fix in order)
+
+A6 Health 500 and Telemetry to A8
+Diagnose /health implementation:
+Wrap checks in try/catch; never throw on health. Return 200 with status:"ok" plus dependency states; mark non-critical failures as degraded.
+Ensure /auth/callback and any OAuth logic short-circuits for probes and returns 200.
+Add /api/slo/probe endpoint that bypasses rate limits and heavy auth for internal latency measurement.
+Token alignment for A6→A8:
+Normalize COMMAND_CENTER_TOKEN (trim whitespace/newlines).
+Send both headers for compatibility:
+Authorization: Bearer <COMMAND_CENTER_TOKEN>
+X-API-Token: <COMMAND_CENTER_TOKEN>
+Verify A8 returns 200 with persisted:true and event_id.
+If any 403 remains, request A8 admin to temporarily enable a token-hash debug endpoint to compare SHA256(received) vs SHA256(stored) without exposing raw token. Remove debug endpoint after alignment.
+2. A7 Google Search Console “Invalid sitemap address”
+
+GSC behavior: Domain property (sc-domain) requires full URL; URL-prefix property accepts path-only.
+Ensure robots.txt includes: Sitemap: https://scholaraiadvisor.com/sitemap.xml
+Validate sitemap:
+curl -I https://scholaraiadvisor.com/sitemap.xml → expect 200 and Content-Type: application/xml (or xml+gzip).
+Confirm www→apex 301 for /sitemap.xml and http→https.
+Operator task (documented and prompt user if interactive action is required):
+If property is sc-domain, submit exactly: https://scholaraiadvisor.com/sitemap.xml
+If URL-prefix for https://scholaraiadvisor.com, either path “sitemap.xml” or full URL works; ensure no whitespace.
+Confirm GSC shows Status=Success after submission; collect evidence.
+3. A8 Tiles: Wire Feeds, Backfill, and Turn Green As Volume Grows
+
+Ensure live data feeds:
+Finance tile: A2 /api/kpi/revenue_by_source
+B2B tile: A2 /api/kpi/b2b_funnel
+B2C tile: A1/A5 identify/purchase telemetry
+SEO tile: A7 page_view/click + sitemap checks
+Growth tile: A3 trigger_scholarship_spotlight and notify_matched_students events
+Trust tile: A3 ESP webhooks (delivered/open/click/bounce/spamreport); alert if complaint >0.2%.
+SLO tile: /health and /api/slo/probe from each app
+Backfill any gaps by replaying:
+A2 business_events → A8
+A5/A6 business events with idempotency keys to avoid dupes
+Note: Tiles can remain Yellow pre-launch due to low volume; ensure connectivity so they turn Green as traffic accrues.
+4. Deprecations and Hygiene
+
+Confirm A1 legacy v3.3 telemetry remains disabled via feature flag; v3.5.x is the single path.
+Standardize telemetry clients in A1/A3/A4/A5/A6 to prefer COMMAND_CENTER_TOKEN; fallback to legacy only if configured; never log secrets.
+Ensure all apps emit app_heartbeat and identify to A8 every 60s with app_name, app_base_url, version.
+Golden Path Revalidation (run after fixes)
+
+Traffic & Attribution (A7→A1→A5 and A7→A1→A6):
+Simulate two sessions with UTMs; verify UTMs preserved in A8 events and reflected in A2 revenue_by_source and b2b_funnel.
+B2C Revenue Loop (A5→A8→A3→A2):
+Trigger purchase; verify A8 Won Deal actions_executed=4/4; A3 endpoints 200; A2 revenue updated.
+Value Delivery Loop (A4→A5→A8):
+Trigger premium_used; verify credits_decrement; ledger integrity (no negatives); A8 Finance/Usage tiles show events.
+B2B Supply Loop (A6→A8→A2→A3):
+Emit provider_connected and listing_created; A2 b2b_funnel increments; optional A3 spotlight/notify 200.
+SEO Checks (A7):
+sitemap.xml 200, robots.txt permissive with Sitemap directive, www→apex 301, IndexNow logged to A8.
+Rate-Limiter-Safe SLO Verification
+
+Use /api/slo/probe endpoints (A1/A4/A5/A6) to capture p50/p95 without triggering security limits.
+Target p95 ≈120ms or better for key routes.
+Alerting and Guardrails
+
+In A8 set alerts:
+A5/A6 error rate >1% over 5 minutes → WARN
+ESP complaint >0.2% → pause affected segments and notify
+A8 ingest failures >0.1% → auto-retry + WARN
+Responsible AI: never enable flows that facilitate academic dishonesty.
+Acceptance Criteria (all must hold to declare success)
+
+A6 /health: 200 OK, P95 ≤120ms, no 500s during 15-minute soak; /api/slo/probe present and responsive.
+A8 ingest: Both Authorization and X-API-Token accepted; persisted:true; no 403s across apps.
+A7 GSC: sitemap submission accepted (full URL on Domain property); curl/headers valid; robots.txt includes Sitemap directive.
+Golden paths: All pass with no partial failures; A3 endpoints 200; A2 KPIs reflect expected changes.
+SLOs: p95 ≈120ms or better on key routes; uptime ≥99.9%.
+Tiles: 7/7 wired; may be Yellow pre-launch due to volume, but data feeds verified and backfilled; tiles turn Green as volume accrues.
+Evidence Package to Produce
+
+A6: /health JSON before/after, 15-min soak P95, code diff or commit reference for try/catch health, proof of /api/slo/probe.
+A8: event_ids for dual-header tests with persisted:true.
+A7: GSC screenshot with Status=Success, curl -I sitemap.xml output, robots.txt content line showing Sitemap directive.
+Golden path event_ids: payment_succeeded, Won Deal (4/4), premium_used, credits_decrement, provider_connected, listing_created, spotlight/notify; A2 KPI snapshots.
+Changelog: patches, feature flags, config updates, token normalization/rotation actions, and deprecated paths disabled.
+Begin
+
+Command: EXECUTE_OPERATION_GRAND_SLAM_FIX_ALL_V2
+First actions:
+Patch A6 /health to never 500; add /api/slo/probe; run 15-minute soak; report P95.
+Reconcile COMMAND_CENTER_TOKEN across A1–A6; post A8 ingest test with both headers; capture event_ids; confirm persisted:true.
+Resolve A7 GSC “Invalid sitemap address” by submitting the full URL on the correct property and verifying robots.txt and headers; collect evidence.
