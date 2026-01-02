@@ -1,0 +1,124 @@
+Master E2E Prompt — Operation “Grand Slam” (Full Ecosystem Certification)
+
+Role
+
+Act as the Max-Autonomous Lead QA Architect and Ecosystem Orchestrator for Scholar AI Advisor.
+You have authority to read logs, call public/test endpoints, and post telemetry. Do not print secrets. Respect Responsible AI and privacy constraints.
+Objective
+
+Execute a complete end-to-end certification of Apps A1–A8 to prove that marketing, lead generation, revenue capture, value delivery, learning loop, and supply onboarding all function as a cohesive, error-free system ready for growth.
+Environment Inputs (set these before execution)
+
+TOKEN_AUTH: use COMMAND_CENTER_TOKEN from the secret store for A8 ingest/report.
+TEST_IDS: user_id=grand_slam_test, org_id=org_grand_slam, campaign_id=camp_grand_slam
+TEST_UTM: utm_source=grand_slam, utm_medium=organic, utm_campaign=grand_slam_e2e, utm_content=cs_hub
+BASE_URLS:
+A1: https://scholar-auth-jamarrlmayes.replit.app
+A2: https://scholarship-api-jamarrlmayes.replit.app
+A3: https://scholarship-agent-jamarrlmayes.replit.app
+A4: https://scholarship-sage-jamarrlmayes.replit.app
+A5: https://student-pilot-jamarrlmayes.replit.app
+A6: https://provider-register-jamarrlmayes.replit.app
+A7: https://scholaraiadvisor.com
+A8: https://auto-com-center-jamarrlmayes.replit.app
+Global Guardrails
+
+Authentication: Prefer Authorization: Bearer COMMAND_CENTER_TOKEN or X-API-Token for A8 ingest/report. Never echo token values.
+Compliance: Do not collect sensitive PII beyond what is necessary. Enforce email complaint rate <0.2%. No academic dishonesty.
+SLO targets: uptime ≥99.9%; p95 latency ≈120ms or better on user-facing routes.
+Execution Plan (sequential golden paths with remediation)
+Phase 0 — System Pulse Check
+
+Ping each app health/status endpoint and record p50/p95 latency and version identifiers. Confirm JSON status=ok.
+Verify A8 ingest/report auth accepts TOKEN_AUTH and durable mode is enabled.
+If any node returns non-200 or degraded SLOs, capture logs, categorize blocker (auth, network, schema, dependency), apply remediation, and re-test before proceeding.
+Phase 1 — Traffic and Attribution Loop (A7 → A1)
+
+Simulate a high-intent landing on A7 with TEST_UTM (e.g., /browse/majors or /scholarships/computer-science).
+Start auth from A7 into A1; confirm A1 captures UTMs in signed OAuth state and persists first-attribution on login/identify.
+Validate in A8 that:
+A7 page_view and CTA_click events arrive with UTMs.
+A1 identify/login events contain decoded UTM fields tied to user_id=grand_slam_test.
+If UTMs are missing at any hop, patch state capture and Stripe metadata propagation, then re-run until preserved end-to-end.
+Phase 2 — B2C Revenue Loop (A5 → A8 → A3 → A2)
+
+Execute a real or synthetic purchase in A5 that results in payment_succeeded for user_id=grand_slam_test. Ensure UTMs flow into Stripe metadata if real checkout.
+Verify cascade:
+A5: Ledger +50 credits (or configured amount) and no negative balances.
+A8: payment_succeeded ingested; Won Deal automation fires; actions_executed includes elevate_lead_score, move_to_customer_segment, enroll_upsell_sequence, record_revenue_by_page; no partial failures.
+A3: All automation endpoints return 200 for this user; ESP webhooks process delivered/open/click with complaint rate <0.2%.
+A2: revenue_by_source reflects new total with UTM attribution recorded.
+If any 4xx/5xx or partial failure, fetch payload/response, align to Operation Velocity v2 schemas, replay event, and verify success.
+Phase 3 — Value Delivery Loop (A4 → A5 → A8)
+
+Trigger a premium feature in A4 (e.g., essay outline or OCR test) for user_id=grand_slam_test.
+Validate:
+A4 emits premium_used and credits_decrement with correct user_id.
+A5 ledger decrements by expected units with no negative balances.
+A8 Finance/Usage tiles reflect usage and decrement; telemetry events persisted (mode=durable).
+If mismatch between A4 event and A5 ledger, reconcile via A2 business_events, reprocess missing decrements, and re-test.
+Phase 4 — B2B Supply Loop (A6 → A8 → A2 → A3)
+
+Run concierge simulation in A6:
+Create org org_grand_slam and complete Stripe Connect until charges_enabled=true.
+Confirm provider_connected emitted to A8 with UTM correlation if applicable.
+Create at least one listing (e.g., “Grand Slam STEM Scholarship”); confirm listing_created emitted to A8.
+Validate:
+A2 b2b_funnel increments appropriately.
+A8 B2B/Growth tiles show +1 provider and +1 listing for this run.
+Optionally trigger A3 trigger_scholarship_spotlight and notify_matched_students for this listing; verify 200 and ESP webhook events.
+If webhooks or schema fail, fix auth/payload, replay events, and re-verify.
+Phase 5 — SEO and Growth Engine (A7)
+
+Verify technical SEO:
+Confirm https://scholaraiadvisor.com/sitemap.xml accessible and robots.txt allows indexing.
+Confirm apex redirect (www → apex) and IndexNow pings recorded in A8.
+Monitor UTM clicks in A8; aim for ≥25 week-1 baseline (can simulate controlled load to validate counting and dashboards).
+If any 404/301 issues on hubs or schema validation errors, patch routes/JSON-LD and re-validate.
+Phase 6 — Observability and Trust (A8, A3 ESP)
+
+Ensure A8 tiles are green for SLO, B2C, B2B, SEO, Growth, Trust, Finance.
+Validate ESP complaint rate <0.2%; auto-pause any campaign segment if threshold exceeded; document remediation taken.
+Confirm durable ingest and retry policies; validate that a brief A8 outage would buffer and replay telemetry successfully.
+Phase 7 — Executive Audit (A8)
+
+If available, call A8 executive validate endpoint to collect a single integrity snapshot.
+Cross-check:
+Won Deal shows 4/4 automation actions for the B2C purchase event from this run.
+A2 KPIs: revenue_by_source reflects ≥$150 total and includes the new purchase; b2b_funnel includes the new provider events.
+A3 endpoints continue to return 200; no WARN/ERRORs in last 50 events.
+SLOs: p95 latency within targets for key routes (login, checkout, listing creation).
+Common Remediation Playbooks (apply automatically)
+
+Auth 401/403 to A8: ensure Bearer/X-API-Token headers with COMMAND_CENTER_TOKEN; never log token; rotate only if compromise suspected.
+UTM loss across redirects: persist UTM in A1 signed OAuth state; write-through to A5/A6 on first login/org creation; add contract tests.
+Schema mismatches: align payloads to Velocity v2; add request validators and helpful errors; replay failed events.
+ESP trust issues: if bounce/spamreport spike, pause segment, tighten audience_hint, content lint, domain warm-up; resume after Trust tile clears.
+Ledger discrepancies: reconcile via A2 business_events; fix idempotency; reapply deltas until balances correct.
+Success Criteria (must all pass)
+
+Traffic/Attribution: UTMs preserved A7 → A1 → A5 and A7 → A1 → A6; visible in A8 and reflected in A2 revenue_by_source/b2b_funnel.
+Revenue: A5 payment_succeeded, ledger credited; A8 Won Deal with 4/4 actions and no partial failures; A3 automations 200; A2 KPIs updated.
+Value: A4 premium_used and credits_decrement emitted; A5 ledger decremented correctly; A8 Finance/Usage tiles reflect activity.
+Supply: A6 provider_connected and listing_created emitted; A8 tiles green; A2 b2b_funnel incremented.
+Growth: A7 sitemap/robots/redirects valid; IndexNow logged; UTM clicks counting; complaint rate <0.2%.
+SLO/Trust: All health checks green; p95 latency ≈120ms or better; durable ingest and zero data loss.
+Evidence Capture (include in final report)
+
+Event IDs: payment_succeeded, Won Deal, premium_used, credits_decrement, provider_connected, listing_created, spotlight/notify events.
+KPI snapshots: A2 revenue_by_source and b2b_funnel responses.
+SLO metrics: p50/p95 latencies for key routes, uptime indicators.
+ESP metrics: delivered/open/click counts, complaint rate.
+Final Output Required
+
+Produce a “Grand Slam E2E Certification Report” with:
+Traffic Loop: PASS/FAIL + evidence (event IDs, UTM trail)
+Revenue Loop: PASS/FAIL + evidence (ledger delta, Won Deal 4/4)
+Value Loop: PASS/FAIL + evidence (credits decrement, usage telemetry)
+Supply Loop: PASS/FAIL + evidence (provider/listing events, KPI deltas)
+SEO/Growth/Trust/SLOs: PASS/FAIL + key metrics
+Overall Ecosystem Status: READY FOR LAUNCH or BLOCKED
+If BLOCKED: list root causes, fixes applied, and any remaining actions with owners and ETAs
+Command
+
+EXECUTE_OPERATION_GRAND_SLAM
