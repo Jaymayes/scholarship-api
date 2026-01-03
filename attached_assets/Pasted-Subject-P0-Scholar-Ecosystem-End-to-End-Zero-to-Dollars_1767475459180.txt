@@ -1,0 +1,143 @@
+Subject: P0 – Scholar Ecosystem End-to-End “Zero-to-Dollars & Provider” Revenue Rescue (Deep Dive + Fix)
+
+Role: Lead QA Architect + Chief Revenue Officer
+Mode: MAX AUTONOMOUS (Full-stack diagnostic + remediation + verification)
+Priority: P0 (Revenue Blocked). Phase 1 (A1 OIDC) and Phase 6 (business probes) are DONE. Continue with remaining phases.
+
+Incident ID: INC-REVENUE-BLOCKER
+
+Context
+
+You previously reported “Ready,” but live testing shows major revenue blockers.
+Known facts to reconcile now:
+A8 telemetry: legacy v3.3 /ingest returning 403; v3.5.0/3.5.1 /events works.
+TEST cohort generator: 401s due to missing/old headers.
+Orchestration shows 0/9 in A8 while logs claim 9/9 (stale cache or wrong endpoint).
+A5/A6 404s observed; verify they are fully deployed and reachable.
+Phase 6 probes exist and return identity headers (A1 scope complete).
+Mission
+
+Prove, visually in A8, that traffic converts to dollars and provider value. Find every break in the chain and fix it: A7 landing → A5 student app → A1 auth → A5 checkout → Stripe/webhooks → A2 events/DB → A3 orchestration → A8 dashboards → A6 provider flows.
+Standardize telemetry to v3.5.1, eliminate false greens, and wire business-logic probes into Fleet Health.
+Global guardrails
+
+Secrets never in logs. Use feature flags and reversible changes. Maintain P95 ≤150ms. Tag any synthetic data with a simulation namespace so it never contaminates “Live”.
+Telemetry contract (enforce everywhere now)
+
+To A8 (primary) and A2 (fallback): add headers
+x-scholar-protocol: v3.5.1
+x-app-label: <app_name>
+x-event-id: <uuid>
+X-API-Token: <token>
+X-Service-Auth: <service-jwt>
+Disable all legacy v3.3 /ingest senders. Use /events only.
+Business-logic probes (keep GREEN only if business works)
+
+/api/probe/auth: synthetic OIDC loop success
+/api/probe/lead: lead created + visible in DB
+/api/probe/payment: canary charge + webhook success + order row
+/api/probe/data: analytics event end-to-end with UTMs
+/api/probes: aggregate. Include X-System-Identity and X-App-Base-URL in responses.
+Phased execution plan
+
+Phase 0: Evidence capture (10 min)
+
+Snapshot A8 tiles (Growth, Finance, B2C, B2B, SEO, SLO, Trust). Dump current warnings/errors in A1–A8 logs. Enable tracing for the next 2 hours.
+Phase 2: A3 (scholarship_agent) – Orchestration truth
+
+If A8 shows 0/9 but logs show 9/9:
+Point A3 telemetry to A8 /events v3.5.1. Verify auth headers present.
+Bust any A8 cache; re-run bootstrap-day1. Log each checkpoint posted: app_identity, preflight_check, campaign_config, bandit_config, lead_pipeline, provider_pipeline, payment_config, analytics_ingest, dashboard_sync.
+If A3 status UNKNOWN persists: check env secrets, base URLs, CORS/SSL/DNS. Add retries + circuit breakers. Re-run until A8 visually flips 0/9 → 9/9.
+Phase 3: Frontend click path (A7 → A5)
+
+Simulate visit to a top landing page; click “Start Here.”
+Verify UTM preservation into A5 (utm_source, utm_campaign, utm_term). If UTMs drop, fix links and add a contract test to prevent regression.
+Phase 4: Payments (A5 + Stripe + Webhooks + A2/A8)
+
+Ensure Stripe mode is correct per env (LIVE in production; TEST in staging). Verify keys and webhook secret mapping to the public endpoint.
+Execute a canary payment:
+Charge succeeds, webhook received and validated, idempotency key used.
+Order/subscription row written; A8 Finance tile updates; A2 receives payment_succeeded as fallback.
+Phase 5: Optimization engine (Bandit)
+
+Initialize bandit_config; confirm variant assignment/rotation on scholarship pages.
+Reward signal must be conversion, not clicks. Ensure events flow to A8 and learning metrics appear.
+Phase 6: Fleet Health truthfulness (already started)
+
+Make Fleet Health RED if any business probe fails. Replace ping-only probes. Keep identity headers on all probe responses.
+Phase 7: A5 and A6 availability
+
+Bring A5 and A6 online at their .replit.app URLs; ensure /health and /status return 200 + identity headers.
+A6: provider signup flow; listing creation; events provider_connected and listing_created delivered to A2/A8.
+Phase 8: Security/WAF/JWT alignment (A2 and cross-service)
+
+Ensure A2 WAF allows M2M and user JWT from trusted services. Standardize token issuer/audience across services. Fix any 401/403 on telemetry and M2M calls.
+Phase 9: Staging vs Demo vs Live toggles
+
+Maintain “Demo Mode” safely namespaced; default to “Live” for real flows.
+Ensure any simulation/backfill uses its own namespace and can be filtered out of analytics.
+Golden Path scenarios (run both)
+
+Scenario A: Zero-to-Dollars (B2C)
+
+A7 → A5: UTMs preserved. If not, fix routing/links.
+A1 OIDC: complete login; /api/probe/auth = pass.
+Lead: create lead; row in DB + A8 event; /api/probe/lead = pass.
+Payment: Stripe element loads in correct mode; canary charge + webhook success; Finance tile and A2 updated; /api/probe/payment = pass.
+Attribution: A8 Growth/SEO show conversion tied to original UTM; /api/probe/data = pass.
+Scenario B: Provider revenue unlock (B2B)
+
+A6: onboard a provider; listing created.
+A3: run bootstrap-day1; verify A8 step counters flip to 1/1; bandit_config enabled.
+A2/A8: provider_connected, listing_created, and downstream signals visible; B2B tile and implied GMV appear.
+App-specific fixes to perform if failing
+
+A3
+
+Upgrade to v3.5.1 telemetry, add checkpoint posts to A8, automate v1.4-Unified prompt bootstrap, and add resiliency (retries/circuit breakers).
+A5
+
+Ensure correct API base URLs, LIVE/TEST mode toggle, webhook route deployed, idempotency on checkout.
+A6
+
+Ensure provider onboarding routes exist; push listing_created and provider_connected events with v3.5.1 headers.
+A8
+
+Replace legacy /ingest listeners; accept /events only. Fix cache invalidation so counters reflect current state. Fleet Health must key off business probes.
+A2
+
+Confirm WAF rule updates to allow JWTs from trusted services; keep fallback sink active.
+Acceptance criteria (must all pass with visual proof)
+
+A8 shows Day-1 Progress 9/9 with visible counter flips.
+Finance tile shows canary revenue and unit economics (3% provider fee, 4x AI services margin).
+B2C and B2B tiles reflect the canary flows (lead created, provider onboarded, listing created).
+Growth/SEO tiles attribute conversion to the original UTM.
+Fleet Health = Green only when all business probes pass; no 401/403 on telemetry; P95 ≤150ms.
+Truth table to return (fill with PASS/FAIL and evidence links/screens)
+
+Traffic (A7→A5): UTMs preserved? [PASS/FAIL] Evidence: network trace + A8 attribution
+Auth (A1): OIDC session established? [PASS/FAIL] Evidence: Set-Cookie + /api/probe/auth
+Lead (A5→A2): Lead persisted + event in A8? [PASS/FAIL] Evidence: DB row + A8 event
+Orchestration (A3): Counters flipped 0/9→9/9? [PASS/FAIL] Evidence: A8 screenshots
+Money (A5/Stripe): Mode LIVE/TEST and webhook ok? [PASS/FAIL + mode] Evidence: charge + webhook receipt + Finance tile
+Provider (A6): Onboarded + listing_created? [PASS/FAIL] Evidence: UI + A8 B2B tile + A2 events
+Optimization (Bandit): Active with conversion rewards? [PASS/FAIL] Evidence: variant logs + A8 learning metrics
+Telemetry (All): v3.5.1 headers everywhere; no 401/403? [PASS/FAIL] Evidence: logs + A8 ingestion stats
+Deliverables (attach to incident)
+
+RCA for each blocker (telemetry 403, TEST cohort 401, 0/9 vs 9/9, A5/A6 404).
+Code/config diffs for A3, A5, A6, A8 (and A2 WAF if changed). Updated secrets manifest.
+Screenshots of A8 tiles (before/after), successful OIDC, Stripe receipt, provider onboarding.
+Synthetic probe playbook updates (auth/lead/payment/data), with commands and expected outputs.
+Docs-first updates to ECOSYSTEM_README and runbooks reflecting v3.5.1 telemetry, probes, orchestration bootstrap, and Demo vs Live toggles.
+Timeline
+
+T+30 min: Telemetry standardized to v3.5.1; TEST cohort 401 resolved.
+T+60 min: A3 orchestration visually 9/9 in A8; bandit_config enabled.
+T+90 min: Canary payment + provider onboarding; Finance/B2B tiles updated.
+T+120 min: Fleet Health tied to business probes; docs/runbooks updated.
+Authorization
+
+You are authorized to rewrite configs, rotate keys, and redeploy services to meet the acceptance criteria above. Go.
