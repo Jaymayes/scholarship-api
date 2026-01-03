@@ -1,0 +1,97 @@
+Subject: URGENT P0 – Scholar Ecosystem “Deep Dive” and Revenue Rescue
+
+Role: Chief Systems Architect & Revenue Operations Lead
+Mode: MAX AUTONOMOUS (Full-stack diagnostic + remediation)
+Priority: P0 (Revenue Blocked – Orchestration stalled at 0/9)
+
+Situation
+
+The frontend (landing pages) is live, but the backend revenue engine is not executing. Dashboard shows “Orchestration stalled at 0/9.” A3 (scholarship_agent) reports UNKNOWN and two critical issues. This means leads from landing pages are hitting a dead end.
+Previous agent status of “Ready” is a false positive. Ping checks are green; business logic is red.
+Mission (What you must achieve)
+
+Bring the entire revenue path online: Landing Page → Auth → Orchestration → Payment → Data/Provider routing → A8 dashboards.
+Clear “Revenue Blocked,” move Day-1 Progress from 0/9 to 9/9, and complete a live end-to-end canary transaction.
+Replace “green-light illusion” probes with real business-logic health probes so Fleet Health reflects true revenue readiness.
+Authority
+
+You are authorized to modify code across A1–A8, edit configs, add env vars/secrets, run migrations, patch health checks, and redeploy. Use safe, reversible changes (feature flags, env toggles, or simulation namespaces). Coordinate secrets changes with least privilege.
+Constraints
+
+Maintain security and privacy. Respect Responsible AI principles. Do not expose secrets in logs or dashboards. Keep P95 latency ≤150ms during and after fixes. Maintain 99.9% target uptime where applicable.
+All simulated data must be namespaced and filterable; no contamination of live analytics.
+Execution Plan
+
+Phase 0: Telemetry and Evidence Capture (10–15 minutes)
+
+Snapshot the current A8 dashboard, A3 status, and “0/9” orchestration state. Save logs (app + ingress) for A1, A3, A8. Tag with incident ID “INC-REVENUE-BLOCKER”.
+Turn on request tracing for cross-app calls. Enable verbose logging only for the incident window; roll back to normal afterward.
+Phase 1: A1 ScholarAuth – Fix the Session Handshake (Blocker class: Authentication)
+
+Verify reverse-proxy trust: enable trust proxy in the web framework (e.g., app.set('trust proxy', 1) or equivalent). Ensure OIDC provider proxy: true/trustProxy: true.
+Cookies: enforce SameSite=None; Secure; HttpOnly; correct Path. Ensure Domain matches the active *.replit.app host; remove any hardcoded prod domain for staging/demo.
+Session store: verify Redis connectivity, TTL ≥300s for auth flows, and adapter persistence. Look for “session not found/cookie not found” in logs.
+Prove fix: run one full OIDC login loop; confirm Set-Cookie correctness and that uid travels across redirect, interaction, and callback. Record evidence.
+Phase 2: A3 scholarship_agent – Resurrect the Orchestration Brain (Blocker class: Orchestration/Config)
+
+Identify why status = UNKNOWN. Typical causes: missing env secrets/API keys, bad prompt bootstrap (v1.4-Unified absent), startup exception, or API timeouts.
+Force initialization: bootstrap app_identity and preflight_check to 1/1. If the dashboard requires pasting v1.4-Unified prompt, automate injection at startup (idempotent, with a feature flag).
+Verify dependencies: confirm A3 has valid URLs and credentials for A1 (auth), A6/A7 (content), A5 (payments), A8 (telemetry). Validate CORS, DNS, and SSL for all inter-app calls.
+Move orchestration steps through 0/9 → 9/9 with logged checkpoints: app_identity, preflight_check, campaign_config, bandit_config, lead_pipeline, provider_pipeline, payment_config, analytics_ingest, dashboard_sync.
+Phase 3: Frontend “Hollow” Click Path – Close the Loop (Blocker class: Routing/Contracts)
+
+Trace the user click “Start Here” from page to backend. Confirm production endpoint, no localhost/dev URLs, and no mixed-content issues.
+Validate payload schema contracts at each hop. Add a contract test to fail fast if schema mismatches.
+Ensure landing pages pass UTM/source so A8 can attribute SEO/conversion correctly.
+Phase 4: Payments – Turn the Revenue Pulse On (Blocker class: Monetization)
+
+Check payment gateway mode and webhooks. If “$7 Test Mode” is displayed, verify test vs live mode is intentional for demo. Ensure webhooks reach the correct public endpoint with secret validation.
+Run a $0.50–$1.00 canary (test key in staging; optional live micro-charge in demo) and confirm:
+Charge created and succeeded
+Order/subscription row written
+A8 Finance tile updates in near-real time
+Provider fee (3%) and AI services margin (4x markup) calculated and visible
+Phase 5: Bandit/Optimization – Make Pages Smart (Blocker class: Growth Efficiency)
+
+Initialize bandit_config and verify it updates candidate variants on scholarship pages. Confirm a/b/epsilon-greedy or Thompson Sampling loop is running.
+Tie bandit metrics to conversions, not just clicks. Ensure feedback is ingested into A8 and visible.
+Phase 6: “Truthful Health” – Replace Ping with Business Probes (Blocker class: Observability)
+
+Update Fleet Health in A8 to include business-logic probes:
+Auth probe: can a synthetic user complete OIDC?
+Lead probe: can a synthetic lead be created and seen in CRM/DB?
+Payment probe: can a $0 trial/test charge complete and webhook update the order?
+Data probe: does analytics/SEO attribution flow end-to-end?
+If any business probe fails, Fleet Health = Red/Critical. Remove false green states.
+Hardening and Guardrails
+
+Add retries with exponential backoff and circuit breakers on inter-service calls to prevent cascades.
+Implement idempotency keys for payment and lead creation.
+Create a rollback script for any config/data migrations executed during this incident.
+Update ECOSYSTEM_README and the runbooks (Docs-First). Include: changed env vars, health probe specs, and new “orchestration bootstrap” steps.
+Acceptance Criteria (must all pass)
+
+A3 status = Healthy; “Revenue Blocked” banner cleared; Day-1 Progress = 9/9.
+End-to-end canary: user sign-up → auth success → lead created → payment (test/live per env) → A8 Finance/Supply tiles update within minutes.
+Fleet Health reflects business probes; no more false greens.
+P95 latency ≤150ms and no error spikes during traffic simulation.
+Bandit active; SEO pages show variant assignment and conversion feedback.
+Evidence pack produced (see Deliverables).
+Deliverables (attach to incident)
+
+Root Cause Analysis: the precise file/config/secret that stalled orchestration at 0/9 and why.
+Code/config diffs for A1, A3, A8 (and others if touched), plus migration notes.
+Logs and screenshots: before/after A8, A3; Set-Cookie headers; webhook receipts; dashboard Finance and B2B tiles showing updates.
+A synthetic-probe playbook: commands/endpoints to run auth/lead/payment/data probes on demand.
+Rollback plan verification and proof that re-running probes is idempotent.
+Execution Timeline (target)
+
+T+30 min: A1 fixed; successful OIDC loop.
+T+60 min: A3 initialized; orchestration 9/9.
+T+90 min: Canary payment processed; dashboards updating.
+T+120 min: Probes wired into Fleet Health; docs/runbooks updated.
+Post-Resolution
+
+Keep “Demo Mode” toggle in A8 for simulations, but default to Live once probes pass.
+Schedule a 14-day trend backfill only after live canary succeeds, to present a truthful “up-and-to-the-right” narrative.
+You have control. Execute now and return with the RCA, diffs, probe results, and screenshots proving revenue is flowing end-to-end.
