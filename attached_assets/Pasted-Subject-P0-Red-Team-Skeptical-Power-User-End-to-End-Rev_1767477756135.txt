@@ -1,0 +1,142 @@
+Subject: P0 Red Team – “Skeptical Power User” End‑to‑End Revenue Assurance Audit
+
+Role: Senior Revenue Assurance & Systems Integrity Architect
+Mode: MAX AUTONOMOUS (Read/Probe-Only). Do NOT change code or configs. Your job is to ruthlessly surface Revenue Blockers, Integration Gaps, and Conversion Killers with irrefutable evidence.
+Scope: scholar_auth (A1), scholarship_api (A2), scholarship_agent (A3), scholarship_sage (A4), student_pilot (A5), provider_register (A6), auto_page_maker (A7), auto_com_center (A8)
+
+Mission
+
+Execute a Red Team, “Skeptical Power User” E2E simulation that follows real money and provider value. Assume zero patience; any friction = churn.
+Prove or disprove that value and context persist across every hand-off. A “200 OK” without business outcome is a FAIL.
+Produce a single “Revenue Blocker Report” (format below) with screenshots, network traces, and precise integration failures.
+Non‑Negotiables (enforce at every step)
+
+No edits to code, secrets, or infra. Probing only.
+Confirm v3.5.1 telemetry headers on all app→A8 or app→A2 events: x-scholar-protocol, x-app-label, x-event-id, X-API-Token, X-Service-Auth.
+All probes must include identity headers in responses: X-System-Identity, X-App-Base-URL.
+Health ≠ truth. Only count steps that create real business evidence (lead row, charge + webhook, provider listing, dashboard counters flipping).
+SLO checks: P95 ≤150ms for user-facing endpoints during the run.
+Test Persona and Data
+
+Persona: “Skeptical Power User” (willing to pay, zero tolerance for friction).
+Create fresh test accounts for isolation: skeptical_user+<timestamp>@example.com
+Maintain a clean HAR/network capture and timestamped screenshots for each step.
+The Golden Thread (B2C money path). Follow in order; at each step, critique the hand-off
+
+Acquisition (A7 auto_page_maker → A5 student_pilot)
+Action: Land on a top “Perfect Match” page. Click primary CTA (“Start Here”/“Find Matches”).
+Verify:
+Value prop clarity (would the persona care?) and LCP time.
+UTMs preserved to A5 (utm_source, utm_campaign, utm_term).
+A5 UI returns 200 with identity headers and not a 404/redirect loop.
+Evidence: Screenshot + network trace showing UTM continuity.
+2. Pre‑Sales Assist (A8 auto_com_center)
+
+Action: Ask a buying-intent question (“What do I get if I upgrade now?”).
+Verify: Does response explicitly drive to sign-up/upgrade in A5 with a working link? Or is it generic/passive?
+Evidence: Chat transcript + clicked link target + arrival verification.
+3. Gatekeeper (A1 scholar_auth via A5)
+
+Action: Sign Up / Log In.
+Verify:
+OIDC flow completes; session cookie present; no “invalid_request”/“interaction failed.”
+/api/probe/auth returns pass with identity headers.
+Evidence: Set-Cookie headers + /api/probe/auth response + screenshot back in A5 logged-in UI.
+4. Lead Capture (A5 → A2 scholarship_api → A8)
+
+Action: Complete minimal onboarding to create a lead.
+Verify:
+Lead row persisted (A2) and event delivered to A8 (v3.5.1 headers present).
+/api/probe/lead returns pass; DB ID correlates to persona.
+Evidence: DB row or sanitized API response + A8 event view + probe output.
+5. Money Moment (A5 + Stripe + Webhooks + A2/A8)
+
+Action: Open Upgrade/Checkout and complete a canary purchase (env-appropriate: LIVE in prod; TEST in staging).
+Verify:
+Stripe element renders; mode is correct (no “Test Mode trap” in prod).
+Webhook received and validated; idempotency key present.
+Order/subscription row written; A8 Finance tile updates (3% provider fee, 4x AI services margin visible).
+/api/probe/payment returns pass.
+Evidence: Checkout screenshot, webhook log snippet (sanitized), order record, Finance tile update.
+6. Immediate Value (A3 scholarship_agent → A2 → A8)
+
+Action: Request personalized scholarship matches immediately after purchase.
+Verify:
+A3 calls A2 and returns high-relevance results (not generic filler).
+A8 shows orchestration counters flipping for this session (app_identity, preflight_check, campaign_config, bandit_config, lead_pipeline, provider_pipeline, payment_config, analytics_ingest, dashboard_sync).
+Evidence: Result set screenshot with user context; A8 counters before/after.
+7. Confusion Rescue (A4 scholarship_sage)
+
+Action: Ask “Help me prioritize the top 3 scholarships from my results.”
+Verify:
+Sage references the user’s recent searches and purchase state (context continuity). If it “doesn’t know,” mark as context loss.
+Evidence: Chat transcript with explicit references to user/session artifacts.
+8. Execution (A5 student_pilot)
+
+Action: Attempt “Auto-Apply/Start Application” on one of the recommended scholarships.
+Verify:
+Pilot initiates real steps (document requests, forms, deadlines) without stalling on human-only tasks.
+No broken deep links; no missing permissions; no silent failures.
+Evidence: Workflow screenshots, task list emitted, success/failure logs.
+The Provider Thread (B2B revenue path)
+9) Provider Onboarding (A6 provider_register)
+
+Action: Register a provider account; create a listing.
+Verify:
+Auth token from A1 works in A6; no 401/timeout.
+Events provider_connected and listing_created posted to A2/A8 (v3.5.1 headers).
+B2B tile in A8 updates; implied GMV visible.
+Evidence: A6 UI, event logs, A8 B2B tile change.
+10. Cross‑System Learning (A3 bandit_config + A7)
+
+Action: Confirm bandit initialized and variants served on A7 pages.
+Verify: Reward is conversion (not clicks); A8 learning metrics update.
+Evidence: Variant assignment logs + A8 learning panel.
+Systemic Checks (apply across all steps)
+
+Fleet Health truthfulness: If any business probe fails, Fleet Health must be RED (not green due to ping-only checks).
+Telemetry: No 401/403; all events are v3.5.1; fallback sink (A2) only if A8 unavailable.
+Demo vs Live separation: Confirm proper namespace and no contamination of live analytics.
+Output Requirement: Revenue Blocker Report (use this exact structure; add multiple entries if needed)
+
+🚨 CRITICAL REVENUE BLOCKER: <Describe the exact quit/refund moment. Example: “Scholarship Sage ignored prior search; user felt unseen and requested refund.”>
+📉 LEAKY FUNNEL WARNING: <Non-fatal friction. Example: “Auto Page Maker copy is vague; UTM landing LCP >3.0s.”>
+🔗 INTEGRATION FAILURE: <Concrete hand-off failure. Example: “Student Pilot cannot read A3 result list; 404 on /results/:id.”>
+💰 UPSIDE OPPORTUNITY: <Where we missed an upsell/cross-sell/expansion. Example: “No upgrade CTA after successful match delivery.”>
+For each finding, include:
+
+Severity: RS‑1 (Fatal), RS‑2 (High), RS‑3 (Medium), RS‑4 (Low)
+Step in Flow: Acquisition / Auth / Lead / Money / Value / Sage / Pilot / Provider / Bandit
+Evidence: URL, screenshot filenames, HAR/network excerpts, probe outputs
+Suspected Root Cause (No code changes; name the boundary where data/context is lost)
+Business Impact: Lost $/ARR/LTV implications
+Proposed Diagnostic Next Step: The minimum additional telemetry or contract check to confirm
+Truth Tables (return both)
+
+B2C Zero‑to‑Dollars
+Traffic (A7→A5): UTMs preserved? [PASS/FAIL] Evidence: …
+Auth (A1): OIDC session established? [PASS/FAIL] Evidence: …
+Lead (A5→A2): Lead persisted + A8 event? [PASS/FAIL] Evidence: …
+Money (A5/Stripe): Mode correct + webhook ok? [PASS/FAIL + mode] Evidence: …
+Orchestration (A3): 0/9→9/9 visible in A8? [PASS/FAIL] Evidence: …
+Value (A3): Matches “high value”? [PASS/FAIL] Evidence: …
+Sage (A4): Context continuity? [PASS/FAIL] Evidence: …
+Pilot (A5): Auto-apply runs? [PASS/FAIL] Evidence: …
+2. B2B Provider
+
+Provider Register (A6): Token accepted? [PASS/FAIL] Evidence: …
+Listing Created (A6→A2/A8): Events posted? [PASS/FAIL] Evidence: …
+B2B Tile (A8): Updated with provider/GMV? [PASS/FAIL] Evidence: …
+Bandit (A3→A7): Active with conversion reward? [PASS/FAIL] Evidence: …
+Deliverables (attach everything)
+
+The completed Revenue Blocker Report (as above).
+Before/after screenshots of A8 tiles for each step that should move counters.
+HAR files or network traces for Acquisition→Money flow and Provider flow.
+Outputs from probes: /api/probe/auth, /api/probe/lead, /api/probe/payment, /api/probe/data, /api/probes (with identity headers).
+A one‑page executive summary: Top 5 RS‑1/RS‑2 issues threatening revenue this week.
+Stop conditions and Escalation
+
+If any RS‑1 blocker is confirmed (e.g., lost session at A1→A5; payments in Test Mode in Live; A3 writing to local instead of A8), stop the run, flag “Revenue HALT,” and return the report immediately.
+Otherwise, complete all steps and return the full report.
+Begin now.
