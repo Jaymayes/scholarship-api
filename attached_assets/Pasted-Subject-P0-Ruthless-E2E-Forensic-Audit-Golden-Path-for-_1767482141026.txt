@@ -1,0 +1,104 @@
+Subject: P0 – Ruthless E2E Forensic Audit (Golden Path) for Revenue Truth
+
+Role: Lead System Architect + Chief Revenue Officer
+Mode: MAX AUTONOMOUS (Probe-Only + Evidence + Fix Action Plan)
+Mission: The system is “False Positive Ready.” Your job is to ruthlessly identify every technical failure, data gap, and logic error that blocks revenue or corrupts Command Center reporting. Assume nothing works until proven with logs and database entries.
+
+Ecosystem Map (audit all hand-offs)
+
+Auth/Identity: scholar_auth (A1)
+Data Backbone: scholarship_api (A2)
+Logic/Matching: scholarship_agent (A3), scholarship_sage (A4)
+User Interfaces: student_pilot (A5), provider_register (A6)
+Marketing: auto_page_maker (A7)
+Central Intelligence: auto_com_center (A8) — currently failing to aggregate
+Global Rules (apply everywhere)
+
+No code changes; probe-only. Your output must include file paths and minimal diffs for fixes, but do not apply them.
+A “200 OK” without business outcome = FAIL. Only count evidence that appears in the database and in A8 tiles.
+Enforce telemetry v3.5.1 everywhere: x-scholar-protocol, x-app-label, x-event-id, X-API-Token, X-Service-Auth.
+All probe responses must include identity headers: X-System-Identity, X-App-Base-URL.
+SLO target: P95 ≤150ms for user-facing endpoints during probes.
+If you cannot verify data moved from Node A to Node B with concrete evidence, mark as FAILURE.
+Execute the Golden Path (simulate a full lifecycle). At each phase, collect screenshots, HAR/network traces, API logs, DB rows, and the A8 tile or event that proves it.
+
+Phase 1 – Acquisition & Traffic (Marketing Check: A7 → A5 → A8)
+
+Action: Load a top A7 landing page. Click the primary CTA to A5.
+Verify:
+Page renders with clear value prop; LCP <3s.
+UTM parameters preserved into A5.
+A8 receives a v3.5.1 page_view/click event. Confirm in A8 ingestion and Growth/SEO tiles within 2 minutes.
+CRITICAL CHECK: If A8 shows no event for this visit/click, log High Priority Reporting Failure and identify which sender still uses legacy v3.3 /ingest or missing auth headers.
+Phase 2 – Onboarding (Identity Check: A1 via A5 → A8)
+
+Action: New sign-up via A1 (from A5).
+Verify:
+OIDC loop completes; Set-Cookie shows SameSite=None; Secure; trust-proxy honored.
+Session persists; /api/probe/auth (if present) passes with identity headers.
+A8 receives user_signup event; B2C tile increments user count for this cohort.
+CRITICAL CHECK: If A8 user count does not change within 2 minutes, mark FAILURE and locate the emitter path in A5/A1 responsible for user_signup events.
+Phase 3 – The Revenue Trigger (Provider/Payment: A6 + Stripe + A2 → A8)
+
+Action: Provider registers in A6 and completes subscription/Connect flow.
+Verify:
+JWT from A1 accepted by A6; no 401/403/WAF blocks.
+Stripe element renders in the correct mode (LIVE in prod, TEST in staging); webhook received and validated; idempotency key used.
+A2 updates provider role/listing; A8 Finance tile reflects transaction; B2B tile increments provider funnel.
+CRITICAL CHECKS:
+Payment cleared? If not, identify failing step (missing key, webhook route, WAF/CORS).
+Did A2 elevate role and emit provider_connected/listing_created? If not, capture the failing API call and contract mismatch.
+Phase 4 – Service Delivery (Value Check: A5 + A3 + A2 + A4 → A8)
+
+Action: From A5, request scholarship matches (A3→A2) and then ask A4 for prioritization help; attempt “Auto-apply” in A5.
+Verify:
+A3 returns “high value” matches (not generic). Show query context, filters, and returned IDs.
+A4 (sage) references the user and the exact recent results (context continuity). If it “doesn’t know,” mark as context loss.
+A5 “Auto-apply” initiates tangible steps (document requests, deadlines, forms) without stalling.
+A8 receives usage metrics: match_returned, sage_assist, application_started, all with v3.5.1 headers.
+CRITICAL CHECK: If any of these usage events don’t appear in A8 within 2 minutes, identify which emitter is misconfigured and why.
+Cross-Cutting Forensics (run in parallel)
+
+Orchestration Truth: A3 claims 9/9? Prove it visually in A8 (app_identity, preflight_check, campaign_config, bandit_config, lead_pipeline, provider_pipeline, payment_config, analytics_ingest, dashboard_sync). If A8 still shows 0/9, capture A3’s sender endpoint, headers, and payload; likely writing to local or wrong endpoint.
+Telemetry Drift: Search for any v3.3 /ingest usage; replace with /events v3.5.1 in recommendations.
+A8 Cache/Health: If counters lag, prove whether A8 cache or authorization is the bottleneck (403 on old paths).
+Demo vs Live: Confirm namespacing so simulated traffic doesn’t contaminate Live tiles.
+Required Output – THE BLOCKER REPORT (use these four sections; list multiple items per section as needed)
+
+The “Silent” Failures
+List data points that occurred in apps but never appeared in A8. For each:
+Symptom
+Evidence (endpoint/headers/payload, log lines, DB row)
+Suspected Root Cause (e.g., legacy /ingest 403, missing X-API-Token, CORS, webhook secret mismatch, DB write to wrong schema)
+Proposed Fix Action Plan:
+Repository and file path to patch (identify exact emitter/handler module)
+Minimal code diff (header injection, endpoint change, trust-proxy/cookie flags, Stripe mode toggle, webhook route map)
+Owner team
+2. Revenue Stoppers
+
+List friction points preventing payment (broken buttons, confusing UI copy, timeouts, offsite loops, 404s on checkout).
+Evidence with timestamps and HAR
+Root Cause hypothesis
+Proposed Fix Action Plan (repo/file and minimal diff)
+3. Marketing Disconnects
+
+Identify where A7 leads fail to enter the funnel.
+Evidence (UTM drop, wrong link targets, A5 asleep/404, bot-blocked telemetry)
+Proposed Fix Action Plan (repo/file and minimal diff)
+4. Fix Action Plan (Consolidated, prioritized by impact)
+
+RS-1 (Fatal), RS-2 (High), RS-3 (Medium), RS-4 (Low)
+For each item provide:
+Repo and file path(s)
+Minimal diff (pseudo-code is acceptable but must be specific)
+Test to prove fix (API probe or business-logic probe)
+Rollback plan
+Truth Tables (return both with PASS/FAIL and concrete evidence)
+
+B2C Zero-to-Dollars: Traffic (A7→A5), Auth (A1), Lead (A5→A2), Money (A5/Stripe + webhook), Orchestration (A3 counters in A8), Value (A3 result quality), Sage (A4 context continuity), Pilot (A5 auto-apply executes)
+B2B Provider: Provider Register (A6 token accepted), Listing Created (A6→A2/A8 events), B2B Tile (A8 update), Bandit (A3→A7 active with conversion reward)
+Stop Conditions and Escalation
+
+If any RS-1 is confirmed (payments in Test Mode on Live, A3 writes to wrong endpoint, A1 session loss), stop and return the report immediately with the failing hand-off captured.
+Otherwise finish all phases and deliver the full Blocker Report with evidence, diffs, and owner assignments.
+Begin now.
