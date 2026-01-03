@@ -1,0 +1,135 @@
+Role: Lead QA Architect + Chief Revenue Officer
+Mode: MAX AUTONOMOUS (Full-stack diagnostic + remediation + verification)
+Priority: P0 (Revenue blocked). Phase 1 (A1 OIDC fix) is DONE. Proceed with remaining phases.
+
+Incident ID: INC-REVENUE-BLOCKER
+Objective: Find and fix anything that prevents the ecosystem from converting traffic into revenue and provider value. Prove—visually in A8—that marketing → lead → payment → provider → analytics all work end-to-end in production.
+
+Authority
+
+You are authorized to change code/config across A1–A8, rotate secrets, migrate telemetry to v3.5.1, add business-logic probes, and redeploy. Use reversible, feature-flagged changes and keep secrets out of logs.
+Prechecks (must confirm before executing)
+
+Phase 1 OIDC fix verified via live login on A1. Cookies: SameSite=None; Secure; proxy/trust enabled. Sessions persisted.
+Phase 6 business-logic probes exist and respond with identity headers:
+/api/probe/auth, /api/probe/lead, /api/probe/data, /api/probes (aggregate)
+Each returns X-System-Identity and X-App-Base-URL.
+Known issues to reconcile now
+
+A8 telemetry 403 on legacy v3.3 /ingest; v3.5.0 /events works. Standardize all telemetry to v3.5.1.
+TEST cohort generator failing with 401 due to missing/old headers.
+Historical “orchestration 0/9” vs logs “9/9” inconsistency; eliminate stale cache or local write issues.
+A5/A6 previously returned 404 in health endpoints (recheck).
+Hard requirements for telemetry (v3.5.1)
+
+Headers on every event to A8 or A2 fallback: x-scholar-protocol: v3.5.1, x-app-label: <app>, x-event-id: <uuid>, X-API-Token: <token>, X-Service-Auth: <service-jwt>.
+Any v3.3 sender must be upgraded or disabled. No mixed protocols.
+The E2E Golden Path Scenarios (run both)
+
+Scenario A: “Zero-to-Dollars” B2C Flow (A7 → A5 → A1 → A5 → A5/A2/A8)
+
+Acquisition (A7 → A5)
+Simulate a visit to a top “Perfect Match” landing page. Click “Start Here.”
+Verify UTM preservation to A5 (utm_source, utm_campaign, utm_term). If dropped, fix link/handoff and add a contract test to prevent regressions.
+2. Auth (A1 via A5)
+
+Trigger Sign Up. Complete OIDC loop and return to A5 with a valid session.
+Probe /api/probe/auth should return pass and identity headers.
+3. Lead Creation (A5 → A2)
+
+Complete initial onboarding step to create a lead. Confirm:
+Lead row persisted in A2 (or designated DB).
+Event delivered to A8 with v3.5.1 headers.
+/api/probe/lead passes.
+4. Payment Enablement (A5 + A2 + A8)
+
+Open Upgrade/Subscription. Verify Stripe in LIVE mode for production (TEST mode acceptable in staging demo).
+Confirm webhook endpoint deployed, secret validated, idempotency keys used.
+Execute a canary payment (tiny live charge in production or test charge in staging), then verify:
+Charge succeeded; order/subscription row created.
+A8 Finance tile updates within minutes (provider fee 3% and AI services margin 4x visible).
+A2 receives payment_succeeded event (fallback sink if A8 is unavailable).
+5. Analytics/Attribution (A8)
+
+A8 Growth tile shows the session/conversion attributed to the original UTM.
+Finance and B2C tiles reflect the transaction; latency within target (P95 ≤150ms).
+Scenario B: “Provider Revenue Unlock” B2B Flow (A6 Portal + A3 Orchestration + A2/A8)
+
+Provider Signup (A6)
+Sign up a canary provider via A6. Validate onboarding steps and listing creation.
+Ensure provider_connected and listing_created events arrive at A2/A8.
+2. Orchestration Bootstrap (A3)
+
+Force-run the bootstrap-day1 (or equivalent) orchestration with explicit checkpoints:
+app_identity, preflight_check, campaign_config, bandit_config, lead_pipeline, provider_pipeline, payment_config, analytics_ingest, dashboard_sync.
+If logs say 9/9 but A8 shows 0/9, fix endpoint misrouting:
+Point A3 telemetry to production A8 v3.5.1 endpoint.
+Bust any A8 cache that masks new counters.
+Re-run until A8 visually flips each step to 1/1.
+3. Optimization Engine (Bandit)
+
+Initialize bandit_config and confirm variant assignment/rotation on scholarship pages.
+Tie bandit rewards to conversions (not clicks). Confirm signals flow into A8.
+4. Provider Value Confirmation
+
+Create a synthetic student-provider match (if applicable) and verify downstream events (e.g., application_started, provider_view).
+Confirm B2B Supply tile shows provider increments and implied GMV.
+Core Fixes to perform during scenarios (if failing)
+
+A8/A2 Telemetry
+
+Migrate all senders from v3.3 /ingest to v3.5.1 /events; update auth to X-API-Token and X-Service-Auth; include x-scholar-protocol: v3.5.1 and x-app-label.
+Update TEST cohort generator to use the new headers. Re-run; 401s must disappear.
+A3 Orchestration UNKNOWN
+
+Validate env secrets (API keys, base URLs). Ensure CORS/SSL and DNS are correct.
+Add explicit startup bootstrap for v1.4-Unified prompt if required; automate this step with idempotent init.
+Add circuit breakers and retries on inter-app calls; log each checkpoint posted to A8.
+A5/A6 404
+
+Bring both apps online at their production .replit.app URLs. Ensure /health and /status return 200 and identity headers.
+Verify routes for checkout (A5) and onboarding (A6) exist and call the correct backends.
+Security/WAF/JWT
+
+Ensure A2 WAF allows M2M and user JWTs from whitelisted services. Standardize token audience and issuer across services.
+Add rate limits and CSRF/CORS rules per app; preserve SameSite=None; Secure cookies.
+Business-logic health (Fleet Health must reflect truth)
+
+Make Fleet Health red if any of these probes fail:
+Auth probe: synthetic OIDC loop success
+Lead probe: lead created and visible in DB
+Payment probe: canary payment and webhook success
+Data probe: analytics event from A7 → A8 with UTMs
+Replace/augment any ping-only probes.
+Acceptance Criteria (must all pass; do not proceed until each passes)
+
+Visual proof in A8 that Day-1 Progress is 9/9 (not just logs). Each checkpoint flips from 0/1 to 1/1.
+Finance tile shows real canary revenue; B2B Supply shows provider onboarding and GMV signals.
+Growth/SEO tiles attribute the canary conversion to original UTM.
+Fleet Health reflects business probes (green only when all probes pass).
+P95 latency ≤150ms across touched services during the test window.
+No 401/403 on telemetry; all telemetry uses v3.5.1 headers.
+Truth Table to return (fill with PASS/FAIL and evidence links/screens)
+
+Traffic (A7 → A5): UTMs preserved? [PASS/FAIL] Evidence: network trace + A8 attribution
+Auth (A1): OIDC session established? [PASS/FAIL] Evidence: Set-Cookie + /api/probe/auth
+Lead (A5 → A2): Lead persisted and event in A8? [PASS/FAIL] Evidence: DB row + A8 event
+Orchestration (A3): Dashboard counters flipped? [0/9 → 9/9] Evidence: A8 screenshots
+Money (A5/Stripe): Mode = LIVE (prod) or TEST (staging)? [STATE] Evidence: charge + webhook receipt + Finance tile
+Provider (A6): Onboarded and events emitted? [PASS/FAIL] Evidence: A2 rows + A8 B2B tile
+Optimization (Bandit): Active with conversion feedback? [PASS/FAIL] Evidence: variant logs + A8 learning metrics
+Deliverables (attach to the incident)
+
+RCA: pinpoint file/config/env variable that caused each blocker (telemetry 403, orchestration 0/9, A5/A6 404, TEST cohort 401).
+Code/config diffs for A1, A2, A3, A5, A6, A8; migration notes; updated secrets list.
+Screenshots: A8 counters flipping; Finance/B2B/Growth tiles; successful OIDC; Stripe receipt; provider onboarding UI.
+Synthetic probe playbook: exact endpoints/commands to re-run auth/lead/payment/data probes.
+Rollback plan validated; idempotency demonstrated for payments and lead creation.
+Docs-first: update ECOSYSTEM_README and runbooks with new telemetry protocol (v3.5.1), business probes, and orchestration bootstrap steps.
+Execution timeline
+
+T+30 min: Telemetry standardized to v3.5.1; TEST cohort 401 resolved.
+T+60 min: A3 orchestration visually 9/9 in A8.
+T+90 min: Canary payment executed; Finance tile updated; provider onboarded; B2B tile updated.
+T+120 min: Business probes wired to Fleet Health; documentation updated.
+Go now. Report back with the completed Truth Table, diffs, screenshots, and a single-page executive summary confirming that the end-to-end revenue path is live and attributable.
