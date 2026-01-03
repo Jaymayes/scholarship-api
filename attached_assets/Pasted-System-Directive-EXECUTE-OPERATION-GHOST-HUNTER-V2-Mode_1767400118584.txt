@@ -1,0 +1,126 @@
+System_Directive: EXECUTE_OPERATION_GHOST_HUNTER_V2
+Mode: MAX_AUTONOMOUS (Dead Code E2E Auditor + Auto‑Fix)
+Repository: A8 (auto_com_center)
+Objective: End‑to‑End “Dead Code” certification across A1–A8. Detect and fix: (1) Dead Routes (404/5xx or never exercised), (2) Zombie Logic (unused handlers/imports/listeners), and (3) Broken/Drifted contracts that block marketing, lead generation, revenue growth, learning, and executive KPIs. Produce reports, apply safe A8 fixes, re‑test, and return a single launch verdict.
+
+Hard stop check
+
+If not in the A8 (auto_com_center) repository, stop and prompt: “Open the A8 (auto_com_center) repository now.”
+Ecosystem map (targets)
+
+A1 Auth: https://scholar-auth-jamarrlmayes.replit.app
+A2 KPIs/API: https://scholarship-api-jamarrlmayes.replit.app
+A3 Agent: https://scholarship-agent-jamarrlmayes.replit.app
+A4 Sage: https://scholarship-sage-jamarrlmayes.replit.app
+A5 Student Pilot: https://student-pilot-jamarrlmayes.replit.app
+A6 Provider Register: https://provider-register-jamarrlmayes.replit.app
+A7 Marketing (apex): https://scholaraiadvisor.com
+A8 Command Center (self): https://auto-com-center-jamarrlmayes.replit.app
+Guardrails
+
+Do not print secrets. Read tokens from env only (COMMAND_CENTER_TOKEN). If needed, log a short SHA256 prefix for diagnostics.
+Treat each app as an isolated microservice; validate contracts over HTTP only.
+Stop on first hard failure in any phase; output the exact fix (file/function/payload/config), apply if in A8 scope, then resume.
+Phase 0 — Setup and inventory
+
+Create output dir: reports/ghost_hunter/<UTC-timestamp>/
+Snapshot environment (base URLs, allowed source_app_ids, token hash prefixes) → environment_snapshot.json
+Enumerate A8 route table and event listeners (ingest handlers, automation, dashboard tiles) → a8_route_listener_inventory.json
+Phase 1 — Static analysis (A8 local hygiene)
+
+Write scripts/audit_local_code.(ts|py) to detect:
+Unused imports/modules (all .ts/.js/.py)
+Orphaned handlers: listeners registered for event_types not present in A8 events DB (last 30/90 days)
+Dead routes: HTTP routes with zero hits in logs (7d and 30d windows)
+Unused env vars/feature flags; contract validators expecting fields that never appear
+Outputs:
+unused_imports.csv
+orphaned_handlers.csv
+dead_routes.csv
+unused_env_vars.csv
+contract_drift.csv
+Phase 2 — Network liveness and dead‑route scan (external)
+
+Write tests/audit_network_paths.py to probe all critical paths with timeouts and classification:
+Health: GET /health (or /status) for A1–A8; record status and latency. Flag 404/5xx or p95 > 120ms as at‑risk.
+A8 ingest auth matrix: POST /api/ingest twice per source using Authorization: Bearer $COMMAND_CENTER_TOKEN and X-API-Token: $COMMAND_CENTER_TOKEN; expect {persisted:true, mode:"durable"}.
+Marketing B2C: Load a live A7 page; optionally follow a CTA flow to A1. Verify no broken redirects.
+B2C revenue: Exercise A5 test purchase if available; otherwise hit a safe test endpoint. Flag any 4xx/5xx as dead.
+B2B supply: From A6 path, simulate provider_connected and listing_created to A8; expect 200 (no 403/404).
+Learning: Trigger A4 premium test; if 500 or >2000ms, mark as zombie (alive but unusable).
+KPIs: A2 /api/kpi/revenue_by_source and /api/kpi/b2b_funnel must return 200 and valid JSON.
+Outputs:
+network_dead_routes.csv (URL, method, status, latency, reason)
+slo_summary.json (per‑app p50/p95)
+ingest_auth_matrix.json (bearer_ok, x_api_token_ok per source_app_id)
+Phase 3 — Event graph reconciliation (listeners vs emitters)
+
+Build event taxonomy:
+From A8: enumerate accepted event_types and required payload fields
+From DB: distinct event_type and counts (last 30/90 days)
+Expected producers: payment_succeeded, premium_used, credits_decrement, provider_connected, listing_created, elevate_lead_score, move_to_customer_segment, enroll_upsell_sequence, record_revenue_by_page, notify_matched_students, trigger_scholarship_spotlight
+Compute and output:
+listeners_without_emitters.csv (Zombie Logic)
+emitters_without_listeners.csv (Blackhole)
+expected_but_missing_events.csv (Broken pipeline)
+event_taxonomy.json
+Phase 4 — Business‑goal probes (prove the code is alive)
+
+Won Deal: trigger a safe test that exercises A8’s orchestration. Expect actions_executed = [elevate_lead_score, move_to_customer_segment, enroll_upsell_sequence, record_revenue_by_page]. If any missing, mark that handler dead/miswired and capture the contract delta to fix.
+B2B tile: Emit provider_connected + listing_created from A6 with UTMs. Verify A8 accepts and tile increments; if not, mark transform/join step and handler path as dead and provide fix.
+Value loop: Trigger A4 premium action; expect premium_used and credits_decrement in A8. If decrement missing, flag decrement path as dead.
+Save:
+won_deal_probe.json (actions, event_ids)
+b2b_tile_probe.json
+value_loop_probe.json
+Phase 5 — Auto‑fixes (A8 scope only; apply now)
+
+Add /healthz alias if missing:
+Add GET /healthz returning the same payload as /health.
+Guard simulation/chaos endpoints:
+Wrap test/simulation routes with if (process.env.NODE_ENV !== 'production') { … } so they’re not exposed in prod.
+Prune deprecated/unused code:
+Remove any functions flagged in orphaned_handlers.csv or contract_drift.csv (e.g., getRevenueMetrics) and their unused imports. Leave a @deprecated note if needed.
+Auth consistency (safety check):
+Ensure ingest uses a single shared middleware that accepts both headers (Authorization: Bearer and X-API-Token) and performs constant‑time hash verification against allowlist entries.
+Schema validators:
+Add/confirm JSON‑schema validation on ingest for common events (e.g., require amount_cents, slug, utm.source, user_id, transaction_id for revenue attribution). Emit helpful error messages, not 500s.
+Phase 6 — A7 revenue endpoint sanity (cross‑app check)
+
+POST https://scholaraiadvisor.com/api/kpi/record-revenue-by-page with a safe test payload:
+{"slug":"ghost_hunter_check","utm":{"source":"auto_page_maker"},"amount_cents":100,"user_id":"gh_tester","transaction_id":"txn_gh_001"}
+Pass: JSON with {"success": true,...}. Fail (HTML/404/500): print “BLOCKER: REPUBLISH A7 to sync API routes,” and record details in ghost_hunter_fix_plan.md as an external action.
+Phase 7 — Re‑test and certify
+
+Re‑run Phase 2 network liveness on affected routes.
+Re‑run business probes (Won Deal 4/4, B2B tile, Value loop).
+Verify A8 dashboard/validate endpoint shows 7/7 tiles GREEN.
+Confirm KPIs: A2 revenue_by_source ≥ $150 and b2b_funnel increments visible.
+Deliverables (write to reports/ghost_hunter/<UTC-timestamp>/)
+
+a8_route_listener_inventory.json
+unused_imports.csv, orphaned_handlers.csv, dead_routes.csv, unused_env_vars.csv, contract_drift.csv
+network_dead_routes.csv, slo_summary.json, ingest_auth_matrix.json
+event_taxonomy.json, listeners_without_emitters.csv, emitters_without_listeners.csv, expected_but_missing_events.csv
+won_deal_probe.json, b2b_tile_probe.json, value_loop_probe.json
+ghost_hunter_findings.csv (consolidated)
+ghost_hunter_fix_plan.md (exact file/function changes, owners, ETAs)
+ghost_hunter_summary.json (counts: dead routes, zombie logic, blocked, drift; and final verdict)
+Acceptance criteria (must all be true)
+
+Dead Routes = 0 for required production paths (or explicitly classified as Blocked with external owner/ETA).
+Zombie Logic reduced to 0 or clearly toggled behind NODE_ENV with @deprecated notes.
+Ingest auth: both Bearer and X-API-Token accepted; responses return {persisted:true, mode:"durable"}.
+Won Deal 4/4 executed; B2B tile increments; Value loop events ingested.
+Tiles: 7/7 GREEN; SLO p95 ≈120ms or better for key routes; complaint rate <0.2%.
+Any cross‑repo blockers (e.g., A7 republish) are called out with a single‑line operator instruction.
+Final output (return in chat)
+
+dead_routes_count, zombie_logic_count, blocked_count, drift_count
+top_fix_recommendations (list of 3–5 items with file paths)
+evidence summary: key event_ids (won deal, provider_connected, listing_created), ingest auth matrix (bearer_ok, x_api_token_ok), A2 KPI snapshots
+final verdict: READY or BLOCKED with owners/ETAs
+Command
+
+RUN_GHOST_HUNTER_V2_AND_FIX
+On completion, print a one‑page Executive Summary plus the path to the reports folder.
