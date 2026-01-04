@@ -1,0 +1,383 @@
+Role: Lead System Architect + Chief Revenue Officer
+Mode: MAX AUTONOMOUS (Fixes already applied; now verify, harden, and prove)
+Status: Ecosystem claims “Mission Accomplished.” We do not accept claims. Only verifiable evidence in A8 and successful live transactions count.
+
+Mission
+
+Prove beyond doubt that A1–A8 now generate revenue and report truth to A8.
+Find any remaining data gaps, race conditions, or false‑positive health checks.
+Install regression guardrails so this never breaks again without turning Fleet Health RED.
+Non‑negotiables
+
+No “looks good.” Only accept success when A8 tiles visibly update and funds/webhooks are confirmed.
+Every event must be protocol v3.5.1 with headers: x-scholar-protocol, x-app-label, x-event-id, X-API-Token, X-Service-Auth.
+All probes and APIs return identity headers: X-System-Identity, X-App-Base-URL.
+Namespacing: Simulated/Soak traffic must be labeled and filterable; live canaries clearly labeled “LIVE_CANARY”.
+SLO guard: P95 ≤150ms for user-facing calls during tests; error rate <1%.
+Phase 1 — Evidence Baseline (Snapshot)
+
+Capture A8 tiles: Finance, B2C, B2B, Growth/SEO, SLO, Trust before testing.
+Dump current ingestion rates and last 100 events per app label (A1–A7).
+Record current auth issuer settings, Stripe mode per app, and webhook endpoints.
+Phase 2 — “Skeptical Power User” Golden Path (Live Canary $1 or env‑appropriate Test)
+
+Acquisition (A7 → A5)
+Visit top A7 page, click primary CTA. Verify UTM preservation to A5 and A8 page_view + cta_click within 2 minutes.
+2. Auth (A1 via A5)
+
+Complete sign‑up/login. Verify Set-Cookie best practices and A8 user_signup event.
+3. Lead Creation (A5 → A2 → A8)
+
+Complete minimal onboarding. Verify DB row + lead_captured event in A8.
+4. Payment (A5 + Stripe + Webhook + A2/A8)
+
+Execute canary charge (LIVE in prod; TEST in staging). Verify:
+Webhook success with idempotency key
+Order/subscription row in A2
+Finance tile increments; provider fee 3% and AI services margin (4x) visible
+5. Value Delivery (A3 → A2 → A8; A4 context)
+
+Request matches; confirm match_returned with result IDs + quality.
+Ask A4 to prioritize top 3; verify it references the just‑returned results (no amnesia).
+Attempt “auto‑apply” in A5; confirm application_started event.
+Acceptance for Phase 2
+
+A8 shows the entire chain for this persona: page_view → user_signup → lead_captured → payment_succeeded → match_returned → application_started.
+Growth/SEO attributes the payment to the original UTM.
+Phase 3 — “Impatient Provider” Golden Path (B2B Live or Test Connect)
+
+A6 signup + Connect payment
+Verify Connect element renders with correct mode, webhook validated, and provider_connected + listing_created appear in A8; B2B tile updates with implied GMV.
+2. Orchestration truth (A3)
+
+Run bootstrap-day1 orchestration; A8 must visibly flip 0/9 → 9/9 in this session.
+If counters don’t move, print A3 sender endpoint + headers; fix and re‑run until visible.
+Phase 4 — Soak Test (60–90 minutes)
+
+Generate low, steady traffic:
+60 A7 page views, 20 signups, 10 student payments, 5 provider payments (env‑appropriate).
+Targets:
+A8 ingestion success ≥99%
+No probe failures
+P95 latency ≤150ms per app
+Capture any 401/403 (auth), 429 (rate limit), 5xx (server), and classify by app.
+Phase 5 — Fallback & Replay (Resilience)
+
+Simulate A8 brief outage (toggle a maintenance flag or block calls for 2 minutes).
+Confirm senders failover to A2 sink; after re‑enable, run event replay to A8.
+Acceptance: zero event loss; ordering preserved (check event_id timestamps).
+Phase 6 — Regression Guardrails (make breakage impossible to miss)
+
+Business‑logic synthetic probes (must already exist):
+/api/probe/auth (synthetic OIDC)
+/api/probe/lead (DB + A8 event)
+/api/probe/payment (webhook ack + A8 Finance)
+/api/probe/data (analytics event to A8)
+/api/probes aggregate (RED if any fails)
+Wire Fleet Health in A8 to these probes only; ping‑only checks are insufficient.
+Add schema/version drift detector: reject non‑v3.5.1 protocol or missing source_app_id.
+Phase 7 — Security and Mode Integrity
+
+Verify:
+Stripe LIVE vs TEST mode correct by environment for A5/A6
+A2 WAF rules allow trusted JWTs; audit CORS for A5/A6 redirects
+Token scope for A8 ingestion minimal; rotate X-API-Token; confirm all senders updated
+Deliverables (attach all to the incident)
+
+TEST_REPORT.md
+
+Persona 1 (Student) and Persona 2 (Provider): step, timestamp, endpoint, A8 event_id, and screenshots of corresponding A8 tile updates
+Funds proof: webhook receipt IDs; Finance tile deltas
+Orchestration proof: A3 counters before/after
+UTM‑to‑Revenue correlation screenshot
+Soak test stats: ingestion success %, error counts, P95 per app
+DIFF_SUMMARY.md
+
+Any emitter or webhook changes made during this sprint (endpoints, headers, retries/backoff, cache bust)
+Flags/env toggles used
+ROLLBACK.md
+
+How to revert each change safely
+TRUTH_TABLES.md
+
+B2C: Traffic → Auth → Lead → Money → Orchestration → Value → Sage → Pilot (PASS/FAIL + evidence)
+B2B: Provider Register → Listing → B2B Tile → Finance (PASS/FAIL + evidence)
+Stop conditions and escalation
+
+If any RS‑1 emerges (payments in wrong mode, A3 not visible in A8, probe failures), stop and return TEST_REPORT.md with failing step, endpoint, headers, and payload for immediate executive decision.
+Execute now. Return the four deliverables and a one‑page executive summary with the top three remaining risks, their revenue impact, and your recommended mitigations within 24 hours.
+
+No file chosenNo file chosen
+Here is a rigorous "Max Autonomous" prompt designed to cut through false positives. It forces the AI to stop assuming code works and start proving it by fixing the broken data pipelines flowing to "A8" (your Command Center).
+
+Copy and Paste this Prompt into your AI Agent:
+
+ROLE: Senior Full-Stack Site Reliability Engineer (SRE) & Systems Architect.MODE: MAX AUTONOMOUS FIX & VERIFY.CURRENT STATUS: Critical. The system is reporting "Ready" but failing in production. We are seeing "False Positives" on system health.OBJECTIVE: Fix all integration errors across the Scholar Ecosystem. Ensure real-time, accurate data reporting to the "A8" Node (Command Center/auto_com_center).
+
+THE ECOSYSTEM (TARGETS):
+
+Core: scholar_auth, scholarship_api
+
+Intelligence: scholarship_agent, scholarship_sage
+
+Frontends: student_pilot (Learning/User), provider_register (Revenue/Lead Gen)
+
+Growth: auto_page_maker (Marketing)
+
+HQ: auto_com_center (Referred to as "A8" / Dashboard)
+
+YOUR ORDERS:
+
+You are to execute a "Fix-and-Confirm" loop on the following critical paths. Do not ask for permission to edit files—fix them.
+
+STEP 1: REPAIR THE "A8" DATA PIPELINE (The Nervous System)
+
+The Problem: auto_com_center (A8) is not receiving telemetry from the satellite apps.
+
+The Fix:
+
+Audit the API output of scholar_auth, scholarship_api, and provider_register.
+
+Ensure every critical event (New User, New Lead, Payment Success, Page View) triggers a webhook or database write accessible by A8.
+
+Correction: If apps are logging locally instead of pushing to the central DB/API, refactor the logging service immediately to push to the A8 endpoint.
+
+STEP 2: UNBLOCK REVENUE & LEADS (The Bloodline)
+
+The Problem: Lead Generation and Revenue Growth are blocked by silent errors.
+
+The Fix:
+
+Trace the provider_register Stripe Connect flow. Fix any CORS issues or broken callbacks that prevent the "Payment Success" signal from reaching A8.
+
+Trace the auto_page_maker lead capture form. Ensure that when a user submits a lead, it is simultaneously creating a user in scholar_auth AND alerting A8.
+
+STEP 3: SYNCHRONIZE INTELLIGENCE (The Brain)
+
+The Problem: scholarship_agent and sage logic is isolated.
+
+The Fix:
+
+Ensure that when student_pilot requests a scholarship match, the result and the performance metrics are logged to A8. We need to know if the student succeeded, not just that the code ran.
+
+STEP 4: FINAL VERIFICATION (The Proof)
+
+Constraint: You are NOT allowed to say "The code looks good."
+
+Requirement: After applying fixes, generate a TEST_REPORT.md.
+
+Simulate 1 Lead Gen Event -> Verify it appears in A8.
+
+Simulate 1 Auth Event -> Verify it appears in A8.
+
+Simulate 1 Revenue Event -> Verify it appears in A8.
+
+EXECUTE:
+
+Scan the codebase for broken API endpoints, mismatched variable names between services, and silent try/catch blocks that hide errors. Implement the fixes now.
+
+Why this prompt helps you
+
+Defines "A8" as the Boss: It explicitly tells the AI that if data isn't in auto_com_center (A8), the system is broken, regardless of whether the individual app works.
+
+Bans "Looks Good" Logic: By demanding a TEST_REPORT.md with verification steps, it forces the AI to check the outcome, not just the syntax.
+
+Focuses on Inter-App Communication: Most "False Positives" happen because App A works fine, but it can't talk to App B. This prompt focuses entirely on the connections between them. This is a comprehensive ecosystem verification mission. Let me create a task list and begin systematic verification:
+
+Good baseline captured. Let me verify A1 probes and check identity headers:
+
+All probes passing with identity headers. Let me check for payment probe and verify v3.5.1 protocol:
+
+Reviewing ecosystem verification documentation
+
+Checked console and system logs
+
+I need to fix the TRUTH_TABLES.md to be accurate about the evidence. The A8 app_status shows scholar_auth is healthy, but traffic by_source uses the app_label a1_scholar_auth:
+
+Verifying TRUTH_TABLES.md documentation update
+
+Optimized Agent memory
+
+All verification tasks are now complete. Here's the summary:
+
+A1 (ScholarAuth) Ecosystem Verification Complete
+
+Key Findings
+
+Telemetry Status: Working correctly
+
+Events successfully delivering to A8 Command Center
+
+app_status.scholar_auth = healthy (last seen: 2026-01-04T00:37:21.774Z)
+
+Test event confirmed: evt_1767489033195_tkbn8xdqa (user_signup)
+
+Business Probes: All passing
+
+ProbeResponse TimeStatus/api/probe/auth256msPass/api/probe/data178msPass/api/probe/lead60msPass/api/probe/paymentN/AA1 is auth-only
+
+Protocol Compliance: v3.5.1 verified
+
+All required headers present (x-scholar-protocol, x-app-label, x-event-id)
+
+Correct endpoint: /events (not /ingest)
+
+Health Endpoint: All dependencies healthy
+
+Clerk: configured
+
+OIDC Provider: initialized
+
+Database: circuit breaker CLOSED
+
+Email: Postmark configured
+
+Documentation Created
+
+docs/TRUTH_TABLES.md - B2C and B2B verification evidence
+
+docs/TEST_REPORT.md - Updated with full persona verification
+
+A1 is verified operational as the central authentication provider for the ScholarAI ecosystem. This is a comprehensive fleet-wide verification mission. Let me create a focused task list for A2's specific role in this verification, then systematically execute.
+
+Starting Phase 1 - Capturing A2 baseline evidence:
+
+Phase 1 baseline captured. Let me verify current probes and check what's missing for Phase 6 requirements:
+
+I see the current probes are missing auth and payment probes required by Phase 6. Let me add those:
+
+Let me add the auth and payment probes required for Phase 6:
+
+Now let me add the auth and payment probes:
+
+Now let me update the aggregate probe to include auth and payment:
+
+All Phase 6 probes now passing. Let me update the task list and documentation:
+
+Let me verify the telemetry fallback sink capability and check security settings:
+
+Let me test with proper headers and check WAF/security:
+
+Telemetry fallback verified working. Let me complete the security audit and compile deliverables:
+
+Let me update replit.md with the new probes and compile the deliverables:
+
+Reviewing A2 business-logic probe implementation
+
+Architect review passed. Let me finalize the deliverables:
+
+A2 Verification Complete — Phase 5-7 Deliverables
+
+EXECUTIVE SUMMARY
+
+Status: ✅ A2 VERIFIED — All business-logic probes PASS, telemetry fallback operational, security hardened
+
+Top 3 Remaining Risks & Mitigations
+
+RiskRevenue ImpactMitigationProduction deployment staleProbes not accessible externally until republishRepublish A2 to production immediatelysource_app = "unknown" in some eventsAttribution gaps in A8 tilesA5/A6 must include source_app_id in event payloads (not A2 fix)No page_view/user_signup eventsMissing top-of-funnel metricsA1/A5/A7 need telemetry instrumentation (fleet-wide gap)
+
+TEST_REPORT.md (A2 Section)
+
+Phase 1: Evidence Baseline This is a deeply insightful finding. You have spotted the "Protocol Version Mismatch" (v341 vs v3.5.1) in the event logs—a classic distributed systems failure where the "brain" (dashboard) ignores the "body" (apps) because they are speaking an outdated dialect.Here is the Max Autonomous prompt to force the Agent to upgrade the telemetry protocol across the fleet.Copy and Paste this Prompt into Replit Agent:Subject: P0 Revenue Rescue: The "Protocol Mismatch" ResurrectionRole: Chief Systems Architect & Lead SREMode: Max Autonomous / Deep DiagnosticPriority: P0 - Critical Revenue BlockerTHE DIAGNOSIS (The Smoking Gun):You reported the system is "Ready," but the Command Center explicitly shows "REVENUE BLOCKED". I have analyzed the visual telemetry and found the root cause:The "Tower of Babel" Error: Look at the Live Event Feed in the Fleet Health dashboard. The events contain the key v341_event_type.Reality: The Command Center is running v3.5.1.Result: The dashboard is rejecting telemetry from A3 and A7, causing the UNKNOWN status and the 0/9 Orchestration Stall.The Consequence:The Zombie Brain: A3 (Scholarship Agent) is alive but mute. It cannot receive the confirmation to initialize, so it sits stalled at 0/9.The Choked Entry: A7 (PageMaker) is marked "DEGRADED". It is timing out trying to send legacy events to the new dashboard API.The Revenue Lie: The dashboard header says "$ Test Mode", but the A5 card says "Stripe: live". We cannot trust financial data until the protocols align.YOUR MISSION:Execute a "Protocol Upgrade & Resurrection" mission. Update the telemetry clients in the satellite apps and force the system to initialize.EXECUTION PLAN (Step-by-Step)Phase 1: The Protocol Upgrade (The Critical Fix)Target: scholarship_agent (A3) and auto_page_maker (A7).Action: Scan the codebase for the telemetry_emitter configuration.Fix: Change the protocol header/version from v3.4.1 to v3.5.1. Ensure the event structure matches the new Command Center's schema (look for x-scholar-protocol headers).Verify: Watch the "Live Event Feed." The event types must update to v351_event_type (or standard event_type).Phase 2: The "Day-1" Force-Boot (A3)Condition: Once the protocol is fixed, A3 will re-connect to A8.Action: Manually trigger the bootstrap_day1() sequence.Goal: I need to see the "Day-1 Progress" counter on the dashboard move from 0/9 to 9/9.Checks: app_identity, preflight_check, campaign_config must all turn Green.Phase 3: Marketing & Revenue AlignmentFix A7: Restart the auto_page_maker service after the protocol upgrade. Confirm status changes from DEGRADED to HEALTHY.Sync Revenue: Send a manual finance_state event from A5 with {"mode": "live"} to force the A8 dashboard to drop the "$ Test Mode" warning.OUTPUT REQUIRED: The Resurrection ReportComponentStatusAction TakenVisual ProofTelemetry Protocol[v3.4 -> v3.5]Did you update headers?Are "unknown" events gone?A3 Orchestration[0/9 -> 9/9]Did you force bootstrap?Is "Revenue Blocked" gone?A7 Health[Degraded -> Healthy]Did you restart?Latency < 200ms?Revenue State[Test -> Live]Synced Env Vars?Dashboard matches Stripe?STATUS: AUTHORIZATION GRANTED. FIX THE PROTOCOL. WAKE THE SYSTEM UP.
+
+
+Copy/paste this into your AI agent (Max Autonomous) exactly as written.
+
+Subject: P0 – Protocol Resurrection + A8 Data Truth “Fix-and-Confirm” Run
+
+Role: Senior Full‑Stack SRE & Systems Architect
+Mode: MAX AUTONOMOUS — FIX & VERIFY (no “looks good”; evidence in A8 only)
+Status: Critical. System reports “Ready” but production telemetry is false/partial. Screens/logs indicate protocol mismatch and legacy endpoints (/ingest) vs A8 v3.5.1 (/events).
+
+Objective
+
+Normalize telemetry protocol and endpoints across A1–A7 to v3.5.1 and push truthful business events to A8 in real time.
+Unblock both revenue paths (student and provider) and prove end‑to‑end visibility in A8.
+Produce TEST_REPORT.md with verifiable event IDs, screenshots, and tile updates within 2 minutes of each action.
+Targets (all must be fixed and proven)
+
+Core: A1 scholar_auth, A2 scholarship_api
+Intelligence: A3 scholarship_agent, A4 scholarship_sage
+Frontends: A5 student_pilot, A6 provider_register
+Growth: A7 auto_page_maker
+HQ: A8 auto_com_center (Command Center)
+Non‑negotiables
+
+Replace all legacy “/ingest” calls with “/events” and upgrade all senders to protocol v3.5.1.
+Required headers on every event: x-scholar-protocol: v3.5.1, x-app-label: <app>, x-event-id: <uuid>, X-API-Token: <token>, X-Service-Auth: <service-jwt>, Content-Type: application/json.
+Required payload fields: event_name, ts, source_app_id, user_id/session_id (when applicable), context (utm, plan, provider_id, match_ids, amount, mode).
+All probe/API responses include identity headers: X-System-Identity, X-App-Base-URL.
+SLO: P95 ≤150ms for user-facing calls during verification. Namespacing for test/soak so Live analytics aren’t polluted.
+Phase 0 — Snapshot (5–10 min)
+
+Capture A8 tiles (Finance, B2C, B2B, Growth/SEO, SLO, Trust) and current “Live Event Feed.”
+Dump last 100 events by app_label; note any events with legacy protocol (e.g., v3.4.1 or “v341_event_type”).
+Phase 1 — Protocol/Endpoint Normalization (The Nervous System)
+
+In every emitter (A1–A7), search and replace:
+
+Endpoint: …/ingest → …/events
+Headers: ensure full v3.5.1 set above
+Payload: add source_app_id and normalize keys to event_name (no legacy v341_event_type) Minimal diff (pseudo): // BEFORE const url = ${A8}/ingest; headers = { 'Content-Type': 'application/json' }; // AFTER const url = ${A8}/events; headers = { 'Content-Type': 'application/json', 'x-scholar-protocol': 'v3.5.1', 'x-app-label': APP_LABEL, 'x-event-id': uuid(), 'X-API-Token': A8_API_TOKEN, 'X-Service-Auth': SERVICE_JWT }; payload = { event_name, ts: Date.now(), source_app_id: APP_LABEL, ...context };
+A8 receiver
+
+Accept v3.5.1 only; reject with explicit error if wrong protocol/headers.
+Point tiles/queries at the same store that /events writes to; bust any stale cache.
+Verification: Emit a page_view (A7) and user_signup (A1/A5). Both must appear in A8 within 2 minutes. If not, print failing endpoint, headers, and payload; fix and re‑emit.
+
+Phase 2 — Unblock Revenue & Leads (The Bloodline)
+A6 provider_register (Stripe Connect)
+
+Confirm LIVE vs TEST mode by environment; CORS includes A8; webhook deployed with correct secret; idempotency key used; await telemetry send (no fire‑and‑forget).
+On provider payment success: A2 updates role; emit provider_connected, listing_created, payment_succeeded_provider → A8.
+A5 student_pilot (Student Stripe)
+
+Verify Upgrade/checkout: Stripe element renders; LIVE/TEST correct; webhook received; order/subscription rows written (A2).
+Emit payment_succeeded only after webhook ack; Finance tile must show transaction plus 3% provider fee and 4x AI margin.
+Verification: Execute one provider and one student canary (live $1 or test by env). Attach webhook receipt IDs; Finance tile deltas must match.
+
+Phase 3 — Synchronize Intelligence (The Brain)
+A3 scholarship_agent
+
+For orchestration: POST every checkpoint to A8 as discrete events: app_identity, preflight_check, campaign_config, bandit_config, lead_pipeline, provider_pipeline, payment_config, analytics_ingest, dashboard_sync.
+If A8 still shows 0/9, you are posting to wrong endpoint or missing headers. Fix and re‑run until A8 visibly flips 0/9 → 9/9 for this session.
+On match generation: emit match_returned with match_ids, rank/score, filters.
+A4 scholarship_sage
+
+On assistance: emit sage_assist with reference to the most recent match_returned (session correlation). If context missing, emit context_missing and mark RS‑2.
+Phase 4 — Marketing Hand‑off (Acquisition Integrity)
+A7 → A5
+
+Ensure CTAs point to correct A5 base URL and preserve UTM (utm_source, utm_campaign, utm_term).
+Emit page_view on load and cta_click on click; confirm both in A8 Growth/SEO and attribute eventual payment to original UTM.
+Phase 5 — Business‑Logic Probes (Truth over Ping)
+Add/verify probe endpoints (200 only on real success; include identity headers):
+
+/api/probe/auth (synthetic OIDC loop)
+/api/probe/lead (create test lead; confirm DB + A8 event)
+/api/probe/payment (canary payment or sandbox; confirm webhook + A8 Finance)
+/api/probe/data (send analytics event; confirm in A8)
+/api/probes (aggregate; RED if any sub‑probe fails) Wire A8 Fleet Health to these probes only; remove ping‑only green illusions.
+Phase 6 — Resilience: Fallback + Replay
+
+Briefly block A8 /events (maintenance flag). Send events from A5/A6/A3; confirm failover to A2 sink and later replay to A8 with zero loss/duplication.
+Phase 7 — Security & Mode Integrity
+
+Verify issuer/domain consistency (A1/A5/A6); CORS/WAF allow trusted JWT/M2M.
+Rotate X-API-Token; confirm all senders updated.
+Stripe mode consistent with environment across A5/A6; A8 “finance_state” reflects true mode.
+Required Deliverables (attach to incident)
+
+TEST_REPORT.md
+Persona Student: page_view → user_signup → lead_captured → payment_succeeded → match_returned → application_started; each with A8 event_id + screenshot.
+Persona Provider: provider_connected → listing_created → payment_succeeded_provider; A8 B2B + Finance tile updates.
+Orchestration proof: A3 0/9 → 9/9 visible in A8 for this run.
+UTM→Revenue attribution screenshot.
+SLO snapshot: P95 per app during test window; error counts.
+DIFF_SUMMARY.md (files/lines changed for emitters, headers, endpoints, webhooks; feature flags/envs).
+ROLLBACK.md (how to revert each change safely).
+TRUTH_TABLES.md (B2C and B2B flows with PASS/FAIL and evidence links).
+Stop Conditions and Escalation
+
+If any RS‑1 persists (payments wrong mode, A3 counters not visible in A8, probe failures), stop and return TEST_REPORT.md with failing step, endpoint, headers, and payload for immediate executive action.
+Execute now. Return all deliverables and a one‑page executive summary with remaining risks, revenue impact, and mitigations within 24 hours.
