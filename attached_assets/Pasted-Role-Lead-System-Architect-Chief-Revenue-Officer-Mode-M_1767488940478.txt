@@ -1,0 +1,108 @@
+Role: Lead System Architect + Chief Revenue Officer
+Mode: MAX AUTONOMOUS (Fixes already applied; now verify, harden, and prove)
+Status: Ecosystem claims “Mission Accomplished.” We do not accept claims. Only verifiable evidence in A8 and successful live transactions count.
+
+Mission
+
+Prove beyond doubt that A1–A8 now generate revenue and report truth to A8.
+Find any remaining data gaps, race conditions, or false‑positive health checks.
+Install regression guardrails so this never breaks again without turning Fleet Health RED.
+Non‑negotiables
+
+No “looks good.” Only accept success when A8 tiles visibly update and funds/webhooks are confirmed.
+Every event must be protocol v3.5.1 with headers: x-scholar-protocol, x-app-label, x-event-id, X-API-Token, X-Service-Auth.
+All probes and APIs return identity headers: X-System-Identity, X-App-Base-URL.
+Namespacing: Simulated/Soak traffic must be labeled and filterable; live canaries clearly labeled “LIVE_CANARY”.
+SLO guard: P95 ≤150ms for user-facing calls during tests; error rate <1%.
+Phase 1 — Evidence Baseline (Snapshot)
+
+Capture A8 tiles: Finance, B2C, B2B, Growth/SEO, SLO, Trust before testing.
+Dump current ingestion rates and last 100 events per app label (A1–A7).
+Record current auth issuer settings, Stripe mode per app, and webhook endpoints.
+Phase 2 — “Skeptical Power User” Golden Path (Live Canary $1 or env‑appropriate Test)
+
+Acquisition (A7 → A5)
+Visit top A7 page, click primary CTA. Verify UTM preservation to A5 and A8 page_view + cta_click within 2 minutes.
+2. Auth (A1 via A5)
+
+Complete sign‑up/login. Verify Set-Cookie best practices and A8 user_signup event.
+3. Lead Creation (A5 → A2 → A8)
+
+Complete minimal onboarding. Verify DB row + lead_captured event in A8.
+4. Payment (A5 + Stripe + Webhook + A2/A8)
+
+Execute canary charge (LIVE in prod; TEST in staging). Verify:
+Webhook success with idempotency key
+Order/subscription row in A2
+Finance tile increments; provider fee 3% and AI services margin (4x) visible
+5. Value Delivery (A3 → A2 → A8; A4 context)
+
+Request matches; confirm match_returned with result IDs + quality.
+Ask A4 to prioritize top 3; verify it references the just‑returned results (no amnesia).
+Attempt “auto‑apply” in A5; confirm application_started event.
+Acceptance for Phase 2
+
+A8 shows the entire chain for this persona: page_view → user_signup → lead_captured → payment_succeeded → match_returned → application_started.
+Growth/SEO attributes the payment to the original UTM.
+Phase 3 — “Impatient Provider” Golden Path (B2B Live or Test Connect)
+
+A6 signup + Connect payment
+Verify Connect element renders with correct mode, webhook validated, and provider_connected + listing_created appear in A8; B2B tile updates with implied GMV.
+2. Orchestration truth (A3)
+
+Run bootstrap-day1 orchestration; A8 must visibly flip 0/9 → 9/9 in this session.
+If counters don’t move, print A3 sender endpoint + headers; fix and re‑run until visible.
+Phase 4 — Soak Test (60–90 minutes)
+
+Generate low, steady traffic:
+60 A7 page views, 20 signups, 10 student payments, 5 provider payments (env‑appropriate).
+Targets:
+A8 ingestion success ≥99%
+No probe failures
+P95 latency ≤150ms per app
+Capture any 401/403 (auth), 429 (rate limit), 5xx (server), and classify by app.
+Phase 5 — Fallback & Replay (Resilience)
+
+Simulate A8 brief outage (toggle a maintenance flag or block calls for 2 minutes).
+Confirm senders failover to A2 sink; after re‑enable, run event replay to A8.
+Acceptance: zero event loss; ordering preserved (check event_id timestamps).
+Phase 6 — Regression Guardrails (make breakage impossible to miss)
+
+Business‑logic synthetic probes (must already exist):
+/api/probe/auth (synthetic OIDC)
+/api/probe/lead (DB + A8 event)
+/api/probe/payment (webhook ack + A8 Finance)
+/api/probe/data (analytics event to A8)
+/api/probes aggregate (RED if any fails)
+Wire Fleet Health in A8 to these probes only; ping‑only checks are insufficient.
+Add schema/version drift detector: reject non‑v3.5.1 protocol or missing source_app_id.
+Phase 7 — Security and Mode Integrity
+
+Verify:
+Stripe LIVE vs TEST mode correct by environment for A5/A6
+A2 WAF rules allow trusted JWTs; audit CORS for A5/A6 redirects
+Token scope for A8 ingestion minimal; rotate X-API-Token; confirm all senders updated
+Deliverables (attach all to the incident)
+
+TEST_REPORT.md
+
+Persona 1 (Student) and Persona 2 (Provider): step, timestamp, endpoint, A8 event_id, and screenshots of corresponding A8 tile updates
+Funds proof: webhook receipt IDs; Finance tile deltas
+Orchestration proof: A3 counters before/after
+UTM‑to‑Revenue correlation screenshot
+Soak test stats: ingestion success %, error counts, P95 per app
+DIFF_SUMMARY.md
+
+Any emitter or webhook changes made during this sprint (endpoints, headers, retries/backoff, cache bust)
+Flags/env toggles used
+ROLLBACK.md
+
+How to revert each change safely
+TRUTH_TABLES.md
+
+B2C: Traffic → Auth → Lead → Money → Orchestration → Value → Sage → Pilot (PASS/FAIL + evidence)
+B2B: Provider Register → Listing → B2B Tile → Finance (PASS/FAIL + evidence)
+Stop conditions and escalation
+
+If any RS‑1 emerges (payments in wrong mode, A3 not visible in A8, probe failures), stop and return TEST_REPORT.md with failing step, endpoint, headers, and payload for immediate executive decision.
+Execute now. Return the four deliverables and a one‑page executive summary with the top three remaining risks, their revenue impact, and your recommended mitigations within 24 hours.

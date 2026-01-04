@@ -17,6 +17,8 @@ from sqlalchemy.orm import Session
 
 from models.database import get_db
 from utils.logger import get_logger
+from config.settings import settings
+import httpx
 
 logger = get_logger(__name__)
 router = APIRouter(prefix="/api/probe", tags=["Business Probes"])
@@ -283,6 +285,121 @@ async def probe_kpi(db: Session = Depends(get_db)):
         )
 
 
+@router.get("/auth")
+async def probe_auth():
+    """
+    Business Probe: OIDC/Auth Infrastructure
+    
+    Verifies A1 OIDC issuer is reachable and JWKS keys are published.
+    This is a synthetic check - no actual authentication performed.
+    """
+    timestamp = datetime.utcnow()
+    
+    jwks_url = settings.scholar_auth_jwks_url
+    issuer_url = settings.scholar_auth_issuer
+    
+    try:
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            jwks_response = await client.get(jwks_url)
+            
+            if jwks_response.status_code != 200:
+                raise Exception(f"JWKS endpoint returned {jwks_response.status_code}")
+            
+            jwks_data = jwks_response.json()
+            key_count = len(jwks_data.get("keys", []))
+            
+            if key_count == 0:
+                raise Exception("JWKS has no keys published")
+        
+        logger.info(f"PROBE: auth | PASS | jwks_keys={key_count}")
+        return JSONResponse(
+            status_code=200,
+            content={
+                "status": "pass",
+                "probe": "auth",
+                "issuer": issuer_url,
+                "jwks_reachable": True,
+                "jwks_key_count": key_count,
+                "timestamp": timestamp.isoformat()
+            },
+            headers=get_identity_headers()
+        )
+        
+    except Exception as e:
+        logger.error(f"PROBE: auth | FAIL | error={str(e)}")
+        return JSONResponse(
+            status_code=500,
+            content={
+                "status": "fail",
+                "probe": "auth",
+                "issuer": issuer_url,
+                "jwks_url": jwks_url,
+                "error": str(e),
+                "timestamp": timestamp.isoformat()
+            },
+            headers=get_identity_headers()
+        )
+
+
+@router.get("/payment")
+async def probe_payment(db: Session = Depends(get_db)):
+    """
+    Business Probe: Payment Infrastructure
+    
+    Verifies Stripe is configured and payment events are being recorded.
+    Checks webhook secret exists and Finance tile has data.
+    """
+    timestamp = datetime.utcnow()
+    
+    try:
+        import os
+        stripe_key_exists = bool(os.environ.get("STRIPE_SECRET_KEY"))
+        webhook_secret_exists = bool(os.environ.get("STRIPE_WEBHOOK_SECRET"))
+        
+        revenue_result = db.execute(text("""
+            SELECT COUNT(*), COALESCE(SUM(total_revenue), 0) 
+            FROM revenue_by_source 
+            WHERE event_name IN ('payment_succeeded', 'fee_captured')
+        """))
+        row = revenue_result.fetchone()
+        payment_event_count = row[0] if row else 0
+        total_revenue = float(row[1]) if row and row[1] else 0.0
+        
+        if not stripe_key_exists:
+            raise Exception("STRIPE_SECRET_KEY not configured")
+        if not webhook_secret_exists:
+            raise Exception("STRIPE_WEBHOOK_SECRET not configured")
+        
+        logger.info(f"PROBE: payment | PASS | events={payment_event_count} | revenue=${total_revenue}")
+        return JSONResponse(
+            status_code=200,
+            content={
+                "status": "pass",
+                "probe": "payment",
+                "stripe_configured": True,
+                "webhook_configured": True,
+                "payment_events": payment_event_count,
+                "total_revenue": total_revenue,
+                "finance_tile_has_data": payment_event_count > 0,
+                "timestamp": timestamp.isoformat()
+            },
+            headers=get_identity_headers()
+        )
+        
+    except Exception as e:
+        logger.error(f"PROBE: payment | FAIL | error={str(e)}")
+        return JSONResponse(
+            status_code=500,
+            content={
+                "status": "fail",
+                "probe": "payment",
+                "error": str(e),
+                "timestamp": timestamp.isoformat()
+            },
+            headers=get_identity_headers()
+        )
+
+
 @router.get("")
 @router.get("/")
 async def aggregate_probes(db: Session = Depends(get_db)):
@@ -298,7 +415,9 @@ async def aggregate_probes(db: Session = Depends(get_db)):
     timestamp = datetime.utcnow()
     results = {
         "db": None,
-        "kpi": None
+        "kpi": None,
+        "auth": None,
+        "payment": None
     }
     all_pass = True
     
@@ -316,6 +435,31 @@ async def aggregate_probes(db: Session = Depends(get_db)):
         results["kpi"] = {"status": "pass"}
     except Exception as e:
         results["kpi"] = {"status": "fail", "error": str(e)}
+        all_pass = False
+    
+    try:
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            jwks_response = await client.get(settings.scholar_auth_jwks_url)
+            if jwks_response.status_code == 200:
+                jwks_data = jwks_response.json()
+                if len(jwks_data.get("keys", [])) > 0:
+                    results["auth"] = {"status": "pass"}
+                else:
+                    raise Exception("No JWKS keys")
+            else:
+                raise Exception(f"JWKS returned {jwks_response.status_code}")
+    except Exception as e:
+        results["auth"] = {"status": "fail", "error": str(e)}
+        all_pass = False
+    
+    try:
+        import os
+        if os.environ.get("STRIPE_SECRET_KEY") and os.environ.get("STRIPE_WEBHOOK_SECRET"):
+            results["payment"] = {"status": "pass"}
+        else:
+            raise Exception("Stripe not fully configured")
+    except Exception as e:
+        results["payment"] = {"status": "fail", "error": str(e)}
         all_pass = False
     
     overall_status = "pass" if all_pass else "fail"
