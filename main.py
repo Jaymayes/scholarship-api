@@ -301,7 +301,23 @@ async def startup_telemetry():
     logger.info("✅ TELEMETRY: app_started event emitted")
     
     import httpx
+    import uuid
     A8_URL = "https://auto-com-center-jamarrlmayes.replit.app"
+    A8_KEY: str = os.environ.get("A8_KEY") or ""
+    
+    def get_a8_headers(event_id: str | None = None) -> dict:
+        """Build v3.5.1 compliant headers for A8 calls"""
+        headers = {
+            "Content-Type": "application/json",
+            "x-scholar-protocol": "v3.5.1",
+            "x-app-label": "A2",
+            "x-event-id": event_id or str(uuid.uuid4()),
+            "X-Protocol-Version": "v3.5.1"
+        }
+        if A8_KEY:
+            headers["Authorization"] = f"Bearer {A8_KEY}"
+        return headers
+    
     identify_envelope = {
         "envelope": {"version": "v3.5.1"},
         "app": {
@@ -321,7 +337,7 @@ async def startup_telemetry():
     }
     try:
         async with httpx.AsyncClient(timeout=5.0) as client:
-            await client.post(f"{A8_URL}/events", json=identify_envelope)
+            await client.post(f"{A8_URL}/events", json=identify_envelope, headers=get_a8_headers("identify_startup"))
         logger.info("✅ TELEMETRY: identify event sent to A8 (v3.5.1)")
     except Exception as e:
         logger.warning(f"⚠️ TELEMETRY: identify send failed: {e}")
@@ -409,13 +425,7 @@ async def startup_telemetry():
                             await client.post(
                                 f"{A8_URL}/events", 
                                 json=blocker_envelope,
-                                headers={
-                                    "Content-Type": "application/json",
-                                    "x-scholar-protocol": "v3.5.1",
-                                    "x-app-label": "A2",
-                                    "x-event-id": f"blocker_{datetime.utcnow().strftime('%Y%m%d%H%M%S')}",
-                                    "X-Protocol-Version": "v3.5.1"
-                                }
+                                headers=get_a8_headers(f"blocker_{datetime.utcnow().strftime('%Y%m%d%H%M%S')}")
                             )
                         logger.critical("🚨 REVENUE BLOCKER: INVENTORY_EMPTY sent to A8")
                     except Exception as e:
@@ -423,14 +433,11 @@ async def startup_telemetry():
                 
                 try:
                     async with httpx.AsyncClient(timeout=5.0) as client:
-                        heartbeat_headers = {
-                            "Content-Type": "application/json",
-                            "x-scholar-protocol": "v3.5.1",
-                            "x-app-label": "A2",
-                            "x-event-id": f"hb_{datetime.utcnow().strftime('%Y%m%d%H%M%S')}",
-                            "X-Protocol-Version": "v3.5.1"
-                        }
-                        response = await client.post(f"{A8_URL}/events", json=envelope, headers=heartbeat_headers)
+                        response = await client.post(
+                            f"{A8_URL}/events", 
+                            json=envelope, 
+                            headers=get_a8_headers(f"hb_{datetime.utcnow().strftime('%Y%m%d%H%M%S')}")
+                        )
                         if response.status_code in (200, 201, 202):
                             logger.debug(f"💓 HEARTBEAT: Sent to A8/events (scholarships={total_scholarships}, p95={p95_latency}ms)")
                         else:
@@ -513,18 +520,13 @@ async def startup_telemetry():
                 }
                 
                 try:
+                    kpi_headers = get_a8_headers(kpi_payload["idempotency_key"])
+                    kpi_headers["X-Idempotency-Key"] = kpi_payload["idempotency_key"]
                     async with httpx.AsyncClient(timeout=5.0) as client:
                         response = await client.post(
-                            "https://auto-com-center-jamarrlmayes.replit.app/events",
+                            f"{A8_URL}/events",
                             json=kpi_payload,
-                            headers={
-                                "Content-Type": "application/json",
-                                "x-scholar-protocol": "v3.5.1",
-                                "x-app-label": "A2",
-                                "x-event-id": kpi_payload["idempotency_key"],
-                                "X-Protocol-Version": "v3.5.1",
-                                "X-Idempotency-Key": kpi_payload["idempotency_key"]
-                            }
+                            headers=kpi_headers
                         )
                         if response.status_code in (200, 201, 202):
                             logger.info(f"📊 KPI_SNAPSHOT: Sent to A8 (tile=SLO, uptime={uptime_5m}%, p95={p95_ms_5m}ms)")

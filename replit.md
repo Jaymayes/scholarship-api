@@ -79,6 +79,7 @@ The business vision is to create a comprehensive, intelligent platform that conn
 - Required headers on all A8 calls: `x-scholar-protocol: v3.5.1`, `x-app-label: A2`, `x-event-id: <uuid>`
 - Payments: Revenue events include `event_name`, `source_app_id`, `ts` (epoch ms) per v3.5.1 schema
 - Env var renamed: `A8_INGEST_URL` → `A8_EVENTS_URL` (defaults to `/events`)
+- **SRE Fix Pack Compliance**: `A8_KEY` env var support added for Authorization headers (optional, enables `Authorization: Bearer <key>`)
 
 **Known Issues**: None blocking
 

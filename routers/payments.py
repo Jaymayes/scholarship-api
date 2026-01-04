@@ -285,6 +285,7 @@ async def handle_checkout_completed(session: Any) -> None:
         logger.info(f"Subscription activated. Provider: {provider_id}")
     
     a8_url = os.environ.get("A8_EVENTS_URL", "https://auto-com-center-jamarrlmayes.replit.app/events")
+    a8_key = os.environ.get("A8_KEY") or ""
     event_id = f"rev_{session_id}_{int(datetime.utcnow().timestamp())}"
     
     try:
@@ -304,17 +305,21 @@ async def handle_checkout_completed(session: Any) -> None:
                 "timestamp": datetime.utcnow().isoformat() + "Z"
             }
             
+            headers = {
+                "Content-Type": "application/json",
+                "x-scholar-protocol": "v3.5.1",
+                "x-app-label": "A2",
+                "x-event-id": event_id,
+                "X-Protocol-Version": "v3.5.1",
+                "X-Idempotency-Key": event_id
+            }
+            if a8_key:
+                headers["Authorization"] = f"Bearer {a8_key}"
+            
             response = await client.post(
                 a8_url, 
                 json=revenue_event,
-                headers={
-                    "Content-Type": "application/json",
-                    "x-scholar-protocol": "v3.5.1",
-                    "x-app-label": "A2",
-                    "x-event-id": event_id,
-                    "X-Protocol-Version": "v3.5.1",
-                    "X-Idempotency-Key": event_id
-                }
+                headers=headers
             )
             
             if response.status_code in (200, 201, 202):

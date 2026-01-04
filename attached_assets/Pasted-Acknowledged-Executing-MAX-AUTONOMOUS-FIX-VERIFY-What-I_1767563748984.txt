@@ -1,0 +1,80 @@
+Acknowledged. Executing MAX AUTONOMOUS FIX & VERIFY.
+
+What I’ve delivered for immediate application
+
+A complete “Fix-and-Confirm” pack with:
+Telemetry spec v3.5.1 for the entire fleet
+Drop-in Node and Python telemetry emitters with retries, idempotency, and security headers
+Patch-ready snippets for each target app to emit the required events to A8
+A8 ingest reference (FastAPI) with idempotent upsert by x-event-id
+A canary script that emits 3 validation events and a TEST_REPORT.md template to record evidence
+Download the SRE Fix Pack
+
+Download sre_fix_pack.zip
+Contents overview
+
+docs/telemetry_spec_v351.md: Required headers, schema, reliability, and security for all event posts to A8.
+libs/node/telemetry.ts and libs/python/telemetry.py: Emitters with exponential backoff, idempotency (x-event-id), and Authorization header.
+App patches (apply in your repos):
+apps/provider_register/src/stripe.ts.patch: Fixes CORS, implements raw-body Stripe webhook, emits PaymentSuccess to A8.
+apps/auto_page_maker/src/leads.ts.patch: Creates user in scholar_auth, then emits NewLead to A8.
+apps/scholar_auth/app/events.py.patch: Emits NewUser on account creation (PII minimized).
+apps/scholarship_api/app/payments.py.patch: Emits PaymentSuccess when credits/charges clear.
+apps/student_pilot/pages/api/match.ts.patch: Emits ScholarshipMatchRequested and ScholarshipMatchResult with latency metrics.
+apps/scholarship_sage/app/assist.py.patch: Emits SageAssist with latency and success.
+a8/ingest_example_fastapi.py: Reference /events endpoint with schema validation and idempotent upsert by x-event-id (use as pattern for the real A8 service).
+scripts/test_canary.sh: Emits the 3 mandatory events to A8; uses deterministic UUIDs embedded in TEST_REPORT.md for verification.
+docs/TEST_REPORT.md: Pre-populated with your canary Event IDs; paste A8 responses and DB rows after running tests.
+docs/DIFF_SUMMARY.md, docs/ROLLBACK.md: What changed and exact rollback procedure.
+How to execute the Fix-and-Confirm loop now
+
+Wire the emitters
+For each app, add the provided telemetry library and patch snippet:
+Set env: A8_URL, A8_KEY, and app-specific labels (e.g., provider_register).
+Ensure each critical event triggers an emitEvent/emit_event call:
+NewUser from scholar_auth on signup
+NewLead from auto_page_maker on lead submit (also create user in scholar_auth)
+PaymentSuccess from provider_register (Stripe webhook) and scholarship_api
+ScholarshipMatchRequested/Result from student_pilot; SageAssist from scholarship_sage
+PageView (optional) from frontends if used in dashboards
+2. Repair A8 data pipeline
+
+Confirm that all emitters POST to A8 /events with:
+x-scholar-protocol: v3.5.1
+x-app-label: {app}
+x-event-id: uuid-v4
+Authorization: Bearer A8_KEY
+Ensure A8 accepts and upserts by x-event-id and enforces an allowlist of BUSINESS_EVENT_TYPES.
+3. Unblock revenue and leads
+
+Stripe “Payment Success” path:
+Use the raw-body webhook route in provider_register; verify signature with STRIPE_WEBHOOK_SECRET.
+Validate CORS for provider_register; OPTIONS returns 204; allow expected origins.
+Lead capture:
+auto_page_maker submits lead -> create user in scholar_auth -> emit NewLead to A8 in one flow.
+4. Synchronize intelligence
+
+student_pilot now emits match start/end with latency_ms and success, and scholarship_sage emits SageAssist. These power the “Brain” KPIs in A8.
+5. Final verification (no “looks good”)
+
+Set env:
+export A8_URL=https://<a8-domain>/events
+export A8_KEY=<ingest-key>
+Run canary:
+bash scripts/test_canary.sh
+This emits 3 events with fixed UUIDs; they are listed inside docs/TEST_REPORT.md.
+Verify in A8 and DB:
+For each event, confirm A8 returns {"accepted":true,"persisted":true,"event_id":"<uuid>"}.
+Query the events table for those event_ids.
+Complete docs/TEST_REPORT.md with responses, DB rows, and P95 write latency (target ≤150ms).
+If any check fails
+
+Compare headers and schema to docs/telemetry_spec_v351.md.
+Use outbox replay (recommend implementing an outbox table/forwarder job) and check A8 logs for schema/allowlist rejections.
+Confirm Stripe webhook secret and raw-body parsing are correctly configured.
+Immediate next commits I recommend
+
+Apply BUSINESS_EVENT_TYPES in A8 to include:
+NewUser, NewLead, PaymentSuccess, PageView, ScholarshipMatchRequested, ScholarshipMatchResult, SageAssist, ProviderOnboarded
+Add /health and /ready to every app and wire them into your deploy checks.
+Once your team applies these patches and runs the canary, paste the three A8 responses and DB rows into docs/TEST_REPORT.md. If you want, I can review the filled report and issue a final “GO/NO-GO” for Demo Mode activation in A8.
