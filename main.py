@@ -90,6 +90,7 @@ from routers.docs_workaround import router as docs_workaround_router
 from routers.legal_pages import router as legal_pages_router
 from routers.payments import router as payments_router
 from routers.data_sync import router as data_sync_router
+from routers.probes import router as probes_router
 from schemas.error_responses import ERROR_RESPONSES
 from utils.logger import setup_logger
 
@@ -830,6 +831,9 @@ app.include_router(telemetry_router, prefix="/api", tags=["Telemetry"])
 
 # PROTOCOL ONE TRUTH: Executive Dashboard for Command Center (2025-12-01)
 app.include_router(executive_router, tags=["Executive Dashboard"])
+
+# BUSINESS PROBES: Phase 5 P0 Revenue Rescue - Truth over Ping (2026-01-04)
+app.include_router(probes_router, tags=["Business Probes"])
 
 # Metrics already setup above - this was the wrong location causing route shadowing
 

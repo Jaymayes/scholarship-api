@@ -54,6 +54,16 @@ The business vision is to create a comprehensive, intelligent platform that conn
 - Both endpoints query PostgreSQL views directly for real-time data
 - **Note**: Requires republishing to production deployment to be accessible via external URL
 
+**Business Logic Probes** (2026-01-04): Phase 5 P0 Revenue Rescue - Truth over Ping
+- `GET /api/probe/` - Aggregate probe status (all probes must pass for green)
+- `GET /api/probe/lead` - Creates namespaced test lead, verifies DB + event emission
+- `GET /api/probe/data` - Sends v3.5.1 analytics event, verifies in DB
+- `GET /api/probe/db` - Database connectivity check
+- `GET /api/probe/kpi` - Verifies revenue_by_source and b2b_funnel views accessible
+- All probe responses include `X-System-Identity` and `X-App-Base-URL` headers
+- Probe data namespaced with `probe_` prefix to prevent contamination
+- Fleet Health should be RED if any business probe fails
+
 **Known Issues**: None blocking
 
 # User Preferences

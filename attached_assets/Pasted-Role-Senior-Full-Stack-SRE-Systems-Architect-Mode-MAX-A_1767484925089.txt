@@ -1,0 +1,117 @@
+Role: Senior Full‑Stack SRE & Systems Architect
+Mode: MAX AUTONOMOUS – Fix & Verify (no “looks good” claims; only evidence)
+Status: False Positive Ready; production failing; Command Center (A8) not receiving truth
+
+Objective
+
+Repair every integration that prevents real-time, accurate data from all apps to A8 (auto_com_center).
+Unblock both revenue paths (B2C Student and B2B Provider).
+Deliver TEST_REPORT.md with proof: one Lead Gen event, one Auth event, and one Revenue event appear in A8 within 2 minutes of action, plus Provider onboarding signals.
+Targets (all apps; fix and prove)
+
+Core: scholar_auth (A1), scholarship_api (A2)
+Intelligence: scholarship_agent (A3), scholarship_sage (A4)
+Frontends: student_pilot (A5), provider_register (A6)
+Growth: auto_page_maker (A7)
+HQ: auto_com_center (A8)
+Guardrails
+
+Secrets never printed. Changes must be idempotent and reversible (feature flags/env toggles).
+Enforce telemetry v3.5.1 across senders; reject legacy v3.3 /ingest.
+Every probe and business endpoint must include identity headers: X-System-Identity, X-App-Base-URL.
+SLO: P95 ≤150ms on user-facing endpoints during verification.
+Demo/Sim data must be namespaced so it cannot contaminate Live analytics.
+Phase 0 – Snapshot and Incident Setup (10 minutes)
+
+Incident ID: INC-A8-FIX-AND-CONFIRM
+Capture current A8 tiles (SLO, B2C, B2B, SEO, Growth, Trust, Finance) and errors.
+Turn on structured logs + request tracing for 2 hours (then revert).
+Phase 1 – Repair the A8 Telemetry Pipeline (The Nervous System)
+Problem: A8 is not reliably receiving truth; some apps still send to legacy /ingest or omit required headers.
+
+Fix now in each sender (A1–A7):
+
+Endpoint: replace any …/ingest with …/events.
+Headers on every event: x-scholar-protocol: v3.5.1, x-app-label: <app>, x-event-id: <uuid>, X-API-Token: <token>, X-Service-Auth: <service-jwt>, Content-Type: application/json.
+Payload must include: event_name, ts, source_app_id, user_id (if available), session_id (if available), context (utm, sku, plan, provider_id, etc.).
+Minimal diff (apply in each emitter module):
+
+Replace: commandCenterUrl = '…/ingest'
+With: commandCenterUrl = '…/events'
+Ensure headers above and payload.source_app_id = APP_LABEL.
+Event emitters required by app (add if missing):
+
+A7: page_view, cta_click (with UTM).
+A1/A5: user_signup (upon successful registration), user_login.
+A5: lead_captured, checkout_viewed, checkout_started, payment_succeeded (after webhook ack), application_started.
+A6: provider_connected, listing_created, plan_selected, payment_succeeded_provider.
+A3: app_identity, preflight_check, campaign_config, bandit_config, lead_pipeline, provider_pipeline, payment_config, analytics_ingest, dashboard_sync; match_returned (with result IDs and filters).
+A4: sage_assist (with referenced result IDs/context).
+A2: write-through confirmations for lead_created, order_created, provider_role_updated.
+A8 (receiver) fixes if needed:
+
+Accept only /events v3.5.1; log and reject legacy protocols with explicit error. Verify tile queries consume the same store where /events persists. Bust/refresh cache post-ingest.
+Verification (Phase 1):
+
+Send one synthetic page_view from A7 and one user_signup from A1/A5; confirm both appear in A8 within 2 minutes. If not, print failing endpoint + headers and fix immediately.
+Phase 2 – Unblock Revenue & Leads (The Bloodline)
+A6 (Provider/Stripe Connect):
+
+Verify Connect/checkout renders with LIVE keys in prod (TEST in staging), CORS allowed, callback URLs match. Webhook deployed and secret validated; use idempotency keys.
+After provider subscribes: A2 must elevate role and emit provider_connected + listing_created; A8 B2B tile must update.
+A5 (Student/Stripe):
+
+Verify Upgrade/Subscription payment path: element renders; LIVE vs TEST correct; webhook receives and acknowledges; order/subscription rows written in A2.
+Emit payment_succeeded to A8 only after webhook success; Finance tile must reflect the transaction (3% provider fee, 4x AI service margin visible).
+Verification (Phase 2):
+
+Execute one provider payment and one student payment; attach receipts/webhook ack IDs; confirm both appear in A8 Finance within 2 minutes.
+Phase 3 – Synchronize Intelligence (The Brain)
+A3 (scholarship_agent):
+
+Bootstrap orchestration and POST each checkpoint to A8 as separate events (see list above). If the dashboard shows 0/9, you are writing to the wrong endpoint or missing headers. Fix and re-run until A8 visibly flips 0/9 → 9/9.
+Emit match_returned with result IDs and quality metadata (rank, fit score).
+A4 (scholarship_sage):
+
+When asked for help after a match, include the user/session and last query context; if missing, log “context_missing” to A8 and mark as RS-2 blocker.
+Verification (Phase 3):
+
+Trigger a real match in A5 → A3 → A2; capture A8 counters flipping; confirm match_returned and sage_assist events arrive and correlate to the same session.
+Phase 4 – Marketing & Handoff Integrity (Acquisition)
+A7 → A5:
+
+Confirm CTAs target the correct A5 base URL; preserve UTM (utm_source, utm_campaign, utm_term).
+Emit page_view on load and cta_click on click from A7; verify both appear in A8 Growth/SEO and attribute to the same session that later converts.
+Phase 5 – Business-Logic Probes (Truth over Ping)
+Add or verify probe endpoints (return identity headers on success; 200 only if the business action succeeds):
+
+/api/probe/auth (synthetic OIDC loop)
+/api/probe/lead (creates a namespaced test lead; verifies DB + A8 event)
+/api/probe/payment (creates a $0 or test-mode payment; verifies webhook + A8 Finance)
+/api/probe/data (sends a v3.5.1 analytics event; verifies A8 ingested)
+/api/probes (aggregate status; RED if any sub-probe fails)
+Fleet Health in A8 must use these probes (not pings). If any probe fails, Fleet Health = RED.
+
+Phase 6 – Final Proof (No “looks good”)
+Produce TEST_REPORT.md with:
+
+One Lead Gen event → appears in A8 (attach event_id and A8 screenshot).
+One Auth event (user_signup) → appears in A8.
+One Revenue event (student or provider) → webhook receipt + Finance tile update.
+Orchestration proof: A3 0/9 → 9/9 visible in A8 for this run.
+Provider onboarding: provider_connected and listing_created visible in A8 B2B tile.
+UTM-to-Revenue attribution: show the original UTM from A7 tied to the payment.
+SLO summary: P95 for A1–A7 probes ≤150ms (list any violators).
+Required Deliverables (attach to the incident)
+
+TEST_REPORT.md (above), with screenshots and event_ids.
+DIFF_SUMMARY.md: exact files and minimal diffs you changed (e.g., telemetry emitters, header injection, endpoint switches, webhook route maps).
+ROLLBACK.md: how to revert each change (flags/env toggles).
+TRUTH_TABLES.md:
+B2C: Traffic → Auth → Lead → Money → Orchestration → Value → Sage → Pilot (PASS/FAIL + evidence)
+B2B: Provider Register → Listing Created → B2B Tile → Finance (PASS/FAIL + evidence)
+Stop Conditions and Escalation
+
+If any RS‑1 remains (payments in TEST on Live, A3 still writing to wrong endpoint, A1 session loss): stop, mark “Revenue HALT,” return TEST_REPORT.md with failing step, endpoint, headers, and payload.
+Otherwise, complete all phases and return full deliverables.
+Execute now.
