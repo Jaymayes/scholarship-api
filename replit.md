@@ -81,6 +81,12 @@ The business vision is to create a comprehensive, intelligent platform that conn
 - Env var renamed: `A8_INGEST_URL` → `A8_EVENTS_URL` (defaults to `/events`)
 - **SRE Fix Pack Compliance**: `A8_KEY` env var support added for Authorization headers (optional, enables `Authorization: Bearer <key>`)
 
+**Deploy Health Endpoints** (2026-01-04): SRE Fix Pack Compliance
+- `GET /health` - Fast health check (200 OK)
+- `GET /ready` - Readiness check with DB + Stripe status verification
+- `GET /healthz` - Kubernetes-style minimal health check
+- All endpoints wired for deploy checks per directive
+
 **Known Issues**: None blocking
 
 # User Preferences
