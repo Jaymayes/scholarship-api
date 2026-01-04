@@ -54,15 +54,24 @@ The business vision is to create a comprehensive, intelligent platform that conn
 - Both endpoints query PostgreSQL views directly for real-time data
 - **Note**: Requires republishing to production deployment to be accessible via external URL
 
-**Business Logic Probes** (2026-01-04): Phase 5 P0 Revenue Rescue - Truth over Ping
-- `GET /api/probe/` - Aggregate probe status (all probes must pass for green)
+**Business Logic Probes** (2026-01-04): Phase 5-6 P0 Revenue Rescue - Complete
+- `GET /api/probe/` - Aggregate probe status (all 4 probes must pass for green: db, kpi, auth, payment)
 - `GET /api/probe/lead` - Creates namespaced test lead, verifies DB + event emission
 - `GET /api/probe/data` - Sends v3.5.1 analytics event, verifies in DB
 - `GET /api/probe/db` - Database connectivity check
 - `GET /api/probe/kpi` - Verifies revenue_by_source and b2b_funnel views accessible
+- `GET /api/probe/auth` - Synthetic OIDC probe (verifies A1 JWKS reachable + keys published)
+- `GET /api/probe/payment` - Stripe infrastructure probe (webhook secret + Finance tile data)
 - All probe responses include `X-System-Identity` and `X-App-Base-URL` headers
 - Probe data namespaced with `probe_` prefix to prevent contamination
 - Fleet Health should be RED if any business probe fails
+
+**Verification Baseline** (2026-01-04): Evidence Baseline Snapshot
+- Finance Tile: $179.99 revenue (fee_captured=$150, payment_succeeded=$29.99)
+- B2B Funnel: 15 rows (providers + listings tracked)
+- Event Sources: A2, A5, A6 all emitting correctly
+- Auth Issuer: https://scholar-auth-jamarrlmayes.replit.app/oidc (JWKS: 1 key)
+- Telemetry Fallback: Verified working (sink=A2_fallback)
 
 **Known Issues**: None blocking
 
