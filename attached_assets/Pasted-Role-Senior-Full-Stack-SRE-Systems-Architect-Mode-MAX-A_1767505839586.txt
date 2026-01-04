@@ -1,0 +1,108 @@
+Role: Senior Full-Stack SRE & Systems Architect
+Mode: MAX AUTONOMOUS FIX & VERIFY
+Status: Critical. Fleet reports “Ready” but A8 shows Revenue Blocked. Evidence indicates legacy protocol/endpoint usage (v3.4.x, v341_event_type, /ingest) while A8 requires v3.5.1 (/events).
+
+Objective
+
+Eliminate all protocol/endpoint drift across A1–A7. Every business event must reach A8 in v3.5.1 format within 2 minutes.
+Prove the money path (student and provider) and orchestration visibility (A3 0/9 → 9/9) are live in A8.
+Deliver TEST_REPORT.md with event IDs, screenshots of A8 tile updates, and diffs.
+Targets
+
+Core: A1 scholar_auth, A2 scholarship_api
+Intelligence: A3 scholarship_agent, A4 scholarship_sage
+Frontends: A5 student_pilot, A6 provider_register
+Growth: A7 auto_page_maker
+HQ: A8 auto_com_center (Command Center)
+Guardrails
+
+Secrets never logged. Changes must be idempotent and reversible (feature flags/env toggles).
+Namespacing: Mark synthetic traffic clearly; keep “LIVE_CANARY” separate and filterable.
+SLO: P95 ≤150ms on user-facing endpoints during tests.
+Phase 0 — Snapshot (Evidence First)
+
+Capture A8 tiles (Finance, B2C, B2B, Growth/SEO, SLO, Trust) and Live Event Feed.
+Export last 200 events grouped by x-app-label; list any with legacy protocol/fields (e.g., v3.4.x, v341_event_type, /ingest).
+Phase 1 — Protocol/Endpoint Normalization (Fleet-Wide)
+For every emitter in A1–A7:
+
+Replace legacy endpoint:
+BEFORE: {A8}/ingest
+AFTER: {A8}/events
+Enforce headers on every request:
+x-scholar-protocol: v3.5.1
+x-app-label: <app_label>
+x-event-id: <uuid>
+X-API-Token: <token>
+X-Service-Auth: <service-jwt>
+Content-Type: application/json
+Standardize payload schema (no legacy v341_event_type):
+event_name (string, canonical)
+ts (epoch ms)
+source_app_id (matches x-app-label)
+user_id, session_id (when available)
+context (utm_source, utm_campaign, plan, provider_id, match_ids, amount, currency, mode)
+Add missing emitters:
+A7: page_view, cta_click (with UTM)
+A1/A5: user_signup, user_login
+A5: checkout_viewed, checkout_started, payment_succeeded (after webhook ack), application_started
+A6: provider_connected, listing_created, payment_succeeded_provider
+A3: app_identity, preflight_check, campaign_config, bandit_config, lead_pipeline, provider_pipeline, payment_config, analytics_ingest, dashboard_sync, match_returned
+A4: sage_assist (include reference to last match_returned)
+A8 receiver hardening:
+Accept v3.5.1 only; reject and log explicit error on wrong protocol/headers.
+Ensure tiles/queries read the same store used by /events; bust cache on test window.
+Phase 2 — Money & Leads Unblock (Proof of Cash Flow)
+Student (A5 + Stripe + A2/A8):
+
+Ensure Stripe mode is correct by environment; webhook deployed and secret validated; idempotency keys used; telemetry emitted only after webhook ack.
+Run a $1 LIVE_CANARY (or TEST in staging) and verify:
+Webhook ack ID
+Order/subscription row in A2
+A8 Finance tile increments; provider fee (3%) and AI margin (4x) visible
+Provider (A6 + Stripe Connect + A2/A8):
+
+Verify Connect flow (CORS, callback URLs, LIVE/TEST).
+On success, A2 elevates role and emits provider_connected + listing_created.
+A8 B2B tile updates; Finance reflects provider payment if applicable.
+Phase 3 — Orchestration Truth (A3 → A8)
+
+Run bootstrap-day1 orchestration. Post each checkpoint as discrete events to A8 in v3.5.1.
+Acceptance: A8 must visibly flip 0/9 → 9/9 for this run. If counters don’t move, print the exact failing endpoint/headers/payload, fix, and re-run.
+Phase 4 — Marketing Hand-off (A7 → A5 → A8)
+
+Confirm A7 CTAs point to the correct A5 base URL and preserve UTM params.
+Verify A8 shows page_view and cta_click, and that the later payment is attributed to the original UTM.
+Phase 5 — Business-Logic Probes (Truth over Ping)
+
+Ensure these probes exist and return 200 only on true success; include identity headers (X-System-Identity, X-App-Base-URL):
+/api/probe/auth (synthetic OIDC)
+/api/probe/lead (creates namespaced test lead; verifies DB + A8 event)
+/api/probe/payment (canary or sandbox; verifies webhook + A8 Finance)
+/api/probe/data (analytics event; verifies A8 ingestion)
+/api/probes (aggregate; RED if any fail)
+Wire A8 Fleet Health to these probes (not ping-only).
+Phase 6 — Resilience (Fallback + Replay)
+
+Briefly disable A8 /events (maintenance toggle), send events, confirm failover to A2 sink, then replay to A8 with zero loss/duplication.
+Deliverables (attach all)
+
+TEST_REPORT.md
+Student Persona chain: page_view → user_signup → lead_captured → payment_succeeded → match_returned → application_started
+Provider Persona chain: provider_connected → listing_created → payment_succeeded_provider
+For each step: timestamp, endpoint, A8 event_id, and A8 tile screenshot showing the update within 2 minutes
+A3 orchestration: screenshot of 0/9 → 9/9 for this session
+UTM→Revenue attribution screenshot
+SLO snapshot (P95 per app) and error counts during the run
+DIFF_SUMMARY.md
+Files/lines changed per app (emitters, endpoints, headers, webhooks)
+Flags/env toggles used
+ROLLBACK.md
+How to revert each change safely and quickly
+TRUTH_TABLES.md (PASS/FAIL + evidence links)
+B2C: Traffic → Auth → Lead → Money → Orchestration → Value → Sage → Pilot
+B2B: Provider Register → Listing → B2B Tile → Finance
+Stop conditions and escalation
+
+If any RS‑1 persists (payments wrong mode, A3 not visible in A8, probe failures), stop, label “REVENUE HALT,” and return TEST_REPORT.md with the failing step, the exact endpoint, headers, and payload for executive decision.
+Execute now. Return all deliverables and a one‑page executive summary covering remaining risks, revenue impact, and your mitigation plan within 24 hours.

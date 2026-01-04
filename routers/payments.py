@@ -284,24 +284,38 @@ async def handle_checkout_completed(session: Any) -> None:
         provider_id = metadata.get("provider_id", "unknown")
         logger.info(f"Subscription activated. Provider: {provider_id}")
     
-    a8_url = os.environ.get("A8_INGEST_URL", "https://auto-com-center-jamarrlmayes.replit.app/ingest")
+    a8_url = os.environ.get("A8_EVENTS_URL", "https://auto-com-center-jamarrlmayes.replit.app/events")
+    event_id = f"rev_{session_id}_{int(datetime.utcnow().timestamp())}"
     
     try:
         async with httpx.AsyncClient(timeout=5.0) as client:
             revenue_event = {
+                "event_name": "payment_succeeded",
                 "source": "https://scholarship-api-jamarrlmayes.replit.app",
+                "source_app_id": "A2",
                 "app_id": "scholarship_api",
                 "metric": "REVENUE",
-                "event_type": "checkout.session.completed",
                 "status": "pass",
                 "amount_cents": amount_total,
                 "currency": currency,
                 "session_id": session_id,
                 "signature_verified": True,
+                "ts": int(datetime.utcnow().timestamp() * 1000),
                 "timestamp": datetime.utcnow().isoformat() + "Z"
             }
             
-            response = await client.post(a8_url, json=revenue_event)
+            response = await client.post(
+                a8_url, 
+                json=revenue_event,
+                headers={
+                    "Content-Type": "application/json",
+                    "x-scholar-protocol": "v3.5.1",
+                    "x-app-label": "A2",
+                    "x-event-id": event_id,
+                    "X-Protocol-Version": "v3.5.1",
+                    "X-Idempotency-Key": event_id
+                }
+            )
             
             if response.status_code in (200, 201, 202):
                 logger.info(f"Revenue event emitted to A8: {amount_total} cents, session={session_id}")

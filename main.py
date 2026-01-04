@@ -406,21 +406,35 @@ async def startup_telemetry():
                     }
                     try:
                         async with httpx.AsyncClient(timeout=5.0) as client:
-                            await client.post(f"{A8_URL}/events", json=blocker_envelope)
+                            await client.post(
+                                f"{A8_URL}/events", 
+                                json=blocker_envelope,
+                                headers={
+                                    "Content-Type": "application/json",
+                                    "x-scholar-protocol": "v3.5.1",
+                                    "x-app-label": "A2",
+                                    "x-event-id": f"blocker_{datetime.utcnow().strftime('%Y%m%d%H%M%S')}",
+                                    "X-Protocol-Version": "v3.5.1"
+                                }
+                            )
                         logger.critical("🚨 REVENUE BLOCKER: INVENTORY_EMPTY sent to A8")
                     except Exception as e:
                         logger.warning(f"⚠️ revenue_blocker send failed: {e}")
                 
                 try:
                     async with httpx.AsyncClient(timeout=5.0) as client:
-                        for endpoint in ["/events", "/api/events", "/ingest"]:
-                            try:
-                                response = await client.post(f"{A8_URL}{endpoint}", json=envelope)
-                                if response.status_code in (200, 201, 202):
-                                    logger.debug(f"💓 HEARTBEAT: Sent to A8{endpoint} (scholarships={total_scholarships}, p95={p95_latency}ms)")
-                                    break
-                            except:
-                                continue
+                        heartbeat_headers = {
+                            "Content-Type": "application/json",
+                            "x-scholar-protocol": "v3.5.1",
+                            "x-app-label": "A2",
+                            "x-event-id": f"hb_{datetime.utcnow().strftime('%Y%m%d%H%M%S')}",
+                            "X-Protocol-Version": "v3.5.1"
+                        }
+                        response = await client.post(f"{A8_URL}/events", json=envelope, headers=heartbeat_headers)
+                        if response.status_code in (200, 201, 202):
+                            logger.debug(f"💓 HEARTBEAT: Sent to A8/events (scholarships={total_scholarships}, p95={p95_latency}ms)")
+                        else:
+                            logger.warning(f"💓 HEARTBEAT: A8 returned {response.status_code}")
                 except Exception as e:
                     logger.warning(f"⚠️ HEARTBEAT: A8 unreachable ({e}), recording locally")
                     await emit_app_event("app_heartbeat", {
@@ -501,10 +515,13 @@ async def startup_telemetry():
                 try:
                     async with httpx.AsyncClient(timeout=5.0) as client:
                         response = await client.post(
-                            "https://auto-com-center-jamarrlmayes.replit.app/ingest",
+                            "https://auto-com-center-jamarrlmayes.replit.app/events",
                             json=kpi_payload,
                             headers={
                                 "Content-Type": "application/json",
+                                "x-scholar-protocol": "v3.5.1",
+                                "x-app-label": "A2",
+                                "x-event-id": kpi_payload["idempotency_key"],
                                 "X-Protocol-Version": "v3.5.1",
                                 "X-Idempotency-Key": kpi_payload["idempotency_key"]
                             }
