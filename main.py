@@ -937,12 +937,31 @@ async def json_status():
     }
 
 @app.get("/readiness")
+@app.get("/ready")
+@app.head("/ready")
 async def readiness_check():
-    """Readiness check endpoint for deployment"""
+    """Readiness check endpoint for deployment - per SRE Fix Pack directive"""
+    from models.database import SessionLocal
+    from sqlalchemy import text as sql_text
+    
+    db_status = "ready"
+    try:
+        db = SessionLocal()
+        db.execute(sql_text("SELECT 1"))
+        db.close()
+    except Exception:
+        db_status = "degraded"
+    
+    stripe_configured = bool(os.environ.get("STRIPE_SECRET_KEY")) and bool(os.environ.get("STRIPE_WEBHOOK_SECRET"))
+    
+    overall_status = "ready" if db_status == "ready" else "not_ready"
+    
     return {
-        "status": "ready",
+        "status": overall_status,
         "services": {
-            "api": "ready"
+            "api": "ready",
+            "database": db_status,
+            "stripe": "configured" if stripe_configured else "missing_secrets"
         }
     }
 

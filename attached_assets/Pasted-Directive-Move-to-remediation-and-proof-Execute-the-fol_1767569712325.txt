@@ -1,0 +1,37 @@
+Directive: Move to remediation and proof. Execute the following in order.
+
+Bring A6 (provider_register) online now
+Configure secrets: STRIPE_SECRET, STRIPE_WEBHOOK_SECRET, A8_URL, A8_KEY, CORS_ORIGIN.
+Ensure Stripe webhook uses a raw-body route at /stripe/webhook and returns 200 on receipt; signature verified.
+Health endpoints: /health and /ready return 200; wire into deploy checks.
+Deploy staging, then prod. Target P95 ≤150ms on webhook handling.
+2. Standardize event contract to v3.5.1 across A1–A7
+
+A1: Prefer rename user_signed_up → NewUser at source; if risky, add a temporary alias in A8’s BUSINESS_EVENT_TYPES and schedule deprecation.
+Ensure all A8 POSTs carry headers: x-scholar-protocol=v3.5.1, x-app-label, x-event-id, Authorization: Bearer A8_KEY, content-type=application/json.
+Enforce idempotent upsert by x-event-id on A8; enable outbox+replay in each app; no silent catches.
+3. Run the canary and record proof
+
+Download the SRE Fix Pack: sre_fix_pack.zip
+Set env and run:
+export A8_URL=https://<your-a8>/events
+export A8_KEY=<ingest_key>
+bash scripts/test_canary.sh
+Expected: {"accepted":true,"persisted":true} for NewLead, NewUser, PaymentSuccess. Paste responses and DB rows into docs/TEST_REPORT.md, including P95 write latency.
+4. Optional manual override with Authorization header
+
+Use the improved script that matches v3.5.1 and includes Authorization:
+Download simulate_fleet.py
+export A8_URL and A8_KEY, then run: python3 simulate_fleet.py
+This emits NewUser, NewLead, PaymentSuccess with proper schema.
+5. Close the loop
+
+If any check fails: compare headers/schema to docs/telemetry_spec_v351.md, replay via outbox, inspect A8 ingestion logs and BUSINESS_EVENT_TYPES allowlist.
+When all three events show persisted:true and exist in storage, mark TEST_REPORT.md as PASS and activate A8 Demo Mode.
+Owner assignments
+
+DevOps: Deploy A6; verify /ready and Stripe webhook live within 30 minutes.
+App Leads (A1/A2/A7): Conform event names and headers; implement outbox if missing.
+Data Ops: Confirm A8 allowlist, idempotent upsert, and dashboards reflect events within seconds.
+This resolves the infra blocker, eliminates false positives, and gives verifiable evidence that A8 is receiving money-path and lead-path events in real time.
+
