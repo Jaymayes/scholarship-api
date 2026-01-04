@@ -73,6 +73,13 @@ The business vision is to create a comprehensive, intelligent platform that conn
 - Auth Issuer: https://scholar-auth-jamarrlmayes.replit.app/oidc (JWKS: 1 key)
 - Telemetry Fallback: Verified working (sink=A2_fallback)
 
+**Protocol Normalization** (2026-01-04): v3.5.1 Compliance Fix
+- Fixed: All A2 outbound telemetry now uses `/events` endpoint (not `/ingest`)
+- Fixed: KPI_SNAPSHOT, heartbeat, revenue_blocker all include v3.5.1 headers
+- Required headers on all A8 calls: `x-scholar-protocol: v3.5.1`, `x-app-label: A2`, `x-event-id: <uuid>`
+- Payments: Revenue events include `event_name`, `source_app_id`, `ts` (epoch ms) per v3.5.1 schema
+- Env var renamed: `A8_INGEST_URL` → `A8_EVENTS_URL` (defaults to `/events`)
+
 **Known Issues**: None blocking
 
 # User Preferences
