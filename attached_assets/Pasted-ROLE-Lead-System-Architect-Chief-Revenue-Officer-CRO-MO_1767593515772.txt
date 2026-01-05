@@ -1,0 +1,113 @@
+ROLE: Lead System Architect & Chief Revenue Officer (CRO)
+MODE: MAX AUTONOMOUS FIX & VERIFY
+PRIORITY: DEFCON 1 — Revenue and Data Critical
+
+CURRENT STATUS
+“False Positive Ready.” Code shows v3.5.1 compliance, but runtime is broken.
+
+A6 provider_register: offline/crashing (404/500) — revenue blocked.
+A2 scholarship_api: misconfigured — missing secrets and failing /ready checks.
+A8 auto_com_center: starved — events not arriving; dashboards misleading.
+Split-brain indicators on dashboard: green tiles with red incident banners (A1 DB unreachable, A3 revenue_blocker, A2 “revenue aggregation pending”).
+OBJECTIVE
+Perform an end-to-end forensic audit and surgical remediation. Do not build new features. Prove—by live data persisted in A8—that Marketing, Leads, Revenue, and Learning pipelines work. A8 is the source of truth; if data is not visible in A8 with persisted:true, the system is failing.
+
+ECOSYSTEM MAP
+
+A1: scholar_auth (Identity)
+A2: scholarship_api (Data Backbone)
+A3/A4: scholarship_agent / scholarship_sage (Logic/Learning)
+A5: student_pilot (User App)
+A6: provider_register (Revenue/B2B)
+A7: auto_page_maker (Marketing/SEO)
+A8: auto_com_center (Command Center/Dashboard)
+NON-NEGOTIABLE RULES
+
+No “looks good” statements. Only evidence: A8 responses with accepted:true, persisted:true and stored rows keyed by x-event-id.
+Staging first; tag all tests with simulated and a namespace.
+Enforce Telemetry v3.5.1 everywhere; reject legacy contracts.
+Idempotency: A8 upserts by x-event-id; clients send uuid-v4.
+P95 write latency target ≤150ms; capture logs and durations.
+TELEMETRY CONTRACT (v3.5.1)
+
+Endpoint: POST <A8_URL>/events
+Required headers:
+content-type: application/json
+x-scholar-protocol: v3.5.1
+x-app-label: one of [scholar_auth, scholarship_api, scholarship_agent, scholarship_sage, student_pilot, provider_register, auto_page_maker]
+x-event-id: uuid-v4
+Authorization: Bearer <A8_KEY>
+Body fields:
+event_type: NewUser | NewLead | PaymentSuccess | PageView | ScholarshipMatchRequested | ScholarshipMatchResult | SageAssist | ProviderOnboarded
+occurred_at (ISO-8601), actor_id, session_id (opt), source, payload{details, amount_cents, currency, provider_id, scholarship_id, latency_ms, success}
+Reliability: retries with exponential backoff on 429/5xx; implement outbox + forwarder if A8 is unreachable.
+PII minimization: no raw PAN/SSN; no full essays.
+EXECUTION PROTOCOL
+
+PHASE 0 — SPLIT-BRAIN DISCOVERY (Evidence first)
+
+Verify A8_URL and A8_KEY secrets exist in every app; confirm endpoint is /events (not legacy /ingest).
+Tighten /health and /ready:
+/health must include a real DB probe (e.g., SELECT 1). Return 500 on DB failure.
+/ready must prove dependencies (DB, Stripe, A8) are reachable and configured.
+Snapshot the red incident banners and the tiles; this is your baseline.
+PHASE 1 — REVENUE RESCUE (A6 and A2)
+
+A6 provider_register
+If Stopped/Crashed: fix secrets and bring online. Required: STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET, DATABASE_URL, A8_URL, A8_KEY, CORS_ORIGIN.
+Stripe webhook must use raw-body verification; signature must pass; return 200 promptly.
+On checkout.session.completed, emit PaymentSuccess to A8 with full headers/body.
+Health SLO: /health and /ready return 200; P95 ≤150ms on webhook+emit path.
+A2 scholarship_api
+Inject live Stripe keys; centralize A8 header builder; ensure Authorization header present on all A8 calls.
+Add /ready → {"status":"ready"} with dependency checks so the LB passes.
+VERIFY
+Simulate a provider payment. Confirm A8 returns accepted:true, persisted:true and Finance/Revenue tiles update within seconds.
+PHASE 2 — MARKETING AND LEAD TRACE (A7 → A1 → A8)
+
+Simulate a lead arriving on an A7 page; confirm PageView in A8.
+On lead submit, A7 creates a user in A1 and emits NewLead to A8 in the same transaction.
+Confirm A1 emits NewUser on signup with PII-minimized payload.
+If any step is missing in A8, patch the emitter immediately (no console-only logging).
+PHASE 3 — THE LEARNING LOOP (A5/A3/A4 → A8)
+
+Simulate a student match request from A5.
+Emit ScholarshipMatchRequested and ScholarshipMatchResult with latency_ms and success.
+A4 emits SageAssist with latency and success.
+Confirm all arrive in A8 with persisted:true.
+PHASE 4 — SURGICAL STRIKE FOR INCIDENTS
+
+A1 DB unreachable: fix DATABASE_URL/pooling; make /health fail on DB failure; confirm logs show “Database Connected.”
+A3 revenue_blocker: identify failing dependency (A2 or A6), whitelist where needed, fix timeouts/routes; clear incident in A8.
+A2 “Revenue aggregation pending”: ensure A2 emits KPI_SNAPSHOT/PaymentSuccess with Authorization header; confirm dashboard text switches to Live.
+PHASE 5 — FINAL HUMAN-IN-THE-LOOP VALIDATION
+Required deliverables (commit to repo/docs):
+
+BLOCKER_REPORT.md
+Silent Failures: events that occurred but never reached A8.
+Revenue Stoppers: UI/API friction (e.g., A6 404/500, missing secrets).
+Fix Action Plan: exact file paths patched and deployment actions taken.
+TEST_REPORT.md
+A8 responses and DB evidence for:
+1x Mock Lead (A7 → A1 → A8)
+1x Mock Auth (A1 → A8)
+1x Mock Payment (A6/A2 → A8)
+Include event_ids, timestamps, retries, P95 write latency.
+TRUTH_TABLES.md
+For A1–A7: Config present? Endpoint reachable? Test event persisted in A8?
+DIFF_SUMMARY.md and ROLLBACK.md
+Every code/config change and safe revert instructions.
+CANARY COMMANDS (staging; replace <A8_URL>, <A8_KEY>)
+
+NewUser (scholar_auth) curl -sS -X POST "<A8_URL>/events" -H "content-type: application/json" -H "x-scholar-protocol: v3.5.1" -H "x-app-label: scholar_auth" -H "x-event-id: $(uuidgen)" -H "authorization: Bearer <A8_KEY>" -d '{"event_type":"NewUser","occurred_at":"'"$(date -u +%Y-%m-%dT%H:%M:%SZ)"'","actor_id":"test_user_01","source":"canary/auth","payload":{"details":"canary"}}'
+NewLead (auto_page_maker): same, with x-app-label=auto_page_maker and event_type=NewLead
+PaymentSuccess (provider_register): same, with x-app-label=provider_register, event_type=PaymentSuccess, payload includes amount_cents and currency
+SUCCESS CRITERIA (binary)
+
+A6 /health and /ready return 200.
+A2 /ready returns 200; Authorization header present on all A8 calls.
+A8 shows persisted:true for NewUser, NewLead, PaymentSuccess, and Learning events; DB contains rows keyed by x-event-id.
+P95 write latency ≤150ms during the test window.
+Red incident banners cleared; revenue is > $0 on the dashboard.
+START
+Assume the system is broken until A8 proves otherwise. Execute Phase 0, then Phases 1–5, and submit the required reports.
