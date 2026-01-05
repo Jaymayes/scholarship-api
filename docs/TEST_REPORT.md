@@ -140,6 +140,26 @@ curl -X POST "https://auto-com-center-jamarrlmayes.replit.app/events" \
 **HTTP Status**: 200
 **Latency**: 181ms (P95 target: ≤150ms - CLOSE)
 
+## KPI_SNAPSHOT Canary (Phase 4 - Revenue Aggregation)
+
+**Test Time**: 2026-01-05T06:43:15Z
+
+**Response**:
+```json
+{
+  "accepted": true,
+  "event_id": "evt_1767595395245_ggotb5l2j",
+  "app_id": "A2",
+  "app_name": "scholarship_api",
+  "event_type": "KPI_SNAPSHOT",
+  "internal_type": "SYSTEM_HEALTH",
+  "persisted": true,
+  "timestamp": "2026-01-05T06:43:15.245Z"
+}
+```
+
+**Status**: ✅ `persisted:true` - Dashboard should switch from "pending" to "Live"
+
 ## Verdict
 
 **A2 Status**: ✅ FULLY OPERATIONAL
