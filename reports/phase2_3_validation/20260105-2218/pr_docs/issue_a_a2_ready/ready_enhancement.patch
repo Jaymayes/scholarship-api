@@ -1,0 +1,69 @@
+--- a/main.py
++++ b/main.py
+@@ -939,6 +939,12 @@ async def json_status():
+ @app.get("/readiness")
+ @app.get("/ready")
+ @app.head("/ready")
+ async def readiness_check():
+-    """Readiness check endpoint for deployment - per SRE Fix Pack directive"""
++    """
++    Readiness check endpoint for deployment - per SRE Fix Pack directive
++    
++    Feature Flags:
++    - READY_EXTENDED_CHECKS: Enable A1 OIDC + EventBus checks (default: false)
++    """
+     from models.database import SessionLocal
+     from sqlalchemy import text as sql_text
++    import httpx
++    
++    # Feature flag for extended checks
++    READY_EXTENDED_CHECKS = os.getenv("READY_EXTENDED_CHECKS", "false").lower() == "true"
+     
+     db_status = "ready"
+     try:
+         db = SessionLocal()
+         db.execute(sql_text("SELECT 1"))
+         db.close()
+     except Exception:
+         db_status = "degraded"
+     
+     stripe_configured = bool(os.environ.get("STRIPE_SECRET_KEY")) and bool(os.environ.get("STRIPE_WEBHOOK_SECRET"))
+     
++    # Extended checks (feature flagged)
++    oidc_status = "skipped"
++    eventbus_status = "skipped"
++    
++    if READY_EXTENDED_CHECKS:
++        # Check A1 OIDC JWKS reachability
++        try:
++            async with httpx.AsyncClient(timeout=5.0) as client:
++                resp = await client.get("https://scholar-auth-jamarrlmayes.replit.app/oidc/jwks")
++                oidc_status = "ready" if resp.status_code == 200 else "degraded"
++        except Exception:
++            oidc_status = "degraded"
++        
++        # Check EventBus/A8 reachability
++        a8_url = os.getenv("EVENT_BUS_URL", "https://auto-com-center-jamarrlmayes.replit.app")
++        try:
++            async with httpx.AsyncClient(timeout=5.0) as client:
++                resp = await client.get(f"{a8_url}/health")
++                eventbus_status = "ready" if resp.status_code == 200 else "degraded"
++        except Exception:
++            eventbus_status = "degraded"
++    
+     overall_status = "ready" if db_status == "ready" else "not_ready"
++    if READY_EXTENDED_CHECKS:
++        if oidc_status == "degraded" or eventbus_status == "degraded":
++            overall_status = "degraded"
+     
+     return {
+         "status": overall_status,
+         "services": {
+             "api": "ready",
+             "database": db_status,
+-            "stripe": "configured" if stripe_configured else "missing_secrets"
++            "stripe": "configured" if stripe_configured else "missing_secrets",
++            "oidc": oidc_status,
++            "eventbus": eventbus_status
+         }
+     }
