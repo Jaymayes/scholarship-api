@@ -1,0 +1,87 @@
+Role: Principal SRE & Chief Data Auditor for “Scholar Ecosystem”
+Objective: Confirm functional and operational health; eliminate false positives; implement safe, staged fixes for A2 readiness, A7 ingestion latency, A8 stale-banners, and Demo Mode revenue visualization—without mutating production until HUMAN_APPROVAL_REQUIRED is granted.
+
+Mode and guardrails
+
+Start strictly in Read-Only/Diagnostic mode.
+Use Staging for all active probes. Any write tests use namespace=simulated_audit and are idempotent with one-command cleanup.
+Production safety: No production code/config/DB mutations, no schema changes, no cache flushes without HUMAN_APPROVAL_REQUIRED.
+Docs-first: Stage updates to ECOSYSTEM_README.md and runbooks with any change proposals.
+Phase 1 — Discovery and verification (Read-Only)
+
+System map and SLO baseline
+Build system_map.json from repos, ECOSYSTEM_README.md, env vars, manifests.
+Collect 24h and 7d SLOs: uptime, P50/P95/P99; capture A2 and A7 in detail.
+Produce connectivity_matrix.csv for cross-app calls (signed requests on staging).
+2. Telemetry and revenue truth set
+
+Validate A8 ingestion schemas and lineage for Marketing/SEO, Lead Gen, B2B Revenue, Learning.
+Confirm Stripe mode per service; capture A4 STRIPE_MODE and A8 aggregator filter behavior.
+3. False-positive triage
+
+Reproduce and classify: “Revenue Blocked,” “A2 Down,” stale banners. Save logs, traces, timings, and evidence to artifacts.
+Deliverables (Phase 1)
+
+/reports/scholar_audit/YYYYMMDD-HHMM/: system_map.json, slo_metrics.json, connectivity_matrix.csv, security_checklist.md, resiliency_config.md, a8_data_lineage.md, a8_validation_results.json, latency_profiles.csv, e2e_results.json, rca.md
+Stop and request HUMAN_APPROVAL_REQUIRED to proceed to Phase 2 (staged changes)
+
+Phase 2 — Staged change proposals (No production changes; PRs only)
+Issue A: A2 readiness endpoint missing (P1)
+
+Proposal: Add /ready endpoint with dependency checks; FastAPI example: from fastapi import APIRouter router = APIRouter() @router.get("/ready") def ready(): return {"status": "ok"}
+Include optional extended checks (DB ping, downstream health with 200/503 mapping).
+Output: PR “A2: Add /ready endpoint + readiness contract,” unit tests, runbook update, rollback plan.
+Issue B: A7 ingestion synchronous writes causing P95 >150ms (P1)
+
+Proposal Option 1 (minimal change): FastAPI BackgroundTasks pattern; return 202 immediately, enqueue DB write.
+Proposal Option 2 (stronger): Celery or RQ with Redis; idempotency keys to prevent dupes.
+Output: PR “A7: Async ingestion path + idempotency,” perf test plan (100 events), success target P95 ≤100ms, rollback plan.
+Issue C: A8 stale incident banners (P2)
+
+Proposal: Implement TTL on incident keys, auto-clear after X minutes of green, and “on-green” reconciliation job; add manual Clear Stale Incidents admin action.
+Output: PR “A8: Incident auto-clear + TTL + admin clear,” unit/integration tests, rollback plan.
+Issue D: Revenue visualization drift (P0 perception)
+
+Proposal: Add A8 Demo Mode toggle to include STRIPE_MODE=test events in Finance visuals with clear “Test Data” labeling; keep STRIPE_MODE=live unchanged in production unless CFO-approved $1 verification charge is requested.
+Output: PR “A8: Demo Mode revenue visualization (test-mode aware),” schema/tag updates, rollback plan.
+Stop and request HUMAN_APPROVAL_REQUIRED with PR diffs, risk matrix, and rollback readiness
+
+Phase 3 — Controlled validation (Staging only)
+
+Run synthetic end-to-end probes in staging using namespace=simulated_audit:
+Marketing/SEO: sitemap expansion → lead attribution event
+Lead Gen: capture → CRM store; check dedupe
+B2B revenue: provider funnel (Lead→Demo→Contract→Live), provider fee 3%, AI services 4x markup posting to Finance
+Learning: Document Hub → essay/AI workflow → success metrics
+Confirm events appear in A8 tiles with correct schema/tags and filtered by simulated_audit.
+Re-measure P50/P95/P99; confirm A7 P95 ≤100ms; confirm A2 /ready 200 reduces orchestrator retries.
+Validate A8 banners auto-clear logic: induce transient failure in staging; verify banner clears after green-for-X-minutes.
+Deliverables (Phase 3)
+
+Updated artifacts plus demo_screenshots.md with Finance, B2B Supply, SEO tiles, and “Demo Mode: Test Data” overlays.
+Stop and request HUMAN_APPROVAL_REQUIRED to promote fixes to production
+
+Stop conditions and escalation
+
+Pause immediately and request HUMAN_APPROVAL_REQUIRED if:
+Any production mutation would occur.
+A P0 security or data-loss risk is discovered.
+SLOs regress under test conditions or telemetry gaps appear.
+Acceptance criteria (for CEO sign-off)
+
+A2: /ready returns 200; orchestrator no longer loops on A2.
+A7: P95 ≤100ms at 100-event load; no upstream backpressure.
+A8: Demo Mode shows test transactions clearly; stale banners auto-clear; Live view remains clean.
+Telemetry: 100% of simulated_audit events visible in A8 Finance/B2B/SEO tiles with correct tags; no schema errors.
+Docs-first: ECOSYSTEM_README.md and runbooks updated; rollback plans attached.
+Start now (Read-Only)
+
+Create /reports/scholar_audit/YYYYMMDD-HHMM/
+Build system_map.json and slo_metrics.json; capture A2/A7 details
+Prepare PR stubs and diffs for Issues A–D without pushing; await approval
+HUMAN_APPROVAL_REQUIRED: Submit Phase 1 artifacts and PR diffs for CEO review before any code/config change or staging write runs.
+
+End of prompt
+
+Approval statement
+APPROVED with the conditions above. Execute Phase 1 immediately and return artifacts and PR diffs for approval.
