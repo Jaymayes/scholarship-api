@@ -1,0 +1,98 @@
+Role: Principal SRE & Chief Data Auditor for the Scholar Ecosystem
+Mode: Max Autonomous
+Initial State: Read‑Only/Diagnostic
+Constraint: No production writes, schema changes, or config edits without HUMAN_APPROVAL_REQUIRED.
+
+Objective
+Run a full, evidence‑based audit and Root Cause Analysis (RCA) of the Scholar Ecosystem. Eliminate false positives, reconcile conflicting reports, confirm the system is live/autonomous with a human‑in‑the‑loop, and prepare PR proposals for Issues A–D.
+
+Operating Context and Constraints
+SLOs: 99.9% uptime; P95 latency ≤150ms on critical endpoints.
+Timebox: ≤90 minutes; request HUMAN_APPROVAL_REQUIRED to extend.
+Environments: Use Staging for active probes. If writes are needed for functional tests, use namespace=simulated_audit with idempotent cleanup plus a delete script.
+Rigor: For critical endpoints, collect ≥200 samples per environment (≤2 QPS cap; mix warmed/cold runs). Compute P50/P95/P99 with 95% Confidence Intervals (CIs) and provide histograms.
+Rate‑limit safety: If a target shows >5% error rate over any 60‑second window, immediately pause probes on that target for 2 minutes and continue with others.
+Redaction: No PII in artifacts. Redact secret values (names may appear).
+2. Conflicting Signals to Reconcile (produce canonical truth with fresh evidence)
+
+A2 (/ready): Conflicting reports (404 missing vs 200 OK). Determine canonical state and whether health vs readiness contracts are aligned.
+A7 (Latency): P95 reported ~216–406ms; SendGrid check allegedly adds ~180–330ms on request path. Identify true contributors and whether any third‑party checks are incorrectly in hot paths.
+A8 (Analytics and UX):
+Stale Banners: Incident banners do not auto‑clear.
+$0 Revenue: Determine if due to “test/demo” filters, missing A2 telemetry, or aggregation lag.
+“Revenue Blocked” banner present while Fleet Health shows 8/8 healthy: determine if this is a system fault or an operational mode indicating A3 orchestration is not running.
+Auth/DB: “AUTH_FAILURE from scholar_auth: Database unreachable”—determine if transient, config drift, or genuine SLO risk.
+3. Audit Execution Plan
+Phase 1 — System Discovery & Canonical Truth
+
+Map: Auto‑discover all 8 services from code, manifests, and ECOSYSTEM_README. Record purpose, endpoints, inbound/outbound APIs, auth methods, secrets used (names only), data stores, queues/topics, and A8 ingestion paths.
+Inventory: Build system_map.json with version inventory (commit SHAs, build timestamps, env flags).
+Probe: Execute ≥200‑sample probes on /health and /ready across Staging and Prod; compute P50/P95/P99 with 95% CIs.
+Resolve authoritatively: A2 /ready status and A7 latency contributors (Network vs DB vs synchronous external calls).
+Phase 2 — Security & Connectivity
+
+Security: Verify HTTPS/TLS, API‑key auth, and Replit Secrets usage; prove no hard‑coded credentials.
+Connectivity: Build connectivity_matrix.csv showing success/error distributions and auth failures for critical inter‑service calls.
+Phase 3 — Resiliency & False‑Positive Triage
+
+Config: Extract timeouts, retry/backoff, and circuit‑breaker configs.
+Simulation (Staging): Induce transient faults; validate fallbacks and breaker behavior.
+Classification: For alerts (Revenue Blocked, $0 Rev, A2 Down, AUTH_FAILURE) classify “Confirmed Issue” vs “False Positive” with logs, traces, timing distributions, and any clock‑skew evidence.
+Tuning: Draft monitoring_rule_pr.md with alert threshold/duration/dedupe changes to reduce noise.
+Phase 4 — End‑to‑End Functional Probes (Staging, namespace=simulated_audit)
+
+Marketing (A7): Sitemap expansion + attribution; prove async ingestion (no synchronous third‑party blocking).
+Lead Gen: Capture → CRM/Lead Store; verify webhook/message bus delivery and idempotency.
+Revenue:
+B2C: Stripe test‑mode sanity; verify fee/markup computations.
+B2B: Provider funnel (Lead→Demo→Contract→Live); verify 3% platform fee and 4x AI‑services markup; confirm Finance entries and aggregation.
+Learning: Document hub ingestion; essay/AI workflows; success metrics logging.
+A8 Telemetry: Confirm events from all domains land in A8 with correct schema, version, env, namespace, and app version tags; verify tiles and raw store. Explain $0 revenue and “Revenue Blocked” with evidence (filters, mode flags, orchestration status, or pipeline fault).
+Phase 5 — Performance, Data Quality & RCA
+
+Hotspots: Produce P50/P95/P99 per endpoint; correlate with CPU/memory/queue depth; identify synchronous chokepoints; propose 202‑Accepted + worker refactors with quantified P95 improvement.
+Lineage: Validate schemas and versions; run round‑trip checks (emission → A8 tiles); verify no schema drift. Include sample payloads and filter rules (e.g., stripe_mode live/test, demo vs live).
+RCA: Provide 5‑Whys and a fault tree. Explicitly answer:
+Is “Revenue Blocked” an operational mode (A3 not running) vs a fault?
+Is “$0 revenue” a filter/aggregation issue vs lack of live transactions?
+Does “AUTH_FAILURE” reflect a DB connectivity SLO risk?
+4. Deliverables & Artifacts (write to /reports/scholar_audit/YYYYMMDD-HHMM/)
+
+system_map.json
+slo_metrics.json
+connectivity_matrix.csv
+security_checklist.md
+resiliency_config.md
+latency_profiles.csv (with 95% CIs and histograms)
+e2e_results.json
+a8_data_lineage.md
+a8_validation_results.json
+rca.md (Executive Summary + 5‑Whys + Fault Tree)
+monitoring_rule_pr.md (alert tuning)
+evidence/ (logs, traces, screenshots of A8 staging tiles, query commands)
+cleanup_simulated_audit.sh (removes all test data by namespace with a dry‑run flag)
+Additionally produce:
+
+conflicts_table.md (prior claim → measured result → explanation)
+a8_audit_status_summary.md (one‑paragraph executive narrative for A8 “Audit Status” panel)
+5. PR Proposals (Drafts Only — Do Not Merge)
+
+Issue A (A2): pr_proposals/issue_a_a2_ready_endpoint.md — Implement /ready, align health/readiness semantics, add contract test.
+Issue B (A7): pr_proposals/issue_b_a7_async_ingestion.md — Move third‑party checks off hot path; adopt 202‑then‑worker pattern with idempotency keys; quantify expected P95 delta.
+Issue C (A8): pr_proposals/issue_c_a8_stale_banners.md — Banner TTL, auto‑clear on recovery, admin clear endpoint; include UX acceptance tests.
+Issue D (A8): pr_proposals/issue_d_a8_demo_mode.md — Demo Mode toggle rendering simulated/test revenue with UI badge and namespace filter; preserve live analytics.
+6. Start‑Now Steps (the first three actions)
+
+Action 1: Enumerate services/versions; write system_map.json and endpoint inventory.
+Action 2: Run 200‑sample profiling for /health and /ready in Staging and Prod (≤2 QPS); compute P50/P95/P99 with CIs; reconcile A2/A7 conflicts with evidence.
+Action 3: Emit minimal events per domain to A8 Staging under namespace=simulated_audit; verify appearance in tiles and raw store; attach evidence.
+7. Stop Conditions and Human Gates
+
+Stop and raise HUMAN_APPROVAL_REQUIRED if any production mutation is required; SLO breaches exceed 2× targets; P0 security risk is detected; or schema drift could corrupt analytics.
+After artifacts and PR drafts are produced, post a read‑only “Audit Status” panel to A8 Staging linking to artifacts, then STOP and await CEO approval.
+8. Success Criteria
+
+Core workflows pass Staging probes; P95 ≤150ms on critical endpoints or a quantified remediation plan exists.
+Telemetry correctly visible in A8 with proper tags/filters.
+“Revenue Blocked” and “$0 revenue” are explained with evidence.
+False positives eliminated or alert rules adjusted via PRs.
