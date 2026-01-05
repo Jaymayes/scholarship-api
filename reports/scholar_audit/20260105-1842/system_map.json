@@ -1,0 +1,129 @@
+{
+  "audit_metadata": {
+    "timestamp": "2026-01-05T18:43:00Z",
+    "audit_id": "20260105-1842",
+    "mode": "READ_ONLY/DIAGNOSTIC",
+    "commit_sha": "a97d995b677104c89aebe7050266b89901f25182",
+    "auditor": "Principal SRE Autonomous System"
+  },
+  
+  "services": {
+    "A1": {
+      "name": "scholar_auth",
+      "purpose": "Identity Provider (OIDC/JWKS)",
+      "url": "https://scholar-auth-jamarrlmayes.replit.app",
+      "endpoints": {
+        "/health": {"method": "GET", "auth": "none", "status": 200},
+        "/ready": {"method": "GET", "auth": "none", "status": 200},
+        "/oidc/.well-known/openid-configuration": {"method": "GET", "auth": "none", "status": 200},
+        "/oidc/jwks": {"method": "GET", "auth": "none", "status": 200}
+      },
+      "secrets_used": ["JWT_SIGNING_KEY", "DATABASE_URL"],
+      "inbound_apis": ["A2", "A3", "A5"],
+      "outbound_apis": ["A8"],
+      "data_stores": ["PostgreSQL"]
+    },
+    "A2": {
+      "name": "scholarship_api",
+      "purpose": "Data Backbone & Telemetry Fallback",
+      "url": "https://scholarship-api-jamarrlmayes.replit.app",
+      "commit_sha": "a97d995b677104c89aebe7050266b89901f25182",
+      "endpoints": {
+        "/health": {"method": "GET", "auth": "none", "status": 200, "p95_ms": 12.6},
+        "/ready": {"method": "GET", "auth": "none", "status": 200, "p95_ms": 137.6},
+        "/api/probe/": {"method": "GET", "auth": "none", "status": 200},
+        "/api/v1/scholarships": {"method": "GET", "auth": "JWT", "status": 200},
+        "/api/kpi/b2b_funnel": {"method": "GET", "auth": "none", "status": 200},
+        "/api/kpi/revenue_by_source": {"method": "GET", "auth": "none", "status": 200}
+      },
+      "secrets_used": ["A8_KEY", "JWT_SECRET_KEY", "SERVICE_AUTH_SECRET", "DATABASE_URL", "STRIPE_SECRET_KEY", "STRIPE_WEBHOOK_SECRET"],
+      "inbound_apis": ["A3", "A5", "A6"],
+      "outbound_apis": ["A8"],
+      "data_stores": ["PostgreSQL"],
+      "a8_integration": {
+        "endpoint": "POST /events",
+        "protocol": "v3.5.1",
+        "auth": "Bearer token",
+        "status": "VERIFIED",
+        "p95_ms": 104
+      }
+    },
+    "A3": {
+      "name": "scholarship_agent",
+      "purpose": "Logic/Matching Engine",
+      "url": "https://scholarship-agent-jamarrlmayes.replit.app",
+      "endpoints": {
+        "/health": {"method": "GET", "auth": "none", "status": 200},
+        "/ready": {"method": "GET", "auth": "none", "status": 200}
+      },
+      "secrets_used": ["TBD"],
+      "inbound_apis": ["A5"],
+      "outbound_apis": ["A2", "A8"]
+    },
+    "A4": {
+      "name": "scholarship_sage",
+      "purpose": "Learning/AI Services",
+      "url": "https://scholarship-sage-jamarrlmayes.replit.app",
+      "endpoints": {
+        "/health": {"method": "GET", "auth": "none", "status": 200},
+        "/ready": {"method": "GET", "auth": "none", "status": 200}
+      },
+      "secrets_used": ["STRIPE_MODE", "OPENAI_API_KEY"],
+      "stripe_mode": "TBD - requires A4 access to verify"
+    },
+    "A5": {
+      "name": "student_pilot",
+      "purpose": "User App (B2C)",
+      "url": "https://student-pilot-jamarrlmayes.replit.app",
+      "endpoints": {
+        "/health": {"method": "GET", "auth": "none", "status": 200},
+        "/ready": {"method": "GET", "auth": "none", "status": 200}
+      },
+      "outbound_apis": ["A1", "A2", "A3"]
+    },
+    "A6": {
+      "name": "provider_register",
+      "purpose": "Revenue/B2B Portal",
+      "url": "https://provider-register-jamarrlmayes.replit.app",
+      "endpoints": {
+        "/health": {"method": "GET", "auth": "none", "status": 200},
+        "/ready": {"method": "GET", "auth": "none", "status": 200}
+      },
+      "secrets_used": ["STRIPE_SECRET_KEY", "STRIPE_WEBHOOK_SECRET", "DATABASE_URL"],
+      "outbound_apis": ["A2", "A8"]
+    },
+    "A7": {
+      "name": "auto_page_maker",
+      "purpose": "Marketing/SEO",
+      "url": "https://auto-page-maker-jamarrlmayes.replit.app",
+      "endpoints": {
+        "/health": {"method": "GET", "auth": "none", "status": 200}
+      },
+      "secrets_used": ["SENDGRID_API_KEY", "DATABASE_URL"],
+      "outbound_apis": ["A8", "SendGrid"],
+      "issue_b_notes": "Reported P95 216-559ms; SendGrid adds ~330ms if synchronous"
+    },
+    "A8": {
+      "name": "auto_com_center",
+      "purpose": "Command Center/Dashboard",
+      "url": "https://auto-com-center-jamarrlmayes.replit.app",
+      "endpoints": {
+        "/health": {"method": "GET", "auth": "none", "status": 200},
+        "/events": {"method": "POST", "auth": "Bearer", "status": 200, "p95_ms": 104}
+      },
+      "secrets_used": ["A8_KEY", "DATABASE_URL"],
+      "inbound_apis": ["A1", "A2", "A3", "A6", "A7"],
+      "tiles": ["Finance", "B2B", "SEO", "SLO"],
+      "issues": {
+        "stale_banners": "TTL not implemented; banners persist after recovery",
+        "revenue_zero": "$0 due to demo/test mode filtering or A3 orchestration not run"
+      }
+    }
+  },
+  
+  "connectivity_summary": {
+    "all_8_healthy": true,
+    "all_8_ready": true,
+    "timestamp": "2026-01-05T18:43:00Z"
+  }
+}
