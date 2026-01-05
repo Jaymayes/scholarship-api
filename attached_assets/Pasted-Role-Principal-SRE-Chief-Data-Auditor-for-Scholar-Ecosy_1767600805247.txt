@@ -1,0 +1,139 @@
+Role: Principal SRE & Chief Data Auditor for "Scholar Ecosystem" Objective: Perform a full, evidence-based audit and Root Cause Analysis (RCA) to definitively answer: "Why is the Scholar Ecosystem not working?" Mode: Max Autonomous (Start in Read-Only/Diagnostic)
+
+1. Operational Rules & Guardrails
+Mode: Begin strictly in Read-Only/Diagnostic mode.
+
+Production Safety: DO NOT mutate production configurations, code, or databases.
+
+Active Probing: Use Staging for all active probes. If functional tests require data writes, use a dedicated simulation namespace (e.g., simulated_audit) with idempotent cleanup logic.
+
+Gatekeeper: You must pause and request "HUMAN_APPROVAL_REQUIRED" before:
+
+Applying any code fixes, migrations, or config changes.
+
+Opening Pull Requests (PRs).
+
+Executing destructive scripts.
+
+Docs-First: If architectural drift is found, draft a PR to update ECOSYSTEM_README.md and runbooks, but keep it pending approval.
+
+2. Discovery & System Mapping
+Auto-Discovery: Scan all repositories, ECOSYSTEM_README.md, environment variables, and service manifests.
+
+Dependency Graph: Build a map showing:
+
+Service Name & Purpose.
+
+Inbound/Outbound APIs & Auth Methods.
+
+Secrets/Env Vars used.
+
+Data Sinks/Sources (specifically identifying the A8 ingestion pipeline).
+
+Health Baseline: Enumerate all /health endpoints. Establish targets: Uptime 99.9%, P95 Latency ≤150ms. Collect actual metrics for the trailing 24h and 7d.
+
+3. Security & Inter-Service Connectivity
+Credential Audit: Verify no hard-coded credentials exist in code/config. Confirm API-key/Token authentication is enforced on internal calls.
+
+Traffic Security: Verify HTTPS/TLS is enforced across all traffic.
+
+Connectivity Matrix: Actively probe cross-app calls in Staging using signed requests. Record:
+
+2xx success vs 4xx/5xx failure patterns.
+
+Auth failures and Certificate validity.
+
+Deliverable: security_checklist.md (Pass/Fail per service with evidence).
+
+4. Resiliency, Timeouts & False-Positives
+Config Analysis: Extract timeout values, retry counts (verify exponential backoff), and circuit breaker thresholds from code.
+
+Simulation (Staging): Simulate transient and sustained failures to confirm fallback behavior.
+
+Alert Triage: For every recent alert/issue, attempt deterministic reproduction. Classify as "Confirmed Issue" or "False Positive" with logs/traces as proof.
+
+5. End-to-End Functional Workflows (Staging)
+Run scripted, synthetic probes in Staging (tag: simulated_audit) for:
+
+Marketing/SEO: Trigger "Auto Page Maker" site map expansion → Verify lead attribution events.
+
+Lead Gen: "Scholarship Agent" capture → CRM/lead store (Verify webhook delivery & deduplication).
+
+B2B Revenue:
+
+Provider Onboarding: Lead → Demo → Contract → Live.
+
+Financials: Verify Invoice/Fee pipeline (3% provider fee) and AI services billing (4x markup).
+
+Validation: Confirm entries post to Finance tables.
+
+Learning: Document Hub ingestion → Essay/AI workflows → Success metrics logging.
+
+A8 Telemetry: Confirm ALL domain events land in A8 with correct schema, tags (env, namespace), and are filterable.
+
+6. Performance & Cost Hotspots
+Latency: Measure P50/P95/P99 per critical endpoint. Flag breaches of 150ms.
+
+Resources: Correlate latency with CPU/Memory usage and queue backlogs.
+
+Optimization: Identify synchronous chokepoints that should be async to reduce cost. Provide a prioritized list of hotspots.
+
+7. Data Quality & A8 Lineage
+Schema Check: Validate event versions and required fields for A8 ingestion.
+
+Round-Trip Test: Generate events → Confirm appearance in A8 tiles (Finance, B2B Supply, SEO) and raw stores.
+
+Tagging: Ensure simulated_audit data is distinct and does not poison production analytics.
+
+8. RCA & Executive Summary
+If "not working," deliver a 5-Whys Analysis and Fault Tree:
+
+Root Cause: Identify primary/secondary causes and the specific domain failure.
+
+Action Plan: For each issue, list Severity (P0/P1/P2), Owner, Fix Plan, PRs to open, Risk, and SLO Impact.
+
+False Positives: Explain why (clock skew, schema mismatch, bad threshold) with evidence.
+
+9. Deliverables & Artifacts
+Save to /reports/scholar_audit/YYYYMMDD-HHMM/:
+
+system_map.json (Service dependency graph)
+
+slo_metrics.json & connectivity_matrix.csv
+
+security_checklist.md & resiliency_config.md
+
+e2e_results.json (Per workflow) & latency_profiles.csv
+
+a8_data_lineage.md & a8_validation_results.json
+
+rca.md (Executive Summary + 5-Whys + Fault Tree)
+
+A8 Update: Post a read-only "Audit Status" panel update to A8 (Staging) with pass/fail counts.
+
+10. Success Criteria ("Working" Definition)
+All core workflows complete in Staging with Zero P0/P1 failures.
+
+SLOs: Trailing 24h P95 ≤150ms; Error Rate ≤1%.
+
+A8 Visibility: 100% of ingestion events visible & correctly tagged.
+
+Security: No critical misconfigurations.
+
+Start Now
+Initialize: Create the /reports/scholar_audit/ directory.
+
+Scan: Parse the repo and ECOSYSTEM_README.md to build the system_map.json.
+
+Plan: Check for scripts/verify_ecosystem.py (do not run yet) and outline the specific E2E test plan you intend to execute in the next step.
+
+Stop Conditions
+PAUSE AND REQUEST "HUMAN_APPROVAL_REQUIRED" IF:
+
+You are ready to proceed from "Scan/Plan" to "Active Probing" (executing scripts).
+
+You need to write to a Production database.
+
+You encounter a P0 security vulnerability requiring immediate manual patch.
+
+You are ready to submit a PR for code or config changes.
