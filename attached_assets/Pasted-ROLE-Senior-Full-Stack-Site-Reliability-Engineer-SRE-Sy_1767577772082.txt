@@ -1,0 +1,123 @@
+ROLE: Senior Full-Stack Site Reliability Engineer (SRE) & Systems Architect
+MODE: DEEP AUDIT, FIX & VERIFY (MAX AUTONOMOUS)
+PRIORITY: DEFCON 1 — Critical Revenue & Data Blockers
+
+CURRENT SITUATION
+Production reports “Ready,” but key services are unreachable or silent. We have False Positives.
+
+A6 (Provider Register) returns 404 (Ghost Ship).
+A2 (Scholarship API) lacks required secrets (Wallet Locked).
+A8 (auto_com_center) is starved of events (Nervous System Failure).
+YOUR MISSION
+Perform a forensic audit and immediate remediation loop across A1–A8. Do not assume any service is healthy until you prove it with a live event persisted in A8. Act as DevOps operator, not just code editor.
+
+TARGET ECOSYSTEM
+
+Core: A1 scholar_auth, A2 scholarship_api
+Intelligence: A3 scholarship_agent, A4 scholarship_sage
+Revenue/Frontends: A6 provider_register (CRITICAL), A5 student_pilot
+Growth: A7 auto_page_maker
+HQ: A8 auto_com_center (Source of Truth/Dashboard)
+RULES OF ENGAGEMENT
+
+No “looks good” statements. Only evidence: A8 responses persisted:true and rows present.
+Use staging first; never contaminate production data. Tag all simulated data as simulated.
+Enforce telemetry contract v3.5.1; fix or refuse anything legacy.
+Idempotency required: A8 must upsert by x-event-id; clients must include unique UUIDs.
+P95 write latency target ≤150ms during tests; capture logs.
+THE STANDARD TELEMETRY CONTRACT (v3.5.1)
+
+Endpoint: POST <A8_URL>/events
+Required headers on every event:
+content-type: application/json
+x-scholar-protocol: v3.5.1
+x-app-label: one of [scholar_auth, scholarship_api, scholarship_agent, scholarship_sage, student_pilot, provider_register, auto_page_maker]
+x-event-id: uuid-v4
+Authorization: Bearer <A8_KEY>
+Event body (JSON): { "event_type": "NewUser|NewLead|PaymentSuccess|PageView|ScholarshipMatchRequested|ScholarshipMatchResult|SageAssist|ProviderOnboarded", "occurred_at": "<ISO-8601>", "actor_id": "<user_id|provider_id|system>", "session_id": "<optional>", "source": "<route|url>", "payload": { "details": "...", "amount_cents": <int for PaymentSuccess>, "currency": "USD", "provider_id": "<optional>", "scholarship_id": "<optional>", "latency_ms": <int for match/sage>, "success": <bool for match/sage> } }
+Reliability: retries with exponential backoff for 429/5xx, outbox + forwarder for offline A8.
+PII minimization: no raw PAN/SSN or full essays; use references/hashes.
+EXECUTION PROTOCOL
+
+PHASE 0 — DEEP DISCOVERY (Find the rot first)
+
+Config audit (A1–A7)
+Verify presence/values: A8_URL, A8_KEY, STRIPE_SECRET/STRIPE_WEBHOOK_SECRET where applicable.
+Confirm endpoint is /events (not legacy /ingest). Flag any drift.
+2. Protocol check
+
+Confirm x-scholar-protocol=v3.5.1 on all A8 calls and Authorization: Bearer <A8_KEY>.
+Identify legacy event names (e.g., user_signed_up) and plan rename or A8 alias.
+3. Deployment status
+
+A6 state: Stopped/Crashed/Sleeping? Fetch /health and /ready. Capture status and logs.
+Confirm public webhook URL for A6 (not localhost).
+PHASE 1 — RESURRECT THE BLOODLINE (Revenue path)
+
+A6 provider_register
+Bring service online. Health criteria: /health and /ready return 200, P95 ≤150ms.
+Stripe webhook: raw-body verification enabled; signature check passes; returns 200 quickly.
+On checkout.session.completed, emit PaymentSuccess to A8 with all required headers.
+2. A2 scholarship_api
+
+Audit and inject missing secrets (e.g., STRIPE_SECRET_KEY). Add Authorization header to all A8 calls.
+Centralize A8 header construction and reuse across all emitters.
+3. Integration sanity
+
+Webhook callback in Stripe dashboard points to the live A6 domain and correct path.
+PHASE 2 — REWIRE THE NERVOUS SYSTEM (Telemetry everywhere)
+
+A1 scholar_auth: Emit NewUser on signup with hashed email; no raw PII. If code uses user_signed_up, either rename to NewUser or add an A8 alias for one release, then deprecate.
+A7 auto_page_maker: On lead submit, create user in A1 and emit NewLead to A8 in the same flow.
+A5 student_pilot + A3/A4: Emit ScholarshipMatchRequested and ScholarshipMatchResult with latency; A4 emits SageAssist with latency and success.
+Logging to console without pushing to A8 is failure; patch it.
+PHASE 3 — THE TRUTH TABLE (Verification by evidence)
+Deliver TEST_REPORT.md and TRUTH_TABLES.md. No verbal sign-off allowed.
+
+Truth Table Matrix (TRUTH_TABLES.md)
+Rows: [A1, A2, A3, A4, A5, A6, A7]
+Columns:
+Config Present? (A8_URL/A8_KEY, other secrets)
+Endpoint Reachable? (/health, /ready)
+Test Event Received by A8? (persisted:true + row in storage)
+Include timestamps, request IDs, and measured P95 write latency.
+2. Simulation required (in staging)
+
+Trigger 1x Mock Lead (A7) -> Confirm in A8.
+Trigger 1x Mock Auth (A1) -> Confirm in A8.
+Trigger 1x Mock Payment (A6) -> Confirm in A8.
+Provide A8 API responses and DB evidence for each. Record no. of retries and durations.
+COMMANDS AND ARTIFACTS TO PRODUCE
+
+A) Canary POSTs (curl)
+
+Replace <A8_URL> and <A8_KEY> accordingly.
+curl -sS -X POST "<A8_URL>/events" 
+-H "content-type: application/json" 
+-H "x-scholar-protocol: v3.5.1" 
+-H "x-app-label: scholar_auth" 
+-H "x-event-id: $(uuidgen)" 
+-H "authorization: Bearer <A8_KEY>" 
+-d '{"event_type":"NewUser","occurred_at":"'"$(date -u +%Y-%m-%dT%H:%M:%SZ)"'","actor_id":"test_user_01","source":"canary/auth","payload":{"details":"canary"}}'
+
+Repeat for NewLead (auto_page_maker) and PaymentSuccess (provider_register).
+
+B) Acceptance criteria
+
+A8 response includes {"accepted":true,"persisted":true}.
+DB query shows the exact x-event-id rows. Attach query results in TEST_REPORT.md.
+P95 write latency ≤150ms across the three events; attach logs/graphs.
+C) Required deliverables (commit to repo/docs)
+
+docs/TEST_REPORT.md (with A8 responses, DB rows, P95 metrics, and retry counts)
+docs/TRUTH_TABLES.md (matrix for A1–A7)
+docs/DIFF_SUMMARY.md (enumerate code/config changes)
+docs/ROLLBACK.md (how to revert safely)
+START ACTION
+Begin PHASE 0 now. Output: a list of concrete drifts found (missing headers/secrets, legacy endpoints), A6 runtime state, and a prioritized fix plan. Then execute PHASE 1–3 and submit TEST_REPORT.md and TRUTH_TABLES.md as proof.
+
+Why this works
+
+Phase 0 force-finds legacy /ingest vs /events and missing Authorization headers—classic silent killers.
+Runtime-first: distinguishes valid code from dead services (A6).
+Truth Table + persisted evidence: eliminates False Positives by proving end-to-end delivery into A8.
