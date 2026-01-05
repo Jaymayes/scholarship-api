@@ -81,6 +81,12 @@ The business vision is to create a comprehensive, intelligent platform that conn
 - Env var renamed: `A8_INGEST_URL` → `A8_EVENTS_URL` (defaults to `/events`)
 - **SRE Fix Pack Compliance**: `A8_KEY` env var support added for Authorization headers (optional, enables `Authorization: Bearer <key>`)
 
+**A8_KEY Configuration** (2026-01-05): Authorization Header Enforcement
+- `A8_KEY` secret configured in Replit Secrets
+- All A8 calls now include `Authorization: Bearer <A8_KEY>` header
+- Canary test verified: `persisted:true` at 181ms latency
+- A2 is FULLY OPERATIONAL with complete v3.5.1 compliance
+
 **Deploy Health Endpoints** (2026-01-04): SRE Fix Pack Compliance
 - `GET /health` - Fast health check (200 OK)
 - `GET /ready` - Readiness check with DB + Stripe status verification

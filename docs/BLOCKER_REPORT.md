@@ -31,20 +31,13 @@ A2 (scholarship_api) is **operational and emitting events to A8**. One configura
 
 ## Configuration Gaps
 
-### Gap 1: A8_KEY Secret Missing
+### ~~Gap 1: A8_KEY Secret Missing~~ ✅ RESOLVED
 
-**Current State**:
-- Code supports `Authorization: Bearer <A8_KEY>` header
-- Environment variable `A8_KEY` is NOT SET
-- Events still accepted by A8 (without auth)
+**Status**: FIXED 2026-01-05T05:18:00Z
 
-**Risk**: Low - A8 currently accepts unauthenticated events. Future A8 enforcement may break flow.
-
-**Remediation**:
-```bash
-# Add A8_KEY to Replit Secrets
-A8_KEY=<ingest-key-from-a8>
-```
+- A8_KEY secret added to Replit Secrets
+- Authorization header now included on all A8 calls
+- Verified with canary test: `persisted:true` at 181ms latency
 
 ## Fix Action Plan
 
