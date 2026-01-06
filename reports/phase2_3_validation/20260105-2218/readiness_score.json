@@ -1,211 +1,269 @@
 {
-  "scoring_timestamp": "2026-01-06T02:07:35.489895Z",
-  "scoring_methodology": "Enterprise-Grade Readiness Scale 0-5 per category",
-  "scale_definitions": {
-    "0": "Absent - No capability",
-    "1": "Ad-hoc - Informal, reactive",
-    "2": "Basic - Documented but inconsistent",
-    "3": "Managed - Consistent, tracked",
-    "4": "Measured - Metrics-driven, reviewed",
-    "5": "Optimized - Continuous improvement"
-  },
-  "categories": {
-    "reliability_slo_adherence": {
+  "version": "1.0",
+  "scoring_timestamp": "2026-01-06T03:33:10.081573Z",
+  "overall_score": 78.8,
+  "grade": "Yellow",
+  "categories": [
+    {
+      "key": "reliability",
       "weight": 15,
       "score": 4,
+      "weighted": 60,
       "evidence": [
         "/health P95=75.53ms (SLO: 150ms) - PASS",
-        "8/8 apps healthy in Phase 1",
+        "8/8 apps healthy in Phase 1 audit",
         "/ready returns 200 with status checks",
-        "Probe endpoints: all 4 probes pass"
+        "All 4 probes pass (db, kpi, auth, payment)"
       ],
-      "deductions": "/ready P95=264ms exceeds target (-1)"
+      "gaps": [
+        "/ready P95=264ms exceeds 150ms target"
+      ],
+      "actions": [
+        {
+          "owner": "A2 Team",
+          "action": "Optimize /ready P95 to <150ms",
+          "eta": "7 days",
+          "risk": "Medium"
+        }
+      ]
     },
-    "performance_scalability": {
+    {
+      "key": "performance",
       "weight": 10,
       "score": 3,
+      "weighted": 30,
       "evidence": [
         "Health endpoint headroom: 74.47ms",
         "200-sample profiling with 95% CIs",
         "Rate limiting configured (in-memory)"
       ],
-      "deductions": "/ready needs optimization; no horizontal scaling test"
+      "gaps": [
+        "No horizontal scaling test",
+        "/ready latency regression"
+      ],
+      "actions": [
+        {
+          "owner": "SRE Team",
+          "action": "Load test with 100 concurrent users",
+          "eta": "14 days",
+          "risk": "Low"
+        },
+        {
+          "owner": "A2 Team",
+          "action": "Profile /ready DB queries",
+          "eta": "7 days",
+          "risk": "Low"
+        }
+      ]
     },
-    "security_secrets_hygiene": {
+    {
+      "key": "security",
       "weight": 15,
       "score": 5,
+      "weighted": 75,
       "evidence": [
-        "SERVICE_AUTH_SECRET: separate from JWT_SECRET_KEY",
+        "SERVICE_AUTH_SECRET: separate from JWT_SECRET_KEY (SEC-03 fix)",
         "Token revocation: revoked_tokens table with JTI blocklist",
         "RS256 + HS256 JWKS validation",
-        "No hard-coded secrets (verified in Phase 1)",
-        "STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET in Replit Secrets"
+        "No hard-coded secrets (Phase 1 verified)",
+        "All secrets in Replit Secrets"
       ],
-      "deductions": "None"
+      "gaps": [],
+      "actions": []
     },
-    "data_protection_compliance": {
+    {
+      "key": "compliance",
       "weight": 10,
       "score": 4,
+      "weighted": 40,
       "evidence": [
-        "FERPA/COPPA posture documented",
+        "FERPA/COPPA posture documented in replit.md",
         "No PII in audit artifacts",
-        "GDPR/CCPA compliance stated in /status page",
+        "GDPR/CCPA statements on /status page",
         "Privacy/Terms/Accessibility pages exist"
       ],
-      "deductions": "SOC2 Type II in progress (85%)"
+      "gaps": [
+        "SOC2 Type II in progress (85%)"
+      ],
+      "actions": [
+        {
+          "owner": "Compliance",
+          "action": "Complete SOC2 Type II audit",
+          "eta": "30 days",
+          "risk": "Low"
+        }
+      ]
     },
-    "observability_telemetry": {
+    {
+      "key": "observability",
       "weight": 10,
       "score": 5,
+      "weighted": 50,
       "evidence": [
-        "v3.5.1 protocol telemetry",
-        "A8 event emission verified",
-        "Sentry integration configured",
+        "v3.5.1 telemetry protocol compliance",
+        "A8 event emission verified (4/4 test events persisted)",
+        "Sentry integration with 10% performance sampling",
         "Structured logging with trace_ids",
-        "KPI_SNAPSHOT emission every 5 min"
+        "KPI_SNAPSHOT emission every 5 minutes"
       ],
-      "deductions": "None"
+      "gaps": [],
+      "actions": []
     },
-    "resiliency_dr_bcp": {
+    {
+      "key": "resiliency",
       "weight": 10,
       "score": 3,
+      "weighted": 30,
       "evidence": [
         "Replit checkpoints for code rollback",
-        "Neon PostgreSQL with managed backups",
-        "Circuit breaker pattern in telemetry"
+        "Neon PostgreSQL managed backups",
+        "Circuit breaker pattern in telemetry fallback"
       ],
-      "deductions": "No documented DR runbook; no multi-region"
+      "gaps": [
+        "No documented DR runbook",
+        "No multi-region deployment"
+      ],
+      "actions": [
+        {
+          "owner": "SRE Team",
+          "action": "Document DR/BCP runbook with RTO/RPO",
+          "eta": "14 days",
+          "risk": "Medium"
+        }
+      ]
     },
-    "release_engineering": {
+    {
+      "key": "release_engineering",
       "weight": 8,
       "score": 4,
+      "weighted": 32,
       "evidence": [
         "Feature flags for all changes (default OFF)",
         "Rollback procedures documented",
         "CI Guard for OIDC (.github/workflows)",
-        "Staging validation before prod"
+        "Staging validation before production"
       ],
-      "deductions": "No blue-green deployment"
+      "gaps": [
+        "No blue-green deployment capability"
+      ],
+      "actions": [
+        {
+          "owner": "Platform",
+          "action": "Evaluate blue-green for Replit",
+          "eta": "30 days",
+          "risk": "Low"
+        }
+      ]
     },
-    "test_quality_engineering": {
+    {
+      "key": "testing",
       "weight": 6,
       "score": 3,
+      "weighted": 18,
       "evidence": [
-        "Contract tests for /ready",
+        "Contract tests for /ready endpoint",
         "Probe endpoints for integration testing",
-        "200-sample statistical profiling"
+        "200-sample statistical profiling methodology"
       ],
-      "deductions": "No automated test suite execution in CI"
+      "gaps": [
+        "No automated test execution in CI",
+        "Limited unit test coverage"
+      ],
+      "actions": [
+        {
+          "owner": "QA Team",
+          "action": "Add pytest to CI pipeline",
+          "eta": "7 days",
+          "risk": "Low"
+        }
+      ]
     },
-    "runbooks_ops_handover": {
+    {
+      "key": "runbooks",
       "weight": 6,
       "score": 4,
+      "weighted": 24,
       "evidence": [
         "step_by_step_merge_instructions.md",
         "rollback_readiness.md",
         "monitoring_rule_changes.md",
-        "replit.md comprehensive documentation"
+        "Comprehensive replit.md documentation"
       ],
-      "deductions": "Runbooks not linked from incident response"
+      "gaps": [
+        "Runbooks not linked from incident response"
+      ],
+      "actions": [
+        {
+          "owner": "SRE Team",
+          "action": "Link runbooks in incident playbook",
+          "eta": "3 days",
+          "risk": "Low"
+        }
+      ]
     },
-    "cost_efficiency_capacity": {
+    {
+      "key": "cost_efficiency",
       "weight": 5,
       "score": 3,
+      "weighted": 15,
       "evidence": [
-        "Single-instance deployment (efficient for current load)",
+        "Single-instance deployment efficient for current load",
         "In-memory rate limiting (Redis optional)"
       ],
-      "deductions": "No capacity planning; no cost monitoring"
+      "gaps": [
+        "No capacity planning",
+        "No cost monitoring dashboard"
+      ],
+      "actions": [
+        {
+          "owner": "Finance",
+          "action": "Set up Replit usage monitoring",
+          "eta": "14 days",
+          "risk": "Low"
+        }
+      ]
     },
-    "dependency_integration_health": {
+    {
+      "key": "dependencies",
       "weight": 5,
       "score": 4,
+      "weighted": 20,
       "evidence": [
         "Auth probe: JWKS reachable, 1 key published",
-        "Payment probe: Stripe configured",
+        "Payment probe: Stripe configured and working",
         "A8 event emission verified",
         "PostgreSQL healthy"
       ],
-      "deductions": "A7 latency issue (234ms) not yet fixed"
+      "gaps": [
+        "A7 latency issue pending fix"
+      ],
+      "actions": [
+        {
+          "owner": "A7 Team",
+          "action": "Apply async refactor patch",
+          "eta": "7 days",
+          "risk": "Medium"
+        }
+      ]
     }
-  },
-  "overall_score": 78.8,
-  "grade": "YELLOW - Conditionally Ready",
-  "weighted_total": 394,
-  "max_possible": 500,
-  "top_5_actions": [
-    "1. Optimize /ready endpoint to P95 < 150ms (currently 264ms)",
-    "2. Apply Issue B async refactor to A7 when access granted",
-    "3. Complete SOC2 Type II audit (currently 85%)",
-    "4. Document DR/BCP runbook with RTO/RPO targets",
-    "5. Set up automated test execution in CI pipeline"
   ],
-  "category_summary": [
+  "blockers": [
     {
-      "category": "reliability_slo_adherence",
-      "score": 4,
-      "weight": 15,
-      "weighted": 60
-    },
-    {
-      "category": "performance_scalability",
-      "score": 3,
-      "weight": 10,
-      "weighted": 30
-    },
-    {
-      "category": "security_secrets_hygiene",
-      "score": 5,
-      "weight": 15,
-      "weighted": 75
-    },
-    {
-      "category": "data_protection_compliance",
-      "score": 4,
-      "weight": 10,
-      "weighted": 40
-    },
-    {
-      "category": "observability_telemetry",
-      "score": 5,
-      "weight": 10,
-      "weighted": 50
-    },
-    {
-      "category": "resiliency_dr_bcp",
-      "score": 3,
-      "weight": 10,
-      "weighted": 30
-    },
-    {
-      "category": "release_engineering",
-      "score": 4,
-      "weight": 8,
-      "weighted": 32
-    },
-    {
-      "category": "test_quality_engineering",
-      "score": 3,
-      "weight": 6,
-      "weighted": 18
-    },
-    {
-      "category": "runbooks_ops_handover",
-      "score": 4,
-      "weight": 6,
-      "weighted": 24
-    },
-    {
-      "category": "cost_efficiency_capacity",
-      "score": 3,
-      "weight": 5,
-      "weighted": 15
-    },
-    {
-      "category": "dependency_integration_health",
-      "score": 4,
-      "weight": 5,
-      "weighted": 20
+      "id": "BLOCK-001",
+      "description": "/ready SLO regression (+87.7%)",
+      "severity": "Medium",
+      "action": "Optimize /ready P95 from 264ms to <150ms before production"
     }
-  ]
+  ],
+  "non_blocking_risks": [
+    "SOC2 Type II audit in progress (85%)",
+    "No DR/BCP runbook documented",
+    "A7 latency issue requires separate project access"
+  ],
+  "assumptions": [
+    "Single-instance deployment sufficient for current traffic",
+    "In-memory rate limiting acceptable without Redis",
+    "Replit platform provides infrastructure reliability"
+  ],
+  "scoring_notes": "Score of 78.8 is YELLOW (Conditionally Ready). Security and Observability are OPTIMIZED (5/5). Performance blocked by /ready latency regression. Path to GREEN requires /ready optimization and DR runbook documentation."
 }
