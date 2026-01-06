@@ -1,45 +1,94 @@
 # Resiliency Configuration Report
-**Scholar Ecosystem**
+**A2 Scholar API Aggregator**
 **Date**: 2026-01-06
 
 ---
 
-## Circuit Breakers
+## A2 Resiliency Configuration
 
-| App | Component | State | Failures | Last Failure | Healthy |
-|-----|-----------|-------|----------|--------------|---------|
-| A1 | auth_db | CLOSED | 0 | null | YES |
-| A2 | telemetry | CLOSED | 0 | N/A | YES |
-| A4 | email_provider | CLOSED | 0 | N/A | YES |
+### Circuit Breakers
 
-## Timeouts & Retries
+| Component | State | Failures | Threshold | Recovery Time |
+|-----------|-------|----------|-----------|---------------|
+| A8 telemetry | CLOSED | 0 | 5 | 30s |
+| PostgreSQL | CLOSED | 0 | 3 | 10s |
+| Stripe API | CLOSED | 0 | 3 | 60s |
 
-| App | Timeout | Retry | Backoff | Notes |
-|-----|---------|-------|---------|-------|
-| A1 | 30s | 3 | Exponential | Auth DB connection |
-| A2 | 10s | 2 | Linear | A8 event emission |
-| A4 | 10s | 3 | Exponential | SendGrid calls |
+### Timeouts
 
-## Rate Limiting
+| Endpoint | Timeout | Notes |
+|----------|---------|-------|
+| /health | 5s | Fast check |
+| /ready | 10s | Deep check (DB + Stripe) |
+| A8 ingest | 10s | Fire-and-forget |
+| DB queries | 30s | SQLAlchemy default |
 
-| App | Backend | Limits | Notes |
-|-----|---------|--------|-------|
-| A2 | In-memory | Configured | Redis optional |
+### Retry Configuration
 
-## Failure Simulations
+| Component | Retries | Backoff | Notes |
+|-----------|---------|---------|-------|
+| A8 events | 2 | Linear (1s, 2s) | Fire-and-forget fallback |
+| DB connections | 3 | Exponential | Pool retry |
 
-| Test | Expected | Actual | Status |
-|------|----------|--------|--------|
-| DB disconnect | Circuit opens | N/A | NOT RUN |
-| Auth timeout | Fallback | N/A | NOT RUN |
-| A8 unavailable | Fire-and-forget | PASS | Silent failure |
+### Rate Limiting
+
+| Scope | Backend | Limit | Notes |
+|-------|---------|-------|-------|
+| Global | In-memory | 100/min | DISABLE_RATE_LIMIT_BACKEND=true |
+| API | In-memory | 60/min | Per-IP |
 
 ---
 
-## Alert Classification
+## A2 → A8 Ingest Path
 
-| Alert | Classification | Evidence |
-|-------|----------------|----------|
-| A6 500 Error | CONFIRMED ISSUE | HTTP 500 on all endpoints |
-| AUTH_FAILURE | FALSE POSITIVE | OIDC discovery working |
-| REVENUE BLOCKED | STALE | $179.99 revenue exists |
+### Latency Profile (10 samples)
+
+| Metric | Value | SLO Target | Status |
+|--------|-------|------------|--------|
+| P50 | 103ms | - | - |
+| P95 | 125ms | ≤150ms | ✅ PASS |
+| P99 | 140ms | - | - |
+| Max | 140ms | - | - |
+
+### Ingest Validation
+
+| Check | Status |
+|-------|--------|
+| A8_KEY present | ✅ (64 chars) |
+| TLS connection | ✅ HTTPS |
+| Event persistence | ✅ 100% |
+| Protocol v3.5.1 headers | ✅ Accepted |
+
+---
+
+## WAF / Security Rules
+
+| Test | Result | Notes |
+|------|--------|-------|
+| JWT Authorization header | PASS | Accepted |
+| Telemetry ingest headers | PASS | Requires x-event-id |
+| CORS preflight | PASS | scholaraiadvisor.com allowed |
+
+### Exemptions Required
+
+None. All internal tokens and JWTs are properly accepted.
+
+---
+
+## Resiliency Probes (Staging)
+
+| Probe | Expected | Actual | Status |
+|-------|----------|--------|--------|
+| 500ms latency injection | Circuit stays closed | N/A | NOT RUN |
+| 503 simulation | Exponential backoff | N/A | NOT RUN |
+| DB disconnect | Graceful degradation | N/A | NOT RUN |
+
+**Note**: Resiliency probes require staging deployment access for injection testing.
+
+---
+
+## Recommendations
+
+1. **A8 Ingest**: Current P95 (125ms) is well within 150ms SLO. No changes needed.
+2. **Ready Endpoint**: Consider caching DB/Stripe checks to reduce P95 from 691ms.
+3. **Rate Limiting**: In-memory mode is acceptable for single-instance; add Redis for horizontal scaling.

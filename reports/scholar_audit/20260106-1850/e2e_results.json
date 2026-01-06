@@ -1,91 +1,51 @@
 {
-  "audit_timestamp": "2026-01-06T18:55:00Z",
+  "audit_timestamp": "2026-01-06T20:18:00Z",
+  "assigned_app": "A2",
   "namespace": "simulated_audit",
-  "tests": {
-    "auth_flow": {
-      "description": "A1 OIDC authentication flow",
-      "status": "PARTIAL",
-      "checks": {
-        "oidc_discovery": "PASS",
-        "jwks_endpoint": "PASS",
-        "auth_endpoint": "PASS (error page for invalid client expected)",
-        "session_management": "NEEDS_CLIENT_TESTING"
-      }
+  "env": "staging",
+  "version": "8adab4df",
+  "a2_specific_tests": {
+    "health_endpoints": {
+      "health": {"status": "PASS", "http_code": 200, "latency_ms": 8},
+      "ready": {"status": "PASS", "http_code": 200, "latency_ms": 691},
+      "healthz": {"status": "PASS", "http_code": 200, "latency_ms": 8}
     },
-    "api_health": {
-      "description": "A2 API health and readiness",
+    "a8_ingest": {
       "status": "PASS",
-      "checks": {
-        "health": "PASS",
-        "ready": "PASS",
-        "db_probe": "PASS",
-        "kpi_probe": "PASS",
-        "auth_probe": "PASS",
-        "payment_probe": "PASS"
-      }
+      "samples": 10,
+      "success_rate": "100%",
+      "p50_latency_ms": 103,
+      "p95_latency_ms": 125,
+      "p99_latency_ms": 140,
+      "slo_target_ms": 150,
+      "slo_met": true,
+      "all_persisted": true
     },
-    "telemetry_to_a8": {
-      "description": "Event flow from A2 to A8",
+    "a8_key_presence": {
       "status": "PASS",
-      "checks": {
-        "event_ingestion": "PASS (200, persisted: true)",
-        "protocol_version": "v3.5.1",
-        "headers_valid": true
-      }
+      "key_length": 64
     },
-    "revenue_tracking": {
-      "description": "Revenue data in A2 KPIs",
-      "status": "PASS",
-      "checks": {
-        "revenue_by_source": "PASS (7 rows)",
-        "b2b_funnel": "PASS (15 rows)",
-        "total_revenue": "$179.99",
-        "payment_events": 2
-      }
-    },
-    "b2b_provider_flow": {
-      "description": "Provider registration and B2B funnel",
-      "status": "BLOCKED",
-      "checks": {
-        "a6_health": "FAIL (500)",
-        "provider_registration": "BLOCKED",
-        "listing_creation": "BLOCKED"
-      },
-      "blocker": "A6 is DOWN"
-    },
-    "student_pilot": {
-      "description": "Student dashboard functionality",
-      "status": "PASS",
-      "checks": {
-        "health": "PASS",
-        "capabilities": 9,
-        "agent": "active"
-      }
-    },
-    "marketing_seo": {
-      "description": "Marketing pages and SEO",
-      "status": "PASS",
-      "checks": {
-        "html_render": "PASS",
-        "meta_tags": "PASS",
-        "json_ld": "PASS"
-      }
-    },
-    "page_maker": {
-      "description": "Auto page generation",
-      "status": "PASS",
-      "checks": {
-        "health": "PASS",
-        "dependencies": "3/3 healthy",
-        "async_mode": true
-      }
+    "waf_rules": {
+      "jwt_header_test": {"status": "PASS", "http_code": 200},
+      "telemetry_ingest": {"status": "PASS", "http_code": 400, "note": "Missing idempotency key (expected)"},
+      "cors_preflight": {"status": "PASS", "http_code": 200}
     }
   },
+  "cross_app_probes": {
+    "A1_auth": {
+      "oidc_discovery": "PASS",
+      "jwks_endpoint": "PASS",
+      "auth_endpoint": "PASS (returns error page for invalid client)"
+    },
+    "A5_student": {"health": "PASS", "capabilities": 9},
+    "A6_provider": {"health": "FAIL (500)", "status": "DOWN"},
+    "A7_marketing": {"html_render": "PASS"},
+    "A8_command": {"health": "PASS", "event_ingestion": "PASS"}
+  },
   "summary": {
-    "total_tests": 8,
-    "passed": 6,
-    "partial": 1,
-    "blocked": 1,
-    "pass_rate": "75%"
+    "a2_tests_passed": 5,
+    "a2_tests_failed": 0,
+    "cross_app_healthy": 5,
+    "cross_app_down": 1
   }
 }
