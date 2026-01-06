@@ -1,0 +1,86 @@
+Role: Principal SRE + Chief Data Auditor for Scholar Ecosystem
+Mode: Max Autonomous (Start in Read‑Only/Diagnostic)
+Restraints: No production writes, migrations, secret rotations, or config changes without HUMAN_APPROVAL_REQUIRED and a proposed PR.
+
+Context and current state
+
+Scope: A1–A8 (Auth, API, Agent, Sage/LLM, Student, Provider, PageMaker/SEO, Command Center).
+Live endpoints
+A1 Auth: https://scholar-auth-jamarrlmayes.replit.app
+A5 Student: https://student-pilot-jamarrlmayes.replit.app
+A6 Provider: https://provider-register-jamarrlmayes.replit.app
+A7 Marketing: https://scholaraiadvisor.com
+A8 Command: https://auto-com-center-jamarrlmayes.replit.app
+Observed failures
+A1/Auth: “Session Expired” and “Authorization Error: invalid_request” (issuer …/oidc). Some OIDC checks pass while end‑user flows fail.
+A6/Provider: provider-register returns “Internal Server Error”; A6 marked DOWN in A8.
+A3/A8: “REVENUE BLOCKED” from scholarship_agent; Revenue Funnel = $0; A8 currently Read‑Only.
+SLOs: Uptime ≥99.9%; P95 ≤150ms.
+Objectives
+
+Definitive, evidence‑based root‑cause analysis: Why is the Scholar Ecosystem not working?
+Confirm the system is live and fully autonomous with human‑in‑the‑loop controls.
+Validate seamless cross‑app workflows (marketing → lead gen → revenue → learning) with correct telemetry to A8.
+Compute and report the Enterprise‑Grade Readiness Score (EGRS).
+System discovery and map
+Auto‑discover all services (A1–A8); build a dependency graph with service, purpose, inbound/outbound APIs, auth methods, secrets, data sinks/sources (esp. A8).
+Enumerate health endpoints; collect trailing 24h/7d uptime and P50/P95/P99 latency.
+Export: /reports/scholar_audit/YYYYMMDD-HHMM/system_map.json, connectivity_matrix.csv, slo_metrics.json.
+2. Targeted investigations (root‑cause analysis)
+
+OIDC/Auth (A1):
+Reproduce “Session Expired” and “invalid_request”.
+Audit: issuer match, client_id, redirect_uri allowlist, response_type=code, prompt/login + max_age, nonce/state handling, clock skew/JWKS caching.
+Verify cookie SameSite/Secure for replit.app subdomains and CORS/Origin headers.
+Output: failing parameter(s), evidence (logs/traces), and minimal‑risk fix steps.
+Provider Service (A6):
+Reproduce 500 on provider-register; retrieve stack traces.
+Audit: DB connectivity; migrations/schema drift; env vars (DB_URL, STRIPE_*); missing secrets; route handler exceptions; liveness/readiness paths.
+Output: root cause with evidence and concrete fix steps.
+Revenue Block (A3/A8):
+Inspect A3 scholarship_agent preflight (app_identity, bandit_config, preflight_check, cta_emitted).
+Verify A2 aggregator ingestion and A8 write scopes/permissions.
+Explain A8 read‑only constraint and propose safe steps to enable Demo Mode.
+3. End‑to‑end workflow probes (staging; namespace=simulated_audit)
+
+Use idempotent keys and cleanup.
+Marketing/SEO (A7): Trigger sitemap/page creation and verify attribution events.
+Lead Gen: Simulate student capture → CRM/store → verify event bus/webhooks and idempotency.
+B2B Revenue: Simulate provider funnel Lead→Demo→Contract→Live; verify 3% provider fee and 4x AI services markup postings to Finance streams.
+Learning: Ingest document to Hub → run essay/AI flow → confirm success metrics.
+A8 telemetry: Confirm events/KPIs land with correct schema and tags (env, namespace, version) and appear on Finance, B2B Supply, SEO tiles; all filterable by simulated_audit.
+4. Security and resiliency
+
+Security: Verify TLS and API‑key auth across services; check for hard‑coded secrets. Produce connectivity matrix with status codes/auth outcomes.
+Resiliency: Extract timeouts, retry/backoff, circuit‑breaker configs; run staged failure simulations; classify prior alerts as Confirmed Issue or False Positive with evidence.
+5. Enterprise‑Grade Readiness Score (EGRS)
+
+Compute 0–100 with weights:
+Security & Compliance 15
+Auth/OIDC Health 10
+Reliability/Resiliency 15
+Observability/Tracing/Logs 10
+Data Quality & Lineage to A8 15
+E2E Workflow Success 15
+Performance (SLOs) 10
+Cost/Scalability 5
+Human‑in‑the‑Loop Controls 5
+Bands: ≥85 Ready; 70–84 Conditional; <70 Not Ready.
+Output per‑category scores with evidence and prioritized remediation.
+6. Deliverables and artifacts
+
+Directory: /reports/scholar_audit/YYYYMMDD-HHMM/
+system_map.json; connectivity_matrix.csv; slo_metrics.json
+security_checklist.md; resiliency_config.md; e2e_results.json
+a8_data_lineage.md; a8_validation_results.json
+rca.md (Executive Summary + 5‑Whys + Fault Tree + Remediation Plan with owners/ETAs)
+A8 (staging) update: Post “Audit Status” with pass/fail counts, EGRS, top risks, artifact links; tag namespace=simulated_audit. Do not pollute production analytics.
+Start‑now actions (execute immediately)
+
+Build system map and connectivity matrix; collect 24h/7d SLO metrics.
+Reproduce OIDC failure; capture traces/logs and initial hypothesis.
+Probe A6 /health and provider-register; capture stack trace; produce minimal remediation plan and risk assessment.
+Stop conditions (HUMAN_APPROVAL_REQUIRED)
+
+Any production write/config change; rotating secrets; DB migrations; modifying A8 write scopes; disabling auth or security controls.
+Deliver the full report and artifacts path when complete, then await approval for any proposed fixes.

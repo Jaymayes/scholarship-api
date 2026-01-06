@@ -1,0 +1,113 @@
+{
+  "audit_timestamp": "2026-01-06T18:50:00Z",
+  "fleet": {
+    "A1": {
+      "name": "scholar-auth",
+      "purpose": "Authentication & OIDC Provider",
+      "url": "https://scholar-auth-jamarrlmayes.replit.app",
+      "status": "HEALTHY",
+      "http_code": 200,
+      "latency_ms": 252,
+      "dependencies": ["auth_db", "clerk", "jwks_signer"],
+      "auth_method": "RS256 JWKS",
+      "outbound_to": ["A2", "A5", "A6", "A7", "A8"],
+      "health_checks": {
+        "health": "PASS",
+        "oidc_discovery": "PASS",
+        "jwks": "PASS (1 key)"
+      }
+    },
+    "A2": {
+      "name": "scholarship-api",
+      "purpose": "Scholarship Discovery & Search API",
+      "url": "https://scholarship-api-jamarrlmayes.replit.app",
+      "status": "HEALTHY",
+      "http_code": 200,
+      "latency_ms": 9,
+      "dependencies": ["PostgreSQL", "Stripe", "A1"],
+      "auth_method": "JWT/JWKS (RS256 + HS256)",
+      "outbound_to": ["A8"],
+      "health_checks": {
+        "health": "PASS",
+        "ready": "PASS",
+        "probes": "4/4 PASS"
+      }
+    },
+    "A3": {
+      "name": "agent-bridge",
+      "purpose": "Scholarship Agent Orchestration",
+      "url": "https://agent-bridge-jamarrlmayes.replit.app",
+      "status": "UNKNOWN",
+      "dependencies": ["A2", "A8"],
+      "outbound_to": ["A2", "A8"]
+    },
+    "A4": {
+      "name": "auto-page-maker",
+      "purpose": "SEO/Page Generation",
+      "url": "https://auto-page-maker-jamarrlmayes.replit.app",
+      "status": "UNKNOWN",
+      "dependencies": ["A2", "A7"],
+      "outbound_to": ["A7", "A8"]
+    },
+    "A5": {
+      "name": "student-pilot",
+      "purpose": "Student Dashboard",
+      "url": "https://student-pilot-jamarrlmayes.replit.app",
+      "status": "HEALTHY",
+      "http_code": 200,
+      "latency_ms": 90,
+      "dependencies": ["A1", "A2"],
+      "health_checks": {
+        "health": "PASS",
+        "capabilities": 9
+      }
+    },
+    "A6": {
+      "name": "provider-register",
+      "purpose": "Provider/B2B Registration",
+      "url": "https://provider-register-jamarrlmayes.replit.app",
+      "status": "DOWN",
+      "http_code": 500,
+      "latency_ms": 62,
+      "error": "Internal Server Error",
+      "dependencies": ["A1", "A2", "PostgreSQL"],
+      "health_checks": {
+        "health": "FAIL (500)",
+        "api_providers": "FAIL (500)"
+      },
+      "rca_required": true
+    },
+    "A7": {
+      "name": "marketing-seo",
+      "purpose": "Marketing/Landing Pages",
+      "url": "https://scholaraiadvisor.com",
+      "status": "HEALTHY",
+      "http_code": 200,
+      "dependencies": ["A4", "A2"],
+      "health_checks": {
+        "html_render": "PASS"
+      }
+    },
+    "A8": {
+      "name": "auto-com-center",
+      "purpose": "Command Center / Telemetry",
+      "url": "https://auto-com-center-jamarrlmayes.replit.app",
+      "status": "HEALTHY",
+      "http_code": 200,
+      "latency_ms": 55,
+      "dependencies": ["All apps"],
+      "auth_method": "API Key (A8_KEY)",
+      "health_checks": {
+        "health": "PASS",
+        "event_ingestion": "PASS (persisted: true)"
+      }
+    }
+  },
+  "summary": {
+    "total_apps": 8,
+    "healthy": 5,
+    "down": 1,
+    "unknown": 2,
+    "critical_issues": ["A6 returning 500 Internal Server Error"]
+  }
+}
