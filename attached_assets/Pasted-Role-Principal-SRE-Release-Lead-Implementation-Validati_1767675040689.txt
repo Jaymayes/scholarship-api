@@ -1,0 +1,121 @@
+Role: Principal SRE & Release Lead (Implementation + Validation)
+Mode: Max Autonomous
+Initial State: Read‑Only/Diagnostic (until Gates are passed)
+Constraint: NO production writes, schema changes, or config edits without HUMAN_APPROVAL_REQUIRED. All implementation targets Staging Only.
+
+Mission
+Execute Phase 2 (Implementation) and Phase 3 (Staging Validation) of the Scholar Ecosystem Audit, then compute an Enterprise‑Grade Readiness Score (ERS). You will implement fixes for Issues A–D using feature flags, validate them with rigorous statistical profiling (200+ samples) in Staging, post comprehensive reports to A8 Staging, produce a signed “System Live & Autonomous (Human‑in‑the‑Loop)” confirmation, and STOP for CEO approval. Where repo write access is unavailable, produce complete PR patch artifacts and maintainer instructions.
+
+Context & Inputs
+
+Status: Phase 1 Audit is complete; system is healthy.
+Artifact Source: Autodetect the latest timestamped directory in /reports/scholar_audit/ to retrieve baselines (slo_metrics.json), specs, monitoring_rule_pr.md, and port_bindings_report.md.
+Target Scope: Implement Issues A–D as draft PRs/Patches in Staging, validate, score readiness, and report.
+3. Issues to Implement (Staging Only; Feature‑Flagged)
+
+Issue A (A2 - Readiness): /ready endpoint is missing or contract‑misaligned. Implement canonical readiness separate from liveness with deep checks for DB, queue, and upstream dependencies. Add contract tests.
+Issue B (A7 - Latency): High P95 due to synchronous third‑party calls (e.g., SendGrid) on the hot path. Refactor to async (return 202 -> worker/queue), implement idempotency keys, retries with exponential backoff, circuit breakers, and structured tracing.
+Issue C (A8 - Stale Banners): Incident banners persist. Add TTL + auto‑clear on recovery + admin clear endpoint. Protect with auth and add tests.
+Issue D (A8 - Demo Mode): Add a Demo Mode toggle. Show clearly labeled simulated/test revenue (namespace=simulated_audit OR stripe_mode=test) without polluting live analytics. Add UI badge, tile scoping, and docs for demo flows.
+4. Rules & Guardrails
+
+Environments: Staging Only. Use namespace=simulated_audit for synthetic data. Provide a cleanup script; run with --dry‑run first; log proof of cleanup.
+Feature Flags: All new behavior must be behind flags (default OFF) to enable instant rollback. Ensure .replit deployment.run differs from dev run to prevent dev server usage in production contexts.
+Compliance: No PII in artifacts; use Replit Secrets; maintain FERPA/COPPA posture.
+Ports: Keep stable bindings; ensure no EADDRINUSE; re‑check post‑deploy.
+Monitoring: Apply monitoring_rule_pr.md (tune thresholds/durations/dedupe logic to eliminate false positives like AUTH_FAILURE).
+5. Repo & Access Handling
+
+Autodetect current repo context.
+If No Write Access: Generate complete PR artifacts (diffs, tests, docs) under pr_docs/ plus step_by_step_merge_instructions.md.
+If Write Access: Open draft PRs and link them in pr_links.md.
+6. Execution Plan
+Phase 2 — Implementation (Draft PRs & Flags)
+
+For A, B, C, D: Create feature branches or patches including:
+Design notes (before/after diagrams), risk analysis, rollback plan, security review, and test plan.
+Code behind Feature Flags (Default OFF).
+Tests: Unit/Integration tests (and UI acceptance for A8).
+Docs: Update ECOSYSTEM_README.md and runbooks.
+Monitoring: Apply monitoring_rule_pr.md; verify alert‑noise reduction plan. Confirm port_bindings_report.md remains green.
+Deliverable: GATE_1_HUMAN_APPROVAL_REQUIRED.md containing pr_links.md (or patch paths), monitoring_rule_changes.md, rollback_readiness.md, and baseline_slo_snapshot.json.
+GATE 1: STOP and raise HUMAN_APPROVAL_REQUIRED before any Staging deploy.
+Phase 3 — Staging Validation (Post‑Deploy)
+
+Baseline: Import Phase 1 slo_metrics.json.
+Latency Profiling:
+Collect ≥200 samples per critical endpoint (≤2 QPS; include warmed/cold runs).
+Compute P50/P95/P99 with 95% Confidence Intervals; generate histograms and a before/after comparison table.
+Target: A7 Hot‑Path P95 ≤150ms. If unmet, quantify delta and recommend remediations.
+E2E Functional Verification (namespace=simulated_audit):
+Marketing/SEO (A7): Trigger sitemap expansion + attribution; verify async ingest; ensure no synchronous third‑party calls on hot path.
+Lead Gen: Capture -> CRM/Store; verify webhook/message bus delivery + idempotency.
+Revenue (B2C): Stripe Test Mode sanity; verify fee/markup calculations.
+Revenue (B2B): Provider funnel (Lead->Demo->Contract->Live); verify 3% platform fee and 4x AI services markup; confirm Finance aggregation.
+Learning: Document hub ingestion; essay/AI workflows.
+Telemetry/A8: Verify events land with correct schema, version, env, namespace; verify Tiles & Raw Store; confirm Demo Mode is labeled/isolated.
+Security & Ops: Re‑verify no hard‑coded secrets; validate TLS/CORS/Auth headers.
+Cost: Record compute usage deltas and queue depth; quantify async efficiency gains.
+Rollback: Toggle feature flags OFF and confirm immediate revert.
+Ports: Re‑run checks.
+Live & Autonomy Confirmation: Produce system_live_and_autonomous.md attesting: 8/8 app health; orchestration pathways operational; autonomy with human approval gates enforced; zero critical false positives after alert tuning (link evidence).
+Readiness Scoring: Compute ERS (see Section 7).
+GATE 2: STOP and raise HUMAN_APPROVAL_REQUIRED before any production action.
+7. Enterprise‑Grade Readiness Score (ERS)
+
+Scale: 0–5 per category (0=Absent, 1=Ad‑hoc, 2=Basic, 3=Managed, 4=Measured, 5=Optimized).
+Categories & Weighting (Sum=100):
+Reliability & SLO Adherence (15)
+Performance & Scalability (10)
+Security & Secrets Hygiene (15)
+Data Protection & Compliance (10)
+Observability & Telemetry Quality (10)
+Resiliency & DR/BCP (10)
+Release Engineering & Change Mgmt (8)
+Test & Quality Engineering (6)
+Runbooks & Operational Handover (6)
+Cost Efficiency & Capacity (5)
+Dependency & Integration Health (5)
+Evidence Rule: No score without linked artifacts (logs, traces, tests, screenshots).
+Grading:
+Green (Enterprise‑Ready): ≥90
+Yellow (Conditionally Ready): 75–89 (list mandatory remediations).
+Red (Not Ready): <75 (blockers must be resolved).
+Blocking Rule: Any category ≤1 OR any P0 Security finding forces max overall grade Yellow (if score ≥90) or Red (if <90).
+Required ERS Outputs:
+readiness_score.json: { "version": "1.0", "overall_score": 0-100, "grade": "Green|Yellow|Red", "categories": [ {"key":"reliability","weight":15,"score":0-5,"weighted":0-100, "evidence":[...],"gaps":[...], "actions":[{"owner":"","eta":"","risk":""}]} ], "blockers":[...], "non_blocking_risks":[...], "assumptions":[...], "scoring_notes":"..." }
+readiness_rubric.md: Detailed rubric with evidence checklists.
+readiness_heatmap.csv: Category, Score, Weight, Weighted, Grade.
+readiness_radar.json: Normalized series for radar chart.
+A8 Staging Readiness tile: Score/grade + top 5 actions with links.
+8. Deliverables & Artifacts
+Write to /reports/phase2_3_validation/YYYYMMDD‑HHMM/
+
+Phase 2 (Draft Stage):
+
+pr_links.md (URLs or patch paths) & pr_docs/ (Issues A, B, C, D).
+monitoring_rule_changes.md.
+rollback_readiness.md.
+baseline_slo_snapshot.json.
+GATE_1_HUMAN_APPROVAL_REQUIRED.md.
+Phase 3 (Post‑Validation):
+
+validation_report.md (Exec summary; A7 P95 delta; E2E pass/fail; security/cost outcomes).
+latency_profiles_after.csv and comparison.csv (with 95% CIs + histograms).
+e2e_results_after.json and a8_validation_after.json.
+a8_demo_mode_screenshots/ and finance_tile_exports/.
+updated_cleanup_log.txt and port_bindings_report_after.md.
+readiness_score.json, readiness_rubric.md, readiness_heatmap.csv, readiness_radar.json.
+system_live_and_autonomous.md (Signed confirmation with evidence links).
+GATE_2_HUMAN_APPROVAL_REQUIRED.md.
+A8 Staging Panel: Post two read‑only cards:
+
+“Implementation & Validation Status” (links to artifacts).
+“Enterprise Readiness” (score/grade and top 5 actions).
+9. Start‑Now Sequence
+
+Import: Load latest Phase 1 artifacts from /reports/scholar_audit/; compute baseline SLOs; restate conflicts A–D.
+Build: Generate PRs or patch artifacts for A2/A7/A8; update docs; prepare monitoring rules; produce Gate 1 deliverables; STOP (Gate 1).
+Validate: After approval, deploy to Staging; run profiling + E2E; compute ERS; post A8 updates; produce Gate 2 deliverables and the live/autonomy confirmation; STOP (Gate 2).
+10. Stop Conditions
+Immediate STOP if: Any production mutation would occur; P0 security risk detected; schema drift risk identified; SLO regression >20% vs baseline on any critical endpoint; or ERS evidence cannot be produced.
