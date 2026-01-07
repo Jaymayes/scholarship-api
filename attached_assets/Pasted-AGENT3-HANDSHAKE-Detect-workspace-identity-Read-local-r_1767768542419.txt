@@ -1,0 +1,95 @@
+AGENT3_HANDSHAKE
+
+Detect workspace identity:
+Read local repo/workspace slug and staging base URL.
+Match APPS TABLE (id, name, repo_hint, base_url_staging).
+Set: ASSIGNED_APP={A1|A2|A3|A4|A5|A6|A7|A8}; APP_BASE_URL; REPO_NAME; VERSION=git sha or git_sha_dynamic.
+ACK: I will execute ONLY “YOUR APP SECTION [ASSIGNED_APP]”. Others are read‑only context. Start Diagnostic Mode. No production mutations without HUMAN_APPROVAL_REQUIRED.
+GLOBAL POLICY & ORCHESTRATOR
+
+Modes: Diagnostic (read‑only, staging‑first) → Staging Fix Mode (branch→fix→stage→validate→PR) → Production Change (HUMAN_APPROVAL_REQUIRED).
+Tag all synthetic events: env=staging, namespace=simulated_audit, version=${VERSION}. Production is diagnostics‑only.
+SLO targets: P95 ≤150ms; 0% 5xx in simulated flows.
+Evidence rule: Every finding must include logs/traces/DB records and, where applicable, A8 evidence tied to an event_id.
+STOP CONDITIONS (HUMAN_APPROVAL_REQUIRED): production writes; secret rotation/creation; enabling/disabling A8 write scopes; schema/alert changes; deployment restarts; cost‑impacting autoscale; PR merges to main.
+Constraints: Never print secrets; verify presence by name only. Operate only within YOUR APP SECTION.
+GLOBAL VERIFICATION PLAN
+
+Discovery: system_map.json; connectivity_matrix.csv; list required secrets (names only); enumerate health endpoints.
+Observability: slo_metrics.json (24h/7d P50/P95/P99; error rates); ensure structured logs include trace_id + request_context.
+Security & Resiliency: TLS on all hops; internal tokens; OIDC state/nonce; in staging inject 500ms latency and simulate 503; verify retries/backoff and circuit‑breaker behavior; document configs and results in resiliency_config.md.
+Data to A8: validate schemas and required tags; lineage event_id → A2 aggregator → A8 raw → A8 dashboards; export a8_data_lineage.md + a8_validation_results.json.
+Performance/Cost: detect synchronous chains >200ms; propose async/queue refactors with projected impact.
+False‑positive triage: re‑run prior alerts; classify Confirmed/False‑Positive with evidence; record in false_positive_register.md; only escalate confirmed issues.
+Second‑Confirmation Checklist: generate readiness_attestation.md proving (a) liveness of all core services, (b) autonomy with RL loop running, (c) human‑in‑loop gates enforced, (d) all A8 tiles receiving namespaced data.
+E2E WORKFLOWS (execute only the steps that touch YOUR APP; safely stub the rest)
+
+Marketing_SEO_A7 → ensure events reach A8 SEO tile.
+Lead_Gen_A5_A1_A3 → ensure Growth tile updates.
+B2B_Revenue_A6_A2_A8 → simulate $1000 GMV + $10 AI cost; verify 3% fee ($30) and 4x markup ($40); confirm Finance tile.
+Learning_A5_A4 → ensure Outcomes tile updates.
+RL ERROR‑CORRECTION LOOP
+Monitor → Reflect (capture evidence) → Synthesize regression test (namespace=simulated_audit) → Propose PR → Verify (reward: fewer 5xx, better P95, higher E2E pass rate) → Update runbooks/ECOSYSTEM_README. No merges/promotions without HUMAN_APPROVAL_REQUIRED.
+
+ENTERPRISE GRADE READINESS (target 100%)
+
+Compute egrs_score.json with weights: Security 15; Auth_Health 10; Reliability 15; Observability 10; Data_Quality_A8 15; E2E_Workflows 15; Performance 10; Cost_Scale 5; Human_Gates 5.
+100% acceptance requires: no P0/P1 issues; all tiles live; all E2E green; P95 ≤150ms; 0% 5xx in simulated flows; proven lineage; auto‑healing checks pass; docs/runbooks updated.
+Summarize score + “Path to 100%” in exec_summary.md.
+GLOBAL DELIVERABLES (write to reports/scholar_audit/YYYYMMDD‑HHMM/)
+
+exec_summary.md; rca.md; system_map.json; connectivity_matrix.csv; slo_metrics.json; security_checklist.md; resiliency_config.md; e2e_results.json; a8_validation_results.json; a8_data_lineage.md; false_positive_register.md; readiness_attestation.md; risk_register.md; cleanup_audit.sh; docs_update_plan.md; egrs_score.json; ceo_promotion_checklist.md.
+APPS TABLE (handshake reference)
+
+A1 scholar_auth | repo_hint: scholar-auth | base: https://scholar-auth-jamarrlmayes.replit.app
+A2 scholar_api_aggregator | repo_hint: scholar-api | base: internal_discovery
+A3 scholarship_agent | repo_hint: scholarship_agent | base: internal_discovery
+A4 scholar_sage | repo_hint: scholar-sage | base: internal_discovery
+A5 student_pilot | repo_hint: student-pilot | base: https://student-pilot-jamarrlmayes.replit.app
+A6 provider_register | repo_hint: provider-register | base: https://provider-register-jamarrlmayes.replit.app
+A7 scholar_pagemaker | repo_hint: scholar-pagemaker | base: https://scholaraiadvisor.com
+A8 scholar_command_center | repo_hint: scholar-command-center | base: https://auto-com-center-jamarrlmayes.replit.app
+YOUR APP SECTION [A1] — Execute only if ASSIGNED_APP=A1
+
+Validate A1‑001: full OIDC redirect chain; inspect Set‑Cookie (SameSite=None, Secure=True) & Domain; validate client_id allowlist; add interaction delay; run 10/10 login flows.
+Staging Fix Mode: branch fix/oidc-cookies; adjust cookie flags; extend interaction TTL; stage deploy; verify 10/10 passes; PR; pause.
+Deliverables_local: auth_trace_log.json; oidc_config_audit.md.
+YOUR APP SECTION [A2]
+
+Confirm /ready 200; measure ingest P50/P95/P99; verify 100% persistence; validate A8_INGEST_KEY presence by name; ensure JWT headers accepted; export ingestion_latency_metrics.csv.
+YOUR APP SECTION [A3]
+
+/preflight; verify bandit_config + app_identity; idempotency keys + scopes; emit synthetic revenue events; confirm A2/A8 acceptance; export agent_preflight_audit.log.
+YOUR APP SECTION [A4]
+
+Load test /chat/completions with cache warm; capture llm_latency_profile.csv.
+Staging Fix Mode: branch perf/llm-optim; cache warm + GC tuning; lightweight /health; stage deploy; verify P95 ≤150ms; PR; pause.
+YOUR APP SECTION [A5]
+
+Confirm /api/login; verify AUTO_PAGE_MAKER_URL available at runtime; run E2E (Signup→OIDC→CRM→bus) → Growth tile; Doc ingest→A4 essay AI→success metric → Outcomes tile; export student_flow_results.json.
+YOUR APP SECTION [A6]
+
+Capture publishing evidence: export migration validation logs (“Failed to validate database migrations”; “Cannot validate statements, stage already exists”; “Failed to monitor preview status”) → /reports/scholar_audit/.../a6_migration_logs.txt.
+Zero‑Downtime DB Migration Playbook:
+Schema diff vs production & SHADOW validation: generate diff; create fresh shadow/preview DB; validate full migration set (no prod mutations).
+If “stage already exists”: safely repair preview/shadow (reset preview metadata/hooks, recreate shadow) without touching production; re‑validate.
+Non‑destructive path: add nullable columns with defaults; dual‑write; backfill; verify reads; swap; schedule legacy drop later.
+Idempotency/guards: each step no‑ops if already applied; ordered/transactional where supported.
+Staging Fix Mode: Branch fix/ext-deployment-migrations → apply to staging; smoke test /health, /register, /api/billing; provider funnel Lead→Demo→Contract→Live; simulate $1000 GMV & $10 AI cost; verify Finance events fee=3% ($30) & 4x markup ($40); confirm A8 Finance tile; export provider_stack_trace.log; billing_logic_verification.md; provider_funnel_tests.json.
+Rollback: down migration or reversible ops; test on shadow/staging.
+Promotion (HUMAN_APPROVAL_REQUIRED): publish with monitored window; confirm endpoints 200; Finance tile visible; finalize.
+YOUR APP SECTION [A7]
+
+Validate /sitemap.xml (>2500 pages) + hub pages; emit attribution events; confirm A8 SEO tile; export sitemap_validation.json.
+YOUR APP SECTION [A8]
+
+Validate /api/ingest + /dashboard/status; reconcile “apps connected” vs raw ingestion; verify Stripe read config; ensure dashboards include namespace=simulated_audit.
+Staging Fix Mode: branch fix/dash-wiring; update dashboard SQL; fallback merges only when central lacks business keys; revenue derived from real payload.value; keep READ_ONLY_LOCK unchanged; stage deploy; PR; pause.
+Deliverables_local: a8_ingestion_validation.json; audit_status_panel_update.json.
+EXECUTION ORDER
+
+Global Discovery → system_map.json & connectivity_matrix.csv; slo_metrics.json; send minimal namespaced synthetic event to verify A8 schema/tags.
+App Diagnostics/Fixes → Execute YOUR APP SECTION; if needed, Staging Fix Mode; produce app deliverables; open PRs; pause for HUMAN_APPROVAL_REQUIRED before any production change.
+Global E2E → Run workflows; for B2B revenue, verify 3% fee & 4x markup; confirm A8 Finance tile; update a8_validation_results.json & a8_data_lineage.md.
+Reporting & Cleanup → Compute EGRS & write egrs_score.json; produce exec_summary.md with concrete “Path to 100%”; update A8 (staging) Audit Status panel (read‑only) with links; provide cleanup_audit.sh and dry‑run it.
+If you want, I can also supply a 1‑page CEO promotion‑gate checklist template to attach to exec_summary.md for A6→A8→A1 approval.
