@@ -1,0 +1,112 @@
+AGENT3_HANDSHAKE — Ecosystem Performance Test Orchestration (A8-led)
+
+Config
+
+ASSIGNED_APP=A8
+VERSION=5869fbddc331b4ea40e8ea51de0687196b9f092b
+MODE=Diagnostic Mode | Staging Test | Read-only for A8
+PROTOCOL=Performance Testing v1.0
+NAMESPACE=perf_test
+Global SLOs: 99.9% uptime; default P95 ≤150ms (stretch ≤120ms). Exceptions: sitemap warm ≤500ms; LLM chat/completions: stable at c=15, error rate <1%.
+Guardrails
+
+HUMAN_APPROVAL_REQUIRED for any run that could exceed c=60 VUs, perform 503 injection, or touch production data.
+Read-only against A8; writes allowed only to test namespaces or mock providers.
+No PII. Use tests/perf/config/data.jsonl seeds where needed. Cache-warm step permitted.
+Test Phases (run in order; halt on FAIL in Smoke or Health)
+
+Smoke and Health
+Verify /health and /healthz for A1–A8; record P50/P95/P99, error rate, uptime snapshot.
+Gate: proceed only if error rate <1% and all health endpoints P95 ≤150ms.
+2. Baseline Load
+
+A8 (command center, read-only):
+/api/executive/overview and related dashboard tiles under namespace=perf_test.
+Concurrency c=20 reads; measure P50/P95/P99 and error rate; current risk: dashboard P95 ~1085ms (A8-PERF-001).
+A7 (PageMaker):
+Routes: /, /browse, /browse/states, /browse/majors, /health.
+sitemap.xml with warm-cache check (target ≤500ms); recommend 1-hour TTL.
+A6 (Provider):
+/register c=10 (target P95 ≤150ms).
+/api/billing logic check: verify 3% provider platform fee and 4x AI markup; finance tile must reflect $30 fee, $40 AI markup.
+A5 (Student Pilot, staging):
+Telemetry path to A8 confirmed; Stripe in live_mode but run test customers only; no real charges.
+A4 (Scholarship Sage):
+/chat/completions baseline c=15 stable; capture latency profile; error rate <1%.
+A3 (Scholarship Agent):
+/preflight and /orchestration/run with idempotency-key verification up to c=20.
+A2 (API/ingest):
+P95 ingest ≤125ms target; persistence 100%.
+3. Stress, Spike, Ramp, Soak
+
+Use k6 scenarios per app with the following templates (adjust durations uniformly across apps):
+Smoke: 5m @ 5 VUs.
+Baseline: 15m @ 20 VUs.
+Ramp: 20m linear 10→60 VUs.
+Spike: 10m 5→100→5 VUs.
+Soak: 60m @ 20 VUs (leak and stability).
+Burst: optional 2m at 100 rps for A2 ingest (no data loss).
+A3 Resiliency:
+503 Injection Test (with HUMAN_APPROVAL_REQUIRED).
+Validate circuit breaker open/close behavior and recovery time; confirm idempotency.
+4. E2E Frontend (Playwright, staging)
+
+Flow 1: signup → OIDC (A1) → CRM record created → A8 Growth/Attribution tile event visible.
+Flow 2: document upload → route to A4 (LLM) → Outcomes tile populated.
+Flow 3: A7 browse pages load, CTA impression event emitted and visible in A8.
+Capture screenshots, videos, HAR; export structured results JSON.
+5. E2E Backend
+
+Provider funnel (A6): Lead → Demo → Contract → Live (simulate with test data); verify event lineage A6→A2→A8.
+Finance tile (A8): validate billing math end-to-end (3% provider fee, 4x AI service markup, $30/$40 checks).
+A2 lineage proof: confirm ingest → persist → telemetry to A8 with zero loss.
+Known Issues to Track
+
+A8-PERF-001: /api/executive/overview exceeds SLO (P95 ~1085ms). Include explicit RETEST after warm-cache; recommend adding caching layer for aggregated dashboard data and re-measure.
+Success Criteria
+
+All non-exempt endpoints P95 ≤150ms and error rate <1%.
+A7 sitemap warm ≤500ms.
+A4 chat/completions stable at c=15, error rate <1%.
+A2 ingest P95 ≤125ms; persistence 100%.
+E2E flows pass with telemetry visible in A8 within 60s.
+No data loss during spike/burst; circuit breaker behaves per design in A3.
+Artifacts to Generate (create if missing; overwrite allowed)
+
+tests/perf/config/targets.yaml (all routes + SLOs)
+tests/perf/scripts/run_suite.sh and cleanup.sh
+k6 scripts:
+A8: tests/perf/k6/a8_dashboard_load.js, a8_filter_test.js
+A7: tests/perf/k6/a7_pages.js
+A6: tests/perf/k6/a6_register_billing.js
+A5: none (frontend E2E only)
+A4: tests/perf/k6/a4_chat_completions.js
+A3: tests/perf/k6/a3_orchestration.js
+A2: a2_smoke.js, a2_baseline.js, a2_ramp.js, a2_spike.js, a2_soak.js, a2_burst.js
+A1: tests/perf/k6/a1_auth.js (/oidc/auth, /oidc/token)
+Playwright:
+tests/perf/playwright/a5_signup_oidc_crm.spec.ts
+tests/perf/playwright/a5_doc_a4_outcomes.spec.ts
+tests/perf/playwright/a7_pages_cta.spec.ts
+a5_playwright_report.html, a5_e2e_results.json
+Reports:
+Per-app slo_verdict.md; latency CSVs; resiliency report for A3; ingest lineage proof for A2.
+Ecosystem roll-up: tests/perf/reports/ecosystem_perf_summary.md and ecosystem_slo_matrix.md
+EGRS delta and final grade; log A8-PERF-001 if still failing.
+Execution Order
+
+Run Smoke → Baseline for all apps.
+If all PASS, run Ramp, Spike, Soak, then E2E Frontend and Backend.
+If any FAIL:
+Capture diagnostics, annotate remediation (e.g., caching for A8 dashboard; sitemap cache for A7).
+Re-run targeted baseline after fix or cache warm.
+Reporting and Closeout
+
+Update EGRS with before/after deltas; include status READY/CONDITIONAL.
+Attach PASS/FAIL verdicts per route and phase.
+Produce latency CSVs and markdown summaries; export a zipped bundle tests/perf/reports/ecosystem_perf_artifacts.zip.
+Approval Gates
+
+Pause and request HUMAN_APPROVAL for: c>60, 503 injection, or any production traffic.
+Proceed with read-only staging and namespace=perf_test by default.
+End of prompt.
