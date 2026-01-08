@@ -1,0 +1,195 @@
+AGENT3_HANDSHAKE
+
+Detect ASSIGNED_APP by matching current environment to the apps array below using any of: repo name match (repo_hint), base URL match (base_url_staging), or deployment metadata; then set context variables:
+ASSIGNED_APP: One of A1–A8
+APP_BASE_URL: From the apps array; if “internal_discovery,” resolve via tests/perf/config/targets.yaml or A8’s service registry; otherwise, use the provided HTTPS URL
+REPO_NAME: From git remote or workspace slug; must align to repo_hint
+VERSION: Current git SHA (short)
+Apps:
+A1 scholar_auth | repo_hint: scholar-auth | base_url_staging: https://scholar-auth-jamarrlmayes.replit.app
+A2 scholar_api_aggregator | repo_hint: scholar-api | base_url_staging: internal_discovery
+A3 scholarship_agent | repo_hint: scholarship_agent | base_url_staging: internal_discovery
+A4 scholar_sage | repo_hint: scholar-sage | base_url_staging: internal_discovery
+A5 student_pilot | repo_hint: student-pilot | base_url_staging: https://student-pilot-jamarrlmayes.replit.app
+A6 provider_register | repo_hint: provider-register | base_url_staging: https://provider-register-jamarrlmayes.replit.app
+A7 scholar_pagemaker | repo_hint: scholar-pagemaker | base_url_staging: https://scholaraiadvisor.com
+A8 scholar_command_center | repo_hint: scholar-command-center | base_url_staging: https://auto-com-center-jamarrlmayes.replit.app
+Status snapshot for situational awareness: DEGRADED (A1 Auth Loop, A6 External 500, A8 Tile Wiring)
+GLOBAL POLICY & ORCHESTRATOR
+
+Orchestrator: A8 (scholar_command_center) is the telemetry sink and reporting authority; all validation data must route to A8.
+Mode and constraints:
+Global mode: Read-Only/Diagnostic-first; Staging Fix Mode allowed; Production Change Mode requires HUMAN_APPROVAL_REQUIRED.
+Never print secrets; never mutate production; operate only within YOUR APP SECTION; all synthetic events must include namespace tags; provide idempotent cleanup.
+Namespace tags for all events and artifacts: {env: staging, namespace: simulated_audit, version: git_sha_dynamic}.
+SLO targets: latency P95 ≤ 150ms for smoke/baseline; error_rate_5xx_target = 0% in simulated flows.
+Second-Confirmation Protocol (mandatory): For every claim, collect two independent evidence sources (e.g., logs/traces/db records AND A8 telemetry tiles/metrics). No PASS without dual-source corroboration.
+Zero-Mock Rule: Use real staging systems and real data paths. No mocked responses. Synthetic events are allowed only if they flow through real services and are tagged with namespace=simulated_audit.
+Verification plan:
+Discovery: generate system_map.json, connectivity_matrix.csv; enumerate required secrets by name; verify health endpoints.
+Observability: confirm logs/traces with trace_id present; collect trailing 24h/7d SLO snapshots where available.
+Security & resiliency: TLS on all hops; no hard-coded secrets; internal API tokens present; OIDC state/nonce validity; resiliency probes (inject 500ms delay, simulate 503 in staging when approved, verify retries/backoff, circuit breaker behavior).
+Evidence rules: No issue is valid without logs/traces/db records and, where applicable, A8 visibility tied to the same event_id.
+Human-in-the-loop gates (require explicit HUMAN_APPROVAL_REQUIRED): Production writes, secret rotation/creation, enabling/disabling A8 write scopes, schema/alert changes, deployment restarts, cost-impacting autoscale, PR merges to main.
+Performance/cost hotspots: Detect sync chains > 200ms and recommend async/queue refactors; capture in rca.md and docs_update_plan.md.
+YOUR APP SECTIONS [A1–A8]
+Execute only the block matching the detected ASSIGNED_APP. Use the key_endpoints list to probe health, smoke, and baseline. For each block: diagnose known_issues, apply the auto_remediation_playbook in Staging Fix Mode, validate success_criteria with dual evidence, and produce deliverables_local. All synthetic events must use namespace=simulated_audit and carry trace_id and event_id.
+
+[A1] scholar_auth (IdP for Student/Provider)
+
+Known issues:
+A1-001 OIDC Session Expired Loop (High): Diagnostics trace shows cookies/TTL mismatch; P95 ~121ms; tests_to_confirm: Run 10 consecutive login flows in staging with interaction delay.
+Key endpoints: /oidc/auth, /oidc/token, /health, /ready, /dashboard/status
+Auto-remediation playbook:
+Branch 'fix/oidc-cookies'; set SameSite=None; Secure=True; extend interaction TTL; stage deploy; run 10/10 login tests; open PR; pause for HUMAN_APPROVAL_REQUIRED.
+Success criteria: 10/10 successful OIDC flows; P95 auth ≤ 150ms.
+Deliverables local: auth_trace_log.json, oidc_config_audit.md.
+[A2] scholar_api_aggregator (Central Ingest -> A8)
+
+Known issues: None explicitly listed in this snapshot; confirm overall ingest path and persistence.
+Key endpoints: /health, /ready, /api/ingest, /v1/events, /dashboard/status
+Auto-remediation playbook: Ensure endpoint tagging, latency tiers (single ≤125ms, batch ≤200ms), persistence 100%, confirm API keys and schema passthrough to A8.
+Success criteria: /ready 200; P95 ingest ≤ 125ms; 100% persistence; events visible in A8 with correct tags.
+Deliverables local: ingestion_latency_metrics.csv.
+[A3] scholarship_agent (Lead matcher; revenue event generator)
+
+Known issues: Validate orchestration, idempotency keys, and circuit breakers.
+Key endpoints: /preflight, /orchestration/run, /v1/events, /health
+Auto-remediation playbook: Ensure idempotency keys on orchestration; validate circuit breakers (Email, S2S Auth, Auto Com Center, Scholarship API) are CLOSED; add retries with jitter and backoff; generate orchestration k6 script if missing.
+Success criteria: Preflight passes; events land in A2/A8 with correct tags; error rate <1% under baseline load.
+Deliverables local: agent_preflight_audit.log.
+[A4] scholar_sage (LLM for Learning)
+
+Known issues:
+A4-001 LLM Latency/Cold Starts (Medium): P95 borderline/exceeded; memory pressure suspected; test with cache warming.
+Key endpoints: /chat/completions, /health, /ready
+Auto-remediation playbook:
+Branch 'perf/llm-optim'; implement cache warming and GC tuning; add lightweight health check; stage deploy; validate P95; PR.
+Success criteria: P95 ≤ 150ms under load; error rate <1%.
+Deliverables local: llm_latency_profile.csv.
+[A5] student_pilot (Student frontend; lead capture; Learning)
+
+Known issues:
+A5-001 Routes/Env Config (Low): Previous 404 resolved; AUTO_PAGE_MAKER_URL set; restart may be required; verify env var availability in runtime.
+Key endpoints: /health, /dashboard, /hub/upload, /api/login
+Auto-remediation playbook:
+Branch 'fix/routes-config' (if needed); confirm /api/login route; ensure AUTO_PAGE_MAKER_URL env loaded; stage deploy; PR.
+Success criteria: Login succeeds; lead event to A2; Growth and Outcomes tiles update in A8.
+Deliverables local: student_flow_results.json.
+[A6] provider_register (Provider onboarding; 3% fee + 4x markup emission)
+
+Known issues:
+A6-001 External Deployment Stale (500) (Critical): External URL returns 500; local/staging passes; billing logic verification needed; compare env vars and migrations between staging and external.
+Key endpoints: /register, /api/billing, /health
+Auto-remediation playbook:
+Branch 'fix/ext-deployment'; verify migrations and secrets by name; confirm staging funnel and billing logic (3% fee, 4x markup); PR with publish plan; HUMAN_APPROVAL_REQUIRED for production publish.
+Success criteria: External /register 200; Finance tile shows 3% and 4x events in A8.
+Deliverables local: provider_stack_trace.log, billing_logic_verification.md, provider_funnel_tests.json.
+[A7] scholar_pagemaker (Marketing/SEO; attribution events)
+
+Known issues: Confirm sitemap volume and attribution event emission to A8; exclude sitemap.xml from global 150ms threshold via tag.
+Key endpoints: /sitemap.xml, /health, core page routes
+Auto-remediation playbook: Validate sitemap > 2500 entries; ensure attribution events publish to A8 with correct tags; tag routes to exclude sitemap from 150ms threshold; tune cache and CDN headers.
+Success criteria: Sitemap > 2500; attribution events visible in A8.
+Deliverables local: sitemap_validation.json.
+[A8] scholar_command_center (Telemetry sink; visualization; audit reporting)
+
+Known issues:
+A8-001 Revenue Blindness/Tile Wiring (Medium): Revenue derived from real payload.value; tiles mixed GREEN/YELLOW; central lacks keys; verify fallback merge logic and Stripe read config with synthetic events.
+Key endpoints: /dashboard, /dashboard/status, /v1/events (ingest)
+Auto-remediation playbook:
+Branch 'fix/dash-wiring'; ensure dashboards include namespace=simulated_audit; verify fallback merges only when central lacks keys; fix Stripe read config; stage deploy; PR. Do not alter locks/scopes.
+Success criteria: Tiles populate with simulated_audit data; lineage proven for 3% and 4x flows.
+Deliverables local: a8_ingestion_validation.json, audit_status_panel_update.json.
+Required secrets (validate presence by name; never print):
+OIDC_ISSUER, CLIENT_ID, CLIENT_SECRET, COOKIE_SECRET, A2_API_KEY, DB_URL, A8_INGEST_KEY, BANDIT_CONFIG, STRIPE_KEY, LLM_API_KEY, AUTH_CLIENT_ID, AUTO_PAGE_MAKER_URL, DATABASE_URL, STRIPE_SECRET_KEY, CMS_API_KEY, SEO_CONFIG, ADMIN_API_KEY, READ_ONLY_LOCK, STRIPE_READ_KEY.
+
+Key endpoints (global probe catalog to use per-app as relevant):
+/oidc/auth, /oidc/token, /health, /ready, /v1/events, /preflight, /orchestration/run, /chat/completions, /dashboard, /hub/upload, /register, /api/billing, /sitemap.xml, /api/ingest, /dashboard/status.
+
+FUNNEL-UNBLOCK PROTOCOL (CRITICAL)
+
+Objective: Diagnose and repair the end-to-end B2C/B2B funnels across A7 → A5/A1 → A3 → A2 → A6 → A8.
+Steps:
+Establish a trace_id and idempotency key for each funnel run; attach {env:staging, namespace:simulated_audit, version:git_sha_dynamic}.
+For each hop, collect dual evidence:
+Source system logs/traces/db record with the same trace_id/event_id.
+A8 telemetry tile/ingest confirmation for the same event_id (Growth, Finance, SEO, Outcomes).
+Emit idempotent synthetic events via real endpoints; confirm no duplicates when retries occur.
+Validate billing lineage at A6 → A8: provider_fee_pct = 3 and ai_markup_factor = 4.0 must match in A6 logs and A8 Finance tile data.
+Stop and open an issue if any hop lacks dual evidence; propose fix-forward in Staging Fix Mode; re-run funnel until PASS.
+E2E WORKFLOWS
+
+Marketing_SEO_A7: Sitemap → Indexing → Attribution → A8 SEO tile.
+Lead_Gen_A5_A1_A3: Signup → OIDC → CRM capture → event bus (idempotency) → A8 Growth tile.
+B2B_Revenue_A6_A2_A8: Provider funnel (Lead → Demo → Contract → Live) → validate fee=3% and AI markup=4x → A8 Finance tile updates.
+Learning_A5_A4: Doc ingest → essay AI → success metric → A8 Outcomes tile.
+Execution rule: Run only the steps that touch your ASSIGNED_APP. Interactions with other apps must use their real staging endpoints; do not mock responses. If a dependency is unavailable, perform a safe, no-side-effect staging retry and record the outage; do not fabricate data.
+RL ERROR-CORRECTION LOOP
+
+Implement the loop: Monitor → Reflect (evidence capture) → Synthesize regression test (namespace=simulated_audit) → Propose PR → Verify → Update docs.
+Reward signals:
+Positive: Reduced P95 latency vs. baseline, reduced false positives in validations, higher E2E pass rate, improved EGRS score, lower cost hotspots.
+Negative: Increased error rate, telemetry gaps to A8, unapproved production mutations, missing dual evidence.
+Constraints: No merges to main without HUMAN_APPROVAL_REQUIRED; all proposals live in staging branches; attach diffs and evidence to fix-forward_proposals.md.
+DELIVERABLES & REPORTING
+
+Compute EGRS score using weights and thresholds:
+Weights: Security 15, Auth_Health 10, Reliability 15, Observability 10, Data_Quality_A8 15, E2E_Workflows 15, Performance 10, Cost_Scale 5, Human_Gates 5.
+Thresholds: Ready ≥ 85, Conditional ≥ 70, Not_Ready < 70.
+Generate deliverables_global:
+exec_summary.md
+rca.md
+system_map.json
+connectivity_matrix.csv
+slo_metrics.json
+security_checklist.md
+resiliency_config.md
+e2e_results.json
+a8_validation_results.json
+a8_data_lineage.md
+risk_register.md
+cleanup_audit.sh (idempotent cleanup of synthetic data; do not touch production)
+docs_update_plan.md
+egrs_score.json
+Generate deliverables_local per ASSIGNED_APP (see your app section).
+Generate three additional files:
+false_positive_register.md (catalog of suspected false positives with dual-evidence adjudication and resolution)
+readiness_attestation.md (APP-level PASS/FAIL with evidence links)
+ceo_promotion_checklist.md (gates met to move from Diagnostic to Production Change Mode)
+Generate a8_second_confirmation.md:
+Authoritative PASS/FAIL of ecosystem readiness with dual evidence for liveness, autonomy, error-correction learning, reinforcement learning, and human-in-the-loop gates.
+Include links to all artifacts and explicit statements on 3% provider fee and 4x AI markup lineage.
+DATA LINEAGE TO A8
+
+Validate Avro/JSON schemas with required tags {env, namespace, version}.
+Confirm lineage Source → A2 → A8 raw → A8 dashboards. Any missing key fields must be corrected in staging and re-validated.
+EXECUTION ORDER & STOP CONDITIONS
+
+Order of execution:
+Global Discovery:
+Build system_map.json, connectivity_matrix.csv, enumerate required secrets (presence-only), probe /health and /ready for all apps, snapshot SLOs (24h/7d if available).
+App Diagnostics/Fixes:
+Execute your app section; apply Staging Fix Mode; validate success_criteria with dual evidence; produce deliverables_local.
+Global E2E:
+Run FUNNEL-UNBLOCK protocol and E2E workflows; confirm A8 tiles (SEO, Growth, Finance, Outcomes) receive events with trace_id and correct financial fields.
+Reporting & Cleanup:
+Compute egrs_score.json; write exec_summary.md, a8_second_confirmation.md, and all required artifacts; run cleanup_audit.sh to remove synthetic test data where safe and idempotent.
+Stop conditions (immediately halt and request HUMAN_APPROVAL_REQUIRED):
+Any action that would modify production (writes, deploys, config changes).
+Secret rotations/creations or scope escalations (A8 write scopes).
+Schema or alert rule changes.
+Deployment restarts or autoscale/cost-impacting changes.
+Error rate ≥ 1% for > 5 minutes during tests.
+Core auth or aggregator P95 > 200ms sustained during smoke/baseline.
+Missing A8 telemetry for any executed test within 60 seconds.
+Any sign of academic dishonesty enablement, data policy breach, or non-compliance with FERPA/COPPA.
+Violation of Zero-Mock Rule or Second-Confirmation Protocol.
+SUCCESS CRITERIA (GLOBAL)
+
+All smoke/baseline SLOs met (P95 ≤ 150ms) with error rate < 1% across A1–A8.
+A8 receives near-real-time telemetry for all apps with required tags and displays SEO, Growth, Finance, and Outcomes tiles populated for simulated_audit.
+Finance lineage proves provider_fee_pct = 3 and ai_markup_factor = 4.0 via A6 logs and A8 Finance tile using identical event_id.
+RL signal path and error-correction learning loops documented and validated.
+Human-in-the-loop gates enforced with approvals logged; zero unauthorized production mutations.
+a8_second_confirmation.md states PASS with links to dual evidence, or FAIL with fix-forward plan, owners, and ETAs.
