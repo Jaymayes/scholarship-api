@@ -1,0 +1,155 @@
+AGENT3_HANDSHAKE
+
+Detect workspace identity:
+Read repo/workspace slug and any configured staging base URL.
+Match to APPS TABLE (id, name, repo_hint, base_url_staging).
+Set:
+ASSIGNED_APP = one of {A1,A2,A3,A4,A5,A6,A7,A8}
+APP_BASE_URL = matched staging URL (or discovered endpoint)
+REPO_NAME = local repo/workspace name
+VERSION = git sha (or git_sha_dynamic)
+ACK: I will execute ONLY “YOUR APP SECTION [ASSIGNED_APP]”. All other sections are read-only context. Max Autonomous enabled; start in Diagnostic Mode. No production mutations without HUMAN_APPROVAL_REQUIRED.
+APPS TABLE (reference)
+
+A1 scholar_auth | scholar-auth | https://scholar-auth-jamarrlmayes.replit.app
+A2 scholar_api_aggregator | scholar-api | internal_discovery
+A3 scholarship_agent | scholarship_agent | internal_discovery
+A4 scholar_sage | scholar-sage | internal_discovery
+A5 student_pilot | student-pilot | https://student-pilot-jamarrlmayes.replit.app
+A6 provider_register | provider-register | https://provider-register-jamarrlmayes.replit.app
+A7 scholar_pagemaker | scholar-pagemaker | https://scholaraiadvisor.com
+A8 scholar_command_center | scholar-command-center | https://auto-com-center-jamarrlmayes.replit.app
+GLOBAL POLICY & TEST ORCHESTRATOR
+
+Modes:
+Diagnostic Mode → design/generate test plans and scripts; staging-first probes.
+Staging Test Mode → run tests only against staging endpoints; namespace test data; generate artifacts; cleanup.
+Production Validation Mode → read-only checks (no load) unless HUMAN_APPROVAL_REQUIRED is granted.
+Guardrails:
+Never test against prod write paths; staging-only with explicit allowlist.
+Tag all synthetic events and test data: env=staging, namespace=perf_test, version=${VERSION}.
+Second-Confirmation Protocol: every test result must include two evidence sources (tool output + platform metrics; logs + traces; DB count + A8 tile).
+Zero-Mock Rule: measurements derived from real traffic and system metrics; no fabricated numbers.
+Success / SLO Targets:
+P95 ≤150ms for critical endpoints and flows; error rate ≤1% under planned load; no sustained 5xx bursts; graceful degradation under spikes; recovery ≤2 minutes.
+Human-in-the-Loop (STOP CONDITIONS → require HUMAN_APPROVAL_REQUIRED):
+Any test against production; any change to rate limits, autoscale, secrets, alert thresholds; tests exceeding pre-set ceilings; cost-impacting changes.
+Tools (generate if missing; prefer OSS):
+Backend load: k6 or Artillery (HTTP, WS).
+Frontend E2E: Playwright (primary) or Cypress (alternate).
+API schema/contract checks: OpenAPI-based validators (if spec available) or JSON schema asserts.
+Metrics: capture tool results, Replit/host logs, A8 tiles, and service logs/traces.
+TEST SUITE STRUCTURE (generate in repo root under /tests/perf/)
+
+/tests/perf/config/
+targets.yaml (per-app base URLs, routes, concurrency ceilings)
+data.jsonl (seed accounts, provider profiles; sanitized; non-PII)
+/tests/perf/k6/ (or /artillery/)
+smoke.js | baseline.js | ramp.js | spike.js | soak.js | breakpoint.js
+/tests/perf/playwright/
+e2e_frontend.spec.ts (A7→A5/A1 flow; A5 learning flow)
+admin_dash.spec.ts (A8 read-only tiles)
+/tests/perf/reports/
+results-*.json | junit.xml | html/ (tool-native)
+/tests/perf/scripts/
+start.sh | run_suite.sh | cleanup.sh (delete records namespace=perf_test)
+TEST TYPES & PROFILES (apply to YOUR app endpoints and the shared flows)
+
+Smoke (5 min): low concurrency (c=5), sanity check, all key routes.
+Baseline (15 min): c=20; measure P50/P95/P99, error rate, CPU/mem footprint (from platform logs) and A8 ingestion count deltas.
+Ramp (20 min): step c=10→20→40→60; confirm linear scaling and stable P95.
+Spike (10 min): instant jump c=5→100 for 2 min; verify no cascading 5xx; recovery ≤2 min.
+Soak (60–120 min): c=20; check memory leaks, connection churn, error drift.
+Breakpoint (optional): controlled increase until first SLO breach; record “max sustainable c” and bottleneck.
+FRONTEND E2E SCENARIOS (Playwright; headless true)
+
+A7→A5/A1 B2C acquisition flow:
+Navigate scholaraiadvisor.com landing → follow CTA with UTM → A5 signup → OIDC with A1 → confirm Growth tile in A8 shows namespace=perf_test lead.
+A5 Learning flow:
+Upload sample doc → trigger A4 essay assistance → submit success metric → confirm A8 Outcomes tile increment.
+A8 dashboard (read-only):
+Load Executive/Operations dashboards; verify tiles render; confirm filters for env=staging and namespace=perf_test.
+BACKEND E2E + SERVICE TESTS (k6/Artillery)
+
+A1 (Auth): /oidc/auth, /oidc/token, /.well-known/openid-configuration
+Validate tokens; TTL behavior; concurrent logins c=30; assert P95 ≤150ms; error ≤1%.
+A2 (Aggregator): /v1/events (write), /health, /ready
+Burst writes 100 rps for 2 min; ensure 0 data loss; confirm A8 increments exactly match sent events.
+A3 (Agent): /preflight, /orchestration/run
+Run orchestration c=20; verify idempotency; measure compensation/retry behavior under injected 503.
+A4 (LLM): /chat/completions
+Baseline (payload 1–2KB); ramp to c=15; monitor latency tail; verify retries/backoff on 429/503.
+A5 (Student): /dashboard, /hub/upload
+Sequence: login → upload → metric emit; check A8 Growth/Outcomes increments.
+A6 (Provider): /register, /api/billing
+Simulate B2B funnel and billing (3% fee on $1000; 4x markup on $10); confirm A8 Finance tile exact amounts; test with c=10.
+A7 (Pages): /sitemap.xml and selected landing pages
+c=30 read-only; assert P95 ≤150ms; ensure attribution pixel/events delivered to A2/A8.
+A8 (Command Center): /api/ingest, /dashboard/status
+Read-only: verify ingestion availability and tile APIs; ensure namespace filters work under c=20.
+DATA & ISOLATION
+
+Test data: synthetic; sanitized; no real PII. Use unique idempotency keys per run and tag namespace=perf_test.
+Cleanup: /tests/perf/scripts/cleanup.sh must remove only records with namespace=perf_test (idempotent).
+ARTIFACTS TO PRODUCE (in /tests/perf/reports/ and linked in /reports/perf_run_YYYYMMDD-HHMM/)
+
+Raw outputs: k6/artillery JSON, Playwright HTML, JUnit/xUnit.
+Derived CSVs: latency_summary.csv (P50/P95/P99), error_rates.csv, throughput.csv.
+A8 Evidence: tiles_screenshots/ + a8_validation_results.json (before/after counts per tile + query used).
+Lineage proof: a8_data_lineage.md (event_id path Source→A2→A8 raw→Tile).
+Capacity report: breakpoint_summary.md (max sustainable concurrency, bottleneck callchains).
+SLO verdicts: per app + end-to-end flows; pass/fail with root-cause notes for any failure.
+Remediation plan: perf_remediation.md (ranked issues, owner, ETA, expected SLO gain).
+Executive summary: exec_summary.md (one page; KPIs, SLOs, pass/fail, next steps).
+INJECTION & CHAOS (staging only; safe patterns)
+
+Latency: add 200–500ms at selected dependencies (config-flag or test harness) and verify retries/backoff and circuit-breaker open/close events.
+Transient faults: 503 for 30s on downstream; ensure fallback paths work and E2E flow degrades gracefully.
+Abort testing immediately if error rate >5% for >60s or if platform throttling/abuse signals appear.
+YOUR APP SECTION [A1] — Execute only if ASSIGNED_APP=A1
+
+Generate k6 scripts for /oidc/auth and /oidc/token; add smoke/baseline/ramp/spike/soak; run with staged credentials (non-prod).
+Export: a1_auth_results.json, a1_latency_summary.csv, a1_slo_verdict.md.
+YOUR APP SECTION [A2] — Execute only if ASSIGNED_APP=A2
+
+Generate k6 scripts for /v1/events, /ready; run burst writes and soak; verify A8 counts (dual-evidence).
+Export: a2_ingest_results.json, a2_lineage_proof.md, a2_slo_verdict.md.
+YOUR APP SECTION [A3] — Execute only if ASSIGNED_APP=A3
+
+Generate load for /preflight and /orchestration/run; include idempotency and 503-injection test.
+Export: a3_orchestration_results.json, a3_resiliency_report.md.
+YOUR APP SECTION [A4] — Execute only if ASSIGNED_APP=A4
+
+Load test /chat/completions with cache warm; ramp until first P95 breach; document payload-size effect.
+Export: a4_llm_latency_profile.csv, a4_breakpoint_summary.md.
+YOUR APP SECTION [A5] — Execute only if ASSIGNED_APP=A5
+
+Playwright scripts: signup→OIDC→CRM→bus→Growth tile; doc→A4→Outcomes tile; run with c=5 UI sessions (headless).
+Export: a5_playwright_report.html, a5_e2e_results.json.
+YOUR APP SECTION [A6] — Execute only if ASSIGNED_APP=A6
+
+k6: /register, /api/billing; simulate funnel; confirm 3% fee on $1000 and 4x markup on $10 appear in A8 Finance.
+Export: a6_billing_logic_verification.md, a6_provider_funnel_tests.json.
+YOUR APP SECTION [A7] — Execute only if ASSIGNED_APP=A7
+
+k6/artillery: /sitemap.xml + key LPs; verify attribution event delivery to A2/A8.
+Export: a7_pages_latency.csv, a7_attribution_delivery.md.
+YOUR APP SECTION [A8] — Execute only if ASSIGNED_APP=A8
+
+Read-only: verify /api/ingest availability and dashboard API filters for namespace=perf_test under c=20 reads.
+Export: a8_dash_filter_tests.json, a8_tile_slo_verdict.md.
+RL ERROR-CORRECTION LOOP (with reinforcement)
+
+Monitor → Reflect (collect failing test evidence) → Synthesize regression test → Propose PR fix (Staging Fix Mode) → Verify (reward = lowered error rate, improved P95, successful E2E rate) → Update runbooks/ECOSYSTEM_README. Do not merge or promote without HUMAN_APPROVAL_REQUIRED.
+EGRS & CAPACITY OUTPUTS
+
+Compute egrs_score.json pre- and post-tests; include capacity headroom estimates based on breakpoint and soak results.
+Produce capacity_plan.md with recommended autoscale/queue/concurrency settings (no changes applied without approval).
+EXECUTION ORDER
+
+Global Discovery & Prep → configs, scripts, seed data, safety checks; dry-run smoke tests.
+Backend Load → per-app smoke/baseline/ramp/spike/soak; collect artifacts and dual evidence.
+Frontend E2E → Playwright runs for A7→A5/A1, A5 learning, A8 read-only.
+Funnel-Unblock → orchestrated end-to-end run with lineage proof to A8 tiles.
+Reporting & Cleanup → all artifacts; SLO verdicts; remediation plan; cleanup namespace=perf_test data (idempotent).
+Pause on STOP CONDITIONS and await HUMAN_APPROVAL_REQUIRED for any production-impacting action.
