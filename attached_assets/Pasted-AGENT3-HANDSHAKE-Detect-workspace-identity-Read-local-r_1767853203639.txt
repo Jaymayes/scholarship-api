@@ -1,0 +1,154 @@
+AGENT3_HANDSHAKE
+
+Detect workspace identity:
+Read local repo/workspace slug and any configured staging base URL.
+Match against the APPS TABLE (id, name, repo_hint, base_url_staging).
+Set context:
+ASSIGNED_APP = one of {A1,A2,A3,A4,A5,A6,A7,A8}
+APP_BASE_URL = matched staging URL (or discovered endpoint)
+REPO_NAME = local repo/workspace name
+VERSION = current git sha (or git_sha_dynamic)
+ACK: I will execute ONLY “YOUR APP SECTION [ASSIGNED_APP]”. All other sections are read-only context for safe cross-app awareness. Max Autonomous enabled; starting in Diagnostic Mode. No production mutations without HUMAN_APPROVAL_REQUIRED.
+APPS TABLE (for handshake)
+
+A1 scholar_auth | repo: scholar-auth | base: https://scholar-auth-jamarrlmayes.replit.app
+A2 scholar_api_aggregator | repo: scholar-api | base: internal_discovery
+A3 scholarship_agent | repo: scholarship_agent | base: internal_discovery
+A4 scholar_sage | repo: scholar-sage | base: internal_discovery
+A5 student_pilot | repo: student-pilot | base: https://student-pilot-jamarrlmayes.replit.app
+A6 provider_register | repo: provider-register | base: https://provider-register-jamarrlmayes.replit.app
+A7 scholar_pagemaker | repo: scholar-pagemaker | base: https://scholaraiadvisor.com
+A8 scholar_command_center | repo: scholar-command-center | base: https://auto-com-center-jamarrlmayes.replit.app
+GLOBAL POLICY & ORCHESTRATOR
+
+Modes:
+Diagnostic Mode: read-only, staging-first probes.
+Staging Fix Mode: allowed (Branch → Fix → Stage → Validate → PR). Any action beyond staging requires HUMAN_APPROVAL_REQUIRED.
+Production Change Mode: strictly requires HUMAN_APPROVAL_REQUIRED.
+Environment & Tags:
+Staging primary; production diagnostics only (no writes/migrations/config changes).
+Tag every synthetic event: env=staging, namespace=simulated_audit, version=${VERSION}.
+SLO Targets:
+P95 latency ≤150ms; 0% 5xx error rate in simulated flows (any 5xx must include evidence).
+Evidence Rules:
+Second-Confirmation Protocol: for every claim, collect two independent evidence sources (e.g., logs + metrics; DB row + A8 tile query; trace + screenshot).
+Zero-Mock Rule: all metrics and values must be derived from real data only; no fabricated multipliers or placeholder values.
+Human-in-the-Loop Gates (Stop Conditions → require HUMAN_APPROVAL_REQUIRED):
+Any production write/config change; secret rotation/creation; enabling/disabling A8 write scopes; schema/alert rule changes; deployment restarts; autoscale/cost-impacting changes; PR merges to main; any action with potential security/data exposure impact.
+Constraints:
+Never print secret values; verify presence by name only.
+Operate strictly within YOUR APP SECTION; cross-app actions remain read-only.
+GLOBAL VERIFICATION PLAN
+
+Discovery:
+Produce system_map.json (Service → Purpose → Dependencies → Required secrets by name → Health endpoints → Inbound/Outbound APIs → A8 sinks/sources).
+Produce connectivity_matrix.csv (non-destructive probes with status, auth type, latency).
+Observability:
+Export trailing 24h/7d SLO snapshots (P50/P95/P99, error rates) to slo_metrics.json for accessible staging endpoints.
+Ensure structured logs for synthetic tests include trace_id and request_context.
+Security & Resiliency:
+Validate TLS on all hops; verify internal token-based auth; confirm OIDC state/nonce where applicable.
+In staging, inject 500ms latency and simulate 503; verify retries/backoff and circuit-breaker behavior; document thresholds/results in resiliency_config.md.
+Data Quality & Lineage to A8:
+Validate Avro/JSON schemas and required tags (env, namespace, version).
+Prove lineage: event_id → A2 aggregator → A8 raw storage → A8 dashboard tiles (evidence in a8_data_lineage.md and a8_validation_results.json).
+Performance/Cost Hotspots:
+Detect synchronous HTTP chains >200ms; recommend async/queue refactors with expected SLO/cost benefit.
+FUNNEL-UNBLOCK PROTOCOL (End-to-End B2C + B2B)
+
+Validate and, if needed, repair the full path: A7 (SEO/Attribution) → A5/A1 (Signup/OIDC) → A3 (Orchestration) → A2 (Ingest) → A6 (Provider/Billing) → A8 (Tiles).
+For each hop:
+Emit minimal idempotent synthetic events (namespace=simulated_audit).
+Dual-evidence verify success (upstream logs/traces + downstream DB/tile query).
+On any failure: generate a regression test; open a draft PR in Staging Fix Mode with rollback plan; pause for HUMAN_APPROVAL_REQUIRED.
+E2E WORKFLOWS (execute only steps for YOUR app; safely stub others)
+
+Marketing_SEO_A7 → A8 SEO tile.
+Lead_Gen_A5_A1_A3 → A8 Growth tile.
+B2B_Revenue_A6_A2_A8 → verify 3% platform fee ($30 on $1000) and 4x AI markup ($40 on $10) → A8 Finance tile.
+Learning_A5_A4 → A8 Outcomes tile.
+YOUR APP SECTION [A1: scholar_auth]
+
+Key endpoints: /oidc/auth, /oidc/token, /health
+Known issues: A1-001 OIDC Session Expired Loop
+Actions:
+Execute 10 consecutive OIDC flows with interaction delay; capture redirect chain and Set-Cookie flags (SameSite=None, Secure=True, correct domain); validate client_id allowlist.
+Staging Fix Mode: branch fix/oidc-cookies; adjust cookie policy/interaction TTL; stage deploy; re-run 10/10 flows; open PR; pause.
+Success criteria: 10/10 OIDC flows succeed; P95 auth ≤150ms.
+Deliverables_local: auth_trace_log.json; oidc_config_audit.md.
+YOUR APP SECTION [A2: scholar_api_aggregator]
+
+Key endpoints: /v1/events, /health, /ready
+Actions:
+Confirm /ready returns 200; measure ingest P50/P95/P99; validate A8_INGEST_KEY presence by name; verify JWT headers pass WAF; confirm 100% persistence to A8.
+Success criteria: /ready 200; P95 ingest ≤125ms; 100% persistence.
+Deliverables_local: ingestion_latency_metrics.csv.
+YOUR APP SECTION [A3: scholarship_agent]
+
+Key endpoints: /preflight, /orchestration/run
+Actions:
+Run /preflight; validate app_identity and bandit_config; ensure idempotency keys; emit synthetic revenue events to A2/A8 with correct tags; confirm acceptance.
+Success criteria: Preflight passes; events accepted by A2/A8 with correct tags.
+Deliverables_local: agent_preflight_audit.log.
+YOUR APP SECTION [A4: scholar_sage]
+
+Key endpoints: /chat/completions, /health
+Known issues: A4-001 LLM Latency/Cold Starts
+Actions:
+Load test with cache warming; capture llm_latency_profile.csv; tune timeouts/GC; optionally implement lightweight /health; validate P95 ≤150ms.
+Success criteria: P95 ≤150ms under load.
+Deliverables_local: llm_latency_profile.csv.
+YOUR APP SECTION [A5: student_pilot]
+
+Key endpoints: /dashboard, /hub/upload, /api/login, /health
+Known issues: A5-001 Routes/Env Config
+Actions:
+Confirm login route/semantics; verify AUTO_PAGE_MAKER_URL loaded; run signup → OIDC → CRM capture → bus (idempotency) and confirm A8 Growth tile; run doc ingest → A4 essay AI → success metric and confirm A8 Outcomes tile.
+Success criteria: Login succeeds; Growth and Outcomes tiles update with simulated_audit events.
+Deliverables_local: student_flow_results.json.
+YOUR APP SECTION [A6: provider_register]
+
+Key endpoints: /register, /health, /api/billing
+Known issues: A6-001 External Deployment Stale (500)
+Actions:
+Dual-source verify external vs local /health; diff secrets by name; verify external DB migration status; capture provider_stack_trace.log.
+Simulate $1000 GMV and $10 AI cost; verify platform fee=3% ($30) and markup=4x ($40); confirm A8 Finance tile.
+Staging Fix Mode: branch fix/ext-deployment; stage deploy; open PR with publish plan; pause.
+Success criteria: External /register 200; finance events (3% and 4x) appear in A8 with correct tags.
+Deliverables_local: provider_stack_trace.log; billing_logic_verification.md; provider_funnel_tests.json.
+YOUR APP SECTION [A7: scholar_pagemaker]
+
+Key endpoints: /sitemap.xml, /health
+Actions:
+Validate sitemap >2500 pages; emit attribution events; confirm A8 SEO tile updates (namespace=simulated_audit).
+Success criteria: Sitemap >2500; A8 SEO tile reflects events.
+Deliverables_local: sitemap_validation.json.
+YOUR APP SECTION [A8: scholar_command_center]
+
+Key endpoints: /api/ingest, /dashboard/status, /health
+Known issues: A8-001 Revenue Blindness/Tile Wiring
+Actions:
+Ensure dashboard queries include namespace=simulated_audit; use fallback only when central lacks keys; verify Stripe read config; compute revenue from real payload.value; reconcile “apps connected” vs raw ingestion; post read-only Audit Status payload.
+Staging Fix Mode: branch fix/dash-wiring; stage deploy; PR; pause.
+Success criteria: All tiles (Finance, Growth, SEO, Outcomes) show simulated_audit data; lineage proven end-to-end.
+Deliverables_local: a8_ingestion_validation.json; audit_status_panel_update.json.
+RL ERROR-CORRECTION LOOP (with reinforcement)
+
+Monitor → Reflect (capture failure evidence) → Synthesize regression test (namespace=simulated_audit) → Propose PR → Verify (reward = lower error rate, improved P95, more E2E passes, fewer false positives) → Update runbooks/ECOSYSTEM_README. No merges/promotions without HUMAN_APPROVAL_REQUIRED.
+EGRS (Enterprise Grade Readiness Score)
+
+Compute egrs_score.json with weights:
+Security 15; Auth_Health 10; Reliability 15; Observability 10; Data_Quality_A8 15; E2E_Workflows 15; Performance 10; Cost_Scale 5; Human_Gates 5.
+Thresholds: Ready ≥85; Conditional ≥70 and <85; Not_Ready <70.
+Target: 100/100. If <100, output precise gaps with fixes and expected point gains.
+DELIVERABLES & REPORTING (write to reports/scholar_audit/YYYYMMDD-HHMM/)
+
+exec_summary.md; rca.md; system_map.json; connectivity_matrix.csv; slo_metrics.json; security_checklist.md; resiliency_config.md; e2e_results.json; a8_validation_results.json; a8_data_lineage.md; risk_register.md; cleanup_audit.sh; docs_update_plan.md; egrs_score.json
+false_positive_register.md; readiness_attestation.md; ceo_promotion_checklist.md
+EXECUTION ORDER & STOP CONDITIONS
+
+Global Discovery → system_map.json, connectivity_matrix.csv, slo_metrics.json; send minimal namespaced synthetic event to confirm A8 schema/tags acceptance.
+App Diagnostics/Fixes → execute YOUR APP SECTION; if needed, enter Staging Fix Mode; produce app-local deliverables; open PR(s).
+Global E2E → run relevant workflows; for B2B validate 3% fee and 4x markup; confirm A8 tiles; update a8_validation_results.json and a8_data_lineage.md.
+Reporting & Cleanup → compute EGRS; produce exec_summary.md with “Path to Ready” to 100/100; update A8 (staging) Audit Status panel (read-only) with links to artifacts; provide cleanup_audit.sh and dry-run proof.
+Stop Conditions (trigger HUMAN_APPROVAL_REQUIRED): any production mutation; enabling write scopes; secret rotation/creation; schema/alert changes; deploy/restart; autoscale/cost changes; any detected risk of data exposure or security posture change.
