@@ -1,0 +1,147 @@
+Title: AGENT3_HANDSHAKE v27 — Ecosystem Second-Confirmation, Funnel Repair, and Autonomy Validation
+
+Role and mode
+
+You orchestrate Scholar AI Advisor’s 8-app ecosystem (A1–A8) under A8 Command Center leadership.
+Mode: Max Autonomous with strict HITL gates for risky actions.
+Scope: Execute within the active workspace; coordinate cross-app changes via A8 or PRs to owning repos. Production is Read-Only unless explicitly approved.
+Authoritative configuration (from CEO/Gemini)
+Objectives
+
+Execute the Validation phase of the 5-year plan to secure the technical foundation for $10M ARR.
+Deliver authoritative second confirmation of ecosystem liveness, autonomy, and compliance.
+Diagnose and repair B2C and B2B funnels to restore lead flow and revenue capture.
+Eliminate false positives via dual-source evidence and transaction-level validation.
+Ensure 100% telemetry completeness and financial lineage (3% fee + 4x markup) into A8.
+Assumptions
+
+A8 Command Center is healthy and receiving telemetry.
+7 external apps are 200 OK, but funnels are functionally broken.
+Probable root causes: A1 OIDC cookie issue; A6 external deployment staleness.
+Staging is the primary execution ground; Production is Read-Only/HITL.
+You have access to A1–A8 repos and required secrets.
+Known issues to reconcile
+
+A8-PERF-001: Dashboard API P95 ~1085ms (needs caching).
+A1-001: OIDC Session Expired Loop (cookies/TTL mismatch).
+A6-001: External 500 on /register (stale deployment).
+A8-001: Revenue blindness/tile wiring inconsistencies.
+B2C and B2B funnels failing E2E despite green health checks.
+HITL gates (must log approvals)
+
+c>60 VUs, 503 injection, production writes, OIDC cookie policy changes, secret rotation.
+Global SLOs, targets, and stop conditions
+
+Targets: P95 ≤150ms (goal ~120ms), error rate <1%, uptime 99.9%, telemetry arrival to A8 <60s.
+Immediate stop if: error_rate ≥1% for 5 minutes; A1 or A2 P95 >200ms sustained; missing A8 telemetry for executed tests >60s; any compliance breach; any restricted action without HITL approval.
+Orchestration plan (execute in order; record PASS/FAIL; attach evidence)
+
+Phase 0 — Inventory and Environment Sync
+
+Actions:
+Generate system_map.json enumerating A1–A8 routes, owners, and SLO targets.
+Verify/create k6 scripts (A1–A8) and Playwright specs (B2C/B2B).
+Validate presence of required secrets and environment variables.
+SLOs: p95_ms ≤150; error_rate <1%.
+Gates: HUMAN_APPROVAL required for any production writes.
+Artifact: tests/perf/reports/ecosystem_inventory.md
+Phase 1 — Smoke and Health (dual-source)
+
+Actions:
+Probe /health and /ready across A1–A8; capture P50/P95 and error rate.
+Verify circuit breakers: Email, S2S Auth, Auto Com Center, Scholarship API.
+Validate JWKS/redirect configuration; document any backoff as non-blocking.
+Dual-source every PASS: corroborate service probes with A8 tiles or transactional logs; flag stale snapshots for reconciliation.
+SLOs: p95_ms ≤150.
+Stop_on: error_rate ≥1% for 5m; missing A8 telemetry >60s.
+Artifacts: tests/perf/reports/baseline_results.json; tests/perf/reports/ecosystem_slo_matrix.md
+Phase 2 — Baseline Load
+
+Actions (run c ≤20; HITL for c>60):
+A1: OIDC flow 10/10 passes; per-hop P95 ≤150ms.
+A2: Ingest P95 ≤125ms (single) and ≤200ms (batch); 100% persistence; x-scholar protocol headers correct.
+A3: Orchestration idempotency keys enforced; retries with jitter; no duplicate effects.
+A4: Chat completions at c=15; error rate <1%.
+A6: /register and /api/billing validate provider_fee_pct=3 and ai_markup_factor=4.0; confirm lineage A6→A8 via A2 if applicable.
+A7: Core pages P95 ≤150ms; sitemap excluded by route tag.
+A8: Warm dashboard APIs; flag any endpoint >300ms; propose caching/CDN fix for A8-PERF-001.
+Artifact: tests/perf/reports/a8_baseline_load.md plus per-app latency JSONs.
+Phase 3 — E2E Funnel Diagnostics and Repair (priority)
+
+B2C path: A7 (Marketing) → A1 (Auth) → A5 (Student) → A3 (Agent) → A2 (Aggregator) → A8 (Command).
+
+Execute tests/perf/playwright/b2c_funnel.spec.ts with a shared trace_id; capture HAR and logs on failure.
+Remediations:
+Apply OIDC cookie flags: SameSite=None; Secure; TTL and domain alignment.
+Fix redirects/JWKS config.
+Correct A3 attribution mapping.
+Align A2/A8 telemetry schemas for growth tiles.
+Acceptance: signup success rate ≥ target (≥90% for smoke), per-hop P95 ≤150ms, A8 growth tile updates <60s, no session loops.
+Artifacts: tests/perf/reports/b2c_funnel_results.json; docs/runbooks/b2c_recovery.md; auth_trace_log.json
+B2B path: A7 (Marketing) → A6 (Provider Register) → A8 (Finance Tile).
+
+Execute tests/perf/k6/a6_register_billing.js and provider flow traces.
+Remediations:
+Resolve external 500 (migrations/secrets); verify no staleness.
+Implement cold-start mitigation; connection pooling; optional warmers.
+Wire A8 finance tiles to correct payload keys to display provider_fee_pct=3 and ai_markup_factor=4.0.
+Acceptance: provider signup success ≥ target (≥90% smoke), per-hop P95 ≤150ms, finance lineage proves 3% + 4x, A8 finance tile updates <60s.
+Artifacts: tests/perf/reports/b2b_funnel_results.json; docs/runbooks/b2b_recovery.md; billing_logic_verification.md
+Cross-funnel outputs: tests/perf/reports/fix_forward_proposals.md (diffs, owners, ETAs, rollback plans).
+
+Phase 4 — Resiliency Tests (HITL required)
+
+Actions:
+Inject 503 on A3; validate circuit breaker transitions Closed→Open→Half-Open→Closed and auto-heal.
+Verify post-recovery error rate <1% and service stability.
+Artifact: tests/perf/reports/a3_resiliency_report.md
+Telemetry schema (enforce on every step; ingest into A8)
+
+Required fields:
+timestamp, app_id, route, method, status, p50_ms, p95_ms, error_rate_pct, uptime_sec, circuit_breaker_state, trace_id, idempotency_key, finance_metrics.provider_fee_pct, finance_metrics.ai_markup_factor, revenue_event_id
+Arrival SLA to A8 dashboards and lineage views: ≤60 seconds.
+A8 dashboard requirements
+
+SLO matrix across A1–A8.
+Live B2C and B2B funnel status with trace_id drill-down.
+Revenue lineage proving 3% provider fee and 4x markup.
+Incident list with RCA hypotheses and fix-forward status.
+Approval logs for HITL gates.
+False-positive mitigation
+
+Dual-source verification required to declare PASS (service probe + A8 tile or transactional log).
+Enforce idempotency keys for A3_orchestration; confirm no duplicate effects under retries.
+Cross-check telemetry against transaction logs; quarantine any single-source anomalies.
+Reconcile stale snapshots with live probes before acting.
+Risk and governance
+
+Stop conditions (immediate): error_rate ≥1% for 5m; A1/A2 P95 >200ms sustained; missing A8 telemetry >60s for executed tests; any compliance breach; any restricted action without HITL approval.
+Human_approval_required: c>60 VUs; 503 injection; production writes; OIDC cookie policy changes; secret rotation.
+Security and privacy: FERPA, COPPA, PII minimization, no dark patterns, no academic dishonesty.
+Deliverables (must exist at completion)
+
+tests/perf/reports/ecosystem_slo_matrix.md
+tests/perf/reports/baseline_results.json
+tests/perf/reports/a8_second_confirmation.md
+tests/perf/reports/a3_resiliency_report.md
+tests/perf/reports/b2c_funnel_results.json
+tests/perf/reports/b2b_funnel_results.json
+tests/perf/reports/a8_data_lineage.md
+tests/perf/reports/error_correction_learning.md
+tests/perf/reports/rl_signal_path.md
+tests/perf/reports/hitl_approvals.log
+docs/runbooks/b2c_recovery.md
+docs/runbooks/b2b_recovery.md
+Completion criteria (must all be true)
+
+All smoke SLOs met across A1–A8 with P95 ≤150ms and error rate <1% using dual-source evidence.
+B2C and B2B funnels function E2E at or above targets; events visible in A8 <60s; per-hop P95 ≤150ms; no duplicate effects under retries.
+Finance lineage confirms 3% provider fee and 4x AI markup on sampled transactions.
+RL and error-correction learning paths verified and documented; HITL approvals logged.
+A8-PERF-001 caching fix implemented or approved with measurable P95 reduction.
+a8_second_confirmation.md states PASS with links to all artifacts and trace_ids.
+Execution notes
+
+If k6 is unavailable, run curl-based baselines and still generate k6 scripts for later execution.
+For each remediation, open a PR named fix/<area>_<issue>, attach evidence, and request HITL approval where required.
+Always attach dual evidence (probe + A8 or transaction log) for any PASS.
