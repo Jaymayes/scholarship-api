@@ -235,12 +235,30 @@ async def telemetry_ingest(
             "accepted_headers": ["x-scholar-protocol", "X-Protocol-Version"]
         })
     
+    trace_id = (
+        request.headers.get("x-trace-id") or
+        request.headers.get("X-Trace-Id") or
+        request.headers.get("X-Request-Id") or
+        request.headers.get("x-request-id") or
+        ""
+    )
+    
     if not idempotency_key:
-        logger.warning(f"REPORT: app=scholarship_api | env=prod | v3.3.1 INGEST: Rejected - Missing idempotency key")
-        return JSONResponse(status_code=400, content={
-            "error": "Missing idempotency key",
-            "detail": "x-event-id or X-Idempotency-Key header is required",
-            "accepted_headers": ["x-event-id", "X-Idempotency-Key"]
+        logger.warning(f"REPORT: app=scholarship_api | env=prod | v3.5.1 INGEST: Rejected - Missing X-Idempotency-Key (HTTP 428)")
+        return JSONResponse(status_code=428, content={
+            "error": "Precondition Required",
+            "detail": "X-Idempotency-Key or x-event-id header is required for mutable operations",
+            "accepted_headers": ["X-Idempotency-Key", "x-event-id"],
+            "directive": "AGENT3_HANDSHAKE_v27"
+        })
+    
+    if not trace_id:
+        logger.warning(f"REPORT: app=scholarship_api | env=prod | v3.5.1 INGEST: Rejected - Missing X-Trace-Id (HTTP 428)")
+        return JSONResponse(status_code=428, content={
+            "error": "Precondition Required",
+            "detail": "X-Trace-Id or X-Request-Id header is required for mutable operations",
+            "accepted_headers": ["X-Trace-Id", "X-Request-Id"],
+            "directive": "AGENT3_HANDSHAKE_v27"
         })
     
     try:
@@ -493,9 +511,47 @@ async def write_events(
     - Validates app_base_url presence (logs warning if missing)
     - REPORT: prefix on all log lines
     
+    v3.5.1 Hardening (AGENT3_HANDSHAKE v27):
+    - Requires X-Idempotency-Key header (HTTP 428 if missing)
+    - Requires X-Trace-Id header (HTTP 428 if missing)
+    
     Accepts batches of events from any ecosystem app and persists to business_events table.
     S2S Auth: Bearer token from scholar_auth JWKS OR service-to-service token.
     """
+    idempotency_key = (
+        request.headers.get("X-Idempotency-Key") or
+        request.headers.get("x-idempotency-key") or
+        request.headers.get("x-event-id") or
+        request.headers.get("X-Event-Id") or
+        ""
+    )
+    
+    trace_id = (
+        request.headers.get("X-Trace-Id") or
+        request.headers.get("x-trace-id") or
+        request.headers.get("X-Request-Id") or
+        request.headers.get("x-request-id") or
+        ""
+    )
+    
+    if not idempotency_key:
+        logger.warning(f"REPORT: app=scholarship_api | v3.5.1 EVENTS: Rejected - Missing X-Idempotency-Key (HTTP 428)")
+        return JSONResponse(status_code=428, content={
+            "error": "Precondition Required",
+            "detail": "X-Idempotency-Key header is required for mutable operations",
+            "accepted_headers": ["X-Idempotency-Key", "x-event-id"],
+            "directive": "AGENT3_HANDSHAKE_v27"
+        })
+    
+    if not trace_id:
+        logger.warning(f"REPORT: app=scholarship_api | v3.5.1 EVENTS: Rejected - Missing X-Trace-Id (HTTP 428)")
+        return JSONResponse(status_code=428, content={
+            "error": "Precondition Required",
+            "detail": "X-Trace-Id or X-Request-Id header is required for mutable operations",
+            "accepted_headers": ["X-Trace-Id", "X-Request-Id"],
+            "directive": "AGENT3_HANDSHAKE_v27"
+        })
+    
     accepted = 0
     failed = 0
     duplicates = 0
