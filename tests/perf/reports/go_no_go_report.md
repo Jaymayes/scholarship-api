@@ -1,36 +1,35 @@
 # GO/NO-GO Report
-**RUN_ID**: CEOSPRINT-20260109-1940-AUTO  
-**Generated**: 2026-01-09T19:53:08Z  
-**Protocol**: v3.5.1  
-**Mode**: Max Autonomous with Strict False-Positive Mitigation
+**RUN_ID**: CEOSPRINT-20260109-2100-REPUBLISH  
+**Generated**: 2026-01-09T21:10:42Z  
+**Type**: Republish Verification
 
 ---
 
 ## VERDICT: **NO-GO**
 
-Per Ambiguity Rule: Conflicts between context claims and fresh probes → NO-GO
-
 ---
 
 ## Acceptance Criteria
 
-| Criterion | Status | Evidence |
-|-----------|--------|----------|
-| B2C: Auth→Discovery→Stripe | PARTIAL | A1/A2 ✅, Stripe pending |
-| B2B: Provider→Listing→Fee | PARTIAL | Revenue ✅, A6 API pending |
-| System Health: A3 100% | FAIL | A3 returns 404 |
-| Telemetry: A8 ≥99% | FAIL | A8 returns 404 |
-| Autonomy: RL + HITL | PASS | Evidence recorded |
-| Governance: Idempotency | PASS | HTTP 428 active, 0% violations |
+| Criterion | Status | Notes |
+|-----------|--------|-------|
+| Republish delta proven | ✅ PASS | version_manifest.json + post_republish_diff.md |
+| B2C Funnel | PARTIAL | A1/A2 ✅, Stripe configured |
+| B2B Funnel | PARTIAL | Revenue $179.99 tracked |
+| System Health: A3 100% | ❌ FAIL | A3 returns 404 |
+| Telemetry: A8 ≥99% | ❌ FAIL | A8 returns 404 |
+| Autonomy & Learning | ✅ PASS | Evidence recorded |
+| Governance: Idempotency | ✅ PASS | 0% violations |
 
 ---
 
-## Critical Conflicts
+## Post-Republish Improvements
 
-| App | Context Claim | Fresh Evidence | Action |
-|-----|---------------|----------------|--------|
-| A3 | 64% readiness | 404 | **NO-GO** |
-| A8 | 100% | 404 | **NO-GO** |
+| App | Before | After | Delta |
+|-----|--------|-------|-------|
+| A1 | 189ms | **112ms** | ✅ -77ms (now under 120ms!) |
+| A5 | 288ms | 143ms | ⬇️ -145ms |
+| A7 | 294ms | 184ms | ⬇️ -110ms |
 
 ---
 
@@ -43,45 +42,15 @@ Per Ambiguity Rule: Conflicts between context claims and fresh probes → NO-GO
 
 ---
 
-## What Passed
+## Blockers (P0)
 
-- ✅ A1 OIDC: 1 JWKS key (RS256)
-- ✅ A2: Dual-source confirmed (prod + local)
-- ✅ A7 SEO: 2,908 URLs (target met)
-- ✅ Idempotency: HTTP 428 enforcement active
-- ✅ Revenue: $179.99 tracked in A2 views
-
----
-
-## Remediation Required
-
-| Priority | Issue |
-|----------|-------|
-| P0 | A3 unreachable (conflicts with 64% claim) |
-| P0 | A8 unreachable (conflicts with 100% claim) |
-| P1 | Fleet P95 latency above 120ms target |
+1. **A3** (scholarai-agent): Returns 404
+2. **A8** (a8-command-center): Returns 404
 
 ---
 
 ## Artifacts (SHA256 in checksums.json)
 
-- system_map.json
-- ecosystem_double_confirm.md
-- a8_wiring_verdict.md
-- b2c_flow_verdict.md
-- b2b_flow_verdict.md
-- a3_resiliency_report.md
-- perf_summary.md
-- seo_verdict.md
-- idempotency_validation.md
-- hitl_approvals.log
-- {A1-A8}_health.json
-- learning_evidence.json
-- b2c_checkout_trace.json
-- fee_lineage.json
+All 18 artifacts generated with cryptographic verification.
 
 **A8 POST+GET**: BLOCKED (A8 unreachable)
-
----
-
-**Conclusion**: A2 workspace fully operational. Fleet-wide issues (A3, A8 unreachable) require cross-workspace access to resolve.

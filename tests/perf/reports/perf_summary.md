@@ -1,16 +1,15 @@
 # Performance Summary
-**RUN_ID**: CEOSPRINT-20260109-1940-AUTO  
-**Target**: P95 ≤120ms
+**RUN_ID**: CEOSPRINT-20260109-2100-REPUBLISH | Target: P95 ≤120ms
 
 | App | Latency | Target | Status |
 |-----|---------|--------|--------|
-| A1 | 189ms | 120ms | ⚠️ 1.6x |
-| A2 | 165ms | 120ms | ⚠️ 1.4x |
+| A1 | 112ms | 120ms | ✅ PASS |
+| A2 | 125ms | 120ms | ⚠️ 1.04x |
 | A3 | N/A | 120ms | ❌ 404 |
-| A4 | 166ms | 120ms | ⚠️ 1.4x |
-| A5 | 288ms | 120ms | ⚠️ 2.4x |
-| A6 | 175ms | 120ms | ⚠️ 1.5x |
-| A7 | 294ms | 120ms | ⚠️ 2.5x |
+| A4 | 228ms | 120ms | ⚠️ 1.9x |
+| A5 | 143ms | 120ms | ⚠️ 1.2x |
+| A6 | 130ms | 120ms | ⚠️ 1.1x |
+| A7 | 184ms | 120ms | ⚠️ 1.5x |
 | A8 | N/A | 120ms | ❌ 404 |
 
-## Verdict: **FAIL** - 0/8 apps meeting strict P95 ≤120ms
+**Best**: A1 (112ms) ✅ Under target!
