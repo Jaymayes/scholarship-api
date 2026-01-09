@@ -1,5 +1,5 @@
 # Idempotency Validation Report - A2
-**Generated**: 2026-01-09T09:45:00Z  
+**Generated**: 2026-01-09T09:50:00Z  
 **Protocol**: v3.5.1  
 **Directive**: AGENT3_HANDSHAKE v27
 
@@ -19,20 +19,22 @@ Per CEO JSON directive, idempotency enforcement is **non-negotiable**:
 | /api/telemetry/ingest | ✅ Required (428) | ✅ Required (428) | ACTIVE |
 | /api/analytics/events | ✅ Required (428) | ✅ Required (428) | ACTIVE |
 | /api/events | ✅ Required (428) | ✅ Required (428) | ACTIVE |
+| /api/analytics/events/raw | ✅ Required (428) | ✅ Required (428) | ACTIVE |
 
 ### Test Results
 
 ```
-Test 1: Missing both headers
-Result: HTTP 428 - Precondition Required
-Response: {"error":"Precondition Required","directive":"AGENT3_HANDSHAKE_v27"}
+Test 1: /api/telemetry/ingest - Missing headers
+Result: HTTP 428 - Precondition Required ✅
 
-Test 2: X-Idempotency-Key only (missing X-Trace-Id)
-Result: HTTP 428 - Precondition Required
-Response: {"error":"Precondition Required","detail":"X-Trace-Id required"}
+Test 2: /api/telemetry/ingest - With both headers
+Result: HTTP 200 - Success ✅
 
-Test 3: Both headers present
-Result: HTTP 200 - Success
+Test 3: /api/analytics/events/raw - Missing headers
+Result: HTTP 428 - Precondition Required ✅
+
+Test 4: /api/analytics/events/raw - With both headers
+Result: HTTP 200 - Success ✅
 ```
 
 ### Dedupe Configuration
@@ -60,6 +62,7 @@ Result: HTTP 200 - Success
 | 15-min dedupe window | Yes | Configured | ✅ |
 | Tenant scoping | Yes | DB table available | ✅ |
 | Synthetic identity tagging | Yes | test_run=true support | ✅ |
+| All mutable ops covered | Yes | 4 endpoints | ✅ |
 
 ## Verdict
 
@@ -70,5 +73,12 @@ All mutable telemetry endpoints now enforce:
 - X-Trace-Id header (HTTP 428 if missing)
 - 15-minute dedupe window via PostgreSQL ON CONFLICT
 
+Covered endpoints:
+1. /api/telemetry/ingest
+2. /api/analytics/events
+3. /api/events
+4. /api/analytics/events/raw
+
 ---
 **Test Evidence**: Validated via curl tests 2026-01-09
+**Architect Review**: PASS

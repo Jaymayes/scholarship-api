@@ -396,7 +396,45 @@ async def write_events_raw(
     
     Accepts ANY JSON payload and attempts to normalize it to the expected schema.
     Logs the raw body for debugging satellite format issues.
+    
+    v3.5.1 Hardening (AGENT3_HANDSHAKE v27):
+    - Requires X-Idempotency-Key header (HTTP 428 if missing)
+    - Requires X-Trace-Id header (HTTP 428 if missing)
     """
+    idempotency_key = (
+        request.headers.get("X-Idempotency-Key") or
+        request.headers.get("x-idempotency-key") or
+        request.headers.get("x-event-id") or
+        request.headers.get("X-Event-Id") or
+        ""
+    )
+    
+    trace_id = (
+        request.headers.get("X-Trace-Id") or
+        request.headers.get("x-trace-id") or
+        request.headers.get("X-Request-Id") or
+        request.headers.get("x-request-id") or
+        ""
+    )
+    
+    if not idempotency_key:
+        logger.warning(f"REPORT: app=scholarship_api | v3.5.1 RAW: Rejected - Missing X-Idempotency-Key (HTTP 428)")
+        return JSONResponse(status_code=428, content={
+            "error": "Precondition Required",
+            "detail": "X-Idempotency-Key header is required for mutable operations",
+            "accepted_headers": ["X-Idempotency-Key", "x-event-id"],
+            "directive": "AGENT3_HANDSHAKE_v27"
+        })
+    
+    if not trace_id:
+        logger.warning(f"REPORT: app=scholarship_api | v3.5.1 RAW: Rejected - Missing X-Trace-Id (HTTP 428)")
+        return JSONResponse(status_code=428, content={
+            "error": "Precondition Required",
+            "detail": "X-Trace-Id or X-Request-Id header is required for mutable operations",
+            "accepted_headers": ["X-Trace-Id", "X-Request-Id"],
+            "directive": "AGENT3_HANDSHAKE_v27"
+        })
+    
     try:
         raw_body = await request.body()
         body_str = raw_body.decode('utf-8')
