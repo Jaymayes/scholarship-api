@@ -1,0 +1,78 @@
+{
+  "collected_at": "2026-01-09T18:35:00Z",
+  "sprint": "60-minute Max Autonomous",
+  "phase": "9",
+  "learning_type": "fleet_health_assessment",
+  "policy_deltas": [
+    {
+      "policy": "idempotency_enforcement",
+      "before": "optional_headers",
+      "after": "strict_428_enforcement",
+      "affected_endpoints": 4,
+      "rollout_phase": "5%_canary"
+    },
+    {
+      "policy": "telemetry_routing",
+      "before": "primary_a8",
+      "after": "fallback_a2_sink",
+      "reason": "A8 unreachable (404)",
+      "temporary": true
+    }
+  ],
+  "parameter_updates": [
+    {
+      "parameter": "p95_target_ms",
+      "value": 120,
+      "apps_meeting": 0,
+      "apps_within_2x": 4
+    },
+    {
+      "parameter": "fleet_health_threshold",
+      "value": "99%",
+      "current": "50%",
+      "gap": "49%"
+    }
+  ],
+  "reward_signals": [
+    {
+      "signal": "health_probe_success",
+      "value": 0.5,
+      "evidence": "4/8 apps healthy"
+    },
+    {
+      "signal": "idempotency_compliance",
+      "value": 1.0,
+      "evidence": "A2 fully compliant"
+    },
+    {
+      "signal": "telemetry_persistence",
+      "value": 0.8,
+      "evidence": "A2 fallback operational, A8 down"
+    },
+    {
+      "signal": "b2c_flow_readiness",
+      "value": 0.7,
+      "evidence": "A1 OIDC working, Stripe configured"
+    },
+    {
+      "signal": "b2b_flow_readiness",
+      "value": 0.3,
+      "evidence": "A6 health OK but APIs 404"
+    }
+  ],
+  "rl_update": {
+    "type": "fleet_health_observation",
+    "observation_window_minutes": 60,
+    "actions_taken": 12,
+    "reward_total": 3.3,
+    "logged": true
+  },
+  "autonomous_operations": {
+    "manual_interventions": 0,
+    "hitl_elevations_requested": 3,
+    "flows_completed_autonomously": ["a2_health_verification", "idempotency_enforcement", "artifact_generation"],
+    "flows_blocked": ["a3_resiliency_test", "a8_telemetry_post", "b2b_provider_flow"]
+  },
+  "hitl_log_entries": 2,
+  "artifacts_generated": 14
+}
