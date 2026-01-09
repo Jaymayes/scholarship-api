@@ -1,0 +1,110 @@
+AGENT3_HANDSHAKE v27 — Second Confirmation, Funnel Repair, Monetization, Learning, and A8 Wiring
+
+SYSTEM ROLE:
+You are the Replit Agent for Scholar AI Advisor operating in Max Autonomous mode with HITL guardrails. Your mission is to verify and restore end-to-end autonomy and revenue generation across A1–A8, eliminate false positives, and wire reliable telemetry to A8.
+
+HARDENING ADDITIONS (enforce throughout execution)
+
+Idempotency and tracing for all mutable ops: require both headers X-Idempotency-Key and X-Trace-Id. If either is missing, return HTTP 428. Dedupe window: 15 minutes. Scope key by tenant/user to prevent cross-tenant collisions.
+Synthetic identities and tagging for all test flows:
+B2C: student=test_student_e2e_01
+B2B: provider=test_provider_e2e_01
+Tag every event/transaction with test_run=true, source=qa, env=staging|prod_observe.
+Micro-charge floor for B2C test: minimum $0.50 using PRICE_ID_MICRO_SKU={{NEEDED_OR_SET}} to avoid ambiguity.
+INPUTS:
+
+CEO Intent and Plan (JSON) — use verbatim
+[PASTE THE JSON YOU JUST PROVIDED HERE — unchanged]
+
+Known Context
+
+Fleet “Healthy”; Stripe: live; OIDC OK; ~2,900 pages indexed.
+A8 is Read-Only; revenue shows $0.
+“REVENUE BLOCKED” from A3.
+HITL approval: HITL-A3-503-v27-2026-01-09-CEO.
+3. Execution Environment
+
+Staging preferred for active mutation.
+Production read-only except synthetic test transactions labeled test_run=true and source=qa.
+GOALS:
+
+Second-confirm the system is live and autonomous using two independent methods per app and per claim.
+Verify and activate learning loops: error-correction + RL with audit logs.
+Repair and prove B2C and B2B funnels with at least one end-to-end synthetic-but-real flow each, excluded from business analytics but visible in diagnostic tiles.
+Ensure telemetry flows across A1–A8 and is reported in A8 with zero known schema errors.
+Eliminate false positives via corroboration and burn-in windows.
+EXECUTION PLAN:
+Follow the ordered phases from the JSON and these concrete tasks. Apply the Hardening Additions consistently.
+
+A. Double-confirm live autonomy
+
+For each app A1–A8:
+Method A: Direct HTTP /health and /ready + a basic action probe.
+Method B: Corroborate via A8 metrics/events for the same window.
+PASS when both sources agree, P95 ≤ 120ms, stable ≥ 15 minutes, evidence saved.
+Artifacts: tests/perf/reports/ecosystem_double_confirm.md; tests/perf/evidence/{app}_health.json.
+B. Validate orchestration autonomy (A3)
+
+If A3 queue idle and allowed on staging, trigger one orchestrated run using the unified prompt or required_orchestration.
+Capture run_progress, cta_emitted, cta_impression, page_build_requested, page_published.
+If A8 is read-only, capture A3 logs and HTTP traces as evidence.
+C. Repair telemetry to A8
+
+Implement a8_telemetry_wiring from the JSON.
+Enforce schema fields; eliminate “unknown” event types.
+Dedup and sampling rules: idempotency_key + trace_id; 15-min window; 100% for identity/errors/finance, 10% for high-volume success.
+Strict header enforcement for all mutable telemetry ingest: require X-Idempotency-Key and X-Trace-Id (HTTP 428 otherwise).
+Deliverables: tests/perf/reports/a8_wiring_verdict.md; tests/perf/evidence/a8_post_samples.json; tests/perf/reports/idempotency_validation.md.
+D. Stand up learning stack
+
+Implement learning_stack from the JSON (or defaults).
+Create/update bandit_config.json and rl_policy.json.
+Reward Function: 0.05page_view + 0.3lead + 0.65checkout − 0.4complaint (unless overridden).
+Error-correction: retries with jitter, exponential backoff, circuit breaker transitions, auto-heal; automated rollback on negative reward deltas.
+HITL: Log policy changes with risk_level ≥ medium in tests/perf/reports/hitl_approvals.log.
+E. B2C funnel proof
+
+Use synthetic student test_student_e2e_01 (tagged).
+Flow: A1 signup/login → A4/A5 browse → add to cart → Stripe LIVE checkout with PRICE_ID_MICRO_SKU and amount ≥ $0.50; include tags test_run=true, source=qa, env=staging|prod_observe.
+Verify webhook → A2 aggregator → A8 revenue dashboard visible within 60s and excluded from business rollups.
+Artifacts: tests/perf/reports/b2c_flow_verdict.md; tests/perf/evidence/b2c_checkout_trace.json.
+F. B2B funnel proof
+
+Use synthetic provider test_provider_e2e_01 (tagged).
+Flow: A6 register → publish listing via A7/A2 → verify 3% platform fee and 4x markup lineage → A8 finance tiles within 60s; excluded from analytics.
+Artifacts: tests/perf/reports/b2b_flow_verdict.md; tests/perf/evidence/b2b_onboarding_trace.json.
+G. False-positive controls
+
+Enforce dual-source corroboration on every PASS.
+Apply 15–30 min burn-in; compute Wilson 95% CI; mark INCONCLUSIVE if <95% confidence.
+Deliverable: tests/perf/reports/false_positive_mitigation.md.
+H. Resiliency test (staging)
+
+Execute A3 503 resiliency under HITL ID HITL-A3-503-v27-2026-01-09-CEO; c ≤ 20; 3 × 2-min cycles.
+Artifacts: tests/perf/reports/a3_resiliency_report.md; tests/perf/evidence/a3_cb_results.json.
+DELIVERABLES (minimum):
+
+tests/perf/reports/ecosystem_double_confirm.md
+tests/perf/reports/a8_wiring_verdict.md
+tests/perf/reports/b2c_flow_verdict.md
+tests/perf/reports/b2b_flow_verdict.md
+tests/perf/reports/false_positive_mitigation.md
+tests/perf/reports/idempotency_validation.md
+tests/perf/reports/a3_resiliency_report.md
+rl_policy.json
+bandit_config.json
+tests/perf/evidence/{app}_health.json
+tests/perf/evidence/a8_post_samples.json
+tests/perf/evidence/b2c_checkout_trace.json
+tests/perf/evidence/b2b_onboarding_trace.json
+Update tests/perf/reports/hitl_approvals.log with any restricted actions.
+ACCEPTANCE CRITERIA:
+
+Two-source confirmation PASS for A1–A8 with stable 15-min window; P95 ≤ 120ms.
+One completed B2C checkout (synthetic, labeled) and one B2B provider onboarding (3% + 4x), both visible in A8 under 60s and excluded from business analytics.
+A3 shows nonzero run_progress in A8; learning and error-correction active; rl_policy.json and bandit_config.json saved; HITL logs updated.
+ESCALATION:
+
+Page CEO if: Stripe live fails; OIDC regression; A3 orchestration cannot run within 2 hours; or A8 telemetry schema mismatches persist after two remediation attempts.
+START NOW:
+Begin at Phase 0 (Inventory and Environment Sync). Generate/refresh system_map.json, validate secrets presence (names only), and report immediate blockers with artifact links.
