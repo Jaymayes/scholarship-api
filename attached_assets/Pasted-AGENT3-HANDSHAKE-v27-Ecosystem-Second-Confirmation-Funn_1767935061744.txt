@@ -1,0 +1,122 @@
+AGENT3_HANDSHAKE v27 — Ecosystem Second Confirmation, Funnel Repair, Monetization & Growth Readiness
+
+Role and mode
+
+You orchestrate the A1–A8 ecosystem under A8 leadership.
+Mode: Max Autonomous. Enforce HITL gates for c>60 VUs, 503 injection, production writes, OIDC cookie policy changes, and secret rotation.
+Production is Read-Only unless explicitly approved.
+Mission outcomes
+
+Deliver authoritative second confirmation of liveness, autonomy, compliance (error-correction learning, reinforcement learning, HITL).
+Diagnose and repair BOTH funnels (B2C and B2B) and restore monetization.
+Eliminate false positives via dual-source verification and transaction-level cross-checks.
+Achieve 100% telemetry completeness and finance lineage (3% provider fee + 4x markup) into A8.
+Global SLOs and stop conditions
+
+Targets: P95 ≤150ms (goal ~120ms), error rate <1%, uptime 99.9%, telemetry arrival to A8 ≤60s.
+Stop immediately if: error_rate ≥1% for 5m; A1 or A2 P95 >200ms sustained; A8 telemetry missing >60s for executed tests; any compliance breach; any restricted action without HITL approval.
+Execute phases in order; mark PASS/FAIL; attach evidence
+
+Phase 0 — Inventory and Environment Sync
+Generate system_map.json (A1–A8 routes, owners, SLOs).
+Verify/create k6 scripts A1–A8; Playwright B2C; k6 B2B.
+Validate secrets/env (OIDC; STRIPE_PUBLISHABLE_KEY, STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET; A8 keys).
+Artifact: tests/perf/reports/ecosystem_inventory.md
+Phase 1 — Smoke and Health (dual-source)
+Probe /health and /ready across A1–A8; capture P50/P95 and error rate.
+Verify circuit breakers: Email, S2S Auth, Auto Com Center, Scholarship API.
+Validate JWKS/redirect configuration; document any backoff as non-blocking.
+Dual-source each PASS with A8 tiles or transactional logs; reconcile stale snapshots.
+Artifacts: tests/perf/reports/baseline_results.json; tests/perf/reports/ecosystem_slo_matrix.md
+Phase 2 — Baseline Load (c ≤20; HITL for c>60)
+Validate:
+A1: OIDC flow 10/10; per-hop P95 ≤150ms; produce auth_trace_log.json.
+A2: Ingest P95 ≤125ms single, ≤200ms batch; 100% persistence; v3.5.1 headers.
+A3: Orchestration idempotency; retries with jitter; no duplicate effects; autonomy clock toward >200 min.
+A4: /chat/completions c=15; error <1%.
+A6: /register and /api/billing confirm provider_fee_pct=3, ai_markup_factor=4.0; lineage A6→A8 visible; optimize P95 from ~160ms to ≤150ms (warmers/keep-alives/pool tuning).
+A7: Core routes P95 ≤150ms; sitemap excluded by tag.
+A8: Warm dashboard; flag endpoints >300ms; propose caching/CDN for A8-PERF-001 with expected P95 reduction.
+Artifact: tests/perf/reports/a8_baseline_load.md (+ per-app latency JSONs)
+Phase 3 — E2E Funnel Diagnostics and Repair (priority)
+B2C: A7 → A1 → A5 → A3 → A2 → A8
+Run tests/perf/playwright/b2c_funnel.spec.ts with shared trace_id; capture HAR/logs on failure.
+Remediate A1-001: SameSite=None; Secure; TTL/domain alignment; fix JWKS/redirects; PR fix/oidc-cookies; request HITL; redeploy staging; re-run.
+Validate A3 attribution mapping; align A2/A8 telemetry; Growth tile must update <60s.
+Acceptance: signup success ≥ 90% (smoke); per-hop P95 ≤150ms; no session loops; events in A8 <60s.
+Artifacts: tests/perf/reports/b2c_funnel_results.json; docs/runbooks/b2c_recovery.md; auth_trace_log.json.
+B2B: A7 → A6 → A8
+Run tests/perf/k6/a6_register_billing.js; confirm /register 200; P95 ≤150ms; validate 3% + 4.0x in logs and A8 finance tile.
+Add warmers/keep-alives/connection pooling if >150ms persists; wire A8 tiles to correct finance payload keys.
+Implement provider listing creation flow; verify listing creation rate ≥ target.
+Artifacts: tests/perf/reports/b2b_funnel_results.json; docs/runbooks/b2b_recovery.md; billing_logic_verification.md.
+Cross-funnel: tests/perf/reports/fix_forward_proposals.md (diffs, owners, ETAs, rollback plan).
+Phase 4 — Monetization Readiness (B2C checkout)
+Implement/verify pricing page with working plan buttons and Stripe test-mode checkout (non-dry-run).
+Ensure STRIPE_PUBLISHABLE_KEY/STRIPE_SECRET_KEY/WEBHOOK set; validate webhooks.
+Confirm credit ledger updates on purchase; emit revenue_event_id with provider_fee_pct and ai_markup_factor where applicable.
+Artifacts: tests/perf/reports/b2c_checkout_results.json; tests/perf/reports/a8_data_lineage.md
+Phase 5 — Activation and Growth Hygiene
+Activation/onboarding: Add guided first AI action to reach TTFV; emit credit_decrement events.
+Acceptance: TTFV < 5 min (smoke); Outcomes tile shows first-use events.
+Artifact: tests/perf/reports/activation_results.json
+SEO/Growth hygiene: Fix canonical URL; remove unintended noindex; add OG images; ensure sitemap and GA configured; verify business_metrics (ctr, signup_rate, checkout_conv_rate, ttfv_min) arrive in A8 ≤60s.
+Artifacts: growth_hygiene_checklist.md; tests/perf/reports/growth_validation.json
+Phase 6 — Learning, autonomy, and safety confirmations
+Error-correction learning: verify retries/backoff and circuit breaker transitions; document auto-heal.
+Reinforcement learning: document RL signal path (A3/A4) with proxies (CTR, funnel completion, complaint penalty), thresholds, rollback levers.
+HITL: log approvals for c>60 VUs, 503 injection, production writes, OIDC cookie policy changes, secret rotation.
+Artifacts: tests/perf/reports/error_correction_learning.md; tests/perf/reports/rl_signal_path.md; tests/perf/reports/hitl_approvals.log
+Phase 7 — Resiliency (HITL required)
+Inject 503 on A3; validate breaker transitions Closed→Open→Half-Open→Closed; confirm post-recovery error_rate <1%; document auto-heal evidence.
+Artifact: tests/perf/reports/a3_resiliency_report.md
+Telemetry schema (enforce; route to A8)
+
+Required fields: timestamp, app_id, route, method, status, p50_ms, p95_ms, error_rate_pct, uptime_sec, circuit_breaker_state, trace_id, idempotency_key, finance_metrics.provider_fee_pct, finance_metrics.ai_markup_factor, revenue_event_id, business_metrics.ctr, business_metrics.signup_rate, business_metrics.checkout_conv_rate, business_metrics.ttfv_min
+Arrival SLA to A8 dashboards/lineage: ≤60 seconds.
+A8 dashboard requirements
+
+SLO matrix across A1–A8.
+Live B2C and B2B funnel status with trace_id drill-down.
+Revenue lineage proving 3% provider fee and 4x markup.
+Activation (TTFV) and checkout conversion tiles.
+Incident list with RCA hypotheses and fix-forward status.
+HITL approval logs.
+False-positive mitigation
+
+Require dual-source evidence (service probe + A8 tile or transaction log) for any PASS.
+Enforce A3 idempotency; confirm no duplicate effects under retries.
+Cross-check telemetry vs transaction logs; reconcile stale snapshots; quarantine single-source anomalies and re-test.
+Risk and governance
+
+Stop conditions (immediate): error_rate ≥1% for 5m; A1/A2 P95 >200ms sustained; A8 telemetry missing >60s for executed tests; compliance breach; restricted action without HITL approval.
+HITL approvals required: c>60 VUs; 503 injection; production writes; OIDC cookie policy changes; secret rotation.
+Security/privacy: FERPA, COPPA, PII minimization, no academic dishonesty.
+Deliverables (must exist at completion)
+
+tests/perf/reports/ecosystem_slo_matrix.md
+tests/perf/reports/baseline_results.json
+tests/perf/reports/a8_baseline_load.md
+tests/perf/reports/a8_second_confirmation.md
+tests/perf/reports/a3_resiliency_report.md
+tests/perf/reports/b2c_funnel_results.json
+tests/perf/reports/b2b_funnel_results.json
+tests/perf/reports/b2c_checkout_results.json
+tests/perf/reports/activation_results.json
+tests/perf/reports/a8_data_lineage.md
+tests/perf/reports/error_correction_learning.md
+tests/perf/reports/rl_signal_path.md
+tests/perf/reports/hitl_approvals.log
+docs/runbooks/b2c_recovery.md
+docs/runbooks/b2b_recovery.md
+growth_hygiene_checklist.md
+tests/perf/reports/fix_forward_proposals.md
+Completion criteria (all must be true)
+
+All smoke SLOs pass (P95 ≤150ms) with error rate <1% and dual-source evidence across A1–A8.
+B2C and B2B funnels function end-to-end at or above targets; events visible in A8 <60s; per-hop P95 ≤150ms; no duplicate effects under retries.
+Checkout conversion (test mode) meets target; credit ledger updates; A8 revenue lineage confirms 3% + 4x on sample transactions.
+TTFV < 5 minutes with documented onboarding path and A8 Outcomes evidence.
+RL and error-correction learning verified and documented; HITL approvals logged.
+A8-PERF-001 caching fix implemented or approved with measurable P95 reduction.
+a8_second_confirmation.md states PASS with links to artifacts and trace_ids.
