@@ -1,0 +1,50 @@
+Executive decision: Proceed with Phase 0 in staging, production remains read-only. HITL approvals and gates stand as defined. The 503 resiliency test is authorized for A3 in staging only under ID HITL-A3-503-v27-2026-01-09-CEO, c ≤ 20, three 2-minute cycles.
+
+Phase 0 status from available assets
+
+Finding: I do not yet have access to the A1–A8 codebases or their file trees. The only materials visible in this workspace are deployment/architecture guidance documents; no application repositories, test directories, or environment files are present here to scan. This prevents a direct file-structure inventory today.
+Compliance with our HITL/controls and secrets posture aligns with the uploaded guidance: maintain human-in-the-loop guardrails and secure secrets via environment-scoped vaults rather than code, which is consistent with our operating model and risk controls .
+What I need now to complete Phase 0
+Please provide or grant access (links or invite) to:
+
+Repos for A1–A8 (read for prod, write for staging), or a monorepo path map.
+Staging endpoints for A1–A8 and the expected /health and /ready routes.
+Current secrets manifest for staging (names only), including OIDC, Stripe (publishable, secret, webhook), and A8 ingest keys. No secret values should live in code; they must be in the platform’s secrets store per our policy .
+Any existing tests under tests/perf (k6 scripts, Playwright specs) if already present.
+A8 dashboard URL plus tile IDs or API endpoints for telemetry verification.
+Current Phase 0 artifacts if any exist (system_map.json, ecosystem_inventory.md) to avoid duplication.
+Agent execution orders for Phase 0 (staging only)
+
+Inventory
+Walk each repo (A1–A8) and emit system_map.json summarizing routes, owners, SLOs, dependencies.
+List existing performance and E2E tests; if missing, scaffold:
+k6: A1–A8 smoke and A6 /register + /api/billing.
+Playwright: B2C funnel trace.
+Produce tests/perf/reports/ecosystem_inventory.md capturing file paths, test coverage, and gaps.
+Secrets validation
+Enumerate required env keys by app and confirm presence in secrets manager: OIDC, Stripe live/test keys, webhooks, A8 ingest. No values to be printed; only key presence and scope per policy .
+Health baseline
+Probe /health and /ready dual-source (HTTP + A8 tiles) and capture p50/p95 and error rate.
+Document circuit breaker endpoints discovered (Email, S2S Auth, Auto Com Center, Scholarship API).
+Stop conditions and gates
+Stop if error_rate ≥1% over 5 minutes, if A1 or A2 p95 >200ms sustained, or if A8 telemetry missing >60s for executed probes. Maintain HITL for c>60, production writes, OIDC cookie policy changes, and secret rotation, consistent with our HITL doctrine .
+Artifacts the agent must produce in Phase 0
+
+system_map.json
+tests/perf/reports/ecosystem_inventory.md
+tests/perf/reports/baseline_results.json
+tests/perf/reports/ecosystem_slo_matrix.md
+Risk, governance, and compliance posture
+
+HITL: Enforced for restricted actions; approvals logged to tests/perf/reports/hitl_approvals.log.
+Secrets: Verified via platform secrets; never committed to code; this aligns with our standard and the provided deployment checklist .
+Autonomy and resiliency patterns: Retries with backoff and breaker transitions are required patterns and will be verified in later phases; this is consistent with the phased approach and resiliency expectations outlined in the uploaded guidance .
+Timing and next checkpoint
+
+Once repo access and endpoints are provided, I expect Phase 0 inventory and baselines within one working session (≈2–4 hours), with a CEO review checkpoint immediately after artifact delivery.
+Action request to the team
+
+Share A1–A8 repo links (staging + prod) and staging endpoints.
+Confirm where you want the agent to run (Replit org/workspace) and grant access.
+Provide the A8 dashboard link and tile identifiers for telemetry cross-checks.
+I’ll authorize the agent to start the Phase 0 run the moment those access prerequisites are met, and I will hold the team to the artifacts and stop conditions above.
