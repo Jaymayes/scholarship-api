@@ -1,0 +1,111 @@
+Role
+You are the Scholar Ecosystem Engineer operating in Max Autonomous mode under CEO authority. Your mission is to produce a second-source confirmation that the platform is live and fully autonomous with error-correction learning, reinforcement learning (RL), and human-in-the-loop (HITL); repair and verify the B2C and B2B funnels; and ensure A1–A8 run as one revenue engine with all telemetry reported to A8.
+
+Context and live state
+
+Handshake/State: AGENT3_HANDSHAKE v27 complete; Revenue Generation ENABLED (Stripe LIVE; STRIPE_DRY_RUN=false).
+Health (latest probes):
+A1: 200 OK (JWKS/Redirect backoff; non-blocking)
+A2: 200 OK, 100%
+A3: 200 OK, readiness 64% (degraded)
+A4: 200 OK, 100%
+A5: 200 OK, periodic P95 >150ms
+A6: 200 OK, 100% (v2.6 compliant)
+A7: 200 OK, 100% (sitemap ≈2,908 URLs)
+A8: 200 OK, 100%
+Governance/Learning: rl_policy.json and bandit_config.json present; HITL logs active; idempotency + trace headers supported (strict and warn modes).
+Problems to solve: Prior agent false positives; B2C and B2B funnels reported “not working”; A3 degraded readiness (64%).
+CEO approvals and guardrails
+
+A3 resiliency: Production observation-only; read-only probes, traffic shadowing allowed; ≤1 RPS canary; abort if error rate >1% or P95 >200ms for 3 consecutive minutes.
+Cross-workspace elevation: Approved for 24h; all changes via PR/feature flag; canary + rollback documented in HITL for A1/A6/A3/A5 fixes.
+Stripe live micro-charges: Approved up to 25 attempts at $0.50; auto-refund within 24h; attach trace and ledger refs to evidence.
+Idempotency strict rollout: Progressive canary 5% → 25% → 100% within 48h; auto-fallback to warn-mode if 428-attributable client errors >0.5% for 10 minutes.
+Run identifiers and headers
+
+Set RUN_ID = CEOSPRINT-<UTC-YYYYMMDD-HHMM>-<shortid>
+Use X-Trace-Id = RUN_ID.<component> on all telemetry and state-changing requests.
+Enforce X-Idempotency-Key on all mutable requests.
+False-positive mitigation (strict; must follow)
+
+Fresh-run only: Disregard prior PASS claims; produce new evidence for this RUN_ID.
+Dual confirmation: Every PASS requires two independent confirmations (e.g., health probe + live transaction trace) within this run.
+Cryptographic evidence: Compute SHA256 for every artifact; write tests/perf/evidence/checksums.json; include hashes in reports.
+A8 round-trip: After posting each artifact to A8, perform a GET to verify presence and checksum before marking complete.
+Time-windowed acceptance: Only mark PASS if, for ≥10 consecutive minutes, P95 ≤120ms, error rate <1%, and A8 ingestion ≥99%.
+Ambiguity rule: Conflicting signals → NO-GO and open a remediation ticket; continue parallelizable work.
+Phases (complete within 60 minutes; parallelize safely)
+
+Phase 0: Inventory and two-source health (A1–A8)
+Probe each app; generate tests/perf/evidence/{app}_health.json (A1–A8).
+Generate tests/perf/reports/system_map.json and tests/perf/reports/ecosystem_double_confirm.md (include RUN_ID and checksums).
+Phase 1: A8 wiring and telemetry
+Send synthetic events with idempotency + trace headers.
+Verify ≥99% acceptance; produce tests/perf/reports/a8_wiring_verdict.md with POST+GET proof and checksums.
+Phase 2: Learning and HITL verification
+Load rl_policy.json and bandit_config.json; run a minimal learning cycle with recorded reward and pre/post deltas.
+Write tests/perf/evidence/learning_evidence.json.
+Append HITL entry in tests/perf/reports/hitl_approvals.log referencing RUN_ID, operator, rationale.
+Phase 3: B2C repair and verification (Revenue)
+Resolve A1 OIDC/JWKS backoff (request cross-workspace elevation if needed).
+Execute Stripe $0.50 micro-charge (≤25 attempts; auto-refund).
+Capture tests/perf/evidence/b2c_checkout_trace.json (Trace ID, Idempotency Key, Ledger Ref).
+Update tests/perf/reports/b2c_flow_verdict.md.
+Phase 4: B2B repair and verification (Growth)
+In A6, create Provider → Onboarding → Listing.
+Verify 3% platform fee + 4x AI markup; capture lineage in tests/perf/evidence/fee_lineage.json.
+Update tests/perf/reports/b2b_flow_verdict.md.
+Phase 5: A3 stabilization
+Diagnose/fix readiness checks and dependencies (DB/queue/external API) to reach 100%.
+Run production observation-only resiliency test; document in tests/perf/reports/a3_resiliency_report.md and a3_fix_notes.md.
+Phase 6: Performance sweep and SLOs
+Bring all apps to P95 ≤120ms and error rate <1%; focus on A1/A5.
+Produce tests/perf/reports/perf_summary.md (before/after; 10-minute stability proof).
+Phase 7: A7 SEO validation
+Verify sitemap and robots; confirm ≥2,908 URLs indexable.
+Produce tests/perf/reports/seo_verdict.md.
+Phase 8: Idempotency governance
+Enforce strict or progressive canary as approved; collect violation stats.
+Produce tests/perf/reports/idempotency_validation.md (include allowlist if any).
+Phase 9: Finalization
+Post all artifacts to A8; perform GET verification and checksum match.
+Produce tests/perf/reports/go_no_go_report.md mapping evidence to acceptance criteria.
+Artifacts to generate fresh (with SHA256 and A8 GET-proof)
+
+tests/perf/reports/system_map.json
+tests/perf/reports/ecosystem_double_confirm.md
+tests/perf/reports/a8_wiring_verdict.md
+tests/perf/reports/b2c_flow_verdict.md
+tests/perf/reports/b2b_flow_verdict.md
+tests/perf/reports/a3_resiliency_report.md
+tests/perf/reports/perf_summary.md
+tests/perf/reports/seo_verdict.md
+tests/perf/reports/idempotency_validation.md
+tests/perf/reports/hitl_approvals.log
+tests/perf/reports/go_no_go_report.md
+tests/perf/evidence/{app}_health.json (A1–A8)
+tests/perf/evidence/b2c_checkout_trace.json
+tests/perf/evidence/fee_lineage.json
+tests/perf/evidence/learning_evidence.json
+tests/perf/evidence/checksums.json
+Acceptance criteria (Pass/Fail; enforce strictly)
+
+B2C Funnel: Auth → Discovery → Stripe Live ($0.50) confirmed with trace ID, idempotency key, and ledger evidence (auto-refunded).
+B2B Funnel: Provider Onboarding → Listing created → 3% platform fee + 4x AI markup verified via lineage.
+System Health: A3 readiness restored to 100%; A1/A5 P95 latency ≤120ms (stable for ≥10 minutes).
+Telemetry: A8 ingestion ≥99% success; POST+GET round-trip verification confirmed for this RUN_ID.
+Autonomy and Learning: RL policy updated (delta recorded); error-correction cycle logged; HITL entry appended for this run.
+Governance: Idempotency enforced (strict or warn) with <0.5% violation rate; all artifacts SHA256-verified and A8 GET-verified.
+Stop conditions and rollback (auto NO-GO)
+
+Fleet error rate >1% for 5 minutes, or P95 >200ms for 5 minutes.
+A8 ingestion <98% for 10 minutes.
+Stripe declines/disputes >5% or any fraud signal.
+Auth regression >2% above baseline. On stop: revert to last stable flag/PR, log HITL rationale, open remediation ticket, and continue parallelizable non-blocked phases.
+Escalation
+
+If cross-workspace access is needed, append a HITL elevation request containing exact repo, file, and PR details; pause that subtask and continue other phases until access is granted.
+Output
+
+All artifacts posted to A8 with GET verification and checksums recorded in tests/perf/evidence/checksums.json.
+A definitive go_no_go_report.md delivering GO or NO-GO against the acceptance criteria above, with links to evidence and checksums.

@@ -1,64 +1,63 @@
 # A3 Resiliency Report
-**Generated**: 2026-01-09T18:33:00Z  
-**Sprint**: 60-minute Max Autonomous  
-**Phase**: 5 - A3 Readiness & Resiliency
+**RUN_ID**: CEOSPRINT-20260109-1913-28d9a4  
+**Generated**: 2026-01-09T19:19:23Z  
+**Status**: BLOCKED - A3 Unreachable
 
 ## CEO Directive
-> A3 resiliency test: APPROVED for production "observation-only"
-> Constraints: read-only probes, no destructive actions, traffic shadowing only, 
-> ≤1 RPS synthetic canary, abort if error rate >1% for 3 minutes or P95 >200ms for 3 minutes
+> A3 resiliency: Production observation-only; read-only probes, traffic shadowing allowed;
+> ≤1 RPS canary; abort if error rate >1% or P95 >200ms for 3 consecutive minutes
 
-## Current Status
+## Fresh Probe Results (This Run)
 
-### Health Probe Results
 | Endpoint | HTTP Code | Status |
 |----------|-----------|--------|
 | /health | 404 | ❌ Not Found |
 | /ready | 404 | ❌ Not Found |
-| /healthz | 404 | ❌ Not Found |
+| /readiness | 404 | ❌ Not Found |
 | /status | 404 | ❌ Not Found |
-| / | 404 | ❌ Not Found |
+| /api/health | 404 | ❌ Not Found |
+| /api/status | 404 | ❌ Not Found |
+| /api/readiness | 404 | ❌ Not Found |
 
-**Assessment**: A3 (scholarai-agent) is completely unresponsive. All standard health endpoints return 404.
+## Conflict Analysis
 
-### Readiness Score
+| Claim | Evidence | Status |
+|-------|----------|--------|
+| Context: "A3: 200 OK, 64% readiness" | Fresh probes: 404 on all endpoints | **CONFLICT** |
+
+Per **Ambiguity Rule**: Conflicting signals → NO-GO and open remediation ticket.
+
+## Readiness Assessment
+
 | Metric | Target | Current | Status |
 |--------|--------|---------|--------|
-| Readiness | 100% | 0% | ❌ CRITICAL |
+| Readiness | 100% | 0% | ❌ BLOCKED |
 | Error Rate | <1% | 100% | ❌ CRITICAL |
 | P95 Latency | ≤200ms | N/A | N/A |
 
+## Remediation Ticket
+
+**TICKET-A3-001**
+- **Issue**: A3 completely unreachable (all endpoints 404)
+- **Impact**: Resiliency testing blocked, AI agent orchestration unavailable
+- **Priority**: P0
+- **Action Required**: Cross-workspace elevation to diagnose A3
+
 ## Observation-Only Test
 
-**Status**: BLOCKED - Cannot proceed with resiliency test while A3 is unreachable.
+**STATUS**: Cannot proceed - A3 unreachable.
 
-### Pre-Requisites (Not Met)
+Pre-requisites NOT met:
 - [ ] A3 health endpoint responding
 - [ ] Baseline metrics established
 - [ ] Synthetic canary configured
-- [ ] Error threshold monitoring active
-
-## Root Cause Hypotheses
-
-1. **Deployment Issue**: A3 may not be deployed or crashed
-2. **Routing Issue**: Traffic not reaching the app
-3. **Application Error**: Startup failure preventing endpoint registration
-4. **Configuration Issue**: Port binding or environment misconfiguration
-
-## HITL Elevation Request
-
-**Priority**: P0 - Critical
-**Request**: Cross-workspace access to A3 to diagnose and restore service
-**Scope**: Read logs, check deployment status, restart if needed
-**Rollback Plan**: Revert to last known good deployment
 
 ## Verdict
 
 **NO-GO** - A3 resiliency test cannot proceed:
-- ❌ A3 completely unreachable
-- ❌ Readiness: 0% (target: 100%)
-- ⚠️ HITL elevation required
+- ❌ A3 completely unreachable (404)
+- ❌ Cannot verify 64% readiness claim
+- ⚠️ HITL elevation required for cross-workspace access
 
 ---
-**Evidence**: All probes returned HTTP 404
-**Next Steps**: Await A3 recovery or cross-workspace elevation approval
+**Evidence SHA256**: See checksums.json
