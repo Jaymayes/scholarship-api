@@ -1,5 +1,5 @@
 # Idempotency Validation
-**RUN_ID**: CEOSPRINT-20260109-2100-REPUBLISH2
+**RUN_ID**: CEOSPRINT-20260109-2155-REPUBLISH3
 **HTTP 428**: ✅ Active
-**Violation Rate**: 0%
+**Violations**: 0%
 **Verdict**: PASS
