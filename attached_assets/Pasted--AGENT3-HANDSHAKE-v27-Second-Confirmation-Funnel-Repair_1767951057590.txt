@@ -1,0 +1,162 @@
+ AGENT3_HANDSHAKE v27 — Second Confirmation, Funnel Repair, Monetization, Learning, and A8 Wiring (Enhanced)
+
+ROLE AND MODE
+
+You orchestrate A1–A8 under A8 leadership.
+Mode: Max Autonomous with HITL guardrails.
+Staging is primary for mutations; Production is read‑only except synthetic tests labeled test_run=true and source=qa.
+INPUTS
+CEO Plan (JSON) — use verbatim as the single source of truth:
+{
+"objectives": [
+"Execute the Enhanced Second Confirmation phase to secure the technical foundation for $10M ARR",
+"Deliver authoritative, dual-source confirmation of ecosystem liveness with zero false positives",
+"Diagnose and repair B2C/B2B funnels using strict header enforcement (Idempotency/Trace-Id)",
+"Eliminate false positives via Wilson 95% confidence intervals and 15-minute stable windows",
+"Ensure 100% telemetry completeness and A8 finance lineage (3% provider fee + 4x markup)"
+],
+"environment": {
+"staging_policy": "Primary execution environment for active mutation and repair",
+"prod_policy": "Read-Only; synthetic writes allowed only with test_run=true, source=qa, and known synthetic identities",
+"known_endpoints": "NEEDED (Discover via system_map.json generation)",
+"secrets_names_only": ["STRIPE_PUBLISHABLE_KEY","STRIPE_SECRET_KEY","STRIPE_WEBHOOK_SECRET","OIDC_CLIENT_SECRET","A8_TELEMETRY_KEY"]
+},
+"double_confirmation_checks": [
+{"name": "Liveness","method_a": "Direct /health and /ready probes","method_b": "A8 telemetry dashboard verification","success_criteria": "Both sources agree, P95 <= 120ms, error_rate < 1%","stable_window_min": 15,"evidence_artifacts": "tests/perf/evidence/{app}_health.json"}
+],
+"autonomy_validation": {
+"signals_to_verify": ["run_progress > 0","cta_emitted","page_published","orchestration_cycle_complete"],
+"required_orchestration": "A3 Orchestration runs >200 min without manual intervention",
+"min_runtime_min": 200,
+"evidence": "A8 logs or A3 transaction logs showing autonomous operation"
+},
+"learning_stack": {
+"rl_type": "thompson_sampling_bandit",
+"reward_function": "0.05page_view + 0.3lead + 0.65checkout - 0.4complaint",
+"error_correction": ["retries_with_jitter","exponential_backoff","circuit_breaker_transitions","auto_heal"],
+"bandit_config_fields": ["arm_weights","exploration_rate"],
+"hitl_gates": "Log approvals for c>60 VUs, 503 injection, production writes, OIDC cookie policy, secret rotation"
+},
+"funnels": {
+"b2c": {
+"path": "A7 -> A1 -> A5 -> A3 -> A2 -> A8",
+"test_plan": "Run tests/perf/playwright/b2c_funnel.spec.ts",
+"fixes": ["Enforce X-Idempotency-Key & X-Trace-Id","Set-Cookie SameSite=None; Secure","Align TTL/domain","Fix JWKS/redirect config","Map A3 attribution"],
+"success_criteria": "Signup success >= 90%, A8 Growth tile updates <60s",
+"artifacts": ["tests/perf/reports/b2c_funnel_results.json","docs/runbooks/b2c_recovery.md","auth_trace_log.json"]
+},
+"b2b": {
+"path": "A7 -> A6 -> A8",
+"test_plan": "Run tests/perf/k6/a6_register_billing.js",
+"fixes": ["Enforce X-Idempotency-Key & X-Trace-Id","Mitigate cold-starts (warmers)","Optimize DB/HTTP client","Wire A8 finance tiles","Implement listing creation"],
+"success_criteria": "Provider signup >= 90%, Lineage confirms 3% + 4x",
+"artifacts": ["tests/perf/reports/b2b_funnel_results.json","docs/runbooks/b2b_recovery.md","billing_logic_verification.md"]
+},
+"hardening": {
+"require_headers": ["X-Idempotency-Key","X-Trace-Id"],
+"http_428_on_missing": true,
+"dedupe_ttl_min": 15,
+"tenant_scope": true,
+"synthetic_identities": {"student": "test_student_e2e_01","provider": "test_provider_e2e_01"},
+"tags": {"test_run": true,"source": "qa","env": ["staging","prod_observe"]},
+"b2c_micro_charge_floor_usd": 0.5,
+"price_id_micro_sku": "AUTO_RESOLVE_OR_CREATE"
+}
+},
+"a8_telemetry_wiring": {
+"events_required": ["identity_ok","page_build_requested","page_published","bandit_config","cta_emitted","cta_impression","checkout_completed","provider_registered","provider_listing_published","revenue_settled","credit_decrement","activation_first_use"],
+"schema_contract_fields": ["timestamp","app_id","route","status","p95_ms","trace_id","idempotency_key","finance_metrics","revenue_event_id"],
+"dedup_rules": "idempotency_key + trace_id within 15-min window",
+"sampling_rules": "100% for errors/finance, 10% for success high-volume",
+"dashboards_to_update": ["SLO Matrix","Revenue Lineage","Funnel Status","Activation"]
+},
+"false_positive_controls": {"dual_source": true,"thresholds": {"p95_ms": 120,"error_rate_pct": "<1%","telemetry_arrival_sec": 60},"burn_in_min": 15,"confidence_method": "Wilson95"},
+"execution_plan": ["Phase 0: Inventory and Environment Sync","Phase 1: Dual-Source Smoke (Second Confirmation)","Phase 2: Baseline Load (c<=20)","Phase 3: E2E Funnels Diagnosis and Repair (Hardened)","Phase 4: Monetization Readiness (Dynamic SKU)","Phase 5: Activation and Growth Hygiene","Phase 6: Learning, Autonomy, and Safety","Phase 7: Resiliency Tests (HITL-approved)"],
+"deliverables": ["tests/perf/reports/ecosystem_slo_matrix.md","tests/perf/reports/baseline_results.json","tests/perf/reports/a8_second_confirmation.md","tests/perf/reports/a3_resiliency_report.md","tests/perf/reports/b2c_funnel_results.json","tests/perf/reports/b2b_funnel_results.json","tests/perf/reports/a8_data_lineage.md","tests/perf/reports/error_correction_learning.md","tests/perf/reports/rl_signal_path.md","tests/perf/reports/hitl_approvals.log","tests/perf/reports/idempotency_validation.md"],
+"risk_and_compliance": {"ferpa_coppa": true,"pii_minimization": true,"no_academic_dishonesty": true,"prod_write_limits": "synthetic labeled only"},
+"escalation_and_handoff": {"when_to_page_ceo": ["Stripe live failure","OIDC regression","A3 stalled > 2 hours","Schema mismatch > 2 attempts"],"hitl_log_updates": "Log all restricted actions and escalations"},
+"acceptance_criteria": ["Two-source PASS for all A1–A8","1 B2C micro-checkout with exclusions","1 B2B provider onboarding verifying 3% + 4x","A3 run_progress>0 in A8 <60s","RL + error-correction verified","HITL log updated"]
+}
+
+HITL approval
+
+HITL-A3-503-v27-2026-01-09-CEO (A3 only, staging, c≤20, three 2‑min 503 cycles)
+Non‑negotiable hardening
+
+Require headers on all mutable ops: X-Idempotency-Key and X-Trace-Id. If missing → HTTP 428. Dedupe window 15 minutes; keys scoped to tenant/user.
+Synthetic identities and tagging for tests: student=test_student_e2e_01, provider=test_provider_e2e_01; tag all test events with test_run=true, source=qa, env=staging|prod_observe.
+Stripe price: If price_id_micro_sku is AUTO_RESOLVE_OR_CREATE or missing, autonomously find or create a $0.50 "Micro QA Charge" price using STRIPE_SECRET_KEY (Stripe API if CLI unavailable).
+Global SLOs and stop conditions
+
+Targets: P95 ≤120ms (goal), error rate <1%, uptime 99.9%, telemetry arrival ≤60s.
+Stop if: error_rate ≥1% for 5 min; A1/A2 P95 >200ms sustained; A8 telemetry missing >60s for executed tests; compliance breach; restricted action without HITL.
+Go/No‑Go gates
+
+Proceed past Phase 0 only if:
+system_map.json lists 8 base endpoints with 200 OK probes.
+STRIPE_SECRET_KEY present; price_id_micro_sku resolved.
+Idempotency/Trace enforcement active on ingest and payment endpoints (HTTP 428 on missing).
+A8 telemetry acceptance rate ≥99% over a 15‑minute burn‑in.
+Execution plan
+Phase 0 — Inventory and Environment Sync
+
+Discover and verify 8 base endpoints; generate system_map.json (routes/owners/SLOs).
+Validate secrets presence (names only).
+Verify k6/Playwright scaffolds.
+Stripe SKU: If missing, create/find $0.50 "Micro QA Charge" (store price_id_micro_sku).
+Artifact: tests/perf/reports/ecosystem_inventory.md
+Phase 1 — Dual‑Source Smoke (Second Confirmation)
+
+For each A1–A8:
+Method A: /health and /ready + basic action probe.
+Method B: corroborate via A8 metrics/events for same window.
+PASS: both sources agree, P95 ≤120ms, stable ≥15 min, Wilson 95% ≥95%.
+Artifacts: tests/perf/reports/ecosystem_double_confirm.md; tests/perf/evidence/{app}_health.json
+Phase 2 — Baseline Load (c≤20; HITL for >60)
+
+Validate A3 autonomy signals and reflect in A8; optimize services >150ms P95; propose warmers/pooling.
+Artifact: tests/perf/reports/a8_baseline_load.md
+Phase 3 — E2E Funnel Diagnosis and Repair (Hardened)
+
+B2C: Playwright b2c_funnel.spec.ts; fix OIDC cookie (SameSite=None; Secure) and JWKS/redirects; align A3 attribution; enforce headers; verify Growth tile <60s.
+Artifacts: tests/perf/reports/b2c_funnel_results.json; docs/runbooks/b2c_recovery.md; auth_trace_log.json
+B2B: k6 register+billing; verify provider_fee_pct=3 and ai_markup_factor=4.0; ensure listing creation; enforce headers; wire A8 finance tiles.
+Artifacts: tests/perf/reports/b2b_funnel_results.json; docs/runbooks/b2b_recovery.md; billing_logic_verification.md
+Phase 4 — Monetization Readiness (Dynamic SKU)
+
+Ensure Stripe LIVE, pricing CTAs wired, credit ledger updates.
+Execute B2C synthetic micro‑checkout using price_id_micro_sku; tag transactions; exclude from business rollups but visible in diagnostics.
+Artifacts: tests/perf/reports/b2c_checkout_results.json; tests/perf/reports/a8_data_lineage.md; tests/perf/evidence/b2c_checkout_trace.json
+Phase 5 — Activation and Growth Hygiene
+
+Implement/verify guided onboarding to first AI action; emit credit_decrement and activation_first_use; measure TTFV <5 min.
+Fix canonical/noindex/OG/sitemap/GA issues as needed.
+Artifacts: tests/perf/reports/activation_results.json; growth_hygiene_checklist.md
+Phase 6 — Learning, Autonomy, and Safety
+
+Prove error‑correction: retries with jitter, exponential backoff, breaker transitions Closed→Open→Half‑Open→Closed, auto‑heal.
+Stand up RL/bandit per the learning_stack; save rl_policy.json and bandit_config.json; HITL required for policy risk ≥ medium.
+Artifacts: tests/perf/reports/error_correction_learning.md; tests/perf/reports/rl_signal_path.md; rl_policy.json; bandit_config.json; tests/perf/reports/hitl_approvals.log
+Phase 7 — Resiliency (HITL‑approved)
+
+Execute A3 503 resiliency per HITL-A3-503-v27-2026-01-09-CEO; c≤20; 3×2‑min; verify breaker transitions and recovery.
+Artifacts: tests/perf/reports/a3_resiliency_report.md; tests/perf/evidence/a3_cb_results.json
+Telemetry and A8 wiring
+
+Implement a8_telemetry_wiring; enforce schema_contract_fields; fix “unknown” types; apply dedup/sampling rules; enforce header policy on ingest.
+Artifacts: tests/perf/reports/a8_wiring_verdict.md; tests/perf/evidence/a8_post_samples.json; tests/perf/reports/idempotency_validation.md
+False‑positive controls
+
+Dual‑source corroboration, 15–30 min burn‑in, Wilson95 confidence; mark INCONCLUSIVE if <95%.
+Artifact: tests/perf/reports/false_positive_mitigation.md
+Acceptance (all must pass)
+
+Two‑source PASS for A1–A8; P95 ≤120ms; error rate <1%; 15‑minute stability.
+One B2C micro‑checkout (synthetic, labeled) and one B2B provider onboarding (3% + 4x) visible in A8 <60s and excluded from business analytics.
+A3 shows run_progress>0 in A8; RL and error‑correction active; configs saved; HITL logs updated.
+Escalation
+
+Page CEO if Stripe live fails; OIDC regression persists; A3 cannot run within 2 hours; or A8 schema mismatches persist after two remediation attempts.
+Start now
+
+Begin at Phase 0. Produce system_map.json, validate secrets (names only), autonomously resolve the $0.50 Stripe price ID, then proceed sequentially and report blockers with artifact links.
