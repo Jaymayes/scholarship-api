@@ -1,0 +1,438 @@
+@Agent (Max Autonomous Mode)
+
+TITLE: AGENT3_HANDSHAKE v27 — Ecosystem Second Confirmation, Funnel Repair, Monetization & Growth Readiness
+
+ROLE AND MODE
+
+You orchestrate the A1–A8 ecosystem under A8 leadership.
+Mode: Max Autonomous.
+Safety: Enforce HITL gates for c>60 VUs, 503 injection, production writes, OIDC cookie policy changes, and secret rotation.
+Environment: Production is Read-Only unless explicitly approved; staging is primary for mutations.
+CEO PLAN (Authoritative JSON)
+Paste this object into memory and use it as the source of truth for scope, targets, and deliverables.
+
+{
+"objectives": [
+"Execute the Validation phase of the 5-year plan to secure the technical foundation for $10M ARR",
+"Deliver authoritative second confirmation of ecosystem liveness, autonomy, and compliance",
+"Diagnose and repair B2C and B2B funnels to restore lead flow and revenue capture",
+"Eliminate false positives via dual-source verification and transaction-level cross-checks",
+"Ensure 100% telemetry completeness and A8 finance lineage (3% provider fee + 4x markup)"
+],
+"assumptions": [
+"A8 Command Center healthy; telemetry flowing within ≤60s SLA",
+"7 external apps responding 200 OK; funnels functionally broken",
+"Root causes likely A1 OIDC cookie loop, A6 marginal latency/staleness, A8 caching gap",
+"Staging is primary execution environment; Production is Read-Only/HITL",
+"Agent has full access to A1–A8 repositories, environment variables, and secrets"
+],
+"known_issues": [
+"A1-001: OIDC session loop / intermittent 500s; fix/oidc-cookies branch pending HITL",
+"A6-001: External 500 resolved but latency ~160ms (target ≤150ms); needs optimization",
+"A8-PERF-001: Dashboard API P95 ~1085ms; caching/CDN fix required",
+"A8-001: Revenue blindness/tile wiring inconsistencies",
+"B2C/B2B funnels failing end-to-end despite green health checks",
+"Monetization blockers: missing/disabled pricing and checkout buttons; Stripe DRY-RUN or missing keys; no visible plans",
+"Growth/SEO hygiene gaps: canonical URL mismatch, accidental noindex, missing OG images, missing sitemap/GA"
+],
+"second_confirmation_checks": {
+"liveness": [
+"Verify /health and /ready for A1–A8 with P95 ≤150ms and error rate <1%"
+],
+"autonomy": [
+"Confirm A3 orchestration runs >200 min without manual intervention"
+],
+"error_correction_learning": [
+"Verify retries with jitter",
+"Exponential backoff",
+"Circuit breaker transitions (Closed→Open→Half-Open)",
+"Auto-heal verified via logs"
+],
+"reinforcement_learning": [
+"Document A3/A4 RL signal path; reward proxies: CTR uplift, funnel completion, complaint penalty"
+],
+"human_in_the_loop": [
+"Log approvals for c>60 VUs, 503 injection, production writes, OIDC cookie policy changes, secret rotation",
+"Log specific approval HITL-A3-503-v27-2026-01-09-CEO for Phase 7"
+],
+"ethics_compliance": [
+"Verify FERPA/COPPA compliance",
+"Confirm no academic dishonesty enablement",
+"Validate PII minimization and masked logs"
+]
+],
+"funnel_repair_plan": {
+"b2c": {
+"path": "A7 → A1 → A5 → A3 → A2 → A8",
+"diagnostics": [
+"Trace OIDC redirect/session loop",
+"Validate JWKS/redirects",
+"Verify A3 attribution emission",
+"Correlate trace_id across A1→A3→A8"
+],
+"remediations": [
+"Set-Cookie SameSite=None; Secure",
+"Align TTL/domain",
+"Fix JWKS/redirect config",
+"Map A3 attribution fields",
+"Align A2/A8 telemetry"
+],
+"acceptance_criteria": [
+"Signup success ≥ 90% (smoke)",
+"Per-hop P95 ≤150ms",
+"A8 Growth tile updates <60s",
+"No session loops"
+],
+"artifacts": [
+"tests/perf/playwright/b2c_funnel.spec.ts",
+"tests/perf/reports/b2c_funnel_results.json",
+"docs/runbooks/b2c_recovery.md",
+"auth_trace_log.json"
+]
+},
+"b2c_monetization": {
+"scope": "Pricing and checkout readiness",
+"diagnostics": [
+"Verify presence of pricing page and CTA routing",
+"Check Stripe keys present and non-dry-run",
+"Validate checkout flow end-to-end in live mode"
+],
+"remediations": [
+"Implement pricing page with working plan buttons",
+"Configure STRIPE_PUBLISHABLE_KEY and STRIPE_SECRET_KEY",
+"Enable LIVE checkout (STRIPE_DRY_RUN=false) and webhooks"
+],
+"acceptance_criteria": [
+"Checkout conversion ≥ target (live)",
+"A8 revenue events visible <60s",
+"Credit ledger updates on purchase"
+],
+"artifacts": [
+"pricing_page_spec.md",
+"tests/perf/reports/b2c_checkout_results.json",
+"tests/perf/reports/a8_data_lineage.md"
+]
+},
+"b2c_onboarding": {
+"scope": "Activation to first AI value",
+"diagnostics": [
+"Measure time_to_first_value (TTFV) from signup to A4 usage",
+"Audit guidance to essay assistant"
+],
+"remediations": [
+"Add guided onboarding to first A4 action",
+"Emit credit_decrement events"
+],
+"acceptance_criteria": [
+"TTFV < 5 min (smoke)",
+"A8 Outcomes tile shows first-use events"
+],
+"artifacts": [
+"onboarding_flow_spec.md",
+"tests/perf/reports/activation_results.json"
+]
+},
+"b2b": {
+"path": "A7 → A6 → A8",
+"diagnostics": [
+"Probe /register and /api/billing latency/errors",
+"Validate provider_fee_pct=3 and ai_markup_factor=4.0",
+"Map finance lineage into A8 tiles",
+"Check provider listing creation post-register"
+],
+"remediations": [
+"Mitigate cold-starts (warmers/keep-alives)",
+"Optimize DB/HTTP client settings",
+"Wire A8 tiles to correct finance payload keys",
+"Implement provider listing creation flow"
+],
+"acceptance_criteria": [
+"Provider signup ≥ 90% (smoke)",
+"Per-hop P95 ≤150ms",
+"A8 Finance tile updates <60s",
+"Lineage confirms 3% + 4x",
+"Provider listing creation rate ≥ target"
+],
+"artifacts": [
+"tests/perf/k6/a6_register_billing.js",
+"tests/perf/reports/b2b_funnel_results.json",
+"docs/runbooks/b2b_recovery.md",
+"billing_logic_verification.md"
+]
+}
+},
+"orchestration_plan": {
+"phases": [
+{
+"name": "Phase 0 - Inventory and Environment Sync",
+"actions": [
+"Generate system_map.json",
+"Verify/create k6 & Playwright scripts",
+"Validate secrets presence"
+],
+"SLOs": {
+"p95_ms": 150,
+"error_rate_pct": "<1%"
+},
+"gates": {
+"human_approval": [
+"production writes"
+]
+}
+},
+{
+"name": "Phase 1 - Smoke and Health",
+"actions": [
+"Dual-source liveness A1–A8",
+"Check circuit breakers (Email,S2S,Auto Com,Scholarship API)",
+"Validate JWKS/redirects"
+],
+"SLOs": {
+"p95_ms": 150
+},
+"gates": {
+"stop_on": [
+"error_rate ≥1% for 5m",
+"missing A8 telemetry >60s"
+]
+}
+},
+{
+"name": "Phase 2 - Baseline Load",
+"actions": [
+"Run c≤20 (HITL for c>60)",
+"Validate A3 idempotency",
+"Verify A6→A8 finance lineage",
+"Warm A8 dashboard; flag endpoints >300ms"
+],
+"SLOs": {
+"p95_ms": 150
+}
+},
+{
+"name": "Phase 3 - E2E Funnels Diagnosis and Repair",
+"actions": [
+"Run B2C Playwright traces",
+"Run B2B k6 flow",
+"Apply OIDC/Billing fixes",
+"Redeploy staging",
+"Re-verify"
+],
+"SLOs": {
+"p95_ms": 150
+},
+"gates": {
+"stop_on": [
+"conversion < target",
+"A8 lineage mismatch"
+]
+}
+},
+{
+"name": "Phase 4 - Monetization Readiness",
+"actions": [
+"Implement pricing page CTAs",
+"Enable Stripe (LIVE mode; STRIPE_DRY_RUN=false)",
+"Validate credit ledger updates"
+],
+"SLOs": {
+"checkout_conv_rate": "≥ target"
+}
+},
+{
+"name": "Phase 5 - Activation and Growth Hygiene",
+"actions": [
+"Add guided onboarding to first A4 action",
+"Emit activation telemetry (ttfv_min)",
+"Fix canonical URL",
+"Remove unintended noindex",
+"Add OG images/sitemap/GA"
+],
+"SLOs": {
+"telemetry_arrival_sec": 60,
+"time_to_first_value_min": "< 5"
+}
+},
+{
+"name": "Phase 6 - Learning, Autonomy, and Safety",
+"actions": [
+"Verify error correction (retries/backoff)",
+"Document RL signal path",
+"Log HITL approvals"
+],
+"SLOs": {
+"error_rate_pct": "<1%"
+}
+},
+{
+"name": "Phase 7 - Resiliency (HITL-approved)",
+"actions": [
+"Execute 503 injection on A3 (ID: HITL-A3-503-v27-2026-01-09-CEO)",
+"Validate breaker transitions and auto-heal"
+],
+"SLOs": {
+"error_rate_pct": "<1% post-recovery"
+},
+"gates": {
+"human_approval": [
+"503 injection"
+]
+}
+}
+]
+},
+"observability_and_reporting": {
+"telemetry_schema": {
+"required_fields": [
+"timestamp",
+"app_id",
+"route",
+"method",
+"status",
+"p50_ms",
+"p95_ms",
+"error_rate_pct",
+"uptime_sec",
+"circuit_breaker_state",
+"trace_id",
+"idempotency_key",
+"finance_metrics.provider_fee_pct",
+"finance_metrics.ai_markup_factor",
+"revenue_event_id",
+"business_metrics.ctr",
+"business_metrics.signup_rate",
+"business_metrics.checkout_conv_rate",
+"business_metrics.ttfv_min"
+],
+"ingest_target": "A8 dashboards and lineage views"
+},
+"a8_dashboard_requirements": [
+"SLO matrix",
+"Live B2C/B2B funnel status",
+"Revenue lineage 3% + 4x",
+"Incident list with RCA",
+"HITL approval logs",
+"Activation/TTFV and checkout conversion tiles"
+],
+"reporting_artifacts": [
+"tests/perf/reports/ecosystem_slo_matrix.md",
+"tests/perf/reports/baseline_results.json",
+"tests/perf/reports/a8_second_confirmation.md",
+"tests/perf/reports/a3_resiliency_report.md",
+"tests/perf/reports/b2c_funnel_results.json",
+"tests/perf/reports/b2b_funnel_results.json",
+"tests/perf/reports/a8_data_lineage.md",
+"tests/perf/reports/error_correction_learning.md",
+"tests/perf/reports/rl_signal_path.md",
+"tests/perf/reports/hitl_approvals.log",
+"tests/perf/reports/b2c_checkout_results.json",
+"tests/perf/reports/activation_results.json"
+]
+},
+"financial_and_kpi_checks": {
+"b2c": {
+"targets": {
+"cta_ctr": "≥ target",
+"signup_success_rate": "≥ 90% (smoke)",
+"checkout_conv_rate": "≥ target (live)",
+"time_to_first_value_min": "< 5"
+}
+},
+"b2b": {
+"targets": {
+"provider_signup_success_rate": "≥ 90% (smoke)",
+"provider_listing_creation_rate": "≥ target",
+"time_to_first_billing_min": "< 2"
+}
+},
+"pricing_enforcement": {
+"provider_fee_pct": 3,
+"ai_service_markup": 4.0
+}
+},
+"false_positive_controls": {
+"dual_source_verification": true,
+"idempotency_keys": [
+"A3_orchestration"
+],
+"circuit_breakers": [
+"Email",
+"S2S Auth",
+"Auto Com Center",
+"Scholarship API"
+],
+"telemetry_vs_transaction_log_crosscheck": true,
+"stale_snapshot_reconciliation": true,
+"thresholds": {
+"error_rate": "<1%",
+"p95_ms": 150,
+"telemetry_arrival_sec": 60
+}
+},
+"risk_and_governance": {
+"stop_conditions": [
+"error_rate ≥1% for 5m",
+"A1/A2 P95 >200ms sustained",
+"A8 telemetry missing >60s for executed tests",
+"compliance breach",
+"restricted action without HITL approval"
+],
+"human_approval_required": [
+"c>60 VUs",
+"503 injection",
+"production writes",
+"OIDC cookie policy changes",
+"secret rotation"
+],
+"security_privacy": [
+"FERPA",
+"COPPA",
+"PII minimization",
+"no academic dishonesty"
+]
+},
+"final_success_criteria": [
+"All smoke SLOs met with P95 ≤150ms and error rate <1% using dual-source evidence",
+"B2C and B2B funnels pass E2E at target success; events visible in A8 <60s; per-hop P95 ≤150ms",
+"Finance lineage proves 3% + 4x on sample set",
+"Checkout conversion (test mode) meets target and credit ledger updates",
+"TTFV < 5 minutes with documented onboarding path",
+"RL and error-correction learning verified; HITL approvals logged",
+"A8-PERF-001 caching fix implemented or approved with measurable P95 reduction",
+"a8_second_confirmation.md signed with trace_ids and artifact links"
+]
+}
+
+COMPATIBILITY ADAPTER (Safe Defaults if Keys Are Missing)
+
+learning_stack:
+rl_type: "thompson_sampling_bandit"
+reward_function: R = 0.05page_view + 0.30lead + 0.65checkout − 0.40complaint
+error_correction_mechanism: retries with jitter, exponential backoff, automatic rollback on negative reward deltas
+bandit_config_fields: epsilon, priors, exploration_decay, min_sample, cooldown_min
+hitl_gates: required for policy edits risk_level ≥ medium
+a8_telemetry_wiring:
+events_required: identity_ok, page_build_requested, page_published, bandit_config, cta_emitted, cta_impression, checkout_completed, provider_registered, provider_listing_published, revenue_settled, credit_decrement, activation_first_use
+schema_contract: use observability_and_reporting.telemetry_schema.required_fields
+sampling_rules: revenue/identity 100%; high-volume events 10%
+dedup_rules: idempotency_key + trace_id; 15-min de-dupe window
+GLOBAL SLOs & STOP CONDITIONS
+
+Targets: P95 ≤150ms (goal ~120ms), error rate <1%, uptime 99.9%, telemetry arrival to A8 ≤60s.
+Stop immediately if: error_rate ≥1% for 5m; A1 or A2 P95 >200ms sustained; A8 telemetry missing >60s for executed tests; any compliance breach; any restricted action without HITL approval.
+HITL APPROVALS (PRE-GRANTED)
+
+Approval ID: HITL-A3-503-v27-2026-01-09-CEO
+Scope: Phase 7 Resiliency Testing (A3 only, staging only, c ≤ 20 VUs, three 2‑min 503 cycles).
+Action: Append this approval to tests/perf/reports/hitl_approvals.log.
+EXECUTION PLAN (Run Phases 0–7 sequentially)
+
+Follow the orchestration_plan.phases from the CEO JSON.
+Produce every artifact listed under observability_and_reporting.reporting_artifacts.
+Additionally produce:
+tests/perf/reports/a8_second_confirmation.md (final signed status with trace_ids and artifact links).
+Per-app evidence: tests/perf/evidence/{app}_health.json
+Checkout and onboarding traces: tests/perf/evidence/b2c_checkout_trace.json, tests/perf/evidence/b2b_onboarding_trace.json
+When a referenced key is missing in the JSON, use the Compatibility Adapter defaults above.
+START NOW
+Phase 0: Scan the repo(s), validate secrets presence (names only), generate system_map.json, and report initial findings and any immediate blockers.
