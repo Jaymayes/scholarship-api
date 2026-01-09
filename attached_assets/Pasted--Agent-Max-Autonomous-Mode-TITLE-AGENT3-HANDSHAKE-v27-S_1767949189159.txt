@@ -1,0 +1,219 @@
+@Agent (Max Autonomous Mode)
+
+**TITLE:** AGENT3_HANDSHAKE v27 — Second Confirmation, Funnel Repair, Monetization, Learning, and A8 Wiring (Enhanced)
+
+**ROLE AND MODE:**
+You orchestrate A1–A8 under A8 leadership.
+- **Mode:** Max Autonomous with HITL guardrails.
+- **Staging** is primary for mutations; **Production** is read‑only except synthetic tests labeled `test_run=true` and `source=qa`.
+
+**INPUTS:**
+**CEO Plan (JSON):**
+```json
+{
+  "objectives": [
+    "Execute the Enhanced Second Confirmation phase to secure the technical foundation for $10M ARR",
+    "Deliver authoritative, dual-source confirmation of ecosystem liveness with zero false positives",
+    "Diagnose and repair B2C/B2B funnels using strict header enforcement (Idempotency/Trace-Id)",
+    "Eliminate false positives via Wilson 95% confidence intervals and 15-minute stable windows",
+    "Ensure 100% telemetry completeness and A8 finance lineage (3% provider fee + 4x markup)"
+  ],
+  "environment": {
+    "staging_policy": "Primary execution environment for active mutation and repair",
+    "prod_policy": "Read-Only; synthetic writes allowed only with test_run=true, source=qa, and known synthetic identities",
+    "known_endpoints": "NEEDED (Discover via system_map.json generation)",
+    "secrets_names_only": [
+      "STRIPE_PUBLISHABLE_KEY",
+      "STRIPE_SECRET_KEY",
+      "STRIPE_WEBHOOK_SECRET",
+      "OIDC_CLIENT_SECRET",
+      "A8_TELEMETRY_KEY"
+    ]
+  },
+  "double_confirmation_checks": [
+    {
+      "name": "Liveness",
+      "method_a": "Direct /health and /ready probes",
+      "method_b": "A8 telemetry dashboard verification",
+      "success_criteria": "Both sources agree, P95 <= 120ms, error_rate < 1%",
+      "stable_window_min": 15,
+      "evidence_artifacts": "tests/perf/evidence/{app}_health.json"
+    }
+  ],
+  "autonomy_validation": {
+    "signals_to_verify": [
+      "run_progress > 0",
+      "cta_emitted",
+      "page_published",
+      "orchestration_cycle_complete"
+    ],
+    "required_orchestration": "A3 Orchestration runs >200 min without manual intervention",
+    "min_runtime_min": 200,
+    "evidence": "A8 logs or A3 transaction logs showing autonomous operation"
+  },
+  "learning_stack": {
+    "rl_type": "thompson_sampling_bandit",
+    "reward_function": "0.05*page_view + 0.3*lead + 0.65*checkout - 0.4*complaint",
+    "error_correction": [
+      "retries_with_jitter",
+      "exponential_backoff",
+      "circuit_breaker_transitions",
+      "auto_heal"
+    ],
+    "bandit_config_fields": [
+      "arm_weights",
+      "exploration_rate"
+    ],
+    "hitl_gates": "Log approvals for c>60 VUs, 503 injection, production writes, OIDC cookie policy, secret rotation"
+  },
+  "funnels": {
+    "b2c": {
+      "path": "A7 -> A1 -> A5 -> A3 -> A2 -> A8",
+      "test_plan": "Run tests/perf/playwright/b2c_funnel.spec.ts",
+      "fixes": [
+        "Enforce X-Idempotency-Key & X-Trace-Id",
+        "Set-Cookie SameSite=None; Secure",
+        "Align TTL/domain",
+        "Fix JWKS/redirect config",
+        "Map A3 attribution"
+      ],
+      "success_criteria": "Signup success >= 90%, A8 Growth tile updates <60s",
+      "artifacts": [
+        "tests/perf/reports/b2c_funnel_results.json",
+        "docs/runbooks/b2c_recovery.md",
+        "auth_trace_log.json"
+      ]
+    },
+    "b2b": {
+      "path": "A7 -> A6 -> A8",
+      "test_plan": "Run tests/perf/k6/a6_register_billing.js",
+      "fixes": [
+        "Enforce X-Idempotency-Key & X-Trace-Id",
+        "Mitigate cold-starts (warmers)",
+        "Optimize DB/HTTP client",
+        "Wire A8 finance tiles",
+        "Implement listing creation"
+      ],
+      "success_criteria": "Provider signup >= 90%, Lineage confirms 3% + 4x",
+      "artifacts": [
+        "tests/perf/reports/b2b_funnel_results.json",
+        "docs/runbooks/b2b_recovery.md",
+        "billing_logic_verification.md"
+      ]
+    },
+    "hardening": {
+      "require_headers": [
+        "X-Idempotency-Key",
+        "X-Trace-Id"
+      ],
+      "http_428_on_missing": true,
+      "dedupe_ttl_min": 15,
+      "tenant_scope": true,
+      "synthetic_identities": {
+        "student": "test_student_e2e_01",
+        "provider": "test_provider_e2e_01"
+      },
+      "tags": {
+        "test_run": true,
+        "source": "qa",
+        "env": [
+          "staging",
+          "prod_observe"
+        ]
+      },
+      "b2c_micro_charge_floor_usd": 0.5,
+      "price_id_micro_sku": "AUTO_RESOLVE_OR_CREATE"
+    }
+  },
+  "a8_telemetry_wiring": {
+    "events_required": [
+      "identity_ok",
+      "page_build_requested",
+      "page_published",
+      "bandit_config",
+      "cta_emitted",
+      "cta_impression",
+      "checkout_completed",
+      "provider_registered",
+      "provider_listing_published",
+      "revenue_settled",
+      "credit_decrement",
+      "activation_first_use"
+    ],
+    "schema_contract_fields": [
+      "timestamp",
+      "app_id",
+      "route",
+      "status",
+      "p95_ms",
+      "trace_id",
+      "idempotency_key",
+      "finance_metrics",
+      "revenue_event_id"
+    ],
+    "dedup_rules": "idempotency_key + trace_id within 15-min window",
+    "sampling_rules": "100% for errors/finance, 10% for success high-volume",
+    "dashboards_to_update": [
+      "SLO Matrix",
+      "Revenue Lineage",
+      "Funnel Status",
+      "Activation"
+    ]
+  },
+  "false_positive_controls": {
+    "dual_source": true,
+    "thresholds": {
+      "p95_ms": 120,
+      "error_rate_pct": "<1%",
+      "telemetry_arrival_sec": 60
+    },
+    "burn_in_min": 15,
+    "confidence_method": "Wilson95"
+  },
+  "execution_plan": [
+    "Phase 0: Inventory and Environment Sync",
+    "Phase 1: Dual-Source Smoke (Second Confirmation)",
+    "Phase 2: Baseline Load (c<=20)",
+    "Phase 3: E2E Funnels Diagnosis and Repair (Hardened)",
+    "Phase 4: Monetization Readiness (Dynamic SKU)",
+    "Phase 5: Activation and Growth Hygiene",
+    "Phase 6: Learning, Autonomy, and Safety",
+    "Phase 7: Resiliency Tests (HITL-approved)"
+  ],
+  "deliverables": [
+    "tests/perf/reports/ecosystem_slo_matrix.md",
+    "tests/perf/reports/baseline_results.json",
+    "tests/perf/reports/a8_second_confirmation.md",
+    "tests/perf/reports/a3_resiliency_report.md",
+    "tests/perf/reports/b2c_funnel_results.json",
+    "tests/perf/reports/b2b_funnel_results.json",
+    "tests/perf/reports/a8_data_lineage.md",
+    "tests/perf/reports/error_correction_learning.md",
+    "tests/perf/reports/rl_signal_path.md",
+    "tests/perf/reports/hitl_approvals.log",
+    "tests/perf/reports/idempotency_validation.md"
+  ],
+  "risk_and_compliance": {
+    "ferpa_coppa": true,
+    "pii_minimization": true,
+    "no_academic_dishonesty": true,
+    "prod_write_limits": "synthetic labeled only"
+  },
+  "escalation_and_handoff": {
+    "when_to_page_ceo": [
+      "Stripe live failure",
+      "OIDC regression",
+      "A3 stalled > 2 hours",
+      "Schema mismatch > 2 attempts"
+    ],
+    "hitl_log_updates": "Log all restricted actions and escalations"
+  },
+  "acceptance_criteria": [
+    "Two-source PASS for all A1–A8",
+    "1 B2C micro-checkout with exclusions",
+    "1 B2B provider onboarding verifying 3% + 4x",
+    "A3 run_progress>0 in A8 <60s",
+    "RL + error-correction verified",
+    "HITL log updated"
+  ]
+}
