@@ -1,0 +1,55 @@
+Excellent. I’ve reviewed both deliverables. Here are my executive decisions, execution order, and the confirmation protocol.
+
+CEO decisions — approved with guardrails
+
+A3 resiliency test: APPROVED for production “observation-only”
+Constraints: read-only probes, no destructive actions, traffic shadowing only, ≤1 RPS synthetic canary, abort if error rate >1% for 3 minutes or P95 >200ms for 3 minutes, all actions logged to HITL.
+2. Cross-workspace elevation: APPROVED (time-boxed, scope-limited)
+
+Scope: A1 OIDC/JWKS redirect loop, A3 readiness (64%→100%), A5 micro-checkout wiring, A6 provider onboarding/listing + fee lineage.
+Controls: every change via PR/feature flag/canary, HITL peer-approval note, rollback plan included in each PR, change window ≤24 hours unless renewed.
+3. Idempotency (HTTP 428) strict enforcement: APPROVED with progressive rollout
+
+Rollout plan: 5% canary → 25% → 100% over 24–48 hours; automatic fallback to warn-mode if client error rate attributable to 428 exceeds 0.5% for 10 minutes. Maintain allowlist for known legacy clients, document exceptions in idempotency_validation.md.
+4. Live Stripe $0.50 test: APPROVED with limits
+
+Limits: ≤25 live test charges, tagged test_student_e2e with X-Trace-Id; auto-refund within 24 hours; attach b2c_checkout_trace.json and ledger links to A8; ensure PCI-safe handling and no PII in logs.
+Execution order (start immediately, 60-minute sprint)
+
+Phase 0–2: Double-confirm health A1–A8; verify A8 telemetry ≥99% acceptance; run a minimal RL/bandit update; append HITL entry for this run.
+Phase 3 (B2C): Fix A1 OIDC/JWKS redirect; run the $0.50 micro-checkout; produce b2c_flow_verdict.md and b2c_checkout_trace.json with idempotency keys.
+Phase 4 (B2B): In A6, complete provider onboarding and listing; capture fee_lineage.json proving 3% + 4x; produce b2b_flow_verdict.md.
+Phase 5 (A3): Restore readiness to 100%; run production observation-only resiliency test per guardrails; generate a3_fix_notes.md and a3_resiliency_report.md.
+Phase 6 (Performance): Bring all apps to P95 ≤120ms; publish perf_summary.md.
+Phase 7 (SEO/A7): Validate sitemap and indexing (≥2,908 URLs); publish seo_verdict.md.
+Phase 8: Confirm idempotency strict rollout plan; update idempotency_validation.md with canary results and any allowlisted clients.
+Phase 9: Post artifacts to A8 and deliver go_no_go_report.md.
+Second-source confirmation protocol (what constitutes “live and fully autonomous”)
+
+Learning: learning_evidence.json shows policy or parameter delta from this run; RL reward logged.
+Human-in-the-loop: New HITL log entry with timestamp, operator, rationale, and approvals.
+Telemetry: A8 ingest ≥99% with event IDs listed in a8_wiring_verdict.md.
+Autonomy: No manual interventions required for the funnels after initial fixes; flows complete via agents and policies.
+Acceptance criteria (unchanged from your Gemini package)
+
+B2C: Auth → Discovery → Stripe Live ($0.50) with trace evidence.
+B2B: Provider Onboarding → Listing → 3% fee + 4x markup with lineage.
+A3 readiness: 100%; all apps P95 ≤120ms.
+Telemetry: A8 ≥99% acceptance; dashboards updated.
+Autonomy: RL update recorded; HITL entry appended.
+Governance: Idempotency headers enforced (strict staged rollout or warn with documented exceptions).
+Stop/rollback criteria (No-Go triggers)
+
+Fleet error rate >1% for 5 minutes.
+P95 latency >200ms for 5 minutes on any core app.
+A8 ingestion <98% for 10 minutes.
+Stripe declines or disputes on test runs >5% or any fraud signal.
+Any auth regression >2% login failure above baseline. If triggered, pause the affected phase, revert to last stable flag/PR, log HITL rationale, and open remediation ticket.
+Required artifacts to A8 (confirm on completion)
+
+go_no_go_report.md, b2c_flow_verdict.md, b2b_flow_verdict.md, a3_resiliency_report.md, perf_summary.md, seo_verdict.md, idempotency_validation.md, hitl_approvals.log, learning_evidence.json, system_map.json, ecosystem_double_confirm.md, {app}_health.json, b2c_checkout_trace.json, fee_lineage.json.
+Directive to the Replit Agent
+Proceed now with the fully-instantiated Max Autonomous prompt you prepared, under the approvals and guardrails above. Deliver a GO/NO-GO within 60 minutes with all artifacts posted to A8. If you hit permissions barriers, file an immediate HITL elevation request and continue with parallelizable work.
+
+Optional input
+If a staging URL for A3 becomes available mid-run, prefer staging for active fault-injection and keep production in observation-only mode.
