@@ -1,6 +1,6 @@
 # GO/NO-GO Report
-**RUN_ID**: CEOSPRINT-20260109-2155-REPUBLISH3  
-**Generated**: 2026-01-09T22:27:21Z
+**RUN_ID**: CEOSPRINT-20260110-0045-REPUBLISH5  
+**Generated**: 2026-01-10T00:54:20Z
 
 ## VERDICT: **NO-GO**
 
@@ -16,5 +16,5 @@
 | ✅ SEO | 2,908 ✅ |
 
 **Fleet**: 6/8 healthy
+**A6**: 120ms (meets target)
 **Blockers**: A3, A8 (404)
-**Artifacts**: 33 files
