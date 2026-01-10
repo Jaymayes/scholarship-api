@@ -1,15 +1,12 @@
 # A3 Orchestration Run Log
-**RUN_ID**: CEOSPRINT-20260110-0615-REPUBLISH-ZT3A
+**RUN_ID**: CEOSPRINT-20260110-0622-REPUBLISH-ZT3B
 
 ## Status: BLOCKED
 A3 (scholarai-agent) returns HTTP 404 - app not running.
 
-## Required Action
-1. Open A3 workspace directly
-2. Check startup logs for errors
-3. Fix port binding / dependencies
-4. Republish
+## Revenue-Unblock Playbook Status
+- R0: BLOCKED (cannot load orchestration)
+- R1-R3: PENDING
 
-## Note
-A8 is READ-ONLY dashboard. All campaigns must run via A3 orchestration.
-Cannot proceed until A3 is reachable.
+## Required Action
+Open A3 workspace → check startup → fix → republish
