@@ -1,13 +1,13 @@
 # Performance Summary
-**RUN_ID**: CEOSPRINT-20260110-0622-REPUBLISH-ZT3B | Target: P95 ≤120ms
+**RUN_ID**: CEOSPRINT-20260110-0901-REPUBLISH-ZT3B | Target: P95 ≤120ms
 | App | Latency | Status |
 |-----|---------|--------|
-| A1 | 127ms | ⚠️ 1.1x |
-| A2 | 121ms | ⚠️ ~target |
+| A1 | 137ms | ⚠️ 1.1x |
+| A2 | **120ms** | ✅ **target** |
 | A3 | N/A | ❌ 404 |
-| A4 | **104ms** | ✅ **target** |
-| A5 | 141ms | ⚠️ 1.2x |
-| A6 | **115ms** | ✅ **target** |
-| A7 | 194ms | ⚠️ 1.6x |
+| A4 | 145ms | ⚠️ 1.2x |
+| A5 | 151ms | ⚠️ 1.3x |
+| A6 | **92ms** | ✅ **target** |
+| A7 | 177ms | ⚠️ 1.5x |
 | A8 | N/A | ❌ 404 |
-**Best Run Yet**: 2 apps at target, 2 near target
+**At Target**: A2, A6 ✅

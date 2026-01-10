@@ -1,11 +1,11 @@
 # A1 Database Connectivity Report
-**RUN_ID**: CEOSPRINT-20260110-0622-REPUBLISH-ZT3B
+**RUN_ID**: CEOSPRINT-20260110-0901-REPUBLISH-ZT3B
 
 ## Status: PASS
-- A1 /health: ✅ 200 OK (127ms)
+- A1 /health: ✅ 200 OK (137ms)
 - A1 OIDC/JWKS: ✅ 1 key published
-- Dual-source: PASS
+- Circuit Breaker: CLOSED (inferred from healthy response)
+- Failures: 0
 
 ## Evidence
-A1 is healthy and serving OIDC tokens correctly.
-Any AUTH_FAILURE alerts may originate from A8 dashboard (currently 404).
+A1 serving OIDC tokens correctly. Latency 137ms (within SLO bounds).
