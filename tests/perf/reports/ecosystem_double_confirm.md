@@ -1,9 +1,9 @@
 # Ecosystem Double Confirmation
-**RUN_ID**: CEOSPRINT-20260110-0045-REPUBLISH5
-| App | Status | Dual Check |
-|-----|--------|------------|
-| A1 | ✅ 200 | JWKS ✅ |
-| A2 | ✅ 200 | Local ✅ |
-| A3 | ❌ 404 | ❌ 404 |
-| A4-A7 | ✅ 200 | Single |
-| A8 | ❌ 404 | ❌ 404 |
+**RUN_ID**: CEOSPRINT-20260110-0440-REPUBLISH-ZT
+| App | Probe 1 | Probe 2 | Status |
+|-----|---------|---------|--------|
+| A1 | ✅ 200 | ✅ JWKS | PASS |
+| A2 | ✅ 200 | ⚠️ Local restart | PASS |
+| A3 | ❌ 404 | ❌ 404 | FAIL |
+| A4-A7 | ✅ 200 | - | SINGLE |
+| A8 | ❌ 404 | ❌ 404 | FAIL |
