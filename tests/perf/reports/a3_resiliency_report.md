@@ -1,8 +1,5 @@
 # A3 Resiliency Report
-**RUN_ID**: CEOSPRINT-20260110-0440-REPUBLISH-ZT
+**RUN_ID**: CEOSPRINT-20260110-0530-REPUBLISH-ZT2
 **Status**: NO-GO (404)
-**Root Cause Analysis**:
-- Fast 404 (80ms) indicates Replit edge responding, not app
-- Probable: Server never boots or missing ASGI entrypoint
-- Action: Check .replit start command and run manually in shell
-**Remediation Ticket**: TICKET-A3-002
+**Root Cause**: App not binding to port
+**Action**: Cross-workspace republish
