@@ -1,5 +1,5 @@
 # Ecosystem Double Confirmation
-**RUN_ID**: CEOSPRINT-20260110-0530-REPUBLISH-ZT2
+**RUN_ID**: CEOSPRINT-20260110-0600-REPUBLISH-ZT3
 | App | Probe 1 | Probe 2 | Status |
 |-----|---------|---------|--------|
 | A1 | ✅ 200 | ✅ JWKS | PASS |

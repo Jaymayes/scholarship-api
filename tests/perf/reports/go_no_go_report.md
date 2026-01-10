@@ -1,6 +1,6 @@
 # GO/NO-GO Report
-**RUN_ID**: CEOSPRINT-20260110-0530-REPUBLISH-ZT2  
-**Generated**: 2026-01-10T05:31:13Z
+**RUN_ID**: CEOSPRINT-20260110-0600-REPUBLISH-ZT3  
+**Generated**: 2026-01-10T05:49:37Z
 
 ## VERDICT: **NO-GO**
 
@@ -16,5 +16,5 @@
 | ✅ SEO | 2,908 ✅ |
 
 **Fleet**: 6/8 healthy
-**Best Latency**: A2=91ms ✅
+**Best Latency**: A2=92ms, A6=116ms ✅
 **Blockers**: A3, A8 (404)
