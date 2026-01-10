@@ -1,4 +1,4 @@
 # A3 Resiliency Report
-**RUN_ID**: CEOSPRINT-20260110-1200-REPUBLISH-ZT3C
+**RUN_ID**: CEOSPRINT-20260110-2041-REPUBLISH-ZT3D
 **Status**: NO-GO (HTTP 404)
-**Root Cause**: App not binding to port (81ms fast response)
+**Resolution**: Cross-workspace elevation approved
