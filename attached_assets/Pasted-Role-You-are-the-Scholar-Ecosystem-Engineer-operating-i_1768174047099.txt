@@ -1,0 +1,125 @@
+Role
+You are the Scholar Ecosystem Engineer operating in Max Autonomous mode under CEO authority. Execute Sprint ZT3G-RERUN-003 to (a) confirm A6’s stability fix, (b) verify the ecosystem end-to-end under a strict Stripe Safety Pause, and (c) deliver contradiction-free, second-confirmed status. Post all telemetry and artifacts to A8 with checksum-verified round-trip.
+
+Inputs
+Gemini Executive Package (JSON):
+[PASTE THE JSON OUTPUT FROM GEMINI HERE]
+
+Run identifiers and headers
+
+RUN_ID = CEOSPRINT-20260111-REPUBLISH-ZT3G-RERUN-003
+Protocol: AGENT3_HANDSHAKE v27
+X-Trace-Id = RUN_ID.<component> on every request
+X-Idempotency-Key on all mutable calls
+CEO approvals and guardrails
+
+A6 Fix Verification: A6 must return HTTP 200. If 500/404, republish immediately and re-verify.
+Stripe Safety ENFORCED: Observed remaining = 4 (<5 threshold). PAUSE B2C CHARGES. Do not bill unless a fresh HITL-CEO approval is recorded for one $0.50 micro-charge; auto-refund within 24h.
+Port binding APPROVED (24h): enforce host=0.0.0.0 on A3/A4/A5/A6/A8.
+Second-confirmation policy (anti–false-positive)
+
+Any PASS requires at least 2-of-3 (prefer 3-of-3):
+HTTP 200 with X-Trace-Id in payload
+Matching X-Trace-Id in logs
+Ledger correlation (A8 POST+GET checksum round-trip and/or Stripe/fee ledger)
+Treat all prior statuses as Unconfirmed until re-verified this run.
+Phases (target ≤60 minutes; parallelize safely)
+Phase -1: A6 Stability Gate + Config
+
+Probe A6 /health. Expect 200. If 500/404, republish and re-probe until 200 or abort after two failures.
+Enforce host=0.0.0.0 on A3/A4/A5/A6/A8 start commands; republish any service returning 404/500.
+Record Git SHAs and deployment timestamps in tests/perf/evidence/version_manifest.json.
+Phase 0: Inventory & A1 Warmup
+
+Warmup: 50 sequential requests to A1 across /, /pricing, /browse, /health.
+Probe health for A1–A8; save tests/perf/reports/system_map.json and {app}_health.json.
+Save tests/perf/reports/a1_warmup_report.md.
+Phase 1: A8 wiring and telemetry
+
+Emit synthetic events with X-Trace-Id; require ≥99% acceptance and POST+GET checksum.
+Save tests/perf/reports/a8_wiring_verdict.md.
+Phase 2: RL + HITL
+
+Verify RL: episode increments; exploration ≤0.001 or trending down; show one closed error-correction loop.
+Record “Stripe Safety Pause” as a HITL event; append tests/perf/reports/hitl_approvals.log.
+Phase 3: A1 DB + Cookie
+
+After warmup, verify A1 P95 ≤120ms over 10 minutes.
+Capture Set-Cookie; verify SameSite=None; Secure.
+Save tests/perf/reports/a1_cookie_validation.md.
+Phase 4: A3 Orchestration (v1.4-Unified)
+
+Run orchestration; confirm ≥1 for run_progress, cta_emitted, page_build_requested, page_published.
+Correlate HTTP+Trace, logs, and A8 ledger; save tests/perf/reports/a3_orchestration_runlog.md.
+Phase 5: B2C Funnel (Safety Mode)
+
+Check Stripe remaining. If <5 and no fresh HITL: SKIP live charge.
+Write tests/perf/reports/b2c_flow_verdict.md with status “Conditional Pass (Safety Pause)”.
+If fresh HITL exists: run a single $0.50 charge + refund using a browser-grade session (cookie jar); capture HTTP+Trace, logs, and Stripe ledger; save tests/perf/evidence/b2c_checkout_trace.json and tests/perf/evidence/refund_confirmations.json.
+Phase 6: B2B Funnel (A6 Verification)
+
+Verify A6 /health 200 and endpoint readiness.
+Onboard provider and publish listing.
+Verify 3% platform fee and 4x AI markup via fee lineage with X-Trace-Id and A8 ingestion.
+Save tests/perf/evidence/fee_lineage.json and tests/perf/reports/b2b_flow_verdict.md.
+Phase 7: Performance Sweep (SLO)
+
+Collect 10-minute samples and compute P95 for /, /pricing, /browse and health routes.
+Save tests/perf/reports/perf_summary.md.
+Phase 8: SEO/A7
+
+Verify ≥2,908 URLs reachable; validate sitemap/canonicals.
+Trigger one new Auto Page Maker build; confirm A8 ingestion.
+Save tests/perf/reports/seo_verdict.md.
+Phase 9: Governance & Idempotency
+
+Enforce idempotency; record canary rollout/coverage.
+Save tests/perf/reports/idempotency_validation.md and tests/perf/reports/post_republish_diff.md.
+Phase 10: Finalization and Second-Confirmation Summary
+
+Generate tests/perf/evidence/checksums.json (SHA256 for all artifacts).
+POST artifacts to A8 and confirm GET round-trip with checksum match.
+Produce tests/perf/reports/go_no_go_report.md mapped to Gemini.acceptance_criteria.
+Summarize 2-of-3 and 3-of-3 proofs in tests/perf/reports/ecosystem_double_confirm.md.
+Acceptance criteria (all must PASS)
+
+A6 production health: 200 OK (no regression).
+B2B: fee lineage (3% + 4x) verified with 2-of-3 (prefer 3-of-3).
+B2C: Marked “Conditional Pass (Safety Pause)” unless a fresh HITL authorizes a single micro-charge, in which case 2-of-3 (prefer 3-of-3) required.
+A1: Warm P95 ≤120ms for ≥10 minutes; cookie SameSite=None; Secure verified.
+A8 telemetry: ≥99% with POST+GET checksum confirmation.
+A1–A8: health routes 200; all bound to 0.0.0.0; secrets validated.
+SEO: ≥2,908 URLs reachable and one fresh page build ingested.
+RL: episode increments; exploration ≤0.001 (or decreasing); error-correction loop demonstrated.
+Stripe safety: No charges if remaining <5 and no fresh HITL approval.
+Stop/rollback rules
+
+A6 fails to stabilize at 200 after two republishes → mark UNVERIFIED, escalate with logs.
+Stripe remaining <5 and no fresh HITL → do not charge; continue all non-billing verifications.
+P95 >120ms persists >10 minutes post-warmup and one optimize attempt → open performance incident; continue remaining checks.
+Artifacts (minimum set)
+
+system_map.json
+version_manifest.json
+{app}_health.json for A1–A8
+a1_warmup_report.md
+a1_cookie_validation.md
+a3_orchestration_runlog.md
+b2c_checkout_trace.json (only if HITL overrides Safety Pause)
+refund_confirmations.json (only if HITL overrides Safety Pause)
+fee_lineage.json
+perf_summary.md
+seo_verdict.md
+idempotency_validation.md
+post_republish_diff.md
+ecosystem_double_confirm.md
+b2c_flow_verdict.md
+b2b_flow_verdict.md
+a8_wiring_verdict.md
+hitl_approvals.log
+checksums.json
+go_no_go_report.md
+Final console output and A8 post
+
+If all criteria pass under Safety Pause rules: print “Attestation: VERIFIED LIVE (ZT3G-RERUN-003)” and post artifact index with checksums; confirm A8 GET round-trip.
+If A6 regresses or any critical criterion fails: print “Attestation: UNVERIFIED (ZT3G-RERUN-003)” and post a remediation plan listing failed checks, root cause hypothesis, next action, owner, and ETA. END-REPLIT-AGENT-PROMPT

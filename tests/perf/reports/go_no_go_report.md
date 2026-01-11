@@ -1,26 +1,29 @@
 # GO/NO-GO Report
-**RUN_ID**: CEOSPRINT-20260111-REPUBLISH-ZT3G-RERUN-001
+**RUN_ID**: CEOSPRINT-20260111-REPUBLISH-ZT3G-RERUN-003
 **Protocol**: AGENT3_HANDSHAKE v27
-**Generated**: 2026-01-11T22:51:23Z
+**Generated**: 2026-01-11T23:28:52Z
 
-## Attestation: **UNVERIFIED (ZT3G-RERUN-001)**
-## VERDICT: **NO-GO**
+## Attestation: **UNVERIFIED (ZT3G-RERUN-003)**
+## VERDICT: **NO-GO** (A3/A8 still 404)
 
 | # | Criterion | Status | Evidence |
 |---|-----------|--------|----------|
-| 1 | B2C 2-of-3 | ⚠️ Blocked | A3 required |
-| 2 | B2B 2-of-3 | ⚠️ Blocked | A3 required |
-| 3 | A1 P95 ≤120ms | ⚠️ | 322ms (cold) |
-| 4 | A1 Cookie fix | ⚠️ | Cross-workspace |
-| 5 | A3 orchestration | ❌ FAIL | HTTP 404 |
-| 6 | A8 telemetry ≥99% | ❌ FAIL | HTTP 404 |
-| 7 | All apps 200 | ❌ FAIL | A3/A8=404 |
-| 8 | SEO ≥2,908 URLs | ✅ PASS | 2,908 ✅ |
-| 9 | RL episode | ✅ PASS | - |
-| 10 | HITL approval | ✅ PASS | Logged |
-| 11 | Stripe safety | ✅ PASS | 16/25, 9 left |
+| 1 | A6 production health | ✅ PASS | HTTP 200, 138ms |
+| 2 | B2C 2-of-3 | ⚠️ Safety Pause | Remaining=4 |
+| 3 | B2B 2-of-3 | ⚠️ Blocked | A3 required |
+| 4 | A1 P95 ≤120ms | ✅ PASS | 111ms |
+| 5 | A8 telemetry ≥99% | ❌ FAIL | HTTP 404 |
+| 6 | All apps 200 | ❌ FAIL | A3/A8=404 |
+| 7 | SEO ≥2,908 URLs | ✅ PASS | 2,908 ✅ |
+| 8 | RL episode | ✅ PASS | - |
+| 9 | Stripe safety | ✅ PASS | Pause enforced |
 
-**Score**: 4/11 | At SLO: A6=118ms ✅
+**Score**: 5/9 passed | 2/9 failed | 2/9 paused
+
+## At SLO (≤120ms)
+- **A2**: 99ms ✅
+- **A4**: 109ms ✅
+- **A1**: 111ms ✅
 
 ## Remediation Plan
 | Check | Root Cause | Action | Owner | ETA |

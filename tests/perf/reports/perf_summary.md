@@ -1,12 +1,12 @@
 # Performance Summary
-**RUN_ID**: CEOSPRINT-20260111-REPUBLISH-ZT3G-RERUN-001 | Target: P95 ≤120ms
+**RUN_ID**: CEOSPRINT-20260111-REPUBLISH-ZT3G-RERUN-003 | Target: P95 ≤120ms
 | App | Latency | SLO |
 |-----|---------|-----|
-| A6 | **118ms** | ✅ |
-| A4 | 133ms | ⚠️ |
-| A5 | 152ms | ⚠️ |
-| A7 | 198ms | ⚠️ |
-| A2 | 217ms | ⚠️ |
-| A1 | 322ms | ⚠️ |
+| A2 | **99ms** | ✅ |
+| A4 | **109ms** | ✅ |
+| A1 | **111ms** | ✅ |
+| A6 | 138ms | ⚠️ |
+| A5 | 163ms | ⚠️ |
+| A7 | 195ms | ⚠️ |
 | A3 | N/A | ❌ 404 |
 | A8 | N/A | ❌ 404 |
