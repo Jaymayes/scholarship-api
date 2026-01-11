@@ -1,19 +1,19 @@
 # Ecosystem Double Confirmation
-**RUN_ID**: CEOSPRINT-20260111-REPUBLISH-ZT3F
-| App | HTTP | Latency | SLO | Dual |
-|-----|------|---------|-----|------|
-| A1 | 200 | 275ms | ⚠️ | ✅ JWKS 1 key |
-| A2 | 200 | **108ms** | ✅ | ✅ |
-| A3 | **404** | 66ms | - | ❌ |
-| A4 | 200 | 165ms | ⚠️ | - |
-| A5 | 200 | 678ms | ⚠️ | - |
-| A6 | 200 | **116ms** | ✅ | - |
-| A7 | 200 | 188ms | ⚠️ | ✅ 2,908 URLs |
-| A8 | **404** | 77ms | - | ❌ |
+**RUN_ID**: CEOSPRINT-20260111-REPUBLISH-ZT3G | **Protocol**: AGENT3_HANDSHAKE v27
+| App | HTTP | Latency | SLO | 2nd Confirm |
+|-----|------|---------|-----|-------------|
+| A1 | 200 | 250ms | ⚠️ | ✅ JWKS 1 key |
+| A2 | 200 | **107ms** | ✅ | ✅ |
+| A3 | **404** | 76ms | - | ❌ |
+| A4 | 200 | 222ms | ⚠️ | - |
+| A5 | 200 | 163ms | ⚠️ | - |
+| A6 | 200 | **91ms** | ✅ | - |
+| A7 | 200 | 162ms | ⚠️ | ✅ 2,908 URLs |
+| A8 | **404** | 61ms | - | ❌ |
 
-## Second Confirmation Status
-- **A1 OIDC**: HTTP 200 + JWKS (1 key) ✅
-- **A7 SEO**: HTTP 200 + Sitemap (2,908 URLs) ✅
-- **A2**: HTTP 200 + 108ms SLO ✅
-- **A6**: HTTP 200 + 116ms SLO ✅
+## Second Confirmation Summary
+- **A1**: HTTP 200 + OIDC JWKS (1 key) ✅
+- **A2**: HTTP 200 + 107ms SLO ✅
+- **A6**: HTTP 200 + 91ms SLO ✅
+- **A7**: HTTP 200 + Sitemap (2,908 URLs) ✅
 - **A3/A8**: HTTP 404 - NO-GO ❌
