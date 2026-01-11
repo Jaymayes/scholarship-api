@@ -1,4 +1,2 @@
 # B2C Flow Verdict
-**RUN_ID**: CEOSPRINT-20260111-REPUBLISH-ZT3G
-**Status**: BLOCKED (A3/A8 required)
-**Stripe**: 16/25 used, 9 remaining
+**RUN_ID**: CEOSPRINT-20260111-REPUBLISH-ZT3G-RERUN-001 | **Status**: BLOCKED | **Stripe**: 16/25
