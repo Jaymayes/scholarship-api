@@ -1,2 +1,3 @@
-# post republish diff
-**RUN_ID**: CEOSPRINT-20260110-2227-REPUBLISH-ZT3EPLUS
+# Post-Republish Diff
+**RUN_ID**: CEOSPRINT-20260111-REPUBLISH-ZT3F | 6/8 healthy | A3/A8=404
+**At SLO**: A2=108ms, A6=116ms ✅

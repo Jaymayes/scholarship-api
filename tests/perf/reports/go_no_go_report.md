@@ -1,23 +1,32 @@
 # GO/NO-GO Report
-**RUN_ID**: CEOSPRINT-20260110-2227-REPUBLISH-ZT3EPLUS
-**Generated**: 2026-01-10T22:28:17Z
+**RUN_ID**: CEOSPRINT-20260111-REPUBLISH-ZT3F
+**Generated**: 2026-01-11T05:42:00Z
 
 ## VERDICT: **NO-GO**
+## Attestation: **UNVERIFIED**
 
-| # | Criterion | Status |
-|---|-----------|--------|
-| 1 | Republish Delta | ✅ PASS |
-| 2 | A1 DB CB CLOSED | ✅ PASS |
-| 3 | **A3 orchestration** | ❌ FAIL (404) |
-| 4 | B2C Stripe | ⚠️ Blocked |
-| 5 | B2B lineage | ⚠️ Blocked |
-| 6 | All apps 200 | ❌ FAIL (A3/A8) |
-| 7 | A8 Telemetry | ❌ FAIL (404) |
-| 8 | Learning & HITL | ✅ PASS |
-| 9 | Governance | ✅ PASS |
-| 10 | SEO ≥2,908 | ✅ PASS |
+| # | Criterion | Status | Evidence |
+|---|-----------|--------|----------|
+| 1 | B2C 2-of-3 proof | ⚠️ Blocked | A3 required |
+| 2 | B2B 2-of-3 proof | ⚠️ Blocked | A3 required |
+| 3 | A1 P95 ≤120ms 10min | ⚠️ | 275ms cold start |
+| 4 | A1 OIDC cookie | ⚠️ | Missing SameSite |
+| 5 | A3 orchestration | ❌ FAIL | HTTP 404 |
+| 6 | A8 telemetry ≥99% | ❌ FAIL | HTTP 404 |
+| 7 | All apps 200 | ❌ FAIL | A3/A8=404 |
+| 8 | SEO ≥2,908 URLs | ✅ PASS | 2,908 ✅ |
+| 9 | RL episode inc | ✅ PASS | - |
+| 10 | HITL approval | ✅ PASS | Cross-workspace |
+| 11 | Stripe cap | ✅ PASS | 16/25 used |
 
-**Score**: 5/10 | **Stripe**: 16/25 used, 9 remaining
+**Score**: 4/11 passed | 3/11 failed | 4/11 blocked
 
-## Blocker
-A3/A8 return 404 (16+ runs confirmed)
+## At SLO (≤120ms)
+- **A2**: 108ms ✅
+- **A6**: 116ms ✅
+
+## Remediation Plan
+| Check | Root Cause | Action | Owner | ETA |
+|-------|-----------|--------|-------|-----|
+| A3 404 | Not binding to port | Fix in A3 workspace | CEO | 24h |
+| A8 404 | Not binding to port | Fix in A8 workspace | CEO | 24h |

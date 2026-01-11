@@ -1,2 +1,5 @@
-# b2b flow verdict
-**RUN_ID**: CEOSPRINT-20260110-2227-REPUBLISH-ZT3EPLUS
+# B2B Flow Verdict
+**RUN_ID**: CEOSPRINT-20260111-REPUBLISH-ZT3F
+**Revenue**: $179.99
+**Fee Model**: 3% + 4x ✅
+**Status**: BLOCKED (A3 required)
