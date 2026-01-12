@@ -2,15 +2,16 @@
 **RUN_ID**: CEOSPRINT-20260111-REPUBLISH-ZT3G-RERUN-005 | **Protocol**: AGENT3_HANDSHAKE v27
 | App | HTTP | Latency | SLO | 2nd Confirm |
 |-----|------|---------|-----|-------------|
-| A1 | 200 | 145ms | ⚠️ | ✅ JWKS 1 key |
-| A2 | 200 | 126ms | ⚠️ | ✅ |
-| A3 | **404** | 72ms | - | ❌ |
-| A4 | 200 | **111ms** | ✅ | - |
-| A5 | 200 | 149ms | ⚠️ | - |
-| A6 | 200 | **82ms** | ✅ | ✅ Stable |
-| A7 | 200 | 193ms | ⚠️ | ✅ 2,908 URLs |
-| A8 | **404** | 74ms | - | ❌ |
+| A1 | 200 | 210ms | ⚠️ | ✅ JWKS 1 key |
+| A2 | 200 | **97ms** | ✅ | ✅ |
+| A3 | **404** | 75ms | - | ❌ External workspace |
+| A4 | 200 | 145ms | ⚠️ | - |
+| A5 | 200 | 124ms | ⚠️ | - |
+| A6 | 200 | 195ms | ⚠️ | ✅ Stable |
+| A7 | 200 | 180ms | ⚠️ | ✅ 2,908 URLs |
+| A8 | **404** | 74ms | - | ❌ External workspace |
 
-## At SLO (≤120ms): A6=82ms, A4=111ms ✅
+## At SLO (≤120ms): A2=97ms ✅
 ## Port 5000: CLEAN ✅
-## A6 Final Stability: VERIFIED ✅
+## A6 No-Touch: VERIFIED ✅
+## A3/A8 Fix: BLOCKED (external workspaces)

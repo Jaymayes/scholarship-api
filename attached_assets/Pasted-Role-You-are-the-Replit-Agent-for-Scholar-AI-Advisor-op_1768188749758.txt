@@ -1,0 +1,131 @@
+Role
+You are the Replit Agent for Scholar AI Advisor operating in Max Autonomous mode under CEO authority. Execute Sprint ZT3G-RERUN-005 (Gold Standard). The prior run failed due to: (1) a Port 5000 conflict (“Address already in use”) and (2) A3/A8 returning HTTP 404 from improper binding. Your mission is to: fix fleet ports (kill the blocking process and enforce dynamic binding to $PORT), force proper binding on A3/A8, confirm A6 is stable without republish (final anti-flap), maintain the Stripe Safety Pause, lock in A1 warm performance, and produce the Gold-Standard artifact package with second confirmation and A8 round-trip checksums.
+
+Run identifiers and headers
+
+RUN_ID = CEOSPRINT-20260111-REPUBLISH-ZT3G-RERUN-005
+Protocol: AGENT3_HANDSHAKE v27
+X-Trace-Id = RUN_ID.<component> on every request
+X-Idempotency-Key on all mutable calls
+CEO approvals and guardrails
+
+Port-5000 Remediation (CRITICAL): Authorized to scan for listeners on 5000, terminate blocking/orphan processes, and enforce host=0.0.0.0 with port=$PORT for all apps (A1–A8). No hardcoded ports allowed.
+A3/A8 Binding Fix (CRITICAL): Authorized to update A3 and A8 start commands to bind 0.0.0.0:$PORT (e.g., uvicorn main:app --host 0.0.0.0 --port $PORT or equivalent for the stack).
+A6 Final Gate (No-Touch): If A6 /health or /readyz ≠ 200 at any time, mark “A6 Regression Detected,” FAIL the sprint, and escalate. Do not republish A6 in this sprint.
+Stripe Safety ENFORCED: Observed remaining ≈4 (<5). Pause all B2C charges. Only run a single $0.50 charge if a fresh HITL-CEO override is recorded for this sprint; auto-refund within 24h.
+Security: Respect secrets; least privilege; bind via $PORT only; no 127.0.0.1 bindings for public routes.
+Second-confirmation policy (anti–false-positive)
+
+Any PASS requires at least 2-of-3 (prefer 3-of-3):
+HTTP 200 with X-Trace-Id in the response
+Matching X-Trace-Id in logs
+Ledger correlation via A8 POST+GET checksum round-trip and/or Stripe/fee ledger
+Treat all prior statuses as Unconfirmed until re-verified in this sprint.
+Phases (target ≤60 minutes; parallelize safely)
+
+Phase -1: Fleet Port Integrity + A3/A8 Binding Fix
+
+Scan for listeners on port 5000 (lsof -i :5000 or netstat/fuser). If found, capture PID, user, command; terminate process; verify port is free.
+Validate each app (A1–A8) start command and runtime bind to 0.0.0.0:$PORT (never hardcoded 5000).
+For A3 and A8 specifically, force binding to 0.0.0.0:$PORT (e.g., uvicorn main:app --host 0.0.0.0 --port $PORT; Flask: app.run(host="0.0.0.0", port=int(os.environ["PORT"])); Node: server.listen(process.env.PORT, "0.0.0.0")).
+Persist changes to start scripts/manifests/Procfiles and republish A3/A8 if their configs were modified.
+Artifacts:
+tests/perf/evidence/listener_inventory.json (before/after scan)
+tests/perf/reports/port_conflict_report.md (what was killed, proof of fix)
+Phase 0: A6 Final Stability Gate (No-Touch)
+
+Probe A6 /health and /readyz; expect 200 throughout. If non-200 at any time, FAIL sprint (no republish). Record A6 Git SHA + deploy timestamp in tests/perf/evidence/version_manifest.json with timestamps/latency.
+Phase 1: Inventory & Strict A1 Warmup
+
+Execute 50 sequential warmup requests to A1 (/, /pricing, /browse, /health).
+Immediately probe A1 health (target ≤120ms) and begin a 10-minute window to collect P95 for /, /pricing, /browse.
+Probe A2–A8 health; record status, latency, uptime, binding, and secrets check; save {app}_health.json for each app and tests/perf/reports/system_map.json.
+Save tests/perf/reports/a1_warmup_report.md (cold vs warm, observed ≤120ms).
+Phase 2: A8 wiring and telemetry
+
+Emit synthetic events with X-Trace-Id; require ≥99% acceptance and A8 POST+GET checksum round-trip for artifacts.
+Save tests/perf/reports/a8_wiring_verdict.md.
+Phase 3: RL + HITL
+
+Verify RL: episode increments; exploration ≤0.001 or trending down; demonstrate one closed error-correction loop (detect → retry/backoff → resolved).
+Record HITL events (Stripe Safety Pause; any cross-workspace verifications) in tests/perf/reports/hitl_approvals.log.
+Phase 4: A1 DB + Cookie (browser-grade)
+
+Confirm A1 P95 ≤120ms over 10 minutes. Capture Set-Cookie; verify SameSite=None; Secure for browser-grade sessions.
+Save tests/perf/reports/a1_cookie_validation.md.
+Phase 5: A3 orchestration (v1.4-Unified)
+
+Execute orchestration; confirm run_progress ≥1, cta_emitted ≥1, page_build_requested ≥1, page_published ≥1 with X-Trace-Id; correlate logs and A8 ledger.
+Save tests/perf/reports/a3_orchestration_runlog.md.
+Phase 6: B2C funnel (Safety Mode)
+
+Stripe remaining <5 and no fresh HITL → SKIP live charge; set tests/perf/reports/b2c_flow_verdict.md = “Conditional Pass (Safety Pause)”.
+If fresh HITL override exists: run one $0.50 micro-charge + refund using a cookie-jar session; capture HTTP+Trace, logs, and Stripe ledger. Save tests/perf/evidence/b2c_checkout_trace.json and tests/perf/evidence/refund_confirmations.json.
+Phase 7: B2B funnel (Final Verification)
+
+Confirm A6 still 200; onboard provider and publish a listing.
+Verify fee lineage (3% platform fee + 4x AI service) with X-Trace-Id and A8 ingestion.
+Save tests/perf/evidence/fee_lineage.json and tests/perf/reports/b2b_flow_verdict.md.
+Phase 8: Performance sweep (SLO)
+
+Collect 10-minute samples; compute P95 for /, /pricing, /browse and each app’s health route. Save tests/perf/reports/perf_summary.md.
+Phase 9: SEO/A7
+
+Verify ≥2,908 URLs reachable; validate sitemap/canonicals; trigger one new A7 Auto Page Maker build; confirm A8 ingestion.
+Save tests/perf/reports/seo_verdict.md.
+Phase 10: Governance & Idempotency
+
+Enforce idempotency; record canary rollout/coverage.
+Save tests/perf/reports/idempotency_validation.md and tests/perf/reports/post_republish_diff.md (diff should show no A6 republish).
+Phase 11: Finalization & Gold-Standard Package
+
+Generate tests/perf/evidence/checksums.json (SHA256 for all artifacts).
+POST artifacts to A8; confirm GET round-trip and checksum match.
+Produce tests/perf/reports/go_no_go_report.md mapped to Acceptance Criteria (below).
+Summarize 2-of-3 and 3-of-3 proofs in tests/perf/reports/ecosystem_double_confirm.md.
+Acceptance criteria (must all PASS)
+
+Ports: No port 5000 conflicts; all services bind 0.0.0.0:$PORT; start scripts updated; listener_inventory.json and port_conflict_report.md show clean state.
+A3/A8: /health 200 OK (binding fixed, no 404).
+A6 (No-Touch): /health and /readyz 200 OK throughout; latency within SLO; no republish during this sprint.
+B2C: “Conditional Pass (Safety Pause)” unless a fresh HITL authorizes one micro-charge; if charged, require 2-of-3 (prefer 3-of-3) and immediate refund.
+B2B: Fee lineage verified with 2-of-3 (prefer 3-of-3) and A8 correlation (3% + 4x).
+A1: Warm health probe ≤120ms and 10-minute P95 ≤120ms; cookie SameSite=None; Secure verified.
+A8 telemetry: ≥99% with POST+GET artifact checksum confirmation.
+Fleet: A1–A8 health routes 200; secrets validated; one fresh A7 page build ingested.
+RL: Episode increments; exploration ≤0.001 (or decreasing); closed error-correction loop demonstrated.
+Stripe Safety: No charges when remaining <5 unless HITL override; refunds executed for any micro-charge.
+Stop/rollback rules
+
+Port conflicts persist after remediation → FAIL sprint; attach port_conflict_report.md and listener_inventory.json.
+A3 or A8 remain 404 after binding fix and republish → FAIL sprint; attach logs and startup command diff.
+A6 non-200 at any time → mark UNVERIFIED; escalate with logs; no republish this sprint.
+Stripe remaining <5 and no fresh HITL → maintain Safety Pause; continue non-billing verifications.
+P95 >120ms persists >10 minutes post-warmup and one optimization → open performance incident; continue remaining checks.
+Artifacts (minimum set)
+
+tests/perf/evidence/listener_inventory.json
+tests/perf/reports/port_conflict_report.md
+tests/perf/reports/system_map.json
+tests/perf/evidence/version_manifest.json
+{app}_health.json for A1–A8
+tests/perf/reports/a1_warmup_report.md
+tests/perf/reports/a1_cookie_validation.md
+tests/perf/reports/a3_orchestration_runlog.md
+tests/perf/reports/b2c_flow_verdict.md
+tests/perf/reports/b2b_flow_verdict.md
+tests/perf/evidence/fee_lineage.json
+tests/perf/reports/perf_summary.md
+tests/perf/reports/seo_verdict.md
+tests/perf/reports/idempotency_validation.md
+tests/perf/reports/post_republish_diff.md
+tests/perf/reports/a8_wiring_verdict.md
+tests/perf/reports/ecosystem_double_confirm.md
+tests/perf/reports/hitl_approvals.log
+tests/perf/evidence/checksums.json
+tests/perf/reports/go_no_go_report.md
+(If HITL charge executed) tests/perf/evidence/b2c_checkout_trace.json and tests/perf/evidence/refund_confirmations.json
+Final console output and A8 post
+
+If all criteria pass and ports are clean and A3/A8 return 200: print “Attestation: VERIFIED LIVE (ZT3G-RERUN-005 — GOLD STANDARD)” and post the artifact index with checksums; confirm A8 GET round-trip.
+If ports remain conflicted, or A3/A8 still 404, or A6 regresses, or any critical criterion fails: print “Attestation: UNVERIFIED (ZT3G-RERUN-005)” and post a remediation plan with failed checks, root-cause hypothesis, next action, owner, and ETA. END-REPLIT-AGENT-PROMPT
