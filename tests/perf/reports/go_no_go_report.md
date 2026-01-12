@@ -1,8 +1,8 @@
 # GO/NO-GO Report
 
-**RUN_ID**: CEOSPRINT-20260113-EXEC-ZT3G-FIX-017
-**Protocol**: AGENT3_HANDSHAKE v28 (Strict Mode)
-**Generated**: 2026-01-12T19:06:43Z
+**RUN_ID**: CEOSPRINT-20260113-EXEC-ZT3G-FIX-021
+**Protocol**: AGENT3_HANDSHAKE v29 (Strict + Scorched Earth)
+**Generated**: 2026-01-12T20:49:54Z
 
 ---
 
@@ -10,43 +10,30 @@
 
 ---
 
-## Acceptance Criteria
+## Fleet
 
-| # | Criterion | Status | Evidence |
-|---|-----------|--------|----------|
-| 1 | A1-A8 health = 200 | ❌ FAIL | A3=404, A8=404 |
-| 2 | A1 cookie verified | ⚠️ PARTIAL | /health doesn't set cookies |
-| 3 | A1 P95 ≤120ms | ⚠️ ABOVE | 159ms after warmup |
-| 4 | A3 orchestration | ❌ BLOCKED | A3 = 404 |
-| 5 | A8 telemetry ≥99% | ❌ BLOCKED | A8 = 404 |
-| 6 | B2B funnel | ⚠️ PARTIAL | A3 orchestration blocked |
-| 7 | B2C micro-charge | ⚠️ CONDITIONAL | Safety pause (4 remaining) |
-| 8 | SEO ≥2,908 URLs | ✅ PASS | 2,908 URLs verified |
-| 9 | RL active | ❌ BLOCKED | A8 = 404 |
-| 10 | Security headers | ✅ PASS | Platform defaults applied |
-| 11 | Stripe Safety | ✅ MAINTAINED | No charges executed |
+| App | HTTP | Status |
+|-----|------|--------|
+| A1 | 200 | ✅ PASS |
+| A2 | 200 | ✅ PASS |
+| A3 | 404 | ❌ BLOCKED |
+| A4 | 200 | ✅ PASS |
+| A5 | 200 | ✅ PASS |
+| A6 | 200 | ✅ PASS |
+| A7 | 200 | ✅ PASS |
+| A8 | 404 | ❌ BLOCKED |
 
-## Fleet Summary
+## Blockers
 
-| Status | Count | Apps |
-|--------|-------|------|
-| ✅ PASS | 6 | A1, A2, A4, A5, A6, A7 |
-| ❌ BLOCKED | 2 | A3, A8 |
+- **A3**: HTTP 404 - Server not binding to 0.0.0.0:$PORT
+- **A8**: HTTP 404 - Server not binding to 0.0.0.0:$PORT
 
-## Critical Blockers
-
-1. **A3 (scholarai-agent)**: HTTP 404 - Server not binding correctly
-2. **A8 (a8-command-center)**: HTTP 404 - Server not binding correctly
-
-## Required Action
+## Required
 
 CEO must manually fix A3 and A8 in their respective workspaces.
-See: `tests/perf/reports/manual_intervention_manifest.md`
 
-## Post-Fix Path
+## Stripe Safety
 
-1. CEO fixes A3 and A8
-2. CEO verifies both return HTTP 200
-3. CEO notifies agent: "A3 and A8 are fixed"
-4. Agent runs VERIFY-ZT3G-018
-5. If 8/8 pass → VERIFIED LIVE (ZT3G)
+- Remaining: 4/25
+- HITL Override: NOT GRANTED
+- Charges: NOT EXECUTED

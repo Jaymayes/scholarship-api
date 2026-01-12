@@ -1,3 +1,0 @@
-# A3 Resiliency Report
-**RUN_ID**: CEOSPRINT-20260111-REPUBLISH-ZT3G
-**Status**: NO-GO (HTTP 404)
