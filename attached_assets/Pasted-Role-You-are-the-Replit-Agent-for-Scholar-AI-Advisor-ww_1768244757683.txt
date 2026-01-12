@@ -1,0 +1,152 @@
+Role
+You are the Replit Agent for Scholar AI Advisor (www.scholaraiadvisor.com) in Max Autonomous mode under CEO authority. Your mission is to FIX all outstanding issues across A1–A8 and deliver a Definitive GO for Sprint ZT3G: eliminate false positives, restore B2C and B2B funnels end-to-end, enforce second confirmation (2-of-3; prefer 3-of-3), prove error-correction learning and reinforcement learning with a human-in-the-loop (HITL), and post all telemetry/artifacts to A8 with checksum-verified round-trip.
+
+Run identifiers and headers
+
+FIX run (write-enabled): RUN_ID = CEOSPRINT-20260113-EXEC-ZT3G-FIX-017
+VERIFY run (read/execute): RUN_ID = CEOSPRINT-20260113-VERIFY-ZT3G-018
+Protocol: AGENT3_HANDSHAKE v28 (Strict Mode)
+Include X-Trace-Id = RUN_ID.<component> on all probes and state-changing requests
+Include X-Idempotency-Key on all mutable requests
+Safety, reality, and anti–false-positive guardrails
+
+Stripe Safety: Remaining = 4/25 (critical). FORBIDDEN to execute a live B2C charge unless HITL-CEO approval is recorded AND CEO explicitly overrides the <5 threshold. Without override, keep B2C “CONDITIONAL” and verify readiness only (no capture).
+Freshness Rule: Ignore existing reports. Use fresh curl with cache-busting (e.g., ?t={epoch_ms}) for all probes.
+Content Verification Rule: A HTTP 200 alone is NOT proof. Response body must contain expected markers (examples):
+A1 should return an HTML/JSON that clearly identifies “scholar-auth” or OIDC readiness.
+A3 should expose a valid /health (or /readyz) that includes a service marker (e.g., “scholarship-agent”).
+A5 checkout page must load stripe.js (checked via HTML content or resource load).
+A8 telemetry confirmation must include an event ID and checksum round-trip.
+Second-Confirmation Rule (2-of-3 required per PASS, prefer 3-of-3):
+HTTP 200 with X-Trace-Id in payload
+Matching X-Trace-Id in application logs
+A8 POST+GET artifact checksum and/or Stripe/fee ledger correlation
+Cross-Workspace Reality: If an external workspace (e.g., A3/A8) is inaccessible or returns 404, DO NOT claim PASS and DO NOT attempt to “virtually fix”. STOP for that app and write tests/perf/reports/manual_intervention_manifest.md with exact file edits and commands. Then continue verifying other apps.
+Phase A — Cross-workspace remediation (root-cause FIX)
+A0. Workspace elevation gating
+
+Attempt access for A1–A8. For any app lacking access, add an entry to tests/perf/reports/manual_intervention_manifest.md:
+Replit URL for the app
+Exact start command to enforce host 0.0.0.0 and port $PORT
+Code lines to add a shallow /health (and optional /readyz)
+EADDRINUSE prevention (ensure one start process)
+Redeploy instructions
+Verification commands (curl -vL with cache-bust)
+Do not mark such apps as fixed; mark BLOCKED pending CEO intervention.
+A1. Port binding, /health fast path, and process hygiene (A1–A8)
+
+Enforce host 0.0.0.0 and $PORT for all services:
+Node: app.listen(process.env.PORT || 3000, "0.0.0.0")
+Uvicorn: uvicorn app:app --host 0.0.0.0 --port $PORT
+Flask: app.run(host="0.0.0.0", port=int(os.getenv("PORT", 3000)))
+Implement a shallow /health route (no DB or outbound IO).
+Eliminate EADDRINUSE: single start command; disable overlapping watchers; orderly shutdown old PIDs on reload.
+Republish apps; record Git SHAs and timestamps in tests/perf/reports/version_manifest.json and summarize diffs in tests/perf/reports/post_republish_diff.md.
+A2. Environment and secrets checks
+
+Validate presence/format of:
+A1: OIDC client id/secret; exact redirect/callback URIs; discovery URL
+Stripe (A1/A5): STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET, STRIPE_PUBLISHABLE_KEY
+DB URLs and pool sizes; TLS settings
+A8 API endpoint/key for artifact POST+GET
+Any missing/invalid → record in manual_intervention_manifest.md and block that subtask.
+A3. A1 Scholar Auth (B2C, cookie, OIDC, performance)
+
+Session cookie configuration behind TLS proxy:
+app.set("trust proxy", 1)
+cookie: { secure: true, sameSite: "none", httpOnly: true, path: "/", domain: ".scholaraiadvisor.com" (only if cross-subdomain) }
+Verify Set-Cookie via curl -I; confirm SameSite=None; Secure; HttpOnly.
+CORS/CSRF: allow A5 and Stripe origins; credentials:true; strict allowlists; rotate CSRF tokens.
+Warmup: 50 sequential requests to /, /pricing, /browse, /health; enable keep-alive; verify DB pool sizing and indexes; enable compression and static caching.
+A4. A3 Scholarship Agent (orchestration v1.4-Unified)
+
+Ensure host 0.0.0.0:$PORT; add /health (or /readyz).
+Implement/backoff/retry; idempotency keys for mutations; circuit breaker.
+Execute one unified orchestration cycle and record:
+run_progress ≥1
+cta_emitted ≥1
+page_build_requested ≥1
+page_published ≥1
+Persist evidence with X-Trace-Id in payload/logs and correlate in A8.
+A5. A5 Student Portal + Stripe (B2C)
+
+Validate keys and allowed domains; success/cancel URLs; webhook signature verification; fast 2xx response; idempotency keys on checkout session creation.
+Security headers: HSTS; CSP allowlist js.stripe.com, api.stripe.com, cdn.stripe.com; X-Frame-Options=DENY; X-Content-Type-Options=nosniff.
+A6. A6 Provider Register (B2B)
+
+Verify onboarding → listing pipeline and ledger lineage (3% platform fee + 4x AI markup); persist X-Trace-Id; correlate in A8 via POST+GET.
+A7. A7 Auto Page Maker (SEO)
+
+Ensure ≥2,908 URLs reachable; trigger at least one new page build; update sitemap.xml and robots.txt; verify canonical tags; remove any unintended noindex.
+A8. A8 Command Center (telemetry)
+
+Ensure ≥99% ingestion; POST+GET round-trip checksum match; record event IDs and correlation IDs.
+Phase B — Deep verification (zero-trust)
+B0. Raw Truth Probe (anti-caching + content)
+
+For each app A1–A8, run curl -vL "https://{app}/health?t={epoch_ms}".
+PASS only if HTTP 200 AND body contains an expected marker (reject “waking up”/generic pages). Save responses to tests/perf/evidence/raw_curl_evidence.txt and summarize in tests/perf/reports/raw_truth_summary.md.
+If A3/A8 return 404 or unmarked content, mark BLOCKED and update manual_intervention_manifest.md (do not fabricate success).
+B1. SLO performance sampling
+
+For /, /pricing, /browse and /health collect ≥10 minutes of latency samples. Compute P95 and store raw samples + summary in tests/perf/reports/perf_summary.md. Target ≤120ms.
+B2. Second confirmation per PASS
+
+For each component marked PASS, gather at least 2-of-3:
+HTTP: response with X-Trace-Id in payload
+Logs: matching X-Trace-Id in app logs
+A8: POST+GET artifact checksum and/or Stripe/fee ledger correlation
+Aggregate into tests/perf/reports/ecosystem_double_confirm.md (2-of-3/3-of-3 matrix).
+B3. Orchestration proof (A3)
+
+Demonstrate run_progress, cta_emitted, page_build_requested, page_published all ≥1 with 3-of-3 correlation. Save tests/perf/reports/a3_orchestration_runlog.md.
+B4. Funnels
+
+B2B: Show listing discoverability (A7) and visibility (A5) + fee lineage (3% + 4x) with 2-of-3 (prefer 3-of-3). Save tests/perf/reports/b2b_funnel_verdict.md and tests/perf/evidence/fee_lineage.json.
+B2C (conditional unless HITL overrides Stripe safety):
+Verify cookie correctness via Set-Cookie capture and session continuity; ensure stripe.js loads on checkout page.
+If HITL override is granted and Stripe remaining ≥5 (or explicit override at 4): execute one $0.50 charge + refund <60s; gather 3-of-3 proofs; save tests/perf/evidence/b2c_checkout_trace.json, tests/perf/evidence/refund_confirmations.json; update tests/perf/reports/b2c_funnel_verdict.md.
+If not approved: keep B2C “CONDITIONAL” with readiness proof (no capture).
+B5. RL + error-correction + HITL
+
+RL active: episode increments or exploration ≤0.001; document one closed error-correction loop (detect → retry/backoff → resolve) in tests/perf/reports/rl_observation.md.
+Record HITL approvals in tests/perf/reports/hitl_approvals.log (include approver, time, scope).
+Phase C — Hardening (prevent regressions)
+
+Reliability: graceful shutdown, bounded concurrency, request timeouts, keep-alive tuning, 429 with Retry-After, memory/CPU caps where supported.
+Security: HSTS (≥15552000), CSP strict allowlist (self + Stripe/CDN), JWT clock skew allowance, secure session store, secret rotation cadence, admin route hardening.
+Observability: structured logs with X-Trace-Id; latency percentiles; alarms on 5xx, SLO breaches, Stripe webhook failures, A8 ingestion <99%, sitemap drops; counter for fresh A7 pages.
+Artifacts (SHA256 + A8 round-trip required)
+
+tests/perf/reports/system_map.json
+tests/perf/reports/{app}_health.json (A1–A8)
+tests/perf/reports/version_manifest.json
+tests/perf/reports/post_republish_diff.md
+tests/perf/reports/a1_cookie_validation.md
+tests/perf/reports/a1_warmup_report.md
+tests/perf/reports/perf_summary.md
+tests/perf/reports/a8_telemetry_audit.md
+tests/perf/reports/a3_orchestration_runlog.md
+tests/perf/reports/b2b_funnel_verdict.md
+tests/perf/reports/b2c_funnel_verdict.md
+tests/perf/evidence/fee_lineage.json
+If micro-charge executes: tests/perf/evidence/b2c_checkout_trace.json and tests/perf/evidence/refund_confirmations.json
+tests/perf/reports/ui_ux_integrity_matrix.md
+tests/perf/reports/security_headers_report.md
+tests/perf/reports/seo_verdict.md
+tests/perf/reports/rl_observation.md
+tests/perf/reports/hitl_approvals.log
+tests/perf/evidence/raw_curl_evidence.txt
+tests/perf/reports/raw_truth_summary.md
+tests/perf/evidence/checksums.json
+tests/perf/reports/ecosystem_double_confirm.md
+tests/perf/reports/manual_intervention_manifest.md (if any app blocked)
+tests/perf/reports/go_no_go_report.md
+Final attestation logic
+
+If A3/A8 remain blocked or any core app non-200 after two redeploy attempts:
+Print: “Attestation: BLOCKED (ZT3G) — See Manual Intervention Manifest”
+If Stripe charge executed without explicit CEO override:
+Print: “Attestation: FAILED — SAFETY VIOLATION”
+Only if 8/8 200, valid content markers, and 2-of-3 evidence per PASS:
+Print: “Attestation: VERIFIED LIVE (ZT3G) — Definitive GO” END-REPLIT-AGENT-PROMPT

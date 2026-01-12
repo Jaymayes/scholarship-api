@@ -1,197 +1,194 @@
-# Manual Intervention Manifest: A3/A8 Fix Package
+# Manual Intervention Manifest
 
-**RUN_ID**: CEOSPRINT-20260113-EXEC-ZT3G-FIX-011
-**Generated**: 2026-01-12T17:30:00Z
-**Priority**: CRITICAL (Blocking Fleet Verification)
-
----
-
-## Agent Limitation Notice
-
-The Replit Agent operates **exclusively in the A2 workspace**. It cannot:
-- Access A3 or A8 filesystems
-- Edit A3 or A8 startup commands
-- View A3 or A8 logs
-- Republish A3 or A8
-
-**CEO must fix A3 and A8 manually.**
+**RUN_ID**: CEOSPRINT-20260113-EXEC-ZT3G-FIX-017
+**Protocol**: AGENT3_HANDSHAKE v28 (Strict Mode)
+**Generated**: 2026-01-12T19:06:43Z
+**Status**: BLOCKED - CEO ACTION REQUIRED
 
 ---
 
-## A3: scholarai-agent (CRITICAL)
+## Agent Workspace Limitation
 
-### Current Status
+This agent operates exclusively in the **A2 (scholarship-api)** workspace. It cannot access, edit, or republish other workspaces.
+
+---
+
+## BLOCKED: A3 (scholarai-agent)
+
+### Current State
+- **URL**: https://scholarai-agent-jamarrlmayes.replit.app
 - **Health**: HTTP 404
-- **Root Cause**: Server not binding to `0.0.0.0:$PORT`
+- **Content**: No valid service marker
 
-### Fix Steps
+### Root Cause
+Server not binding to `0.0.0.0:$PORT` or missing `/health` endpoint.
 
-1. **Open Workspace**
-   ```
-   https://replit.com/@jamarrlmayes/scholarai-agent
-   ```
+### Required Fixes
 
-2. **Check Current Startup**
-   - Look in `.replit` file for `run` command
-   - Or check Workflows panel for the run command
+#### 1. Open Workspace
+```
+https://replit.com/@jamarrlmayes/scholarai-agent
+```
 
-3. **Identify Framework and Fix**
+#### 2. Check/Fix Startup Command
 
-   **If Python/FastAPI/Uvicorn:**
-   ```python
-   # main.py - ensure this pattern at bottom
-   if __name__ == "__main__":
-       import uvicorn
-       import os
-       port = int(os.environ.get("PORT", 5000))
-       uvicorn.run(app, host="0.0.0.0", port=port)
-   ```
-   
-   **Or in run command:**
-   ```bash
-   uvicorn main:app --host 0.0.0.0 --port $PORT
-   ```
+**Option A: Uvicorn (FastAPI)**
+```bash
+# In .replit or workflow
+uvicorn main:app --host 0.0.0.0 --port $PORT
+```
 
-   **If Python/Flask:**
-   ```python
-   if __name__ == "__main__":
-       import os
-       port = int(os.environ.get("PORT", 5000))
-       app.run(host="0.0.0.0", port=port)
-   ```
+**Option B: In Python code (main.py)**
+```python
+import os
+import uvicorn
 
-   **If Node.js/Express:**
-   ```javascript
-   const port = process.env.PORT || 5000;
-   app.listen(port, "0.0.0.0", () => {
-     console.log(`Server running on port ${port}`);
-   });
-   ```
+if __name__ == "__main__":
+    port = int(os.environ.get("PORT", 5000))
+    uvicorn.run("main:app", host="0.0.0.0", port=port)
+```
 
-4. **Add /health Endpoint (if missing)**
-   
-   **FastAPI:**
-   ```python
-   @app.get("/health")
-   async def health():
-       return {"status": "ok"}
-   ```
-   
-   **Flask:**
-   ```python
-   @app.route("/health")
-   def health():
-       return {"status": "ok"}
-   ```
-   
-   **Express:**
-   ```javascript
-   app.get("/health", (req, res) => {
-     res.json({ status: "ok" });
-   });
-   ```
+#### 3. Add /health Endpoint
 
-5. **Republish**
-   - Click the Deploy/Publish button
-   - Wait for deployment to complete
+**FastAPI:**
+```python
+from fastapi import FastAPI
 
-6. **Verify**
-   ```bash
-   curl -I https://scholarai-agent-jamarrlmayes.replit.app/health
-   # Expected: HTTP/2 200
-   ```
+app = FastAPI()
 
-### Common Issues
-- `--host 127.0.0.1` instead of `0.0.0.0`
-- Missing `PORT` environment variable usage
-- No `/health` endpoint defined
-- EADDRINUSE (another process on same port)
+@app.get("/health")
+async def health():
+    return {"status": "ok", "service": "scholarship-agent"}
+```
+
+**Flask:**
+```python
+@app.route("/health")
+def health():
+    return {"status": "ok", "service": "scholarship-agent"}
+```
+
+#### 4. Prevent EADDRINUSE
+- Ensure only ONE start command in `.replit` or workflow
+- Remove any duplicate process managers
+- Use `pkill -f uvicorn` before starting if needed
+
+#### 5. Republish
+- Save all changes
+- Click Deploy/Publish button
+- Wait for deployment to complete
+
+#### 6. Verify
+```bash
+curl -vL "https://scholarai-agent-jamarrlmayes.replit.app/health?t=$(date +%s)"
+# Expected: HTTP 200 with {"status": "ok", "service": "scholarship-agent"}
+```
 
 ---
 
-## A8: a8-command-center (CRITICAL)
+## BLOCKED: A8 (a8-command-center)
 
-### Current Status
+### Current State
+- **URL**: https://a8-command-center-jamarrlmayes.replit.app
 - **Health**: HTTP 404
-- **Root Cause**: Server not binding to `0.0.0.0:$PORT`
+- **Content**: No valid service marker
 
-### Fix Steps
+### Root Cause
+Server not binding to `0.0.0.0:$PORT` or missing `/health` endpoint.
 
-1. **Open Workspace**
-   ```
-   https://replit.com/@jamarrlmayes/a8-command-center
-   ```
+### Required Fixes
 
-2. **Check Current Startup**
-   - Look in `.replit` file for `run` command
-   - Or check Workflows panel for the run command
+#### 1. Open Workspace
+```
+https://replit.com/@jamarrlmayes/a8-command-center
+```
 
-3. **Apply Same Fix Pattern as A3**
-   - Ensure `host="0.0.0.0"` or `--host 0.0.0.0`
-   - Ensure using `$PORT` or `process.env.PORT`
-   - Add `/health` endpoint if missing
+#### 2. Check/Fix Startup Command
 
-4. **Republish**
-   - Click the Deploy/Publish button
-   - Wait for deployment to complete
+**Node.js/Express:**
+```javascript
+const port = process.env.PORT || 5000;
+app.listen(port, "0.0.0.0", () => {
+  console.log(`A8 Command Center running on port ${port}`);
+});
+```
 
-5. **Verify**
-   ```bash
-   curl -I https://a8-command-center-jamarrlmayes.replit.app/health
-   # Expected: HTTP/2 200
-   ```
+**Python/Uvicorn:**
+```bash
+uvicorn main:app --host 0.0.0.0 --port $PORT
+```
+
+#### 3. Add /health Endpoint
+
+**Express:**
+```javascript
+app.get("/health", (req, res) => {
+  res.json({ status: "ok", service: "command-center" });
+});
+```
+
+**FastAPI:**
+```python
+@app.get("/health")
+async def health():
+    return {"status": "ok", "service": "command-center"}
+```
+
+#### 4. Republish
+- Save all changes
+- Click Deploy/Publish button
+- Wait for deployment to complete
+
+#### 5. Verify
+```bash
+curl -vL "https://a8-command-center-jamarrlmayes.replit.app/health?t=$(date +%s)"
+# Expected: HTTP 200 with {"status": "ok", "service": "command-center"}
+```
 
 ---
 
-## Quick Reference: Framework Patterns
+## Verification After Fixes
 
-| Framework | Host Binding |
-|-----------|--------------|
-| Uvicorn | `uvicorn app:app --host 0.0.0.0 --port $PORT` |
-| Gunicorn | `gunicorn app:app --bind 0.0.0.0:$PORT` |
-| Flask | `app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))` |
-| Express | `app.listen(process.env.PORT, "0.0.0.0")` |
-| Fastify | `server.listen({ port: process.env.PORT, host: "0.0.0.0" })` |
-
----
-
-## Verification After Fix
-
-Once both A3 and A8 are fixed, run this command:
+Run this command to verify both apps:
 
 ```bash
 for app in scholarai-agent a8-command-center; do
-  echo "$app: $(curl -s -o /dev/null -w '%{http_code}' https://${app}-jamarrlmayes.replit.app/health)"
+  resp=$(curl -sS "https://${app}-jamarrlmayes.replit.app/health?t=$(date +%s)" 2>/dev/null)
+  code=$(curl -sS -o /dev/null -w "%{http_code}" "https://${app}-jamarrlmayes.replit.app/health" 2>/dev/null)
+  echo "$app: HTTP $code"
+  echo "  Body: $resp"
 done
 ```
 
-**Expected Output:**
+**Expected:**
 ```
-scholarai-agent: 200
-a8-command-center: 200
+scholarai-agent: HTTP 200
+  Body: {"status":"ok","service":"scholarship-agent"}
+a8-command-center: HTTP 200
+  Body: {"status":"ok","service":"command-center"}
 ```
 
 ---
 
 ## Timeline
 
-| Phase | Action | Owner | ETA |
-|-------|--------|-------|-----|
-| T+0 | Open A3 workspace | CEO | Immediate |
-| T+5 | Identify root cause | CEO | 5 min |
-| T+15 | Apply fix | CEO | 15 min |
-| T+20 | Republish A3 | CEO | 20 min |
-| T+25 | Verify A3 = 200 | CEO | 25 min |
-| T+30 | Repeat for A8 | CEO | 30 min |
-| T+40 | Both verified | CEO | 40 min |
-| T+45 | Re-run verification | Agent | 45 min |
+| Step | Action | Owner | ETA |
+|------|--------|-------|-----|
+| 1 | Open A3 workspace | CEO | Immediate |
+| 2 | Apply A3 fixes | CEO | +10 min |
+| 3 | Republish A3 | CEO | +15 min |
+| 4 | Verify A3 = 200 | CEO | +20 min |
+| 5 | Open A8 workspace | CEO | +20 min |
+| 6 | Apply A8 fixes | CEO | +30 min |
+| 7 | Republish A8 | CEO | +35 min |
+| 8 | Verify A8 = 200 | CEO | +40 min |
+| 9 | Notify Agent | CEO | +40 min |
+| 10 | Full verification | Agent | +55 min |
 
 ---
 
-## Post-Fix: Agent Verification
+## Post-Fix Command
 
-Once A3 and A8 return 200, notify the agent with:
+Once A3 and A8 are fixed, send to agent:
 
-> "A3 and A8 are fixed. Run verification CEOSPRINT-20260113-VERIFY-ZT3G-012"
-
-The agent will then execute the full verification suite.
+> "A3 and A8 are fixed and returning 200. Run verification CEOSPRINT-20260113-VERIFY-ZT3G-018"
