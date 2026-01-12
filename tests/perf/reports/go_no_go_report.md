@@ -1,12 +1,12 @@
-# GO/NO-GO Report: Sprint 008 (Persistence + Soak)
+# GO/NO-GO Report: Run 009
 
-**RUN_ID**: SPRINT-008-SOAK-20260112-071349
+**RUN_ID**: CEOSPRINT-20260113-0100Z-ZT3G-RERUN-009-E2E
 **Protocol**: AGENT3_HANDSHAKE v27
-**Generated**: 2026-01-12T07:14:36Z
+**Generated**: 2026-01-12T17:27:29Z
 
 ---
 
-## Attestation: **UNVERIFIED (Sprint 008 — Fail-Fast at T+0)**
+## Attestation: **UNVERIFIED (ZT3G)**
 
 ---
 
@@ -14,78 +14,69 @@
 
 | Field | Value |
 |-------|-------|
-| Timestamp | 2026-01-12T07:13:50Z |
+| Timestamp | 2026-01-12T17:27:29Z |
 | Trigger | A3 and A8 returned HTTP 404 |
-| Action | Sprint STOPPED per guardrail |
-| Phases Executed | T+0 only |
-| Phases Skipped | T+15, T+60 |
+| Action | Run STOPPED per fail-fast guardrail |
+| Phase | 0 (Raw Truth Gate) |
 
 ---
 
-### T+0 Raw Truth Gate
+### Acceptance Criteria Status
 
-| App | Expected | Actual | Status |
-|-----|----------|--------|--------|
-| A3 | 200 | **404** | ❌ FAIL |
-| A6 | 200 | 200 | ✅ PASS |
-| A8 | 200 | **404** | ❌ FAIL |
-
-### Full Fleet at Fail-Fast
-
-| App | /health |
-|-----|---------|
-| A1 | 200 ✅ |
-| A2 | 200 ✅ |
-| A3 | **404** ❌ |
-| A4 | 200 ✅ |
-| A5 | 200 ✅ |
-| A6 | 200 ✅ |
-| A7 | 200 ✅ |
-| A8 | **404** ❌ |
-
-**Fleet Status**: 6/8 Healthy
+| # | Criterion | Status | Evidence |
+|---|-----------|--------|----------|
+| 1 | All A1-A8 health = 200 | ❌ FAIL | A3=404, A8=404 |
+| 2 | A3/A6/A8 Raw Truth | ❌ FAIL | A3=404, A8=404 |
+| 3 | A8 telemetry ≥99% | ❌ BLOCKED | A8 down |
+| 4 | A1 warm P95 ≤120ms | ⚠️ NOT TESTED | Run stopped |
+| 5 | B2B funnel verified | ⚠️ NOT TESTED | Run stopped |
+| 6 | B2C funnel ready | ⚠️ NOT TESTED | Run stopped |
+| 7 | RL active | ⚠️ NOT TESTED | A8 down |
+| 8 | UI/UX ≥6/7 | ⚠️ NOT TESTED | Run stopped |
+| 9 | SEO ≥2,908 URLs | ⚠️ NOT TESTED | Run stopped |
+| 10 | Stripe Safety | ✅ MAINTAINED | 4 remaining |
 
 ---
 
-### Pass Criteria Evaluation
+### Fleet Status at Fail-Fast
 
-| # | Criterion | Status | Reason |
-|---|-----------|--------|--------|
-| 1 | A3/A6/A8 all 200 at T+0/15/60 | ❌ FAIL | A3=404, A8=404 at T+0 |
-| 2 | No outage >60s | N/A | Sprint stopped |
-| 3 | Error rate <0.5% | N/A | Sprint stopped |
-| 4 | A1 warm probe ≤120ms | N/A | Not tested |
-| 5 | A1 60-min P95 ≤120ms | N/A | Not tested |
-| 6 | A8 ingestion ≥99% | N/A | A8 down |
-| 7 | RL signal stable | N/A | A8 down |
-| 8 | UI/UX sweep no 404/5xx | N/A | Not tested |
-| 9 | Evidence integrity | ✅ PASS | Checksums generated |
+| App | /health | Latency |
+|-----|---------|---------|
+| A1 | 200 ✅ | 461ms |
+| A2 | 200 ✅ | 325ms |
+| A3 | **404** ❌ | 154ms |
+| A4 | 200 ✅ | 215ms |
+| A5 | 200 ✅ | 325ms |
+| A6 | 200 ✅ | 283ms |
+| A7 | 200 ✅ | 267ms |
+| A8 | **404** ❌ | 100ms |
+
+**Fleet Health**: 6/8
+
+---
+
+### Remediation Plan
+
+| Check | Root Cause | Action | Owner | ETA |
+|-------|------------|--------|-------|-----|
+| A3 = 404 | Not binding to 0.0.0.0:$PORT | Fix startup in A3 workspace → Republish | CEO | 30 min |
+| A8 = 404 | Not binding to 0.0.0.0:$PORT | Fix startup in A8 workspace → Republish | CEO | 30 min |
+| A8 telemetry | A8 down | Blocked until A8 fixed | CEO | 30 min |
+| RL observation | A8 down | Blocked until A8 fixed | CEO | 30 min |
 
 ---
 
 ### Evidence Files
 
-- `tests/perf/evidence/raw_truth_soak.txt` - Raw curl outputs
-- `tests/perf/evidence/checksums.json` - SHA256 checksums
-- `tests/perf/reports/go_no_go_report.md` - This report
+- `tests/perf/evidence/raw_curl_evidence.txt`
+- `tests/perf/evidence/{A1-A8}_health.json`
+- `tests/perf/reports/raw_truth_summary.md`
 
 ---
 
-### Manual Intervention Required
+### Next Steps
 
-A3 and A8 must be fixed before Sprint 008 can continue:
-
-| App | Workspace | Root Cause | Fix |
-|-----|-----------|------------|-----|
-| A3 | `@jamarrlmayes/scholarai-agent` | Not binding to 0.0.0.0:$PORT | Fix startup → Republish |
-| A8 | `@jamarrlmayes/a8-command-center` | Not binding to 0.0.0.0:$PORT | Fix startup → Republish |
-
-See: `tests/perf/reports/manual_intervention_manifest.md` for detailed steps.
-
----
-
-### Recommendation
-
-1. Fix A3 and A8 in their respective workspaces
-2. Verify both return HTTP 200
-3. Re-run Sprint 008 from T+0
+1. Fix A3 in `@jamarrlmayes/scholarai-agent` workspace
+2. Fix A8 in `@jamarrlmayes/a8-command-center` workspace
+3. Verify both return HTTP 200
+4. Re-run Run 009
