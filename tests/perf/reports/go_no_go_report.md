@@ -1,33 +1,54 @@
 # GO/NO-GO Report
-**RUN_ID**: CEOSPRINT-20260111-REPUBLISH-ZT3G-RERUN-007
+**RUN_ID**: CEOSPRINT-20260111-REPUBLISH-ZT3G-RERUN-007-E2E
 **Protocol**: AGENT3_HANDSHAKE v27
-**Generated**: 2026-01-12T04:35:06Z
+**Generated**: 2026-01-12T05:58:55Z
 
-## Attestation: **UNVERIFIED (ZT3G-RERUN-007)**
-## Verdict: **SPRINT STOPPED** (Raw Truth Probe FAILED)
+## Attestation: **UNVERIFIED (ZT3G-RERUN-007 — Critical Liveness Failure)**
+## Verdict: **SPRINT STOPPED AT PHASE -1**
+
+---
 
 ### Raw Truth Probe Results
 
-| App | Expected | Actual | Verbatim Status Line |
-|-----|----------|--------|---------------------|
-| A3 | 200 | **404** | `< HTTP/2 404` |
-| A8 | 200 | **404** | `< HTTP/2 404` |
-| A6 | 200 | 200 ✅ | `< HTTP/2 200` |
+| App | /health | Status |
+|-----|---------|--------|
+| A1 | 200 | ✅ PASS |
+| A2 | 200 | ✅ PASS |
+| A3 | **404** | ❌ CRITICAL |
+| A4 | 200 | ✅ PASS |
+| A5 | 200 | ✅ PASS |
+| A6 | 200 | ✅ PASS |
+| A7 | 200 | ✅ PASS |
+| A8 | **404** | ❌ CRITICAL |
 
-### Decision Gate
-Per guardrails: **Any core app returning non-200 → STOP immediately**
+### Critical Apps (must all be 200)
+- A3: **404** ❌
+- A6: 200 ✅
+- A8: **404** ❌
 
-### Manual Intervention Required
-See: `tests/perf/reports/manual_intervention_manifest.md`
+---
 
 ### Acceptance Criteria Status
 
-| # | Criterion | Status |
-|---|-----------|--------|
-| 1 | Raw Truth (A3/A8/A6 = 200) | ❌ FAILED |
-| 2 | No False Positives | ✅ PASS (sprint stopped correctly) |
-| 3 | Stripe Safety Pause | ✅ PASS |
-| 4 | A1 P95 ≤120ms | ⚠️ NOT TESTED (sprint stopped) |
-| 5 | B2B Fee Lineage | ⚠️ NOT TESTED (sprint stopped) |
-| 6 | A8 Telemetry | ⚠️ NOT TESTED (sprint stopped) |
-| 7 | Evidence Integrity | ⚠️ NOT TESTED (sprint stopped) |
+| # | Criterion | Status | Notes |
+|---|-----------|--------|-------|
+| 1 | Raw Truth Liveness | ❌ FAILED | A3/A8 = 404 |
+| 2 | UI/UX Integrity | ⚠️ NOT TESTED | Sprint stopped |
+| 3 | B2C Funnel | ⚠️ NOT TESTED | Sprint stopped |
+| 4 | B2B Funnel | ⚠️ NOT TESTED | Sprint stopped |
+| 5 | A1 Performance | ⚠️ NOT TESTED | Sprint stopped |
+| 6 | Telemetry & RL | ⚠️ NOT TESTED | Sprint stopped |
+| 7 | Security Headers | ⚠️ NOT TESTED | Sprint stopped |
+| 8 | Evidence Integrity | ⚠️ NOT TESTED | Sprint stopped |
+| 9 | No False Positives | ✅ PASS | Sprint stopped correctly |
+
+---
+
+### Manual Intervention Required
+
+See: `tests/perf/reports/manual_intervention_manifest.md`
+
+### Evidence Files
+- `tests/perf/evidence/raw_curl_evidence.txt`
+- `tests/perf/evidence/{A1-A8}_health.json`
+- `tests/perf/reports/raw_truth_summary.md`
