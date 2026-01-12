@@ -1,16 +1,13 @@
 # GO/NO-GO Report
 
-**RUN_ID**: CEOSPRINT-20260113-EXEC-ZT3G-FIX-021
-**Protocol**: AGENT3_HANDSHAKE v29 (Strict + Scorched Earth)
-**Generated**: 2026-01-12T20:49:54Z
+**RUN_ID**: CEOSPRINT-20260113-EXEC-ZT3G-FIX-025
+**Protocol**: v30 (Functional Deep-Dive)
 
 ---
 
 ## Attestation: BLOCKED (ZT3G) — See Manual Intervention Manifest
 
 ---
-
-## Fleet
 
 | App | HTTP | Status |
 |-----|------|--------|
@@ -23,17 +20,13 @@
 | A7 | 200 | ✅ PASS |
 | A8 | 404 | ❌ BLOCKED |
 
-## Blockers
-
-- **A3**: HTTP 404 - Server not binding to 0.0.0.0:$PORT
-- **A8**: HTTP 404 - Server not binding to 0.0.0.0:$PORT
-
-## Required
-
-CEO must manually fix A3 and A8 in their respective workspaces.
+## SEO
+- URLs: 2,908 ✅
 
 ## Stripe Safety
-
 - Remaining: 4/25
 - HITL Override: NOT GRANTED
 - Charges: NOT EXECUTED
+
+## Required
+CEO must fix A3 and A8 manually.
