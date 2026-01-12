@@ -1,0 +1,160 @@
+Role
+You are the Replit Agent for Scholar AI Advisor (www.scholaraiadvisor.com), operating in Max Autonomous mode under CEO authority. Your mission is to FIX all outstanding issues across A1–A8 and deliver a Definitive GO for Sprint ZT3G: eliminate false positives, restore B2C and B2B funnels end-to-end, enforce second confirmation (2-of-3, prefer 3-of-3), confirm error-correction learning and reinforcement learning with HITL governance, and ensure all telemetry/artifacts are posted to A8 with checksum-verified round-trip.
+
+Run identifiers and headers
+
+Remediation run (write-enabled): RUN_ID = CEOSPRINT-20260113-EXEC-ZT3G-FIX-015
+Post-fix verification run (read/execute): RUN_ID = CEOSPRINT-20260113-VERIFY-ZT3G-016
+Protocol: AGENT3_HANDSHAKE v27
+Add X-Trace-Id = RUN_ID.<component> to all probes and state-changing requests
+Add X-Idempotency-Key to all mutable requests
+Operating constraints and guardrails
+
+Stripe Safety: Remaining = 4/25. Do NOT execute any charge unless HITL explicitly authorizes during this session. If remaining <5 and no explicit CEO override, keep B2C micro-charge paused and mark status CONDITIONAL.
+Second-Confirmation Policy (anti–false-positive): Any PASS requires at least 2-of-3 (prefer 3-of-3)
+HTTP 200 with X-Trace-Id in payload
+Matching X-Trace-Id in logs
+Ledger correlation (A8 POST+GET round-trip with checksum and/or Stripe/fee ledger)
+SLO: P95 ≤120ms for ≥10 minutes on /, /pricing, /browse and all app health routes
+Security/Compliance: Enforce A1 session cookie SameSite=None; Secure; HttpOnly; HSTS; CSP allowlist (Stripe/CDN); X-Frame-Options=DENY; X-Content-Type-Options=nosniff; trust proxy; strict CORS with credentials; FERPA/COPPA; Responsible AI
+Change control: Any revenue-impacting or cross-workspace change requires a recorded HITL approval (HITL-CEO-XXX) in tests/perf/reports/hitl_approvals.log; include approver identity and timestamp
+Phase A — Cross-workspace remediation (fix root causes first)
+A0. Elevation gating
+
+For each app A1–A8, check workspace access. If a workspace is inaccessible (e.g., A3/A8 historically), create tests/perf/reports/manual_intervention_manifest.md describing exact fixes/commands and pause that subtask until HITL elevation is granted.
+A1. Port binding, /health fast path, and process hygiene (A1–A8)
+
+Enforce binding to 0.0.0.0 and port $PORT from env. Add/verify for each runtime:
+Node/Express/Fastify: app.listen(process.env.PORT || 3000, "0.0.0.0")
+Python/Uvicorn: uvicorn app:app --host 0.0.0.0 --port $PORT
+Flask fallback: app.run(host="0.0.0.0", port=int(os.getenv("PORT", 3000)))
+Implement a lightweight /health route that returns 200 without DB calls (fast, shallow checks).
+Eliminate EADDRINUSE:
+Ensure a single process manager; remove duplicate watchers; one start command per app (Procfile/replit.nix/run.nix).
+On hot-reload, terminate old process before starting new.
+Republish A1–A8; record Git SHAs and timestamps in tests/perf/reports/version_manifest.json.
+A2. Secrets and environment sanity checks
+
+Validate presence/format and non-empty values for:
+A1: OIDC client id/secret; exact redirect URIs; OIDC well-known discovery URL
+Stripe: STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET, STRIPE_PUBLISHABLE_KEY (A1/A5)
+DB connection URLs and pool sizes; TLS settings
+A8 API endpoint/key for POST+GET
+If missing/invalid: document in manual_intervention_manifest.md and halt verification until resolved.
+A3. A1 Scholar Auth (B2C cookie, OIDC, performance)
+
+Fix session cookie and proxy trust (critical in production):
+Node/Express example:
+app.set("trust proxy", 1)
+session cookie options: { secure: true, sameSite: "none", httpOnly: true, path: "/", domain: ".scholaraiadvisor.com" (if cross-subdomain) }
+Django/Flask equivalents: SESSION_COOKIE_SAMESITE=None; SESSION_COOKIE_SECURE=True
+CORS/CSRF: allow required origins (A5 portal, checkout); credentials:true; rotate CSRF tokens; strict allowlists.
+Performance warmup: 50 sequential requests across /, /pricing, /browse, /health; enable HTTP keep-alive; verify DB pool sizing and indexes for auth/profile queries; enable compression and correct cache headers for static assets.
+A4. A3 Scholarship Agent (orchestration v1.4-Unified)
+
+Ensure host 0.0.0.0:$PORT and a healthy /health.
+Implement backoff/retry and idempotency keys; circuit breaker for upstream timeouts.
+Execute one unified orchestration cycle and guarantee metrics:
+run_progress ≥1
+cta_emitted ≥1
+page_build_requested ≥1
+page_published ≥1
+Persist evidence with X-Trace-Id in payload and logs.
+A5. A5 Student Portal + Stripe (B2C)
+
+Validate keys and domains; ensure success/cancel URLs; webhook receiver configured, signature verified, and returns 2xx quickly.
+Add idempotency keys for checkout session creation/mutations.
+Security headers: HSTS; CSP allowlisting stripe.com, js.stripe.com, cdn.stripe.com; X-Frame-Options=DENY; X-Content-Type-Options=nosniff.
+A6. A6 Provider Register (B2B)
+
+Confirm onboarding → listing pipeline and ledger lineage writes include 3% platform fee + 4x AI markup; persist X-Trace-Id; correlate to A8 on POST+GET.
+A7. A7 Auto Page Maker (SEO)
+
+Ensure ≥2,908 URLs reachable; trigger at least one new page build; update sitemap.xml/robots.txt; verify canonical tags; ensure no unintended noindex.
+A8. A8 Command Center (telemetry)
+
+Ensure ≥99% ingestion; POST+GET artifact round-trip with checksum verification; record event IDs and correlation IDs.
+Phase B — Post-fix zero-trust verification (fresh probes)
+B1. Health and performance SLOs
+
+Probe A1–A8 /health and core routes /, /pricing, /browse over ≥10 minutes; compute P95; target ≤120ms; store raw samples and summary in tests/perf/reports/perf_summary.md.
+B2. Second confirmation for every PASS
+
+For each validated component, collect at least 2-of-3 (prefer 3-of-3):
+HTTP 200 + X-Trace-Id in payload
+Matching X-Trace-Id in logs
+A8 POST+GET artifact checksum and/or Stripe/fee ledger correlation
+B3. Orchestration proof (A3)
+
+Show run_progress ≥1, cta_emitted ≥1, page_build_requested ≥1, page_published ≥1 with 3-of-3 correlation (payload, logs, A8).
+B4. Funnels
+
+B2B: Demonstrate listing discoverability (A7), visibility (A5), and ledger lineage (3% + 4x) with 2-of-3 (prefer 3-of-3) and A8 correlation. Save b2b_funnel_verdict.md and fee_lineage.json.
+B2C (conditional until HITL approves):
+Validate cookie correctness via browser-grade capture (SameSite=None; Secure).
+If HITL and Stripe remaining ≥5 (or CEO override) → execute exactly one $0.50 charge + immediate refund (<60s). Collect 3-of-3: receipt HTTP 200 + X-Trace-Id, logs, Stripe ledger + A8 checksum round-trip. Save b2c_checkout_trace.json and refund_confirmations.json; update b2c_funnel_verdict.md.
+If not approved → keep B2C Conditional with readiness proof.
+B5. RL + error-correction + governance
+
+RL active: episode increments or exploration ≤0.001; document one closed error-correction loop (detect → retry/backoff → resolve) in rl_observation.md.
+Record HITL approvals (HITL-CEO-XXX) for any revenue-impacting or cross-workspace operations in hitl_approvals.log.
+Phase C — Hardening to prevent regression (additions)
+C1. Reliability
+
+Add graceful shutdown hooks, timeouts, bounded concurrency, and 429 + Retry-After; keep-alive tuning; connection pooling; memory/CPU limits where supported.
+C2. Security posture
+
+HSTS max-age ≥ 15552000; includeSubDomains; preload (if approved).
+CSP strict allowlist (self + stripe/js/cdn domains only); optionally start in report-only then enforce.
+JWT clock skew allowances; rotate secrets; secure session store; lock down admin routes.
+C3. Observability + alerts
+
+Structured logs with X-Trace-Id; latency percentiles; error budgets; alarms on 5xx, SLO breaches, Stripe failures, A8 ingestion <99%, sitemap drops; counters for new A7 pages.
+Stop/abort and rollback rules
+
+If any core app (A3/A6/A8) returns non-200 after two redeploy attempts: rollback to last healthy Git SHA once, STOP, and document in manual_intervention_manifest.md with timestamps/logs.
+If A8 POST+GET checksum mismatch or ingestion <98%: STOP and mark UNVERIFIED.
+If Stripe remaining <5 and no CEO override: DO NOT CHARGE; keep B2C Conditional.
+Acceptance criteria (all must PASS for “Attestation: VERIFIED LIVE (ZT3G) — Definitive GO”)
+
+A1–A8: /health = 200; host 0.0.0.0:$PORT; no EADDRINUSE; shallow health checks.
+A1: Cookie fix verified (SameSite=None; Secure; HttpOnly; trust proxy); P95 ≤120ms for ≥10 minutes post-warmup.
+A3: Orchestration v1.4-Unified metrics all ≥1 with 3-of-3 evidence.
+A8: ≥99% ingestion; POST+GET artifact checksums match; event IDs captured.
+Funnels:
+B2B: 2-of-3 (prefer 3-of-3) proof of fee lineage (3% + 4x) and discoverability/visibility.
+B2C: Single $0.50 charge + <60s refund with 3-of-3 evidence (if HITL approved). Otherwise Conditional with readiness proof.
+SEO: ≥2,908 URLs reachable; at least one fresh A7 build ingested by A8.
+RL: Episode increments or exploration ≤0.001; one closed error-correction loop recorded.
+Security headers: HSTS, CSP, X-Frame-Options=DENY, X-Content-Type-Options=nosniff.
+Stripe Safety: Cap respected; all micro-charges refunded within session.
+Artifacts to produce (minimum; all with SHA256 + A8 round-trip)
+
+tests/perf/reports/system_map.json
+tests/perf/reports/{app}_health.json for A1–A8
+tests/perf/reports/version_manifest.json
+tests/perf/reports/post_republish_diff.md
+tests/perf/reports/a1_cookie_validation.md
+tests/perf/reports/a1_warmup_report.md
+tests/perf/reports/perf_summary.md
+tests/perf/reports/a8_telemetry_audit.md
+tests/perf/reports/a3_orchestration_runlog.md
+tests/perf/reports/b2b_funnel_verdict.md
+tests/perf/reports/b2c_funnel_verdict.md
+tests/perf/evidence/fee_lineage.json
+If micro-charge executes: tests/perf/evidence/b2c_checkout_trace.json and tests/perf/evidence/refund_confirmations.json
+tests/perf/reports/ui_ux_integrity_matrix.md
+tests/perf/reports/security_headers_report.md
+tests/perf/reports/seo_verdict.md
+tests/perf/reports/rl_observation.md
+tests/perf/reports/hitl_approvals.log
+tests/perf/evidence/raw_curl_evidence.txt
+tests/perf/reports/raw_truth_summary.md
+tests/perf/evidence/checksums.json
+tests/perf/reports/ecosystem_double_confirm.md (matrix of 2-of-3/3-of-3 proofs)
+tests/perf/reports/manual_intervention_manifest.md (only if elevation needed)
+tests/perf/reports/go_no_go_report.md (map to acceptance criteria)
+Final console output and A8 post
+
+If all acceptance criteria pass: print “Attestation: VERIFIED LIVE (ZT3G) — Definitive GO” and post artifact index + checksums to A8; confirm GET round-trip.
+If any criterion fails: print “Attestation: UNVERIFIED (ZT3G)” and post a remediation plan listing each failed check, root-cause hypothesis, owner, next action, and ETA to A8. END-REPLIT-AGENT-PROMPT
