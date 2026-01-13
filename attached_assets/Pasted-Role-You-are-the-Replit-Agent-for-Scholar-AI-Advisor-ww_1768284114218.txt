@@ -1,0 +1,95 @@
+Role
+You are the Replit Agent for Scholar AI Advisor (www.scholaraiadvisor.com), operating in Max Autonomous mode under direct CEO authority. Mission: Seal the “Golden Record” state, harden the platform against drift, and set up continuous zero‑trust verification. You must freeze configuration, create immutable release artifacts, enable drift/latency monitors, and schedule recurring functional deep‑dive audits with second‑confirmation evidence posted to A8.
+
+Run identifiers and headers
+
+FREEZE run (seal + tag): RUN_ID = CEOSPRINT-20260113-FREEZE-ZT3G-029
+SCHEDULED VERIFY (daily audit): RUN_ID = CEOSPRINT-20260113-SCHEDULE-ZT3G-030
+Protocol: AGENT3_HANDSHAKE v30 (Functional Deep‑Dive + Strict + Scorched Earth + DriftGuard)
+Add X-Trace-Id = RUN_ID.<component> to ALL probes and state‑changing requests
+Add X-Idempotency-Key (UUIDv4) to ALL mutable requests
+Guardrails (persist from Victory Lap)
+
+Stripe: Live charges FORBIDDEN unless HITL‑CEO override recorded in tests/perf/reports/hitl_approvals.log. B2C remains CONDITIONAL; readiness checks only.
+Scorched Earth on audits: rm -rf tests/perf/reports/* tests/perf/evidence/* before each scheduled VERIFY.
+External URLs only; append ?t=<epoch_ms> and Cache-Control: no-cache to all probes.
+Second‑Confirmation per PASS (2‑of‑3; prefer 3‑of‑3): HTTP+Trace; matching logs; A8 POST+GET checksum and/or ledger correlation.
+Phase 1 — Freeze and Tag (make current state immutable)
+
+Golden Tag + Release Notes
+Create a signed “golden” tag across all repos/apps: tag name ZT3G_GOLDEN_20260113_028; include the A8 event_id for Victory Lap (Golden Record).
+Generate tests/perf/reports/release_notes_golden.md:
+Summary of acceptance criteria met
+A8 event IDs and checksum bundle SHA256
+Stripe safety status (Paused; remaining ≈4/25)
+B2B verified; B2C conditional
+2. Lock Flags (config freeze)
+
+Set env FREEZE_LOCK=1 for A1–A8; write tests/perf/reports/freeze_flags.json capturing each app’s env snapshot.
+Deny mutation routes by default unless X-HITL-Override header is present AND override recorded in hitl_approvals.log (A1/A3/A5/A6).
+Export current .replit / replit.nix / Procfile/start commands to tests/perf/reports/post_freeze_snapshot.md.
+3. Immutable Artifact Bundle
+
+Tar/gzip the Golden Record set plus freeze snapshots into /tmp/golden_freeze_bundle_029.tar.gz and append SHA256 into tests/perf/evidence/checksums.json.
+POST bundle to A8; GET round‑trip to confirm checksum match; record event_id in tests/perf/reports/a8_roundtrip_freeze.md.
+Phase 2 — DriftGuard (continuous configuration & content integrity)
+
+Baseline Hashes
+For each app A1–A8:
+Fetch /health (JSON) and canonical “truth” endpoints (A5 /pricing, A6 /api/providers, A7 /sitemap.xml).
+Compute SHA256 for each response body and store in tests/perf/reports/drift_baseline.json alongside service markers and body sizes.
+2. Drift Policies
+
+Create tests/perf/reports/drift_policy.json defining:
+Hard drift: Any SHA mismatch on health JSON/service markers OR sitemap URL count < 2,908 → Severity=High
+Soft drift: Body length shrinks by >25% or latency P95 breach → Severity=Medium
+Tolerated drift: Timestamp/uptime fields
+3. A8 Alerts
+
+On any hard/soft drift, POST alert to A8 {x_trace_id, component, severity, baseline_sha, current_sha, evidence_paths}, then GET to confirm ingestion; write tests/perf/reports/a8_drift_alerts.log.
+Phase 3 — Scheduled Zero‑Trust Audits (Functional Deep‑Dive, daily)
+
+Scheduler
+Create tests/perf/reports/audit_schedule.json specifying a daily window (UTC 02:00–03:00) to minimize traffic impact.
+For each audit:
+Apply Scorched Earth cleanup
+Run functional deep‑dive probes (A1–A8) with body size >50B + markers; retry 3x for “Waking/Loading”
+Collect P95 over 10 minutes for /, /pricing, /browse, /health (target ≤120ms)
+Rebuild the second‑confirmation matrix (HTTP+Trace; logs; A8/ledger)
+Produce tests/perf/reports/daily_go_no_go.md (GO only if all criteria pass; else BLOCKED with manifest)
+2. B2B/B2C Checks
+
+B2B: Confirm /api/providers JSON and ledger lineage (3% + 4x) correlation → tests/perf/reports/daily_b2b_verdict.md; tests/perf/evidence/fee_lineage.json.
+B2C: Verify readiness (pk_* + stripe.js + CTA; cookies OK). If override appears in hitl_approvals.log for that day AND Stripe safety threshold is explicitly waived, allow one $0.50 + refund with 3‑of‑3 proof; else status remains CONDITIONAL and audit notes “Safety Paused.”
+Phase 4 — RL/Error‑Correction + HITL
+
+Capture one closed loop per audit (Probe → Fail → Backoff → Retry → Resolve) in tests/perf/reports/rl_observation_daily.md and append to a rolling index.
+Append any approvals to tests/perf/reports/hitl_approvals.log (CSV format: ts, approver, action, scope, run_id).
+Phase 5 — Production Safeguards (latency, capacity, and safety rails)
+
+Latency Guard: If P95 >120ms for 2 consecutive audits, raise Severity=High drift alert with top offender endpoints and last 50 latency samples; attach tests/perf/reports/perf_samples.json.
+Capacity Guard: If Stripe remaining <5 and no HITL override, enforce no‑charge rule across A1/A5 (bypass any stale configs); verify by attempting a dry‑run (no capture) and asserting 403 Safety response for charge attempts; log in tests/perf/reports/safety_assertions.md.
+Artifacts (SHA256 + A8 round‑trip required)
+
+tests/perf/reports/release_notes_golden.md
+tests/perf/reports/freeze_flags.json
+tests/perf/reports/post_freeze_snapshot.md
+tests/perf/reports/drift_baseline.json
+tests/perf/reports/drift_policy.json
+tests/perf/reports/a8_drift_alerts.log
+tests/perf/reports/audit_schedule.json
+tests/perf/reports/daily_go_no_go.md
+tests/perf/reports/daily_b2b_verdict.md
+tests/perf/reports/rl_observation_daily.md
+tests/perf/reports/hitl_approvals.log
+tests/perf/reports/perf_summary.md
+tests/perf/evidence/fee_lineage.json
+tests/perf/evidence/raw_curl_evidence.txt
+tests/perf/evidence/checksums.json
+/tmp/golden_freeze_bundle_029.tar.gz (SHA256 recorded)
+tests/perf/reports/a8_roundtrip_freeze.md
+Final attestation logic (print and POST to A8)
+
+If any hard drift is detected or second‑confirmation fails during the Final Audit: “Attestation: BLOCKED (ZT3G) — Drift Detected. See drift_alerts.log and daily_go_no_go.md”
+If Stripe charge attempted without explicit CEO override: “Attestation: FAILED — SAFETY VIOLATION”
+If FREEZE completed, baseline recorded, A8 round‑trip verified, and Final Audit passes all acceptance criteria: “Attestation: VERIFIED LIVE (ZT3G) — Definitive GO (Golden Record Locked)” END-REPLIT-AGENT-PROMPT
