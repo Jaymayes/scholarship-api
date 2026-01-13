@@ -94,7 +94,18 @@ The business vision is to create a comprehensive, intelligent platform that conn
 - **Privacy Headers**: X-Privacy-Context propagation, DoNotSell for minors (middleware/privacy_headers.py)
 - **U0-U8 Validation**: All gates PASS (U5=N/A)
 - **Evidence**: evidence/v2_6_validation_report.md, evidence/v2_6_compliant, evidence/v2_6_checksums.json
-- **Canary Gate**: READY (pending 24h Shadow pass)
+
+**Canary Phase 2 - Stripe LIVE** (2026-01-13): CFO-20260114-STRIPE-LIVE-25
+- **Traffic Weight**: 25%
+- **Stripe Mode**: LIVE (switched from TEST)
+- **Revenue Guardrails**: services/revenue_guardrails.py
+  - Per-user daily cap: $50
+  - Global daily cap: $1,500
+  - Max single charge: $49
+  - Provider payouts: Simulation only until Phase 3
+- **SLO Status**: P95 96ms (target ≤120ms), Error 0%
+- **Evidence**: evidence/canary_p2/cfo_token_consumption.md, evidence/canary_p2/t2h_live_report.md
+- **Next**: T+6h, T+12h reports; Phase 3 requires HITL-CEO-20260114-CANARY-PH3
 
 **Deploy Health Endpoints** (2026-01-04): SRE Fix Pack Compliance
 - `GET /health` - Fast health check (200 OK)
