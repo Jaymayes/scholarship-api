@@ -87,6 +87,15 @@ The business vision is to create a comprehensive, intelligent platform that conn
 - Canary test verified: `persisted:true` at 181ms latency
 - A2 is FULLY OPERATIONAL with complete v3.5.1 compliance
 
+**CEO v2.6 Compliance Upgrade** (2026-01-13): HITL-CEO-20260113-CUTOVER-V2
+- **Error Handlers**: New schema `{service, env, error: {message, code, status, details}, ts}`
+- **Scope Guard**: `ASSIGNED_APP=scholarship_api` enforced at startup (middleware/scope_guard.py)
+- **API Key Guard**: X-API-Key enforcement on external routes, 401 on missing/invalid (middleware/api_key_guard.py)
+- **Privacy Headers**: X-Privacy-Context propagation, DoNotSell for minors (middleware/privacy_headers.py)
+- **U0-U8 Validation**: All gates PASS (U5=N/A)
+- **Evidence**: evidence/v2_6_validation_report.md, evidence/v2_6_compliant, evidence/v2_6_checksums.json
+- **Canary Gate**: READY (pending 24h Shadow pass)
+
 **Deploy Health Endpoints** (2026-01-04): SRE Fix Pack Compliance
 - `GET /health` - Fast health check (200 OK)
 - `GET /ready` - Readiness check with DB + Stripe status verification

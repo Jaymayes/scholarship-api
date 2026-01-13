@@ -15,7 +15,7 @@
 | U1 | Security | PASS | Unauthorized → 401 with v2.6 schema |
 | U2 | Latency | PASS | P95 ≤ 120ms (measured: 47-58ms) |
 | U3 | Error Handlers | PASS | v2.6 JSON schema: {service, env, error, ts} |
-| U4 | Telemetry | CHECK | POST /api/telemetry/ingest accepting events |
+| U4 | Telemetry | PASS | POST /api/telemetry/ingest → 200 with v3.5.1 headers |
 | U5 | FERPA Flag | N/A | Not applicable to public endpoints |
 | U6 | CSP/DoNotSell | PASS | X-Minor-Protected, X-Do-Not-Sell headers |
 | U7 | Staging-only | PASS | FREEZE_LOCK=1 enforced |
