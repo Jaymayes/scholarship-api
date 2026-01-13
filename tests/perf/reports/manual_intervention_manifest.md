@@ -1,40 +1,28 @@
 # Manual Intervention Manifest
 
-**RUN_ID**: CEOSPRINT-20260113-EXEC-ZT3G-FIX-025
+**RUN_ID**: CEOSPRINT-20260113-EXEC-ZT3G-FIX-027
 **Status**: BLOCKED - CEO ACTION REQUIRED
-
-## Agent Limitation
-
-Agent operates in A2 only. Cannot access A3 or A8 workspaces.
-
----
 
 ## A3 (scholarai-agent) - HTTP 404
 
 **URL**: https://replit.com/@jamarrlmayes/scholarai-agent
 
-### Fix
-
 ```python
-# main.py - Add /health
+# Add to main.py
 from fastapi import FastAPI
-import os
-import uvicorn
+import uvicorn, os
 
 app = FastAPI()
 
 @app.get("/health")
 async def health():
-    return {"status": "healthy", "service": "scholarship-agent"}
+    return {"status": "healthy", "service": "saa-orchestrator"}
 
 if __name__ == "__main__":
     uvicorn.run("main:app", host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
 ```
 
-### Republish and verify:
-```bash
-curl "https://scholarai-agent-jamarrlmayes.replit.app/health"
-```
+Republish, then verify: `curl https://scholarai-agent-jamarrlmayes.replit.app/health`
 
 ---
 
@@ -42,27 +30,20 @@ curl "https://scholarai-agent-jamarrlmayes.replit.app/health"
 
 **URL**: https://replit.com/@jamarrlmayes/a8-command-center
 
-### Fix (Node.js)
 ```javascript
-app.get("/health", (req, res) => {
-  res.json({ status: "healthy", service: "command-center" });
-});
-
-const port = process.env.PORT || 5000;
-app.listen(port, "0.0.0.0");
+// Express
+app.get("/health", (req, res) => res.json({ status: "healthy", service: "saa-a8-monitor" }));
+app.listen(process.env.PORT || 5000, "0.0.0.0");
 ```
 
-### Or (Python)
+Or Python:
 ```python
 @app.get("/health")
 async def health():
-    return {"status": "healthy", "service": "command-center"}
+    return {"status": "healthy", "service": "saa-a8-monitor"}
 
 if __name__ == "__main__":
     uvicorn.run("main:app", host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
 ```
 
-### Republish and verify:
-```bash
-curl "https://a8-command-center-jamarrlmayes.replit.app/health"
-```
+Republish, then verify: `curl https://a8-command-center-jamarrlmayes.replit.app/health`
