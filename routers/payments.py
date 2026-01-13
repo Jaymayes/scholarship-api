@@ -15,6 +15,10 @@ from pydantic import BaseModel
 import stripe
 
 from services.stripe_client import configure_stripe, get_publishable_key, get_stripe_secret_key, StripeConfigurationError
+from services.revenue_guardrails import (
+    check_charge_allowed, record_charge, record_refund,
+    get_limits_status, get_stripe_mode, is_stripe_live_mode
+)
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/payment", tags=["Payments"])
@@ -280,9 +284,11 @@ async def handle_checkout_completed(session: Any) -> None:
         user_id = metadata.get("user_id", "unknown")
         app = metadata.get("app", "scholarship_api")
         logger.info(f"Credit purchase completed. User: {user_id}, App: {app}")
+        record_charge(user_id, amount_total)
     elif mode == "subscription":
         provider_id = metadata.get("provider_id", "unknown")
         logger.info(f"Subscription activated. Provider: {provider_id}")
+        record_charge(provider_id, amount_total)
     
     a8_url = os.environ.get("A8_EVENTS_URL", "https://auto-com-center-jamarrlmayes.replit.app/events")
     a8_key = os.environ.get("A8_KEY") or ""
@@ -454,7 +460,9 @@ async def payment_status() -> Dict[str, Any]:
     {
         "status": "operational",
         "stripe_configured": true,
-        "webhook_secret_configured": true
+        "webhook_secret_configured": true,
+        "mode": "TEST|LIVE",
+        "guardrails": {...}
     }
     ```
     """
@@ -471,5 +479,23 @@ async def payment_status() -> Dict[str, Any]:
         "status": "operational" if stripe_configured else "degraded",
         "stripe_configured": stripe_configured,
         "webhook_secret_configured": webhook_configured,
+        "mode": get_stripe_mode(),
+        "guardrails": get_limits_status(),
         "message": "Payment endpoints ready" if stripe_configured else "Stripe credentials pending"
+    }
+
+
+@router.get("/guardrails")
+async def get_guardrails_status() -> Dict[str, Any]:
+    """
+    Get revenue guardrails status - CFO-20260114-STRIPE-LIVE-25
+    
+    Shows current spending limits and utilization.
+    """
+    return {
+        "status": "active",
+        "mode": get_stripe_mode(),
+        "limits": get_limits_status(),
+        "cfo_authorization": "CFO-20260114-STRIPE-LIVE-25",
+        "provider_payouts": "simulation_only_until_phase3"
     }

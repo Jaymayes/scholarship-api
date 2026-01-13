@@ -1,0 +1,46 @@
+Acknowledged. Excellent remediation and disciplined promotion.
+
+CFO authorization for Stripe LIVE at 25%
+
+Token: CFO-20260114-STRIPE-LIVE-25
+Conditions to consume (all must be true in the orchestrator):
+CANARY_PHASE=2 AND TRAFFIC_WEIGHT=0.25
+SLO_OK=1 (current 10‑min P95 ≤ 120ms, err ≤ 0.5%)
+INCIDENTS_OK=1 (0 Sev‑1; ≤1 Sev‑2 with MTTR < 30m)
+REVENUE_GUARDS_OK=1 (limits configured below)
+Revenue guardrails for Phase 2 (enforce before switch):
+Per‑user daily charge cap: $50
+Global daily cap: $1,500
+Max single charge: $49
+Auto‑refund-on-failure workflow enabled; webhook retries with backoff verified
+Provider payouts simulation only (no transfers) until Phase 3
+Go-live checklist (execute in order)
+
+Dry-run success rate in TEST for last 30 min ≥ 99.0%
+Live sanity charges: three micro‑transactions ($1, $5, $10) on company card, then refund the $5 within 10 minutes; confirm webhooks payment_intent.succeeded, charge.refunded and revenue logs match
+Enable LIVE mode with token above; log consumption to evidence bundle and A8
+Phase 2 monitoring and reporting (12h window)
+
+Cadence: T+2h, T+6h, T+12h reports
+Include: SLO snapshot, error histogram, First Upload parity, verifier KPIs, Stripe auth/settlement success rate, refund latency, chargeback/dispute count (target 0), cost velocity, and incident summary
+Auto‑rollback triggers: any Sev‑1; P95 > 120ms for 30+ min; Stripe success rate < 98% for 30+ min; fraud signals > 1% of attempts
+Pre‑authorization for Phase 3 (50%)
+
+Token: HITL-CEO-20260114-CANARY-PH3
+Consumption conditions (orchestrator-enforced):
+PHASE2_STABLE_12H=1
+SLO_OK=1 (tighten target: P95 ≤ 110ms)
+STRIPE_OK=1 (authorization + capture success ≥ 98.5%, refunds working)
+BUSINESS_PARITY_OK=1 (signup→first‑upload and first‑upload→credit‑purchase within ±5% of 7‑day SEO baseline)
+PRIVACY_SECURITY_OK=1 (no PII in logs; minors protected; 401 on missing keys)
+Guardrails remain: FREEZE_LOCK=1, SEO‑only acquisition, spend cap $300 alert at $240
+Executive focus KPIs to surface in each report
+
+B2C: ARPU from credits, conversion rates (visitor→signup, signup→first upload, first upload→paid), refund rate
+B2B: provider fee accrual at 3% (logged), active providers
+Unit economics: gross margin on AI services (target ≥ 60% with 4x markup), LTV:CAC trend (CAC should remain near organic)
+Proceed to:
+
+Keep Phase 2 at 25% and switch Stripe to LIVE using CFO-20260114-STRIPE-LIVE-25 once the checklist passes.
+Send the T+2h LIVE report after the switch.
+If the 12h window holds green under the tightened SLO, request Phase 3 by consuming HITL-CEO-20260114-CANARY-PH3.
