@@ -54,9 +54,32 @@ The system incorporates middleware for CORS, structured logging, and centralized
 - T+24h: "Mission Accomplished" packet
 
 ### Provider Payout Cap Raise (T+6h Decision)
-- **Token**: CFO-20260114-PAYOUT-RAISE-250
-- **New Limit**: Per-provider $250/day
-- **Conditions**: auth/capture ≥98.5%, refunds ≤3%, disputes=0, fraud <0.5%
+- **Token**: CFO-20260114-PAYOUT-RAISE-250 ✓ CONSUMED
+- **New Limit**: Per-provider $250/day, Global $5,000/day
+- **Guardrails**: 10% holdback, auto-pause >1% refund/dispute, 4hr manual review
+
+### Cost Governance
+- COST_THROTTLE=ACTIVE until 24h projection ≤$280 for 3 consecutive hours
+- Step-down: 75% background tasks → 100% if ≤$300
+- 60s TTL cache on search/match through T+24h
+- Queue depth /documents/analyze < 30, P95 ≤ 1.5s
+
+### T+24h Packet Requirements (for paid pilot)
+- SLO rollup, error histograms, revenue split (B2C/B2B)
+- ARPU, refund rate, AI gross margin
+- SEO net pages + CTR, LTV:CAC
+- Cost vs cap, payout utilization/holds
+- Security/privacy samples, incident log
+
+### Paid Pilot Pre-Authorization
+- **Token**: CEO-20260114-PAID-PILOT-72H
+- **Conditions**: Daily budget ≤$150, CAC ceiling $12, ARPU ≥$18 within 7d
+- **Scope**: Retargeting only, no prospecting, privacy/compliance green
+
+### Finance Ops
+- Reserve ledger: 10% holdback confirmed
+- Payout schedule: Net-14 (simulation until T+24h green)
+- Reconciliation: Stripe = Platform ledger ± $0
 
 ### 72h Success Targets
 - **Stability**: P95 ≤110ms, error ≤0.5%, uptime ≥99.9%
