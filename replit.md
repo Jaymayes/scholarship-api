@@ -1,119 +1,6 @@
 # Overview
 
-This project is a Scholarship Discovery & Search API built with FastAPI, acting as a system-of-record for scholarships. It offers advanced search, filtering, and eligibility checking using semantic and keyword search, and provides analytics on user interactions. The API feeds data to Student Dashboards and Landing Pages and integrates with an Agent Bridge for distributed workflows across other services like Auto Page Maker, Student Pilot, and Scholarship Sage.
-
-The business vision is to create a comprehensive, intelligent platform that connects students with relevant scholarships, aiming to be a leading solution in the scholarship search market with enterprise-grade orchestration capabilities.
-
-**Current Compliance Status**: Dual-compliant with Agent3 Master Prompt + v3.0 Section B (2025-11-28)
-
-**Real-Time Data Status**: All Master Prompt endpoints now use LIVE database queries (no mock data)
-
-**Readiness Status**: PRODUCTION READY - Autonomous operation, all endpoints secured
-
-**Security Hardening Status** (2025-12-17): Fleet-wide security remediation complete
-- SEC-03 Fix: Dedicated `SERVICE_AUTH_SECRET` enforced (no key reuse with JWT_SECRET_KEY)
-- Token Revocation: `revoked_tokens` PostgreSQL table with JTI-based blocklist checks
-- Auth Middleware: RS256 (JWKS) + HS256 (legacy) tokens validated against revocation list
-- Production Enforcement: Startup fails without required security secrets
-
-**CORS Fix** (2025-12-22): Custom domain support added
-- Added `https://scholaraiadvisor.com` to CORS allowed origins
-- Added `https://www.scholaraiadvisor.com` to CORS allowed origins
-- Added `X-App-ID`, `X-Protocol-Version`, `X-Request-ID` to CORS allowed headers
-- All 10 origins now supported (8 Replit apps + 2 custom domains)
-
-**Clerk Migration** (2025-12-24): A2 OIDC issuer alignment complete
-- Updated `scholar_auth_issuer` to `https://scholar-auth-jamarrlmayes.replit.app/oidc`
-- Updated `scholar_auth_jwks_url` to `https://scholar-auth-jamarrlmayes.replit.app/oidc/jwks`
-- A2 accepts Clerk-backed A1 tokens via OIDC (no direct Clerk integration in A2)
-- 72-hour monitoring watch active
-- **CI Guard Added** (2025-12-24): `.github/workflows/rp-observability.yml` - Satellite OIDC Guard
-  - Runs on push/PR to main and nightly at 08:00 UTC
-  - Validates A1 discovery endpoint reachability
-  - Verifies JWKS keys are published
-  - Scans for legacy issuer URLs (missing /oidc suffix)
-
-**Rate Limiting Fix** (2025-12-28): DEF-005 resolved
-- Set `DISABLE_RATE_LIMIT_BACKEND=true` to use in-memory rate limiting intentionally
-- Eliminates Redis connection error spam on startup
-- In-memory mode is acceptable for single-instance deployment
-- Future: Provision Redis via `REDIS_URL` env var when horizontal scaling is needed
-
-**Phase 1 Readiness** (2025-12-31): MAX AUTONOMOUS "Fix First, Then Flywheel" sprint
-- **B2B Funnel View**: `b2b_funnel` PostgreSQL view created for provider→listing funnel tracking
-- **Revenue Attribution View**: `revenue_by_source` PostgreSQL view for UTM-based revenue attribution
-- **Event Ingestion Verified**: `provider_connected`, `listing_created`, `fee_captured`, `payment_succeeded` events persisting correctly
-- **A8 Integration Ready**: Views and business_events table ready for A8 dashboard tiles
-- **Search p95**: ≤120ms (current: 45-77ms)
-- **Error rate**: <1% (current: 0%)
-- **PII leaks**: 0 (verified)
-
-**KPI REST Endpoints** (2026-01-01): A8 Dashboard Integration
-- `GET /api/kpi/b2b_funnel?limit=100` - B2B provider→listing funnel for A8 B2B tile
-- `GET /api/kpi/revenue_by_source?limit=100` - UTM revenue attribution for A8 Finance tile
-- Both endpoints query PostgreSQL views directly for real-time data
-- **Note**: Requires republishing to production deployment to be accessible via external URL
-
-**Business Logic Probes** (2026-01-04): Phase 5-6 P0 Revenue Rescue - Complete
-- `GET /api/probe/` - Aggregate probe status (all 4 probes must pass for green: db, kpi, auth, payment)
-- `GET /api/probe/lead` - Creates namespaced test lead, verifies DB + event emission
-- `GET /api/probe/data` - Sends v3.5.1 analytics event, verifies in DB
-- `GET /api/probe/db` - Database connectivity check
-- `GET /api/probe/kpi` - Verifies revenue_by_source and b2b_funnel views accessible
-- `GET /api/probe/auth` - Synthetic OIDC probe (verifies A1 JWKS reachable + keys published)
-- `GET /api/probe/payment` - Stripe infrastructure probe (webhook secret + Finance tile data)
-- All probe responses include `X-System-Identity` and `X-App-Base-URL` headers
-- Probe data namespaced with `probe_` prefix to prevent contamination
-- Fleet Health should be RED if any business probe fails
-
-**Verification Baseline** (2026-01-04): Evidence Baseline Snapshot
-- Finance Tile: $179.99 revenue (fee_captured=$150, payment_succeeded=$29.99)
-- B2B Funnel: 15 rows (providers + listings tracked)
-- Event Sources: A2, A5, A6 all emitting correctly
-- Auth Issuer: https://scholar-auth-jamarrlmayes.replit.app/oidc (JWKS: 1 key)
-- Telemetry Fallback: Verified working (sink=A2_fallback)
-
-**Protocol Normalization** (2026-01-04): v3.5.1 Compliance Fix
-- Fixed: All A2 outbound telemetry now uses `/events` endpoint (not `/ingest`)
-- Fixed: KPI_SNAPSHOT, heartbeat, revenue_blocker all include v3.5.1 headers
-- Required headers on all A8 calls: `x-scholar-protocol: v3.5.1`, `x-app-label: A2`, `x-event-id: <uuid>`
-- Payments: Revenue events include `event_name`, `source_app_id`, `ts` (epoch ms) per v3.5.1 schema
-- Env var renamed: `A8_INGEST_URL` → `A8_EVENTS_URL` (defaults to `/events`)
-- **SRE Fix Pack Compliance**: `A8_KEY` env var support added for Authorization headers (optional, enables `Authorization: Bearer <key>`)
-
-**A8_KEY Configuration** (2026-01-05): Authorization Header Enforcement
-- `A8_KEY` secret configured in Replit Secrets
-- All A8 calls now include `Authorization: Bearer <A8_KEY>` header
-- Canary test verified: `persisted:true` at 181ms latency
-- A2 is FULLY OPERATIONAL with complete v3.5.1 compliance
-
-**CEO v2.6 Compliance Upgrade** (2026-01-13): HITL-CEO-20260113-CUTOVER-V2
-- **Error Handlers**: New schema `{service, env, error: {message, code, status, details}, ts}`
-- **Scope Guard**: `ASSIGNED_APP=scholarship_api` enforced at startup (middleware/scope_guard.py)
-- **API Key Guard**: X-API-Key enforcement on external routes, 401 on missing/invalid (middleware/api_key_guard.py)
-- **Privacy Headers**: X-Privacy-Context propagation, DoNotSell for minors (middleware/privacy_headers.py)
-- **U0-U8 Validation**: All gates PASS (U5=N/A)
-- **Evidence**: evidence/v2_6_validation_report.md, evidence/v2_6_compliant, evidence/v2_6_checksums.json
-
-**Canary Phase 2 - Stripe LIVE** (2026-01-13): CFO-20260114-STRIPE-LIVE-25
-- **Traffic Weight**: 25%
-- **Stripe Mode**: LIVE (switched from TEST)
-- **Revenue Guardrails**: services/revenue_guardrails.py
-  - Per-user daily cap: $50
-  - Global daily cap: $1,500
-  - Max single charge: $49
-  - Provider payouts: Simulation only until Phase 3
-- **SLO Status**: P95 96ms (target ≤120ms), Error 0%
-- **Evidence**: evidence/canary_p2/cfo_token_consumption.md, evidence/canary_p2/t2h_live_report.md
-- **Next**: T+6h, T+12h reports; Phase 3 requires HITL-CEO-20260114-CANARY-PH3
-
-**Deploy Health Endpoints** (2026-01-04): SRE Fix Pack Compliance
-- `GET /health` - Fast health check (200 OK)
-- `GET /ready` - Readiness check with DB + Stripe status verification
-- `GET /healthz` - Kubernetes-style minimal health check
-- All endpoints wired for deploy checks per directive
-
-**Known Issues**: None blocking
+This project is a Scholarship Discovery & Search API built with FastAPI, serving as a system-of-record for scholarships. It provides advanced search, filtering, and eligibility checking using semantic and keyword search, and offers analytics on user interactions. The API supplies data to Student Dashboards and Landing Pages and integrates with an Agent Bridge for distributed workflows across other services. The business vision is to create a comprehensive, intelligent platform connecting students with relevant scholarships, aiming to be a leading solution in the scholarship search market with enterprise-grade orchestration.
 
 # User Preferences
 
@@ -122,60 +9,13 @@ Preferred communication style: Simple, everyday language.
 # System Architecture
 
 ## UI/UX Decisions
-The API supports integration with Student Dashboards, landing pages, and third-party developers. It adheres to a Global Identity Standard for consistent cross-app integration within the 8-app ScholarshipAI ecosystem, ensuring consistent identity headers and no cross-app identity bleed.
+The API supports integration with Student Dashboards, landing pages, and third-party developers, adhering to a Global Identity Standard for consistent cross-app integration within the ScholarshipAI ecosystem.
 
 ## Technical Implementations
-The application uses FastAPI for high performance and async capabilities, with Pydantic models for data validation. A service-oriented architecture separates concerns for scholarship operations, eligibility, search, and analytics. Data is stored in a PostgreSQL database via SQLAlchemy ORM. The API follows a RESTful design with versioned endpoints (`/api/v1/`) and includes AI-powered endpoints.
-
-## Feature Specifications
-- **Eligibility Engine**: A deterministic, rules-based engine for evaluating eligibility with scoring and bulk processing.
-- **Ranking System**: A hybrid approach combining content-based filtering with "eligible-first" prioritization.
-- **Search Intelligence**: Features semantic and keyword search, smart suggestions, and quality assessment.
-- **Public Smart Search** (2025-12-18): Public scholarship feed with filtering at `GET /api/v1/scholarships/public`:
-  - `q`: Keyword search across title and description (case-insensitive)
-  - `min_amount`: Minimum scholarship value filter
-  - `tags`: Reserved for future tag-based filtering (GIN index ready)
-  - `deadline_before`: Filter by application deadline
-  - ETag caching with 60s TTL, 304 Not Modified support
-  - Database indexes: GIN on `tags`, B-tree on `amount` and `application_deadline`
-- **Business Event Instrumentation**: A central event tracking system for executive KPI reporting, including a `business_events` table and an event emission service using a fire-and-forget async approach with a circuit breaker pattern. Fixed 2025-11-30: asyncpg SSL/JSONB compatibility for proper event recording.
-- **Telemetry Contract v3.5.1** (2025-12-15): Fleet-wide telemetry with Command Center integration:
-  - **SYSTEM_DIAGNOSTIC Support (2025-12-15)**: Accepts diagnostic events from A3 with relaxed payload validation
-  - `POST /api/telemetry/ingest` - **PRIMARY** fleet fallback endpoint (v3.5.1 Multi-App compliant)
-  - `POST /api/analytics/events` - Legacy S2S event write endpoint (CSRF bypass enabled)
-  - `POST /api/events` - Legacy fallback event write endpoint
-  - `GET /api/stats?window=5m|1h|24h&group=event_type` - DB-backed aggregated stats
-  - `GET /api/kpis/today` and `GET /api/kpis/rollup?days=7` - Revenue-aware KPI summaries
-  - `app_heartbeat` emission every 60 seconds on startup
-  - `KPI_SNAPSHOT` emission every 5 minutes with SLO tile metrics
-  - **v3.5.1 Header Support (2025-12-14)**: Accepts fleet-wide headers AND legacy headers:
-    - New: `x-scholar-protocol`, `x-app-label`, `x-event-type`, `x-event-id`, `x-sent-at`
-    - Legacy: `X-Protocol-Version`, `X-Idempotency-Key`
-  - **APP_IDENTITY**: `A2 scholarship_api https://scholarship-api-jamarrlmayes.replit.app protocol=v3.5.1`
-  - **Role**: `telemetry_fallback` - Fleet fallback sink when A8 Command Center unavailable
-- **Credits Ledger System**: A transactional credit ledger system enabling B2C monetization and paywalled AI features, featuring a database-backed ledger, transactional idempotency, row-level locking, API endpoints with JWT and RBAC, and security/compliance features.
-- **Stripe Payment Integration** (2025-12-08): Centralized payment endpoints for ecosystem apps (Operation Vital Signs):
-  - `POST /api/payment/create-checkout-session` - Create Stripe Checkout session (for A5/A6)
-  - `GET /api/payment/publishable-key` - Get Stripe publishable key for frontend
-  - `POST /api/payment/webhook` - Stripe webhook handler for payment events
-  - `GET /api/payment/status` - Payment service health check
-  - Uses Replit Stripe Connector for secure credential management (sandbox mode active)
-  - Webhook signature verification: STRICT (rejects unsigned webhooks)
-  - **Live Auth Test**: Scheduled Wednesday 2025-12-11 09:00 UTC ($1 test payment)
-- **Legal Pages & Report Branding** (2025-12-01): Unified Business + Legal Pages specification implementation:
-  - `GET /privacy` - Privacy Policy (FERPA/COPPA compliant, SEO-optimized HTML)
-  - `GET /terms` - Terms of Service (binding arbitration, Maricopa County jurisdiction, class action waiver)
-  - `GET /accessibility` - Accessibility Statement (WCAG 2.1 AA, 2-day response SLA, alternative formats)
-  - JSON-LD Organization schema with sameAs entries for SEO
-  - Report branding (`_report` field) in central-stats endpoint with legal links
-  - Business identity: Scholar AI Advisor by Referral Service LLC, contact: support@referralsvc.com, 602-796-0177
+The application leverages FastAPI for performance and async capabilities, using Pydantic for data validation. It employs a service-oriented architecture to separate concerns for scholarship operations, eligibility, search, and analytics. Data is persisted in PostgreSQL via SQLAlchemy ORM. The API follows a RESTful design with versioned endpoints and incorporates AI-powered features. Key features include a deterministic, rules-based eligibility engine, a hybrid ranking system, and intelligent search capabilities with semantic and keyword search. It also includes business event instrumentation for KPI reporting and a transactional credits ledger system for monetization. A centralized Stripe payment integration handles checkout sessions and webhooks. Legal pages (Privacy Policy, Terms of Service, Accessibility Statement) are implemented with SEO optimization and compliance.
 
 ## System Design Choices
-- **Middleware**: Includes CORS, structured logging, and centralized error handling.
-- **Production Readiness**: Functional on port 5000, with enterprise-grade containerization, production middleware, strict validation, and CI/CD support.
-- **Universal E2E Testing Framework**: A read-only framework for 8 interconnected ScholarshipAI applications, featuring isolated modules, revenue-first rollout gates, a 120ms TTFB performance target, YAML output, FERPA/COPPA compliance, and graceful unknown host handling.
-- **System Prompt Pack**: Adopts a ScholarshipAI ecosystem-wide universal system prompt pack (v1.1) with dual architecture support for consistent directives, guardrails, KPIs, and SLOs.
-- **Sentry Error & Performance Monitoring**: Comprehensive integration for production-grade error and performance monitoring, including 10% performance sampling, PII redaction, `request_id` correlation, intelligent sampling, FastAPI integration, user context tracking, and performance monitoring for P95 latency tracking.
+The system incorporates middleware for CORS, structured logging, and centralized error handling. It is designed for production readiness with enterprise-grade containerization and CI/CD support. A universal E2E testing framework ensures cross-application consistency. The project adheres to a ScholarshipAI ecosystem-wide universal system prompt pack for consistent directives. Sentry is integrated for comprehensive error and performance monitoring, including PII redaction and performance sampling.
 
 # External Dependencies
 
@@ -185,3 +25,5 @@ The application uses FastAPI for high performance and async capabilities, with P
 - **PostgreSQL**: Primary database for data persistence.
 - **OpenAI**: Integrated for AI-powered search enhancement, scholarship summaries, eligibility analysis, and trend insights.
 - **scholar_auth**: Used for JWT/JWKS validation.
+- **Stripe**: Payment processing.
+- **Sentry**: Error and performance monitoring.
