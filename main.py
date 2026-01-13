@@ -11,6 +11,10 @@ from slowapi.middleware import SlowAPIMiddleware as RateLimitMiddleware
 
 from config.settings import Environment, settings
 
+# CEO v2.6 DIRECTIVE: Scope Guard - fail-fast on ASSIGNED_APP mismatch
+from middleware.scope_guard import verify_scope_guard
+verify_scope_guard()
+
 # CEO DIRECTIVE 2025-11-04: Sentry integration REQUIRED NOW
 # Initialize Sentry as early as possible to catch startup errors
 from observability.sentry_init import init_sentry
@@ -669,6 +673,14 @@ app.middleware("http")(trace_id_middleware)
 # 4.05 AGENT3: Identity headers (add system_identity to all responses)
 app.add_middleware(IdentityHeadersMiddleware)
 
+# CEO v2.6 DIRECTIVE: Privacy Headers (X-Privacy-Context, DoNotSell for minors)
+from middleware.privacy_headers import PrivacyHeadersMiddleware
+app.add_middleware(PrivacyHeadersMiddleware)
+
+# CEO v2.6 DIRECTIVE: API Key Guard (X-API-Key enforcement on external routes)
+from middleware.api_key_guard import APIKeyGuardMiddleware
+app.add_middleware(APIKeyGuardMiddleware)
+
 # 4.1 GATE 0: Resilience Patterns (Circuit Breaker + Request Timeout)
 # Prevents cascading failures and queue buildup per CEO directive
 from middleware.request_timeout import RequestTimeoutMiddleware
@@ -695,51 +707,15 @@ else:
 from middleware.http_metrics import HTTPMetricsMiddleware
 app.add_middleware(HTTPMetricsMiddleware, enable_metrics=True)
 
-# Global exception handlers with unified error format
-from middleware.error_handlers import (
-    general_exception_handler,
-    http_exception_handler,
-    method_not_allowed_handler,
-    not_found_handler,
-    validation_exception_handler,
-)
-
-
-# Unified error handlers (all return standardized format)
-@app.exception_handler(HTTPException)
-async def handle_http_exception(request: Request, exc: HTTPException):
-    return await http_exception_handler(request, exc)
-
-@app.exception_handler(RequestValidationError)
-async def handle_validation_error(request: Request, exc: RequestValidationError):
-    return await validation_exception_handler(request, exc)
+# CEO v2.6 DIRECTIVE: Unified error handlers with v2.6 schema
+from middleware.error_handlers import register_error_handlers
+register_error_handlers(app)
 
 @app.exception_handler(RateLimitExceeded)
 async def handle_rate_limit_error(request: Request, exc: RateLimitExceeded):
     # Import the updated rate limit handler
     from middleware.rate_limiting import rate_limit_handler
     return await rate_limit_handler(request, exc)
-
-@app.exception_handler(Exception)
-async def handle_general_error(request: Request, exc: Exception):
-    # Try APIError handler first
-    from middleware.error_handlers import api_error_handler
-    from middleware.error_handling import APIError
-    
-    if isinstance(exc, APIError):
-        return await api_error_handler(request, exc)
-    
-    # Fall back to general exception handler
-    return await general_exception_handler(request, exc)
-
-# Specific status code handlers - ENABLED FOR UNIFIED ERROR SCHEMA
-@app.exception_handler(404)
-async def handle_not_found(request: Request, exc: HTTPException):
-    return await not_found_handler(request, exc)
-
-@app.exception_handler(405)
-async def handle_method_not_allowed(request: Request, exc: HTTPException):
-    return await method_not_allowed_handler(request, exc)
 
 # Include routers
 # V2.2 Note: /canary endpoint moved to health router for proper organization

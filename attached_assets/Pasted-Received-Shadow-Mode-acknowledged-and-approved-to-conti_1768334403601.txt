@@ -1,0 +1,79 @@
+Received. Shadow Mode acknowledged and approved to continue under the existing gates.
+
+Executive decisions and assignments
+
+A6 Provider: Remediation accepted; keep health and latency telemetry pinned during Shadow.
+A2 scholarship_api: Hard blocker for Canary. I’m assigning this to the API Lead now with an immediate hotfix and v2.6 upgrade mandate.
+HITL token for A2 workspace
+
+Token: HITL-CEO-20260113-CUTOVER-V2
+Use this token once at start; log consumption in the validation report.
+A2 hotfix package (drop-in)
+
+Replace middleware/error_handlers.py with this exact implementation and ensure it is imported in app startup.
+File: middleware/error_handlers.py
+from future import annotations
+from typing import Any, Dict
+import os, time
+from fastapi import FastAPI, Request
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import JSONResponse
+from starlette.exceptions import HTTPException as StarletteHTTPException
+
+SERVICE = os.getenv("APP_ID", "scholarship_api")
+ENV = os.getenv("ENV", "staging")
+
+def _base_payload(message: str, code: str, status: int, details: Any | None = None) -> Dict[str, Any]:
+return {
+"service": SERVICE,
+"env": ENV,
+"error": {"message": message, "code": code, "status": status, "details": details},
+"ts": int(time.time() * 1000),
+}
+
+def register_error_handlers(app: FastAPI) -> None:
+@app.exception_handler(StarletteHTTPException)
+async def http_exception_handler(request: Request, exc: StarletteHTTPException) -> JSONResponse:
+return JSONResponse(status_code=exc.status_code, content=_base_payload(str(exc.detail), "http_error", exc.status_code))
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError) -> JSONResponse:
+    return JSONResponse(status_code=422, content=_base_payload("validation_error", "validation_error", 422, exc.errors()))
+
+@app.exception_handler(Exception)
+async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+    return JSONResponse(status_code=500, content=_base_payload("internal_error", "internal_error", 500, {"type": exc.__class__.__name__}))
+2) Ensure startup wires the handlers.
+
+In main.py (or app factory): from middleware.error_handlers import register_error_handlers app = FastAPI() register_error_handlers(app)
+3. v2.6 compliance deltas (A2)
+
+Scope Guard: ENV ASSIGNED_APP=scholarship_api; fail-fast on mismatch during startup.
+API-key enforcement: All external routes require X-API-Key; return 401 when missing/invalid.
+Privacy headers: propagate X-Privacy-Context; never log PII; minors => set DoNotSell=true and block third-party trackers in responses where applicable.
+Golden Record: tag baseline after tests pass; do not change prod state.
+4. Validation required (U0–U8)
+
+U0 Health: GET /health → 200, includes {service, env}.
+U1 Security: unauthorized request → 401; authorized → 200.
+U2 Latency: 10-min P95 ≤ 120ms.
+U3 Error handlers: raise 404 and trigger validation error; responses must match JSON schema above.
+U4 Telemetry: A8 events emitted for request_count, error_count, privacy_enforced.
+U5 FERPA flag: public endpoints return is_ferpa_covered=false for B2C unless explicitly rostered.
+U6 CSP/DoNotSell: minors path shows trackers blocked and DoNotSell=true.
+U7 Staging-only writes; production writes blocked under FREEZE_LOCK=1.
+U8 Artifacts: v2_6_compliant signal file + validation_report.md + checksums posted.
+Deadlines and gates
+
+A2 hotfix and v2.6 upgrade: due today EOD. This is the only blocker to unlock Phase 2 (Canary).
+Shadow Mode: continue 24h. Post T+12h checkpoint with SLO, error rate, parity, and privacy logs.
+Canary authorization remains withheld until: Shadow 24h PASS + A2 U0–U8 PASS + evidence bundle uploaded.
+Contingency
+
+If A2 cannot meet EOD, hold at Shadow; do not advance. Page CEO if any Sev‑1 occurs or SLO breach >30 minutes.
+What I need from you next
+
+Confirm A6 remains healthy through the first hour of Shadow and attach the SLO snapshot.
+Notify when A2 hotfix begins; on completion, attach validation_report.md and the v2_6_compliant signal.
+After T+12h, send the mid‑Shadow report. I will issue the Canary token upon evidence review.
+Stay the course. Low-CAC, SEO-led growth remains the priority; no paid acquisition during Shadow/early Canary.
