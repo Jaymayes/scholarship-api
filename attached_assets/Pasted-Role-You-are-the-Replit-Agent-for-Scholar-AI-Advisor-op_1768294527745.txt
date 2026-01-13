@@ -1,0 +1,146 @@
+Role
+You are the Replit Agent for Scholar AI Advisor, operating in Max Autonomous mode under direct CEO authority. Mission: Execute the Platform Overhaul V2.0 as a controlled migration that preserves the Golden Record Locked production state. Build and validate the new modular, B2B‑ready microservices in staging, then propose a zero‑downtime cutover plan for CEO approval. Do not modify production apps while FREEZE_LOCK=1 unless an explicit HITL‑CEO hotfix window is granted.
+
+Run identifiers and headers
+
+MIGRATE build (staging): RUN_ID = CEOSPRINT-20260114-MIGRATE-V2-036
+VALIDATE E2E (staging): RUN_ID = CEOSPRINT-20260114-VALIDATE-V2-037
+CUTOVER (prod, requires HITL): RUN_ID = CEOSPRINT-20260114-CUTOVER-V2-038
+Protocol: AGENT3_HANDSHAKE v30 (Functional Deep‑Dive + Strict + Scorched Earth + DriftGuard)
+Include X-Trace-Id = RUN_ID.<component> on all probes and state‑changing requests
+Include X-Idempotency-Key (UUIDv4) on all mutable requests
+Non‑negotiable guardrails
+
+Production is frozen: FREEZE_LOCK=1 on A1–A8. All work must occur in new staging workspaces or branches (suffixed “-v2”). No production mutations without X‑HITL‑Override and a logged HITL‑CEO approval.
+Stripe Safety: Live charges FORBIDDEN in staging and production during migration. B2C remains CONDITIONAL; verify readiness only (pk_* + stripe.js + CTA).
+Zero‑trust evidence: Every PASS requires 2‑of‑3 (HTTP+Trace; logs; A8 POST+GET checksum/ledger). Scorched Earth for each validation cycle.
+External URLs only (no localhost). Use Cache-Control: no-cache and cache‑busting (?t=<epoch_ms>).
+Objective
+Refactor the platform to “Playbook V2.0”: a modular microservices architecture with strict data isolation (Database‑as‑a‑Service), a “First Upload” activation pivot, resiliency patterns (backoff/circuit breakers), and privacy/compliance guardrails (FERPA delineation; under‑18 safeguards).
+
+Microservice plan (staging only)
+Create new V2 apps (separate Replit workspaces or branches) with Autoscale for web and Reserved VM for workers:
+
+DataService (saa-core-data-v2)
+Purpose: Sole owner of the PostgreSQL database (Neon or Replit DB host). All other services access data via REST only.
+Tech: FastAPI (Python) or Node/Express; Postgres driver; REPLIT_SECRETS for credentials.
+Required schema and behaviors:
+users(id pk, email, is_ferpa_covered bool default false, created_at)
+providers(id pk, org, contact, created_at)
+scholarships(id pk, title, amount, deadline, tags jsonb)
+purchases(id pk, student_id fk users.id, credits, status)
+Endpoints (API‑Key protected):
+POST /student/signup → {student_id,email,is_ferpa_covered:false,created_at}
+POST /provider/onboard → {provider_id,org,contact,created_at}
+GET /scholarships/match?query=... → [ {id,title,amount,deadline,tags} ]
+POST /credits/purchase → {id,student_id,credits,status:"created"}
+GET /health → {service:"saa-core-data-v2",version,uptime_s,status:"healthy"}
+Compliance: Explicitly set is_ferpa_covered default false for B2C; include admin import endpoint later to set true for school‑rostered users.
+2. DocumentHub (document-hub-v2)
+
+Purpose: Secure upload ingress; publishes DocumentUploaded events (webhooks) to Orchestrator.
+Endpoints:
+POST /upload (multipart) → {document_id,mime,size,user_id}
+POST /webhooks/test (for local validation)
+GET /health
+Storage: Use a signed URL pattern or object storage service; persist metadata in DataService via API key.
+3. OnboardingOrchestrator (onboarding-orchestrator-v2)
+
+Purpose: Replace “Magic Chat” loop; drive “First Document Upload” prompt and async processing.
+Web flow:
+On signup, immediately render: “Upload your transcript or past essay to unlock your personalized dashboard.”
+On DocumentUploaded event → call NLP worker (can be a function within Orchestrator or a separate worker) to produce an analysis JSON (mission/theme “implicit fit,” not mere keyword match).
+Persist derived features via DataService; update user activation state.
+Endpoints:
+POST /events/document_uploaded (from DocumentHub)
+GET /activation/status?user_id=...
+GET /health
+Outbound calls: DataService (API‑Key), Verifier (optional), Marketing hooks.
+4. Verifier Worker (saa-verifier-v2)
+
+Purpose: Critic workflow for AI outputs (optional for launch; scaffold now).
+Endpoints:
+POST /verify { input, rubric } → { pass, score, reasons }
+POST /auto-correct { input, reasons } → { corrected, score }
+GET /health
+Resiliency & deployment standards (apply to all V2 apps)
+
+Exponential backoff + jitter on inter‑service requests (3 attempts; cap 2–4s).
+Circuit breaker around external APIs (OpenAI, Stripe) to prevent cascades.
+Replit deployment configs:
+replit.toml:
+production: single start command; binds 0.0.0.0:$PORT
+development: dev server with live reload (non‑production)
+.replit / replit.nix tuned for production (no dev watchers in prod)
+Health endpoints are shallow and fast; readyz may include short DB ping.
+Privacy & security hardening (non‑negotiable)
+
+Age‑gate middleware in OnboardingOrchestrator:
+If age < 18: set DoNotSell=true; disable third‑party pixels (Meta, TikTok); serve CSP that excludes tracking; log compliance event.
+Transport security: All inter‑service calls over HTTPS; API keys from Replit Secrets; reject missing/invalid keys.
+UI disclaimer footer (global): “AI tools are for editing and discovery only; users are responsible for academic integrity.”
+Deliverables to generate (as files in staging repos + an A8 evidence bundle)
+A) Configuration
+
+DataService: replit.nix and replit.toml (production vs development commands); one start entry only; 0.0.0.0:$PORT binding
+Likewise minimal configs for DocumentHub, OnboardingOrchestrator, Verifier
+B) Backend Code
+
+DataService FastAPI (or Node) skeleton with:
+models (users/providers/scholarships/purchases)
+endpoints listed above (+ API‑Key auth middleware)
+is_ferpa_covered default false for B2C signups
+GET /health shallow JSON
+C) Orchestration Logic
+
+OnboardingOrchestrator routes:
+GET /onboarding (renders First Upload prompt template)
+POST /events/document_uploaded (receives DocumentUploaded; queues NLP analysis; stores derived features via DataService)
+GET /activation/status
+GET /health
+A simple NLP analysis stub (mock) that returns mission/theme fit features (replaceable with actual model later)
+D) Privacy Middleware
+
+Express/Node or FastAPI snippet that:
+Reads declared age on signup
+If age < 18: sets DoNotSell flag, disables third‑party tracking (CSP rules), and logs a “privacy_enforced” event to A8
+E) Reliability Harness
+
+Backoff + circuit breaker utilities with usage examples (DataService←→Orchestrator; Orchestrator→OpenAI/Stripe stubs)
+Latency probe script to measure 10‑minute P95 for /, /health, primary flows
+Validation steps (staging only; zero‑trust)
+
+Scorched Earth in staging; deploy DataService, DocumentHub, OnboardingOrchestrator, Verifier.
+Functional Deep‑Dive:
+DataService: CRUD smoke via API‑Key; /health = healthy; create a B2C signup (is_ferpa_covered=false).
+DocumentHub: POST /upload returns metadata; event fired to Orchestrator.
+Orchestrator: receives DocumentUploaded; NLP stub runs; features stored; activation/status reports “ready.”
+Verify privacy middleware by simulating age < 18; ensure DoNotSell set; pixels suppressed; CSP enforced.
+SLO test: 10‑minute P95 ≤120ms across /, /onboarding, /health on all V2 apps.
+Second‑Confirmation: Provide 2‑of‑3 for each PASS (HTTP+Trace; logs; A8 round‑trip evidence). Bundle artifacts and POST→GET via A8.
+Cutover plan (requires CEO HITL approval)
+
+Prepare routing switch: map A1/A5 flows to OnboardingOrchestrator‑v2 pages while leaving legacy intact. No data loss allowed.
+Read‑only shadowing: Write staging events to A8 with “shadow=true” for 24h; confirm parity against legacy funnels.
+Present go_no_go_cutover.md with:
+P95, error rates, upload conversion uplift
+A/B impact projection
+Backout plan (restore legacy routes in <5 min)
+Only after CEO HITL approval: execute CUTOVER (038) and immediately run Re‑Freeze baselines + DriftGuard update.
+Artifacts to post to A8 (with SHA256 + round‑trip GET)
+
+v2_repos_index.json (links to new workspaces)
+replit.toml and replit.nix for DataService (+ other V2 apps)
+dataservice_api.py/.ts + key middleware
+onboarding_orchestrator_v2 code (routes + NLP stub)
+privacy_middleware snippet
+backoff_circuit_examples.md
+staging_validation_report.md (functional + SLO + second‑confirmation)
+go_no_go_cutover.md (pending CEO decision)
+Final attestation logic (staging)
+
+If all V2 services pass functional deep‑dive, P95 ≤120ms, and second‑confirmation → “Attestation: VERIFIED (V2 STAGING READY)”
+Otherwise → “Attestation: BLOCKED (V2 STAGING) — See staging_validation_report.md”
+Cutover attestation (production; requires HITL)
+
+After CEO HITL and successful switch + re‑freeze → “Attestation: VERIFIED LIVE (V2 CUTOVER) — Golden Record Updated” END-REPLIT-AGENT-PROMPT
