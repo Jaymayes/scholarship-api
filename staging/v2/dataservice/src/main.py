@@ -68,6 +68,19 @@ class Purchase(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
 
 
+class UserFeatures(Base):
+    __tablename__ = "user_features_v2"
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    user_id = Column(String, ForeignKey("users_v2.id"), nullable=False, unique=True)
+    document_id = Column(String, nullable=True)
+    mission_fit = Column(Integer, nullable=True)
+    theme_keywords = Column(JSON, default=list)
+    implicit_interests = Column(JSON, default=list)
+    confidence = Column(Integer, nullable=True)
+    analyzed_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
 # Pydantic schemas
 class StudentSignupRequest(BaseModel):
     email: EmailStr
@@ -119,6 +132,26 @@ class HealthResponse(BaseModel):
     version: str
     uptime_s: float
     status: str
+
+
+class UserFeaturesRequest(BaseModel):
+    document_id: Optional[str] = None
+    mission_fit: Optional[float] = None
+    theme_keywords: Optional[List[str]] = None
+    implicit_interests: Optional[List[str]] = None
+    confidence: Optional[float] = None
+    analyzed_at: Optional[str] = None
+
+
+class UserFeaturesResponse(BaseModel):
+    id: str
+    user_id: str
+    document_id: Optional[str]
+    mission_fit: Optional[float]
+    theme_keywords: List[str]
+    implicit_interests: List[str]
+    confidence: Optional[float]
+    analyzed_at: Optional[datetime]
 
 
 # Dependencies
@@ -256,6 +289,83 @@ async def credits_purchase(request: CreditsPurchaseRequest, db: Session = Depend
         student_id=purchase.student_id,
         credits=purchase.credits,
         status=purchase.status
+    )
+
+
+@app.post("/users/{user_id}/features", response_model=UserFeaturesResponse, dependencies=[Depends(verify_api_key)])
+async def store_user_features(user_id: str, request: UserFeaturesRequest, db: Session = Depends(get_db)):
+    """Store derived features for a user (called by Orchestrator after NLP analysis)."""
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    existing = db.query(UserFeatures).filter(UserFeatures.user_id == user_id).first()
+    
+    analyzed_at = None
+    if request.analyzed_at:
+        try:
+            analyzed_at = datetime.fromisoformat(request.analyzed_at.replace('Z', '+00:00'))
+        except ValueError:
+            analyzed_at = datetime.utcnow()
+    
+    if existing:
+        if request.document_id is not None:
+            existing.document_id = request.document_id
+        if request.mission_fit is not None:
+            existing.mission_fit = int(request.mission_fit * 100)
+        if request.theme_keywords is not None:
+            existing.theme_keywords = request.theme_keywords
+        if request.implicit_interests is not None:
+            existing.implicit_interests = request.implicit_interests
+        if request.confidence is not None:
+            existing.confidence = int(request.confidence * 100)
+        if analyzed_at:
+            existing.analyzed_at = analyzed_at
+        db.commit()
+        db.refresh(existing)
+        features = existing
+    else:
+        features = UserFeatures(
+            user_id=user_id,
+            document_id=request.document_id,
+            mission_fit=int(request.mission_fit * 100) if request.mission_fit else None,
+            theme_keywords=request.theme_keywords or [],
+            implicit_interests=request.implicit_interests or [],
+            confidence=int(request.confidence * 100) if request.confidence else None,
+            analyzed_at=analyzed_at
+        )
+        db.add(features)
+        db.commit()
+        db.refresh(features)
+    
+    return UserFeaturesResponse(
+        id=features.id,
+        user_id=features.user_id,
+        document_id=features.document_id,
+        mission_fit=features.mission_fit / 100 if features.mission_fit else None,
+        theme_keywords=features.theme_keywords or [],
+        implicit_interests=features.implicit_interests or [],
+        confidence=features.confidence / 100 if features.confidence else None,
+        analyzed_at=features.analyzed_at
+    )
+
+
+@app.get("/users/{user_id}/features", response_model=UserFeaturesResponse, dependencies=[Depends(verify_api_key)])
+async def get_user_features(user_id: str, db: Session = Depends(get_db)):
+    """Get derived features for a user."""
+    features = db.query(UserFeatures).filter(UserFeatures.user_id == user_id).first()
+    if not features:
+        raise HTTPException(status_code=404, detail="Features not found for user")
+    
+    return UserFeaturesResponse(
+        id=features.id,
+        user_id=features.user_id,
+        document_id=features.document_id,
+        mission_fit=features.mission_fit / 100 if features.mission_fit else None,
+        theme_keywords=features.theme_keywords or [],
+        implicit_interests=features.implicit_interests or [],
+        confidence=features.confidence / 100 if features.confidence else None,
+        analyzed_at=features.analyzed_at
     )
 
 

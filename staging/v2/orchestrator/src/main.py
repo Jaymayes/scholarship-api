@@ -10,7 +10,7 @@ import httpx
 from datetime import datetime
 from typing import Optional, Dict, Any, List
 
-from fastapi import FastAPI, HTTPException, Header, Request
+from fastapi import FastAPI, HTTPException, Header, Request, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
@@ -19,10 +19,20 @@ PORT = int(os.environ.get("PORT", 5000))
 DATASERVICE_URL = os.environ.get("DATASERVICE_URL", "")
 DATASERVICE_API_KEY = os.environ.get("DATASERVICE_API_KEY", "")
 A8_EVENTS_URL = os.environ.get("A8_EVENTS_URL", "")
+ORCHESTRATOR_API_KEY = os.environ.get("ORCHESTRATOR_API_KEY", "")
 START_TIME = time.time()
 VERSION = "2.0.0"
 
 app = FastAPI(title="OnboardingOrchestrator (onboarding-orchestrator-v2)", version=VERSION)
+
+
+async def verify_api_key(x_api_key: str = Header(None)):
+    """Verify API key for protected endpoints."""
+    if not ORCHESTRATOR_API_KEY:
+        return True
+    if x_api_key != ORCHESTRATOR_API_KEY:
+        raise HTTPException(status_code=401, detail="Invalid API key")
+    return True
 
 app.add_middleware(
     CORSMiddleware,
@@ -164,7 +174,7 @@ async def onboarding():
     return HTMLResponse(content=html)
 
 
-@app.post("/events/document_uploaded")
+@app.post("/events/document_uploaded", dependencies=[Depends(verify_api_key)])
 async def document_uploaded(event: DocumentUploadedEvent):
     """Receive DocumentUploaded event from DocumentHub; queue NLP analysis."""
     analysis = nlp_analysis_stub(event.document_id, event.mime)
@@ -195,7 +205,7 @@ async def document_uploaded(event: DocumentUploadedEvent):
     return {"status": "processed", "document_id": event.document_id}
 
 
-@app.get("/activation/status", response_model=ActivationStatus)
+@app.get("/activation/status", response_model=ActivationStatus, dependencies=[Depends(verify_api_key)])
 async def activation_status(user_id: str):
     """Check user activation status."""
     if user_id not in activation_store:

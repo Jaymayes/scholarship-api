@@ -6,6 +6,7 @@ Protocol: AGENT3_HANDSHAKE v30
 import os
 import time
 import uuid
+import asyncio
 import httpx
 from datetime import datetime
 from typing import Optional
@@ -16,6 +17,7 @@ from pydantic import BaseModel
 
 PORT = int(os.environ.get("PORT", 5000))
 ORCHESTRATOR_URL = os.environ.get("ORCHESTRATOR_URL", "")
+ORCHESTRATOR_API_KEY = os.environ.get("ORCHESTRATOR_API_KEY", "")
 API_KEY = os.environ.get("DOCUMENTHUB_API_KEY", "")
 START_TIME = time.time()
 VERSION = "2.0.0"
@@ -75,13 +77,17 @@ async def emit_document_uploaded(document_id: str, user_id: str, mime: str, size
     }
     
     delays = [0.5, 1.0, 2.0]
+    headers = {"Content-Type": "application/json"}
+    if ORCHESTRATOR_API_KEY:
+        headers["X-API-Key"] = ORCHESTRATOR_API_KEY
+    
     async with httpx.AsyncClient(timeout=10.0) as client:
         for i, delay in enumerate(delays):
             try:
                 response = await client.post(
                     f"{ORCHESTRATOR_URL}/events/document_uploaded",
                     json=event,
-                    headers={"Content-Type": "application/json"}
+                    headers=headers
                 )
                 if response.status_code == 200:
                     return
