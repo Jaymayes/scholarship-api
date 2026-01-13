@@ -2,10 +2,10 @@
 
 | Component | Status |
 |-----------|--------|
-| A1 Auth | ✅ HTTP 200 |
-| A5 Student Portal | ✅ HTTP 200 |
-| A2 API | ✅ HTTP 200 |
+| A1 Auth | ✅ PASS |
+| A5 Student Portal | ✅ PASS |
+| A2 API | ✅ PASS |
 | A8 Telemetry | ❌ BLOCKED |
-| Stripe | ⚠️ CONDITIONAL (4/25, no override) |
+| Stripe | ⚠️ CONDITIONAL (4/25) |
 
 **Verdict**: CONDITIONAL

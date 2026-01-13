@@ -1,49 +1,42 @@
 # Manual Intervention Manifest
 
-**RUN_ID**: CEOSPRINT-20260113-EXEC-ZT3G-FIX-027
-**Status**: BLOCKED - CEO ACTION REQUIRED
+**RUN_ID**: CEOSPRINT-20260114-DAILY-ZT3G-031
+**Status**: CEO ACTION REQUIRED
 
-## A3 (scholarai-agent) - HTTP 404
+## A3 (scholarai-agent) - HARD DRIFT
 
 **URL**: https://replit.com/@jamarrlmayes/scholarai-agent
+**Status**: HTTP 404
+
+### Fix
+```bash
+# Startup command
+uvicorn main:app --host 0.0.0.0 --port $PORT
+```
 
 ```python
-# Add to main.py
-from fastapi import FastAPI
-import uvicorn, os
-
-app = FastAPI()
-
 @app.get("/health")
 async def health():
     return {"status": "healthy", "service": "saa-orchestrator"}
-
-if __name__ == "__main__":
-    uvicorn.run("main:app", host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
 ```
 
-Republish, then verify: `curl https://scholarai-agent-jamarrlmayes.replit.app/health`
+Republish → verify: `curl https://scholarai-agent-jamarrlmayes.replit.app/health`
 
 ---
 
-## A8 (a8-command-center) - HTTP 404
+## A8 (a8-command-center) - HARD DRIFT
 
 **URL**: https://replit.com/@jamarrlmayes/a8-command-center
+**Status**: HTTP 404
 
-```javascript
-// Express
-app.get("/health", (req, res) => res.json({ status: "healthy", service: "saa-a8-monitor" }));
+### Fix
+```bash
+# Node.js
 app.listen(process.env.PORT || 5000, "0.0.0.0");
 ```
 
-Or Python:
-```python
-@app.get("/health")
-async def health():
-    return {"status": "healthy", "service": "saa-a8-monitor"}
-
-if __name__ == "__main__":
-    uvicorn.run("main:app", host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
+```javascript
+app.get("/health", (req, res) => res.json({ status: "healthy", service: "saa-a8-monitor" }));
 ```
 
-Republish, then verify: `curl https://a8-command-center-jamarrlmayes.replit.app/health`
+Republish → verify: `curl https://a8-command-center-jamarrlmayes.replit.app/health`
