@@ -143,7 +143,18 @@ Target 20% latency reduction:
 
 ##### Scale Criteria (72h pilot complete)
 - Consider $300→$400 only if: CAC ≤$7, ARPU7 ≥2.0× CAC, refunds ≤3%, Stripe ≥98.5%
-- Requires explicit CEO authorization
+- **PRE-APPROVED**: CEO authorization granted for Day 4 scale-up pending T+24h green gates
+
+##### Experiment Rollouts (100% - CEO Authorized)
+- First-Upload UX: sticky "Resume upload" CTA + prefilled step state → **100% LIVE**
+- Credit Pack Framing: value-pack nudge with 3-pack anchor → **100% LIVE**
+
+##### White-Glove Provider Sprint (48h)
+- Target: +3 providers, +6 listings
+- Outreach: Checkout-abandoning providers
+- SLA: 24-48h turnaround from materials receipt
+- Incentive: Free listing setup, priority category placement
+- Success: Outreach-to-reply ≥25%, Reply-to-listing ≥60%
 
 #### SEO Growth Engine (Auto Page Maker)
 - Weekly goal: +7,500 net pages indexed
