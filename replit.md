@@ -112,12 +112,23 @@ Target 20% latency reduction:
 - V1 retirement: Day 7 archive, checksum + data retention manifest
 - Security: privacy mini-audit, key rotation at T+48h
 
-#### Paid Acquisition Pilot (72h Retargeting-Only)
-- **Token**: CEO-20260114-PAID-PILOT-72H ✓ CONSUMED
-- **Budget**: $150/day rolling 24h
-- **Success to Scale**: CAC ≤$8 for 24h AND ARPU ≥1.8× CAC AND refunds ≤4%
-- **Step-Up Token**: CEO-20260114-PAID-PILOT-STEPUP (to $300/day)
-- **Auto-Pause**: CAC >$12 for 24h OR ARPU <$18 OR fraud ≥0.5%
+#### Paid Acquisition Pilot - Day 2 (Step-Up Active)
+- **Token**: CEO-20260114-PAID-PILOT-STEPUP ✓ CONSUMED
+- **Budget**: $300/day rolling 24h (stepped up from $150)
+- **Pacing**: 30/30/40 split AM/PM/evening
+
+##### Operating Rules
+- **Auto-Downshift**: $150/day if 6h avg breaches CAC >$10, Stripe <98.5%, fraud ≥0.5%, or refund ≥4%
+- **Segments**: First-upload abandoners, checkout abandoners, high-intent viewers
+- **Frequency Caps**: ≤3 impressions/user/day, ≤7/week; suppress converters 14d
+- **Creative Mix**: 70% winner, 20% challenger, 10% exploratory
+- **Kill Criteria**: After 500 impressions, drop if CTR −30% vs control or CAC +25% vs cohort for 6h
+
+##### Success Gates (Sustained)
+- CAC ≤$8 for 24h continuous
+- ARPU ≥1.8× CAC
+- Refunds ≤4%
+- Stripe success ≥98.5%
 
 #### SEO Growth Engine (Auto Page Maker)
 - Weekly goal: +7,500 net pages indexed
