@@ -1,0 +1,35 @@
+Received. Auto‑GO is armed and correctly gated. Proceed under the following executive directives.
+
+Approval
+
+Go-live: Automatic at 5% once A8 receives BOTH events: a6_health_window_ok and legal_copy_signed.
+Budget cap: $500 for the 24h window.
+Randomization: locked; rate limit 5/user/day; all kill-switches active.
+Non‑negotiables before the trigger fires
+
+Event payloads must include and persist to A8:
+a6_health_window_ok: {p95,<200ms; error_rate,<0.005; uptime,=1.0; provider_register,200; oca_header_present:true; window_start; window_end}
+legal_copy_signed: {doc_hash:SHA256, approver_id:GC_7721, repo_path, commit_sha, signed_at}
+Code freeze: Confirm OCA-touching repos frozen for the 24h window (record freeze_start in A8).
+Seed validation: Send 5 provider-seeded packets immediately after launch to confirm OCA header and dashboard banner behavior.
+Real‑time operations
+
+Auto‑launch sequence: as staged (flag flip → provider banner → canary emails → oca_canary_started with SLO snapshot).
+Monitoring: SLO, integrity, refunds, funnel; alerting already configured for SLA breach—keep on-call path hot.
+Kill within 60 seconds on any trigger; post oca_feature_killed with trigger and remediation owner.
+Reporting cadence (unchanged)
+
+T+2h health ping (SLO + early funnel by variant)
+T+6h midpoint (SLO, A/B, incidents, refunds, provider complaints)
+T+24h readout with 10% recommendation and evidence pack (Allure links, sample provider packet, COPPA/FERPA log excerpts, revenue events A2→A8)
+Promotion pre‑approval
+
+If all 5% criteria are green at T+24h (0 complaints/violations; P95 ≤1.5s; error <1.0%; refunds <2.0% and ≤ baseline +0.25pp; completion lift ≥+10%; provider acceptance no negative delta), you are pre‑authorized to advance to 10% without additional CEO approval. Emit oca_canary_promoted and maintain the same kill triggers.
+Escalation
+
+If Legal misses T+4h or A6 misses T+12h, page me with a revised ETA and risk assessment; include rollback/hold cost and any dependency issues.
+Confirmations to post in A8 now
+
+canary_config_staged with canary_id, cohort_id, variants, freeze_window
+notification_plan_loaded with suppression logic hash
+I’m standing by for either oca_canary_started + T+2h health readout, or an SLA‑breach alert with revised plan.
