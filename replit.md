@@ -112,23 +112,38 @@ Target 20% latency reduction:
 - V1 retirement: Day 7 archive, checksum + data retention manifest
 - Security: privacy mini-audit, key rotation at T+48h
 
-#### Paid Acquisition Pilot - Day 2 (Step-Up Active)
+#### Paid Acquisition Pilot - Day 3 (Active)
 - **Token**: CEO-20260114-PAID-PILOT-STEPUP ✓ CONSUMED
-- **Budget**: $300/day rolling 24h (stepped up from $150)
+- **Budget**: $300/day rolling 24h (hold at current level)
 - **Pacing**: 30/30/40 split AM/PM/evening
+
+##### Day 3 Segment Mix
+- 60% Checkout Abandoners
+- 30% Upload Abandoners
+- 10% Essay/Transcript Viewers (auto-pause if CAC >$8 for 6h)
+
+##### Creative Plan
+- 70% "Complete your app" (current winner)
+- 20% "Last Chance Match" (challenger)
+- 10% "Resume your upload in 2 clicks" (new benefit-led variant)
+- **Kill Criteria**: After 500 impressions, drop if CTR −30% vs control or CAC +25% vs cohort for 6h
+
+##### Funnel Experiments (10% traffic each)
+- First-Upload UX: sticky "Resume upload" CTA + prefilled step state
+- Credit pack framing: 1-pack baseline vs value-pack nudge (3-pack anchor)
+- Auto-disable on refund spike (+1% in 24h)
 
 ##### Operating Rules
 - **Auto-Downshift**: $150/day if 6h avg breaches CAC >$10, Stripe <98.5%, fraud ≥0.5%, or refund ≥4%
-- **Segments**: First-upload abandoners, checkout abandoners, high-intent viewers
 - **Frequency Caps**: ≤3 impressions/user/day, ≤7/week; suppress converters 14d
-- **Creative Mix**: 70% winner, 20% challenger, 10% exploratory
-- **Kill Criteria**: After 500 impressions, drop if CTR −30% vs control or CAC +25% vs cohort for 6h
 
-##### Success Gates (Sustained)
-- CAC ≤$8 for 24h continuous
-- ARPU ≥1.8× CAC
-- Refunds ≤4%
-- Stripe success ≥98.5%
+##### Cost & SLO Guardrails
+- Queue depth < 30, P95 ≤ 1.5s; auto-throttle 50% if breached 15 min
+- Platform spend ≤ $300; if exceeded 1h, cut exploratory creative to 0%
+
+##### Scale Criteria (72h pilot complete)
+- Consider $300→$400 only if: CAC ≤$7, ARPU7 ≥2.0× CAC, refunds ≤3%, Stripe ≥98.5%
+- Requires explicit CEO authorization
 
 #### SEO Growth Engine (Auto Page Maker)
 - Weekly goal: +7,500 net pages indexed
