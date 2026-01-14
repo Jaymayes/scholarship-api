@@ -1,0 +1,83 @@
+CEO decision: Approved with minor redlines and go-forward actions
+
+Overall: The sequences align with “Editor/Coach, not Ghostwriter,” set the right expectations for students, and pre-empt provider spam concerns. I’m approving these for the 10% canary with the edits and implementation notes below.
+
+Priority redlines (apply before T‑1 dry run)
+
+Canonical tracking
+Add utm_term={{cohort_id}}&utm_content={{variant_id}} to all URLs.
+Append x-a8-cid={{a8_campaign_id}}&x-a8-eid={{event_id}} for A8 attribution.
+Student email
+Subject: “Apply to {{scholarship_name}} in seconds — you write the essay”
+First bullet: “We pre-fill administrative fields (contact, GPA, eligibility). You can edit before sending.”
+Replace “Select your pre-written essay” with “Attach your essay (written by you).”
+Footer compliance: add unsubscribe/preference link, company address. Ensure CAN‑SPAM/CASL compliant.
+In‑product modal
+Integrity checkbox text: “I wrote the attached essay myself and meet the eligibility criteria.”
+Consent checkbox text: “I authorize submission of my profile data and attached documents to {{provider_name}}.”
+Add link: “What we won’t do” → opens integrity policy panel.
+Telemetry on click path: modal_viewed → doc_selected → consent_checked → integrity_checked → submit_clicked → submit_result.
+Provider email
+Add line: “Submissions include a header: ‘Prepared via Scholar AI Advisor OCA — Admin data verified; essay attested by student.’”
+Include link to provider audit log with filters pre-applied to OCA=true and the Report Issue workflow.
+Provider dashboard banner
+Add microcopy on the button: “Report Issue” → opens ticket with auto‑disable on submit; shows what will happen next.
+A/B variants (pre-wire; 50/50 split inside 10% canary)
+
+Student subject lines
+A: “Apply to {{scholarship_name}} in seconds — you write the essay”
+B: “Fast‑Track your {{scholarship_name}} application (no AI essays, ever)”
+CTA copy
+A: “Review application”
+B: “Open fast‑track review”
+Success gate to keep best variant: +10% CTR and +5% submit rate vs the other variant with no increase in refunds/complaints.
+Telemetry and IDs to configure
+
+Campaign IDs
+oca_canary_student_v1
+oca_canary_provider_v1
+Required A8 events (no PII)
+oca_email_sent/open/click
+oca_modal_viewed
+oca_doc_selected
+oca_consent_checked
+oca_integrity_checked
+oca_submit_clicked
+oca_submit_result {success|blocked_reason}
+provider_issue_reported {reason}
+oca_feature_killed {trigger}
+Runtime refusal message (standardized, for red‑team parity)
+
+“I can’t write or complete scholarship essays for you. I can help you organize your ideas, improve clarity, and check structure. Upload your draft and I’ll coach you on edits.”
+KPIs and guardrails for this sequence
+
+Students
+Open rate ≥ 35%, CTR ≥ 8%, modal completion ≥ 70%, submit success ≥ 50% of modal entrants
+Providers
+Complaint rate = 0; time‑to‑first‑review unchanged or faster
+Integrity/ops
+Ghostwriting refusal pass rate = 100%
+Refund ≤ baseline +0.25pp and < 2.0% 24h
+P95 ≤ 1.5s, runtime error < 1.0%
+Any provider complaint or confirmed integrity violation triggers auto‑disable per spec.
+Dependencies and owners
+
+Engineering
+Implement OCA header in PDF/packet and emit OCA=true tag to provider portal.
+Wire all telemetry and ensure UTMs/event IDs flow to A8.
+Confirm Allure artifacts publish on each pipeline run (already noted present).
+Marketing/Ops
+Load email templates with variants and UTMs; set cohort_id and variant_id.
+Set suppression logic for under‑13 and for users lacking consent.
+QA
+Validate “translation bypass” and “paraphrase‑to‑compose” vectors in the red‑team suite.
+Run T‑1 end‑to‑end dry run across both variants; attach Allure report.
+Risks and mitigations
+
+Provider sensitivity to volume: Cap per‑student submissions at 5/day; throttle OCA if queue depth > 30 for 15 minutes.
+Misinterpretation by students: Prominent “We will never write your essay” line in email and modal. Integrity policy panel linked.
+Go/No‑Go
+
+Conditional GO for T‑1 dry run using these final edits.
+Canary GO at 5% for 24h, then 10% if clean, contingent on A6 Provider service being green and legal copy sign‑off.
+Please confirm once the copy deck is updated and the templates are loaded; I’ll authorize the T‑1 dry run immediately.
