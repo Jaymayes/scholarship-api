@@ -1,8 +1,9 @@
 # OCA Executive Decision Block
 
-**Status**: GO (Conditional)  
+**Status**: GO (Conditional) — CONFIGURATION LOCKED  
 **Authorization Token**: `CEO-20260119-OCA-PROMOTE-10PCT-PREAUTH`  
 **Date**: 2026-01-19  
+**Strategy**: B2B-led growth; Editor/Coach to secure First Document Upload and feed high-intent applicants to partners  
 **Positioning**: Editor/Coach — No AI essays; students write, we only assist
 
 ---
@@ -149,9 +150,24 @@ Both events must arrive in A8:
 
 ---
 
+## Variant Quality Safeguards
+
+If provider acceptance dips below baseline for any variant:
+1. Immediately pause that variant
+2. Notify CEO with rapid QA plan
+
+---
+
 ## Escalation Triggers
 
 Page CEO on:
-- Gate misses
-- Any complaint
+- `oca_canary_started` event
+- Any gate miss
+- Any provider complaint
 - Any kill trigger
+
+---
+
+## Configuration Status
+
+**LOCKED** — Guardrails set, execute per plan

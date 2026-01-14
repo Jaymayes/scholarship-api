@@ -1,0 +1,52 @@
+Acknowledged. Executive Decision Block accepted.
+
+CEO Order: GO (Conditional)
+
+Authorization: CEO-20260119-OCA-PROMOTE-10PCT-PREAUTH
+Strategy: B2B-led growth; “Editor/Coach” to secure First Document Upload and feed high-intent applicants to partners
+Guardrail: “No AI essays. Students write; we only assist.” Non‑negotiable across all surfaces
+Launch gates and automation
+
+Auto-GO only when BOTH are posted to A8:
+legal_copy_signed (GC_7721, SHA256, repo_path, commit_sha, signed_at)
+a6_health_window_ok (p95<200ms, error<0.5%, uptime=1.0, provider_register_status=200, oca_header_present=true)
+If Legal misses T+4h: auto-failover to Provider‑Only banner; page CEO with ETA and risk
+SLOs, budget, and kill logic
+
+Budget cap: $500
+SLO thresholds: P95 ≤1.5s; error <1.0%; queue ≤30; refunds <2.0% and ≤ baseline +0.25pp; complaints = 0; violations = 0
+Kill within 60s on breach; rollback + incident filed to A8 with proof
+Measurement and controls
+
+Core Activation Metric: First Document Upload
+Control: 10% holdout (no notifications)
+Cost telemetry: cost_per_notified, cost_per_started, cost_per_completed, compute_per_completion
+Throttle policy: if P95 ≥1.3s for 10 min → 4/user/day; restore when P95 <1.0s for 30 min
+Owner actions (time-bound)
+
+Ops/SRE (Immediate)
+Run 1‑minute kill drill; attach proof to A8
+Verify compliance line renders identically in student/provider variants
+Confirm schema flags live: holdout_control=true + all cost fields
+General Counsel (T+4h)
+Post legal_copy_signed; if delayed, trigger Provider‑Only banner and page CEO
+Engineering A6 (T+12h)
+Post a6_health_window_ok; pre‑warm capacity
+Marketing (Immediate)
+Enforce suppression for under_13 and no_consent; verify UTM/A8 attribution
+Reporting packets (must page CEO on delivery)
+
+T+2h: SLO by variant, queue depth, funnel by variant + control (open→click→start→complete), suppression match rate, 0 complaints/violations confirmation, cost telemetry
+T+6h: Trends vs T+2h, refunds/chargebacks, provider acceptance vs baseline, top failure signatures, interim A/B + control lift
+T+24h: Full readout + evidence pack (5 seed validations: OCA header, banner, Report Issue, audit entry, A8 IDs), ROI view (ARPU lift, payback, unit economics vs $500 cap)
+Promotion rules
+
+5% → 10%: Auto-promote at T+24h if all green using the token
+10% → 25%: Prepare T+36h brief; require P95 ≤1.2s (last 6h), error <0.7%, completion lift ≥+12% vs control, provider acceptance ≥ baseline, and cost-per-completion within target margin
+Variant quality safeguards
+
+If provider acceptance dips below baseline for any variant, immediately pause that variant and notify CEO with a rapid QA plan
+What pages me
+
+oca_canary_started event, any gate miss, any provider complaint, any kill trigger
+The configuration is locked. Guardrails are set. Execute.
