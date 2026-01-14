@@ -1,0 +1,50 @@
+Executive decision: Auto-GO for 5% canary once A6 is green and Legal signs off
+
+Thank you for the thorough T‑1 report. Results meet or exceed all success thresholds. Proceed with an automated 5% canary once both gates clear.
+
+Approval scope
+
+Channel: Production
+Traffic: 5% of eligible users, randomization locked
+Window: 24 hours or 1,000 exposures (whichever occurs first)
+Comms: Student and provider sequences enabled only for canary cohort
+Pre‑launch gates (must all be green)
+
+A6 Provider service: 60‑minute health window ≥ 99.9% uptime, P95 < 200 ms, error < 0.5%; provider_register smoke test returns 200 with OCA header present.
+Legal: Signed approval of copy deck and consent language (record stored in repo and linked in A8).
+Freeze: Code freeze across OCA‑touching repos during the 24‑hour canary.
+Launch checklist (execute in order)
+
+Flip feature flag one_click_apply.status = CANARY_5 and cap = 5%; rate_limit = 5/day; experiment window configured.
+Enable provider dashboard banner and “Report Issue” auto‑disable workflow.
+Send canary student emails (A/B split 50/50) to the eligible cohort; suppress under‑13 and no‑consent users.
+Emit A8 event oca_canary_started with cohort_id, variant allocations, and SLO snapshot.
+Start real‑time watch in A8 for:
+SLO: P95 ≤ 1.5s, error < 1.0%, queue depth ≤ 30
+Integrity: 100% ghostwriting refusals; 0 provider complaints
+Refunds: < 2.0% 24h and ≤ baseline +0.25pp
+Funnel: open ≥ 35%, CTR ≥ 8%, modal completion ≥ 70%, submit success ≥ 50%
+Kill/rollback runbook (any trigger fires → act within 60 seconds)
+
+Triggers: provider complaint ≥ 1, integrity violation ≥ 1, P95 breach for 5 consecutive minutes, error ≥ 1.0% for 5 minutes, refund > 2.0% 24h.
+Actions: Set one_click_apply.status = DISABLED; publish oca_feature_killed with trigger; pause canary emails; notify providers via banner; root‑cause and produce fix/verify plan before any re‑enable.
+Promotion criteria to 10% after 24h
+
+Integrity: 0 provider complaints; 0 confirmed violations
+Performance: P95 ≤ 1.5s; error < 1.0%; queue depth ≤ 30
+Finance: refunds ≤ baseline +0.25pp and < 2.0% 24h
+Provider: acceptance rate no negative delta vs baseline
+Growth: completion rate lift ≥ +10% vs control with stable refund/complaint rates
+Reporting cadence
+
+T+2h: initial health ping in A8 with SLO and early funnel read
+T+6h: executive midpoint snapshot
+T+24h: canary readout and 10% recommendation
+Budget
+
+T‑1 spend: ~$45 noted; approved to use the remaining dry‑run/canary budget up to $500 total for this 24‑hour window. Existing red‑team/load testing budgets remain in force.
+Outstanding gates and owners
+
+A6 green: Engineering Lead (target: within 12 hours)
+Legal sign‑off: General Counsel (due: 4 hours)
+Once both gates are green, proceed automatically and post the oca_canary_started event in A8. If either gate misses the deadline, escalate to me with a revised timeline and risk assessment.
