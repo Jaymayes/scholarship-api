@@ -1,10 +1,11 @@
 # OCA Executive Decision Block
 
-**Status**: GO (Conditional) — CONFIGURATION LOCKED  
+**Status**: GO (Conditional) — ARMED_AWAITING_GATES  
 **Authorization Token**: `CEO-20260119-OCA-PROMOTE-10PCT-PREAUTH`  
 **Date**: 2026-01-19  
-**Strategy**: B2B-led growth; Editor/Coach to secure First Document Upload and feed high-intent applicants to partners  
-**Positioning**: Editor/Coach — No AI essays; students write, we only assist
+**Strategy**: B2B-led growth; lift First Document Uploads ≥10% without harming trust or unit economics  
+**Positioning**: Editor/Coach — No AI essays; students write, we only assist  
+**Guardrails**: $500 cap; LTV:CAC ≥4:1 check at T+24h
 
 ---
 
@@ -28,10 +29,33 @@
 
 ## Launch Gates and Automation
 
-### Auto-GO Trigger
-Both events must arrive in A8:
-- `a6_health_window_ok`
-- `legal_copy_signed`
+### Auto-GO Trigger (THREE Gates Required)
+All three events must arrive in A8:
+
+#### 1. legal_copy_signed (T+4h)
+- Approver: GC_7721
+- SHA256 doc_hash, repo_path, commit_sha, signed_at
+- **Failover**: Provider-Only banner + page CEO
+
+#### 2. a6_health_window_ok (T+12h)
+- p95 < 200ms
+- error < 0.5%
+- uptime = 1.0
+- oca_header_present = true
+- provider_register_status = 200
+
+#### 3. a8_preflight_verifications_ok (Immediate)
+- Kill drill proof attached
+- A/B compliance screenshots with exact "No AI essays" text
+- Holdout integrity: 10% control cohort with zero notification events
+- Allocation drift ≤ 0.5pp; randomization locked
+- Cost telemetry fields non-null in dry run:
+  - cost_per_notified
+  - cost_per_started
+  - cost_per_completed
+  - compute_per_completion
+- Variant safeguard test: simulated acceptance dip → variant paused + CEO page captured
+- Log hygiene sample: OCA header present; no PII in audit
 
 ### Post-Launch Sequence (Automatic)
 1. Flag → `CANARY_5`
@@ -60,8 +84,8 @@ Both events must arrive in A8:
 - File A8 incident with root-cause placeholder and rollback proof
 
 ### Throttle Policy
-- If P95 approaches 1.3s for 10+ minutes → reduce to 4/user/day
-- Restore after 30 minutes < 1.0s
+- If P95 ≥ 1.3s (10-min avg) → reduce to 4/user/day
+- Restore when P95 < 1.0s (30-min avg)
 
 ---
 
@@ -95,13 +119,24 @@ Both events must arrive in A8:
 
 ---
 
-## Promotion Rule (No Additional Approval)
+## Promotion Rules
 
-**Condition**: All green at T+24h
+### 5% → 10% (Auto with Token)
+
+**Condition**: All Success Criteria green at T+24h (including ROI/LTV:CAC ≥4:1 trajectory)
 
 **Action**: Auto-emit `oca_canary_promoted` to 10% traffic
 
 **Token**: `CEO-20260119-OCA-PROMOTE-10PCT-PREAUTH`
+
+### 10% → 25% (Requires Brief)
+
+**Condition**: T+36h brief required with:
+- P95 ≤ 1.2s (last 6h)
+- Error < 0.7%
+- Completion lift ≥ +12% vs control
+- Provider acceptance ≥ baseline
+- Cost-per-completion within target margin
 
 ---
 
@@ -132,21 +167,6 @@ Both events must arrive in A8:
 | Provider acceptance | Neutral-to-positive |
 | Refunds | < 2.0% |
 | Cost-per-completed | Validates scale economics |
-
----
-
-## Next Scale Gate: 10% → 25%
-
-**Pre-declared requirements**:
-| Metric | Threshold |
-|--------|-----------|
-| P95 latency | ≤ 1.2s for last 6h |
-| Error rate | < 0.7% |
-| Completion lift vs. control | ≥ +12% |
-| Provider acceptance | ≥ baseline |
-| Cost-per-completion | Within target margin window |
-
-**Promotion Brief**: Prepare at T+36h if eligible
 
 ---
 
