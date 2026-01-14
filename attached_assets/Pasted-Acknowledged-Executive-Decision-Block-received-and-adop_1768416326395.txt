@@ -1,0 +1,51 @@
+Acknowledged. Executive Decision Block received and adopted.
+
+CEO Order: GO (Conditional)
+
+Authorization: CEO-20260119-OCA-PROMOTE-10PCT-PREAUTH
+Controller: CEO on-call for oca_canary_started, any gate miss, any provider complaint
+Positioning: “Editor/Coach,” No AI essays—students write; we only assist
+What happens now (owners, deadlines)
+
+Legal (T+4h): Post legal_copy_signed to A8 with SHA256 doc_hash, approver_id=GC_7721, repo_path, commit_sha, signed_at. If delayed, immediately page me and switch to Provider-Only banner until student copy clears.
+Engineering A6 (T+12h): Post a6_health_window_ok with p95<200ms, error<0.5%, uptime=1.0, provider_register_status=200, oca_header_present=true, window_start/end (ISO8601). Pre-warm capacity.
+Ops/SRE (Immediate):
+Run a 1-minute kill runbook drill; attach proof to A8.
+Verify A/B templates render the compliance line identically: “No AI essays. Students write; we only assist.”
+Confirm schema flags live: holdout_control=true for 10% control; cost telemetry fields for cost_per_notified, cost_per_started, cost_per_completed.
+Marketing/Comms (Immediate): Ensure suppression rules active (under_13, no_consent, unsubscribed). UTM/A8 attribution verified.
+Launch gates and automation
+
+Auto-GO only when BOTH events arrive in A8: a6_health_window_ok AND legal_copy_signed.
+Post-launch sequence executes automatically: flag → CANARY_5, provider banner on, canary emails A/B 50/50, 5-provider seed validation, emit oca_canary_started.
+SLOs, guardrails, and kill logic
+
+SLO: P95 ≤1.5s, error <1.0%, queue ≤30, refunds <2.0% and ≤baseline +0.25pp, complaints = 0, violations = 0.
+Kill within 60s on breach; auto-rollback; file A8 incident with root-cause placeholder and rollback proof.
+Throttle policy: If P95 approaches 1.3s for 10+ minutes, reduce to 4/user/day; restore after 30 minutes <1.0s.
+Measurement directives (data-first)
+
+Core Activation Metric: First Document Upload.
+Control: 10% holdout (no notifications) to measure true lift.
+Required T+2h packet:
+SLO by variant; queue depth
+Funnel: open → click → start → complete by variant and control
+Suppression match rate; 0 complaints/violations confirmation
+Cost telemetry: cost per notified, per start, per completion; compute-per-completion
+T+6h: Trend vs. T+2h, refunds/chargebacks, provider acceptance vs. baseline, top failure signatures from Report Issue, interim A/B lift and control lift.
+T+24h: Full readout + evidence pack (5 seed validations: OCA header, banner, report issue, audit entries, A8 IDs). Include ROI view: ARPU lift, payback, and unit-economics vs. $500 cap.
+Promotion rule (no additional approval)
+
+If all green at T+24h: auto-emit oca_canary_promoted to 10% traffic using token CEO-20260119-OCA-PROMOTE-10PCT-PREAUTH.
+Risk controls aligned to Playbook V2.0
+
+Academic integrity: Non-negotiable messaging in all surfaces; no AI-written essays. Strict COPPA/FERPA posture; no PII in logs; OCA header required in submissions and audits.
+Legal latency: Provider-Only fallback if copy slips; page me at T+4h miss.
+Autonomy Tax: We accept up to 1.5s P95 during canary; $500 hard budget cap.
+Success target for this canary
+
+≥+10% completion lift vs. control, neutral-to-positive provider acceptance, refunds <2.0%, validated cost-per-completed-application that supports scale.
+Next scale gate (pre-declared)
+
+From 10% → 25% requires: P95 ≤1.2s for last 6h, error <0.7%, ≥+12% completion lift vs. control, provider acceptance ≥ baseline, cost-per-completion within target margin window. Prepare a promotion brief at T+36h if eligible.
+Execute per plan. Keep automation on. Page me on gate misses, any complaint, or any kill trigger.
