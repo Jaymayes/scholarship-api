@@ -1,0 +1,55 @@
+Yes. Below is the One‑Click Apply compliance checklist for Product. It encodes our “Editor/Coach, not Ghostwriter” principle, FERPA/COPPA posture, and operational kill‑switches.
+
+One‑Click Apply compliance checklist (≤10% test traffic)
+
+Scope and intent
+
+Purpose: accelerate admin form fill only. No AI auto‑writing of essays or statements. The Tutor must refuse unethical requests (e.g., “write the rest for me”) and cite academic integrity policies .
+Positioning: “Editor/Coach” guidance only; preview and explicit student confirmation required before any submission.
+UX and consent
+
+Pre‑submit modal must disclose: what fields were prefilled, what was left untouched, and the provider’s specific terms; require checkbox consent and a final “Submit” click.
+Academic integrity notice visible at the point of help (Coach) and at submission; AI must decline requests to generate prohibited content .
+Provide an easy “view/edit” step before send; default focus on review, not speed.
+Functional constraints
+
+Allow prefill only for non‑creative fields (profile, eligibility, reusable facts). Never inject AI‑generated essays/personal statements.
+Rate limits: max N submissions/user/day (set N by provider policy); add basic anti‑automation (e.g., human confirmation step).
+No auto‑submit on page load or background; submission only via explicit user action.
+Data privacy and security
+
+COPPA age gate: if DOB < 13, route to parental consent; user state = Pending_Parent_Auth; block One‑Click Apply for under‑consent accounts .
+FERPA access control: enforce authorization so a student cannot access or submit another student’s records; assert 403 on unauthorized access attempts and log the event .
+Logging: no PII in logs; record only event IDs, timestamps, provider ID, and outcome to A8.
+Provider safeguards
+
+Honor provider‑specific rules (attachments allowed, word limits, required custom prompts).
+Hard block if any provider complaint > 0 during the test; this is an immediate kill‑switch condition.
+Store provider‑visible audit trail: timestamp, fields prefilled, student confirmation hash.
+Accessibility and transparency
+
+WCAG 2.1 checks on the new modal and flows (axe scan; fail build on “Critical/Serious”) .
+Plain‑language explanations of what One‑Click Apply does and does not do.
+Quality gates and test coverage (pre‑prod)
+
+Playwright E2E: magic‑link auth, file handling, review/confirm/submit sequence; verify UI state and server responses .
+Red‑team tests that attempt to coerce the AI into ghostwriting are refused with policy‑aligned messages .
+Load/perf (k6): assert API p95 under our SLO; integrate into CI with Allure reporting and quality gates so releases are blocked on failure .
+Operational SLOs and guardrails (prod)
+
+SLOs: p95 ≤ 1.5s; queue depth ≤ 30; on breach for 15 min, throttle 50% non‑revenue traffic and page Ops.
+Refund guardrail: auto‑revert One‑Click Apply if refunds > 2.0% 24h or +0.75pp vs baseline.
+Safety/complaints: auto‑disable if provider complaints ≥ 1 or if academic‑integrity violations are detected in A8.
+Experiment design
+
+Exposure cap: ≤10% of eligible traffic; randomization locked; no exposure to users <13 or without consent state.
+Success metrics: completion rate lift (review→submit), provider acceptance rate, refund rate delta, complaint rate (must be 0), time‑to‑submit.
+Decision window: 7 days or 1,000 qualified exposures, whichever first.
+Audit artifacts
+
+Allure report bundling functional, safety, performance, and accessibility results; history/trends enabled for regression tracking .
+A8 decision log entry for enable/disable events with reason codes.
+Strategic linkage
+
+Reinforces “first document upload” as the activation lever and integrates Coach value without violating integrity standards from Playbook V2.0’s activation thesis .
+If you want, I can package this into a one‑page spec for Product and generate the CI test checklist (E2E + red team + load + a11y) so Engineering can wire the gates exactly as above.
