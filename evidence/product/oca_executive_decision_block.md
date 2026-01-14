@@ -3,20 +3,37 @@
 **Status**: GO (Conditional) — ARMED_AWAITING_GATES  
 **Authorization Token**: `CEO-20260119-OCA-PROMOTE-10PCT-PREAUTH`  
 **Date**: 2026-01-19  
-**Strategy**: B2B-led growth; lift First Document Uploads ≥10% without harming trust or unit economics  
+**Strategy**: B2B-led growth via First Document Upload lift  
 **Positioning**: Editor/Coach — No AI essays; students write, we only assist  
-**Guardrails**: $500 cap; LTV:CAC ≥4:1 check at T+24h
+**Guardrails**: $500 cap; LTV:CAC ≥4:1 at T+24h
 
 ---
 
-## Owner Assignments and Deadlines
+## Current Gate Status
 
-| Owner | Deadline | Deliverable |
-|-------|----------|-------------|
-| Legal | T+4h | `legal_copy_signed` to A8 with SHA256, approver_id=GC_7721, repo_path, commit_sha, signed_at |
-| Engineering A6 | T+12h | `a6_health_window_ok` with p95<200ms, error<0.5%, uptime=1.0, provider_register=200, oca_header=true |
-| Ops/SRE | Immediate | Kill runbook drill (1-min), A/B template verification, schema flags live |
-| Marketing/Comms | Immediate | Suppression rules active, UTM/A8 attribution verified |
+| Gate | Event | Status | Deadline |
+|------|-------|--------|----------|
+| 1 | `a8_preflight_verifications_ok` | **PASSED** ✓ | Complete |
+| 2 | `legal_copy_signed` | Pending | T+4h |
+| 3 | `a6_health_window_ok` | Pending | T+12h |
+
+---
+
+## Orders and Timers
+
+### Legal (Gate 2)
+- **T+3h45 warning**: If not posted, page CEO with ETA and confirm Provider-Only failover readiness
+- **T+4h miss**: Auto-failover to Provider-Only banner + page CEO
+
+### Engineering A6 (Gate 3)
+- Pre-warm capacity
+- Ensure: p95<200ms, error<0.5%, uptime=1.0, oca_header_present=true, provider_register=200
+- **Proactive throttle**: If 10-min P95 trend ≥1.25s pre-launch, clamp to 4/user/day and notify A8
+
+### Ops/SRE
+- Post `code_freeze_hash` to A8 now
+- Confirm `freeze_start` recorded at launch
+- Attach kill-drill proof in T+2h packet
 
 ### Schema Flags Required
 - `holdout_control=true` for 10% control
@@ -97,13 +114,17 @@ All three events must arrive in A8:
 ### Control Group
 10% holdout (no notifications) to measure true lift
 
-### T+2h Packet
-- SLO by variant; queue depth
-- Funnel: open → click → start → complete (by variant and control)
-- Suppression match rate
-- 0 complaints/violations confirmation
-- Cost telemetry: cost per notified, per start, per completion
-- Compute-per-completion
+### T+2h Packet (Page CEO on Delivery)
+- **SLOs**: P95, error rate, queue depth by variant and control
+- **Funnel**: open → click → start → complete (by variant and control)
+- **Safety**: Suppression match rate; 0 complaints/violations confirmation
+- **Integrity**: Holdout drift ≤0.5pp; randomization locked
+- **Economics**: cost_per_notified, cost_per_started, cost_per_completed, compute_per_completion
+- **B2B pulse**: Early provider acceptance vs baseline
+- **Kill-drill proof**: Attached
+
+#### Data Sufficiency Guardrail
+If <500 opens OR <50 starts total at T+2h → defer any optimization actions until T+6h
 
 ### T+6h Packet
 - Trend vs. T+2h
@@ -123,7 +144,13 @@ All three events must arrive in A8:
 
 ### 5% → 10% (Auto with Token)
 
-**Condition**: All Success Criteria green at T+24h (including ROI/LTV:CAC ≥4:1 trajectory)
+**Condition**: All green at T+24h:
+- Completion lift ≥ +10% vs control
+- Provider acceptance ≥ baseline
+- Refunds < 2.0% AND ≤ baseline +0.25pp
+- LTV:CAC trajectory ≥ 4:1 with LTV basis, CAC components, and compute_per_completion reported
+
+**If any red/yellow**: Hold at 5% and include corrective plan
 
 **Action**: Auto-emit `oca_canary_promoted` to 10% traffic
 
