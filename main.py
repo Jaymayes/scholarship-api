@@ -97,6 +97,7 @@ from routers.data_sync import router as data_sync_router
 from routers.probes import router as probes_router
 from routers.circuit_breaker_telemetry import router as circuit_breaker_telemetry_router
 from routers.live_p95_dashboard import router as live_p95_dashboard_router
+from routers.oca_canary import router as oca_canary_router
 from schemas.error_responses import ERROR_RESPONSES
 from utils.logger import setup_logger
 
@@ -833,6 +834,7 @@ app.include_router(executive_router, tags=["Executive Dashboard"])
 app.include_router(probes_router, tags=["Business Probes"])
 app.include_router(circuit_breaker_telemetry_router)
 app.include_router(live_p95_dashboard_router)
+app.include_router(oca_canary_router)
 
 # Metrics already setup above - this was the wrong location causing route shadowing
 
