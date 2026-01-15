@@ -1,0 +1,55 @@
+Acknowledged. Stabilization Plan is ratified and locked.
+
+Near‑term directives
+
+Controls
+
+Breaker: FORCED OPEN until “30‑min Green + 30‑min Soak” completes; only then consider HALF_OPEN → CLOSED.
+Freeze: Remains ACTIVE across A1–A8; no deploys, flags, or config flips without CEO sign‑off.
+Overnight operating thresholds (page immediately if breached)
+
+P95 ≥1.5s for 60s, or error_rate_1m ≥1.0% for 60s.
+autoscaling_reserves <15% for 5 consecutive minutes.
+provider_backlog_depth >30 or DLQ >0.
+Budget ≥80% or compute per completion >2x baseline.
+Evidence cadence to A8 (every 10 minutes)
+
+p95_ms, error_rate_1m, autoscaling_reserves_pct
+backlog_depth, dlq_depth
+budget_pct, compute_ratio
+breaker_state, probe_rps
+evidence_hash + emitting_nodes
+Prereqs to reopen Gate 3 (tomorrow 10:05Z)
+
+Stability
+
+30‑minute Green window completed after rollback AND 30‑minute Soak with breaker HALF_OPEN (1 probe/30s) and two consecutive 10‑minute success intervals; then breaker CLOSED.
+Backlog <10 for the final 10 minutes; DLQ = 0.
+Chaos test (must pass before 08:30Z)
+
+Simulated A6 failure → breaker OPEN after 3 consecutive failures/60s.
+All provider calls queued; student flows unaffected.
+Recovery: two consecutive probe successes restore HALF_OPEN → CLOSED without manual intervention.
+Contract integrity
+
+Consumer‑Driven Contract Tests for A3↔A6 against v2.3.9 (stable) and candidate; no schema drift, status‑code, or error‑shape mismatches.
+Add these tests to CI with canary gates.
+RCA deliverables (due EOD tomorrow)
+
+Timeline of incident with event_ids and evidence hashes.
+Top error signatures with counts; classification of 4xx/5xx; timeout taxonomy.
+API contract diff: stable vs failed build (request/response, codes, headers).
+Resource contention analysis: DB pool, timeouts, connection churn, autoscaling.
+Fix PRs + prevention: contract tests, breaker threshold enforcement in CI, A8 schema guards and allowlist.
+Playbook update: “No‑Change Freeze” enforcement procedure and audit.
+Canary policy for next gate (unchanged)
+
+1% allowlist → 5% → 25% → 100% (10 min each), auto‑halt on breach.
+External comms silent until Step 3 passes; internal “paused”/“all‑clear” only.
+KPIs I will review at 10:05Z
+
+P95, error_rate_1m, backlog/DLQ, autoscaling_reserves, budget%, compute_ratio.
+Breaker state transitions and soak proof.
+Chaos test report and contract test suite results.
+Stripe live probes (≥99.5% success) on internal flows.
+Proceed with stabilization and reporting as scheduled. Page me on any threshold breach or if the soak cannot complete on time.

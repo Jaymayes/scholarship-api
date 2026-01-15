@@ -48,6 +48,7 @@ EXCLUDED_PREFIXES = (
     "/stabilization/",
     "/canary/",
     "/recovery/",
+    "/monitoring/",
 )
 
 
