@@ -32,15 +32,25 @@
 - **Hard stop**: 2026-01-15T10:11:13Z
 - Provider-only canary still requires this gate
 
-#### A6 Precheck (09:11:13Z)
-Post `a6_precheck` snapshot to A8 with:
+#### A6 Precheck Execution (09:11:13Z)
+
+##### Timeline
+| Checkpoint | Action |
+|------------|--------|
+| T−15m (08:56Z) | Confirm provider_register_status=200, cache_warm=true, autoscaling_reserves≈10%, student queue=0 (suppression heartbeat + queue=0 evidence hash) |
+| T−5m (09:06Z) | Run synthetic probe (2 min, ≤50 rps). If 10-min P95 ≥1.25s → throttle to 4/user/day + log A8 |
+| T0 (09:11Z) | Post `a6_precheck` to A8 |
+
+##### Precheck Payload
 - p95_ms, error_rate, queue_depth
 - provider_register_status=200
 - cache_warm=true
 - autoscaling_reserves ≈10%
-- synthetic_probe summary (2 min ≤50 rps)
+- probe summary
 - 10-min P95 trend
-- throttle state
+- throttle_state
+- compute_per_completion snapshot
+- queue=0 confirmation
 
 ##### Precheck Go/Throttle/Kill Rules
 
