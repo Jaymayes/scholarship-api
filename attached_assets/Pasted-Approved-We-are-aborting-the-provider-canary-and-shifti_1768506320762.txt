@@ -1,0 +1,49 @@
+Approved. We are aborting the provider canary and shifting to recovery.
+
+Executive orders — effective immediately
+
+Abort canary
+
+Execute a8_canary_abort with reason=error_rate_15_38 and include the checklist evidence hash.
+Hide all provider onboarding CTAs. Stay silent externally; send “Canary Paused” to internal stakeholders only.
+Roll back A6 and stabilize
+
+Rollback target: build_20260115_0845_stable (sha256:9a8b7c6d5e4f…) — the last checklist‑verified healthy image. If your latest healthy target is v2.3.9‑stable, pin that exact digest and confirm. No partial rollbacks.
+Cold restart → cache warm → begin probes at 10 rps for 5 minutes, then 20 rps if P95 ≤1.0s.
+Start a new stabilization window only after rollback success; requirement remains 30 minutes continuous green (P95 <1.25s, error <0.5%).
+Freeze and isolation
+
+Enforce manual NO‑CHANGE FREEZE in A8 (block deploys/flags across A1–A8).
+Force the A3→A6 circuit breaker to OPEN via ops override until A6 achieves the new 30‑minute green window. All provider calls must queue; student flows stay live.
+Guardrails and cost
+
+Keep autoscaling_reserves ≥15%; clamp probes if P95 drifts upward.
+Maintain budget <80% and compute per completion ≤2x baseline. If breached, KILL and page me.
+Telemetry hygiene (unchanged)
+
+Canonical only: oca_canary_a6_precheck events with evidence_hash + required signatures.
+Quarantine all dev/noisy streams. Any schema violation triggers halt.
+B2C protection (immediate)
+
+Keep Auto Page Maker and student flows live; show friendly “Provider maintenance” notice only where provider artifacts would surface.
+Ensure A3 always returns {success:false, queued:true} for provider‑dependent paths; no user‑visible 5xx.
+RCA plan (due EOD tomorrow with evidence)
+
+Contract/regression mismatch between A3 and A6
+Diff the A3→A6 API contracts from the passing build vs failing build; run consumer‑driven contract tests. Any request/response shape drift or status‑code change must be fixed and versioned.
+Rate limiting and error classification
+Verify 429/4xx are counted as failures for breaker decisions; ensure 3 consecutive failures in 60s on provider_register will OPEN the breaker. Align retry/backoff and thresholds.
+Resource contention
+Inspect DB pool utilization, timeout/error classes, and connection churn around the spike; raise pool size or tune timeouts if needed. Deliverables: incident timeline, top error signatures with counts, root cause, fix, and prevention PRs (tests + canary checks added to CI).
+Scheduling
+
+Gate 3 is reset to tomorrow 10:05Z, contingent on a fresh 30‑minute green window after rollback. No external comms until we pass Step 3 of the canary in the next window.
+What I need back now
+
+Event IDs + evidence hashes for:
+a8_canary_abort
+a6_rollback_start and a6_rollback_complete (include build ID and digest)
+breaker_override_open
+freeze_enabled
+Post‑rollback snapshot at T+10 minutes: P95, error_rate_1m, backlog_depth, autoscaling_reserves, budget%, compute_ratio.
+Proceed.

@@ -47,6 +47,7 @@ EXCLUDED_PREFIXES = (
     "/oca/canary/",
     "/stabilization/",
     "/canary/",
+    "/recovery/",
 )
 
 

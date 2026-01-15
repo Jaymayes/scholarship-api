@@ -354,6 +354,22 @@ class A3A6CircuitBreaker:
         finally:
             self._backlog_processor_running = False
     
+    def force_open(self, reason: str = "ops_override"):
+        """Force the circuit breaker to OPEN state via ops override."""
+        self.state = BreakerState.OPEN
+        self.last_state_change = time.time()
+        self.consecutive_failures = self.FAILURE_THRESHOLD
+        logger.warning(f"Circuit breaker FORCED OPEN: {reason}")
+    
+    def force_close(self, reason: str = "ops_override"):
+        """Force the circuit breaker to CLOSED state via ops override."""
+        self.state = BreakerState.CLOSED
+        self.last_state_change = time.time()
+        self.consecutive_failures = 0
+        self.consecutive_successes = self.RECOVERY_THRESHOLD
+        self.failure_times.clear()
+        logger.info(f"Circuit breaker FORCED CLOSED: {reason}")
+    
     def get_status(self) -> dict:
         """Get circuit breaker status for health checks."""
         return {

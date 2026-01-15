@@ -100,6 +100,7 @@ from routers.live_p95_dashboard import router as live_p95_dashboard_router
 from routers.oca_canary import router as oca_canary_router
 from routers.stabilization import router as stabilization_router
 from routers.pre_canary_checklist import router as pre_canary_checklist_router
+from routers.recovery_ops import router as recovery_ops_router
 from schemas.error_responses import ERROR_RESPONSES
 from utils.logger import setup_logger
 
@@ -839,6 +840,7 @@ app.include_router(live_p95_dashboard_router)
 app.include_router(oca_canary_router)
 app.include_router(stabilization_router)
 app.include_router(pre_canary_checklist_router)
+app.include_router(recovery_ops_router)
 
 # Metrics already setup above - this was the wrong location causing route shadowing
 
