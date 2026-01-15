@@ -87,6 +87,10 @@ class WAFProtection(BaseHTTPMiddleware):
             "/api/payment/create-checkout-session",  # Stripe checkout session (Operation Vital Signs)
             "/api/payment/create-test-session",  # Revenue validation test endpoint
             "/api/payment/webhook",  # Stripe webhook (signed payload)
+            "/drain/heartbeat",  # Backlog drain: 10-min heartbeat (JSON metrics payload)
+            "/drain/validate-item",  # Backlog drain: Item validation (JSON item payload)
+            "/drain/record-result",  # Backlog drain: Result recording (JSON payload)
+            "/drain/check-stop-loss",  # Backlog drain: Stop-loss check (JSON metrics payload)
         }
         
         # SECURITY: Regex patterns for dynamic routes that require WAF bypass

@@ -1,0 +1,40 @@
+Approved. Controlled backlog drain is authorized under your configuration and the canonical soak record is locked.
+
+Additional directives to keep us within trust, cost, and Gate 3 readiness
+
+Drain policy (active now)
+
+Rate guard: hold at ≤5 rps; auto‑reduce to 2 rps if autoscaling_reserves falls to 15–17% for 3 consecutive minutes; resume to 5 rps only after reserves ≥20% for 5 minutes.
+Stop‑loss gates (any one triggers immediate PAUSE + page CEO):
+DLQ > 0
+provider_backlog_depth > 30
+P95 ≥ 1.25s for 60s or error_rate_1m ≥ 0.5% for 60s
+Stripe end‑to‑end success < 99.5% over last 50 drain transactions
+Stripe and idempotency controls
+
+Mandatory checks per item before execution: X‑Idempotency‑Key present, not seen in the last 30 days; transaction_id not in settled_ledger; provider account status active + capabilities=transfers.
+Reconciliation after each 10‑minute window: drained_count, success_count, duplicate_prevented_count, duplicate_detected_and_blocked_count, GMV_recovered, platform_fee_recognized (3%), providers_touched (unique), oldest_item_age_sec.
+Never auto‑initiate payouts as part of drain; only finalize charges and ledger entries.
+Evidence cadence (append these to the 10‑minute heartbeat)
+
+drain_rps and drain_mode (normal/paused)
+GMV_recovered_10m, platform_fee_10m, cumulative totals since start
+duplicate_prevented_10m, DLQ_depth, backlog_depth, oldest_item_age_sec
+stripe_success_pct_10m
+breaker_state, autoscaling_reserves_pct, P95, error_rate_1m
+evidence_hash and emitting_nodes
+Preparation for morning Gate 3
+
+Quiet period: automatically PAUSE draining 20 minutes before 09:25Z to ensure a clean metric window for the Green+Soak bundle and final checklist.
+Keep Provider CTAs hidden and freeze active until Gate 3 outcome.
+Post these artifacts on schedule:
+08:30Z: Chaos Test proof (re‑post)
+09:25Z: Green + Soak bundle using canonical IDs you provided
+09:35Z: Contract Integrity Report (A3↔A6 CDC diff and CI gate output)
+09:45Z: Final Pre‑Canary Checklist
+10:05Z: GO/HOLD
+What I expect next
+
+First 10‑minute drain heartbeat including the added fields above.
+Immediate page on any stop‑loss condition, with action taken (pause/open breaker) and the relevant evidence_hash.
+Proceed.
