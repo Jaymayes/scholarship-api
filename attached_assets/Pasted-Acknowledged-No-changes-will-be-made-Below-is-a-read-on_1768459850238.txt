@@ -1,0 +1,113 @@
+Acknowledged. No changes will be made. Below is a read‑only, black‑box test plan to diagnose why leads and revenue are not materializing, plus effort and timeline.
+
+Executive context (why you see “zero” now)
+
+We are in Provider‑Only failover. All student surfaces and notifications are suppressed by design, so B2C leads and credit revenue will be zero until Legal clears or failover is lifted.
+This plan verifies whether: a) the “zero” is solely due to failover, and b) there are additional structural issues in acquisition, activation, or monetization that will still block growth after failover ends.
+Scope and principles
+
+Read‑only. No config flips, no traffic changes, no transactions. Data pulls, GET/HEAD pings, and log reviews only.
+Evidence‑first. Every test produces a metric, an owner, and a pass/fail criterion.
+Dual engine. We assess both funnels independently: B2C (students) and B2B (providers).
+A. Platform‑level sanity checks (read‑only)
+
+A8 ingestion health
+What: Verify last 7 days event counts by stream: traffic/session, funnel (open→click→start→complete), monetization (credit_purchase_), provider (task_), incident/kill.
+Why: Zero or near‑zero events indicates broken telemetry or routing.
+Pass: Non‑zero event flow per stream; no schema mismatch spikes.
+Owner: Ops/SRE + Data.
+2. SLO snapshot vs budget
+
+What: P95, error rate, queue depth, uptime; hourly spend vs $500 cap; compute_per_completion trend.
+Why: Latency/Errors or runaway compute can choke conversions.
+Pass: P95 < 1.2s normal; < 1.5s canary; error < 1.0%; queue ≤ 30; spend ≤ 80% of cap.
+Owner: Ops/SRE.
+3. Suppression and gating footprint
+
+What: Share of traffic suppressed: under_13, no_consent, unsubscribed; cohort assignment including control/holdout.
+Why: Over‑suppression or mis‑cohorting can drop volume to near zero.
+Pass: Suppression distribution within historical bands; holdout near the configured 10% ±0.5pp.
+Owner: Data + Legal.
+B. B2C acquisition and activation (read‑only, while failover is active)
+4) Organic acquisition (Auto Page Maker SEO)
+
+What: Indexability and discoverability audit: canonical tags, robots, sitemap, schema.org, page load, lighthouse, 404/500 rates. Review Search Console/analytics coverage (impressions, CTR).
+Why: If pages aren’t indexable or fast, you won’t get sessions.
+Pass: Indexable pages, no accidental noindex, CWV LCP < 2.5s on 75th percentile, 0 major crawl errors.
+Owner: Growth + Web.
+5. Traffic attribution integrity
+
+What: Sessions by source/medium/UTM; landing‑page to event linkage in A8.
+Why: If attribution is broken, you can’t diagnose drop‑offs.
+Pass: ≥95% of sessions carry source/medium; UTMs resolve to A8 sessions.
+Owner: Growth + Data.
+6. Activation funnel integrity (First Document Upload)
+
+What: Rate per step: landing open → CTA click → signup → doc_upload_start → doc_upload_complete.
+Why: Pinpoint where users quit.
+Pass: Each step records events; typical benchmarks (for guidance): click‑through 3–8%, signup/start 30–50% of clicks, upload complete 50–70% of starts.
+Owner: Product + Data.
+7. Payments readiness (B2C)
+
+What: Read‑only Stripe mode and errors: live vs test mode flags; credit_purchase_begin vs credit_purchase_success counts; top 5 error codes; refund rate and delta to baseline.
+Why: Misconfigured payments yields zero revenue even with demand.
+Pass: Live mode; non‑zero purchase_success in historical windows; refund < 2% and ≤ baseline +0.25pp.
+Owner: Finance + Engineering.
+C. B2B provider funnel (read‑only under Provider‑Only mode)
+8) Provider activity and value
+
+What: Logins/session length; tasks created/completed; time‑to‑first‑review; acceptance rate vs baseline.
+Why: Confirms that the provider side remains healthy and valuable.
+Pass: No >20% drop vs baseline in logins or TTR; acceptance ≥ baseline.
+Owner: Growth + Product.
+9. Provider acquisition funnel
+
+What: provider_onboard_start → provider_onboard_complete → first_posting → first_review; support tickets by stage.
+Why: If new providers aren’t activating, B2B engine stalls regardless of student volume.
+Pass: >60% onboard completion; >40% posting; median time‑to‑first‑review within baseline.
+Owner: Sales Ops + Product.
+10. Compliance guardrails
+
+What: Evidence that no student data appears in provider views during failover; audit log samples with OCA headers; PII checks.
+Why: Avoid FERPA/COPPA violations that would halt growth.
+Pass: 0 violations; complete audit trail for sampled actions.
+Owner: Legal + Security.
+D. Experiment and messaging integrity (read‑only)
+11) Variant and control hygiene
+
+What: Allocation drift; correct messaging rendered (compliance line); event parity across A/B/control.
+Why: Broken variants or wrong copy break trust and measurement.
+Pass: Drift ≤ 0.5pp; compliance text present on all surfaces; event schemas consistent across variants.
+Owner: Ops/SRE + Growth.
+12. Incident and kill‑trigger audit
+
+What: Review kill events, near‑misses, escalations; RCA presence.
+Why: Frequent auto‑kills signal reliability blockers to conversion.
+Pass: No un‑RCA’d incidents; mean time to detect < 1 minute; mean time to resolve < 30 minutes.
+Owner: SRE.
+Outputs you’ll receive from this test (no changes required)
+
+A single “Lead and Revenue Gap Map” showing, for each step in both funnels: traffic, conversion, SLO, top 3 defect signatures, and owner.
+A quantified “what’s blocking revenue” call: Acquisition vs Activation vs Monetization vs Provider value vs Compliance.
+An “effort to green” estimate per blocker with dependencies.
+Most likely root causes to confirm or rule out quickly
+
+B2C is intentionally zeroed by failover (expected).
+SEO pages not indexed or are slow; attribution gaps; suppression too aggressive; payments not in live mode; excessive latency or error spikes at key steps; provider acceptance/backlog issues.
+Effort and timeline
+
+Diagnostic Sprint (read‑only; no changes)
+
+Day 1–2: Pull A8 and Stripe readouts; SLO and budget traces; suppression/holdout analysis; provider activity metrics; incident review; SEO technical audit.
+Day 3: Deliver Gap Map & Executive Readout with prioritized issues and fix list.
+Remediation (post‑diagnostic; requires changes and separate approval)
+
+Tier 1 (1–2 weeks): Fix top one or two bottlenecks that most affect revenue (e.g., payments mode/config, onboarding friction events missing, attribution patch, variant copy fix, SEO indexability). Parallel: stabilize SLOs if above thresholds.
+Tier 2 (2–4 weeks): Structural improvements (e.g., activation flow UX, doc upload reliability, schema refinements, provider acceptance tooling).
+Ongoing: Weekly A/B + cost telemetry governance; 24/7 SLO watch; quarterly SEO/landing refresh.
+What I need to kick off the read‑only tests
+
+A8 read access for events and dashboards.
+Read‑only access to Stripe and Search Console/Analytics.
+Current baselines for SLOs, acceptance, and key funnel rates.
+I will return the Gap Map and a quantified “time to green” within 3 business days from data access, with an executive recommendation on where to invest first for leads and revenue.
