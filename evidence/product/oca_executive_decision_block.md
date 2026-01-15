@@ -2,20 +2,31 @@
 
 **Status**: GO (Conditional) — ARMED_AWAITING_GATES  
 **Authorization Token**: `CEO-20260119-OCA-PROMOTE-10PCT-PREAUTH`  
-**Date**: 2026-01-19  
+**Lock Event**: `evt_1768428673887_yfharrqcg`  
+**T0**: 2026-01-14T22:11:13Z  
 **Strategy**: B2B-led growth via First Document Upload lift  
 **Positioning**: Editor/Coach — No AI essays; students write, we only assist  
-**Guardrails**: $500 cap; LTV:CAC ≥4:1 at T+24h
+**Guardrails**: $500 cap; LTV:CAC ≥4:1 at T+24h  
+**Code Freeze**: Active and absolute
 
 ---
 
 ## Current Gate Status
 
-| Gate | Event | Status | Deadline |
-|------|-------|--------|----------|
+| Gate | Event | Status | Deadline (UTC) |
+|------|-------|--------|----------------|
 | 1 | `a8_preflight_verifications_ok` | **PASSED** ✓ | Complete |
-| 2 | `legal_copy_signed` | Pending | T+4h |
-| 3 | `a6_health_window_ok` | Pending | T+12h |
+| 2 | `legal_copy_signed` | Pending | 2026-01-15T02:11:13Z |
+| 3 | `a6_health_window_ok` | Pending | 2026-01-15T10:11:13Z |
+
+### Hard Deadlines (UTC)
+
+#### Gate 2: legal_copy_signed
+- **T+3h45 warning**: 2026-01-15T01:56:13Z → Page CEO with ETA and Provider-Only readiness if not posted
+- **T+4h hard stop**: 2026-01-15T02:11:13Z → Auto-switch to Provider-Only banner + page CEO
+
+#### Gate 3: a6_health_window_ok
+- **T+12h hard stop**: 2026-01-15T10:11:13Z → Launch only if posted
 
 ---
 
