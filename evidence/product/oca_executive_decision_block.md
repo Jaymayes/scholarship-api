@@ -29,8 +29,32 @@
   - `student_notifications_suppressed = true` (queue_count=0, suppression_rule_hash)
 
 ### Gate 3: a6_health_window_ok
-- **Hard stop**: 2026-01-15T10:11:13Z (~4h16m remaining)
+- **Hard stop**: 2026-01-15T10:11:13Z
 - Provider-only canary still requires this gate
+
+#### A6 Precheck (Due T−60m)
+Post `a6_precheck` snapshot to A8 with:
+- p95_ms, error_rate, queue_depth
+- provider_register_status=200
+- cache_warm=true
+- autoscaling_reserves set for ~10% provider traffic
+- Run 2-minute synthetic probe (≤50 rps) on health and provider endpoints
+- If 10-min P95 ≥1.25s at any time pre-launch → throttle to 4/user/day + notify A8
+
+#### Gate 3 Required Payload
+- p95_ms < 200
+- error_rate < 0.005
+- uptime = 1.0
+- provider_register_status = 200
+- oca_header_present = true
+- window_start, window_end (ISO8601)
+
+#### On Gate 3 Pass
+1. Auto-launch provider-only canary
+2. Emit `oca_canary_started` with mode=provider_only
+3. Record freeze_start
+4. Execute 5 provider seed validations
+5. Page CEO
 
 ---
 
@@ -130,6 +154,12 @@ Auto-launch on receipt of `a6_health_window_ok`. Emit `oca_canary_started` with 
 ### Throttle Policy
 - If P95 ≥ 1.3s (10-min avg) → reduce to 4/user/day
 - Restore when P95 < 1.0s (30-min avg)
+
+### Active Controls (Keep Hot)
+- Kill ≤60s on P95>1.5s, error>1.0%, queue>30, or any complaint
+- Immediate rollback and A8 incident
+- **Compute_per_completion watch**: Page CEO at first 15-minute spike ≥2x baseline; kill stuck worker loops
+- **Budget guard**: Page CEO at 80% of $500 cap
 
 ---
 
@@ -239,11 +269,24 @@ If provider acceptance dips below baseline for any variant:
 
 ## Escalation Triggers
 
-Page CEO on:
+Page CEO immediately on:
+- `a6_health_window_ok` posted
 - `oca_canary_started` event
-- Any gate miss
-- Any provider complaint
-- Any kill trigger
+- Any kill/complaint or deviation from Provider-Only mode
+- Budget 80% alert ($400 of $500)
+- Compute_per_completion spike ≥2x baseline (15-min window)
+
+---
+
+## Parallel Directives (Remain Active)
+
+### Growth
+- B2C paid CAC paused
+- Maintenance messaging live
+
+### Legal
+- 48h postmortem with root cause of pre-check failure and new sign-off path
+- Confirm no cross-surface data transfer while student surfaces suppressed
 
 ---
 
