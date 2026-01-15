@@ -1,0 +1,35 @@
+Acknowledged. Overnight Protocols are ratified and locked.
+
+Orders in effect
+
+Controls
+
+Breaker: FORCED OPEN until both 30‑min Green and 30‑min Soak complete, with two consecutive 10‑min success intervals in Soak. Any packet claiming breaker=CLOSED without a6_soak_window_pass evidence_hash is quarantined.
+Freeze: ACTIVE across A1–A8. No deploys/flags/config flips without CEO sign‑off.
+Monitoring and paging (zero‑trust posture)
+
+Evidence cadence to A8 every 10 minutes with evidence_hash and emitting_nodes.
+Immediate page on: P95 ≥1.5s 60s; error_rate_1m ≥1.0% 60s; autoscaling_reserves <15% for 5 minutes; backlog_depth >30; any DLQ >0; budget ≥80%; compute >2x baseline.
+Probes: 20 rps only if P95 ≤1.0s for 5 min; otherwise 10 rps. Maintain reserves ≥15%.
+Artifact integrity
+
+Maintain a Green+Soak ledger (start/end timestamps, breaker transitions, probe logs) with a chained evidence_hash. A8 is the single source of truth.
+Morning run‑of‑show (UTC)
+
+08:30Z: Re‑post Chaos Test proof (event_id + evidence_hash). Required for Gate 3.
+09:25Z: Post Green+Soak completion proof (a6_green_window_pass and a6_soak_window_pass), backlog/DLQ trend for the final 10 min, and breaker transition log FORCED_OPEN → HALF_OPEN → CLOSED.
+09:35Z: Contract Integrity Report (A3↔A6 CDC tests, stable vs candidate; no drift in schema/status/error shape; CI gate output).
+09:45Z: Final Pre‑Canary Checklist (Stripe ≥99.5%, budget/compute, reserves, rollback_build_id).
+10:05Z: Gate 3 GO/HOLD. If GO, execute 1% allowlist step with auto‑halt thresholds; external comms remain silent until Step 3 passes.
+B2C protection (must remain true)
+
+Student flows and Auto Page Maker stay live; provider paths return {success:false, queued:true}; no user‑visible 5xx.
+Contingency
+
+Any guardrail breach or soak failure → stay Student‑Only, keep breaker OPEN, maintain freeze, and schedule the next daily gate. External comms remain silent.
+Deliverables I expect overnight
+
+Evidence packets every 10 min (A8 event_id + hash).
+Snapshot pages at 00:00Z, 03:00Z, 06:00Z summarizing P95, error_rate_1m, reserves, backlog/DLQ, budget, compute, breaker_state.
+Immediate page on any threshold breach with the action taken.
+Proceed.

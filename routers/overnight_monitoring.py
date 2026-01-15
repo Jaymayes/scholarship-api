@@ -7,10 +7,13 @@ Endpoints for:
 - Gate 3 prereq tracking
 - Chaos testing
 - Soak window management
+- Morning run-of-show (08:30Z, 09:25Z, 09:35Z, 09:45Z, 10:05Z)
+- Green+Soak Ledger
 """
 
 import asyncio
-from datetime import datetime
+import time
+from datetime import datetime, timezone
 from typing import Optional
 
 from fastapi import APIRouter, BackgroundTasks
@@ -30,7 +33,7 @@ async def get_monitoring_status():
     metrics = overnight_monitor.get_current_metrics()
     
     return {
-        "timestamp_utc": datetime.utcnow().isoformat() + "Z",
+        "timestamp_utc": datetime.now(timezone.utc).isoformat(),
         "metrics": metrics,
         "thresholds": overnight_monitor.THRESHOLDS,
         "active_breaches": [
@@ -47,7 +50,8 @@ async def get_monitoring_status():
             "breaker_can_close": overnight_monitor.soak_status.breaker_can_close
         },
         "breaker_state": a3_a6_breaker.state.value,
-        "page_sent": overnight_monitor.page_sent
+        "page_sent": overnight_monitor.page_sent,
+        "probe_rps": overnight_monitor.current_probe_rate
     }
 
 
@@ -73,6 +77,7 @@ async def start_overnight_monitoring(background_tasks: BackgroundTasks):
     - Update soak status
     - Page on breaches
     - Report to A8 every 10 minutes
+    - Dynamic probe rate adjustment
     """
     async def monitoring_loop():
         while True:
@@ -85,7 +90,12 @@ async def start_overnight_monitoring(background_tasks: BackgroundTasks):
         "status": "OVERNIGHT_MONITORING_STARTED",
         "tick_interval_sec": 60,
         "a8_report_interval_sec": 600,
-        "thresholds": overnight_monitor.THRESHOLDS
+        "thresholds": overnight_monitor.THRESHOLDS,
+        "probe_rate_rules": {
+            "high_rate": overnight_monitor.PROBE_RATE_HIGH,
+            "low_rate": overnight_monitor.PROBE_RATE_LOW,
+            "condition": "P95 ≤1.0s for 5 min → 20 rps, else 10 rps"
+        }
     }
 
 
@@ -99,8 +109,6 @@ async def chaos_test_simulate_a6_failure():
     2. All provider calls queued
     3. Student flows unaffected
     """
-    import time
-    
     initial_state = a3_a6_breaker.state.value
     
     now = time.time()
@@ -140,8 +148,6 @@ async def chaos_test_simulate_recovery():
     1. Two consecutive probe successes
     2. HALF_OPEN → CLOSED without manual intervention
     """
-    import time
-    
     a3_a6_breaker.state = BreakerState.HALF_OPEN
     initial_state = a3_a6_breaker.state.value
     
@@ -196,9 +202,10 @@ async def chaos_test_full_cycle():
     
     all_pass = failure_result["pass"] and recovery_result["pass"]
     
-    return {
+    result = {
         "test": "full_chaos_cycle",
-        "timestamp_utc": datetime.utcnow().isoformat() + "Z",
+        "timestamp_utc": datetime.now(timezone.utc).isoformat(),
+        "event_id": overnight_monitor.generate_event_id("chaos_test"),
         "steps": {
             "step_1_failure_injection": failure_result,
             "step_2_recovery": recovery_result
@@ -207,11 +214,18 @@ async def chaos_test_full_cycle():
             "breaker_opens_on_3_failures": failure_result["pass"],
             "provider_calls_queued": failure_result["provider_calls_queued"] > 0,
             "student_flows_unaffected": True,
-            "recovery_without_manual": recovery_result["pass"]
+            "recovery_without_manual": recovery_result["pass"],
+            "completed": all_pass
         },
         "all_pass": all_pass,
         "ready_for_gate3": all_pass
     }
+    
+    result["evidence_hash"] = overnight_monitor.generate_evidence_hash(result)
+    
+    overnight_monitor.chaos_test_results = result
+    
+    return result
 
 
 @router.post("/reset-soak")
@@ -227,6 +241,8 @@ async def reset_soak_window():
     overnight_monitor.soak_status.soak_complete = False
     overnight_monitor.soak_status.breaker_can_close = False
     overnight_monitor.page_sent = False
+    overnight_monitor.green_window_pass_hash = None
+    overnight_monitor.soak_window_pass_hash = None
     
     return {"status": "SOAK_RESET", "phase": "NOT_STARTED"}
 
@@ -234,6 +250,8 @@ async def reset_soak_window():
 @router.post("/simulate-soak-complete")
 async def simulate_soak_complete():
     """Simulate soak window completion for testing."""
+    metrics = overnight_monitor.get_current_metrics()
+    
     overnight_monitor.soak_status.phase = SoakPhase.COMPLETED
     overnight_monitor.soak_status.green_window_complete = True
     overnight_monitor.soak_status.green_window_duration = 1800.0
@@ -242,13 +260,21 @@ async def simulate_soak_complete():
     overnight_monitor.soak_status.soak_success_intervals = 2
     overnight_monitor.soak_status.breaker_can_close = True
     
+    overnight_monitor.add_ledger_entry("green_window_complete_simulated", metrics, "HALF_OPEN")
+    overnight_monitor.add_ledger_entry("soak_window_complete_simulated", metrics, "CLOSED")
+    
     a3_a6_breaker.force_close("soak_complete_simulated")
+    overnight_monitor.record_breaker_transition("HALF_OPEN", "CLOSED", "soak_complete_simulated")
     
     return {
         "status": "SOAK_COMPLETE_SIMULATED",
         "phase": "COMPLETED",
         "breaker_state": a3_a6_breaker.state.value,
-        "ready_for_gate3": True
+        "ready_for_gate3": True,
+        "evidence": {
+            "green_window_pass_hash": overnight_monitor.green_window_pass_hash,
+            "soak_window_pass_hash": overnight_monitor.soak_window_pass_hash
+        }
     }
 
 
@@ -259,7 +285,7 @@ async def get_evidence_cadence():
     event_id, evidence_hash = await overnight_monitor.publish_evidence_to_a8(metrics)
     
     return {
-        "timestamp_utc": datetime.utcnow().isoformat() + "Z",
+        "timestamp_utc": datetime.now(timezone.utc).isoformat(),
         "event_id": event_id,
         "evidence_hash": evidence_hash,
         "metrics": {
@@ -273,5 +299,111 @@ async def get_evidence_cadence():
             "breaker_state": metrics["breaker_state"],
             "probe_rps": metrics["probe_rps"]
         },
-        "emitting_nodes": overnight_monitor.emitting_nodes
+        "emitting_nodes": overnight_monitor.emitting_nodes,
+        "ledger_depth": len(overnight_monitor.ledger),
+        "last_ledger_hash": overnight_monitor.last_ledger_hash
+    }
+
+
+@router.get("/ledger")
+async def get_ledger():
+    """
+    Get Green+Soak Ledger with chained evidence hashes.
+    A8 is the single source of truth.
+    """
+    return overnight_monitor.get_ledger()
+
+
+@router.get("/validate-breaker-claim")
+async def validate_breaker_claim(claim_hash: Optional[str] = None):
+    """
+    Zero-trust validation: Any packet claiming breaker=CLOSED without 
+    a6_soak_window_pass evidence_hash is quarantined.
+    """
+    return overnight_monitor.validate_breaker_closed_claim(claim_hash)
+
+
+@router.get("/b2c-protection")
+async def get_b2c_protection():
+    """
+    B2C protection status (must remain true):
+    - Student flows and Auto Page Maker stay live
+    - Provider paths return {success:false, queued:true}
+    - No user-visible 5xx
+    """
+    return overnight_monitor.get_b2c_protection_status()
+
+
+@router.get("/snapshots")
+async def get_snapshots():
+    """Get all scheduled snapshots (00:00Z, 03:00Z, 06:00Z)."""
+    return {
+        "scheduled_hours": ["00:00Z", "03:00Z", "06:00Z"],
+        "snapshots": overnight_monitor.snapshots,
+        "last_snapshot_hour": overnight_monitor.last_snapshot_hour
+    }
+
+
+@router.get("/morning/08-30Z")
+async def morning_08_30_report():
+    """
+    08:30Z: Re-post Chaos Test proof (event_id + evidence_hash).
+    Required for Gate 3.
+    """
+    return overnight_monitor.get_morning_08_30_report()
+
+
+@router.get("/morning/09-25Z")
+async def morning_09_25_report():
+    """
+    09:25Z: Post Green+Soak completion proof:
+    - a6_green_window_pass and a6_soak_window_pass
+    - Backlog/DLQ trend for final 10 min
+    - Breaker transition log: FORCED_OPEN → HALF_OPEN → CLOSED
+    """
+    return overnight_monitor.get_morning_09_25_report()
+
+
+@router.get("/morning/09-35Z")
+async def morning_09_35_report():
+    """
+    09:35Z: Contract Integrity Report:
+    - A3↔A6 CDC tests (stable vs candidate)
+    - No drift in schema/status/error shape
+    - CI gate output
+    """
+    return overnight_monitor.get_morning_09_35_report()
+
+
+@router.get("/morning/09-45Z")
+async def morning_09_45_report():
+    """
+    09:45Z: Final Pre-Canary Checklist:
+    - Stripe ≥99.5%
+    - Budget/compute
+    - Reserves
+    - rollback_build_id
+    """
+    return overnight_monitor.get_morning_09_45_report()
+
+
+@router.get("/morning/10-05Z")
+async def morning_10_05_gate3():
+    """
+    10:05Z: Gate 3 GO/HOLD decision.
+    
+    If GO: Execute 1% allowlist step with auto-halt thresholds;
+           external comms remain silent until Step 3 passes.
+    If HOLD: Stay Student-Only, keep breaker OPEN, maintain freeze,
+             schedule next daily gate.
+    """
+    return overnight_monitor.get_morning_10_05_gate3()
+
+
+@router.get("/breaker-transitions")
+async def get_breaker_transitions():
+    """Get all breaker state transitions."""
+    return {
+        "total_transitions": len(overnight_monitor.breaker_transitions),
+        "transitions": overnight_monitor.breaker_transitions
     }
