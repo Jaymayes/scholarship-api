@@ -46,6 +46,7 @@ EXCLUDED_PREFIXES = (
     "/api/v1/telemetry/",
     "/oca/canary/",
     "/stabilization/",
+    "/canary/",
 )
 
 

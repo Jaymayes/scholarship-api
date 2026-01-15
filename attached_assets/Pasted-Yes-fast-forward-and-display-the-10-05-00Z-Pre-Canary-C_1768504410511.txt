@@ -1,0 +1,43 @@
+Yes—fast‑forward and display the 10:05:00Z Pre‑Canary Checklist.
+
+Include these items exactly:
+
+Health
+A6 P95 and error_rate_1m for last 10 min and last 30 min
+A6 uptime window counter since GREEN_ACHIEVED
+A3→A6 call path P95/error
+Backlog_depth and DLQ_depth trends (10‑min sparkline)
+Breaker proof
+breaker_flag_status: enabled=true, source=env‑immutable, immutable=true
+Evidence: env read + signed A8 event_id and evidence_hash
+Capacity and cost
+autoscaling_reserves_pct, current rps=20, headroom at 50 rps
+compute_per_completion vs baseline; budget utilization %
+DB pool headroom and connection count
+Security/compliance
+FERPA/COPPA guardrails ON; no PII in logs proof sample
+TLS cert validity >30 days; webhook secrets rotated <90 days
+Stripe Connect readiness (must be specific)
+Mode: live
+account_create, account_links, payouts: last 50 probe results, success ≥99.5%
+Webhooks: endpoints, versions, signature verification ON, replay‑safe idempotency keys
+Fee application: 3% platform fee configured and validated in test flow
+Canary mechanics
+Allowlist for 1%: org_ids, emails masked, Stripe account IDs
+rollback_build_id and image digest; health probe of rollback image; warm cache status
+Step timers set to 10 min each; success gates locked: P95 <1.25s, error <0.5%, backlog <10, Stripe success ≥99.5%
+Auto‑halt triggers wired (P95 ≥1.5s or error ≥1.0% for 60s; backlog >30; budget ≥80%; compute >2x)
+Telemetry hygiene
+A8 schema guards ON; only oca_canary_a6_precheck accepted with evidence_hash + required signatures
+Dashboard pins: p95/error, backlog, breaker_state, budget, compute_per_completion
+Ops controls
+No‑change freeze still active
+Pager routes verified for THROTTLE and KILL
+Comms packet
+Silent during 1% internal
+Draft “All‑clear” and “Canary paused” templates staged but not sent
+Decision rubric I will use at 10:11:13Z Gate 3
+
+GO for Step 1 (1% allowlist) only if all above show PASS and green window still unbroken.
+Any single FAIL → HOLD; remain Student‑Only; schedule next daily gate.
+Show the checklist now with event_ids and evidence_hashes for each proof.
