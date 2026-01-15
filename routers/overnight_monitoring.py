@@ -407,3 +407,64 @@ async def get_breaker_transitions():
         "total_transitions": len(overnight_monitor.breaker_transitions),
         "transitions": overnight_monitor.breaker_transitions
     }
+
+
+@router.post("/soak/start")
+async def start_soak_window():
+    """
+    Start soak window sequence.
+    
+    Records a6_soak_window_start event with:
+    - event_id
+    - evidence_hash
+    - Breaker: HALF_OPEN (1 probe/30s)
+    - Freeze: ACTIVE
+    - Quarantine validator: ARMED
+    """
+    return overnight_monitor.start_soak_window()
+
+
+@router.get("/soak/status")
+async def get_soak_status():
+    """Get current soak status with elapsed time and intervals."""
+    return overnight_monitor.get_soak_status_report()
+
+
+@router.get("/soak/milestone/T+10min")
+async def soak_milestone_t10():
+    """
+    T+10 min: Success Interval 1 status with metrics and evidence_hash.
+    """
+    return overnight_monitor.get_soak_milestone_status(1)
+
+
+@router.get("/soak/milestone/T+20min")
+async def soak_milestone_t20():
+    """
+    T+20 min: Success Interval 2 status with metrics and evidence_hash.
+    """
+    return overnight_monitor.get_soak_milestone_status(2)
+
+
+@router.get("/soak/milestone/T+30min")
+async def soak_milestone_t30():
+    """
+    T+30 min: Post a6_soak_window_pass with:
+    - evidence_hash
+    - Breaker transition log (FORCED_OPEN → HALF_OPEN → CLOSED)
+    - Final 10-min backlog/DLQ trend
+    """
+    return overnight_monitor.get_soak_milestone_status(3)
+
+
+@router.post("/soak/complete")
+async def complete_soak_window():
+    """
+    Complete soak window and generate a6_soak_window_pass.
+    
+    Returns the T+30 min report with:
+    - a6_soak_window_pass evidence_hash
+    - Breaker transition log (FORCED_OPEN → HALF_OPEN → CLOSED)
+    - Final 10-min backlog/DLQ trend
+    """
+    return overnight_monitor.complete_soak_window()
