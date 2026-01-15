@@ -1,9 +1,10 @@
 # OCA Executive Decision Block
 
-**Status**: GO (Conditional) — COUNTDOWN_ACTIVE  
+**Status**: FAILOVER ACTIVATED — DEGRADED (Provider-Only Mode)  
 **Authorization Token**: `CEO-20260119-OCA-PROMOTE-10PCT-PREAUTH`  
 **Lock Event**: `evt_1768428673887_yfharrqcg`  
 **T0**: 2026-01-14T22:11:13Z  
+**Current Clock**: T+07:44 (05:55Z)  
 **Strategy**: B2B-led growth via First Document Upload lift  
 **Positioning**: Editor/Coach — No AI essays; students write, we only assist  
 **Guardrails**: $500 cap; LTV:CAC ≥4:1 at T+24h  
@@ -16,35 +17,46 @@
 | Gate | Event | Status | Deadline (UTC) |
 |------|-------|--------|----------------|
 | 1 | `a8_preflight_verifications_ok` | **PASSED** ✓ | Complete |
-| 2 | `legal_copy_signed` | Pending | 2026-01-15T02:11:13Z |
+| 2 | `legal_copy_signed` | **MISSED** ✗ | 2026-01-15T02:11:13Z |
 | 3 | `a6_health_window_ok` | Pending | 2026-01-15T10:11:13Z |
 
-### Hard Deadlines (UTC)
+### Gate 2 Miss — Failover Details
+- **Missed Deadline**: 2026-01-15T02:11:13Z
+- **Mode**: Provider-Only (student notifications suppressed)
+- **Events Required**:
+  - `oca_failover_activated` with lock_event_id, missed_deadline_ts
+  - `provider_only_banner_active = true` (screenshot_id)
+  - `student_notifications_suppressed = true` (queue_count=0, suppression_rule_hash)
 
-#### Gate 2: legal_copy_signed
-- **T+3h45 warning**: 2026-01-15T01:56:13Z → Page CEO with ETA and Provider-Only readiness if not posted
-- **T+4h hard stop**: 2026-01-15T02:11:13Z → Auto-switch to Provider-Only banner + page CEO
-
-#### Gate 3: a6_health_window_ok
-- **T+12h hard stop**: 2026-01-15T10:11:13Z → Launch only if posted
+### Gate 3: a6_health_window_ok
+- **Hard stop**: 2026-01-15T10:11:13Z (~4h16m remaining)
+- Provider-only canary still requires this gate
 
 ---
 
-## Orders and Timers
-
-### Legal (Gate 2)
-- **T+3h45 warning**: If not posted, page CEO with ETA and confirm Provider-Only failover readiness
-- **T+4h miss**: Auto-failover to Provider-Only banner + page CEO
-
-### Engineering A6 (Gate 3)
-- Pre-warm capacity
-- Ensure: p95<200ms, error<0.5%, uptime=1.0, oca_header_present=true, provider_register=200
-- **Proactive throttle**: If 10-min P95 trend ≥1.25s pre-launch, clamp to 4/user/day and notify A8
+## Immediate Orders (Failover Mode)
 
 ### Ops/SRE
-- Post `code_freeze_hash` to A8 now
-- Confirm `freeze_start` recorded at launch
-- Attach kill-drill proof in T+2h packet
+- Flip to Provider-Only mode (if not already)
+- Post to A8:
+  - `oca_failover_activated` with lock_event_id, missed_deadline_ts
+  - `provider_only_banner_active = true` (screenshot_id)
+  - `student_notifications_suppressed = true` (queue_count=0, suppression_rule_hash)
+- Correct dashboards: status → Gate 2 Missed / Failover Active
+- Purge or hard-hold any queued student emails/modals
+- Confirm zero sends after 02:11:13Z
+- Budget/SLO guardrails unchanged; maintain kill ≤60s and throttle policies
+
+### General Counsel
+- Page CEO with RCA/ETA
+- Post `legal_incident_created` with doc_hash placeholder and remediation plan
+- No hot-fixing copy during freeze
+
+### Engineering A6 (Gate 3)
+- Continue toward Gate 3 by 10:11:13Z (~4h16m remaining)
+- Pre-warm capacity sized for provider-only traffic (~10% of original expectation)
+- Keep proactive throttle on
+- Ensure: p95<200ms, error<0.5%, uptime=1.0, oca_header_present=true, provider_register=200
 
 ### Schema Flags Required
 - `holdout_control=true` for 10% control
@@ -85,12 +97,16 @@ All three events must arrive in A8:
 - Variant safeguard test: simulated acceptance dip → variant paused + CEO page captured
 - Log hygiene sample: OCA header present; no PII in audit
 
-### Post-Launch Sequence (Automatic)
-1. Flag → `CANARY_5`
+### Launch Condition (Provider-Only)
+
+Auto-launch on receipt of `a6_health_window_ok`. Emit `oca_canary_started` with `mode = provider_only`.
+
+### Post-Launch Sequence (Provider-Only)
+1. Flag → `CANARY_5` with mode=provider_only
 2. Provider banner ON
-3. Canary emails A/B 50/50
+3. Student notifications SUPPRESSED
 4. 5-provider seed validation
-5. Emit `oca_canary_started`
+5. Emit `oca_canary_started` with mode=provider_only
 
 ---
 
@@ -125,17 +141,14 @@ All three events must arrive in A8:
 ### Control Group
 10% holdout (no notifications) to measure true lift
 
-### T+2h Packet (Page CEO on Delivery)
-- **SLOs**: P95, error rate, queue depth by variant and control
-- **Funnel**: open → click → start → complete (by variant and control)
-- **Safety**: Suppression match rate; 0 complaints/violations confirmation
-- **Integrity**: Holdout drift ≤0.5pp; randomization locked
-- **Economics**: cost_per_notified, cost_per_started, cost_per_completed, compute_per_completion
-- **B2B pulse**: Early provider acceptance vs baseline
-- **Kill-drill proof**: Attached
-
-#### Data Sufficiency Guardrail
-If <500 opens OR <50 starts total at T+2h → defer any optimization actions until T+6h
+### T+2h Packet — Provider-Only Version (Page CEO on Delivery)
+- **SLOs**: P95, error, queue
+- **Provider Funnel**: banner impressions → clicks → onboard start → verification task created → acceptance
+- **Safety**: 0 complaints/violations
+- **Integrity**: OCA header present; no PII in logs
+- **Cost Telemetry**: cost_per_notified, cost_per_started, cost_per_completed (provider flow), compute_per_completion
+- **Provider Metrics**: acceptance vs baseline, time-to-first-review, decline reasons (top 5)
+- **Evidence**: kill-drill proof attached; screenshots of provider banner; confirmation of student suppression (post-02:11Z)
 
 ### T+6h Packet
 - Trend vs. T+2h
@@ -143,6 +156,14 @@ If <500 opens OR <50 starts total at T+2h → defer any optimization actions unt
 - Provider acceptance vs. baseline
 - Top failure signatures from Report Issue
 - Interim A/B lift and control lift
+
+### T+24h Decision (Provider-Only)
+
+**No student promotion.** Success measured on B2B:
+- Provider acceptance ≥ baseline
+- Incidents/complaints = 0
+- SLOs within thresholds; refunds/chargebacks = 0
+- Unit economics: compute_per_completion within margin; LTV:CAC trajectory ≥4:1 (provider-side)
 
 ### T+24h Packet
 - Full readout + evidence pack
@@ -226,6 +247,17 @@ Page CEO on:
 
 ---
 
+## Postmortem Requirement (Legal Miss)
+
+GC to deliver 5-point brief:
+1. Root cause
+2. Why detection failed before T+3h45
+3. Containment
+4. Corrective actions
+5. New sign-off path with auto-reminders
+
+---
+
 ## Configuration Status
 
-**LOCKED** — Guardrails set, execute per plan
+**FAILOVER ACTIVE** — Provider-Only Mode, Code Freeze Absolute
