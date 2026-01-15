@@ -2,9 +2,11 @@
 Controlled Backlog Drain Service
 
 Implements CEO-authorized drain policy with:
-- Rate guard: ≤5 rps, auto-reduce to 2 rps if reserves 15-17% for 3 min
+- Band 2 (3 rps) default, burst to 5 rps with token bucket if P95 < 1.0s and reserves ≥22%
+- Per-provider cap: max 1 rps per provider
+- Rate guard: reduce to 2 rps if reserves 15-17% for 3 min, resume 5 rps after reserves ≥20% for 5 min
 - Stop-loss gates triggering immediate PAUSE + page CEO
-- Stripe idempotency controls
+- Stripe idempotency controls with duplicate hold
 - 10-minute evidence cadence
 - Quiet period 20 min before Gate 3
 """
@@ -19,6 +21,8 @@ from enum import Enum
 
 class DrainMode(str, Enum):
     NORMAL = "normal"
+    BAND2 = "band2"
+    BURST = "burst"
     PAUSED = "paused"
     REDUCED = "reduced"
     QUIET_PERIOD = "quiet_period"
@@ -28,8 +32,10 @@ class BacklogDrainService:
     def __init__(self):
         self.drain_mode = DrainMode.PAUSED
         self.drain_rps = 0
+        self.band2_rps = 3
         self.max_rps = 5
         self.reduced_rps = 2
+        self.per_provider_max_rps = 1
         
         self.drain_start_time: Optional[datetime] = None
         self.last_heartbeat_time: Optional[datetime] = None
@@ -47,12 +53,21 @@ class BacklogDrainService:
         self.window_drained_count = 0
         self.window_success_count = 0
         self.window_duplicates_prevented = 0
+        self.window_duplicates_blocked = 0
         self.window_stripe_transactions = []
         
         self.seen_idempotency_keys: Dict[str, datetime] = {}
         self.settled_transaction_ids: set = set()
         self.providers_touched: set = set()
         self.oldest_item_age_sec = 0
+        
+        self.provider_request_times: Dict[str, List[datetime]] = {}
+        self.providers_held: Dict[str, Dict] = {}
+        
+        self.token_bucket_tokens = 5.0
+        self.token_bucket_max = 5.0
+        self.token_bucket_refill_rate = 1.0
+        self.last_token_refill: Optional[datetime] = None
         
         self.reserves_history: List[Dict] = []
         self.low_reserves_start: Optional[datetime] = None
@@ -64,6 +79,10 @@ class BacklogDrainService:
         
         self.heartbeats: List[Dict] = []
         self.last_evidence_hash: str = "genesis_drain_000000"
+        
+        self.budget_pct = 0.0
+        self.compute_ratio = 1.0
+        self.live_backlog_depth = 0
         
         self.gate3_time = datetime.now(timezone.utc).replace(
             hour=9, minute=25, second=0, microsecond=0
@@ -79,7 +98,7 @@ class BacklogDrainService:
         return hashlib.sha256(hash_input.encode()).hexdigest()
     
     def start_drain(self) -> Dict:
-        """Start controlled backlog drain."""
+        """Start controlled backlog drain in Band 2 (3 rps)."""
         now = datetime.now(timezone.utc)
         
         if now >= self.quiet_period_start and now < self.gate3_time:
@@ -90,11 +109,13 @@ class BacklogDrainService:
                 "quiet_period_ends": self.gate3_time.isoformat()
             }
         
-        self.drain_mode = DrainMode.NORMAL
-        self.drain_rps = self.max_rps
+        self.drain_mode = DrainMode.BAND2
+        self.drain_rps = self.band2_rps
         self.drain_start_time = now
         self.current_window_start = now
         self.last_heartbeat_time = now
+        self.last_token_refill = now
+        self.token_bucket_tokens = self.token_bucket_max
         
         self._reset_window_metrics()
         
@@ -115,8 +136,11 @@ class BacklogDrainService:
             "drain_mode": self.drain_mode.value,
             "drain_rps": self.drain_rps,
             "rate_guard": {
+                "band2_rps": self.band2_rps,
                 "max_rps": self.max_rps,
                 "reduced_rps": self.reduced_rps,
+                "per_provider_max_rps": self.per_provider_max_rps,
+                "burst_trigger": "P95 < 1.0s AND reserves ≥22%",
                 "reduce_trigger": "reserves 15-17% for 3 consecutive minutes",
                 "resume_trigger": "reserves ≥20% for 5 minutes"
             },
@@ -126,10 +150,186 @@ class BacklogDrainService:
                 "P95 ≥ 1.25s for 60s OR error_rate_1m ≥ 0.5% for 60s",
                 "Stripe success < 99.5% over last 50 drain transactions"
             ],
+            "risk_controls": {
+                "per_provider_cap": "max 1 rps per provider",
+                "token_bucket_burst": "up to 5 rps if P95 < 1.0s and reserves ≥22%",
+                "duplicate_blocked_hold": "hold provider queue if duplicate detected-and-blocked > 0"
+            },
             "quiet_period": {
                 "starts": self.quiet_period_start.isoformat(),
                 "gate3_time": self.gate3_time.isoformat()
+            },
+            "overnight_goal": "drive live backlog < 10 before 09:05Z quiet period"
+        }
+    
+    def check_provider_rate_limit(self, provider_id: str) -> Dict:
+        """Check per-provider rate limit (max 1 rps per provider)."""
+        now = datetime.now(timezone.utc)
+        
+        if provider_id in self.providers_held:
+            hold_info = self.providers_held[provider_id]
+            return {
+                "allowed": False,
+                "reason": "provider_held",
+                "hold_reason": hold_info.get("reason"),
+                "held_since": hold_info.get("held_since"),
+                "requires_manual_review": True
             }
+        
+        if provider_id not in self.provider_request_times:
+            self.provider_request_times[provider_id] = []
+        
+        cutoff = now - timedelta(seconds=1)
+        self.provider_request_times[provider_id] = [
+            t for t in self.provider_request_times[provider_id] if t > cutoff
+        ]
+        
+        if len(self.provider_request_times[provider_id]) >= self.per_provider_max_rps:
+            return {
+                "allowed": False,
+                "reason": "per_provider_rate_limit",
+                "requests_in_window": len(self.provider_request_times[provider_id]),
+                "max_rps": self.per_provider_max_rps
+            }
+        
+        self.provider_request_times[provider_id].append(now)
+        return {
+            "allowed": True,
+            "requests_in_window": len(self.provider_request_times[provider_id]),
+            "max_rps": self.per_provider_max_rps
+        }
+    
+    def check_token_bucket_burst(self, p95_ms: float, reserves_pct: float) -> Dict:
+        """Check if burst mode is available via token bucket."""
+        now = datetime.now(timezone.utc)
+        
+        if self.last_token_refill:
+            elapsed = (now - self.last_token_refill).total_seconds()
+            self.token_bucket_tokens = min(
+                self.token_bucket_max,
+                self.token_bucket_tokens + (elapsed * self.token_bucket_refill_rate)
+            )
+        self.last_token_refill = now
+        
+        can_burst = p95_ms < 1000 and reserves_pct >= 22
+        
+        if can_burst and self.token_bucket_tokens >= 1:
+            self.token_bucket_tokens -= 1
+            if self.drain_mode != DrainMode.BURST:
+                self.drain_mode = DrainMode.BURST
+                self.drain_rps = self.max_rps
+            return {
+                "burst_allowed": True,
+                "tokens_remaining": round(self.token_bucket_tokens, 2),
+                "drain_rps": self.drain_rps,
+                "drain_mode": self.drain_mode.value
+            }
+        else:
+            if self.drain_mode == DrainMode.BURST:
+                self.drain_mode = DrainMode.BAND2
+                self.drain_rps = self.band2_rps
+            return {
+                "burst_allowed": False,
+                "tokens_remaining": round(self.token_bucket_tokens, 2),
+                "reason": "P95 >= 1.0s or reserves < 22%" if not can_burst else "no tokens",
+                "drain_rps": self.drain_rps,
+                "drain_mode": self.drain_mode.value
+            }
+    
+    def hold_provider(self, provider_id: str, reason: str) -> Dict:
+        """Hold a provider's queue for manual review."""
+        now = datetime.now(timezone.utc)
+        self.providers_held[provider_id] = {
+            "held_since": now.isoformat(),
+            "reason": reason,
+            "requires_manual_review": True
+        }
+        
+        event_id = f"provider_hold_{int(now.timestamp() * 1000)}_{uuid.uuid4().hex[:8]}"
+        evidence_hash = self.generate_evidence_hash({
+            "event": "provider_hold",
+            "provider_id": provider_id,
+            "reason": reason
+        })
+        self.last_evidence_hash = evidence_hash
+        
+        return {
+            "event": "provider_hold",
+            "event_id": event_id,
+            "evidence_hash": evidence_hash,
+            "timestamp_utc": now.isoformat(),
+            "provider_id": provider_id,
+            "reason": reason,
+            "action": "queue_held",
+            "requires_manual_review": True
+        }
+    
+    def release_provider(self, provider_id: str) -> Dict:
+        """Release a provider's hold after manual review."""
+        now = datetime.now(timezone.utc)
+        
+        if provider_id not in self.providers_held:
+            return {
+                "success": False,
+                "reason": "provider_not_held",
+                "provider_id": provider_id
+            }
+        
+        hold_info = self.providers_held.pop(provider_id)
+        
+        event_id = f"provider_release_{int(now.timestamp() * 1000)}_{uuid.uuid4().hex[:8]}"
+        evidence_hash = self.generate_evidence_hash({
+            "event": "provider_release",
+            "provider_id": provider_id
+        })
+        self.last_evidence_hash = evidence_hash
+        
+        return {
+            "event": "provider_release",
+            "event_id": event_id,
+            "evidence_hash": evidence_hash,
+            "timestamp_utc": now.isoformat(),
+            "provider_id": provider_id,
+            "previous_hold": hold_info,
+            "action": "queue_released"
+        }
+    
+    def get_forecast(self, current_backlog: int, drain_rate_per_min: Optional[float] = None) -> Dict:
+        """Get forecast for backlog clearance vs quiet period target."""
+        now = datetime.now(timezone.utc)
+        
+        if drain_rate_per_min is None:
+            drain_rate_per_min = self.drain_rps * 60 * 0.8
+        
+        self.live_backlog_depth = current_backlog
+        
+        time_to_quiet_period = (self.quiet_period_start - now).total_seconds() / 60
+        
+        items_to_drain = max(0, current_backlog - 10)
+        
+        if drain_rate_per_min > 0:
+            minutes_to_target = items_to_drain / drain_rate_per_min
+        else:
+            minutes_to_target = float('inf')
+        
+        will_meet_target = minutes_to_target <= time_to_quiet_period
+        
+        buffer_minutes = time_to_quiet_period - minutes_to_target
+        
+        return {
+            "timestamp_utc": now.isoformat(),
+            "forecast_type": "backlog_clearance_vs_quiet_period",
+            "current_backlog": current_backlog,
+            "target_backlog": 10,
+            "items_to_drain": items_to_drain,
+            "drain_rate_per_min": round(drain_rate_per_min, 2),
+            "drain_rps": self.drain_rps,
+            "minutes_to_target": round(minutes_to_target, 1) if minutes_to_target != float('inf') else "infinite",
+            "quiet_period_start": self.quiet_period_start.isoformat(),
+            "minutes_to_quiet_period": round(time_to_quiet_period, 1),
+            "will_meet_target": will_meet_target,
+            "buffer_minutes": round(buffer_minutes, 1) if buffer_minutes > 0 else 0,
+            "recommendation": "on_track" if will_meet_target else "increase_drain_rate_or_reduce_scope"
         }
     
     def pause_drain(self, reason: str = "manual") -> Dict:
@@ -162,6 +362,7 @@ class BacklogDrainService:
         self.window_drained_count = 0
         self.window_success_count = 0
         self.window_duplicates_prevented = 0
+        self.window_duplicates_blocked = 0
         self.window_stripe_transactions = []
     
     def check_stop_loss_gates(self, metrics: Dict) -> Optional[Dict]:
@@ -446,11 +647,27 @@ class BacklogDrainService:
                 "breaker_state": metrics.get("breaker_state", "UNKNOWN"),
                 "autoscaling_reserves_pct": metrics.get("autoscaling_reserves_pct", 0),
                 "P95": metrics.get("p95_ms", 0),
-                "error_rate_1m": metrics.get("error_rate_1m", 0)
+                "error_rate_1m": metrics.get("error_rate_1m", 0),
+                "budget_pct": metrics.get("budget_pct", self.budget_pct),
+                "compute_ratio": metrics.get("compute_ratio", self.compute_ratio)
             },
             "rate_guard": rate_guard,
+            "per_provider_controls": {
+                "max_rps_per_provider": self.per_provider_max_rps,
+                "providers_held": len(self.providers_held),
+                "held_provider_ids": list(self.providers_held.keys())
+            },
+            "token_bucket": {
+                "tokens_remaining": round(self.token_bucket_tokens, 2),
+                "max_tokens": self.token_bucket_max,
+                "refill_rate": self.token_bucket_refill_rate
+            },
             "emitting_nodes": ["a3_monitor", "a6_monitor", "a8_collector", "drain_service"]
         }
+        
+        self.budget_pct = metrics.get("budget_pct", self.budget_pct)
+        self.compute_ratio = metrics.get("compute_ratio", self.compute_ratio)
+        self.live_backlog_depth = metrics.get("provider_backlog_depth", 0)
         
         evidence_hash = self.generate_evidence_hash(heartbeat_data)
         heartbeat_data["evidence_hash"] = evidence_hash

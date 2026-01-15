@@ -38,6 +38,18 @@ class MetricsRequest(BaseModel):
     error_rate_1m: float = 0.0
     breaker_state: str = "HALF_OPEN"
     autoscaling_reserves_pct: float = 20.0
+    budget_pct: float = 0.0
+    compute_ratio: float = 1.0
+
+
+class ForecastRequest(BaseModel):
+    current_backlog: int
+    drain_rate_per_min: Optional[float] = None
+
+
+class ProviderHoldRequest(BaseModel):
+    provider_id: str
+    reason: str
 
 
 @router.post("/start")
@@ -157,3 +169,70 @@ async def get_heartbeats():
 async def check_quiet_period():
     """Check quiet period status."""
     return drain_service.check_quiet_period()
+
+
+@router.post("/forecast")
+async def get_forecast(request: ForecastRequest):
+    """
+    Get forecast for backlog clearance vs quiet period target.
+    
+    Calculates:
+    - Time to drain current backlog to target (<10)
+    - Time remaining until quiet period (09:05Z)
+    - Whether target will be met
+    - Buffer time or shortfall
+    """
+    return drain_service.get_forecast(
+        request.current_backlog,
+        request.drain_rate_per_min
+    )
+
+
+@router.post("/provider/rate-limit")
+async def check_provider_rate_limit(provider_id: str):
+    """
+    Check per-provider rate limit (max 1 rps per provider).
+    
+    Returns whether the provider can accept a new request.
+    """
+    return drain_service.check_provider_rate_limit(provider_id)
+
+
+@router.post("/provider/hold")
+async def hold_provider(request: ProviderHoldRequest):
+    """
+    Hold a provider's queue for manual review.
+    
+    Required when duplicate detected-and-blocked > 0 in a window.
+    """
+    return drain_service.hold_provider(request.provider_id, request.reason)
+
+
+@router.post("/provider/release")
+async def release_provider(provider_id: str):
+    """
+    Release a provider's hold after manual review.
+    """
+    return drain_service.release_provider(provider_id)
+
+
+@router.get("/providers/held")
+async def get_held_providers():
+    """Get list of providers currently on hold."""
+    return {
+        "providers_held": len(drain_service.providers_held),
+        "held_providers": drain_service.providers_held
+    }
+
+
+@router.post("/token-bucket/check")
+async def check_token_bucket(p95_ms: float, reserves_pct: float):
+    """
+    Check if burst mode is available via token bucket.
+    
+    Burst to 5 rps allowed if:
+    - P95 < 1.0s
+    - Reserves ≥ 22%
+    - Tokens available in bucket
+    """
+    return drain_service.check_token_bucket_burst(p95_ms, reserves_pct)

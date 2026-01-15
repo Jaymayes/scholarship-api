@@ -91,6 +91,8 @@ class WAFProtection(BaseHTTPMiddleware):
             "/drain/validate-item",  # Backlog drain: Item validation (JSON item payload)
             "/drain/record-result",  # Backlog drain: Result recording (JSON payload)
             "/drain/check-stop-loss",  # Backlog drain: Stop-loss check (JSON metrics payload)
+            "/drain/forecast",  # Backlog drain: Forecast endpoint (JSON payload)
+            "/drain/provider/hold",  # Backlog drain: Provider hold (JSON payload)
         }
         
         # SECURITY: Regex patterns for dynamic routes that require WAF bypass
