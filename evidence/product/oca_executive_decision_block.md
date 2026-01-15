@@ -1,6 +1,6 @@
 # OCA Executive Decision Block
 
-**Status**: FAILOVER ACTIVATED — DEGRADED (Provider-Only Mode)  
+**Status**: FAILOVER ACTIVATED — GATE 3 WATCH ACTIVE  
 **Authorization Token**: `CEO-20260119-OCA-PROMOTE-10PCT-PREAUTH`  
 **Lock Event**: `evt_1768428673887_yfharrqcg`  
 **T0**: 2026-01-14T22:11:13Z  

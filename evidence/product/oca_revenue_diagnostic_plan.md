@@ -176,9 +176,12 @@ We are in Provider-Only failover. All student surfaces and notifications are sup
 
 ## Requirements to Kick Off
 
-- [ ] A8 read access for events and dashboards
-- [ ] Read-only access to Stripe and Search Console/Analytics
-- [ ] Current baselines for SLOs, acceptance, and key funnel rates
+- [x] A8 read access for events and dashboards — **CONFIRMED**
+- [x] Read-only access to Stripe and Search Console/Analytics — **CONFIRMED**
+- [x] Current baselines for SLOs, acceptance, and key funnel rates — **CONFIRMED**
+
+**Diagnostic Started**: Now  
+**Day 1 EOD**: Heads-up (findings only, no changes)
 
 ---
 
