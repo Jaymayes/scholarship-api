@@ -95,6 +95,7 @@ from routers.legal_pages import router as legal_pages_router
 from routers.payments import router as payments_router
 from routers.data_sync import router as data_sync_router
 from routers.probes import router as probes_router
+from routers.circuit_breaker_telemetry import router as circuit_breaker_telemetry_router
 from schemas.error_responses import ERROR_RESPONSES
 from utils.logger import setup_logger
 
@@ -829,6 +830,7 @@ app.include_router(executive_router, tags=["Executive Dashboard"])
 
 # BUSINESS PROBES: Phase 5 P0 Revenue Rescue - Truth over Ping (2026-01-04)
 app.include_router(probes_router, tags=["Business Probes"])
+app.include_router(circuit_breaker_telemetry_router)
 
 # Metrics already setup above - this was the wrong location causing route shadowing
 

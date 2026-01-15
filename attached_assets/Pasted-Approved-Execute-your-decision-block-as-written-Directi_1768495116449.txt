@@ -1,0 +1,64 @@
+Approved. Execute your decision block as written.
+
+Direction on next step: do both in parallel.
+
+Track A (Comms): Prepare and stage Maintenance Mode comms now; auto‑send if A6 is not green by 09:21:13Z.
+Track B (Engineering): Implement the A3→A6 Circuit Breaker immediately; ship behind a flag within the next 30 minutes.
+Track A — Maintenance Mode communications (ready-to-send)
+
+Trigger: A6 not green by 09:21:13Z or fails again during the 30‑min stabilization window.
+Channels and copy:
+In‑product banner (Provider UI):
+“Provider onboarding is temporarily unavailable while we complete reliability maintenance. Student services remain fully available. Incident ID: A6‑PRV‑2026‑01‑15. Next update: [time +30m].”
+Status page incident:
+Title: “A6 Provider onboarding degraded”
+Impact: “Provider sign‑ups and credential verification unavailable; existing provider dashboards unaffected.”
+Metrics: uptime target 99.9%, current error_rate, P95, rollback build ID.
+ETA: “Restoration targeted within current gate; next checkpoint 10:11:13Z.”
+Email to institutional partners (draft):
+Subject: Action required: temporary pause on provider onboarding (A6)
+Body: “We are pausing new provider onboarding while we complete a reliability rollback on the A6 Provider App. Student services are unaffected. Our standard is 99.9% availability; today’s regression tripped our automatic safeguards. We will reopen onboarding after 30 minutes of clean health (P95 <1.25s, error <0.5%). You’ll receive an all‑clear or next ETA at 10:11:13Z. Incident ID A6‑PRV‑2026‑01‑15. If you have pilot timelines, reply and we will prioritize a white‑glove slot post‑restore.”
+CS/Sales talk track:
+“Safety interlock engaged; no data loss; onboarding resumes after sustained green. We can provision sandboxes without production writes if needed.”
+Owner: Partnerships + CS lead
+SLA: Send within 5 minutes of trigger; post updates every 30 minutes until resolved.
+Track B — A3→A6 Circuit Breaker spec (implement now)
+
+Scope: Calls from A3 (Auto Page Maker + scholarship flows) to A6 /provider/register and any A6 health‑gated endpoints.
+States:
+Closed: normal calls
+Open: triggered after 3 consecutive failures (5xx, timeout >2s, or network error) within 60s; remain open 5 minutes
+Half‑open: allow 1 probe per 30s; if 2 consecutive successes → close; on failure → open
+Behavior while Open:
+Do not call A6; enqueue payloads into provider_backlog with idempotency_key and retry_after timestamp.
+Continue B2C page building and CTA logging; never block student flows.
+Queue:
+Storage: Redis or Postgres table provider_backlog(id, idempotency_key, payload_json, first_seen_at, next_retry_at, attempts, status)
+Retry: exponential backoff with full jitter: base 30s, cap 15m, max 10 attempts, then dead‑letter with alert
+Telemetry to A8 (1‑min cadence):
+breaker_state, failures_last_5m, open_count_1h
+provider_backlog_depth, dlq_depth
+a3_call_p95_ms_to_a6, a3_call_error_rate_to_a6
+Guardrails (A8 Kill/Throttle already approved):
+THROTTLE if provider_backlog_depth 10–30 or P95 1.25–1.5s
+KILL if >30 or P95 ≥1.5s or error ≥1.0%
+Acceptance tests:
+With A6 down, A3 returns 200 for student flows; backlog depth increases; zero 5xx exposed to users.
+With A6 restored, backlog drains at ≥5 rps without impacting P95 >1.25s.
+No duplicate provider records when retries occur (idempotency_key enforced).
+Gate management and criteria
+
+Gate 3 remains HOLD for provider launch until:
+A6 green for a continuous 30 minutes (health 200; probe P95 <1.25s; error <0.5%).
+A3 breaker closed and provider_backlog_depth <10 for 10 minutes.
+Budget <80% and compute per completion within 2x baseline.
+If not met by 10:11:13Z, continue Student‑Only mode for the remainder of the window; reschedule provider launch to the next daily gate.
+Owner/Timing
+
+A6 Incident Lead: rollback and sustain green window; start now.
+A3 Lead: circuit breaker PR up in 20 minutes, deploy behind flag; flip on immediately after merge.
+A8 Lead: alerts wired and dashboards pinned to Gate 3 board; confirm by 08:45Z.
+Answer to your question
+
+Yes, draft and stage the Maintenance Mode comms now as above.
+In parallel, proceed with the A3 Circuit Breaker implementation per the spec. Page me if any acceptance test fails or if budget crosses 80%.

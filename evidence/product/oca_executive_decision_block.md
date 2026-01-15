@@ -63,6 +63,39 @@
 #### Gate 3 Required Payload
 - p95_ms < 200
 - error_rate < 0.005
+
+### Gate 3 Revised Criteria (CEO Directive 2026-01-15)
+
+Gate 3 remains HOLD for provider launch until:
+
+| Criterion | Threshold | Duration |
+|-----------|-----------|----------|
+| A6 health 200 | probe P95 <1.25s, error <0.5% | 30 min continuous |
+| A3 breaker state | CLOSED | 10 min continuous |
+| Provider backlog | depth <10 | 10 min continuous |
+| Budget | <80% of $500 cap | Current |
+| Compute per completion | <2x baseline | 15-min window |
+
+If not met by 10:11:13Z:
+- Continue Student-Only mode for remainder of window
+- Reschedule provider launch to next daily gate
+
+### A3→A6 Circuit Breaker (Deployed)
+
+**Feature Flag**: `A3_A6_CIRCUIT_BREAKER_ENABLED=true`
+
+| State | Condition | Action |
+|-------|-----------|--------|
+| CLOSED | Normal | Calls to A6 pass through |
+| OPEN | 3 consecutive failures in 60s | Block 5 min, queue payloads |
+| HALF_OPEN | After 5 min | 1 probe/30s, 2 successes → CLOSED |
+
+**Backlog Queue**:
+- Storage: In-memory (Redis/Postgres optional)
+- Retry: Exponential backoff, base 30s, cap 15m, max 10 attempts
+- DLQ: After 10 failed attempts with alert
+
+**Telemetry Endpoint**: `/api/v1/telemetry/a3-a6-breaker`
 - uptime = 1.0
 - provider_register_status = 200
 - oca_header_present = true
