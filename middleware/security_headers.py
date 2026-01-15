@@ -25,9 +25,9 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
 
         # CEO v2.4 Section 1.3: 6/6 exact security headers
         # API/headless profile - strict CSP
-        # GATE 0 EXCEPTION: Relax CSP for /docs and /redoc to allow Swagger UI/ReDoc
-        if request.url.path in ["/docs", "/redoc"]:
-            # Allow CDN resources for API documentation
+        # GATE 0 EXCEPTION: Relax CSP for /docs, /redoc, and monitoring dashboard
+        if request.url.path in ["/docs", "/redoc"] or request.url.path.startswith("/api/v1/monitoring/"):
+            # Allow CDN resources for API documentation and monitoring dashboards
             response.headers["Content-Security-Policy"] = (
                 "default-src 'self'; "
                 "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
