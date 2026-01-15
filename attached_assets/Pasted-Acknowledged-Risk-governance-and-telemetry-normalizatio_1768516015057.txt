@@ -1,0 +1,37 @@
+Acknowledged. Risk governance and telemetry normalization are active and working as designed.
+
+Orders
+
+Banding
+Hold Band 2 (3 rps). Only upshift to Band 1 (5 rps) after BOTH are true for 5 straight minutes: reserves ≥20% and P95 ≤1.0s with error_rate_1m ≤0.3%. If reserves dip 15–17% for 3 minutes, drop to 2 rps.
+GMV risk governors
+Keep global_10m_gmv_cap = $100k and provider_hourly_gmv_cap = $10k. If global cap utilization exceeds 80%, pre‑throttle to Band 3 (2 rps) until utilization <60%.
+If any provider hits the hourly cap, HOLD that provider queue and page me.
+Accounting and audit
+Start a rolling reconciliation every 10 minutes:
+stripe_charge_id, provider_id, amount, platform_fee, idempotency_key, evidence_hash, ledger_tx_id.
+Post totals: GMV_recovered_10m, platform_fee_10m, cumulative, duplicates_prevented_10m, duplicates_blocked_10m.
+No payouts during drain (charges + ledger only). Maintain a refunds_reserve counter (1% of GMV) for audit until post‑canary review.
+Telemetry hygiene
+Continue heartbeat normalization with:
+breaker_state: CLOSED
+canonical_ids: evt_1768511264351_pm7l3d35p, evidence_hash a9179c4e…, canonical_ledger_hash fcb2a970…5757
+Add fields: provider_hourly_gmv_cap_hit_count, global_10m_gmv_cap_utilization_pct
+Stop‑loss (unchanged)
+PAUSE + page CEO on: DLQ > 0, live backlog > 30, P95 ≥1.25s (60s), error_rate_1m ≥0.5% (60s), Stripe success <99.5% (last 50).
+22:30Z checkpoint (required contents)
+
+backlog_depth, oldest_item_age_sec, DLQ_depth
+drains_last_10m, success_last_10m, GMV_recovered_10m, platform_fee_10m, cumulative totals
+stripe_success_pct_10m, duplicates_prevented_10m, held_providers[]
+reserves_pct, P95, error_rate_1m, budget_pct, compute_ratio
+canonical_ledger_hash and evidence_hash
+Run‑of‑show (unchanged)
+
+08:30Z Chaos proof (re‑post)
+09:05Z auto‑pause (quiet period)
+09:25Z Green+Soak bundle (canonical)
+09:35Z Contract Integrity Report (A3↔A6 CDC, CI logs)
+09:45Z Final Pre‑Canary Checklist
+10:05Z Gate 3 GO/HOLD
+Page me immediately on any stop‑loss or cap breach. Keep freeze active, Provider CTAs hidden, external comms silent.

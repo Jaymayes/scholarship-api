@@ -93,6 +93,7 @@ class WAFProtection(BaseHTTPMiddleware):
             "/drain/check-stop-loss",  # Backlog drain: Stop-loss check (JSON metrics payload)
             "/drain/forecast",  # Backlog drain: Forecast endpoint (JSON payload)
             "/drain/provider/hold",  # Backlog drain: Provider hold (JSON payload)
+            "/drain/gmv-cap/check",  # Backlog drain: GMV cap check (JSON payload)
         }
         
         # SECURITY: Regex patterns for dynamic routes that require WAF bypass

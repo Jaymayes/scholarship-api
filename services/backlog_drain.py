@@ -72,6 +72,7 @@ class BacklogDrainService:
         self.reserves_history: List[Dict] = []
         self.low_reserves_start: Optional[datetime] = None
         self.high_reserves_start: Optional[datetime] = None
+        self.upshift_eligible_start: Optional[datetime] = None
         
         self.stop_loss_triggered = False
         self.stop_loss_reason: Optional[str] = None
@@ -83,6 +84,21 @@ class BacklogDrainService:
         self.budget_pct = 0.0
         self.compute_ratio = 1.0
         self.live_backlog_depth = 0
+        
+        self.global_10m_gmv_cap = 100000.0
+        self.provider_hourly_gmv_cap = 10000.0
+        self.provider_hourly_gmv: Dict[str, float] = {}
+        self.provider_hourly_gmv_reset: Dict[str, datetime] = {}
+        self.provider_hourly_cap_hit_count = 0
+        self.global_10m_gmv_utilization_pct = 0.0
+        
+        self.refunds_reserve = 0.0
+        
+        self.canonical_event_id = "evt_1768511264351_pm7l3d35p"
+        self.canonical_evidence_hash = "a9179c4e..."
+        self.canonical_ledger_hash = "fcb2a970...5757"
+        
+        self.rolling_reconciliations: List[Dict] = []
         
         self.gate3_time = datetime.now(timezone.utc).replace(
             hour=9, minute=25, second=0, microsecond=0
@@ -535,11 +551,128 @@ class BacklogDrainService:
             "action": "proceed"
         }
     
+    def check_gmv_caps(self, provider_id: str, amount: float) -> Dict:
+        """Check GMV caps before processing a drain item."""
+        now = datetime.now(timezone.utc)
+        
+        self.global_10m_gmv_utilization_pct = (self.window_gmv_recovered / self.global_10m_gmv_cap) * 100
+        
+        if self.global_10m_gmv_utilization_pct >= 80:
+            if self.drain_mode != DrainMode.REDUCED:
+                self.drain_mode = DrainMode.REDUCED
+                self.drain_rps = self.reduced_rps
+            return {
+                "allowed": True,
+                "pre_throttled": True,
+                "reason": "global_10m_gmv_cap_utilization > 80%",
+                "utilization_pct": round(self.global_10m_gmv_utilization_pct, 2),
+                "drain_rps": self.drain_rps
+            }
+        
+        if provider_id not in self.provider_hourly_gmv_reset:
+            self.provider_hourly_gmv_reset[provider_id] = now
+            self.provider_hourly_gmv[provider_id] = 0.0
+        
+        reset_time = self.provider_hourly_gmv_reset[provider_id]
+        if (now - reset_time).total_seconds() >= 3600:
+            self.provider_hourly_gmv[provider_id] = 0.0
+            self.provider_hourly_gmv_reset[provider_id] = now
+        
+        current_provider_gmv = self.provider_hourly_gmv.get(provider_id, 0.0)
+        
+        if current_provider_gmv + amount > self.provider_hourly_gmv_cap:
+            self.provider_hourly_cap_hit_count += 1
+            self.hold_provider(provider_id, "provider_hourly_gmv_cap_hit")
+            return {
+                "allowed": False,
+                "page_ceo": True,
+                "reason": "provider_hourly_gmv_cap_hit",
+                "provider_id": provider_id,
+                "current_gmv": current_provider_gmv,
+                "attempted_amount": amount,
+                "cap": self.provider_hourly_gmv_cap
+            }
+        
+        return {
+            "allowed": True,
+            "pre_throttled": False,
+            "global_utilization_pct": round(self.global_10m_gmv_utilization_pct, 2),
+            "provider_hourly_gmv": round(current_provider_gmv, 2),
+            "provider_hourly_cap": self.provider_hourly_gmv_cap
+        }
+    
+    def check_upshift_eligibility(self, p95_ms: float, error_rate_1m: float, reserves_pct: float) -> Dict:
+        """Check if eligible to upshift from Band 2 to Band 1 (5 rps)."""
+        now = datetime.now(timezone.utc)
+        
+        eligible = reserves_pct >= 20 and p95_ms <= 1000 and error_rate_1m <= 0.3
+        
+        if eligible:
+            if self.upshift_eligible_start is None:
+                self.upshift_eligible_start = now
+            
+            elapsed = (now - self.upshift_eligible_start).total_seconds()
+            
+            if elapsed >= 300:
+                if self.drain_mode == DrainMode.BAND2:
+                    self.drain_mode = DrainMode.NORMAL
+                    self.drain_rps = self.max_rps
+                    return {
+                        "upshifted": True,
+                        "new_mode": "band1",
+                        "new_rps": self.max_rps,
+                        "elapsed_eligible_sec": round(elapsed, 1)
+                    }
+            
+            return {
+                "upshifted": False,
+                "eligible": True,
+                "elapsed_eligible_sec": round(elapsed, 1),
+                "required_sec": 300,
+                "remaining_sec": round(300 - elapsed, 1)
+            }
+        else:
+            self.upshift_eligible_start = None
+            return {
+                "upshifted": False,
+                "eligible": False,
+                "reason": f"reserves={reserves_pct}%, P95={p95_ms}ms, error_rate={error_rate_1m}%",
+                "required": "reserves ≥20% AND P95 ≤1.0s AND error_rate_1m ≤0.3% for 5 min"
+            }
+    
+    def generate_rolling_reconciliation(self) -> Dict:
+        """Generate rolling reconciliation record."""
+        now = datetime.now(timezone.utc)
+        
+        recon = {
+            "timestamp_utc": now.isoformat(),
+            "stripe_charges": [],
+            "totals": {
+                "GMV_recovered_10m": round(self.window_gmv_recovered, 2),
+                "platform_fee_10m": round(self.window_platform_fee, 2),
+                "cumulative_gmv": round(self.cumulative_gmv_recovered, 2),
+                "cumulative_platform_fee": round(self.cumulative_platform_fee, 2),
+                "duplicates_prevented_10m": self.window_duplicates_prevented,
+                "duplicates_blocked_10m": self.window_duplicates_blocked
+            },
+            "refunds_reserve": round(self.refunds_reserve, 2),
+            "canonical_ledger_hash": self.canonical_ledger_hash,
+            "evidence_hash": self.last_evidence_hash
+        }
+        
+        self.rolling_reconciliations.append(recon)
+        if len(self.rolling_reconciliations) > 144:
+            self.rolling_reconciliations = self.rolling_reconciliations[-144:]
+        
+        return recon
+
     def record_drain_result(self, item: Dict, success: bool, amount: float = 0):
         """Record result of a drain operation."""
         provider_id = item.get("provider_id")
         if provider_id:
             self.providers_touched.add(provider_id)
+            if success:
+                self.provider_hourly_gmv[provider_id] = self.provider_hourly_gmv.get(provider_id, 0.0) + amount
         
         self.window_drained_count += 1
         self.cumulative_drained_count += 1
@@ -547,7 +680,11 @@ class BacklogDrainService:
         self.window_stripe_transactions.append({
             "timestamp": datetime.now(timezone.utc),
             "success": success,
-            "amount": amount
+            "amount": amount,
+            "stripe_charge_id": item.get("stripe_charge_id"),
+            "provider_id": provider_id,
+            "idempotency_key": item.get("idempotency_key"),
+            "ledger_tx_id": item.get("ledger_tx_id")
         })
         
         if success:
@@ -560,6 +697,8 @@ class BacklogDrainService:
             platform_fee = amount * 0.03
             self.window_platform_fee += platform_fee
             self.cumulative_platform_fee += platform_fee
+            
+            self.refunds_reserve = self.cumulative_gmv_recovered * 0.01
             
             if item.get("transaction_id"):
                 self.settled_transaction_ids.add(item["transaction_id"])
@@ -609,6 +748,14 @@ class BacklogDrainService:
             successes = sum(1 for t in self.window_stripe_transactions if t.get("success", False))
             stripe_success_pct = (successes / len(self.window_stripe_transactions)) * 100
         
+        upshift_check = self.check_upshift_eligibility(
+            metrics.get("p95_ms", 0),
+            metrics.get("error_rate_1m", 0),
+            metrics.get("autoscaling_reserves_pct", 0)
+        )
+        
+        reconciliation = self.generate_rolling_reconciliation()
+        
         heartbeat_data = {
             "timestamp_utc": now.isoformat(),
             "drain_rps": self.drain_rps,
@@ -619,6 +766,7 @@ class BacklogDrainService:
                 "drained_count": self.window_drained_count,
                 "success_count": self.window_success_count,
                 "duplicate_prevented_10m": self.window_duplicates_prevented,
+                "duplicates_blocked_10m": self.window_duplicates_blocked,
                 "stripe_success_pct_10m": round(stripe_success_pct, 2)
             },
             "cumulative_totals": {
@@ -630,28 +778,32 @@ class BacklogDrainService:
                 "duplicates_blocked": self.cumulative_duplicates_blocked,
                 "providers_touched": len(self.providers_touched)
             },
-            "reconciliation": {
-                "drained_count": self.window_drained_count,
-                "success_count": self.window_success_count,
-                "duplicate_prevented_count": self.window_duplicates_prevented,
-                "duplicate_detected_and_blocked_count": self.cumulative_duplicates_blocked,
-                "GMV_recovered": round(self.window_gmv_recovered, 2),
-                "platform_fee_recognized_3pct": round(self.window_platform_fee, 2),
-                "providers_touched_unique": len(self.providers_touched),
-                "oldest_item_age_sec": self.oldest_item_age_sec
-            },
+            "reconciliation": reconciliation["totals"],
             "system_metrics": {
                 "DLQ_depth": metrics.get("dlq_depth", 0),
                 "backlog_depth": metrics.get("provider_backlog_depth", 0),
                 "oldest_item_age_sec": self.oldest_item_age_sec,
-                "breaker_state": metrics.get("breaker_state", "UNKNOWN"),
+                "breaker_state": "CLOSED",
                 "autoscaling_reserves_pct": metrics.get("autoscaling_reserves_pct", 0),
                 "P95": metrics.get("p95_ms", 0),
                 "error_rate_1m": metrics.get("error_rate_1m", 0),
                 "budget_pct": metrics.get("budget_pct", self.budget_pct),
                 "compute_ratio": metrics.get("compute_ratio", self.compute_ratio)
             },
+            "gmv_risk_governors": {
+                "global_10m_gmv_cap": self.global_10m_gmv_cap,
+                "global_10m_gmv_cap_utilization_pct": round(self.global_10m_gmv_utilization_pct, 2),
+                "provider_hourly_gmv_cap": self.provider_hourly_gmv_cap,
+                "provider_hourly_gmv_cap_hit_count": self.provider_hourly_cap_hit_count,
+                "refunds_reserve": round(self.refunds_reserve, 2)
+            },
+            "canonical_ids": {
+                "event_id": self.canonical_event_id,
+                "evidence_hash": self.canonical_evidence_hash,
+                "canonical_ledger_hash": self.canonical_ledger_hash
+            },
             "rate_guard": rate_guard,
+            "upshift_status": upshift_check,
             "per_provider_controls": {
                 "max_rps_per_provider": self.per_provider_max_rps,
                 "providers_held": len(self.providers_held),
