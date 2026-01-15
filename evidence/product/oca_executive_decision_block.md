@@ -32,14 +32,23 @@
 - **Hard stop**: 2026-01-15T10:11:13Z
 - Provider-only canary still requires this gate
 
-#### A6 Precheck (Due T−60m)
+#### A6 Precheck (09:11:13Z)
 Post `a6_precheck` snapshot to A8 with:
 - p95_ms, error_rate, queue_depth
 - provider_register_status=200
 - cache_warm=true
-- autoscaling_reserves set for ~10% provider traffic
-- Run 2-minute synthetic probe (≤50 rps) on health and provider endpoints
-- If 10-min P95 ≥1.25s at any time pre-launch → throttle to 4/user/day + notify A8
+- autoscaling_reserves ≈10%
+- synthetic_probe summary (2 min ≤50 rps)
+- 10-min P95 trend
+- throttle state
+
+##### Precheck Go/Throttle/Kill Rules
+
+| State | Condition | Action |
+|-------|-----------|--------|
+| **GO** | P95 <1.25s, error <0.5%, queue <10, compute stable | Proceed to Gate 3 |
+| **THROTTLE** | 1.25s ≤ P95 <1.5s OR queue 10-30 | Clamp 4/user/day, log A8, recheck after 10 min |
+| **KILL/ABORT** | P95 ≥1.5s, error ≥1.0%, queue >30, or complaint | Rollback ≤60s, A8 incident |
 
 #### Gate 3 Required Payload
 - p95_ms < 200
