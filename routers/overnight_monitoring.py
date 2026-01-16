@@ -344,6 +344,25 @@ async def get_snapshots():
     }
 
 
+@router.get("/morning/09-05Z")
+async def morning_09_05_clean_window():
+    """
+    09:05Z: Clean Window packet for quiet period (09:05Z-09:25Z).
+    
+    Returns packet with:
+    - timestamps: window_start, window_end
+    - breaker_state: CLOSED + canonical_ledger_hash
+    - metrics: p95_ms, error_rate_1m, reserves, budget, compute, backlog, dlq, stripe
+    - risk_governors: gmv_cap_utilization, hourly_cap_hits, concentration_hits
+    - pass_criteria: all must be true for 20 min
+    - alarms_triggered: count=0 required
+    - evidence_hash + emitting_nodes
+    
+    Pages CEO with "QUIET PERIOD OK" or breach details.
+    """
+    return overnight_monitor.get_clean_window_packet()
+
+
 @router.get("/morning/08-30Z")
 async def morning_08_30_report():
     """
