@@ -1,0 +1,29 @@
+Acknowledged. GO to Step 4 (100%) is approved and recorded.
+
+Execute now
+
+DevOps Lead: POST escalation to full rollout. Endpoint: POST /oca/canary/protocols/gate3/escalate Payload { "from_step": 3, "to_step": 4, "traffic_pct": 100, "budget_cap_usd": 20000, "canary_event_id": "evt_3c3074f7", "evidence_hash": "e7176153886a9b8978fb619a6cb68114ac0f174e05bf2834ad6afe2d9b68f3e9", "auto_halt": { "p95_ms_hard": 1500, "p95_ms_warn": 400, "error_rate_pct_hard": 1.0, "error_rate_pct_soft": 0.25, "backlog_immediate_threshold": 30, "dlq_immediate_if_nonzero": true, "stripe_success_pct_min": 99.5, "budget_pct_hard": 80, "compute_ratio_hard": 2.0, "breaker_required_state": "CLOSED", "schema_or_telemetry_violation_immediate": true }, "business_acceptance_gates": { "onboard_success_pct_min": 99.5, "time_register_to_payouts_enabled_minutes_median_max": 3, "account_link_success_pct_min": 99.5, "ledger_reconciliation_delta_cents": 0 } }
+Soak protocol at 100% (first 10 minutes)
+
+Must hold: P95 ≤ 400 ms; error ≤ 0.25%; DLQ=0; backlog ≤ 10; Stripe ≥ 99.5%; compute ≤ 1.5x; breaker CLOSED; ledger delta = $0.00.
+Governors: keep Global GMV Cap = $100k (80% pre‑throttle) for the first 60 minutes.
+Rollback: stable build hot and cache warm; any breach or $0.01 reconciliation delta → immediate HALT + rollback + page CEO.
+Finance Ops (parallel)
+
+Run 20‑transaction settlement spot‑check (charges, account links, payouts). Confirm disputes = 0 and parity TRUE with canonical_ledger_hash continuity. Page immediately if any discrepancy.
+Comms
+
+Prepare All‑clear draft; hold for my signal after Step 4 T+10 is GREEN. Draft elements:
+Provider Finance & Compliance release is live at 100%.
+Median onboarding 1.6 minutes; account‑link success 100% during soak.
+Stripe probes 100%; reconciliation deltas $0.00.
+No action required from providers.
+Reporting required
+
+Step 4 T+10 Snapshot: event_id, evidence_hash, last 5 heartbeats, endpoint P50/P95/P99, error, backlog, DLQ, compute, breaker, Stripe probes, budget vs $20k, KPIs, ledger parity and canonical_ledger_hash.
+24‑hour Business Readout (tomorrow AM):
+Providers onboarded per hour vs baseline (target +10%).
+Time‑to‑first‑payout median.
+GMV processed and 3% fee accrued; reconciliation exceptions = 0.
+Any Stripe rate‑limit incidents or circuit‑breaker opens.
+Execute escalation now and return the Step 4 ESCALATION ACK with event_id and evidence_hash.
