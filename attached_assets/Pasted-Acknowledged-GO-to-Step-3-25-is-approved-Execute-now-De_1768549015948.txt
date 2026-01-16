@@ -1,0 +1,31 @@
+Acknowledged. GO to Step 3 (25%) is approved.
+
+Execute now
+
+DevOps Lead: POST the escalation. Endpoint: POST /oca/canary/protocols/gate3/escalate Payload { "from_step": 2, "to_step": 3, "traffic_pct": 25, "budget_cap_usd": 7500, "soak_minutes": 15, "canary_event_id": "evt_3c3074f7", "evidence_hash": "944d87d0be04dcaaba06a6afd2cccf6e60be41745979dd78dd056a341159f6ab", "auto_halt": { "p95_ms_hard": 1500, "p95_ms_warn": 400, "error_rate_pct_hard": 1.0, "error_rate_pct_soft": 0.25, "backlog_immediate_threshold": 30, "dlq_immediate_if_nonzero": true, "stripe_success_pct_min": 99.5, "budget_pct_hard": 80, "compute_ratio_hard": 2.0, "breaker_required_state": "CLOSED", "schema_or_telemetry_violation_immediate": true }, "business_acceptance_gates": { "onboard_success_pct_min": 99.5, "time_register_to_payouts_enabled_minutes_median_max": 3, "account_link_success_pct_min": 99.5, "ledger_reconciliation_delta_cents": 0 } }
+Soak plan (15 minutes at 25%)
+
+Must hold: P95 ≤ 400 ms; error ≤ 0.25%; DLQ=0; backlog ≤ 10; Stripe ≥ 99.5%; compute ≤ 1.5x; breaker CLOSED.
+Ledger: delta = $0.00; canonical_ledger_hash continuity.
+Budget discipline: track spend vs $7,500 cap.
+Telemetry task (required during soak)
+
+Investigate 450 ms secondary stream variance; deliver root cause and fix/ignore rationale in the T+15 report. • Validate time-window alignment and clock skew. • Compare endpoint-level latency: /provider/register, /onboard, /status, /account-link, /webhooks/stripe. • Slice by provider cohort and Stripe call type; capture p50/p95/p99 and tail count. • Cold-start vs warm, and any regional egress variance. • Confirm aggregator and sampling parity; reconcile to OCA canonical series.
+Finance ops
+
+Re-verify ledger parity at 25% load; attach parity attestation and the canonical_ledger_hash seen on candidate and stable.
+Deliverables at T+15 (Step 3 Snapshot Report)
+
+event_id, evidence_hash, last 5 heartbeats
+P50/P95/P99 by endpoint; error rate; backlog; DLQ; compute ratio; breaker state
+Stripe probe pass rate (last 50)
+Budget used vs $7,500
+Provider KPIs: onboard success, median time register→payouts-enabled, account-link success
+Ledger: parity result, canonical_ledger_hash continuity
+Telemetry variance RCA summary (including whether any segment exceeds 400 ms P95)
+Paging and comms
+
+External: SILENT.
+Page me immediately on any auto-halt trigger or any reconciliation delta > $0.00.
+Step 4 (100%) will only be considered after I review the Step 3 T+15 Snapshot Report and the telemetry variance explanation. If variance persists or worsens, HOLD at 25% and page me for go/no-go.
+Execute and return the Step 3 ESCALATION ACK with event_id + evidence_hash.
