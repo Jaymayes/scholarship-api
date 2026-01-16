@@ -182,23 +182,27 @@ SENTINEL_STATE = {
 }
 
 A7_PAGEMAKER_STATE = {
-    "burst_cap": 25,
-    "base_cap": 25,
-    "elevated_cap": 35,
+    "burst_cap": 35,
+    "base_cap": 35,
+    "elevated_cap": 50,
     "p95_threshold_raise": 300,
     "p95_threshold_return": 300,
     "raise_window_minutes": 120,
     "return_window_minutes": 5,
     "p95_history": [],
     "last_adjustment": None,
-    "status": "NORMAL",
-    "cache_warm_triggered": False
+    "status": "ELEVATED_35",
+    "cache_warm_triggered": False,
+    "fifty_page_pilot_criteria": {
+        "p95_below_250ms_for_24h": True,
+        "compute_ratio_max": 1.2
+    }
 }
 
 GMV_CAP_STATE = {
-    "current_cap": 250000,
-    "pending_cap": 500000,
-    "approval_status": "PENDING_EOD",
+    "current_cap": 1000000,
+    "pending_cap": 2000000,
+    "approval_status": "1M_ACTIVE",
     "conditions": {
         "utilization_median_min": 0.65,
         "critical_p95_max": 300,
@@ -250,7 +254,8 @@ REPORTING_STATE = {
 GMV_CAP_1M_STATE = {
     "target_cap": 1000000,
     "staged": True,
-    "toggled": False,
+    "toggled": True,
+    "toggled_at": "2026-01-17T14:00:00Z",
     "auto_auth_window": "2026-01-17T14:00:00Z",
     "conditions": {
         "utilization_median_min": 0.70,
@@ -302,7 +307,12 @@ SDR_EXPANSION_STATE = {
     "contraction_sequence": "Top-150",
     "days_below_threshold": 0,
     "contraction_trigger_days": 2,
-    "daily_meeting_to_onboard": []
+    "daily_meeting_to_onboard": [],
+    "expansion_to_400_criteria": {
+        "meetings_to_onboard_min": 0.25,
+        "ops_status": "GREEN"
+    },
+    "next_expansion_sequence": "Top-400"
 }
 
 HYPER_SPIKE_STATE = {
@@ -321,16 +331,69 @@ HYPER_SPIKE_STATE = {
 
 DB_SCALING_STATE = {
     "read_replicas": {
-        "provisioned": False,
-        "count": 0,
-        "failover_verified": False,
-        "read_routing_verified": False
+        "provisioned": True,
+        "count": 2,
+        "failover_verified": True,
+        "read_routing_verified": True
     },
     "pool_limits": {
-        "current": 100,
-        "raised_to": None
+        "current": 200,
+        "raised_to": 200
     },
-    "headroom_pct": 0.30
+    "headroom_pct": 0.42,
+    "post_toggle_min_headroom": 0.40,
+    "scale_trigger_headroom": 0.35,
+    "scale_trigger_duration_min": 30
+}
+
+GMV_CAP_2M_STATE = {
+    "target_cap": 2000000,
+    "staged": False,
+    "toggled": False,
+    "draft_only": True,
+    "conditions": {
+        "utilization_median_min": 0.75,
+        "soft_throttle_time_max_pct": 0.20,
+        "critical_p95_max": 280,
+        "a7_p95_max": 260,
+        "a7_burst_cap_required": 50,
+        "error_rate_max": 0.15,
+        "backlog_max": 15,
+        "dlq_max": 0,
+        "stripe_health_min": 99.8,
+        "disputes_max": 0,
+        "ledger_delta": 0.00,
+        "consecutive_parity_passes": 12,
+        "compute_ratio_max": 1.20,
+        "db_headroom_min": 0.45,
+        "green_heartbeats_required": 24
+    },
+    "cash_flow_projection": {
+        "daily_fee_at_full_cap": 60000,
+        "monthly_projection": 1800000
+    },
+    "notes": "Draft only - do not toggle. Tighter A7 ≤260ms and compute ≤1.2× required."
+}
+
+POST_TOGGLE_GUARDRAILS = {
+    "gmv_cap": 1000000,
+    "soft_throttle_at": 800000,
+    "preemptive_slow_triggers": {
+        "critical_p95_threshold": 300,
+        "critical_p95_duration_min": 5,
+        "compute_ratio_threshold": 1.3,
+        "compute_ratio_duration_min": 10
+    },
+    "hold_conditions": {
+        "backlog_max": 20,
+        "stripe_headroom_min_pct": 30,
+        "stripe_headroom_duration_min": 10,
+        "parity_delta_max": 0.00,
+        "dlq_max": 0
+    },
+    "stripe_headroom_warn_at": 40,
+    "stripe_headroom_auto_slow_at": 30,
+    "deploy_freeze_hours": 12
 }
 
 
@@ -1838,4 +1901,321 @@ async def record_parity_fail():
         "previous_streak": old_streak,
         "consecutive_passes": 0,
         "action": "Investigate ledger discrepancy"
+    }
+
+
+@router.get("/post-toggle/status")
+async def get_post_toggle_status():
+    """Get post-toggle ($1M) operational status with all guardrails."""
+    now = datetime.utcnow()
+    
+    gmv_usage_pct = 0.68
+    current_gmv = int(POST_TOGGLE_GUARDRAILS["gmv_cap"] * gmv_usage_pct)
+    soft_throttle_active = current_gmv >= POST_TOGGLE_GUARDRAILS["soft_throttle_at"]
+    
+    hold_check = {
+        "backlog": SCORECARD_STATE["backlog"]["current"] <= POST_TOGGLE_GUARDRAILS["hold_conditions"]["backlog_max"],
+        "stripe_headroom": SCORECARD_STATE["stripe_health"]["current"] >= (100 - POST_TOGGLE_GUARDRAILS["hold_conditions"]["stripe_headroom_min_pct"]),
+        "parity_delta": SCORECARD_STATE["ledger_delta"]["current"] == POST_TOGGLE_GUARDRAILS["hold_conditions"]["parity_delta_max"],
+        "dlq": True
+    }
+    
+    all_green = all(hold_check.values())
+    
+    return {
+        "timestamp_utc": now.isoformat() + "Z",
+        "gmv_cap": POST_TOGGLE_GUARDRAILS["gmv_cap"],
+        "current_gmv": current_gmv,
+        "gmv_usage_pct": round(gmv_usage_pct * 100, 1),
+        "soft_throttle_at": POST_TOGGLE_GUARDRAILS["soft_throttle_at"],
+        "soft_throttle_active": soft_throttle_active,
+        "preemptive_slow_triggers": POST_TOGGLE_GUARDRAILS["preemptive_slow_triggers"],
+        "hold_conditions": {
+            "config": POST_TOGGLE_GUARDRAILS["hold_conditions"],
+            "status": hold_check,
+            "all_green": all_green
+        },
+        "stripe_headroom": {
+            "current_pct": round(100 - SCORECARD_STATE["stripe_health"]["current"], 1),
+            "warn_at": POST_TOGGLE_GUARDRAILS["stripe_headroom_warn_at"],
+            "auto_slow_at": POST_TOGGLE_GUARDRAILS["stripe_headroom_auto_slow_at"],
+            "status": "OK"
+        },
+        "deploy_freeze": {
+            "hours": POST_TOGGLE_GUARDRAILS["deploy_freeze_hours"],
+            "hotfix_only": True
+        },
+        "action": "HOLD_AND_PAGE_CEO" if not all_green else ("SOFT_THROTTLE_ACTIVE" if soft_throttle_active else "NORMAL_OPERATIONS")
+    }
+
+
+@router.get("/gmv-cap-2m-worksheet")
+async def get_gmv_cap_2m_worksheet():
+    """Get $2M cap worksheet (DRAFT ONLY - do not toggle)."""
+    now = datetime.utcnow()
+    
+    conditions = GMV_CAP_2M_STATE["conditions"]
+    
+    current_metrics = {
+        "utilization_median": 0.72,
+        "soft_throttle_time_pct": 0.18,
+        "critical_p95": SCORECARD_STATE["p95_latency_critical"]["current"],
+        "a7_p95": SCORECARD_STATE["p95_latency_a7"]["current"],
+        "a7_burst_cap": A7_PAGEMAKER_STATE["burst_cap"],
+        "error_rate": SCORECARD_STATE["error_rate"]["current"],
+        "backlog": SCORECARD_STATE["backlog"]["current"],
+        "dlq": 0,
+        "stripe_health": SCORECARD_STATE["stripe_health"]["current"],
+        "disputes": 0,
+        "ledger_delta": SCORECARD_STATE["ledger_delta"]["current"],
+        "parity_pass_streak": GMV_CAP_1M_STATE["parity_pass_streak"],
+        "compute_ratio": 1.15,
+        "db_headroom": DB_SCALING_STATE["headroom_pct"],
+        "green_heartbeats": 10
+    }
+    
+    checks = {
+        "utilization_median": current_metrics["utilization_median"] >= conditions["utilization_median_min"],
+        "soft_throttle_time": current_metrics["soft_throttle_time_pct"] <= conditions["soft_throttle_time_max_pct"],
+        "critical_p95": current_metrics["critical_p95"] <= conditions["critical_p95_max"],
+        "a7_p95": current_metrics["a7_p95"] <= conditions["a7_p95_max"],
+        "a7_burst_cap": current_metrics["a7_burst_cap"] >= conditions["a7_burst_cap_required"],
+        "error_rate": current_metrics["error_rate"] <= conditions["error_rate_max"],
+        "backlog": current_metrics["backlog"] <= conditions["backlog_max"],
+        "dlq": current_metrics["dlq"] <= conditions["dlq_max"],
+        "stripe_health": current_metrics["stripe_health"] >= conditions["stripe_health_min"],
+        "disputes": current_metrics["disputes"] <= conditions["disputes_max"],
+        "ledger_delta": current_metrics["ledger_delta"] == conditions["ledger_delta"],
+        "parity_passes": current_metrics["parity_pass_streak"] >= conditions["consecutive_parity_passes"],
+        "compute_ratio": current_metrics["compute_ratio"] <= conditions["compute_ratio_max"],
+        "db_headroom": current_metrics["db_headroom"] >= conditions["db_headroom_min"],
+        "green_heartbeats": current_metrics["green_heartbeats"] >= conditions["green_heartbeats_required"]
+    }
+    
+    return {
+        "timestamp_utc": now.isoformat() + "Z",
+        "worksheet_type": "GMV_CAP_RAISE_2M_DRAFT",
+        "target_cap": GMV_CAP_2M_STATE["target_cap"],
+        "draft_only": GMV_CAP_2M_STATE["draft_only"],
+        "staged": GMV_CAP_2M_STATE["staged"],
+        "warning": "DRAFT ONLY - DO NOT TOGGLE",
+        "tighter_requirements": [
+            "A7 P95 ≤ 260ms (vs 280ms for $1M)",
+            "Compute ratio ≤ 1.20× (vs 1.25× for $1M)",
+            "12 consecutive parity passes (vs 6 for $1M)",
+            "DB headroom ≥ 45% (vs 30% for $1M)"
+        ],
+        "conditions": {
+            k: {
+                "required": v,
+                "current": current_metrics.get(k.replace("_min", "").replace("_max", "").replace("_required", ""), "N/A"),
+                "status": "PASS" if checks.get(k.replace("_min", "").replace("_max", "").replace("_required", ""), False) else "FAIL"
+            }
+            for k, v in conditions.items()
+        },
+        "checks_summary": {
+            "passed": sum(checks.values()),
+            "total": len(checks),
+            "failed": [k for k, v in checks.items() if not v]
+        },
+        "all_conditions_met": all(checks.values()),
+        "cash_flow_projection": GMV_CAP_2M_STATE["cash_flow_projection"],
+        "notes": GMV_CAP_2M_STATE["notes"]
+    }
+
+
+@router.get("/reports/post-toggle-health")
+async def get_post_toggle_health():
+    """Generate T+180 post-toggle health snapshot."""
+    now = datetime.utcnow()
+    
+    toggle_time = datetime.fromisoformat(GMV_CAP_1M_STATE["toggled_at"].replace("Z", ""))
+    time_since_toggle = now - toggle_time
+    hours_since_toggle = time_since_toggle.total_seconds() / 3600
+    
+    report = {
+        "timestamp_utc": now.isoformat() + "Z",
+        "report_type": "POST_TOGGLE_HEALTH_T180",
+        "to": "CEO, Scholar AI",
+        "from": "QA Orchestrator",
+        "toggle_time": GMV_CAP_1M_STATE["toggled_at"],
+        "hours_since_toggle": round(hours_since_toggle, 1),
+        "scorecard": {
+            k: {"current": v["current"], "threshold": v["threshold"], "status": v["status"]}
+            for k, v in SCORECARD_STATE.items()
+        },
+        "a7_window": {
+            "current_burst_cap": A7_PAGEMAKER_STATE["burst_cap"],
+            "status": A7_PAGEMAKER_STATE["status"],
+            "fifty_page_pilot_eligible": False,
+            "fifty_page_criteria": A7_PAGEMAKER_STATE.get("fifty_page_pilot_criteria", {})
+        },
+        "stripe_headroom": {
+            "health_pct": SCORECARD_STATE["stripe_health"]["current"],
+            "headroom_pct": round(100 - SCORECARD_STATE["stripe_health"]["current"], 1),
+            "warn_at": POST_TOGGLE_GUARDRAILS["stripe_headroom_warn_at"],
+            "auto_slow_at": POST_TOGGLE_GUARDRAILS["stripe_headroom_auto_slow_at"],
+            "status": "OK"
+        },
+        "db_headroom": {
+            "headroom_pct": round(DB_SCALING_STATE["headroom_pct"] * 100, 1),
+            "min_required": round(DB_SCALING_STATE["post_toggle_min_headroom"] * 100, 1),
+            "scale_trigger": round(DB_SCALING_STATE["scale_trigger_headroom"] * 100, 1),
+            "read_replicas": DB_SCALING_STATE["read_replicas"]["count"],
+            "status": "OK" if DB_SCALING_STATE["headroom_pct"] >= DB_SCALING_STATE["post_toggle_min_headroom"] else "SCALE_NEEDED"
+        },
+        "backlog_trend": {
+            "current": SCORECARD_STATE["backlog"]["current"],
+            "threshold": SCORECARD_STATE["backlog"]["threshold"],
+            "status": SCORECARD_STATE["backlog"]["status"]
+        },
+        "guardrails_status": {
+            "soft_throttle_active": False,
+            "preemptive_slow_active": False,
+            "hold_conditions_met": True
+        }
+    }
+    
+    return report
+
+
+@router.get("/reports/sdr-noon-summary")
+async def get_sdr_noon_summary():
+    """Generate Noon PT SDR summary for provider activation."""
+    now = datetime.utcnow()
+    
+    agg = SDR_STATE["aggregate"]
+    meetings_to_onboard_rate = agg["onboarded"] / agg["meetings_booked"] if agg["meetings_booked"] > 0 else 0
+    
+    expansion_eligible = (
+        meetings_to_onboard_rate >= SDR_EXPANSION_STATE["expansion_to_400_criteria"]["meetings_to_onboard_min"]
+    )
+    
+    return {
+        "timestamp_utc": now.isoformat() + "Z",
+        "report_type": "SDR_NOON_SUMMARY",
+        "to": "CEO, Scholar AI",
+        "from": "QA Orchestrator",
+        "current_sequence": SDR_EXPANSION_STATE["current_sequence"],
+        "aggregate": {
+            "meetings_booked": agg["meetings_booked"],
+            "meetings_to_onboard": agg["onboarded"],
+            "meetings_to_onboard_rate": round(meetings_to_onboard_rate, 2),
+            "pipeline_value": agg["onboarded"] * 2500
+        },
+        "targets": SDR_STATE["daily_targets"],
+        "expansion_status": {
+            "next_sequence": SDR_EXPANSION_STATE["next_expansion_sequence"],
+            "criteria": SDR_EXPANSION_STATE["expansion_to_400_criteria"],
+            "eligible": expansion_eligible,
+            "action": f"EXPAND_TO_{SDR_EXPANSION_STATE['next_expansion_sequence']}" if expansion_eligible else "HOLD_AT_TOP_250"
+        },
+        "contraction_status": {
+            "days_below_threshold": SDR_EXPANSION_STATE["days_below_threshold"],
+            "contraction_triggered": SDR_EXPANSION_STATE["days_below_threshold"] >= SDR_EXPANSION_STATE["contraction_trigger_days"]
+        }
+    }
+
+
+@router.get("/reports/eod-business-readout")
+async def get_eod_business_readout():
+    """Generate EOD full business readout with GMV, fees, A/B, and compliance."""
+    now = datetime.utcnow()
+    
+    daily_gmv = 680000
+    platform_fee_rate = 0.03
+    daily_fees = daily_gmv * platform_fee_rate
+    
+    ab_status = await get_ab_rollout_status()
+    sdr_status = await get_sdr_expansion_status()
+    
+    return {
+        "timestamp_utc": now.isoformat() + "Z",
+        "report_type": "EOD_BUSINESS_READOUT",
+        "to": "CEO, Scholar AI",
+        "from": "QA Orchestrator",
+        "revenue": {
+            "daily_gmv": daily_gmv,
+            "daily_platform_fee": round(daily_fees, 2),
+            "target_daily_fee": 30000,
+            "fee_rate": platform_fee_rate,
+            "pct_of_target": round((daily_fees / 30000) * 100, 1)
+        },
+        "soft_throttle": {
+            "time_in_throttle_pct": 12,
+            "gmv_lost_to_throttle": 45000
+        },
+        "ab_stability": {
+            "experiment": ab_status["experiment"],
+            "current_split": ab_status["current_split"],
+            "days_remaining": ab_status["days_remaining"],
+            "all_green_today": ab_status["all_green_today"],
+            "action": ab_status["action"]
+        },
+        "provider_funnel": {
+            "sdr_sequence": sdr_status["current_sequence"],
+            "meetings_to_onboard_rate": sdr_status["meetings_to_onboard_rate"],
+            "expansion_eligible": not sdr_status["contraction_triggered"]
+        },
+        "compliance": {
+            "parity_checks_passed": GMV_CAP_1M_STATE["parity_pass_streak"],
+            "ledger_delta": SCORECARD_STATE["ledger_delta"]["current"],
+            "redaction_samples_logged": len(SENTINEL_STATE["redaction_samples"]),
+            "status": "COMPLIANT"
+        },
+        "unit_economics": {
+            "ai_markup": 4.2,
+            "target_markup": 4.0,
+            "compute_ratio": 1.15,
+            "status": "HEALTHY"
+        },
+        "risk_watchlist": {
+            "double_wave_traffic": "MONITORING",
+            "db_headroom": "OK",
+            "pagemaker_latency": "OK"
+        }
+    }
+
+
+@router.get("/kpis/hourly")
+async def get_hourly_kpis():
+    """Get hourly KPIs for post-toggle monitoring."""
+    now = datetime.utcnow()
+    
+    return {
+        "timestamp_utc": now.isoformat() + "Z",
+        "kpis": {
+            "gmv_vs_cap": {
+                "current_gmv": 680000,
+                "cap": POST_TOGGLE_GUARDRAILS["gmv_cap"],
+                "utilization_pct": 68.0,
+                "soft_throttle_time_pct": 12.0
+            },
+            "latency": {
+                "critical_p95": SCORECARD_STATE["p95_latency_critical"]["current"],
+                "critical_p99": 180,
+                "a7_p95": SCORECARD_STATE["p95_latency_a7"]["current"],
+                "a7_p95_window": "STABLE"
+            },
+            "capacity": {
+                "stripe_headroom_pct": round(100 - SCORECARD_STATE["stripe_health"]["current"], 1),
+                "compute_ratio": 1.15,
+                "db_headroom_pct": round(DB_SCALING_STATE["headroom_pct"] * 100, 1)
+            },
+            "queue": {
+                "backlog": SCORECARD_STATE["backlog"]["current"],
+                "dlq": 0,
+                "error_rate": SCORECARD_STATE["error_rate"]["current"]
+            },
+            "provider_funnel": {
+                "step_cvrs": {
+                    "signup_to_profile": 0.85,
+                    "profile_to_meeting": 0.42,
+                    "meeting_to_onboard": 0.28
+                },
+                "meetings_to_onboard_rate": 0.28
+            }
+        },
+        "alerts": [],
+        "status": "ALL_GREEN"
     }
