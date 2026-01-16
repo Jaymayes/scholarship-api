@@ -103,6 +103,7 @@ from routers.pre_canary_checklist import router as pre_canary_checklist_router
 from routers.recovery_ops import router as recovery_ops_router
 from routers.overnight_monitoring import router as overnight_monitoring_router
 from routers.backlog_drain import router as backlog_drain_router
+from routers.day2_operations import router as day2_operations_router
 from schemas.error_responses import ERROR_RESPONSES
 from utils.logger import setup_logger
 
@@ -845,6 +846,7 @@ app.include_router(pre_canary_checklist_router)
 app.include_router(recovery_ops_router)
 app.include_router(overnight_monitoring_router)
 app.include_router(backlog_drain_router)
+app.include_router(day2_operations_router, tags=["Day-2 Operations"])
 
 # Metrics already setup above - this was the wrong location causing route shadowing
 
