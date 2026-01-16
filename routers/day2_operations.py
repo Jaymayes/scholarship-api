@@ -81,25 +81,82 @@ SYNTHETIC_MONITORS = {
         "p95_ms": 0,
         "last_check": None,
         "consecutive_failures": 0,
-        "alert_threshold_ms": 350,
-        "alert_window_min": 10
+        "alert_threshold_ms": 300,
+        "warn_threshold_ms": 300,
+        "alert_window_min": 5,
+        "cadence_sec": 30
     },
     "/onboard": {
         "status": "GREEN",
         "p95_ms": 0,
         "last_check": None,
         "consecutive_failures": 0,
-        "alert_threshold_ms": 350,
-        "alert_window_min": 10
+        "alert_threshold_ms": 300,
+        "warn_threshold_ms": 300,
+        "alert_window_min": 5,
+        "cadence_sec": 30
     },
     "/account-link": {
         "status": "GREEN",
         "p95_ms": 0,
         "last_check": None,
         "consecutive_failures": 0,
-        "alert_threshold_ms": 350,
-        "alert_window_min": 10
+        "alert_threshold_ms": 300,
+        "warn_threshold_ms": 300,
+        "alert_window_min": 5,
+        "cadence_sec": 30
     }
+}
+
+GMV_CAP_STATE = {
+    "current_cap_usd": 250000,
+    "previous_cap_usd": 100000,
+    "soft_throttle_pct": 80,
+    "utilized_usd": 0.0,
+    "utilization_pct": 0.0,
+    "deploy_freeze_until": None,
+    "deploy_freeze_hours": 12,
+    "raised_at": None
+}
+
+SDR_EXPERIMENT_STATE = {
+    "experiment_id": "exp_sdr_payouts_2026q1",
+    "started_at": None,
+    "status": "pending",
+    "daily_targets": {
+        "emails_per_rep": 60,
+        "meaningful_replies": 12,
+        "meetings_booked": 4
+    },
+    "variants": {
+        "A": {
+            "name": "Speed",
+            "headline": "Instant Payout reliability",
+            "touches": 0,
+            "replies": 0,
+            "meetings_booked": 0
+        },
+        "B": {
+            "name": "Control & Compliance",
+            "headline": "FERPA-first payouts with full audit trail",
+            "touches": 0,
+            "replies": 0,
+            "meetings_booked": 0
+        }
+    },
+    "total_providers_contacted": 0,
+    "total_meetings_booked": 0,
+    "total_replies": 0,
+    "touches_by_step": {1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0, 7: 0, 8: 0}
+}
+
+SITEMAP_STATE = {
+    "submitted_at": None,
+    "status": "pending",
+    "pages_submitted": 0,
+    "pages_indexed": 0,
+    "last_check": None,
+    "check_interval_min": 30
 }
 
 
@@ -837,6 +894,357 @@ async def get_eod_note():
         "auto_page_maker": {
             "pages_generated": 0,
             "target_eod_plus_1": 50,
-            "sitemap_submitted": False
+            "sitemap_submitted": SITEMAP_STATE["status"] != "pending"
+        },
+        "sdr_experiment": {
+            "experiment_id": SDR_EXPERIMENT_STATE["experiment_id"],
+            "status": SDR_EXPERIMENT_STATE["status"],
+            "total_touches": sum(SDR_EXPERIMENT_STATE["touches_by_step"].values()),
+            "total_meetings_booked": SDR_EXPERIMENT_STATE["total_meetings_booked"],
+            "total_replies": SDR_EXPERIMENT_STATE["total_replies"]
+        }
+    }
+
+
+class SDREventAttributed(BaseModel):
+    source: str = "SDR"
+    experiment_id: str = "exp_sdr_payouts_2026q1"
+    variant: str
+    step: int = Field(..., ge=1, le=8)
+    provider_id: str
+    meeting_booked: bool = False
+    reply_received: bool = False
+    fund_size_bucket: Optional[str] = None
+    persona: Optional[str] = None
+    current_rails: Optional[str] = None
+    cycle_window: Optional[str] = None
+    meeting_date: Optional[str] = None
+    next_step: Optional[str] = None
+    likelihood_pct: Optional[float] = None
+    verified_link: bool = False
+
+
+@router.post("/experiment/event-attributed")
+async def record_sdr_event_attributed(event: SDREventAttributed):
+    """Record an SDR touch event with full attribution tags."""
+    global SDR_EXPERIMENT_STATE
+    
+    now = datetime.utcnow()
+    
+    if event.variant not in SDR_EXPERIMENT_STATE["variants"]:
+        raise HTTPException(status_code=400, detail=f"Invalid variant: {event.variant}")
+    
+    if SDR_EXPERIMENT_STATE["status"] == "pending":
+        SDR_EXPERIMENT_STATE["status"] = "running"
+        SDR_EXPERIMENT_STATE["started_at"] = now.isoformat() + "Z"
+    
+    variant_data = SDR_EXPERIMENT_STATE["variants"][event.variant]
+    variant_data["touches"] += 1
+    SDR_EXPERIMENT_STATE["touches_by_step"][event.step] = SDR_EXPERIMENT_STATE["touches_by_step"].get(event.step, 0) + 1
+    
+    if event.reply_received:
+        variant_data["replies"] += 1
+        SDR_EXPERIMENT_STATE["total_replies"] += 1
+    
+    if event.meeting_booked:
+        variant_data["meetings_booked"] += 1
+        SDR_EXPERIMENT_STATE["total_meetings_booked"] += 1
+    
+    if event.verified_link:
+        SDR_EXPERIMENT_STATE["total_providers_contacted"] += 1
+    
+    return {
+        "status": "recorded",
+        "experiment_id": event.experiment_id,
+        "variant": event.variant,
+        "step": event.step,
+        "provider_id": event.provider_id,
+        "meeting_booked": event.meeting_booked,
+        "reply_received": event.reply_received,
+        "verified_link": event.verified_link,
+        "timestamp_utc": now.isoformat() + "Z",
+        "totals": {
+            "variant_touches": variant_data["touches"],
+            "variant_meetings": variant_data["meetings_booked"],
+            "total_touches": sum(v["touches"] for v in SDR_EXPERIMENT_STATE["variants"].values()),
+            "total_meetings": SDR_EXPERIMENT_STATE["total_meetings_booked"]
+        }
+    }
+
+
+@router.get("/sdr/status")
+async def get_sdr_experiment_status():
+    """Get SDR experiment status and metrics."""
+    now = datetime.utcnow()
+    
+    variant_a = SDR_EXPERIMENT_STATE["variants"]["A"]
+    variant_b = SDR_EXPERIMENT_STATE["variants"]["B"]
+    
+    a_meeting_rate = (variant_a["meetings_booked"] / variant_a["touches"] * 100) if variant_a["touches"] > 0 else 0
+    b_meeting_rate = (variant_b["meetings_booked"] / variant_b["touches"] * 100) if variant_b["touches"] > 0 else 0
+    
+    a_reply_rate = (variant_a["replies"] / variant_a["touches"] * 100) if variant_a["touches"] > 0 else 0
+    b_reply_rate = (variant_b["replies"] / variant_b["touches"] * 100) if variant_b["touches"] > 0 else 0
+    
+    return {
+        "timestamp_utc": now.isoformat() + "Z",
+        "experiment_id": SDR_EXPERIMENT_STATE["experiment_id"],
+        "status": SDR_EXPERIMENT_STATE["status"],
+        "started_at": SDR_EXPERIMENT_STATE["started_at"],
+        "variants": {
+            "A": {
+                "name": variant_a["name"],
+                "headline": variant_a["headline"],
+                "touches": variant_a["touches"],
+                "replies": variant_a["replies"],
+                "reply_rate_pct": round(a_reply_rate, 2),
+                "meetings_booked": variant_a["meetings_booked"],
+                "meeting_rate_pct": round(a_meeting_rate, 2)
+            },
+            "B": {
+                "name": variant_b["name"],
+                "headline": variant_b["headline"],
+                "touches": variant_b["touches"],
+                "replies": variant_b["replies"],
+                "reply_rate_pct": round(b_reply_rate, 2),
+                "meetings_booked": variant_b["meetings_booked"],
+                "meeting_rate_pct": round(b_meeting_rate, 2)
+            }
+        },
+        "totals": {
+            "providers_contacted": SDR_EXPERIMENT_STATE["total_providers_contacted"],
+            "total_touches": sum(v["touches"] for v in SDR_EXPERIMENT_STATE["variants"].values()),
+            "total_replies": SDR_EXPERIMENT_STATE["total_replies"],
+            "total_meetings_booked": SDR_EXPERIMENT_STATE["total_meetings_booked"]
+        },
+        "touches_by_step": SDR_EXPERIMENT_STATE["touches_by_step"],
+        "daily_targets": SDR_EXPERIMENT_STATE["daily_targets"]
+    }
+
+
+@router.post("/gmv-cap/raise")
+async def raise_gmv_cap():
+    """Raise GMV cap to $250k with 12-hour deploy freeze."""
+    global GMV_CAP_STATE
+    
+    now = datetime.utcnow()
+    
+    GMV_CAP_STATE["previous_cap_usd"] = 100000
+    GMV_CAP_STATE["current_cap_usd"] = 250000
+    GMV_CAP_STATE["raised_at"] = now.isoformat() + "Z"
+    GMV_CAP_STATE["deploy_freeze_until"] = (now + timedelta(hours=12)).isoformat() + "Z"
+    
+    return {
+        "status": "GMV_CAP_RAISED",
+        "timestamp_utc": now.isoformat() + "Z",
+        "previous_cap_usd": 100000,
+        "new_cap_usd": 250000,
+        "soft_throttle_pct": 80,
+        "soft_throttle_trigger_usd": 200000,
+        "deploy_freeze": {
+            "active": True,
+            "until": GMV_CAP_STATE["deploy_freeze_until"],
+            "hours": 12
+        },
+        "guardrails": "unchanged"
+    }
+
+
+@router.get("/gmv-cap/status")
+async def get_gmv_cap_status():
+    """Get current GMV cap status and utilization."""
+    now = datetime.utcnow()
+    
+    utilization_pct = (GMV_CAP_STATE["utilized_usd"] / GMV_CAP_STATE["current_cap_usd"] * 100) if GMV_CAP_STATE["current_cap_usd"] > 0 else 0
+    GMV_CAP_STATE["utilization_pct"] = round(utilization_pct, 2)
+    
+    soft_throttle_trigger = GMV_CAP_STATE["current_cap_usd"] * (GMV_CAP_STATE["soft_throttle_pct"] / 100)
+    throttle_active = GMV_CAP_STATE["utilized_usd"] >= soft_throttle_trigger
+    
+    deploy_freeze_active = False
+    deploy_freeze_remaining_hours = 0
+    if GMV_CAP_STATE["deploy_freeze_until"]:
+        until = datetime.fromisoformat(GMV_CAP_STATE["deploy_freeze_until"].replace("Z", "+00:00"))
+        remaining = (until - now.replace(tzinfo=until.tzinfo)).total_seconds() / 3600
+        if remaining > 0:
+            deploy_freeze_active = True
+            deploy_freeze_remaining_hours = round(remaining, 1)
+    
+    return {
+        "timestamp_utc": now.isoformat() + "Z",
+        "current_cap_usd": GMV_CAP_STATE["current_cap_usd"],
+        "utilized_usd": GMV_CAP_STATE["utilized_usd"],
+        "utilization_pct": GMV_CAP_STATE["utilization_pct"],
+        "soft_throttle": {
+            "threshold_pct": GMV_CAP_STATE["soft_throttle_pct"],
+            "trigger_usd": soft_throttle_trigger,
+            "active": throttle_active
+        },
+        "deploy_freeze": {
+            "active": deploy_freeze_active,
+            "until": GMV_CAP_STATE["deploy_freeze_until"],
+            "hours_remaining": deploy_freeze_remaining_hours
+        },
+        "raised_at": GMV_CAP_STATE["raised_at"]
+    }
+
+
+@router.post("/sitemap/submit")
+async def submit_sitemap():
+    """Submit sitemap to Search Console."""
+    global SITEMAP_STATE
+    
+    now = datetime.utcnow()
+    
+    SITEMAP_STATE["submitted_at"] = now.isoformat() + "Z"
+    SITEMAP_STATE["status"] = "submitted"
+    SITEMAP_STATE["pages_submitted"] = 50
+    SITEMAP_STATE["last_check"] = now.isoformat() + "Z"
+    
+    return {
+        "status": "SITEMAP_SUBMITTED",
+        "timestamp_utc": now.isoformat() + "Z",
+        "pages_submitted": 50,
+        "next_check": (now + timedelta(minutes=30)).isoformat() + "Z",
+        "actions": [
+            "Sitemap submitted to Search Console",
+            "T+30 check scheduled",
+            "If Pending: resubmit and fetch as Google",
+            "If Crawled-not-indexed: add internal links from top nav and APM hub"
+        ]
+    }
+
+
+@router.get("/sitemap/status")
+async def get_sitemap_status():
+    """Get sitemap indexation status with T+30 check."""
+    now = datetime.utcnow()
+    
+    next_check_due = False
+    if SITEMAP_STATE["submitted_at"]:
+        submitted = datetime.fromisoformat(SITEMAP_STATE["submitted_at"].replace("Z", "+00:00"))
+        elapsed_min = (now.replace(tzinfo=submitted.tzinfo) - submitted).total_seconds() / 60
+        if elapsed_min >= 30:
+            next_check_due = True
+    
+    return {
+        "timestamp_utc": now.isoformat() + "Z",
+        "status": SITEMAP_STATE["status"],
+        "submitted_at": SITEMAP_STATE["submitted_at"],
+        "pages_submitted": SITEMAP_STATE["pages_submitted"],
+        "pages_indexed": SITEMAP_STATE["pages_indexed"],
+        "last_check": SITEMAP_STATE["last_check"],
+        "t30_check_due": next_check_due,
+        "remediation_actions": {
+            "if_pending": "Resubmit and fetch as Google",
+            "if_crawled_not_indexed": "Add internal links from top nav and APM hub"
+        }
+    }
+
+
+@router.post("/sitemap/check")
+async def check_sitemap(status: str, pages_indexed: int = 0):
+    """Record sitemap check result (pending, indexed, crawled_not_indexed)."""
+    global SITEMAP_STATE
+    
+    now = datetime.utcnow()
+    
+    valid_statuses = ["pending", "indexed", "crawled_not_indexed"]
+    if status not in valid_statuses:
+        raise HTTPException(status_code=400, detail=f"Invalid status. Must be one of: {valid_statuses}")
+    
+    SITEMAP_STATE["status"] = status
+    SITEMAP_STATE["pages_indexed"] = pages_indexed
+    SITEMAP_STATE["last_check"] = now.isoformat() + "Z"
+    
+    remediation = None
+    if status == "pending":
+        remediation = "Resubmit sitemap and trigger fetch as Google"
+    elif status == "crawled_not_indexed":
+        remediation = "Add internal links from top nav and APM hub to prioritize indexation"
+    
+    return {
+        "status": "CHECK_RECORDED",
+        "sitemap_status": status,
+        "pages_indexed": pages_indexed,
+        "timestamp_utc": now.isoformat() + "Z",
+        "remediation_required": status != "indexed",
+        "remediation_action": remediation
+    }
+
+
+@router.get("/dashboard/provider-activation-funnel")
+async def get_provider_activation_funnel():
+    """Get Provider Activation Funnel tile for dashboard."""
+    now = datetime.utcnow()
+    
+    return {
+        "timestamp_utc": now.isoformat() + "Z",
+        "tile": "Provider Activation Funnel",
+        "stages": {
+            "signup": {
+                "count": 0,
+                "conversion_to_next_pct": 100.0
+            },
+            "account_link_started": {
+                "count": 0,
+                "conversion_to_next_pct": 100.0
+            },
+            "account_link_success": {
+                "count": 0,
+                "success_rate_pct": PROVIDER_DASHBOARD_STATE["account_link_success_pct"]
+            },
+            "payouts_enabled": {
+                "count": 0,
+                "median_time_min": PROVIDER_DASHBOARD_STATE["median_register_to_payouts_min"]
+            },
+            "first_payout": {
+                "count": 0,
+                "median_time_to_first_payout_min": None
+            }
+        },
+        "targets": {
+            "account_link_success_min_pct": 99.5,
+            "median_register_to_payouts_max_min": 3.0,
+            "zero_disputes": True
+        }
+    }
+
+
+@router.get("/dashboard/gmv-forecast-vs-cap")
+async def get_gmv_forecast_vs_cap():
+    """Get GMV forecast vs cap tile for dashboard."""
+    now = datetime.utcnow()
+    
+    current_gmv = GMV_CAP_STATE["utilized_usd"]
+    current_cap = GMV_CAP_STATE["current_cap_usd"]
+    utilization_pct = (current_gmv / current_cap * 100) if current_cap > 0 else 0
+    
+    hours_elapsed = 1
+    if GMV_CAP_STATE["raised_at"]:
+        raised = datetime.fromisoformat(GMV_CAP_STATE["raised_at"].replace("Z", "+00:00"))
+        hours_elapsed = max(1, (now.replace(tzinfo=raised.tzinfo) - raised).total_seconds() / 3600)
+    
+    hourly_rate = current_gmv / hours_elapsed
+    forecast_24h = hourly_rate * 24
+    
+    return {
+        "timestamp_utc": now.isoformat() + "Z",
+        "tile": "GMV Forecast vs Cap",
+        "current": {
+            "gmv_usd": current_gmv,
+            "cap_usd": current_cap,
+            "utilization_pct": round(utilization_pct, 2),
+            "fee_accrued_3pct_usd": round(current_gmv * 0.03, 2)
+        },
+        "forecast": {
+            "hourly_rate_usd": round(hourly_rate, 2),
+            "forecast_24h_usd": round(forecast_24h, 2),
+            "forecast_vs_cap_pct": round((forecast_24h / current_cap * 100), 2) if current_cap > 0 else 0
+        },
+        "soft_throttle": {
+            "threshold_usd": current_cap * 0.8,
+            "active": current_gmv >= (current_cap * 0.8),
+            "headroom_usd": max(0, (current_cap * 0.8) - current_gmv)
         }
     }
