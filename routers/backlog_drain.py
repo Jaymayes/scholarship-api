@@ -361,6 +361,22 @@ async def get_ledger_csv():
     return PlainTextResponse(content=csv_content, media_type="text/csv")
 
 
+@router.get("/gmv-cap/status")
+async def get_gmv_cap_status():
+    """Get current GMV cap status and utilization."""
+    return {
+        "global_10m_gmv_cap": drain_service.global_10m_gmv_cap,
+        "global_10m_gmv_current": round(drain_service.window_gmv_recovered, 2),
+        "global_10m_gmv_utilization_pct": round(drain_service.global_10m_gmv_utilization_pct, 2),
+        "pre_throttle_threshold_pct": 80,
+        "resume_threshold_pct": 60,
+        "provider_hourly_gmv_cap": drain_service.provider_hourly_gmv_cap,
+        "provider_hourly_cap_hit_count": drain_service.provider_hourly_cap_hit_count,
+        "provider_concentration_cap_pct": drain_service.provider_concentration_cap_pct,
+        "top_provider_concentration": drain_service.get_top_provider_concentration()
+    }
+
+
 @router.get("/00-00z-snapshot")
 async def get_cfo_snapshot():
     """
