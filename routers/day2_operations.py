@@ -565,3 +565,278 @@ async def get_t60_review_package():
         "requires_ceo_approval": True,
         "next_action": "Page CEO for approval" if all_conditions_met else "Hold at current cap"
     }
+
+
+SENTINEL_STATE = {
+    "container_rss": {
+        "baseline_mb": None,
+        "current_mb": None,
+        "drift_pct": 0.0,
+        "last_check": None,
+        "alert_threshold_pct": 10,
+        "window_min": 60,
+        "status": "GREEN"
+    },
+    "stripe_rate_limit": {
+        "remaining_pct": 100.0,
+        "warn_threshold_pct": 20,
+        "last_check": None,
+        "status": "GREEN"
+    }
+}
+
+
+@router.get("/sentinels/status")
+async def get_sentinel_status():
+    """Get Day-2 sentinel status for container and Stripe monitoring."""
+    import psutil
+    
+    now = datetime.utcnow()
+    process = psutil.Process()
+    current_rss_mb = process.memory_info().rss / (1024 * 1024)
+    
+    if SENTINEL_STATE["container_rss"]["baseline_mb"] is None:
+        SENTINEL_STATE["container_rss"]["baseline_mb"] = current_rss_mb
+    
+    SENTINEL_STATE["container_rss"]["current_mb"] = round(current_rss_mb, 1)
+    baseline = SENTINEL_STATE["container_rss"]["baseline_mb"]
+    drift = ((current_rss_mb - baseline) / baseline * 100) if baseline > 0 else 0
+    SENTINEL_STATE["container_rss"]["drift_pct"] = round(drift, 2)
+    SENTINEL_STATE["container_rss"]["last_check"] = now.isoformat() + "Z"
+    
+    if drift > SENTINEL_STATE["container_rss"]["alert_threshold_pct"]:
+        SENTINEL_STATE["container_rss"]["status"] = "PAGE"
+    else:
+        SENTINEL_STATE["container_rss"]["status"] = "GREEN"
+    
+    stripe_remaining = SENTINEL_STATE["stripe_rate_limit"]["remaining_pct"]
+    if stripe_remaining < SENTINEL_STATE["stripe_rate_limit"]["warn_threshold_pct"]:
+        SENTINEL_STATE["stripe_rate_limit"]["status"] = "WARN"
+    else:
+        SENTINEL_STATE["stripe_rate_limit"]["status"] = "GREEN"
+    SENTINEL_STATE["stripe_rate_limit"]["last_check"] = now.isoformat() + "Z"
+    
+    alerts = []
+    if SENTINEL_STATE["container_rss"]["status"] == "PAGE":
+        alerts.append({
+            "sentinel": "container_rss",
+            "severity": "PAGE",
+            "message": f"Container RSS drift {SENTINEL_STATE['container_rss']['drift_pct']}% exceeds {SENTINEL_STATE['container_rss']['alert_threshold_pct']}% threshold",
+            "action": "Page CEO immediately"
+        })
+    
+    if SENTINEL_STATE["stripe_rate_limit"]["status"] == "WARN":
+        alerts.append({
+            "sentinel": "stripe_rate_limit",
+            "severity": "WARN",
+            "message": f"Stripe rate-limit remaining {stripe_remaining}% below {SENTINEL_STATE['stripe_rate_limit']['warn_threshold_pct']}% threshold",
+            "action": "Monitor closely; prepare rate-limit mitigation"
+        })
+    
+    overall_status = "GREEN"
+    if any(a["severity"] == "PAGE" for a in alerts):
+        overall_status = "PAGE"
+    elif any(a["severity"] == "WARN" for a in alerts):
+        overall_status = "WARN"
+    
+    return {
+        "timestamp_utc": now.isoformat() + "Z",
+        "overall_status": overall_status,
+        "sentinels": {
+            "container_rss": {
+                "baseline_mb": round(SENTINEL_STATE["container_rss"]["baseline_mb"], 1),
+                "current_mb": SENTINEL_STATE["container_rss"]["current_mb"],
+                "drift_pct": SENTINEL_STATE["container_rss"]["drift_pct"],
+                "threshold_pct": SENTINEL_STATE["container_rss"]["alert_threshold_pct"],
+                "window_min": SENTINEL_STATE["container_rss"]["window_min"],
+                "status": SENTINEL_STATE["container_rss"]["status"]
+            },
+            "stripe_rate_limit": {
+                "remaining_pct": SENTINEL_STATE["stripe_rate_limit"]["remaining_pct"],
+                "warn_threshold_pct": SENTINEL_STATE["stripe_rate_limit"]["warn_threshold_pct"],
+                "status": SENTINEL_STATE["stripe_rate_limit"]["status"]
+            }
+        },
+        "alerts": alerts,
+        "alert_count": len(alerts)
+    }
+
+
+@router.post("/sentinels/stripe-rate-limit")
+async def update_stripe_rate_limit(remaining_pct: float):
+    """Update Stripe rate-limit remaining percentage."""
+    global SENTINEL_STATE
+    
+    now = datetime.utcnow()
+    SENTINEL_STATE["stripe_rate_limit"]["remaining_pct"] = remaining_pct
+    SENTINEL_STATE["stripe_rate_limit"]["last_check"] = now.isoformat() + "Z"
+    
+    if remaining_pct < SENTINEL_STATE["stripe_rate_limit"]["warn_threshold_pct"]:
+        SENTINEL_STATE["stripe_rate_limit"]["status"] = "WARN"
+    else:
+        SENTINEL_STATE["stripe_rate_limit"]["status"] = "GREEN"
+    
+    return {
+        "status": "updated",
+        "remaining_pct": remaining_pct,
+        "sentinel_status": SENTINEL_STATE["stripe_rate_limit"]["status"],
+        "timestamp_utc": now.isoformat() + "Z"
+    }
+
+
+@router.get("/dashboard/tiles")
+async def get_dashboard_tiles():
+    """Get all dashboard tiles for Day-2 monitoring."""
+    now = datetime.utcnow()
+    
+    ab_status = AB_TEST_STATE
+    variant_a = ab_status["variants"]["A"]
+    variant_b = ab_status["variants"]["B"]
+    
+    a_signups = variant_a["signups"]
+    b_signups = variant_b["signups"]
+    a_cvr = (variant_a["verified_links"] / a_signups * 100) if a_signups > 0 else 0
+    b_cvr = (variant_b["verified_links"] / b_signups * 100) if b_signups > 0 else 0
+    
+    total_verified = variant_a["verified_links"] + variant_b["verified_links"]
+    sample_size = a_signups + b_signups
+    
+    confidence = 0.0
+    if sample_size >= 100 and a_cvr != b_cvr:
+        import math
+        se = math.sqrt((a_cvr * (100 - a_cvr) / max(a_signups, 1)) + (b_cvr * (100 - b_cvr) / max(b_signups, 1)))
+        z = abs(a_cvr - b_cvr) / max(se, 0.001)
+        confidence = min(99.9, 50 + 25 * z) if z > 0 else 0
+    
+    actual_rate = PROVIDER_DASHBOARD_STATE["providers_onboarded_hour"]
+    baseline = PROVIDER_DASHBOARD_STATE["baseline_onboarded_hour"]
+    uplift = ((actual_rate - baseline) / baseline * 100) if baseline > 0 else 0
+    
+    return {
+        "timestamp_utc": now.isoformat() + "Z",
+        "tiles": {
+            "providers_onboarded_hour": {
+                "value": actual_rate,
+                "baseline": baseline,
+                "uplift_pct": round(uplift, 1),
+                "target_pct": 10,
+                "status": "MET" if uplift >= 10 else "MISS",
+                "topline": True
+            },
+            "signup_cvr_by_variant": {
+                "variant_a": {
+                    "name": variant_a["name"],
+                    "cvr_pct": round(a_cvr, 2),
+                    "sample_size": a_signups
+                },
+                "variant_b": {
+                    "name": variant_b["name"],
+                    "cvr_pct": round(b_cvr, 2),
+                    "sample_size": b_signups
+                },
+                "confidence_pct": round(confidence, 1),
+                "total_verified_links": total_verified,
+                "target_verified_links": 300
+            },
+            "account_link_success": {
+                "value_pct": PROVIDER_DASHBOARD_STATE["account_link_success_pct"],
+                "target_pct": 99.5,
+                "status": "MET" if PROVIDER_DASHBOARD_STATE["account_link_success_pct"] >= 99.5 else "MISS"
+            },
+            "median_register_to_payouts": {
+                "value_min": PROVIDER_DASHBOARD_STATE["median_register_to_payouts_min"],
+                "target_max_min": 3.0,
+                "status": "MET" if PROVIDER_DASHBOARD_STATE["median_register_to_payouts_min"] <= 3.0 else "MISS"
+            },
+            "endpoint_p95s": {
+                "endpoints": PROVIDER_DASHBOARD_STATE["endpoint_p95s"],
+                "threshold_ms": 350,
+                "all_under_threshold": all(v <= 350 for v in PROVIDER_DASHBOARD_STATE["endpoint_p95s"].values())
+            },
+            "stripe_probe_success": {
+                "value_pct": PROVIDER_DASHBOARD_STATE["stripe_probe_success_pct"],
+                "target_pct": 99.5,
+                "status": "MET" if PROVIDER_DASHBOARD_STATE["stripe_probe_success_pct"] >= 99.5 else "MISS"
+            },
+            "ledger_parity": {
+                "status": PROVIDER_DASHBOARD_STATE["ledger_parity_status"],
+                "exceptions": PROVIDER_DASHBOARD_STATE["reconciliation_exceptions"]
+            },
+            "gmv_and_fees": {
+                "gmv_processed_usd": PROVIDER_DASHBOARD_STATE["gmv_processed"],
+                "fee_accrued_3pct_usd": PROVIDER_DASHBOARD_STATE["fee_accrued_3pct"]
+            }
+        },
+        "attribution_tags": ["source", "experiment_id", "variant", "verified_link", "time_to_payouts_enabled"]
+    }
+
+
+@router.get("/eod-note")
+async def get_eod_note():
+    """Generate EOD note with A/B sample size, uplift, alerts, and SDR activity."""
+    now = datetime.utcnow()
+    
+    ab_status = AB_TEST_STATE
+    variant_a = ab_status["variants"]["A"]
+    variant_b = ab_status["variants"]["B"]
+    
+    a_cvr = (variant_a["verified_links"] / variant_a["signups"] * 100) if variant_a["signups"] > 0 else 0
+    b_cvr = (variant_b["verified_links"] / variant_b["signups"] * 100) if variant_b["signups"] > 0 else 0
+    
+    total_signups = variant_a["signups"] + variant_b["signups"]
+    total_verified = variant_a["verified_links"] + variant_b["verified_links"]
+    
+    leading_variant = "A" if a_cvr >= b_cvr else "B"
+    leading_cvr = max(a_cvr, b_cvr)
+    trailing_cvr = min(a_cvr, b_cvr)
+    interim_uplift = ((leading_cvr - trailing_cvr) / trailing_cvr * 100) if trailing_cvr > 0 else 0
+    
+    alerts_today = []
+    for path, monitor in SYNTHETIC_MONITORS.items():
+        if monitor["consecutive_failures"] > 0:
+            alerts_today.append({
+                "type": "latency_breach",
+                "endpoint": path,
+                "consecutive_failures": monitor["consecutive_failures"]
+            })
+    
+    return {
+        "report_type": "EOD Note",
+        "date": now.strftime("%Y-%m-%d"),
+        "timestamp_utc": now.isoformat() + "Z",
+        "ab_test": {
+            "experiment_id": ab_status["experiment_id"],
+            "status": ab_status["status"],
+            "sample_size": {
+                "total_signups": total_signups,
+                "variant_a_signups": variant_a["signups"],
+                "variant_b_signups": variant_b["signups"],
+                "total_verified_links": total_verified,
+                "target": 300,
+                "completion_pct": round(total_verified / 300 * 100, 1)
+            },
+            "interim_results": {
+                "leading_variant": leading_variant,
+                "variant_a_cvr": round(a_cvr, 2),
+                "variant_b_cvr": round(b_cvr, 2),
+                "interim_uplift_pct": round(interim_uplift, 1),
+                "confidence_status": "Insufficient sample" if total_verified < 50 else "Building" if total_verified < 200 else "Near threshold"
+            },
+            "winner": ab_status["winner"]
+        },
+        "alerts_today": {
+            "count": len(alerts_today),
+            "details": alerts_today
+        },
+        "sdr_activity": {
+            "waitlist_sequence": "LAUNCHED",
+            "top_100_targets": "QUEUED",
+            "responses_today": 0,
+            "meetings_booked": 0
+        },
+        "auto_page_maker": {
+            "pages_generated": 0,
+            "target_eod_plus_1": 50,
+            "sitemap_submitted": False
+        }
+    }
