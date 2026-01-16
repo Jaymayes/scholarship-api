@@ -1,0 +1,53 @@
+Acknowledged. Green + Soak bundle is VERIFIED and accepted.
+
+Orders: proceed to the next two milestones on schedule.
+
+09:35Z — Contract Integrity Report (deliver exactly)
+
+Builds and scope
+stable_build_id (A6) and candidate_build_id (A6) + digests
+A3 orchestration build_id that exercised the contracts
+CDC test matrix (must attach evidence_hash and CI job links)
+Endpoints: /provider/register, /provider/onboard, /provider/status, /provider/account-link, /provider/webhooks/stripe
+Request/response schema diffs: body, headers, enums, date/time formats, idempotency semantics
+Status code map: 2xx, 4xx (throttles, validation, idempotency replay), 5xx (none expected)
+Error shape invariants: code, message, details[], correlation_id
+Negative tests: invalid idempotency_key, duplicate transaction_id, revoked provider capability, webhook signature mismatch
+Limits and timeouts: per-endpoint latency P95 and hard timeouts; rate-limit headers present and documented
+Security/PII: no PII in logs; COPPA/FERPA flags preserved; canonical redaction patterns applied
+Stripe integration stubs vs live probes alignment; webhook idempotency guarantees verified
+Results rubric (must be GREEN to pass)
+Schema drift: NONE
+Status code drift: NONE
+Error-shape drift: NONE
+Latency and rate-limit behavior: within guardrails
+Evidence: event_id + evidence_hash for the CI suite and artifacts
+09:45Z — Final Pre‑Canary Checklist (all must be TRUE; attach event_id + evidence_hash)
+
+Health: P95 <1.25s; error <0.5%; reserves ≥15%; backlog <10; DLQ = 0
+Stripe live probes ≥99.5%: create_account, account_links, payouts (last 50)
+Budget <80%; compute ≤2x baseline
+Breaker = CLOSED; canonical_ledger_hash present
+Risk governors ARMED: global GMV cap ($100k, 80% pre‑throttle), provider hourly ($10k hold+page), concentration (>25% hold+page)
+Rollback readiness: rollback_build_id + digest; health probe PASS; warm cache READY
+Allowlist: org_ids/emails/acct_ids for 1% internal/pilot cohort validated
+10:05Z — Gate 3 execution plan (authorized if both above PASS)
+
+Step 1 canary: 1% allowlist for 10 min
+Budget cap: $500
+Evidence heartbeat every 60s: p95, error, backlog, dlq, reserves, budget, compute, stripe_success, breaker_state, evidence_hash
+Auto‑halt/rollback (any for 60s unless immediate noted):
+P95 ≥1.5s or error ≥1.0%
+backlog >30 (immediate), DLQ >0 (immediate)
+Stripe success <99.5% (last 50)
+Budget ≥80% or compute >2x baseline
+Schema/telemetry violation (non‑anchored packet) (immediate)
+If Step 1 PASS: escalate 5% → 25% → 100% (10 min each), same gates
+External comms: SILENT until Step 3 (25%) passes; then prepare “All‑clear” draft but hold for CEO approval
+Rollback: single‑click revert to rollback_build_id; breaker remains CLOSED; revert CTAs to hidden
+Pages I expect
+
+09:35Z Contract Integrity Report: event_id + evidence_hash, GREEN summary
+09:45Z Pre‑Canary Checklist: recommendation = GO, event_id + evidence_hash
+10:05Z Gate 3 decision + Step‑1 start (or HOLD with reason and action)
+Proceed.
