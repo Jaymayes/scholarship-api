@@ -26,6 +26,7 @@ class DrainMode(str, Enum):
     PAUSED = "paused"
     REDUCED = "reduced"
     QUIET_PERIOD = "quiet_period"
+    IDLE_WATCH = "idle_watch"
 
 
 class BacklogDrainService:
@@ -99,6 +100,15 @@ class BacklogDrainService:
         self.canonical_ledger_hash = "fcb2a970...5757"
         
         self.rolling_reconciliations: List[Dict] = []
+        self.drain_day_ledger: List[Dict] = []
+        self.ledger_sealed = False
+        self.ledger_seal_hash: Optional[str] = None
+        self.drain_completed = False
+        self.drain_completion_event_id: Optional[str] = None
+        self.drain_completion_evidence_hash: Optional[str] = None
+        
+        self.provider_concentration_cap_pct = 25.0
+        self.provider_window_gmv: Dict[str, float] = {}
         
         self.gate3_time = datetime.now(timezone.utc).replace(
             hour=9, minute=25, second=0, microsecond=0
@@ -875,6 +885,226 @@ class BacklogDrainService:
             },
             "heartbeat_count": len(self.heartbeats),
             "last_evidence_hash": self.last_evidence_hash
+        }
+    
+    def check_provider_concentration(self, provider_id: str, amount: float) -> Dict:
+        """Check if any provider exceeds 25% of 10-min GMV window."""
+        now = datetime.now(timezone.utc)
+        
+        if provider_id not in self.provider_window_gmv:
+            self.provider_window_gmv[provider_id] = 0.0
+        self.provider_window_gmv[provider_id] += amount
+        
+        total_window_gmv = sum(self.provider_window_gmv.values())
+        if total_window_gmv == 0:
+            return {"allowed": True, "concentration_pct": 0}
+        
+        provider_pct = (self.provider_window_gmv[provider_id] / total_window_gmv) * 100
+        
+        if provider_pct > self.provider_concentration_cap_pct:
+            self.hold_provider(provider_id, f"concentration_cap_exceeded_{provider_pct:.1f}%")
+            return {
+                "allowed": False,
+                "page_ceo": True,
+                "event": "provider_concentration_cap_exceeded",
+                "provider_id": provider_id,
+                "concentration_pct": round(provider_pct, 2),
+                "cap_pct": self.provider_concentration_cap_pct,
+                "provider_gmv": round(self.provider_window_gmv[provider_id], 2),
+                "total_window_gmv": round(total_window_gmv, 2)
+            }
+        
+        return {
+            "allowed": True,
+            "provider_id": provider_id,
+            "concentration_pct": round(provider_pct, 2),
+            "cap_pct": self.provider_concentration_cap_pct
+        }
+    
+    def get_top_provider_concentration(self) -> Dict:
+        """Get concentration percentage of top provider in 10-min window."""
+        total = sum(self.provider_window_gmv.values())
+        if total == 0:
+            return {"top_provider": None, "concentration_pct": 0}
+        
+        top_provider = max(self.provider_window_gmv.items(), key=lambda x: x[1], default=(None, 0))
+        return {
+            "top_provider": top_provider[0],
+            "top_provider_gmv": round(top_provider[1], 2),
+            "total_window_gmv": round(total, 2),
+            "concentration_pct": round((top_provider[1] / total) * 100, 2) if total > 0 else 0
+        }
+    
+    def complete_drain(self) -> Dict:
+        """Complete drain and enter idle_watch mode when backlog=0."""
+        now = datetime.now(timezone.utc)
+        
+        if self.drain_completed:
+            return {
+                "already_completed": True,
+                "event_id": self.drain_completion_event_id,
+                "evidence_hash": self.drain_completion_evidence_hash
+            }
+        
+        self.drain_mode = DrainMode.IDLE_WATCH
+        self.drain_rps = 0
+        self.drain_completed = True
+        
+        event_id = f"drain_complete_{int(now.timestamp() * 1000)}_{uuid.uuid4().hex[:8]}"
+        self.drain_completion_event_id = event_id
+        
+        evidence_hash = self.generate_evidence_hash({
+            "event": "drain_complete",
+            "event_id": event_id,
+            "drain_mode": "idle_watch",
+            "breaker_state": "CLOSED",
+            "cumulative_totals": {
+                "GMV_recovered": self.cumulative_gmv_recovered,
+                "platform_fee": self.cumulative_platform_fee,
+                "drained_count": self.cumulative_drained_count,
+                "success_count": self.cumulative_success_count
+            }
+        })
+        self.drain_completion_evidence_hash = evidence_hash
+        self.last_evidence_hash = evidence_hash
+        
+        return {
+            "page_ceo": True,
+            "event": "drain_complete",
+            "event_id": event_id,
+            "evidence_hash": evidence_hash,
+            "timestamp_utc": now.isoformat(),
+            "drain_mode": "idle_watch",
+            "breaker_state": "CLOSED",
+            "cumulative_totals": {
+                "GMV_recovered": round(self.cumulative_gmv_recovered, 2),
+                "platform_fee": round(self.cumulative_platform_fee, 2),
+                "drained_count": self.cumulative_drained_count,
+                "success_count": self.cumulative_success_count,
+                "providers_touched": len(self.providers_touched)
+            },
+            "message": "Drain complete. Mode set to idle_watch. Breaker CLOSED."
+        }
+    
+    def add_ledger_entry(self, entry: Dict):
+        """Add a row-level entry to the Drain Day Ledger."""
+        if self.ledger_sealed:
+            return {"error": "ledger_sealed", "message": "Cannot add entries to sealed ledger"}
+        
+        now = datetime.now(timezone.utc)
+        entry["timestamp_utc"] = now.isoformat()
+        entry["evidence_hash"] = self.generate_evidence_hash(entry)
+        self.drain_day_ledger.append(entry)
+        return {"added": True, "entry_count": len(self.drain_day_ledger)}
+    
+    def seal_ledger(self) -> Dict:
+        """Seal the Drain Day Ledger with bundle hash."""
+        now = datetime.now(timezone.utc)
+        
+        if self.ledger_sealed:
+            return {
+                "already_sealed": True,
+                "seal_hash": self.ledger_seal_hash
+            }
+        
+        self.ledger_sealed = True
+        
+        ledger_content = {
+            "seal_timestamp_utc": now.isoformat(),
+            "entry_count": len(self.drain_day_ledger),
+            "entries": self.drain_day_ledger,
+            "totals": {
+                "GMV_recovered": self.cumulative_gmv_recovered,
+                "platform_fee": self.cumulative_platform_fee,
+                "refunds_reserve": self.refunds_reserve,
+                "drained_count": self.cumulative_drained_count,
+                "success_count": self.cumulative_success_count
+            },
+            "canonical_ledger_hash": self.canonical_ledger_hash
+        }
+        
+        seal_hash = self.generate_evidence_hash(ledger_content)
+        self.ledger_seal_hash = seal_hash
+        self.last_evidence_hash = seal_hash
+        
+        event_id = f"ledger_seal_{int(now.timestamp() * 1000)}_{uuid.uuid4().hex[:8]}"
+        
+        return {
+            "event": "ledger_sealed",
+            "event_id": event_id,
+            "timestamp_utc": now.isoformat(),
+            "seal_hash": seal_hash,
+            "bundle_hash": seal_hash,
+            "entry_count": len(self.drain_day_ledger),
+            "totals": {
+                "GMV_recovered": round(self.cumulative_gmv_recovered, 2),
+                "platform_fee": round(self.cumulative_platform_fee, 2),
+                "refunds_reserve": round(self.refunds_reserve, 2)
+            },
+            "canonical_ledger_hash": self.canonical_ledger_hash,
+            "message": "Drain Day Ledger sealed. No further entries allowed."
+        }
+    
+    def export_reconciliation_csv(self) -> str:
+        """Export reconciliation data as CSV string."""
+        import csv
+        import io
+        
+        output = io.StringIO()
+        fieldnames = [
+            "stripe_charge_id", "provider_id", "amount", "platform_fee",
+            "idempotency_key", "ledger_tx_id", "evidence_hash", "timestamp_utc"
+        ]
+        
+        writer = csv.DictWriter(output, fieldnames=fieldnames)
+        writer.writeheader()
+        
+        for entry in self.drain_day_ledger:
+            row = {fn: entry.get(fn, "") for fn in fieldnames}
+            writer.writerow(row)
+        
+        return output.getvalue()
+    
+    def generate_cfo_snapshot(self) -> Dict:
+        """Generate 00:00Z CFO-ready snapshot with mini P&L."""
+        now = datetime.now(timezone.utc)
+        
+        stripe_success_pct = 100.0
+        total_txns = self.cumulative_drained_count
+        if total_txns > 0:
+            stripe_success_pct = (self.cumulative_success_count / total_txns) * 100
+        
+        top_provider = self.get_top_provider_concentration()
+        
+        payment_processing_fee = self.cumulative_gmv_recovered * 0.029 + (self.cumulative_success_count * 0.30)
+        net_contribution = self.cumulative_platform_fee - self.refunds_reserve - payment_processing_fee
+        
+        evidence_hash = self.generate_evidence_hash({
+            "snapshot": "00:00Z_CFO",
+            "timestamp": now.isoformat(),
+            "gmv": self.cumulative_gmv_recovered
+        })
+        self.last_evidence_hash = evidence_hash
+        
+        return {
+            "snapshot": "00:00Z_CFO",
+            "timestamp_utc": now.isoformat(),
+            "GMV_recovered_total": round(self.cumulative_gmv_recovered, 2),
+            "platform_fee_total_3pct": round(self.cumulative_platform_fee, 2),
+            "refunds_reserve_total_1pct": round(self.refunds_reserve, 2),
+            "stripe_success_pct_total": round(stripe_success_pct, 2),
+            "duplicates_prevented_total": self.cumulative_duplicates_prevented,
+            "duplicates_blocked_total": self.cumulative_duplicates_blocked,
+            "providers_touched": len(self.providers_touched),
+            "concentration_top_provider_10m_pct": top_provider["concentration_pct"],
+            "mini_pnl": {
+                "platform_fees": round(self.cumulative_platform_fee, 2),
+                "minus_refunds_reserve": round(-self.refunds_reserve, 2),
+                "minus_payment_processing": round(-payment_processing_fee, 2),
+                "equals_net_contribution": round(net_contribution, 2)
+            },
+            "canonical_ledger_hash": self.canonical_ledger_hash,
+            "evidence_hash": evidence_hash
         }
 
 

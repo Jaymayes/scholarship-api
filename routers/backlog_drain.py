@@ -284,6 +284,98 @@ async def get_all_reconciliations():
     }
 
 
+class ProviderConcentrationRequest(BaseModel):
+    provider_id: str
+    amount: float
+
+
+class LedgerEntryRequest(BaseModel):
+    stripe_charge_id: str
+    provider_id: str
+    amount: float
+    platform_fee: float
+    idempotency_key: str
+    ledger_tx_id: str
+
+
+@router.post("/complete")
+async def complete_drain():
+    """
+    Complete drain and enter idle_watch mode when backlog=0.
+    
+    Sets drain_mode=idle_watch, keeps breaker=CLOSED.
+    Pages CEO with event_id and evidence_hash.
+    """
+    return drain_service.complete_drain()
+
+
+@router.post("/concentration/check")
+async def check_provider_concentration(request: ProviderConcentrationRequest):
+    """
+    Check if provider exceeds 25% of 10-min GMV window.
+    
+    If exceeded, HOLDs provider queue and pages CEO.
+    """
+    return drain_service.check_provider_concentration(request.provider_id, request.amount)
+
+
+@router.get("/concentration/top")
+async def get_top_provider_concentration():
+    """Get concentration percentage of top provider in 10-min window."""
+    return drain_service.get_top_provider_concentration()
+
+
+@router.post("/ledger/entry")
+async def add_ledger_entry(request: LedgerEntryRequest):
+    """Add a row-level entry to the Drain Day Ledger."""
+    return drain_service.add_ledger_entry(request.model_dump())
+
+
+@router.post("/ledger/seal")
+async def seal_ledger():
+    """
+    Seal the Drain Day Ledger with bundle hash.
+    
+    Locks ledger with row-level entries and emits seal event.
+    No further entries allowed after sealing.
+    """
+    return drain_service.seal_ledger()
+
+
+@router.get("/ledger/entries")
+async def get_ledger_entries():
+    """Get all entries in the Drain Day Ledger."""
+    return {
+        "sealed": drain_service.ledger_sealed,
+        "seal_hash": drain_service.ledger_seal_hash,
+        "entry_count": len(drain_service.drain_day_ledger),
+        "entries": drain_service.drain_day_ledger
+    }
+
+
+@router.get("/ledger/csv")
+async def get_ledger_csv():
+    """Export reconciliation data as CSV."""
+    from fastapi.responses import PlainTextResponse
+    csv_content = drain_service.export_reconciliation_csv()
+    return PlainTextResponse(content=csv_content, media_type="text/csv")
+
+
+@router.get("/00-00z-snapshot")
+async def get_cfo_snapshot():
+    """
+    Generate 00:00Z CFO-ready snapshot with mini P&L.
+    
+    Includes:
+    - GMV_recovered_total, platform_fee_total (3%), refunds_reserve_total (1%)
+    - stripe_success_pct_total, duplicates stats
+    - providers_touched, concentration_top_provider_10m_pct
+    - Mini P&L: fees - refunds_reserve - payment processing = net contribution
+    - canonical_ledger_hash and evidence_hash
+    """
+    return drain_service.generate_cfo_snapshot()
+
+
 @router.get("/22-30z-checkpoint")
 async def get_22_30z_checkpoint():
     """

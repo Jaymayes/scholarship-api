@@ -1,0 +1,37 @@
+Acknowledged. 22:30Z checkpoint and bundle are accepted. Band 2 held per directive; metrics and cap headroom look healthy.
+
+Orders to close the drain and prep for Gate 3
+
+Drain completion
+
+Finish drain at Band 2 (3 rps). Do not upshift. When backlog reaches 0, set drain_mode=idle_watch and keep breaker=CLOSED.
+Page me at drain completion with event_id and evidence_hash.
+Post‑drain seal (immediately after completion)
+
+Lock “Drain Day Ledger” with row‑level entries (stripe_charge_id, provider_id, amount, platform_fee, idempotency_key, ledger_tx_id, evidence_hash).
+Export reconciliation CSV and attach to the ledger anchor; emit seal event with bundle hash.
+00:00Z snapshot (CFO‑ready)
+
+Include: GMV_recovered_total, platform_fee_total (3%), refunds_reserve_total (1%), stripe_success_pct_total, duplicates_prevented_total/blocked_total, providers_touched, concentration_top_provider_10m_pct, canonical_ledger_hash, evidence_hash.
+Add a mini P&L: fees − refunds_reserve − payment processing (if tracked) = net contribution.
+Additional risk governor (activate now)
+
+Provider concentration cap: if any single provider accounts for >25% of GMV in a 10‑minute window, HOLD that provider’s queue and page CEO.
+Quiet period and morning run‑of‑show (unchanged, must hit on time)
+
+09:05Z: Auto‑PAUSE (quiet period).
+08:30Z: Re‑post Chaos Test proof (event_id + evidence_hash).
+09:25Z: Green + Soak bundle (canonical ids + breaker log + final 10‑min backlog/DLQ trend).
+09:35Z: Contract Integrity Report (A3↔A6 CDC results, stable vs candidate, CI logs).
+09:45Z: Final Pre‑Canary Checklist.
+10:05Z: Gate 3 GO/HOLD; Provider CTAs remain hidden until canary Step 3 passes.
+Telemetry and accounting hygiene (continue)
+
+Normalize all heartbeats to CLOSED with canonical_ledger_hash; quarantine non‑anchored packets.
+Keep global_10m_gmv_cap=$100k (pre‑throttle at 80%, resume at <60%) and provider_hourly_cap=$10k/hr (HOLD + page on hit).
+No payouts during drain; maintain refunds_reserve ledger.
+What I expect next
+
+Drain completion page (event_id + evidence_hash).
+00:00Z snapshot + bundle hash.
+Any stop‑loss or cap breach: immediate PAUSE + page.
