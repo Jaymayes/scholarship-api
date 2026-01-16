@@ -1,0 +1,58 @@
+Acknowledged. Executive GO is recorded.
+
+Orders (execute now)
+
+DevOps Lead: Escalate to Step 2 (5%) immediately.
+Endpoint: POST /oca/canary/protocols/gate3/escalate
+Payload:
+{
+"from_step": 1,
+"to_step": 2,
+"traffic_pct": 5,
+"budget_cap_usd": 2000,
+"evidence_hash": "54683d3d30534a873758293f37134e3d0573c9ee4dfab9bccd8129f21ca59e9b",
+"canary_event_id": "evt_fac4c19d",
+"auto_halt": {
+"p95_ms_hard": 1500,
+"p95_ms_warn": 300,
+"error_rate_pct_hard": 1.0,
+"error_rate_pct_soft": 0.25,
+"backlog_immediate_threshold": 30,
+"dlq_immediate_if_nonzero": true,
+"stripe_success_pct_min": 99.5,
+"budget_pct_hard": 80,
+"compute_ratio_hard": 2.0,
+"breaker_required_state": "CLOSED",
+"schema_or_telemetry_violation_immediate": true
+},
+"business_acceptance_gates": {
+"onboard_success_pct_min": 99.5,
+"time_register_to_payouts_enabled_minutes_median_max": 3,
+"account_link_success_pct_min": 99.5,
+"ledger_reconciliation_delta_cents": 0
+}
+}
+
+Product Lead: During the 10‑minute Step 2 hold, monitor:
+• Provider Onboarding Success Rate ≥ 99.5%
+• Median time register→payouts-enabled ≤ 3 minutes
+• Account-link success ≥ 99.5%
+
+Finance Ops: Verify canonical_ledger_hash continuity (candidate vs stable) during Step 2 and prepare parity attestation for Step 3 gate.
+
+Paging and thresholds
+
+Page CEO immediately on any auto-halt trigger or any reconciliation delta > $0.00.
+Maintain radio silence externally. No comms until Step 3 soak passes and I approve the All‑clear.
+Next gate (pre-authorized conditions)
+
+After 10 minutes at 5%, if the last 3 heartbeats are green and: • P95 ≤ 400 ms • Error rate ≤ 0.25% • DLQ = 0, backlog ≤ 10 • Stripe ≥ 99.5% • Compute ≤ 1.5x • Ledger parity: no deltas then prepare escalate payload to Step 3 with budget_cap_usd = 7500 and start a 15‑minute soak.
+Required Step 2 snapshot (send at T+10 min)
+
+canary_event_id, evidence_hash
+P95, error_rate, backlog, DLQ, compute_ratio, breaker_state
+Stripe probe pass rate (last 50)
+Budget consumed vs $2,000
+Provider funnel KPIs (success rate, time-to-payouts-enabled, account-link success)
+Ledger parity result and current canonical_ledger_hash
+Execute now and confirm escalation ACK with event_id + evidence_hash.
