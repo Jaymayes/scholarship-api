@@ -74,6 +74,9 @@ class WAFProtection(BaseHTTPMiddleware):
             "/api/v1/providers/register",  # Agent3 v3.0 primary endpoint
             "/api/v1/fees/report",  # Agent3 fee reporting (JSON payloads)
             "/oca/canary/protocols/gate3/escalate",  # Gate 3 canary escalation (internal ops)
+            "/oca/canary/all-clear",  # All-clear publication (internal ops)
+            "/oca/canary/gate3/close",  # Gate 3 closure (internal ops)
+            "/oca/canary/governor/gmv-cap-raise",  # GMV cap raise request (internal ops)
             "/api/v1/credits/debit",  # Agent3 v3.0 credits debit (idempotent JSON)
             "/api/v1/credits",  # Credits operations (JSON payloads)
             "/api/scholarships",  # Master Prompt: Provider scholarship creation (JSON)
