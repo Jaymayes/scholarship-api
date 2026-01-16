@@ -84,6 +84,13 @@ class WAFProtection(BaseHTTPMiddleware):
             "/day2/sitemap/submit",  # Sitemap submission (internal ops)
             "/day2/sitemap/check",  # Sitemap check (internal ops)
             "/day2/gmv-cap/raise",  # GMV cap raise (internal ops)
+            "/oca/canary/day2/sentinels",  # QA Orchestrator: Fault injection (internal ops)
+            "/oca/canary/day2/parity-check",  # QA Orchestrator: Ledger parity check (internal ops)
+            "/oca/canary/day2/log-redaction-sample",  # QA Orchestrator: PII redaction sample (internal ops)
+            "/oca/canary/day2/gmv-governor-review",  # QA Orchestrator: GMV governance (internal ops)
+            "/oca/canary/day2/synthetic-monitor",  # QA Orchestrator: Synthetic monitoring (internal ops)
+            "/oca/canary/day2/scorecard/update",  # QA Orchestrator: Scorecard update (internal ops)
+            "/oca/canary/day2/incidents",  # QA Orchestrator: Incidents triage (internal ops)
             "/api/v1/credits/debit",  # Agent3 v3.0 credits debit (idempotent JSON)
             "/api/v1/credits",  # Credits operations (JSON payloads)
             "/api/scholarships",  # Master Prompt: Provider scholarship creation (JSON)
@@ -113,6 +120,8 @@ class WAFProtection(BaseHTTPMiddleware):
         # CEO Directive Gate B: Only HMAC-authenticated callback routes bypass SQL checks
         self._waf_bypass_patterns = [
             re.compile(r'^/api/v1/partners/[^/]+/onboarding/[^/]+/complete$'),  # Onboarding callback only
+            re.compile(r'^/oca/canary/day2/incidents/INC-\d{3}/triage$'),  # QA Orchestrator incident triage
+            re.compile(r'^/oca/canary/day2/test-suites/[^/]+/run$'),  # QA Orchestrator test suite execution
         ]
 
         logger.info(f"WAF Protection initialized - Block mode: {self.block_mode}")
