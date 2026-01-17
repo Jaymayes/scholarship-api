@@ -80,17 +80,37 @@ STATE_MAPPINGS = {
 
 If hybrid search causes significant False Negatives:
 
-1. Route traffic to standard search endpoint:
-   ```python
-   # In routers/search.py
-   USE_HYBRID_SEARCH = False  # Toggle off
-   ```
+### Option 1: Redirect Users to Standard Search
+The standard search endpoint `/api/v1/scholarships/public` does not apply hard filters.
+Update frontend to call standard search instead of hybrid search:
+```javascript
+// Change from:
+const response = await fetch('/api/v1/search/hybrid/public?student_gpa=3.5');
+// To:
+const response = await fetch('/api/v1/scholarships/public?limit=20');
+```
 
-2. Or disable specific hard filters:
-   ```python
-   # In hybrid_search_service.py
-   DISABLED_FILTERS = ["major"]  # Skip major filter
-   ```
+### Option 2: Disable Public Hybrid Endpoint
+Remove the public hybrid search from the API key guard exclusion list:
+```python
+# In middleware/api_key_guard.py, remove this line:
+"/api/v1/search/hybrid/public",
+```
+This effectively disables the endpoint for unauthenticated users.
+
+### Option 3: Modify Filter Logic (Code Change Required)
+In `services/hybrid_search_service.py`, adjust the `_apply_hard_filters` method:
+```python
+def _apply_hard_filters(self, scholarship: Scholarship, student: StudentProfile) -> dict:
+    passed = True
+    details = {}
+    
+    # To disable GPA filter temporarily, comment out this block:
+    # if student.gpa and scholarship.eligibility_criteria.min_gpa:
+    #     if student.gpa < scholarship.eligibility_criteria.min_gpa:
+    #         passed = False
+    #         details["gpa"] = "Student GPA below minimum"
+```
 
 ## Monitoring
 
