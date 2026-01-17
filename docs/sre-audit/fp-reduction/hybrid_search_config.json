@@ -1,0 +1,47 @@
+{
+  "run_id": "CEOSPRINT-20260113-EXEC-ZT3G-FIX-027",
+  "config_version": "1.0.0",
+  "hard_filters": ["deadline", "gpa", "residency", "major"],
+  "deadline_buffer_days": 30,
+  "gpa_tolerance": 0.0,
+  "major_fuzzy_threshold": 0.8,
+  "strictMajorMatch": false,
+  "vector_weight": 0.7,
+  "keyword_weight": 0.3,
+  "freshness_boost": 0.1,
+  "filter_logic": {
+    "deadline": {
+      "enabled": true,
+      "rule": "scholarship.deadline >= NOW()",
+      "buffer_days": 30,
+      "always_enforced": true
+    },
+    "gpa": {
+      "enabled": true,
+      "rule": "student.gpa >= scholarship.min_gpa",
+      "tolerance": 0.0,
+      "null_handling": "pass_if_null"
+    },
+    "residency": {
+      "enabled": true,
+      "rule": "student.state IN scholarship.residency_states OR states is empty",
+      "null_handling": "pass_if_null"
+    },
+    "major": {
+      "enabled": true,
+      "rule": "student.major IN scholarship.fields_of_study OR fields is empty",
+      "fuzzy_matching": false,
+      "null_handling": "pass_if_null"
+    }
+  },
+  "endpoints": {
+    "public_search": "/api/v1/search/hybrid/public",
+    "authenticated_search": "/api/v1/search/hybrid"
+  },
+  "performance_targets": {
+    "p95_latency_ms": 200,
+    "fpr_target_pct": 5,
+    "precision_target": 0.85,
+    "recall_target": 0.70
+  }
+}
