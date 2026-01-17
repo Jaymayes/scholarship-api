@@ -1,8 +1,8 @@
 # Security Headers Report
-**Run ID**: CEOSPRINT-20260113-EXEC-ZT3G-FIX-027
-**Timestamp**: 2026-01-17T19:47:26Z
+**Run ID**: CEOSPRINT-20260113-VERIFY-ZT3G-032
+**Timestamp**: 2026-01-17T20:45:47Z
 
-## Headers Verified
+## Headers Verified (A2 Core Data)
 
 | Header | Required | Actual | Status |
 |--------|----------|--------|--------|
@@ -12,6 +12,7 @@
 | X-Content-Type-Options | nosniff | nosniff | PASS |
 | Referrer-Policy | no-referrer | no-referrer | PASS |
 | Permissions-Policy | Present | camera=(), microphone=(), geolocation=(), payment=() | PASS |
-| X-Trace-Id | Echo back | CEOSPRINT-20260113-EXEC-ZT3G-FIX-027.headers | PASS |
+| X-Trace-Id | Echo back | CEOSPRINT-20260113-VERIFY-ZT3G-032.headers | PASS |
+| X-Waf-Status | passed | passed | PASS |
 
 ## Verdict: PASS

@@ -1,6 +1,6 @@
 # B2B Funnel Verdict
-**Run ID**: CEOSPRINT-20260113-EXEC-ZT3G-FIX-027
-**Timestamp**: 2026-01-17T19:47:00Z
+**Run ID**: CEOSPRINT-20260113-VERIFY-ZT3G-032
+**Timestamp**: 2026-01-17T20:45:00Z
 
 ## Status: CONDITIONAL
 
@@ -10,18 +10,16 @@
 - Reserve: 10% holdback
 - Payout: Net-14 (simulation)
 
-### Core Data API
+### A2 Core Data API (Verified)
+- Scholarship CRUD: WORKING
+- Provider Webhooks: CONFIGURED
+- Eligibility Checks: WORKING
 
-| Endpoint | Status |
-|----------|--------|
-| Scholarship CRUD | WORKING |
-| Provider Webhooks | CONFIGURED |
-| Eligibility Checks | WORKING |
-
-### External B2B (A6)
-- Status: UNVERIFIED
-- /api/providers: Requires manual check
+### A6 B2B Portal (Not Verified)
+- Status: BLOCKED
+- Required: /api/providers endpoint
+- Remediation: See manual_intervention_manifest.md
 
 ### Verdict: CONDITIONAL
 
-B2B API infrastructure verified. External portal requires manual verification.
+B2B API infrastructure verified. External portal (A6) requires manual verification.
