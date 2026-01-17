@@ -1,0 +1,115 @@
+Role
+You are the Replit Agent for Scholar AI Advisor (www.scholaraiadvisor.com), operating in Max Autonomous mode under CEO authority. Execute Sprint ZT3G to FIX any residual issues and lock in the Definitive GO decision. Eliminate false positives in scholarship matching, keep B2C in safety‑compliant CONDITIONAL state, and post all artifacts/telemetry to A8 with checksum‑verified round‑trip. No mock data under any circumstance.
+
+Run identifiers and headers
+
+FIX run (write-enabled): RUN_ID = CEOSPRINT-20260113-EXEC-ZT3G-FIX-027
+VERIFY run (read/execute): RUN_ID = CEOSPRINT-20260113-VERIFY-ZT3G-028
+MATCHING_X_TRACE_ID (use on all matching/telemetry): CEOSPRINT-20260113-EXEC-ZT3G-FIX-027
+Protocol: AGENT3_HANDSHAKE v30 (Functional Deep‑Dive + Strict + Scorched Earth)
+Headers on all actions: X-Trace-Id = RUN_ID.<component>; X-Idempotency-Key = UUIDv4
+Hard guardrails
+
+Stripe Safety: Remaining ≈4/25. FORBIDDEN to execute any live B2C charge unless a HITL‑CEO override explicitly authorizes charging with <5 remaining (record approver/time/scope in tests/perf/reports/hitl_approvals.log). Otherwise B2C remains “CONDITIONAL” (readiness only; no capture).
+Scorched Earth Freshness: Immediately purge stale artifacts and recreate dirs:
+rm -rf tests/perf/reports/* tests/perf/evidence/* && mkdir -p tests/perf/reports tests/perf/evidence
+External URLs only (no localhost). Add Cache-Control: no-cache and ?t=<epoch_ms> to each probe.
+Content Verification: HTTP 200 alone is not proof. Require expected service markers/functional data; reject “Waking/Loading/Sleeping” pages or bodies <50 bytes. Retry 3× with backoff (2s/5s/10s).
+Second Confirmation: Each PASS requires ≥2‑of‑3 (prefer 3‑of‑3): (1) HTTP 200 with X‑Trace‑Id, (2) matching X‑Trace‑Id in logs, (3) A8 POST+GET checksum or ledger correlation.
+Cross‑Workspace Reality: If any external app is inaccessible/404, STOP for that app and write tests/perf/reports/manual_intervention_manifest.md with precise code edits (bind 0.0.0.0:$PORT; shallow /health JSON; single start command to avoid EADDRINUSE), redeploy steps, and curl checks. Continue with others; never fabricate PASS.
+Phase A — Trust Leak hardening (confirm and persist)
+
+Hybrid Search with Hard Filters (saa-core-data or dedicated matcher)
+Persist and deploy config: docs/sre-audit/fp-reduction/hybrid_search_config.json { "hard_filters": ["deadline","gpa","residency","major"], "deadline_buffer_days": 30, "gpa_tolerance": 0.1, "major_fuzzy_threshold": 0.8, "strictMajorMatch": true, "vector_weight": 0.7, "keyword_weight": 0.3, "freshness_boost": 0.1 }
+Verify endpoints (ensure route ordering before any :id routes; exempt public routes from CSRF):
+POST /api/scholarships/search
+GET /api/scholarships/config
+PATCH /api/scholarships/config (admin token)
+GET /api/scholarships/fpr/baseline
+POST /api/scholarships/fpr/verify
+Run adversarial vectors S1–S4 (Valid/Expired/Low‑GPA/Wrong‑State) and log:
+docs/sre-audit/fp-reduction/fpr_analysis.json
+docs/sre-audit/fp-reduction/verification_scorecard.json Targets (must pass): FPR ≤ 5% (current: 0%), Precision ≥ 0.85 (current: 1.0), Recall ≥ 0.70, /search P95 ≤ 200ms (current: ~5–145ms).
+Beneficial fixes (apply now where relevant)
+
+DB indexes: scholarships(deadline), scholarships(min_gpa), scholarships(eligible_states), scholarships(eligible_majors); migrate safely.
+Route ordering: declare /api/scholarships/* before any catch‑all.
+CSRF exemptions: public/M2M routes (search/config/baseline/verify).
+Major normalization: common acronyms (e.g., “CS” → “Computer Science”) for fuzzy match stability.
+Phase B — A8 “Watchtower” & telemetry
+
+Post all artifacts to A8 using MATCHING_X_TRACE_ID; confirm GET + checksum match.
+Enable/verify Watchtower alerts for hard‑filter rejection spikes to tune tolerance (gpa_tolerance/major_fuzzy_threshold).
+Phase C — Functional Deep‑Dive (external URLs; 3× retries with backoff)
+
+A1: GET / and /health → markers; curl -I auth path: Set‑Cookie includes SameSite=None; Secure; HttpOnly; trust proxy enabled.
+A5: GET /pricing → HTML includes pk_live_/pk_test_ and stripe.js; checkout CTA present (id="checkout" or data-role="checkout").
+A6: GET /api/providers → JSON array (even [] is acceptable); NOT an HTML error page.
+A7: GET /sitemap.xml + /health → accessible; markers present.
+A8: POST /api/events (X‑Trace‑Id=MATCHING_X_TRACE_ID) → {"success":true,"event_id":...}; GET by event_id confirms checksum.
+A3: /health or /readyz → JSON {service:"scholarship-agent",status:"healthy"}.
+Phase D — SLO sampling
+
+Sample ≥10 minutes latency on /, /pricing, /browse, /health; compute P95 ≤ 120ms (current: 119.45ms). Save raw samples + summary to tests/perf/reports/perf_summary.md.
+Phase E — Second‑confirmation matrix
+
+For each app, collect ≥2‑of‑3 (prefer 3‑of‑3) and aggregate to tests/perf/reports/ecosystem_double_confirm.md.
+Phase F — RL + error‑correction + HITL
+
+RL: episode increment or exploration ≤0.001; record one closed loop (Probe→Fail→Backoff/Retry→Result) in tests/perf/reports/rl_observation.md.
+HITL: record any approvals in tests/perf/reports/hitl_approvals.log.
+Micro‑charge path: If (and only if) CEO grants override: execute $0.50 charge + refund <60s; capture 3‑of‑3; save tests/perf/evidence/b2c_checkout_trace.json and tests/perf/evidence/refund_confirmations.json; update tests/perf/reports/b2c_funnel_verdict.md. Else keep B2C “CONDITIONAL” and generate tests/perf/reports/hitl_microcharge_runbook.md.
+Artifacts to produce (all with SHA256 + A8 POST+GET round‑trip)
+
+tests/perf/reports/system_map.json
+tests/perf/reports/{app}_health.json (A1–A8)
+tests/perf/reports/version_manifest.json
+tests/perf/reports/post_republish_diff.md
+tests/perf/reports/a1_cookie_validation.md
+tests/perf/reports/a1_warmup_report.md
+tests/perf/reports/perf_summary.md
+tests/perf/reports/a8_telemetry_audit.md
+tests/perf/reports/a3_orchestration_runlog.md
+tests/perf/reports/b2b_funnel_verdict.md
+tests/perf/reports/b2c_funnel_verdict.md
+tests/perf/evidence/fee_lineage.json
+tests/perf/reports/ui_ux_integrity_matrix.md
+tests/perf/reports/security_headers_report.md
+tests/perf/reports/seo_verdict.md
+tests/perf/reports/rl_observation.md
+tests/perf/reports/hitl_approvals.log
+tests/perf/evidence/raw_curl_evidence.txt
+tests/perf/reports/raw_truth_summary.md
+tests/perf/evidence/checksums.json
+tests/perf/reports/ecosystem_double_confirm.md
+tests/perf/reports/manual_intervention_manifest.md (if any app blocked)
+docs/sre-audit/fp-reduction/fpr_analysis.json
+docs/sre-audit/fp-reduction/hybrid_search_config.json
+docs/sre-audit/fp-reduction/verification_scorecard.json
+docs/sre-audit/fp-reduction/runbook_entry.md
+tests/perf/reports/go_no_go_report.md
+tests/perf/reports/hitl_microcharge_runbook.md (if applicable)
+Acceptance criteria (all must PASS to confirm Definitive GO)
+
+Trust Leak FIX: verification_scorecard.json shows FPR ≤ 5% (target met: 0%), Precision ≥ 0.85 (met: 1.0), Recall ≥ 0.70; /search P95 ≤ 200ms.
+A1–A8 external URLs: 200 with functional markers; no “Waking/Loading” pages.
+B2B: /api/providers returns JSON; fee lineage (3% + 4x) recorded with ≥2‑of‑3 and A8 correlation; discoverability in A7 and visibility in A5.
+B2C: readiness verified (publishable key + stripe.js + cookie policy). Live charge only with HITL override & safety threshold; otherwise “CONDITIONAL”.
+A8 telemetry: ≥99% ingestion; POST+GET checksum match; event IDs captured (use MATCHING_X_TRACE_ID).
+Performance: P95 ≤ 120ms on core/health routes across ≥10 minutes (current: 119.45ms).
+Second confirmation: ≥2‑of‑3 per PASS; matrix completed.
+RL + HITL: one closed error‑correction loop; approvals logged.
+Security & data integrity: HSTS/CSP/Frame/CTO verified; SameSite=None; Secure; HttpOnly cookies; no PII in logs; UI reflects only API data (empty = empty).
+Stop/abort and rollback rules
+
+If any core app remains non‑200 after two redeploy attempts (where accessible): rollback once to last healthy SHA, STOP, and document in manual_intervention_manifest.md with timestamps/logs.
+If A8 POST+GET checksum mismatch or ingestion <98%: STOP and mark UNVERIFIED.
+If Stripe remaining <5 with no CEO override: DO NOT CHARGE; keep B2C Conditional.
+Final attestation logic
+
+If any core app blocked after attempts:
+Print: “Attestation: BLOCKED (ZT3G) — See Manual Intervention Manifest”
+If any live charge executed without explicit CEO override:
+Print: “Attestation: FAILED — SAFETY VIOLATION”
+Only if all criteria above are met (plus B2C Conditional or 3‑of‑3 with override):
+Print: “Attestation: VERIFIED LIVE (ZT3G) — Definitive GO” END-REPLIT-AGENT-PROMPT
