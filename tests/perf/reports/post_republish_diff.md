@@ -1,25 +1,18 @@
 # Post-Republish Diff
-**Run ID**: CEOSPRINT-20260113-VERIFY-ZT3G-032
-**Timestamp**: 2026-01-17T20:45:00Z
+**Run ID**: CEOSPRINT-20260113-VERIFY-ZT3G-036
 
-## A2 Core Data (This Workspace)
-
-No republish needed. Current deployment verified.
-
-**Last Commit**: 287dafca80655296733f1870d7924c78ff7f37ee
-**Status**: DEPLOYED
+## A2 Core Data
+- Status: DEPLOYED
+- Git SHA: 579251319f85b1472e0dd6c28042e87fd5cae10c
+- No republish needed
 
 ## External Apps
-
-No republish executed from this workspace. External apps require manual republish by workspace owners.
+No republish from this workspace. Pending owner action.
 
 | App | Status | Action |
 |-----|--------|--------|
-| A3 | PENDING | Apply fixes from manifest, republish |
-| A5 | PENDING | Apply fixes from manifest, republish |
-| A6 | PENDING | Apply fixes from manifest, republish |
-| A7 | PENDING | Apply fixes from manifest, republish |
-| A8 | PENDING | Apply fixes from manifest, republish |
-
-## Verdict
-Post-republish verification pending for external apps.
+| A3 | PENDING | Apply manifest fixes |
+| A5 | PENDING | Apply manifest fixes |
+| A6 | PENDING | Apply manifest fixes |
+| A7 | PENDING | Apply manifest fixes |
+| A8 | PENDING | Apply manifest fixes |
