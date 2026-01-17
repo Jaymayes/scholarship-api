@@ -1,0 +1,47 @@
+{
+  "version": "1.0.0",
+  "last_updated": "2026-01-17T11:20:00Z",
+  "hard_filters_implemented": [
+    {
+      "filter": "deadline",
+      "type": "hard",
+      "logic": "scholarship.application_deadline >= NOW()",
+      "bypass_allowed": false,
+      "description": "Never show expired scholarships"
+    },
+    {
+      "filter": "gpa",
+      "type": "hard",
+      "logic": "student.gpa >= scholarship.eligibility_criteria.min_gpa",
+      "bypass_allowed": false,
+      "null_handling": "If student GPA not provided, show scholarship (soft pass)"
+    },
+    {
+      "filter": "residency",
+      "type": "hard",
+      "logic": "student.state IN scholarship.eligibility_criteria.residency_states OR residency_states IS EMPTY",
+      "bypass_allowed": false,
+      "null_handling": "If no residency restriction, show to all"
+    },
+    {
+      "filter": "major",
+      "type": "hard",
+      "logic": "student.field_of_study IN scholarship.eligibility_criteria.fields_of_study OR fields_of_study IS EMPTY",
+      "bypass_allowed": false,
+      "null_handling": "If no major restriction, show to all"
+    }
+  ],
+  "vector_weight": 0.7,
+  "keyword_weight": 0.3,
+  "ranking_factors": {
+    "eligibility_match_score": 0.4,
+    "deadline_proximity": 0.2,
+    "amount": 0.2,
+    "relevance_score": 0.2
+  },
+  "filter_order": ["deadline", "gpa", "residency", "major"],
+  "performance_targets": {
+    "p95_latency": "500ms",
+    "max_db_queries": 2
+  }
+}

@@ -23,6 +23,7 @@ EXCLUDED_PATHS = {
     "/terms",
     "/accessibility",
     "/api/v1/scholarships/public",
+    "/api/v1/search/hybrid/public",
     "/api/probe/",
     "/api/probe/db",
     "/api/probe/kpi",
