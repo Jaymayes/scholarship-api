@@ -51,6 +51,7 @@ EXCLUDED_PREFIXES = (
     "/monitoring/",
     "/drain/",
     "/day2/",
+    "/a3/",
 )
 
 
