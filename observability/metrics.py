@@ -119,7 +119,7 @@ class ActiveScholarshipsCollector:
         """Compute active scholarships count at Prometheus scrape time"""
         try:
             from services.scholarship_service import scholarship_service
-            count = len(scholarship_service.scholarships)
+            count = scholarship_service.get_scholarship_count()
             logger.info(f"🔄 SCRAPE-TIME COLLECTION: active_scholarships_total = {count}")
 
             yield GaugeMetricFamily(
@@ -299,7 +299,7 @@ class MetricsService:
         """Reconcile scholarship count from service - startup/lifecycle hook"""
         try:
             from services.scholarship_service import scholarship_service
-            count = len(scholarship_service.scholarships)
+            count = scholarship_service.get_scholarship_count()
             self.update_scholarship_count(count)
             logger.info(f"🔄 LIFECYCLE RECONCILIATION: Set active_scholarships_total to {count}")
             return count
@@ -318,7 +318,7 @@ async def get_metrics():
 
         # CustomCollector handles active_scholarships_total at scrape-time (no manual set needed)
         from services.scholarship_service import scholarship_service
-        scholarship_count = len(scholarship_service.scholarships)
+        scholarship_count = scholarship_service.get_scholarship_count()
         logger.info(f"📊 Updated active_scholarships_total to {scholarship_count}")
 
         # Use default single-process registry

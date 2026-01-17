@@ -121,12 +121,16 @@ async def search_scholarships(
             # Return 304 Not Modified
             response.status_code = 304
             response.headers["ETag"] = etag
-            response.headers["Cache-Control"] = "public, max-age=300"
+            response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate"
+            response.headers["Pragma"] = "no-cache"
+            response.headers["Expires"] = "0"
             return Response(status_code=304, headers=response.headers)
         
-        # CEO v2.4 Section 3.2: Cache-Control for lists (120s = 2 minutes)
+        # SRE DIRECTIVE: Zero-Staleness - Aggressive cache-busting
         response.headers["ETag"] = etag
-        response.headers["Cache-Control"] = "public, max-age=120"
+        response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate"
+        response.headers["Pragma"] = "no-cache"
+        response.headers["Expires"] = "0"
         response.headers["Vary"] = "Accept, Origin"
 
         return result
@@ -262,10 +266,17 @@ async def get_public_scholarships(
         if_none_match = request.headers.get("If-None-Match")
         
         if etag_matches(etag, if_none_match):
-            return Response(status_code=304, headers={"ETag": etag, "Cache-Control": "public, max-age=60"})
+            return Response(status_code=304, headers={
+                "ETag": etag, 
+                "Cache-Control": "no-store, no-cache, must-revalidate",
+                "Pragma": "no-cache",
+                "Expires": "0"
+            })
         
         response.headers["ETag"] = etag
-        response.headers["Cache-Control"] = "public, max-age=60, s-maxage=60"
+        response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate"
+        response.headers["Pragma"] = "no-cache"
+        response.headers["Expires"] = "0"
         response.headers["Vary"] = "Accept, Origin"
         
         logger.info(f"Public feed: returned {len(safe_items)} scholarships (page {page})")
@@ -332,12 +343,16 @@ async def get_scholarship(
             # Return 304 Not Modified
             response.status_code = 304
             response.headers["ETag"] = etag
-            response.headers["Cache-Control"] = "public, max-age=1800"
+            response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate"
+            response.headers["Pragma"] = "no-cache"
+            response.headers["Expires"] = "0"
             return Response(status_code=304, headers=response.headers)
         
-        # CEO v2.3 Section 3.2: Cache-Control for details (1800s = 30 minutes)
+        # SRE DIRECTIVE: Zero-Staleness - Aggressive cache-busting
         response.headers["ETag"] = etag
-        response.headers["Cache-Control"] = "public, max-age=1800"
+        response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate"
+        response.headers["Pragma"] = "no-cache"
+        response.headers["Expires"] = "0"
         response.headers["Vary"] = "Accept, Origin"
 
         return scholarship

@@ -1,0 +1,102 @@
+Role: You are the Lead Site Reliability Engineer (SRE) for the Scholar Ecosystem. Your mandate is to enforce Zero-Staleness and Real-Time Truth across this application. You are operating within a Replit environment.
+
+Strategic Context: We are experiencing a "Prototyping Paradox" where apps look functional but are serving stale, cached, or mock data (faker.js/hardcoded JSON) instead of live production DB values. This destroys trust.
+
+Mission (Definition of Done):
+
+Source of Truth: Every data point on the UI must originate from the Production Database via the Production API.
+
+Death to Mocks: All "fallback to mock data" logic in production builds must be disabled. If the API fails, the UI must show an Error State, not fake data.
+
+Freshness SLA: Data on screen is no older than 5 seconds (via SWR/Polling or WebSockets).
+
+Cache-Busting: API responses in production must utilize Cache-Control: no-store.
+
+Stop Rules (Halt Immediately If):
+
+You encounter or log PII (Student Names, Emails) in plain text.
+
+The application fails to build or boot after a change.
+
+You detect a "Database-as-a-Service" connectivity failure (cannot reach the central data node).
+
+Execution Plan
+Phase 1: The "Mock" & "Localhost" Hunt (Audit)
+Environment Audit:
+
+Scan src/, .env, and vite.config.ts (or next.config.js).
+
+Flag: Any URL referencing localhost, 127.0.0.1, or http:// (instead of https://).
+
+Flag: Any logic that toggles useMockData = true.
+
+Code Scan:
+
+Grep for terms: faker, mock, dummy, sampleData, stub.
+
+Identify try/catch blocks in data fetching hooks (e.g., useScholarships) where the catch block returns hardcoded data instead of throwing the error.
+
+Network Configuration:
+
+Verify the API Base URL is dynamically set via import.meta.env.VITE_API_URL (or equivalent) and NOT hardcoded.
+
+Phase 2: Remediation (The Fix)
+Apply these changes surgically. Verify the app compiles after each step.
+
+A) Enforce Production Endpoints
+
+Update the .replit [deployment] block or Secrets to ensure VITE_API_URL points to the Live Production API URL (e.g., https://scholar-api-prod.replit.app), never a dev URL.
+
+B) "Fail Loudly" (Disable Mocks)
+
+In all data fetching functions:
+
+Wrap mock data returns in: if (import.meta.env.DEV) { return mockData; }
+
+In Production (!DEV), if the fetch fails, throw the error so the UI can display a "Retry" prompt. Do NOT silently serve stale/fake data.
+
+C) Aggressive Cache-Busting
+
+API Layer: Ensure all API fetch requests include headers:
+
+JavaScript
+
+headers: {
+  'Cache-Control': 'no-cache, no-store, must-revalidate',
+  'Pragma': 'no-cache',
+  'Expires': '0'
+}
+Frontend Layer: If using SWR or TanStack Query:
+
+Set refreshInterval: 5000 (5 seconds) for critical dashboards.
+
+Set revalidateOnFocus: true.
+
+Set dedupingInterval: 0 to prevent stale reads.
+
+Phase 3: Verification (The Proof)
+The "Write-Read" Test:
+
+Create a test record in the Database (or ask me to).
+
+Verify it appears on the UI within 5 seconds without a page refresh.
+
+Header Check:
+
+Inspect network requests in the Preview. Confirm API responses have no-store headers.
+
+Error Handling:
+
+Temporarily break the API URL. Confirm the UI shows an "Error loading data" state, NOT fake data.
+
+Output Requirement: Report your findings in this format:
+
+Staleness Sources Found: [List files/lines with mocks or localhost refs]
+
+Fixes Applied: [List of changes]
+
+Current Freshness Strategy: [e.g., "Switched to SWR with 5s polling"]
+
+Verification Status: [PASS/FAIL on the Write-Read Test]
+
+GO.
