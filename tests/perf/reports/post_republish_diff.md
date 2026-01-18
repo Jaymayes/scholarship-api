@@ -1,17 +1,7 @@
 # Post-Republish Diff
-**Run ID**: CEOSPRINT-20260113-VERIFY-ZT3G-030
+**Run ID**: CEOSPRINT-20260113-VERIFY-ZT3G-034
 
-## A2 Core Data
-- Status: DEPLOYED (no changes needed this run)
-- Git SHA: 01fe737695c5f635568138242f6659b6bc1afd09
+## A2: DEPLOYED
+Git SHA: 360f73c1870cddc7c80917e8b5641dde428d4fd3
 
-## External Apps (Pending Owner Action)
-| App | Status | Required Action |
-|-----|--------|-----------------|
-| A1 | PENDING | Cookie config + trust proxy |
-| A3 | PENDING | /health + /readyz + orchestration |
-| A4 | PENDING | /health endpoint |
-| A5 | PENDING | Stripe markers + headers |
-| A6 | PENDING | /api/providers endpoint |
-| A7 | PENDING | /sitemap.xml + /health |
-| A8 | PENDING | /api/events + checksum |
+## External Apps: PENDING
