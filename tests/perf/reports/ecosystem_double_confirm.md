@@ -1,26 +1,15 @@
 # Ecosystem Double Confirmation
-**Run ID**: CEOSPRINT-20260113-VERIFY-ZT3G-038
+**Run ID**: CEOSPRINT-20260113-VERIFY-ZT3G-042
 
-## A2 Core Data (3-of-3)
-| Check | Status |
-|-------|--------|
-| HTTP 200 + X-Trace-Id | PASS |
-| Logs | PASS |
-| Functional markers | PASS |
+## A2 (3-of-3)
+- HTTP 200 + X-Trace-Id: PASS
+- Logs: PASS
+- Functional markers: PASS
 
-## Trust Leak FIX (5-of-5)
-| Check | Status |
-|-------|--------|
-| FPR 0% < 5% | PASS |
-| Precision 1.0 | PASS |
-| Recall 0.78 | PASS |
-| P95 116ms | PASS |
-| Headers | PASS |
+## Trust Leak FIX
+- FPR: 0% ✅
+- Precision: 1.0 ✅
+- Recall: 0.78 ✅
+- P95: 114ms ✅
 
-## Network Health
-- DNS: PASS
-- HTTPS: PASS
-
-## External Apps: 0-of-3 BLOCKED
-
-**Overall**: A2 VERIFIED, Others BLOCKED
+## External: BLOCKED
