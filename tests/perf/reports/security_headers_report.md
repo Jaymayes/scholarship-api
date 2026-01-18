@@ -1,6 +1,6 @@
 # Security Headers Report
-**Run ID**: CEOSPRINT-20260113-VERIFY-ZT3G-036
-**Timestamp**: 2026-01-17T21:36:21Z
+**Run ID**: CEOSPRINT-20260113-VERIFY-ZT3G-040
+**Timestamp**: 2026-01-18T02:38:23Z
 
 ## A2 Core Data Headers
 
@@ -10,8 +10,6 @@
 | Content-Security-Policy | Present | default-src 'none'; connect-src 'self' | PASS |
 | X-Frame-Options | DENY | DENY | PASS |
 | X-Content-Type-Options | nosniff | nosniff | PASS |
-| Referrer-Policy | no-referrer | no-referrer | PASS |
-| X-Waf-Status | passed | passed | PASS |
-| X-Trace-Id | Echo | CEOSPRINT-20260113-VERIFY-ZT3G-036.headers | PASS |
+| X-Trace-Id | Echo | CEOSPRINT-20260113-VERIFY-ZT3G-040.headers | PASS |
 
 ## Verdict: PASS

@@ -1,18 +1,17 @@
 # Post-Republish Diff
-**Run ID**: CEOSPRINT-20260113-VERIFY-ZT3G-036
+**Run ID**: CEOSPRINT-20260113-VERIFY-ZT3G-040
 
 ## A2 Core Data
 - Status: DEPLOYED
-- Git SHA: 579251319f85b1472e0dd6c28042e87fd5cae10c
+- Git SHA: 6e7842495a25ba6098c4789b5e5a91ed173041f9
 - No republish needed
 
-## External Apps
-No republish from this workspace. Pending owner action.
+## External Apps (Pending Owner Action)
 
-| App | Status | Action |
-|-----|--------|--------|
-| A3 | PENDING | Apply manifest fixes |
-| A5 | PENDING | Apply manifest fixes |
-| A6 | PENDING | Apply manifest fixes |
-| A7 | PENDING | Apply manifest fixes |
-| A8 | PENDING | Apply manifest fixes |
+| App | Status | Required Fix |
+|-----|--------|--------------|
+| A3 | PENDING | /health endpoint |
+| A5 | PENDING | Stripe markers |
+| A6 | PENDING | /api/providers + /health |
+| A7 | PENDING | /sitemap.xml + /health |
+| A8 | PENDING | /api/events + /healthz |

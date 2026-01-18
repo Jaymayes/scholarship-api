@@ -1,7 +1,7 @@
 # Manual Intervention Manifest
-**FIX Run ID**: CEOSPRINT-20260113-EXEC-ZT3G-FIX-035
-**VERIFY Run ID**: CEOSPRINT-20260113-VERIFY-ZT3G-036
-**Timestamp**: 2026-01-17T21:36:00Z
+**FIX Run ID**: CEOSPRINT-20260113-EXEC-ZT3G-FIX-039
+**VERIFY Run ID**: CEOSPRINT-20260113-VERIFY-ZT3G-040
+**Timestamp**: 2026-01-18T02:38:23Z
 **Protocol**: AGENT3_HANDSHAKE v30
 
 ---
@@ -14,12 +14,13 @@ External apps (A3, A5, A6, A7, A8) cannot be modified from this workspace. This 
 
 ## A6 — provider-register (PRIMARY BLOCKER)
 
+### Status: /api/providers returns 404
+
 ### Replit Workspace
 `https://replit.com/@<username>/provider-register`
 
-### Required Changes
+### Option 1: Node.js/Express
 
-#### Option 1: Node.js/Express
 **File**: `server/index.js` (or `index.js`)
 
 ```javascript
@@ -36,9 +37,8 @@ app.get("/health", (req, res) => {
   });
 });
 
-// Required: /api/providers endpoint
+// REQUIRED: /api/providers endpoint (empty array is acceptable)
 app.get("/api/providers", (req, res) => {
-  // Return JSON array (empty [] is acceptable for verification)
   res.json([]);
 });
 
@@ -48,7 +48,8 @@ app.listen(PORT, "0.0.0.0", () => {
 });
 ```
 
-#### Option 2: Python/FastAPI
+### Option 2: Python/FastAPI
+
 **File**: `main.py`
 
 ```python
@@ -68,7 +69,6 @@ def health():
 
 @app.get("/api/providers")
 def providers():
-    # Return JSON array (empty [] is acceptable)
     return []
 
 if __name__ == "__main__":
@@ -76,10 +76,33 @@ if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=int(os.environ.get("PORT", 3000)))
 ```
 
-**Start command**:
-```bash
-uvicorn main:app --host 0.0.0.0 --port $PORT
+**Start command**: `uvicorn main:app --host 0.0.0.0 --port $PORT`
+
+### Option 3: Python/Flask
+
+**File**: `app.py`
+
+```python
+from flask import Flask, jsonify
+import os
+
+app = Flask(__name__)
+
+@app.get("/health")
+def health():
+    return jsonify(service="provider-register", status="healthy")
+
+@app.get("/api/providers")
+def providers():
+    return jsonify([])
+
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=int(os.getenv("PORT", 3000)))
 ```
+
+### CSRF/CORS Note
+- Exempt GET `/api/providers` from CSRF if enforced
+- Keep CORS tight
 
 ### Republish Steps
 1. Apply code changes above
@@ -98,14 +121,74 @@ curl -sSL "https://<A6_HOST>/api/providers?t=$(date +%s)" -H "Cache-Control: no-
 
 ---
 
-## A3 — scholarship-agent (Orchestrator/Agent)
+## A8 — auto-com-center (Health Alias)
 
-### Replit Workspace
-`https://replit.com/@<username>/scholarship-agent`
+### Status: Add /healthz alias if missing
 
-### Required Changes
+### Node.js
+```javascript
+app.get("/healthz", (req, res) => {
+  res.json({service: "auto-com-center", status: "healthy"});
+});
+```
 
-#### Node.js
+### FastAPI
+```python
+@app.get("/healthz")
+def healthz():
+    return {"service": "auto-com-center", "status": "healthy"}
+```
+
+### Full A8 Implementation (if not present)
+
+```python
+from fastapi import FastAPI, Request
+from datetime import datetime
+import uuid
+
+app = FastAPI()
+events_store = {}
+
+@app.post("/api/events")
+async def ingest_event(request: Request):
+    body = await request.json()
+    event_id = str(uuid.uuid4())
+    trace_id = request.headers.get("X-Trace-Id", "unknown")
+    events_store[event_id] = {
+        "event_id": event_id,
+        "trace_id": trace_id,
+        "payload": body,
+        "timestamp": datetime.utcnow().isoformat() + "Z"
+    }
+    return {"success": True, "event_id": event_id}
+
+@app.get("/api/events/{event_id}")
+def get_event(event_id: str):
+    return events_store.get(event_id, {"error": "not_found"})
+
+@app.get("/health")
+def health():
+    return {"service": "auto-com-center", "status": "healthy", "events_count": len(events_store)}
+
+@app.get("/healthz")
+def healthz():
+    return {"service": "auto-com-center", "status": "healthy"}
+```
+
+### Verification
+```bash
+curl -sSL "https://<A8_HOST>/healthz?t=$(date +%s)"
+curl -X POST "https://<A8_HOST>/api/events" \
+  -H "Content-Type: application/json" \
+  -H "X-Trace-Id: CEOSPRINT-20260113-EXEC-ZT3G-FIX-027" \
+  -d '{"kind":"verify"}'
+```
+
+---
+
+## A3 — scholarship-agent
+
+### Node.js
 ```javascript
 const express = require('express');
 const app = express();
@@ -124,23 +207,6 @@ app.listen(PORT, "0.0.0.0", () => {
 });
 ```
 
-#### FastAPI
-```python
-from fastapi import FastAPI
-from datetime import datetime
-import os
-
-app = FastAPI()
-
-@app.get("/health")
-def health():
-    return {"service": "scholarship-agent", "status": "healthy", "timestamp": datetime.utcnow().isoformat() + "Z"}
-
-if __name__ == "__main__":
-    import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=int(os.environ.get("PORT", 3000)))
-```
-
 ### Verification
 ```bash
 curl -sSL "https://<A3_HOST>/health?t=$(date +%s)" -H "Cache-Control: no-cache"
@@ -150,12 +216,7 @@ curl -sSL "https://<A3_HOST>/health?t=$(date +%s)" -H "Cache-Control: no-cache"
 
 ## A5 — student-pilot (B2C)
 
-### Replit Workspace
-`https://replit.com/@<username>/student-pilot`
-
-### Required Changes
-
-#### 1. Stripe on /pricing
+### Stripe on /pricing
 ```html
 <!-- In <head> section -->
 <script src="https://js.stripe.com/v3"></script>
@@ -167,11 +228,10 @@ curl -sSL "https://<A3_HOST>/health?t=$(date +%s)" -H "Cache-Control: no-cache"
 <button id="checkout" data-role="checkout">Start Free Trial</button>
 ```
 
-#### 2. Cookie Configuration (Node.js)
+### Cookie Configuration (Node.js)
 ```javascript
 app.set('trust proxy', 1);
 
-// Session cookies
 res.cookie('session', value, {
   secure: true,
   httpOnly: true,
@@ -179,10 +239,10 @@ res.cookie('session', value, {
 });
 ```
 
-#### 3. Health Endpoint
+### Health Endpoint
 ```javascript
 app.get("/health", (req, res) => {
-  res.json({service: "student-pilot", status: "healthy", timestamp: new Date().toISOString()});
+  res.json({service: "student-pilot", status: "healthy"});
 });
 ```
 
@@ -196,12 +256,7 @@ curl -sSL "https://<A5_HOST>/health?t=$(date +%s)"
 
 ## A7 — auto-page-maker (SEO)
 
-### Replit Workspace
-`https://replit.com/@<username>/auto-page-maker`
-
-### Required Changes
-
-#### Sitemap Endpoint (Node.js)
+### Sitemap + Health (Node.js)
 ```javascript
 app.get("/sitemap.xml", (req, res) => {
   res.set('Content-Type', 'application/xml');
@@ -216,25 +271,8 @@ app.get("/sitemap.xml", (req, res) => {
 });
 
 app.get("/health", (req, res) => {
-  res.json({service: "auto-page-maker", status: "healthy", timestamp: new Date().toISOString()});
+  res.json({service: "auto-page-maker", status: "healthy"});
 });
-```
-
-#### FastAPI
-```python
-from fastapi import Response
-
-@app.get("/sitemap.xml")
-def sitemap():
-    xml = """<?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-  <url><loc>https://www.scholaraiadvisor.com/</loc></url>
-</urlset>"""
-    return Response(content=xml, media_type="application/xml")
-
-@app.get("/health")
-def health():
-    return {"service": "auto-page-maker", "status": "healthy"}
 ```
 
 ### Verification
@@ -245,90 +283,15 @@ curl -sSL "https://<A7_HOST>/health?t=$(date +%s)"
 
 ---
 
-## A8 — auto-com-center (Telemetry)
-
-### Replit Workspace
-`https://replit.com/@<username>/auto-com-center`
-
-### Required Changes
-
-#### FastAPI Implementation
-```python
-from fastapi import FastAPI, Request
-from datetime import datetime
-import uuid
-
-app = FastAPI()
-events_store = {}
-
-@app.post("/api/events")
-async def ingest_event(request: Request):
-    body = await request.json()
-    event_id = str(uuid.uuid4())
-    trace_id = request.headers.get("X-Trace-Id", "unknown")
-    events_store[event_id] = {"event_id": event_id, "trace_id": trace_id, "payload": body, "timestamp": datetime.utcnow().isoformat() + "Z"}
-    return {"success": True, "event_id": event_id}
-
-@app.get("/api/events/{event_id}")
-def get_event(event_id: str):
-    return events_store.get(event_id, {"error": "not_found"})
-
-@app.get("/health")
-def health():
-    return {"service": "auto-com-center", "status": "healthy", "events_count": len(events_store)}
-```
-
-#### Node.js Implementation
-```javascript
-const express = require('express');
-const { v4: uuidv4 } = require('uuid');
-const app = express();
-app.use(express.json());
-
-const eventsStore = {};
-
-app.post("/api/events", (req, res) => {
-  const eventId = uuidv4();
-  eventsStore[eventId] = {event_id: eventId, trace_id: req.headers['x-trace-id'], payload: req.body};
-  res.json({success: true, event_id: eventId});
-});
-
-app.get("/api/events/:eventId", (req, res) => {
-  res.json(eventsStore[req.params.eventId] || {error: "not_found"});
-});
-
-app.get("/health", (req, res) => {
-  res.json({service: "auto-com-center", status: "healthy"});
-});
-
-app.listen(process.env.PORT || 3000, "0.0.0.0");
-```
-
-### Verification
-```bash
-# POST event
-EVENT=$(curl -sSL -X POST "https://<A8_HOST>/api/events" \
-  -H "Content-Type: application/json" \
-  -H "X-Trace-Id: CEOSPRINT-20260113-EXEC-ZT3G-FIX-027" \
-  -d '{"kind":"verify"}')
-echo "$EVENT"
-
-# GET event back
-EVENT_ID=$(echo "$EVENT" | jq -r '.event_id')
-curl -sSL "https://<A8_HOST>/api/events/${EVENT_ID}"
-```
-
----
-
 ## Summary
 
 | App | Status | Primary Fix |
 |-----|--------|-------------|
 | A2 (Core Data) | VERIFIED | None needed |
-| A3 (Agent) | UNVERIFIED | Add /health, bind 0.0.0.0 |
-| A5 (B2C) | UNVERIFIED | Stripe markers, cookie config |
-| A6 (B2B) | UNVERIFIED | /api/providers + /health |
-| A7 (SEO) | UNVERIFIED | /sitemap.xml + /health |
-| A8 (Telemetry) | UNVERIFIED | POST/GET /api/events |
+| A3 (Agent) | BLOCKED | Add /health, bind 0.0.0.0 |
+| A5 (B2C) | BLOCKED | Stripe markers, cookie config |
+| A6 (B2B) | BLOCKED | /api/providers + /health |
+| A7 (SEO) | BLOCKED | /sitemap.xml + /health |
+| A8 (Telemetry) | BLOCKED | POST/GET /api/events, /healthz |
 
-**Action**: Share this manifest with workspace owners → Apply fixes → Republish → Re-verify
+**Action**: Share with workspace owners → Apply fixes → Republish → Re-verify

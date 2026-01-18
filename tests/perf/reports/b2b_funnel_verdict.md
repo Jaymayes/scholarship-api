@@ -1,7 +1,11 @@
 # B2B Funnel Verdict
-**Run ID**: CEOSPRINT-20260113-VERIFY-ZT3G-036
+**Run ID**: CEOSPRINT-20260113-VERIFY-ZT3G-040
 
 ## Status: CONDITIONAL
+
+### A6 Primary Blocker
+- `/api/providers` returns 404
+- Remediation: manual_intervention_manifest.md
 
 ### Fee Structure
 - Provider Fee: 3%
@@ -12,9 +16,5 @@
 - Scholarship CRUD: WORKING
 - Provider webhooks: CONFIGURED
 
-### A6 B2B Portal: BLOCKED
-- Requires: /api/providers endpoint
-- Remediation: manual_intervention_manifest.md
-
 ## Verdict: CONDITIONAL
-B2B API infrastructure verified. External portal requires manual fix.
+B2B API infrastructure verified. A6 portal requires /api/providers endpoint.

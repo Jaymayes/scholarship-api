@@ -1,5 +1,5 @@
 # Raw Truth Summary
-**Run ID**: CEOSPRINT-20260113-VERIFY-ZT3G-036
+**Run ID**: CEOSPRINT-20260113-VERIFY-ZT3G-040
 
 ## VERIFIED WORKING (A2 Core Data)
 1. Health: HTTP 200 with markers
@@ -11,17 +11,19 @@
 
 ## CONDITIONAL
 - B2C: Stripe configured, no charge (guardrail)
-- B2B: API ready, external portal unverified
+- B2B: API ready, A6 /api/providers 404
 
-## NOT VERIFIED
+## BLOCKED
 - A3, A5, A6, A7, A8: External workspaces
 
 ## Raw Facts
 | Fact | Value |
 |------|-------|
-| Git SHA | 579251319f85b1472e0dd6c28042e87fd5cae10c |
+| Git SHA | 6e7842495a25ba6098c4789b5e5a91ed173041f9 |
 | FPR | 0% |
 | Precision | 1.0 |
 | Recall | 0.78 |
+| A6 Blocker | /api/providers 404 |
+| A8 Gap | /healthz alias |
 | Stripe | ~4/25 |
 | CEO Override | NOT PRESENT |
