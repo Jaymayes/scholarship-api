@@ -1,5 +1,5 @@
 # Ecosystem Double Confirmation
-**Run ID**: CEOSPRINT-20260113-VERIFY-ZT3G-034
+**Run ID**: CEOSPRINT-20260113-VERIFY-ZT3G-038
 
 ## A2 Core Data (3-of-3)
 | Check | Status |
@@ -14,8 +14,12 @@
 | FPR 0% < 5% | PASS |
 | Precision 1.0 | PASS |
 | Recall 0.78 | PASS |
-| P95 118ms | PASS |
+| P95 116ms | PASS |
 | Headers | PASS |
+
+## Network Health
+- DNS: PASS
+- HTTPS: PASS
 
 ## External Apps: 0-of-3 BLOCKED
 

@@ -1,7 +1,6 @@
 # A1 Cookie Validation
-**Run ID**: CEOSPRINT-20260113-VERIFY-ZT3G-034
+**Run ID**: CEOSPRINT-20260113-VERIFY-ZT3G-038
 
 ## Status: BLOCKED
-- Required: SameSite=None; Secure; HttpOnly
 
 **Verdict**: BLOCKED

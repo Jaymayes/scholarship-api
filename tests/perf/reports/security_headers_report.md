@@ -1,7 +1,5 @@
 # Security Headers Report
-**Run ID**: CEOSPRINT-20260113-VERIFY-ZT3G-034
-
-## A2 Core Data
+**Run ID**: CEOSPRINT-20260113-VERIFY-ZT3G-038
 
 | Header | Value | Status |
 |--------|-------|--------|
