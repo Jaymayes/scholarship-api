@@ -1,0 +1,93 @@
+Role
+You are the Replit Agent for Scholar AI Advisor (www.scholaraiadvisor.com), operating in Max Autonomous mode under CEO authority. ZT3G is at CONDITIONAL GO. Your mission is to hotfix A6 (/api/providers) and the A8 health alias if missing, re‑verify all externals, complete second‑confirmation evidence, and upgrade the attestation to “VERIFIED LIVE (ZT3G) — Definitive GO.” Do not execute any live B2C charges.
+
+Run identifiers and headers
+
+FIX run: RUN_ID = CEOSPRINT-20260113-EXEC-ZT3G-FIX-043
+VERIFY run: RUN_ID = CEOSPRINT-20260113-VERIFY-ZT3G-044
+MATCHING_X_TRACE_ID = CEOSPRINT-20260113-EXEC-ZT3G-FIX-027
+Protocol: AGENT3_HANDSHAKE v30 (Strict + Functional Deep‑Dive + Scorched Earth)
+Add to all requests: X-Trace-Id = RUN_ID.<component>; X-Idempotency-Key = UUIDv4
+Guardrails
+
+Stripe Safety: Remaining ~4/25. NO CHARGES. B2C remains “CONDITIONAL” unless a HITL‑CEO override is recorded in tests/perf/reports/hitl_approvals.log.
+Scorched Earth (run now): rm -rf tests/perf/reports/* tests/perf/evidence/* && mkdir -p tests/perf/reports tests/perf/evidence
+External URLs only; add Cache-Control: no-cache and ?t=<epoch_ms> on all probes.
+Second Confirmation: Each PASS must have ≥2‑of‑3 (HTTP+Trace; Logs; A8 POST+GET checksum/ledger).
+Phase A — A6 provider-register HOTFIX (PRIMARY)
+If you can edit A6:
+
+Node/Express (server/index.js or routes): // Health app.get("/health",(req,res)=>res.json({service:"provider-register",status:"healthy",timestamp:new Date().toISOString()})); // Providers (read-only; empty array acceptable) app.get("/api/providers",(req,res)=>res.json([])); // Single start command (avoid EADDRINUSE) app.listen(process.env.PORT||3000,"0.0.0.0",()=>console.log("A6 up"));
+FastAPI (main.py): from fastapi import FastAPI app = FastAPI() @app.get("/health") def health(): return {"service":"provider-register","status":"healthy"} @app.get("/api/providers") def providers(): return []
+Start: uvicorn main:app --host 0.0.0.0 --port $PORT
+Flask (app.py): from flask import Flask, jsonify; app=Flask(name) @app.get("/health") def health(): return jsonify(service="provider-register",status="healthy") @app.get("/api/providers") def providers(): return jsonify([]) app.run(host="0.0.0.0",port=int(os.getenv("PORT",3000)))
+Notes:
+
+Exempt GET /api/providers from CSRF if enforced; keep CORS tight (GET only).
+Ensure route ordering places /api/providers before any catch‑all or :id route.
+Republish; record SHA/time in tests/perf/reports/version_manifest.json; note diffs in tests/perf/reports/post_republish_diff.md.
+If you cannot edit A6 from this context:
+
+Append the exact copy‑paste block above (with file paths and “Click Publish” steps) to tests/perf/reports/manual_intervention_manifest.md and continue.
+Verify A6 externally (3× retry with 2s/5s/10s backoff); save outputs:
+
+curl -sSL "https://<A6_HOST>/health?t=$(date +%s)"
+curl -sSL "https://<A6_HOST>/api/providers?t=$(date +%s)" Store raw to tests/perf/evidence/raw_curl_evidence.txt and summary to tests/perf/reports/raw_truth_summary.md.
+Phase B — A8 health alias (compatibility)
+If /health works but /healthz 404s, add alias:
+
+Node: app.get("/healthz",(req,res)=>res.json({service:"auto-com-center",status:"healthy"}));
+FastAPI: @app.get("/healthz") def healthz(): return {"service":"auto-com-center","status":"healthy"} Republish; verify:
+curl -sSL "https://<A8_HOST>/healthz?t=$(date +%s)"
+Phase C — Functional Deep‑Dive re‑verification (external; 3× backoff)
+
+A3: curl -sSL "https://<A3_HOST>/health?t=$(date +%s)" → JSON {service:"scholarship-agent",status:"healthy"}
+A5: curl -sSL "https://<A5_HOST>/pricing?t=$(date +%s)" → pk_live_/pk_test_ present + js.stripe.com + checkout CTA
+A6: curl -sSL "https://<A6_HOST>/api/providers?t=$(date +%s)" → JSON array (even [])
+A7: curl -sSL "https://<A7_HOST>/sitemap.xml?t=$(date +%s)" → <urlset>; curl "https://<A7_HOST>/health?t=$(date +%s)"
+A8: POST /api/events (X‑Trace‑Id=MATCHING_X_TRACE_ID) → {"success":true,"event_id":...}; GET /api/events/<id> confirms checksum round‑trip Append raw outputs to tests/perf/evidence/raw_curl_evidence.txt and refresh tests/perf/reports/raw_truth_summary.md.
+Phase D — Performance SLO sampling
+
+Over ≥10 minutes, sample /, /pricing, /browse, /health across apps; compute P95 ≤120ms. Save raw samples + summary to tests/perf/reports/perf_summary.md.
+Phase E — Second‑confirmation matrix
+
+For each app, collect ≥2‑of‑3 (HTTP+X‑Trace‑Id; matching logs; A8 checksum/ledger) and aggregate into tests/perf/reports/ecosystem_double_confirm.md.
+Phase F — RL + HITL proof
+
+Record one closed loop (e.g., A6 404 → fix/republish → 200) in tests/perf/reports/rl_observation.md.
+Append approvals to tests/perf/reports/hitl_approvals.log.
+Keep B2C CONDITIONAL (no charge); if CEO later authorizes, run $0.50 + refund with 3‑of‑3 proof and update tests/perf/reports/b2c_funnel_verdict.md.
+Artifacts (SHA256 + A8 POST+GET checksum required)
+
+tests/perf/reports/system_map.json
+tests/perf/reports/{app}_health.json (A1–A8)
+tests/perf/reports/version_manifest.json
+tests/perf/reports/post_republish_diff.md
+tests/perf/reports/perf_summary.md
+tests/perf/reports/a8_telemetry_audit.md
+tests/perf/reports/b2b_funnel_verdict.md
+tests/perf/reports/b2c_funnel_verdict.md (CONDITIONAL; no charge)
+tests/perf/reports/security_headers_report.md
+tests/perf/reports/seo_verdict.md
+tests/perf/reports/ecosystem_double_confirm.md
+tests/perf/reports/rl_observation.md
+tests/perf/reports/hitl_approvals.log
+tests/perf/evidence/raw_curl_evidence.txt
+tests/perf/evidence/checksums.json
+tests/perf/reports/manual_intervention_manifest.md (only if any app remains blocked)
+docs/sre-audit/fp-reduction/hybrid_search_config.json (confirm deployed)
+docs/sre-audit/fp-reduction/verification_scorecard.json (FPR ≤5% remains green)
+tests/perf/reports/go_no_go_report.md
+Acceptance criteria (upgrade to Definitive GO)
+
+A6 /api/providers returns JSON via external URL; /health JSON present.
+A3/A5/A7/A8 functional checks pass with correct content markers (no “Waking/Loading” placeholders).
+A8 POST+GET checksum round‑trip success (event_id).
+P95 ≤120ms across sampled window; A8 ingestion ≥99%.
+Second‑confirmation matrix complete; RL closed loop documented.
+B2C remains CONDITIONAL unless HITL override is recorded.
+Final attestation logic
+
+If every criterion above passes: Print: “Attestation: VERIFIED LIVE (ZT3G) — Definitive GO”
+If any external needs owner action but manifest is complete and all other criteria pass: Print: “Attestation: CONDITIONAL GO (ZT3G) — See Manual Intervention Manifest”
+If telemetry checksum or SLO/guardrail violations occur: Print: “Attestation: UNVERIFIED (ZT3G)” with failing gates and remediation. END-REPLIT-AGENT-PROMPT

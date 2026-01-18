@@ -1,14 +1,9 @@
 # A8 Telemetry Audit
-**Run ID**: CEOSPRINT-20260113-VERIFY-ZT3G-040
+**Run ID**: CEOSPRINT-20260113-VERIFY-ZT3G-044
 
 ## Status: BLOCKED
 
-### A8 auto-com-center: UNVERIFIED
-- Required: POST/GET /api/events + /health + /healthz alias
-- Remediation: manual_intervention_manifest.md
+- Required: POST/GET /api/events + /healthz
+- Ingestion target: ≥99%
 
-## Ingestion Target
-- Required: ≥99% success
-- Status: UNVERIFIED
-
-## Verdict: BLOCKED
+**Verdict**: BLOCKED

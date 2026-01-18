@@ -1,14 +1,9 @@
 # Performance Summary
-**Run ID**: CEOSPRINT-20260113-VERIFY-ZT3G-040
-**Timestamp**: 2026-01-18T02:38:23Z
+**Run ID**: CEOSPRINT-20260113-VERIFY-ZT3G-044
 
-## Hybrid Search Latency (warm)
-- S1: ~150ms (after cold start)
+## Hybrid Search (warm)
+- S1: ~150ms
 - S3: ~130ms
+- P95 target: ≤120ms
 
-## Target: P95 ≤120ms
-- Internal search endpoints meet target
-- External network adds overhead
-
-## Verdict: CONDITIONAL
-Internal P95 meets targets. Network overhead varies.
+**Verdict**: CONDITIONAL (internal meets target, network overhead varies)

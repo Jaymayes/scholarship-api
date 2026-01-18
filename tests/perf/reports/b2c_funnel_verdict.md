@@ -1,21 +1,11 @@
 # B2C Funnel Verdict
-**Run ID**: CEOSPRINT-20260113-VERIFY-ZT3G-040
+**Run ID**: CEOSPRINT-20260113-VERIFY-ZT3G-044
 
 ## Status: CONDITIONAL
 
-### Stripe Safety
-- Remaining: ~4/25
+- Stripe: ~4/25
 - CEO Override: NOT PRESENT
 - Live Charge: NOT EXECUTED
+- A5 B2C: BLOCKED (needs Stripe markers)
 
-### A2 Core Data: VERIFIED
-- Scholarship Search: WORKING
-- Hybrid Search: DEPLOYED
-- FPR: 0%
-
-### A5 B2C Landing: BLOCKED
-- Requires: Stripe markers on /pricing
-- Remediation: manual_intervention_manifest.md
-
-## Verdict: CONDITIONAL
-B2C API ready. No charge without CEO override.
+**Verdict**: CONDITIONAL - No charge without override
