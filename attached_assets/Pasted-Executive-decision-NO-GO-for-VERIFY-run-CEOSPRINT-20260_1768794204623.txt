@@ -1,0 +1,52 @@
+Executive decision: NO GO for VERIFY (run CEOSPRINT-20260113-VERIFY-ZT3G-046) due to network isolation in the execution environment. Proceed with code/application fixes and owner-side deployment; re-run verification once outbound DNS is restored.
+
+What I’m approving now
+
+Accept Phase 0.2 STOP as correct. The Manual Intervention Manifest you generated is our source of truth for Golden Path fixes.
+Authorize external owners to apply and publish Golden Path changes for A1–A8 immediately.
+Maintain B2C charges locked (SAFETY_LOCK_ACTIVE) until verification passes.
+Owner actions (timeboxed)
+
+Infra/Workspace (SLA: 4 hours)
+Restore outbound DNS/internet for the verification runner or execute VERIFY from a runner with confirmed egress.
+Confirm by posting: date/time, resolver config summary, “nslookup replit.app” proof, and a one-line traceroute or curl to example.com.
+2. External App Owners (SLA: 12 hours)
+
+Apply Golden Path from tests/perf/reports/manual_intervention_manifest.md:
+Global: bind to 0.0.0.0:$PORT
+A1: trust proxy + secure cookies (SameSite=None)
+A5: Stripe guardrail (SAFETY_LOCK_ACTIVE) until CEO overrides
+A6: /api/providers returns JSON array (not HTML)
+A8: /api/events echoes X-Trace-Id and returns event_id
+Publish each app (A1–A8) and post the deployment timestamp and commit hash.
+3. Verification Lead (SLA: 24 hours post-publish)
+
+Re-run: RUN_ID = CEOSPRINT-20260113-VERIFY-ZT3G-046
+Deliverables to CEO channel:
+A8 event_id proving telemetry ingestion
+A6 /api/providers response (expects ≥3 providers)
+Security headers snapshot (HSTS, CSP, XFO, XCTO)
+Latency summary (P50/P95/P99) per app, 15-min window
+SHA-256 artifact list regenerated under tests/perf/reports/ and tests/perf/evidence/
+Go/No‑Go gates for “Definitive GO”
+
+Connectivity: DNS ok; 8/8 URLs return HTTP 200 for ≥30 minutes
+Performance: P95 ≤120ms (stretch), acceptable interim ≤150ms; no single app >170ms for >10 min
+Telemetry: 100% ingestion; trace_id echoed by A8; second confirmation ≥2-of-3
+Trust: FPR ≤5%, Precision ≥0.85, Recall ≥0.70 (current thresholds) with logs attached
+B2B: /api/providers returns active providers; fee lineage shows 3% platform fee
+B2C: charges remain blocked until above gates pass; then I will issue the micro‑charge pilot order
+Contingency if egress cannot be restored within 8 hours
+
+Execute VERIFY from an alternate CI runner with outbound access (GitHub Actions self‑hosted or Replit deployment runner)
+Mirror artifacts back into tests/perf/reports/ and post run IDs
+Why this matters (Prime Directive alignment)
+
+Data-first: We will not claim “Verified Live” without real network validation and fresh artifacts.
+CAC and SEO engine: A7/A8 fixes ensure Auto Page Maker scale-up won’t regress telemetry or trigger 429 storms during verify.
+Revenue integrity: A5 Stripe guardrails prevent accidental live charges prior to CEO override.
+Next update cadence
+
+Infra status in 4 hours (egress restored or alternate runner selected)
+Verification packet within 24 hours of publish
+I will issue the B2C micro‑charge pilot authorization immediately after VERIFY passes all gates.
