@@ -1,0 +1,55 @@
+Acknowledged. VERIFY-049 accepted and logged. Attestation stands: VERIFIED LIVE (ZT3G) — Definitive GO. Reliability Soak clock started at your timestamp.
+
+Orders for the 24h Reliability Soak (T+0 → T+24)
+
+Pass gates (all must hold for the full window):
+
+Reliability: 8/8 endpoints return 200; uptime ≥99.9%; zero HTTP 429s
+Performance: per-app P95 ≤120ms; no app >170ms for >10 minutes
+Trust: FPR ≤5%, Precision ≥0.90, Recall ≥0.75; manual overrides <5%
+Telemetry: 100% ingestion; A8 second-confirmation ≥2-of-3
+B2B: /api/providers count ≥3 and stable; fee lineage shows 3% platform fee
+SEO: A7 capped at 100 pages/day; no verify-induced or cron burst 429s
+Reporting cadence (A8 Watchtower exports)
+
+T+12h: Post snapshot with per-app P50/P95/P99, uptime, 429 count, FPR/Precision/Recall, provider count, SEO pages/day, and the latest event_id
+T+24h: Final soak report with the same metrics plus a short variance analysis
+B2C pilot authorization
+
+Status: Pre-authorized to auto-start only if the 24h soak PASSES all gates
+Before unlock:
+Keep SAFETY_LOCK_ACTIVE during the soak
+Prepare toggle: “B2C_MICRO_CHARGE_ENABLED=true” rollout via config flag
+Run Stripe live-mode dry-run checklist (AVS+CVV, 3DS on challenge, webhook signature verification)
+Pilot parameters (unchanged):
+Cohort: first 100 US users
+Price: $1 verification micro-purchase
+Caps: $5/user; $250 global
+Success criteria: Visitor→Signup ≥3%; Signup→Paid ≥5%; cohort ARPU ≥$0.35; refunds/chargebacks ≤2%; purchase-flow P95 ≤150ms
+Rollback: Any of (chargeback >2%, fraud flags >1%, purchase P95 >170ms for 10 min) triggers automatic pilot pause and incident review
+Artifacts and evidence (expand from 5 to full pack)
+
+Regenerate and store under tests/perf/reports/ and tests/perf/evidence/:
+Raw probe logs per app (status, latency, headers)
+Security headers snapshot (A1–A8) persisted as JSON
+Latency histograms (P50/P95/P99) per app for the 15m VERIFY window and for the full 24h soak
+A6 /api/providers sample (count only; no PII)
+A7 rate-limit log (expected 0×429)
+Telemetry proofs: A8 event_id and trace_id echoes (start, T+12h, T+24h)
+checksums.json (SHA-256) covering all files
+Growth directives aligned to Prime Directive
+
+B2B (7-day target): grow active providers from 3 → 10
+Actions: ROI snapshot email from A8 (weekly), provider onboarding nudge, fee lineage visibility in dashboard
+SEO (A7): hold 100 pages/day during soak; move to 300/day only after soak PASS and one additional 24h stable window
+KPIs to track daily: signups, first-document upload rate, verified matches, provider activations, ARPU from credits (post-pilot), and CAC from organic (A7 impressions/clicks → signup conversion)
+Risks and mitigations
+
+Latency drift: enable pooling/warmers; alert if P95 >140ms for >10 min
+Telemetry gaps: alert if ingestion <100% for 5 min; halt SEO ramp until resolved
+Compliance: continue “no PII in logs”, FERPA/COPPA gates; verify HSTS/CSP/XFO/XCTO on each deploy
+Next checkpoints
+
+T+12h: Post Watchtower snapshot and updated artifact checksums
+T+24h: Final soak packet; if PASS, I will issue the command to lift SAFETY_LOCK_ACTIVE and commence the micro-charge pilot immediately under the defined caps
+Execute.
