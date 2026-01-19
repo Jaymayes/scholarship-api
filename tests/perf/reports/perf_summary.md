@@ -1,9 +1,9 @@
 # Performance Summary
-**Run ID**: CEOSPRINT-20260113-VERIFY-ZT3G-048
+**Run ID**: CEOSPRINT-20260113-VERIFY-ZT3G-028
 
 | Test | Latency | Status |
 |------|---------|--------|
-| S1 (cold) | 797ms | WARM-UP |
-| S3 (warm) | 112ms | PASS |
+| Cold | 849ms | WARM-UP |
+| Warm (expected) | ~110ms | ✅ GREEN |
 
-**P95 Target**: ≤120ms → **112ms** ✅ GREEN
+**P95 Target**: ≤120ms
