@@ -106,6 +106,7 @@ from routers.backlog_drain import router as backlog_drain_router
 from routers.day2_operations import router as day2_operations_router
 from routers.qa_orchestrator import router as qa_orchestrator_router
 from routers.a3_orchestrator import router as a3_orchestrator_router
+from routers.canary import router as canary_router
 from schemas.error_responses import ERROR_RESPONSES
 from utils.logger import setup_logger
 
@@ -268,6 +269,17 @@ async def startup_jwks_prewarm():
         logger.error(f"❌ JWKS prewarm failed: {e}")
         logger.warning("⚠️ Falling back to lazy initialization on first protected request")
 
+
+@app.on_event("startup")
+async def startup_a8_telemetry():
+    """SEV-2 CIR-20260119-001: Start A8 telemetry emitter for canary monitoring"""
+    from services.a8_telemetry import a8_telemetry
+    
+    if a8_telemetry.enabled:
+        a8_telemetry.start(interval_seconds=60)
+        logger.info("📡 A8 Telemetry Emitter started (60s interval) - CIR-20260119-001")
+    else:
+        logger.warning("📡 A8 Telemetry disabled - missing EVENT_BUS_URL or TOKEN")
 
 @app.on_event("startup")
 async def startup_telemetry():
@@ -851,6 +863,7 @@ app.include_router(backlog_drain_router)
 app.include_router(day2_operations_router, tags=["Day-2 Operations"])
 app.include_router(qa_orchestrator_router, tags=["QA Orchestrator"])
 app.include_router(a3_orchestrator_router, tags=["A3 Orchestrator"])
+app.include_router(canary_router, tags=["SEV-2 Canary"])
 
 # Metrics already setup above - this was the wrong location causing route shadowing
 

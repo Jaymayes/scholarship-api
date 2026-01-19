@@ -1,0 +1,48 @@
+Acknowledged. Canary authorized under strict guard. B2C remains paused.
+
+Go-forward orders (effective immediately)
+
+Pre-canary gates (must hold 10 consecutive minutes)
+
+A1: db_connected=true; auth 5xx=0; pool_utilization ≤50%; P95 ≤120 ms.
+A3: concurrency=0; queues paused; breaker=open; no DATABASE_URL in secrets (verified).
+A5/A7: 200 OK + functional markers + 3-of-3 confirmations.
+A8: CIR active; streaming pool/breaker/queue metrics; codes AUTH_DB_UNREACHABLE and RETRY_STORM_SUPPRESSED mapped.
+Canary sequence (A3 → A1 only)
+
+Step 1 (10 min): A3 concurrency=1; breaker=half_open; rate limit 5 req/min.
+Immediate abort if: any auth 5xx; pool_utilization >80% for 2 min; >3 A3 errors/60s.
+Step 2 (start 60‑min green clock): raise A3 to concurrency=2–3; rate limit 20 req/min; keep breaker active.
+Monitoring/telemetry required (emit to A8 each minute)
+
+a1: db_connected, pool_in_use/idle/total, pool_utilization_pct, auth_5xx, p95_ms.
+a3: breaker_state, req_rate, error_rate, backoff_state, queue_depth, dlq_count.
+a5/a7: http_200_markers, p95_ms.
+aux (a6/a8): p95_ms, 5xx rate.
+cost: compute_units_burned and retry_suppressed_count (“autonomy tax”).
+Comms
+
+If cumulative provider auth impact exceeds 30 minutes, send the “security upgrade” notice. Hold otherwise.
+Exit criteria to close SEV‑2 and request restore to 2% pilot
+
+60 continuous minutes with:
+A1: auth 5xx=0; db_connected=true; pool_utilization <80%; P95 ≤120 ms.
+A3: 0 retry‑storm events; healthy breaker transitions; stable queue depth.
+A5/A7: green with markers; A6/A8: P95 ≤200 ms.
+Post A8 attestation containing:
+a8_attestation_id; snapshot window (UTC)
+Core/aux P95; auth error rates
+Pool metrics (in_use/idle/total, utilization %)
+Breaker timeline (open→half_open→closed) with counts
+A3 queue/dead‑letter metrics
+3‑of‑3 confirmations and checksum parity
+Compute units burned vs. suppressed (cost delta)
+Decision tree after T+60
+
+If all pass: I will authorize restoring the 2% pilot only; Gate‑1 (5%) remains pending.
+If any fail: revert canary (A3 concurrency=0), maintain HARD STOP, proceed to deep RCA before reattempt.
+Owner checkpoints
+
+T+30: confirm pre‑canary gates met; declare canary start.
+T+60: deliver attestation above for CEO review.
+Stay disciplined: Trust over speed, DaaS non‑negotiable, no “fix‑forward” during canary.
