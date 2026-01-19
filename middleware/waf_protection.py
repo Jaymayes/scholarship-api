@@ -118,6 +118,16 @@ class WAFProtection(BaseHTTPMiddleware):
             "/drain/concentration/check",  # Backlog drain: Concentration check (JSON payload)
             "/drain/ledger/entry",  # Backlog drain: Ledger entry (JSON payload)
             "/api/v1/search/hybrid",  # ML Hybrid Search: Student profile matching (JSON payload)
+            "/api/internal/canary/gates/check",  # SEV-2 Canary: Pre-canary gates check (internal ops)
+            "/api/internal/canary/step1/start",  # SEV-2 Canary: Step 1 start (internal ops)
+            "/api/internal/canary/step2/start",  # SEV-2 Canary: Step 2 start (internal ops)
+            "/api/internal/canary/metrics",  # SEV-2 Canary: Metrics submission (internal ops)
+            "/api/internal/canary/attestation",  # SEV-2 Canary: Attestation generation (internal ops)
+            "/api/internal/pilot/synthetic-login",  # SEV-2 Pilot: Synthetic login test (internal ops)
+            "/api/internal/pilot/activate",  # SEV-2 Pilot: Pilot activation (internal ops)
+            "/api/internal/pilot/deactivate",  # SEV-2 Pilot: Pilot deactivation (internal ops)
+            "/api/internal/pilot/metrics",  # SEV-2 Pilot: Metrics submission (internal ops)
+            "/api/internal/pilot/breaker/result",  # SEV-2 Pilot: Breaker result (internal ops)
         }
         
         # SECURITY: Regex patterns for dynamic routes that require WAF bypass

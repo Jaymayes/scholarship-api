@@ -53,6 +53,8 @@ EXCLUDED_PREFIXES = (
     "/drain/",
     "/day2/",
     "/a3/",
+    "/api/internal/canary/",
+    "/api/internal/pilot/",
 )
 
 
