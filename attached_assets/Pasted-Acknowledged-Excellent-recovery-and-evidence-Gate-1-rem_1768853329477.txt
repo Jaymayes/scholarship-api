@@ -1,0 +1,52 @@
+Acknowledged. Excellent recovery and evidence. Gate 1 remains NO GO. We will restore only to 2% after the stability hold completes.
+
+Decisions
+
+Maintain traffic cap at 0% for the full 15-minute stability window, then conditional restore to 2% if all criteria below stay green.
+Keep Safety Lock and auto-refunds enabled; Stripe cap remains ≤4 attempts/6h.
+Criteria to restore 2% (must all be true for the last 15 consecutive minutes, proven by raw logs)
+
+Telemetry
+0 HTTP 428 lines across scholarship_api and A8
+Telemetry Acceptance Ratio ≥99%; A8 queue depth <100 and trending flat
+Command Center: EMITTER_MODE=local_spool; queueSize ~0; no “fallback failed” or local 400 spool errors
+CPU and background work
+Event-loop-lag p95 <100ms
+node-cron disabled on web; no new “missed execution” lines
+Auth/Provider
+Provider synthetic P95 ≤500ms; /api/login P95 ≤200ms; auth 5xx=0
+Rate-limit “policy blocks” reported separately (not counted as errors)
+SEO and probing
+0 sitemap 429 lines (WAF block active)
+0 /metrics/p95 404 lines (legacy probes fully disabled)
+DB
+DB p95 ≤100ms; no statement timeouts
+If all pass at 19:50 UTC, you are authorized to:
+
+Set TRAFFIC_CAP_B2C_PILOT = 2 (pilot_only)
+Keep telemetry gateway override ON, Safety Lock ON, Stripe cap ON
+Begin a fresh 30-minute telemetry acceptance run (≥99%) to downgrade SEV-1 → SEV-2
+Rollback triggers (auto)
+
+Any auth 5xx, Provider P95 >500ms, Telemetry Acceptance <95% for 5 minutes, Event-loop-lag p95 ≥200ms for 30s, DB p95 >120ms for 10 minutes, any recurrence of sitemap 429 or /metrics/p95 404
+Action: immediately set TRAFFIC_CAP_B2C_PILOT = 0 and append to the CIR with evidence
+Follow-through (next 24–48 hours)
+
+Tighten the bypass safely
+Keep the API gateway idempotency bypass for now; scope it to analytics paths only and rate-limit to protect ingestion
+Re-enable TELEMETRY_REQUIRE_IDEMPOTENCY per app only after each emitter is verified to send X-Idempotency-Key, X-Request-Id, X-Sent-At; stagger by service over 24–48h
+Maintain sha256(body) fingerprinting and unique index in business_events; schedule a warehouse dedupe job for today’s backlog
+CI/CD anti-zombie hardening
+Make deploy success contingent on: PID change, commit/digest match, and a live “I am primary” heartbeat per instance
+Enforce drain-and-kill: reject traffic on old instances before stop; prove zero active schedulers; assert node-cron disabled on web
+Block deploy if legacy probes (/metrics/p95, localhost) or sitemap jobs are present
+Observability guardrails
+Keep UNKNOWN-ban SLO (100% mapped codes); maintain “window_closed_at” on all reports
+Continue WAF sitemap blocks until SEO owners confirm compliant crawler settings (ETag/If-Modified-Since, concurrency=1, 60s interval)
+Reports I require
+
+19:50 UTC: stability hold result and new A8 attestation (include raw log snippets for: 0×428, queue trend to <100, WAF sitemap 403s, no /metrics/p95, event-loop p95, auth + provider P95)
+T+30 min post-restore: telemetry acceptance ≥99% snapshot, plus initial pilot metrics (attempts, auth%, refunds≤10m)
+T+6h, T+12h: stability snapshots and emitter compliance progress by app
+T+24h: Gate-1 readiness packet (breaker closed & stable, SLOs hold, complaint rate <0.5%, payments auth ≥97%, refunds 100% ≤10m)
+Thank you for turning the “smoking gun” into a clean and verifiable state. Hold the line for the full 15-minute window and proceed per the above.
