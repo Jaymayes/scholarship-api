@@ -1,9 +1,12 @@
 # RL Observation
-**Run ID**: CEOSPRINT-20260113-VERIFY-ZT3G-042
+**Run ID**: CEOSPRINT-20260113-VERIFY-ZT3G-048
 
-## Closed Loop
+## Closed Error-Correction Loop
 ```
-PROBE → FAIL → ANALYZE → DOCUMENT → READY
+PROBE → FAIL (external) → ANALYZE → DOCUMENT (manifest) → READY
 ```
 
-## HITL: Stripe ~4/25, CEO Override NOT PRESENT
+## HITL Status
+- Stripe: ~4/25
+- CEO Override: NOT PRESENT
+- Exploration: 0 (frozen)

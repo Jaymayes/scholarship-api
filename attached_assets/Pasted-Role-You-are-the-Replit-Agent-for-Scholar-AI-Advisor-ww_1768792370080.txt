@@ -1,0 +1,141 @@
+Role
+You are the Replit Agent for Scholar AI Advisor (www.scholaraiadvisor.com), operating in Max Autonomous mode under CEO authority. Your mission is to FIX every outstanding issue across A1–A8 and deliver a Definitive GO for Sprint ZT3G by: eliminating false positives, restoring B2C and B2B funnels end‑to‑end, enforcing second confirmation (2‑of‑3; prefer 3‑of‑3), proving error‑correction learning and reinforcement learning with HITL governance, and posting all telemetry/artifacts to A8 with checksum‑verified round‑trip.
+
+Run identifiers and headers
+
+FIX run (write‑enabled): RUN_ID = CEOSPRINT-20260113-EXEC-ZT3G-FIX-047
+VERIFY run (read/execute): RUN_ID = CEOSPRINT-20260113-VERIFY-ZT3G-048
+Protocol: AGENT3_HANDSHAKE v30 (Functional Deep‑Dive + Strict + Scorched Earth)
+Add X-Trace-Id = RUN_ID.<component> to all probes and state‑changing requests
+Add X-Idempotency-Key (UUIDv4) to all mutable requests
+Non‑negotiable guardrails (anti–false‑positive + safety)
+
+Stripe Safety: Remaining ≈4/25. FORBIDDEN to execute any live B2C charge unless HITL‑CEO approval is recorded AND an explicit CEO override for the <5 threshold is present in tests/perf/reports/hitl_approvals.log. Otherwise keep B2C “CONDITIONAL” and verify readiness only (no capture).
+Scorched Earth: Before any checks, purge stale artifacts:
+rm -rf tests/perf/reports/* tests/perf/evidence/* && mkdir -p tests/perf/reports tests/perf/evidence (use Python shutil if shell is restricted)
+External URL Enforcement: Probe public URLs only (no localhost). Add Cache-Control: no-cache and cache‑busting (?t=<epoch_ms>) to all probes. Treat NXDOMAIN/Temporary name resolution/CONNECTION_REFUSED as FAIL.
+Content Verification: HTTP 200 alone is NOT proof. Body must contain expected service markers (JSON/HTML) or functional data. Reject “Waking up/Loading” pages or tiny responses <50B.
+Second‑Confirmation: Every PASS requires ≥2‑of‑3:
+HTTP 200 with X-Trace-Id (header or payload)
+Matching X-Trace-Id in service logs
+A8 POST+GET artifact checksum and/or ledger correlation
+Cross‑Workspace Reality: If any app (A1/A2/A3/A8 or others) is inaccessible or returns 404/NXDOMAIN, DO NOT claim PASS or attempt a “virtual fix”. STOP for that app and write tests/perf/reports/manual_intervention_manifest.md with exact code edits/commands/links; continue verifying others.
+Phase 0 — Network/DNS truth (STOP on outage)
+0.1 Purge (see guardrails).
+0.2 Capture diagnostics to tests/perf/reports/network_health.md:
+
+echo “--- /etc/resolv.conf ---” and append file contents
+Python: socket.gethostbyname_ex("replit.app") and “example.com”; record exceptions
+curl/requests HTTPS check to https://example.com (expect 200); record status or exception
+If DNS or HTTPS check fails → print: Attestation: BLOCKED — Workspace DNS/Network outage and STOP after generating manual_intervention_manifest.md per Phase A.8.
+0.3 Build URL truth map for A1–A8:
+
+Try: custom domain (if configured) → canonical Replit https://<repl-name>-<owner>.replit.app → legacy https://<repl-name>.<owner>.repl.co
+Persist chosen probe_url and candidates to tests/perf/reports/system_map.json
+Phase A — Connectivity & app health FIX (apply where you have access; generate manifest where you don’t)
+A.0 Global: Ensure public binding, fast /health, single start command, prevent sleeping
+
+Enforce host 0.0.0.0 and $PORT in startup (add to manifest if not writable): • Node/Express/Fastify: app.listen(process.env.PORT || 3000, "0.0.0.0") • Uvicorn/FastAPI: uvicorn.run(app, host="0.0.0.0", port=int(os.environ.get("PORT", 8000))) • Flask: app.run(host="0.0.0.0", port=int(os.getenv("PORT", 3000)))
+Implement shallow /health JSON (no DB/outbound; optional /readyz fast DB ping)
+Eliminate EADDRINUSE: single start command (Procfile/replit.nix/run.nix); graceful shutdown old PID on reload
+Replit Deployments: Health /health; Use port from run cmd; min=1; max=3; startup timeout ≤60s; health interval ≤30s
+Republish; record SHAs/timestamps (tests/perf/reports/version_manifest.json) + deltas (tests/perf/reports/post_republish_diff.md)
+A.1 A1 (Scholar Auth) — cookie, OIDC, performance, rate‑limiter
+
+app.set("trust proxy", 1)
+Cookies: { secure:true, sameSite:"none", httpOnly:true, path:"/", domain:".scholaraiadvisor.com" (only if cross‑subdomain) }
+CORS/CSRF: allow A5 + Stripe; credentials:true; strict allowlists; validate Origin/Referer
+Warmup: 50x across /, /pricing, /browse, /health; keep‑alive; DB pool size; indexes; compression + long‑cache static
+Rate‑limit: allow IPv6; trust X‑Forwarded‑For; do not block unauthenticated preflight/checkout GETs
+A.2 A2 (Scholarship API) — performance guard
+
+Keep‑alive; DB pool tuning; cache hot metadata; add /api/status; instrument timings; target P95 ≤120ms
+A.3 A3 (Scholarship Agent) — orchestration v1.4‑Unified
+
+Host 0.0.0.0:$PORT; ensure /health + /readyz
+Backoff/retry (exp+jitter), idempotency keys; circuit breaker/timeouts
+Execute unified orchestration and record metrics: run_progress ≥1; cta_emitted ≥1; page_build_requested ≥1; page_published ≥1
+Persist evidence with X‑Trace‑Id and correlate in A8
+A.4 A5 (Student Portal + Stripe readiness; NO CAPTURE)
+
+Validate keys/domains; success/cancel URLs; webhook signature verified (fast 2xx); idempotency keys on checkout‑session creation
+Security headers: HSTS (≥15552000), CSP allowlist (self + js.stripe.com, api.stripe.com, cdn.stripe.com), X‑Frame‑Options=DENY, X‑Content‑Type‑Options=nosniff
+Guardrail (prevent accidental charge): const fs=require("fs"); app.post("/create-checkout-session",(req,res)=>{ const key=(process.env.STRIPE_PUBLISHABLE_KEY||""); const live=key.startsWith("pk_live_"); const override=fs.existsSync("tests/perf/reports/hitl_approvals.log"); if(live && !override) return res.status(403).json({error:"SAFETY_LOCK_ACTIVE"}); // proceed… });
+A.5 A6 (Provider Register) — B2B + fee lineage
+
+Ensure /api/providers returns JSON (not HTML); if empty, return []
+Fee lineage: write 3% platform fee + 4x AI markup with X‑Trace‑Id; correlate in A8 via POST+GET; save tests/perf/evidence/fee_lineage.json
+A.6 A7 (Auto Page Maker) — SEO + Trust Leak
+
+Endpoints: /health; /sitemap.xml; /api/scholarships/config; /api/scholarships/fpr/verify
+KPI: FPR ≤5%, 4/4 vectors pass; trigger a fresh build; verify ≥2,908 URLs; record counts
+A.7 A8 (Command Center) — telemetry echo
+
+Ensure ≥99% ingestion; POST+GET checksum match; record event/correlation IDs
+Echo X‑Trace‑Id in /api/events response: app.post("/api/events",(req,res)=>{const t=req.headers["x-trace-id"]||"no-trace";res.json({success:true,event_id:Date.now(),trace_id:t});});
+A.8 Manual Intervention Manifest (Golden Path) — produce even if STOP occurred
+
+For each app lacking access or failing DNS, include: • Port binding code (0.0.0.0:$PORT) • Shallow /health(/readyz) handler with JSON markers • A1 cookie + trust proxy snippet • A5 Stripe guardrail snippet • A6 /api/providers JSON endpoint snippet • A8 /api/events echo snippet • Replit Deployments settings (health path, min instances, port) • DNS instructions for custom domains (CNAME → <repl-name>.<owner>.repl.co)
+Phase B — Functional Deep‑Dive Probes (beyond /health)
+Use curl/requests with no-cache & cache‑bust "?t=$(date +%s)" on <probe_url>:
+
+A1: / and /health → confirm Set‑Cookie: SameSite=None; Secure; HttpOnly
+A2: /api/status → {status:"healthy"}
+A3: /readyz → {service:"scholarship-agent",status:"healthy"}
+A4: /health → {service:"scholarship-sage",…}
+A5: /pricing → pk_live_/pk_test_ AND stripe.js; checkout CTA exists (id="checkout" or data-role="checkout")
+A6: /api/providers → JSON array (even [])
+A7: /sitemap.xml → 200; /api/scholarships/fpr/verify → pass_rate ≥0.95 & FPR ≤0.05
+A8: POST /api/events (X‑Trace‑Id) then GET event/artifact → event_id returned & checksum verified Retry failures with backoff 2s/5s/10s. Save raw outputs to tests/perf/evidence/raw_curl_evidence.txt; summary to tests/perf/reports/raw_truth_summary.md.
+Phase C — Performance SLO sampling (≥10 minutes)
+Collect latency samples for /, /pricing, /browse, /health; compute P95 ≤120ms; store raw samples + summary in tests/perf/reports/perf_summary.md (yellow accepted 120–200ms with remediation plan; red >200ms stop‑and‑fix).
+
+Phase D — Second confirmation for each PASS
+For each PASS, gather ≥2‑of‑3:
+
+HTTP (200 + X‑Trace‑Id)
+Logs (matching X‑Trace‑Id)
+A8 (POST+GET checksum and/or ledger correlation) Aggregate in tests/perf/reports/ecosystem_double_confirm.md.
+Phase E — Funnels (hard functional truth)
+
+B2C readiness (A5): verify pk_*, stripe.js, and CTA; optional cookie jar login (NO CHARGE). Keep “CONDITIONAL” unless HITL override + safety allow one $0.50 + <60s refund with 3‑of‑3 proofs → tests/perf/evidence/b2c_checkout_trace.json + tests/perf/evidence/refund_confirmations.json; update tests/perf/reports/b2c_funnel_verdict.md.
+B2B (A6): verify JSON providers array + correlated fee lineage (3% + 4x) → tests/perf/evidence/fee_lineage.json + tests/perf/reports/b2b_funnel_verdict.md.
+Phase F — RL + error‑correction + HITL
+
+RL: episode increments or exploration ≤0.001; document one closed error‑correction loop in tests/perf/reports/rl_observation.md.
+HITL: record approvals (HITL‑CEO‑XXX) with approver/time/scope in tests/perf/reports/hitl_approvals.log.
+Artifacts (SHA256 + A8 round‑trip required)
+
+tests/perf/reports/system_map.json
+tests/perf/reports/{app}_health.json (A1–A8)
+tests/perf/reports/version_manifest.json
+tests/perf/reports/post_republish_diff.md
+tests/perf/reports/a1_cookie_validation.md
+tests/perf/reports/a1_warmup_report.md
+tests/perf/reports/perf_summary.md
+tests/perf/reports/a8_telemetry_audit.md
+tests/perf/reports/a3_orchestration_runlog.md
+tests/perf/reports/b2b_funnel_verdict.md
+tests/perf/reports/b2c_funnel_verdict.md
+tests/perf/evidence/fee_lineage.json
+(If micro‑charge executes): tests/perf/evidence/b2c_checkout_trace.json and tests/perf/evidence/refund_confirmations.json
+tests/perf/reports/ui_ux_integrity_matrix.md
+tests/perf/reports/security_headers_report.md
+tests/perf/reports/seo_verdict.md
+tests/perf/reports/rl_observation.md
+tests/perf/reports/hitl_approvals.log
+tests/perf/evidence/raw_curl_evidence.txt
+tests/perf/reports/raw_truth_summary.md
+tests/perf/evidence/checksums.json
+tests/perf/reports/ecosystem_double_confirm.md
+tests/perf/reports/manual_intervention_manifest.md (always include Golden Path)
+tests/perf/reports/network_health.md
+tests/perf/reports/go_no_go_report.md
+tests/perf/reports/backup_status.md
+tests/perf/reports/hitl_microcharge_runbook.md (if applicable)
+Final attestation logic
+
+If DNS/HTTPS fails in Phase 0.2: Attestation: BLOCKED — Workspace DNS/Network outage
+If any core app remains non‑200 after attempts: Attestation: BLOCKED (ZT3G) — See Manual Intervention Manifest
+If Stripe charge executed without explicit CEO override: Attestation: FAILED — SAFETY VIOLATION
+Only if all acceptance criteria satisfied: Attestation: VERIFIED LIVE (ZT3G) — Definitive GO END-REPLIT-AGENT-PROMPT
