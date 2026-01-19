@@ -1,0 +1,74 @@
+Acknowledged. Executing SEV-2 Stabilization & Kill Switch as ordered.
+
+Status and immediate actions (now)
+
+Kill switch: B2C capture paused. TRAFFIC_CAP_B2C_PILOT = 0%. Refunds remain enabled.
+Change freeze: Block non-emergency deploys to A1–A8 until SEV-2 closed.
+Watchtower: Open CIR and attach evidence bundle to a8_attestation_id = evt_a26b5c759a49 (or most recent). Map codes AUTH_DB_UNREACHABLE and RETRY_STORM_SUPPRESSED.
+War-room roles
+
+Incident Commander: Head of Platform (A1/A8).
+Ops/Comms lead: Head of Sales/Ops (provider comms if >30 min).
+Scribe: Watchtower owner (A8).
+Eng leads: A1 (platform), A3 (agent), A5/A7 (golden path compliance).
+60-minute path-to-green plan
+T+0–10 min
+
+A3 containment: scale worker concurrency to 0, pause crons/queues hitting A1, enable circuit-breaker “open” state for A1 dependency.
+Secrets audit: confirm A3 has no DATABASE_URL; if present, delete immediately (Golden Path violation). A3 must use A1 API + key only.
+Snapshot logs/metrics: preserve for RCA.
+T+10–25 min
+
+A1 stabilization:
+Verify DATABASE_URL and perform SELECT 1 using the same client A1 uses.
+Enforce pooling (app-level): max=10, min=2, idleTimeout=10s, acquireTimeout=3s, statement_timeout=5s, keepalive=on.
+Reduce HTTP worker concurrency temporarily to avoid stampede on reconnect.
+Add health markers: db_connected=true/false, pool_in_use, pool_idle to /health for A8 scraping.
+T+25–40 min
+
+Canary: From A3, single request to A1 via API gateway; confirm 200 and db_connected=true.
+Re-enable A3 at concurrency=1 with breaker half-open; test a single job; verify backoff metrics and that breaker reopens on any A1 5xx/timeouts.
+T+40–60 min
+
+Stabilize: Gradually raise A3 concurrency to a safe floor (e.g., 2–3). Keep global rate limiter to A1 enabled (token bucket).
+Begin 60-minute green snapshot clock for exit criteria (A1 uptime, no retry storms, P95 core ≤120ms, aux ≤200ms).
+Permanent fixes (commit by D+1, verify in soak)
+
+Enforce Database-as-a-Service contract:
+Policy check: No worker app (A2–A7) may hold DATABASE_URL; A8 registry will block deploy if detected.
+Circuit breakers everywhere:
+Standard profile: open on 3 consecutive 5xx/timeouts, cooldown 60s, exponential backoff with jitter; metrics emitted to A8.
+Global rate limiting:
+Per-service token bucket in front of A1; start 50 rps ceiling with burst 20 during pilot; tune with soak.
+Pooling hardening:
+Keep max pooled connections per instance ≤10; introduce connection reuse metrics; alarm at >80% utilization for 5 min.
+Queue pressure controls:
+Drop or dead-letter non-critical jobs when breaker open; cap queue depth; alarm on growth slope.
+Golden Path guard:
+Manifest digest + static scan to fail CI if DATABASE_URL found outside DataService.
+Load/chaos tests:
+Add auth-DB disruption test to CI nightly; assert breakers open/close and that queues don’t storm.
+Provider and student comms
+
+If outage >30 minutes:
+Providers: send maintenance notice (“security and reliability upgrade to Auth layer”; no action required, status link provided).
+Students: suppress purchase prompts; show banner “System upgrade in progress; try again soon.” No charges will be retained.
+Exit criteria to lift HARD STOP (and restore 2% pilot; Gate-1 remains pending CEO approval)
+
+A1: 60 mins green; db_connected=true; pool utilization <80%; 0 auth 5xx.
+A3: 0 RETRY_STORM events; breaker metrics normal; queue depth stable.
+Performance: P95 core (A1–A4) ≤120ms; aux (A6/A8) ≤200ms.
+Governance: A3 secrets audited clean; A5/A7 still compliant with Golden Path; 3-of-3 confirmations.
+Deliver A8 attestation with snapshot window, error rates, P95s, breaker stats, pool metrics, and checksum parity.
+RCA and prevention (due within 48 hours)
+
+Format: 5-Whys, timeline, customer impact, cost of compute burn (“Autonomy Tax”), fixes, guardrails, and learning.
+Include: before/after pool configs, breaker thresholds, rate limits, and test evidence.
+Authorizations
+
+I authorize all actions above, including temporary traffic suppression and emergency config changes to enforce pooling, breakers, and rate limits.
+B2B onboarding activity continues (non-auth tasks); provider login flows resume only after A1 green.
+Report back
+
+T+30 min: brief with A1 probe results, pooling/breaker config, and confirmation that A3 is contained.
+T+60 min: A8 attestation for exit-criteria review. I will decide on restoring the 2% pilot window upon receiving a clean snapshot.

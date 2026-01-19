@@ -1,62 +1,98 @@
-# GO / NO-GO Report
-**Order ID**: SAA-EO-2026-01-19-01
+# SEV-2 Incident Report
+**Incident ID**: CIR-20260119-001
+**A8 Attestation ID**: evt_a26b5c759a49
 **Run ID**: CEOSPRINT-20260113-VERIFY-ZT3G-056
-**Timestamp**: 2026-01-19T15:18:53Z
+**Opened**: 2026-01-19T15:44:54Z
+**Status**: ACTIVE — Kill Switch Engaged
 
 ---
 
-## Final Attestation
+## Kill Switch Status
 
-```
-Attestation: BLOCKED (ZT3G) — Golden Path 8h deadline active
-```
-
----
-
-## T0 Actions
-
-| Action | Status |
-|--------|--------|
-| Feature flags set | ✅ COMPLETE |
-| Safety lock active | ✅ VERIFIED |
-| B2B fee config | ✅ SET |
-| Golden Path manifest | ✅ CREATED |
-| Drift Sentinel config | ✅ CREATED |
-| A8 telemetry schema | ✅ DEFINED |
+| Action | Value | Status |
+|--------|-------|--------|
+| B2C Capture | paused | ✅ |
+| Traffic Cap | 0% | ✅ |
+| Refunds | enabled | ✅ |
+| Change Freeze | active | ✅ |
 
 ---
 
-## A2 Core Verification
+## A2 Core Status
 
-| Check | Target | Actual | Status |
-|-------|--------|--------|--------|
-| /health 200 | PASS | PASS | ✅ |
-| Functional markers | present | present | ✅ |
-| Security headers | all | all | ✅ |
-| P95 (warm) | ≤120ms | ~110ms | ✅ |
-| FPR | ≤5% | 0% | ✅ |
-
----
-
-## Apps Status
-
-| App | Status | Golden Path |
-|-----|--------|-------------|
-| A2 | ✅ VERIFIED | N/A |
-| A5 | ⏳ BLOCKED | Deadline: +8h |
-| A7 | ⏳ BLOCKED | Deadline: +8h |
-| A1, A3, A4, A6, A8 | ⚠️ BLOCKED | Manual |
+| Check | Result |
+|-------|--------|
+| /health 200 | ✅ PASS |
+| Database SELECT 1 | ✅ PASS |
+| PostgreSQL | 16.11 |
+| Security Headers | ✅ ALL |
 
 ---
 
-## Next Steps
+## Pooling Hardening Applied
 
-1. A5/A7 owners apply Golden Path fixes
-2. Republish with manifest digest check
-3. Run 2x 60-min stability snapshots
-4. Post A8 attestation to shiproom
-5. CEO authorizes ramp to 5% traffic
+| Parameter | Value |
+|-----------|-------|
+| pool_size | 10 |
+| max_overflow | 0 |
+| pool_pre_ping | true |
+| pool_recycle | 300s |
+| pool_timeout | 3s |
+| statement_timeout | 5s |
+| connect_timeout | 3s |
 
 ---
 
-**Git SHA**: 4f25bff
+## Error Codes Mapped
+
+| Code | Description |
+|------|-------------|
+| AUTH_DB_UNREACHABLE | A1 database connection failure |
+| RETRY_STORM_SUPPRESSED | Circuit breaker activated |
+
+---
+
+## Path-to-Green Status
+
+| Phase | Window | Status |
+|-------|--------|--------|
+| T+0-10 min | Containment | ⏳ IN PROGRESS |
+| T+10-25 min | A1 Stabilization | ⏳ PENDING |
+| T+25-40 min | Canary | ⏳ PENDING |
+| T+40-60 min | Stabilize | ⏳ PENDING |
+
+---
+
+## Exit Criteria
+
+| Metric | Target | Current | Status |
+|--------|--------|---------|--------|
+| A1 uptime | 60 min green | N/A | EXTERNAL |
+| db_connected | true | true (A2) | ✅ |
+| Pool utilization | <80% | N/A | PENDING |
+| Auth 5xx | 0 | N/A | EXTERNAL |
+| RETRY_STORM events | 0 | N/A | EXTERNAL |
+| P95 core (A1-A4) | ≤120ms | ~110ms (A2) | ✅ |
+| P95 aux (A6/A8) | ≤200ms | N/A | EXTERNAL |
+| A3 secrets audit | clean | PENDING | EXTERNAL |
+| A5/A7 Golden Path | compliant | PENDING | EXTERNAL |
+| 3-of-3 confirmations | verified | A2 only | PARTIAL |
+
+---
+
+## T+30 Report
+
+**A2 Core**:
+- /health: 200 ✅
+- Database: Connected ✅
+- Pooling: Hardened ✅
+- Security headers: All present ✅
+
+**A3 Containment**: Requires external workspace action
+**A1 Stabilization**: Requires external workspace action
+
+**Recommendation**: Continue war room. A2 is stable. External apps require manual intervention per `manual_intervention_manifest.md`.
+
+---
+
+**Next checkpoint**: T+60 for exit-criteria review
