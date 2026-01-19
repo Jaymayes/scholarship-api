@@ -1,0 +1,73 @@
+Acknowledged. SEV-1 declared. I am ordering a force restart of the fleet and a telemetry gate bypass now.
+
+Authorizations and hard controls (execute immediately)
+
+Traffic: Set TRAFFIC_CAP_B2C_PILOT = 0 for the restart window. Keep SAFETY_LOCK and auto-refunds active. B2B sessions may momentarily drop; acceptable for 30–60s during cutover.
+Telemetry gate: TELEMETRY_STRICT_MODE = false and TELEMETRY_REQUIRE_IDEMPOTENCY = false on scholarship_api and A8 ingestion. Accept all events with 200/202. Log “missing_header” and compute sha256(body) for post-hoc dedupe.
+Fleet SEO: WAF block on all sitemap endpoints and revoke scheduler tokens across all workspaces. This is in addition to pausing internal jobs.
+Probes: Disable localhost and /metrics/p95 probes fleet-wide until the unified /metrics + A8 p95 aggregate is confirmed.
+SEV-1 force restart plan (A1–A8)
+Sequence (repeat for each app, but start with A7, A8, then A1, then A3, then the rest):
+
+Quiesce and snapshot
+Capture 30s of logs and open file descriptors.
+Record current PID, commit_sha, build_artifact_sha, manifest_digest.
+2. Hard stop and rebuild
+
+Kill running process (kill -9) and stop the container/process supervisor.
+Clear any resident cron/scheduler in the web process.
+Rebuild/restart from the Golden Path manifest; inject version labels into boot logs.
+3. Verify green before next app
+
+Confirm new PID differs from snapshot and boot logs show the new commit and digest.
+Health markers: 200 + functional markers; for A1 confirm db_connected=true, pool_in_use/idle/total sane, and pool_utilization <50% after warm.
+Synthetic: hit only the public https origin; follow redirects; confirm two consecutive passes.
+Observability: POST to /api/analytics/events without X-Idempotency-Key returns 202; queue depth declines; no 428s.
+Post-restart truth probes (must pass before restoring 2%)
+
+Telemetry acceptance
+Target ≥99% acceptance for 15 consecutive minutes; 0 HTTP 428; A8 queue depth trending to <100; no “fallback failed” lines.
+SEO suppression
+0 sitemap 429 lines across all workspaces for 30 minutes (WAF confirms blocks).
+Auth health
+Provider synthetic flow P95 ≤500ms; /api/login P95 ≤200ms; auth 5xx=0; policy blocks (401/403/429) reported separately.
+CPU/event-loop
+Event-loop-lag p95 <100ms; no node-cron “missed execution” on web processes (cron jobs must run only on worker VMs).
+DB latency
+Raw DB p95 ≤100ms sustained with slow-query log at 80ms; no statement timeouts.
+Data integrity and clean-up
+
+Accept duplicates now; preserve raw payloads. After ingestion stabilizes, run a post-hoc dedupe job keyed on coalesce(request_id, sha256(body)), collapsing duplicates in business_events. Maintain a unique index on that key going forward.
+Owner-specific tasks and confirmations (must be posted to A8/shiproom)
+
+Platform SRE
+Execute the force restart across A7, A8, A1, A3, then remaining services.
+Post PID-before/PID-after, commit_sha, and manifest_digest per app.
+Attach a log snippet showing 202 acceptance for a synthetic telemetry POST with no idempotency header.
+Growth Eng (A7)
+Confirm WAF rule IDs and show 0 sitemap hits for 30 minutes; post the WAF log extract.
+Watchtower
+Replace localhost probes; confirm unified /metrics is scraped and A8 is emitting p95 aggregates. Disable /metrics/p95 direct probes.
+Post a single “window_closed_at” timestamp with each snapshot to prevent stale “green mirage.”
+Rollback/kill conditions (auto)
+
+If after restart the Telemetry Acceptance Ratio <95% for any rolling 10 minutes OR provider synthetic P95 >500ms OR any auth 5xx appears, keep B2C at 0% and open/append to the SEV-1 CIR.
+Exit and restore path
+
+When all post-restart probes above pass for 15 minutes:
+Restore TRAFFIC_CAP_B2C_PILOT to 2%.
+Continue the 30-minute telemetry ≥99% acceptance run to clear SEV-1 to SEV-2, then into normal watch.
+Gate 1 (5%) remains NO GO until 24h stability and breaker closed/stable.
+Communications
+
+Post “Emergency restart to remediate telemetry and background worker drift” to status page (5–10 min window). Notify the 10-provider cohort; reassure no data loss and minor interruption possible.
+What I expect back
+
+A8 attestation IDs per restart phase (A7, A8, A1, A3, others) with:
+New PID/commit/digest, health markers, telemetry 202 sample, acceptance ratio, queue depth, DB p95, event-loop p95, and WAF confirmation.
+A clean log tail excerpt showing:
+0 telemetry 428s
+0 sitemap 429s
+No localhost/301 synthetic errors
+No node-cron missed execution on web processes
+Proceed. Stop the bleeding now; verify with log evidence, not dashboards.

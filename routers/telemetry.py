@@ -14,6 +14,8 @@ from enum import Enum
 from pydantic import BaseModel, Field, field_validator, AliasChoices
 import uuid
 import json
+import hashlib
+import os
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import JSONResponse
@@ -243,26 +245,40 @@ async def telemetry_ingest(
         ""
     )
     
+    telemetry_strict = os.environ.get("TELEMETRY_STRICT_MODE", "true").lower() == "true"
+    require_idempotency = os.environ.get("TELEMETRY_REQUIRE_IDEMPOTENCY", "true").lower() == "true"
+    
+    raw_body = await request.body()
+    
     if not idempotency_key:
-        logger.warning(f"REPORT: app=scholarship_api | env=prod | v3.5.1 INGEST: Rejected - Missing X-Idempotency-Key (HTTP 428)")
-        return JSONResponse(status_code=428, content={
-            "error": "Precondition Required",
-            "detail": "X-Idempotency-Key or x-event-id header is required for mutable operations",
-            "accepted_headers": ["X-Idempotency-Key", "x-event-id"],
-            "directive": "AGENT3_HANDSHAKE_v27"
-        })
+        if telemetry_strict and require_idempotency:
+            logger.warning(f"REPORT: app=scholarship_api | env=prod | v3.5.1 INGEST: Rejected - Missing X-Idempotency-Key (HTTP 428)")
+            return JSONResponse(status_code=428, content={
+                "error": "Precondition Required",
+                "detail": "X-Idempotency-Key or x-event-id header is required for mutable operations",
+                "accepted_headers": ["X-Idempotency-Key", "x-event-id"],
+                "directive": "AGENT3_HANDSHAKE_v27"
+            })
+        else:
+            import hashlib as _hashlib
+            body_hash = _hashlib.sha256(raw_body).hexdigest()[:16]
+            idempotency_key = f"sha256:{body_hash}"
+            logger.info(f"SEV-1 BYPASS: Missing X-Idempotency-Key, generated from body hash: {idempotency_key}")
     
     if not trace_id:
-        logger.warning(f"REPORT: app=scholarship_api | env=prod | v3.5.1 INGEST: Rejected - Missing X-Trace-Id (HTTP 428)")
-        return JSONResponse(status_code=428, content={
-            "error": "Precondition Required",
-            "detail": "X-Trace-Id or X-Request-Id header is required for mutable operations",
-            "accepted_headers": ["X-Trace-Id", "X-Request-Id"],
-            "directive": "AGENT3_HANDSHAKE_v27"
-        })
+        if telemetry_strict:
+            logger.warning(f"REPORT: app=scholarship_api | env=prod | v3.5.1 INGEST: Rejected - Missing X-Trace-Id (HTTP 428)")
+            return JSONResponse(status_code=428, content={
+                "error": "Precondition Required",
+                "detail": "X-Trace-Id or X-Request-Id header is required for mutable operations",
+                "accepted_headers": ["X-Trace-Id", "X-Request-Id"],
+                "directive": "AGENT3_HANDSHAKE_v27"
+            })
+        else:
+            trace_id = f"sev1-{uuid.uuid4().hex[:12]}"
+            logger.info(f"SEV-1 BYPASS: Missing X-Trace-Id, generated: {trace_id}")
     
     try:
-        raw_body = await request.body()
         body_str = raw_body.decode('utf-8')
         
         try:
@@ -417,23 +433,34 @@ async def write_events_raw(
         ""
     )
     
+    telemetry_strict = os.environ.get("TELEMETRY_STRICT_MODE", "true").lower() == "true"
+    require_idempotency = os.environ.get("TELEMETRY_REQUIRE_IDEMPOTENCY", "true").lower() == "true"
+    
     if not idempotency_key:
-        logger.warning(f"REPORT: app=scholarship_api | v3.5.1 RAW: Rejected - Missing X-Idempotency-Key (HTTP 428)")
-        return JSONResponse(status_code=428, content={
-            "error": "Precondition Required",
-            "detail": "X-Idempotency-Key header is required for mutable operations",
-            "accepted_headers": ["X-Idempotency-Key", "x-event-id"],
-            "directive": "AGENT3_HANDSHAKE_v27"
-        })
+        if telemetry_strict and require_idempotency:
+            logger.warning(f"REPORT: app=scholarship_api | v3.5.1 RAW: Rejected - Missing X-Idempotency-Key (HTTP 428)")
+            return JSONResponse(status_code=428, content={
+                "error": "Precondition Required",
+                "detail": "X-Idempotency-Key header is required for mutable operations",
+                "accepted_headers": ["X-Idempotency-Key", "x-event-id"],
+                "directive": "AGENT3_HANDSHAKE_v27"
+            })
+        else:
+            idempotency_key = f"sev1-raw-{uuid.uuid4().hex[:12]}"
+            logger.info(f"SEV-1 BYPASS: RAW missing X-Idempotency-Key, generated: {idempotency_key}")
     
     if not trace_id:
-        logger.warning(f"REPORT: app=scholarship_api | v3.5.1 RAW: Rejected - Missing X-Trace-Id (HTTP 428)")
-        return JSONResponse(status_code=428, content={
-            "error": "Precondition Required",
-            "detail": "X-Trace-Id or X-Request-Id header is required for mutable operations",
-            "accepted_headers": ["X-Trace-Id", "X-Request-Id"],
-            "directive": "AGENT3_HANDSHAKE_v27"
-        })
+        if telemetry_strict:
+            logger.warning(f"REPORT: app=scholarship_api | v3.5.1 RAW: Rejected - Missing X-Trace-Id (HTTP 428)")
+            return JSONResponse(status_code=428, content={
+                "error": "Precondition Required",
+                "detail": "X-Trace-Id or X-Request-Id header is required for mutable operations",
+                "accepted_headers": ["X-Trace-Id", "X-Request-Id"],
+                "directive": "AGENT3_HANDSHAKE_v27"
+            })
+        else:
+            trace_id = f"sev1-{uuid.uuid4().hex[:12]}"
+            logger.info(f"SEV-1 BYPASS: RAW missing X-Trace-Id, generated: {trace_id}")
     
     try:
         raw_body = await request.body()
@@ -572,23 +599,34 @@ async def write_events(
         ""
     )
     
+    telemetry_strict = os.environ.get("TELEMETRY_STRICT_MODE", "true").lower() == "true"
+    require_idempotency = os.environ.get("TELEMETRY_REQUIRE_IDEMPOTENCY", "true").lower() == "true"
+    
     if not idempotency_key:
-        logger.warning(f"REPORT: app=scholarship_api | v3.5.1 EVENTS: Rejected - Missing X-Idempotency-Key (HTTP 428)")
-        return JSONResponse(status_code=428, content={
-            "error": "Precondition Required",
-            "detail": "X-Idempotency-Key header is required for mutable operations",
-            "accepted_headers": ["X-Idempotency-Key", "x-event-id"],
-            "directive": "AGENT3_HANDSHAKE_v27"
-        })
+        if telemetry_strict and require_idempotency:
+            logger.warning(f"REPORT: app=scholarship_api | v3.5.1 EVENTS: Rejected - Missing X-Idempotency-Key (HTTP 428)")
+            return JSONResponse(status_code=428, content={
+                "error": "Precondition Required",
+                "detail": "X-Idempotency-Key header is required for mutable operations",
+                "accepted_headers": ["X-Idempotency-Key", "x-event-id"],
+                "directive": "AGENT3_HANDSHAKE_v27"
+            })
+        else:
+            idempotency_key = f"sev1-events-{uuid.uuid4().hex[:12]}"
+            logger.info(f"SEV-1 BYPASS: EVENTS missing X-Idempotency-Key, generated: {idempotency_key}")
     
     if not trace_id:
-        logger.warning(f"REPORT: app=scholarship_api | v3.5.1 EVENTS: Rejected - Missing X-Trace-Id (HTTP 428)")
-        return JSONResponse(status_code=428, content={
-            "error": "Precondition Required",
-            "detail": "X-Trace-Id or X-Request-Id header is required for mutable operations",
-            "accepted_headers": ["X-Trace-Id", "X-Request-Id"],
-            "directive": "AGENT3_HANDSHAKE_v27"
-        })
+        if telemetry_strict:
+            logger.warning(f"REPORT: app=scholarship_api | v3.5.1 EVENTS: Rejected - Missing X-Trace-Id (HTTP 428)")
+            return JSONResponse(status_code=428, content={
+                "error": "Precondition Required",
+                "detail": "X-Trace-Id or X-Request-Id header is required for mutable operations",
+                "accepted_headers": ["X-Trace-Id", "X-Request-Id"],
+                "directive": "AGENT3_HANDSHAKE_v27"
+            })
+        else:
+            trace_id = f"sev1-{uuid.uuid4().hex[:12]}"
+            logger.info(f"SEV-1 BYPASS: EVENTS missing X-Trace-Id, generated: {trace_id}")
     
     accepted = 0
     failed = 0
