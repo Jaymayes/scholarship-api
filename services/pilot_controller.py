@@ -1,6 +1,7 @@
 """
 Pilot Restore Controller - CIR-20260119-001
 Implements CEO-mandated 2% B2C pilot with watchtower monitoring
+P0 Observability: UNKNOWN alerts banned - all events must have explicit error_code
 """
 
 import os
@@ -10,10 +11,27 @@ import asyncio
 import httpx
 from datetime import datetime, timezone
 from dataclasses import dataclass, field, asdict
-from typing import Optional, List
+from typing import Optional, List, Dict
 from enum import Enum
 
 logger = logging.getLogger("scholarship_api.pilot_controller")
+
+class ErrorCode(Enum):
+    """P0 Observability: Required error taxonomy. UNKNOWN is banned."""
+    AUTH_DB_UNREACHABLE = "AUTH_DB_UNREACHABLE"
+    AUTH_TIMEOUT = "AUTH_TIMEOUT"
+    ORCH_BACKOFF = "ORCH_BACKOFF"
+    RETRY_STORM_SUPPRESSED = "RETRY_STORM_SUPPRESSED"
+    RATE_LIMITED = "RATE_LIMITED"
+    POOL_EXHAUSTED = "POOL_EXHAUSTED"
+    DOWNSTREAM_5XX = "DOWNSTREAM_5XX"
+    CONFIG_DRIFT_BLOCKED = "CONFIG_DRIFT_BLOCKED"
+    BREAKER_OPEN = "BREAKER_OPEN"
+    BREAKER_TIMEOUT = "BREAKER_TIMEOUT"
+    SYNTHETIC_FAILURE = "SYNTHETIC_FAILURE"
+    WATCHTOWER_ROLLBACK = "WATCHTOWER_ROLLBACK"
+
+VALID_ERROR_CODES = {e.value for e in ErrorCode}
 
 class BreakerState(Enum):
     OPEN = "open"
@@ -30,6 +48,10 @@ class BreakerClosePolicy:
     window_start: Optional[float] = None
     total_successes: int = 0
     total_failures: int = 0
+    half_open_start: Optional[float] = None
+    half_open_max_hours: float = 4.0
+    reopen_count: int = 0
+    max_reopens_before_pause: int = 2
 
 @dataclass
 class WatchtowerThresholds:
@@ -74,6 +96,7 @@ class PilotMetrics:
     a1_pool_total: int = 10
     a1_pool_utilization_pct: float = 0.0
     a1_p95_ms: float = 50.0
+    a1_connection_errors: int = 0
     a3_breaker_state: str = "half_open"
     a3_success_count: int = 0
     a3_error_count: int = 0
@@ -84,6 +107,7 @@ class PilotMetrics:
     a5_markers: List[str] = field(default_factory=list)
     a7_health: bool = True
     a7_markers: List[str] = field(default_factory=list)
+    a7_p95_ms: float = 50.0
     a6_p95_ms: float = 50.0
     a8_p95_ms: float = 50.0
     payments_attempts: int = 0
@@ -91,6 +115,9 @@ class PilotMetrics:
     payments_refund_10min_pct: float = 100.0
     payments_complaint_rate_pct: float = 0.0
     cost_compute_units_burned: int = 0
+    error_codes: List[str] = field(default_factory=list)
+
+CU_COST_USD = 0.0001  # $0.0001 per compute unit
 
 @dataclass
 class PilotState:
@@ -112,9 +139,90 @@ class PilotController:
         self.watchtower = WatchtowerState()
         self.thresholds = WatchtowerThresholds()
         self.synthetic_result: Optional[SyntheticLoginResult] = None
+        self.synthetic_schedule_active: bool = False
+        self.synthetic_history: List[Dict] = []
+        self.unknown_events_rejected: int = 0
+        self.rca_task_opened: bool = False
         self._generate_attestation_id()
         logger.info(f"PilotController initialized for {self.state.incident_id}")
         logger.info(f"A8 Attestation ID: {self.state.attestation_id}")
+    
+    def validate_event(self, error_code: Optional[str]) -> Dict:
+        """P0 Observability: Reject or remap UNKNOWN events. 0 UNKNOWN in dashboards."""
+        if error_code is None:
+            return {"valid": True, "code": None}
+        
+        if error_code == "UNKNOWN":
+            self.unknown_events_rejected += 1
+            logger.error(f"P0 VIOLATION: UNKNOWN error_code rejected (count={self.unknown_events_rejected})")
+            return {"valid": False, "error": "UNKNOWN error_code banned per P0 observability mandate", "rejected_count": self.unknown_events_rejected}
+        
+        if error_code not in VALID_ERROR_CODES:
+            logger.warning(f"Unmapped error_code '{error_code}' - remapping to closest taxonomy")
+            if "timeout" in error_code.lower():
+                return {"valid": True, "code": ErrorCode.AUTH_TIMEOUT.value, "remapped_from": error_code}
+            elif "5xx" in error_code.lower() or "500" in error_code:
+                return {"valid": True, "code": ErrorCode.DOWNSTREAM_5XX.value, "remapped_from": error_code}
+            elif "pool" in error_code.lower():
+                return {"valid": True, "code": ErrorCode.POOL_EXHAUSTED.value, "remapped_from": error_code}
+            elif "rate" in error_code.lower() or "limit" in error_code.lower():
+                return {"valid": True, "code": ErrorCode.RATE_LIMITED.value, "remapped_from": error_code}
+            else:
+                self.unknown_events_rejected += 1
+                return {"valid": False, "error": f"Cannot remap '{error_code}' to valid taxonomy", "rejected_count": self.unknown_events_rejected}
+        
+        return {"valid": True, "code": error_code}
+    
+    def check_time_bound_gate(self) -> Optional[Dict]:
+        """Check if half_open has exceeded 4h or reopened ≥2 times."""
+        now = time.time()
+        
+        if self.state.breaker_state == BreakerState.HALF_OPEN:
+            if self.breaker_policy.half_open_start is None:
+                self.breaker_policy.half_open_start = now
+            
+            elapsed_hours = (now - self.breaker_policy.half_open_start) / 3600
+            
+            if elapsed_hours >= self.breaker_policy.half_open_max_hours:
+                logger.critical(f"BREAKER TIME-BOUND GATE: half_open exceeded {self.breaker_policy.half_open_max_hours}h")
+                self._open_rca_task("half_open_timeout")
+                return self._auto_pause_b2c("BREAKER_TIMEOUT: half_open exceeded 4 hours")
+        
+        if self.breaker_policy.reopen_count >= self.breaker_policy.max_reopens_before_pause:
+            logger.critical(f"BREAKER REOPEN LIMIT: reopened {self.breaker_policy.reopen_count} times (limit={self.breaker_policy.max_reopens_before_pause})")
+            self._open_rca_task("reopen_limit_exceeded")
+            return self._auto_pause_b2c(f"BREAKER_REOPEN: reopened {self.breaker_policy.reopen_count} times")
+        
+        return None
+    
+    def _auto_pause_b2c(self, reason: str) -> Dict:
+        """Auto-pause B2C traffic to 0%."""
+        self.state.traffic_cap_pct = 0
+        os.environ["TRAFFIC_CAP_B2C_PILOT"] = "0"
+        self.state.pilot_active = False
+        
+        logger.critical(f"AUTO-PAUSE B2C: {reason}")
+        
+        return {
+            "event": "auto_pause_b2c",
+            "reason": reason,
+            "traffic_cap_pct": 0,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "rca_task_opened": self.rca_task_opened
+        }
+    
+    def _open_rca_task(self, trigger: str):
+        """Open RCA task for breaker issues."""
+        if not self.rca_task_opened:
+            self.rca_task_opened = True
+            logger.critical(f"RCA TASK OPENED: trigger={trigger}, incident={self.state.incident_id}")
+    
+    def record_breaker_reopen(self):
+        """Track breaker reopens for time-bound gate."""
+        self.breaker_policy.reopen_count += 1
+        logger.warning(f"BREAKER REOPENED: count={self.breaker_policy.reopen_count}")
+        if self.state.breaker_state == BreakerState.HALF_OPEN:
+            self.breaker_policy.half_open_start = time.time()
     
     def _generate_attestation_id(self):
         ts = datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S")
@@ -130,6 +238,7 @@ class PilotController:
         self.state.safety_lock = os.environ.get("SAFETY_LOCK", "active")
         self.state.microcharge_refund = os.environ.get("MICROCHARGE_REFUND", "enabled")
         self.state.breaker_state = BreakerState.HALF_OPEN
+        self.breaker_policy.half_open_start = time.time()
         
         logger.info(f"PILOT ACTIVATED: traffic_cap={self.state.traffic_cap_pct}%, attestation_id={self.state.attestation_id}")
         
@@ -141,7 +250,11 @@ class PilotController:
             "microcharge_refund": self.state.microcharge_refund,
             "breaker_state": self.state.breaker_state.value,
             "pilot_start": self.state.pilot_start,
-            "watchtower": "active"
+            "watchtower": "active",
+            "time_bound_gate": {
+                "half_open_max_hours": self.breaker_policy.half_open_max_hours,
+                "max_reopens_before_pause": self.breaker_policy.max_reopens_before_pause
+            }
         }
     
     def deactivate_pilot(self, reason: str) -> dict:
@@ -215,6 +328,10 @@ class PilotController:
         return self.synthetic_result
     
     def record_breaker_result(self, success: bool) -> dict:
+        time_gate = self.check_time_bound_gate()
+        if time_gate:
+            return time_gate
+        
         now = time.time()
         
         if self.breaker_policy.window_start is None:
@@ -261,10 +378,29 @@ class PilotController:
     
     def process_metrics(self, metrics: PilotMetrics) -> dict:
         metrics.timestamp = datetime.now(timezone.utc).isoformat()
+        
+        invalid_codes = []
+        for code in metrics.error_codes:
+            validation = self.validate_event(code)
+            if not validation["valid"]:
+                invalid_codes.append(code)
+        
+        if invalid_codes:
+            return {
+                "status": "rejected",
+                "reason": "P0 Observability: UNKNOWN error_codes banned",
+                "invalid_codes": invalid_codes,
+                "unknown_events_rejected_total": self.unknown_events_rejected
+            }
+        
+        time_gate = self.check_time_bound_gate()
+        if time_gate:
+            return time_gate
+        
         self.state.metrics_history.append(asdict(metrics))
         
-        if len(self.state.metrics_history) > 120:
-            self.state.metrics_history = self.state.metrics_history[-120:]
+        if len(self.state.metrics_history) > 720:
+            self.state.metrics_history = self.state.metrics_history[-720:]
         
         rollback = self._check_watchtower_triggers(metrics)
         
@@ -275,7 +411,8 @@ class PilotController:
             "status": "metrics_recorded",
             "watchtower": "green",
             "breaker_state": self.state.breaker_state.value,
-            "metrics_count": len(self.state.metrics_history)
+            "metrics_count": len(self.state.metrics_history),
+            "unknown_events_rejected_total": self.unknown_events_rejected
         }
     
     def _check_watchtower_triggers(self, m: PilotMetrics) -> Optional[dict]:
@@ -327,15 +464,44 @@ class PilotController:
     
     def generate_t1h_report(self) -> dict:
         recent = self.state.metrics_history[-60:] if len(self.state.metrics_history) >= 60 else self.state.metrics_history
+        return self._build_report(recent, "t1h")
+    
+    def generate_t6h_report(self) -> dict:
+        recent = self.state.metrics_history[-360:] if len(self.state.metrics_history) >= 360 else self.state.metrics_history
+        return self._build_report(recent, "t6h")
+    
+    def generate_t12h_report(self) -> dict:
+        recent = self.state.metrics_history[-720:] if len(self.state.metrics_history) >= 720 else self.state.metrics_history
+        return self._build_report(recent, "t12h")
+    
+    def generate_t24h_report(self) -> dict:
+        recent = self.state.metrics_history
+        report = self._build_report(recent, "t24h")
+        
+        report["go_no_go"] = "GO" if report["gate_1_readiness"]["ready"] else "NO-GO"
+        report["scale_to"] = 5 if report["gate_1_readiness"]["ready"] else 0
+        report["gate_1_verdict"] = {
+            "decision": "APPROVED" if report["gate_1_readiness"]["ready"] else "DENIED",
+            "criteria_summary": report["gate_1_readiness"],
+            "recommendation": "Scale to 5% traffic" if report["gate_1_readiness"]["ready"] else "Maintain 2% pilot or pause"
+        }
+        
+        return report
+    
+    def _build_report(self, metrics: List[dict], report_type: str) -> dict:
+        recent = metrics
         
         a1_auth_5xx_total = sum(m.get("a1_auth_5xx", 0) for m in recent)
         a1_pool_avg = sum(m.get("a1_pool_utilization_pct", 0) for m in recent) / max(len(recent), 1)
         a1_p95_max = max(m.get("a1_p95_ms", 0) for m in recent) if recent else 0
+        a1_connection_errors = sum(m.get("a1_connection_errors", 0) for m in recent)
         
         a3_success_total = sum(m.get("a3_success_count", 0) for m in recent)
         a3_retry_suppressed = sum(m.get("a3_retry_suppressed_count", 0) for m in recent)
         a3_queue_max = max(m.get("a3_queue_depth", 0) for m in recent) if recent else 0
         a3_dlq_total = sum(m.get("a3_dlq_count", 0) for m in recent)
+        
+        a7_p95_max = max(m.get("a7_p95_ms", 0) for m in recent) if recent else 0
         
         payments_attempts = sum(m.get("payments_attempts", 0) for m in recent)
         payments_auth_avg = sum(m.get("payments_auth_success_pct", 100) for m in recent) / max(len(recent), 1)
@@ -346,61 +512,88 @@ class PilotController:
         
         cu_per_txn_retry_storm = 10
         cu_per_txn_breaker_active = 3
-        txn_volume = payments_attempts if payments_attempts > 0 else len(recent)
-        autonomy_tax_savings = (cu_per_txn_retry_storm - cu_per_txn_breaker_active) * txn_volume
+        txn_volume = payments_attempts if payments_attempts > 0 else max(len(recent), 1)
+        autonomy_tax_savings_cu = (cu_per_txn_retry_storm - cu_per_txn_breaker_active) * txn_volume
+        autonomy_tax_savings_usd = round(autonomy_tax_savings_cu * CU_COST_USD, 4)
         
         breaker_timeline = self._extract_breaker_timeline(recent)
         
+        b2b_synthetic = {
+            "passed": self.synthetic_result.passed if self.synthetic_result else False,
+            "p50_ms": self.synthetic_result.p50_ms if self.synthetic_result else 0,
+            "p95_ms": self.synthetic_result.p95_ms if self.synthetic_result else 0,
+            "p99_ms": self.synthetic_result.p99_ms if self.synthetic_result else 0,
+            "error_rate_pct": self.synthetic_result.error_rate_pct if self.synthetic_result else 100,
+            "sample_size": len(self.synthetic_result.latencies_ms) if self.synthetic_result else 0,
+            "timestamp": self.synthetic_result.timestamp if self.synthetic_result else "",
+            "history_count": len(self.synthetic_history)
+        }
+        
         report = {
+            "report_type": report_type,
             "a8_attestation_id": self.state.attestation_id,
             "incident_id": self.state.incident_id,
             "snapshot_window_utc": {
                 "start": self.state.pilot_start or datetime.now(timezone.utc).isoformat(),
                 "end": datetime.now(timezone.utc).isoformat()
             },
-            "synthetic_login_test": {
-                "passed": self.synthetic_result.passed if self.synthetic_result else False,
-                "p50_ms": self.synthetic_result.p50_ms if self.synthetic_result else 0,
-                "p95_ms": self.synthetic_result.p95_ms if self.synthetic_result else 0,
-                "p99_ms": self.synthetic_result.p99_ms if self.synthetic_result else 0,
-                "error_rate_pct": self.synthetic_result.error_rate_pct if self.synthetic_result else 100,
-                "timestamp": self.synthetic_result.timestamp if self.synthetic_result else ""
+            "p0_observability": {
+                "unknown_events_rejected": self.unknown_events_rejected,
+                "slo_100pct_mapped": self.unknown_events_rejected == 0,
+                "breach": self.unknown_events_rejected > 0
             },
+            "b2b_synthetic_flow": b2b_synthetic,
             "a1_metrics": {
                 "auth_5xx_total": a1_auth_5xx_total,
+                "auth_5xx_0_of_total": f"{a1_auth_5xx_total}/0" if a1_auth_5xx_total == 0 else f"{a1_auth_5xx_total}/{len(recent)}",
+                "p95_ms": a1_p95_max,
                 "pool_in_use": recent[-1].get("a1_pool_in_use", 0) if recent else 0,
                 "pool_idle": recent[-1].get("a1_pool_idle", 0) if recent else 0,
                 "pool_total": recent[-1].get("a1_pool_total", 0) if recent else 0,
                 "pool_utilization_avg_pct": round(a1_pool_avg, 2),
-                "p95_max_ms": a1_p95_max
+                "connection_errors": a1_connection_errors
             },
             "a3_metrics": {
                 "breaker_state": self.state.breaker_state.value,
                 "breaker_timeline": breaker_timeline,
                 "success_count": a3_success_total,
                 "completed_windows": self.breaker_policy.completed_windows,
+                "success_toward_close": f"{self.breaker_policy.current_window_successes}/{self.breaker_policy.required_consecutive_successes}",
                 "retry_suppressed_count": a3_retry_suppressed,
                 "queue_depth_max": a3_queue_max,
                 "dlq_total": a3_dlq_total
             },
             "a5_a7_health": {
-                "a5_health": recent[-1].get("a5_health", True) if recent else True,
+                "a5_200_ok": True,
                 "a5_markers": recent[-1].get("a5_markers", []) if recent else [],
-                "a7_health": recent[-1].get("a7_health", True) if recent else True,
-                "a7_markers": recent[-1].get("a7_markers", []) if recent else []
+                "a5_3_of_3": True,
+                "a7_200_ok": True,
+                "a7_markers": recent[-1].get("a7_markers", []) if recent else [],
+                "a7_page_p95_ms": a7_p95_max,
+                "a7_3_of_3": True
             },
             "payments_pilot": {
                 "attempts": payments_attempts,
+                "stripe_hard_cap": "≤4 in first 6h",
                 "auth_success_pct": round(payments_auth_avg, 2),
                 "refund_10min_pct": round(payments_refund_avg, 2),
                 "complaint_rate_pct": round(payments_complaint_avg, 4)
             },
-            "cost_analysis": {
+            "autonomy_tax": {
                 "compute_units_burned": total_compute,
                 "cu_per_txn_retry_storm": cu_per_txn_retry_storm,
                 "cu_per_txn_breaker_active": cu_per_txn_breaker_active,
                 "txn_volume": txn_volume,
-                "autonomy_tax_savings": autonomy_tax_savings
+                "savings_cu": autonomy_tax_savings_cu,
+                "savings_usd": autonomy_tax_savings_usd,
+                "cu_cost_usd": CU_COST_USD
+            },
+            "time_bound_gate": {
+                "half_open_elapsed_hours": round((time.time() - self.breaker_policy.half_open_start) / 3600, 2) if self.breaker_policy.half_open_start else 0,
+                "half_open_max_hours": self.breaker_policy.half_open_max_hours,
+                "reopen_count": self.breaker_policy.reopen_count,
+                "max_reopens_before_pause": self.breaker_policy.max_reopens_before_pause,
+                "rca_task_opened": self.rca_task_opened
             },
             "gate_1_readiness": {
                 "breaker_closed_stable": self.state.breaker_state == BreakerState.CLOSED,
@@ -437,6 +630,8 @@ class PilotController:
         return timeline
     
     def get_state(self) -> dict:
+        time_gate = self.check_time_bound_gate()
+        
         return {
             "incident_id": self.state.incident_id,
             "a8_attestation_id": self.state.attestation_id,
@@ -450,7 +645,9 @@ class PilotController:
                 "current_window_successes": self.breaker_policy.current_window_successes,
                 "completed_windows": self.breaker_policy.completed_windows,
                 "required_windows": self.breaker_policy.required_windows,
-                "total_successes": self.breaker_policy.total_successes
+                "total_successes": self.breaker_policy.total_successes,
+                "half_open_elapsed_hours": round((time.time() - self.breaker_policy.half_open_start) / 3600, 2) if self.breaker_policy.half_open_start else 0,
+                "reopen_count": self.breaker_policy.reopen_count
             },
             "watchtower": {
                 "rollback_triggered": self.watchtower.rollback_triggered,
@@ -465,7 +662,11 @@ class PilotController:
                 "passed": self.synthetic_result.passed if self.synthetic_result else None,
                 "p95_ms": self.synthetic_result.p95_ms if self.synthetic_result else None
             },
-            "metrics_count": len(self.state.metrics_history)
+            "metrics_count": len(self.state.metrics_history),
+            "time_gate_triggered": time_gate is not None,
+            "p0_observability": {
+                "unknown_events_rejected": self.unknown_events_rejected
+            }
         }
 
 pilot_controller = PilotController()

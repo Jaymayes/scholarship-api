@@ -128,6 +128,8 @@ class WAFProtection(BaseHTTPMiddleware):
             "/api/internal/pilot/deactivate",  # SEV-2 Pilot: Pilot deactivation (internal ops)
             "/api/internal/pilot/metrics",  # SEV-2 Pilot: Metrics submission (internal ops)
             "/api/internal/pilot/breaker/result",  # SEV-2 Pilot: Breaker result (internal ops)
+            "/api/internal/pilot/breaker/reopen",  # SEV-2 Pilot: Breaker reopen tracking (internal ops)
+            "/api/internal/pilot/observability/validate",  # SEV-2 Pilot: P0 observability validation (internal ops)
         }
         
         # SECURITY: Regex patterns for dynamic routes that require WAF bypass

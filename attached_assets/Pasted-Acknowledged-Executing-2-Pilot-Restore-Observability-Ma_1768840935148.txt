@@ -1,0 +1,34 @@
+Acknowledged. Executing 2% Pilot Restore & Observability Mandate under defensive posture.
+
+Orders in effect (no changes to flags)
+
+B2C_CAPTURE = pilot_only; TRAFFIC_CAP_B2C_PILOT = 2%; SAFETY_LOCK = active; MICROCHARGE_REFUND = enabled.
+A3 breaker = half_open with close policy: 50 consecutive successes across two 5‑minute windows; emit breaker_closed on close.
+Stripe hard cap: ≤4 live attempts in first 6 hours; 100% refunds ≤10 minutes.
+Observability mandate (P0)
+
+UNKNOWN alerts are banned. Watchtower must reject or remap any event without an explicit error_code.
+Required taxonomy (initial, extend as needed): AUTH_DB_UNREACHABLE, AUTH_TIMEOUT, ORCH_BACKOFF, RETRY_STORM_SUPPRESSED, RATE_LIMITED, POOL_EXHAUSTED, DOWNSTREAM_5XX, CONFIG_DRIFT_BLOCKED.
+SLO: 100% events mapped; 0 UNKNOWN in dashboards. Breach = incident.
+Breaker/time‑bound gate
+
+Half_open may persist for up to 4 hours. If breaker does not close within that window, or reopens ≥2 times, auto‑pause B2C (cap=0) and open an RCA task.
+B2B protection
+
+Synthetic Provider Login flow (Login → Dashboard → Applicant List) every 5 minutes for 2 hours.
+SEV‑1 if P95 >500 ms or any auth 5xx; immediate B2C pause to 0% and notify.
+T+1h report (required)
+
+Attestation: latest A8 event ID + snapshot window (UTC).
+A1: auth_5xx=0/total, P95, pool_in_use/idle/total, utilization %, connection errors.
+A3: breaker timeline (open→half_open→closed), success counters toward policy, retry_suppressed_count, queue_depth/DLQ.
+A5/A7: 200 + markers + 3‑of‑3; A7 page P95.
+B2B synthetic flow: P50/P95/P99, error rate, sample size; pass/fail.
+Payments pilot: attempts, auth_success %, refund ≤10 min %, complaint rate.
+Autonomy Tax: compute_units_burned and savings = (CU_per_txn_retry_storm − CU_per_txn_breaker_active) × txn_volume. Include $ estimate using our CU cost.
+Cadence and gates
+
+T+1h: report (above).
+T+6h and T+12h: snapshots.
+T+24h: Watchtower report with GO/NO‑GO for Gate‑1 (5%). Gate‑1 requires: breaker closed and stable, SLOs hold, complaint rate <0.5%, payments auth ≥97%, 100% refunds ≤10m.
+Execution is approved as a data‑gathering exercise. Scale confidence, not traffic. Send the T+1h package with UNKNOWN=0, breaker progress, and autonomy‑tax savings.

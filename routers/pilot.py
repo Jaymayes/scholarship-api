@@ -7,13 +7,16 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from typing import Optional, List
 
-from services.pilot_controller import pilot_controller, PilotMetrics
+from services.pilot_controller import pilot_controller, PilotMetrics, VALID_ERROR_CODES
 
 router = APIRouter(prefix="/api/internal/pilot", tags=["pilot-sev2"])
 
 class SyntheticLoginRequest(BaseModel):
     provider_login_url: Optional[str] = None
     iterations: int = 10
+
+class EventValidationRequest(BaseModel):
+    error_code: str
 
 class PilotMetricsRequest(BaseModel):
     a1_auth_5xx: int = 0
@@ -22,6 +25,7 @@ class PilotMetricsRequest(BaseModel):
     a1_pool_total: int = 10
     a1_pool_utilization_pct: float = 0.0
     a1_p95_ms: float = 50.0
+    a1_connection_errors: int = 0
     a3_breaker_state: str = "half_open"
     a3_success_count: int = 0
     a3_error_count: int = 0
@@ -32,6 +36,7 @@ class PilotMetricsRequest(BaseModel):
     a5_markers: List[str] = []
     a7_health: bool = True
     a7_markers: List[str] = []
+    a7_p95_ms: float = 50.0
     a6_p95_ms: float = 50.0
     a8_p95_ms: float = 50.0
     payments_attempts: int = 0
@@ -39,6 +44,7 @@ class PilotMetricsRequest(BaseModel):
     payments_refund_10min_pct: float = 100.0
     payments_complaint_rate_pct: float = 0.0
     cost_compute_units_burned: int = 0
+    error_codes: List[str] = []
 
 class BreakerResultRequest(BaseModel):
     success: bool
@@ -103,6 +109,7 @@ async def submit_pilot_metrics(metrics: PilotMetricsRequest):
         a1_pool_total=metrics.a1_pool_total,
         a1_pool_utilization_pct=metrics.a1_pool_utilization_pct,
         a1_p95_ms=metrics.a1_p95_ms,
+        a1_connection_errors=metrics.a1_connection_errors,
         a3_breaker_state=metrics.a3_breaker_state,
         a3_success_count=metrics.a3_success_count,
         a3_error_count=metrics.a3_error_count,
@@ -113,16 +120,38 @@ async def submit_pilot_metrics(metrics: PilotMetricsRequest):
         a5_markers=metrics.a5_markers,
         a7_health=metrics.a7_health,
         a7_markers=metrics.a7_markers,
+        a7_p95_ms=metrics.a7_p95_ms,
         a6_p95_ms=metrics.a6_p95_ms,
         a8_p95_ms=metrics.a8_p95_ms,
         payments_attempts=metrics.payments_attempts,
         payments_auth_success_pct=metrics.payments_auth_success_pct,
         payments_refund_10min_pct=metrics.payments_refund_10min_pct,
         payments_complaint_rate_pct=metrics.payments_complaint_rate_pct,
-        cost_compute_units_burned=metrics.cost_compute_units_burned
+        cost_compute_units_burned=metrics.cost_compute_units_burned,
+        error_codes=metrics.error_codes
     )
     
     result = pilot_controller.process_metrics(pm)
+    
+    if result.get("status") == "rejected":
+        raise HTTPException(
+            status_code=400, 
+            detail={
+                "error": "P0 Observability Violation",
+                "reason": result.get("reason"),
+                "invalid_codes": result.get("invalid_codes"),
+                "unknown_events_rejected_total": result.get("unknown_events_rejected_total")
+            }
+        )
+    
+    if result.get("event") == "auto_pause_b2c":
+        return {
+            "watchtower": "AUTO_PAUSE_B2C",
+            "reason": result.get("reason"),
+            "timestamp": result.get("timestamp"),
+            "traffic_cap_pct": 0,
+            "rca_task_opened": result.get("rca_task_opened")
+        }
     
     if result.get("status") == "pilot_deactivated":
         return {
@@ -152,6 +181,61 @@ async def record_breaker_result(req: BreakerResultRequest):
 async def get_t1h_report():
     return pilot_controller.generate_t1h_report()
 
+@router.get("/report/t6h")
+async def get_t6h_report():
+    return pilot_controller.generate_t6h_report()
+
+@router.get("/report/t12h")
+async def get_t12h_report():
+    return pilot_controller.generate_t12h_report()
+
+@router.get("/report/t24h")
+async def get_t24h_report():
+    """T+24h Watchtower report with GO/NO-GO for Gate-1 (5%)."""
+    return pilot_controller.generate_t24h_report()
+
+@router.get("/observability/taxonomy")
+async def get_error_taxonomy():
+    """P0 Observability: Return valid error_code taxonomy. UNKNOWN is banned."""
+    return {
+        "valid_error_codes": list(VALID_ERROR_CODES),
+        "unknown_banned": True,
+        "slo": "100% events mapped; 0 UNKNOWN in dashboards",
+        "unknown_events_rejected": pilot_controller.unknown_events_rejected
+    }
+
+@router.post("/observability/validate")
+async def validate_error_code(req: EventValidationRequest):
+    """P0 Observability: Validate an error_code before submission."""
+    result = pilot_controller.validate_event(req.error_code)
+    if not result["valid"]:
+        raise HTTPException(status_code=400, detail=result)
+    return result
+
+@router.post("/breaker/reopen")
+async def record_breaker_reopen():
+    """Track breaker reopen for time-bound gate."""
+    pilot_controller.record_breaker_reopen()
+    return {
+        "reopen_count": pilot_controller.breaker_policy.reopen_count,
+        "max_reopens_before_pause": pilot_controller.breaker_policy.max_reopens_before_pause,
+        "will_auto_pause": pilot_controller.breaker_policy.reopen_count >= pilot_controller.breaker_policy.max_reopens_before_pause
+    }
+
+@router.get("/time-gate/status")
+async def get_time_gate_status():
+    """Check breaker time-bound gate status."""
+    import time
+    half_open_start = pilot_controller.breaker_policy.half_open_start
+    return {
+        "half_open_elapsed_hours": round((time.time() - half_open_start) / 3600, 2) if half_open_start else 0,
+        "half_open_max_hours": pilot_controller.breaker_policy.half_open_max_hours,
+        "reopen_count": pilot_controller.breaker_policy.reopen_count,
+        "max_reopens_before_pause": pilot_controller.breaker_policy.max_reopens_before_pause,
+        "rca_task_opened": pilot_controller.rca_task_opened,
+        "will_auto_pause_on_timeout": half_open_start is not None and (time.time() - half_open_start) / 3600 >= pilot_controller.breaker_policy.half_open_max_hours
+    }
+
 @router.get("/watchtower/status")
 async def get_watchtower_status():
     state = pilot_controller.get_state()
@@ -169,5 +253,14 @@ async def get_watchtower_status():
             "a3_error_burst_window_sec": 60
         },
         "current_state": state["watchtower"],
-        "breaker_policy": state["breaker_policy"]
+        "breaker_policy": state["breaker_policy"],
+        "time_bound_gate": {
+            "half_open_max_hours": pilot_controller.breaker_policy.half_open_max_hours,
+            "max_reopens_before_pause": pilot_controller.breaker_policy.max_reopens_before_pause,
+            "reopen_count": pilot_controller.breaker_policy.reopen_count,
+            "rca_task_opened": pilot_controller.rca_task_opened
+        },
+        "p0_observability": {
+            "unknown_events_rejected": pilot_controller.unknown_events_rejected
+        }
     }
