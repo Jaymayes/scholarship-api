@@ -1,0 +1,40 @@
+Acknowledged. SEV‑1 regression accepted. You have authorization to execute the hard fixes with strict guardrails. Traffic remains 0% until log‑verified recovery.
+
+Authorizations (effective now)
+
+Database migration (blocking): Run 20260119_create_ledger_table.sql in a single explicit transaction with IF NOT EXISTS guards and idempotent index/constraint creation. On success: record DDL hash + applied_at in schema_migrations and emit A8 attestation.
+Ledger safety: Freeze all provider invoicing and fee postings until the ledger table is created, backfilled, and reconciled. No B2B billing events may proceed.
+Telemetry code patch: Rebuild scholarai-command-center image defaulting strict_mode=false; treat 428/5xx as “accept and spool” (no multi‑retry). One attempt → success to spool with x-fingerprint; no remote retries while in SEV‑1.
+Spool I/O repair: Mount a dedicated, bounded volume (/tmp/telemetry, 100MB cap, rotate+gzip). Write‑through with fsync on batch close; 2s write timeout; alert on ENOSPC/EACCES. Do not drop memory queues until a durable write returns.
+Kill noisy probes: Disable all /metrics/p95 and any localhost checks fleet‑wide. Scrape /metrics only; compute p95 in A8. Keep WAF sitemap block active.
+Self‑DDoS guard: Keep scholarai-command-center stopped until patched image is deployed and verified. Allowlist synthetic IPs for provider flow; continue rate‑limit suppression for abuse IPs.
+Required verifications (post each step, with raw logs)
+
+DB migration (T+15 min): show BEGIN…COMMIT, new table DDL, primary key, indexes, grants, and “schema_migrations” entry; DB p95 ≤100 ms.
+Telemetry acceptance (T+15–30 min): 0×428 across scholarship_api/A8; queue trend <100; 0 “fallback failed/local persistence error” lines; sample POST without headers → 200/202 with x‑fingerprint.
+Probing suppression (T+30 min): 0 /metrics/p95 404; 0 sitemap 429; no localhost probes.
+Auth/Provider (T+30 min): provider synthetic P95 ≤500 ms; /api/login P95 ≤200 ms; auth 5xx=0 (policy blocks reported separately).
+Event loop/cron (T+30 min): event‑loop‑lag p95 <100 ms; no “missed execution” on web.
+Backfill and data‑loss remediation (after patch verified)
+
+Dump the current in‑memory telemetry queue to disk before restart; ingest from spool with at‑least‑once semantics using fingerprint de‑duplication.
+Reconstruct failed ledger events from DLQ/business_events/A6 logs; write a reconciliation report: attempted, written, duplicates removed, net postings. No invoice/unlock until CFO sign‑off on this report.
+Hard gates before any traffic restore
+
+60 consecutive minutes of logs (not dashboards) meeting all criteria above.
+A8 attestation bundle: migration DDL hash, telemetry acceptance ≥99%, queue<100, probe suppression proof, auth/provider KPIs, DB p95, event‑loop p95, and reconciliation plan.
+Process and prevention (to be implemented after green)
+
+Deployment guard: app start blocks if pending migrations exist; or a migrator job runs pre‑start and records DDL hash. Require PID change + commit/digest + “I‑am‑primary” heartbeat before traffic.
+Analytics contract test: CI sends headerless test event; build fails unless gateway returns 200/202 and x‑fingerprint present.
+Financial safety: ledger write path has canary write + readback + checksum; any failure flips FATAL_GATE=ON and blocks award disbursement postings.
+Comms
+
+Status page: “Emergency maintenance for telemetry/ledger integrity; student purchase flow paused; provider billing paused. No funds moved; data being backfilled.”
+Direct note to the 10‑provider cohort once the migration is verified.
+Next reports
+
+T+15 min: migration verification with raw logs.
+T+30 min: telemetry acceptance, queue trend, probe suppression, auth/provider KPIs.
+T+60 min: 60‑minute green attestation. Only then will I consider authorizing a return to 2% pilot.
+Proceed. Keep everything at 0% until the 60‑minute green by logs is posted.
