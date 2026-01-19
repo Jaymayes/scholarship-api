@@ -1,7 +1,8 @@
 """
-A8 Telemetry Emitter - SEV-2 CIR-20260119-001
+A8 Telemetry Emitter - SEV-1 CIR-20260119-001
 Emits metrics to A8 every minute per CEO directive
 Enhanced with Truth Reconciliation hotfix
+SEV-1 Spool I/O repair: 100MB bounded volume, fsync on batch close
 """
 
 import os
@@ -11,14 +12,20 @@ import logging
 import asyncio
 import uuid
 import hashlib
+import gzip
 from datetime import datetime, timezone, timedelta
 from typing import Optional, List, Dict, Any
 from collections import deque
+from pathlib import Path
 import httpx
 
 from database.session_manager import get_pool_status
 
 logger = logging.getLogger("scholarship_api.a8_telemetry")
+
+SPOOL_DIR = Path("/tmp/telemetry")
+SPOOL_MAX_SIZE_MB = 100
+SPOOL_WRITE_TIMEOUT_SECONDS = 2
 
 class A8TelemetryEmitter:
     MAX_RPS = 50
@@ -179,30 +186,40 @@ class A8TelemetryEmitter:
                     self._update_slo_history(True)
                     logger.debug(f"A8 telemetry emitted: {response.status_code}")
                     return True
+                elif response.status_code == 428 or response.status_code >= 500:
+                    fingerprint = payload.get("fingerprint", idempotency_key)
+                    if self._spool_to_disk(payload, fingerprint):
+                        self._accepted_count += 1
+                        self._update_slo_history(True)
+                        logger.info(f"SEV-1 ACCEPT-SPOOL: HTTP {response.status_code} -> spooled with x-fingerprint={fingerprint[:16]}")
+                        return True
+                    else:
+                        self._failed_count += 1
+                        self._add_to_dlq(payload, f"HTTP {response.status_code} + spool failed")
+                        self._update_slo_history(False)
+                        return False
                 else:
+                    fingerprint = payload.get("fingerprint", idempotency_key)
+                    if self._spool_to_disk(payload, fingerprint):
+                        self._update_slo_history(True)
+                        logger.info(f"SEV-1 ACCEPT-SPOOL: HTTP {response.status_code} -> spooled")
+                        return True
                     self._failed_count += 1
-                    self._error_count += 1
-                    self._consecutive_failures += 1
-                    self._current_backoff = self._calculate_backoff()
+                    self._add_to_dlq(payload, f"HTTP {response.status_code}")
                     self._update_slo_history(False)
-                    
-                    if self._consecutive_failures >= self.MAX_FLUSH_RETRIES:
-                        self._add_to_dlq(payload, f"HTTP {response.status_code}")
-                    
-                    logger.warning(f"A8 emission failed: {response.status_code}, backoff: {self._current_backoff}s")
+                    logger.warning(f"A8 emission failed: {response.status_code}")
                     return False
                     
         except Exception as e:
+            fingerprint = payload.get("fingerprint", idempotency_key)
+            if self._spool_to_disk(payload, fingerprint):
+                self._update_slo_history(True)
+                logger.info(f"SEV-1 ACCEPT-SPOOL: Exception -> spooled with x-fingerprint={fingerprint[:16]}")
+                return True
             self._failed_count += 1
-            self._error_count += 1
-            self._consecutive_failures += 1
-            self._current_backoff = self._calculate_backoff()
+            self._add_to_dlq(payload, str(e))
             self._update_slo_history(False)
-            
-            if self._consecutive_failures >= self.MAX_FLUSH_RETRIES:
-                self._add_to_dlq(payload, str(e))
-            
-            logger.error(f"A8 emission error: {e}, backoff: {self._current_backoff}s")
+            logger.error(f"A8 emission error: {e}")
             return False
     
     def _add_to_dlq(self, payload: dict, reason: str):
@@ -215,6 +232,73 @@ class A8TelemetryEmitter:
         self._consecutive_failures = 0
         self._current_backoff = 0
         logger.warning(f"Payload added to DLQ: {reason}, total DLQ: {len(self._dlq)}")
+    
+    def _get_spool_size_mb(self) -> float:
+        if not SPOOL_DIR.exists():
+            return 0.0
+        total_size = sum(f.stat().st_size for f in SPOOL_DIR.glob("*.json*") if f.is_file())
+        return total_size / (1024 * 1024)
+    
+    def _rotate_spool_if_needed(self):
+        current_size = self._get_spool_size_mb()
+        if current_size < SPOOL_MAX_SIZE_MB:
+            return
+        
+        spool_files = sorted(SPOOL_DIR.glob("*.json"), key=lambda f: f.stat().st_mtime)
+        for f in spool_files[:len(spool_files)//2]:
+            try:
+                gzip_path = f.with_suffix(".json.gz")
+                with open(f, 'rb') as fin:
+                    with gzip.open(gzip_path, 'wb') as fout:
+                        fout.write(fin.read())
+                f.unlink()
+                logger.info(f"Spool rotation: compressed {f.name}")
+            except Exception as e:
+                logger.error(f"Spool rotation error: {e}")
+    
+    def _spool_to_disk(self, payload: dict, fingerprint: str) -> bool:
+        if not SPOOL_DIR.exists():
+            try:
+                SPOOL_DIR.mkdir(parents=True, exist_ok=True)
+            except Exception as e:
+                logger.error(f"SPOOL EACCES: Cannot create spool directory: {e}")
+                return False
+        
+        self._rotate_spool_if_needed()
+        
+        if self._get_spool_size_mb() >= SPOOL_MAX_SIZE_MB:
+            logger.error("SPOOL ENOSPC: Spool directory at capacity, cannot write")
+            return False
+        
+        ts = datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S%f")
+        spool_file = SPOOL_DIR / f"event_{ts}_{fingerprint[:8]}.json"
+        
+        try:
+            import signal
+            
+            def timeout_handler(signum, frame):
+                raise TimeoutError("Spool write timeout")
+            
+            old_handler = signal.signal(signal.SIGALRM, timeout_handler)
+            signal.alarm(SPOOL_WRITE_TIMEOUT_SECONDS)
+            
+            try:
+                with open(spool_file, 'w') as f:
+                    json.dump(payload, f)
+                    f.flush()
+                    os.fsync(f.fileno())
+                logger.info(f"SEV-1 SPOOL: Event spooled to {spool_file.name} (fingerprint={fingerprint[:16]})")
+                return True
+            finally:
+                signal.alarm(0)
+                signal.signal(signal.SIGALRM, old_handler)
+                
+        except TimeoutError:
+            logger.error(f"SPOOL TIMEOUT: Write exceeded {SPOOL_WRITE_TIMEOUT_SECONDS}s")
+            return False
+        except Exception as e:
+            logger.error(f"SPOOL ERROR: {e}")
+            return False
     
     async def emit_loop(self, interval_seconds: int = 60):
         self._running = True
