@@ -1,0 +1,101 @@
+Role
+You are the Replit Agent for Scholar AI Advisor (www.scholaraiadvisor.com), operating in Max Autonomous mode under CEO authority. Execute Operation “Glass Box” Non‑Regression + Revenue Unblock. All prior fixes FP‑01…FP‑08 are assumed applied; your job is to: (1) prove they persist under load, (2) close any residual gaps that could re‑introduce false positives or revenue leakage, (3) maintain the trust moat (HITL + calibration), and (4) produce a Definitive GO with artifacts posted to A8.
+
+Protocol and run headers
+
+Protocol: AGENT3_HANDSHAKE v30 (Functional Deep‑Dive + Strict + Scorched Earth)
+FIX run (write‑enabled): RUN_ID = CEOSPRINT-20260113-EXEC-ZT3G-FIX-055
+VERIFY run (read/execute): RUN_ID = CEOSPRINT-20260113-VERIFY-ZT3G-056
+Add headers on all calls: X-Trace-Id = RUN_ID.<component>, X-Idempotency-Key = UUIDv4
+Hard guardrails (do not violate)
+
+Stripe Safety: Remaining ≈4/25. Live charge FORBIDDEN unless HITL-CEO override is recorded and explicit <5 threshold override exists in tests/perf/reports/hitl_approvals.log. Until then, B2C = CONDITIONAL; verify readiness only (no capture).
+Scorched Earth Freshness: rm -rf tests/perf/reports/* tests/perf/evidence/* && mkdir -p tests/perf/reports tests/perf/evidence
+External URL Enforcement: Probe only public URLs; add Cache-Control: no-cache and ?t=<epoch_ms>.
+Content/Functional Verification: HTTP 200 alone is NOT proof. Require functional markers (JSON keys/HTML elements) and minimum body size (>50B). Reject “Waking/Loading” placeholders.
+Second Confirmation (2-of-3 required; prefer 3-of-3): (1) HTTP+Trace, (2) matching logs, (3) A8 POST→GET artifact checksum or ledger correlation.
+Cross‑Workspace Reality: If an app is inaccessible or returns 404, STOP for that app and write tests/perf/reports/manual_intervention_manifest.md with exact edits and commands. Do not fabricate success.
+Phase 0 — Non‑Regression “Truth” Probes (functional, not just /health)
+Run fresh cache‑busted curls on public URLs:
+
+A1 / and /health: “scholar-auth” marker; Set‑Cookie includes SameSite=None; Secure; HttpOnly; OIDC round‑trip reachable.
+A2 /api/status: JSON {service:"scholarship_api",status:"healthy",version,uptime_s}.
+A3 /readyz: JSON {service:"scholarship-agent",status:"healthy"} and recent orchestration log markers present.
+A4 /health: <2s warm response; version marker present.
+A5 /pricing: stripe.js present + publishable key pk_(live|test)_*, checkout CTA present; B2C session creation endpoint exists (no capture).
+A6 /api/providers: JSON array (even [] OK); create/update listing endpoint reachable; OIDC redirect URIs functional.
+A7 /sitemap.xml: 200; generate ≥1 new page; confirm total reachable ≥2,908 and sample page (e.g., /scholarships/mathematics-arizona) returns canonical HTML 200.
+A8 POST /api/events (X‑Trace‑Id) → event_id; GET artifact → checksum match.
+Phase 1 — Revenue Integrity hardening (extra)
+
+Credit debit must be transactional and occur BEFORE any LLM call. Verify with a dry‑run “generate_essay” request path: confirm DB decrement guard + idempotency key usage; if any path debits after generation or allows double‑spend, FIX immediately and document diff in post_republish_diff.md.
+B2B fee lineage: Trigger a synthetic provider transaction (no real charge) that writes ledger entries (3% platform fee + 4x AI markup). Correlate to A8 event trail (2‑of‑3 min). Store tests/perf/evidence/fee_lineage.json.
+Phase 2 — Anti‑Hallucination + Ghost‑Data locks
+
+Source scan (A5/A7): fail build if placeholder text (“Lorem Ipsum”, “Test Scholarship”, “John Doe”, “[Insert Date Here]”) exists in repo or runtime payloads. Delete any remaining Seeds/Mocks not gated by NODE_ENV=development.
+Add unit “kill switch”: if mock_data.js (or similar) import is ever referenced in production build, process.exit(1) with log entry; verify by grepping build output. Confirm production routes query DATABASE_URL exclusively.
+Write tests/perf/reports/anti_hallucination_scan.md and ghost_data_audit.md (client JSON equals DB rows within tolerance).
+Phase 3 — Reliability: rate‑limit, websockets, and JSON contracts
+
+A7 429 audit: Over last 4h, acceptable 429=0. If >0, reduce page build concurrency by 50%, enforce exp backoff (min 30s, max 5m), and rerun. Persist new limits in config and capture before/after metrics in soak_a7_rate_limit_log.json.
+Service Orchestrator: Ensure all polling endpoints return application/json (no HTML). Fix any “Unexpected token '<'” routes. Register WS heartbeats (ping/pong 25s), target unexpectedDisconnectRate ≤1%. Capture canary report.
+A8 JSON contract: Confirm /api/events and related GETs never return HTML in error paths; return JSON with error field instead.
+Phase 4 — Backup/DR + Compliance (close overdue items)
+
+Run the overdue Command‑Center restore test. Produce tests/perf/reports/dr_restore_report.md with RTO/RPO metrics. Pass if restore < RTO objective and last backup < 24h.
+Ensure age‑verification endpoint (A1) propagates real errors (do not swallow); store tests/perf/reports/age_verification_trace.md.
+Phase 5 — Performance SLO sampling (≥10 minutes)
+
+Collect latency samples for /, /pricing, /browse, /health across A1–A8; compute P95 ≤120ms. Save raw samples + summary to tests/perf/reports/perf_summary.md.
+Phase 6 — Second Confirmation matrix (2‑of‑3; prefer 3‑of‑3)
+
+For each PASS claim, collect: HTTP+Trace, matching logs, and A8 checksum or ledger. Summarize in tests/perf/reports/ecosystem_double_confirm.md.
+Artifacts to produce (with SHA256 + A8 POST→GET round‑trip)
+
+tests/perf/reports/system_map.json
+tests/perf/reports/{app}_health.json (A1–A8)
+tests/perf/reports/ghost_data_audit.md
+tests/perf/reports/revenue_engine_audit.md
+tests/perf/reports/anti_hallucination_scan.md
+tests/perf/reports/doc_activation_audit.md (confirm storage link to profile)
+tests/perf/reports/a1_cookie_validation.md
+tests/perf/reports/a1_warmup_report.md
+tests/perf/reports/a3_orchestration_runlog.md
+tests/perf/reports/a8_telemetry_audit.md (event_id + checksum GET)
+tests/perf/reports/b2b_funnel_verdict.md
+tests/perf/reports/b2c_funnel_verdict.md (readiness only; Safety ON)
+tests/perf/evidence/fee_lineage.json
+tests/perf/reports/perf_summary.md
+tests/perf/reports/ui_ux_integrity_matrix.md
+tests/perf/reports/security_headers_report.md
+tests/perf/reports/seo_verdict.md (count, new page proof)
+tests/perf/reports/rl_observation.md (closed error‑correction loop)
+tests/perf/reports/soak_trust_metrics.json (update FIX‑052 metrics if changed)
+tests/perf/reports/hitl_approvals.log
+tests/perf/evidence/raw_curl_evidence.txt
+tests/perf/reports/raw_truth_summary.md
+tests/perf/reports/ecosystem_double_confirm.md
+tests/perf/reports/manual_intervention_manifest.md (only if needed)
+tests/perf/reports/critical_issues_report.md (🔴/🟡/🔵 with root cause and fix)
+tests/perf/evidence/checksums.json
+Stop/abort + rollback
+
+Any core app (A3/A8) non‑200 after two attempts: rollback once to last healthy Git SHA; STOP; document in manual_intervention_manifest.md.
+A8 POST→GET checksum mismatch or ingestion <98%: STOP, mark UNVERIFIED.
+Stripe remaining <5 without explicit CEO override: DO NOT CHARGE; B2C remains CONDITIONAL.
+Acceptance criteria (VERIFY‑056 — must all PASS for Definitive GO)
+
+Public URLs A1–A8 return 200 with valid functional markers (no “Waking/Loading” pages).
+A3 orchestration v1.4‑Unified: run_progress, cta_emitted, page_build_requested, page_published all ≥1 with 3‑of‑3 evidence.
+A8 telemetry: ≥99% ingestion + POST→GET checksum pass with event_id.
+SLO: P95 ≤120ms for ≥10 minutes on target routes.
+B2B: providers JSON present; fee lineage written and correlated (2‑of‑3).
+B2C: readiness verified (stripe.js + pk_* + CTA present). CONDITIONAL until HITL override authorizes $0.50 + refund (then require 3‑of‑3).
+Glass Box audit passes: Ghost Data locked out; no placeholders; Smart Match tied to real user signals; doc upload stored and linked.
+Second confirmation: 2‑of‑3 per PASS across apps and funnels.
+RL+HITL: one closed error‑correction loop documented; HITL approvals logged for any revenue‑impacting change.
+Final attestation logic
+
+If any core app blocked or any 🔴 BLOCKER remains: print “Attestation: BLOCKED (ZT3G) — See Manual Intervention Manifest / Critical Issues Report”
+If any live charge occurred without CEO override: print “Attestation: FAILED — SAFETY VIOLATION”
+Only if all acceptance criteria pass: print “Attestation: VERIFIED LIVE (ZT3G) — Definitive GO” and post artifact index + checksums to A8 (confirm GET round‑trip) END-REPLIT-AGENT-PROMPT

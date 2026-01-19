@@ -1,11 +1,11 @@
 # Security Headers
-**Run ID**: CEOSPRINT-20260113-VERIFY-ZT3G-028
+**Run ID**: CEOSPRINT-20260113-VERIFY-ZT3G-056
 
-| Header | Status |
-|--------|--------|
-| HSTS | PASS |
-| CSP | PASS |
-| XFO | PASS |
-| XCTO | PASS |
+| Header | Value | Status |
+|--------|-------|--------|
+| HSTS | max-age=15552000; includeSubDomains | PASS |
+| CSP | default-src 'none'; connect-src 'self' | PASS |
+| XFO | DENY | PASS |
+| XCTO | nosniff | PASS |
 
 **Verdict**: PASS

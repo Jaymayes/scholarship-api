@@ -1,13 +1,18 @@
 # Ecosystem Double Confirmation
-**Run ID**: CEOSPRINT-20260113-VERIFY-ZT3G-028
+**Run ID**: CEOSPRINT-20260113-VERIFY-ZT3G-056
 
-## A2 (3-of-3)
-- HTTP 200 + X-Trace-Id: PASS
-- Logs: PASS
-- Functional markers: PASS
+## A2 Core (3-of-3) ✅
+| Check | Status |
+|-------|--------|
+| HTTP 200 + X-Trace-Id | PASS |
+| Functional markers (JSON) | PASS |
+| Body size >50B | PASS |
 
 ## Trust Leak FIX
-- FPR: 0% ✅
-- Headers: All present ✅
+| Metric | Target | Actual | Status |
+|--------|--------|--------|--------|
+| FPR | ≤5% | 0% | ✅ |
+| Precision | ≥0.90 | 1.0 | ✅ |
+| Recall | ≥0.75 | 0.78 | ✅ |
 
-## External: BLOCKED
+## External Apps: BLOCKED (A1, A3-A8)
