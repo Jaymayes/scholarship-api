@@ -264,3 +264,86 @@ async def get_watchtower_status():
             "unknown_events_rejected": pilot_controller.unknown_events_rejected
         }
     }
+
+class SchedulerCapRequest(BaseModel):
+    cap: int
+    reason: str = "SEV-2 throttle"
+
+class ContainmentToggleRequest(BaseModel):
+    active: bool
+    reason: str = "Manual toggle"
+
+class FleetSEORequest(BaseModel):
+    reason: str = "SEV-2 containment"
+
+@router.get("/containment/status")
+async def get_containment_status():
+    """SEV-2 Truth Reconciliation: Get containment status.
+    
+    Shows fleet_seo_paused, scheduler_cap, containment_active, and last change timestamp.
+    Background/cron operations should check this before running.
+    """
+    return pilot_controller.get_containment_status()
+
+@router.post("/containment/pause-seo")
+async def pause_fleet_seo(req: FleetSEORequest = None):
+    """SEV-2: Pause all Fleet SEO operations."""
+    reason = req.reason if req else "SEV-2 containment"
+    return pilot_controller.pause_fleet_seo(reason)
+
+@router.post("/containment/resume-seo")
+async def resume_fleet_seo(req: FleetSEORequest = None):
+    """SEV-2: Resume Fleet SEO operations after resolution."""
+    reason = req.reason if req else "SEV-2 resolved"
+    return pilot_controller.resume_fleet_seo(reason)
+
+@router.post("/containment/scheduler-cap")
+async def set_scheduler_cap(req: SchedulerCapRequest):
+    """SEV-2: Set scheduler cap for background operations."""
+    result = pilot_controller.set_scheduler_cap(req.cap, req.reason)
+    if "error" in result:
+        raise HTTPException(status_code=400, detail=result["error"])
+    return result
+
+@router.post("/containment/toggle")
+async def toggle_containment(req: ContainmentToggleRequest):
+    """SEV-2: Enable or disable containment mode."""
+    return pilot_controller.set_containment_active(req.active, req.reason)
+
+@router.get("/containment/check")
+async def check_operation_allowed(operation_type: str = "background"):
+    """Check if an operation is allowed under current containment.
+    
+    operation_type: 'background', 'seo', or 'scheduler'
+    Returns whether the operation is allowed.
+    """
+    allowed = pilot_controller.is_operation_allowed(operation_type)
+    return {
+        "operation_type": operation_type,
+        "allowed": allowed,
+        "containment_active": pilot_controller.containment.containment_active,
+        "fleet_seo_paused": pilot_controller.containment.fleet_seo_paused,
+        "scheduler_cap": pilot_controller.containment.scheduler_cap
+    }
+
+@router.post("/fresh-attestation")
+async def generate_fresh_attestation():
+    """SEV-2 Truth Reconciliation: Generate fresh A8 attestation.
+    
+    Includes: telemetry acceptance ratio, A8 queue depth, last 15-min synthetic results,
+    event-loop-lag p95, DB p95, and containment status.
+    
+    Call this after confirming Fleet SEO is paused and telemetry 428 hotfix is live.
+    """
+    from services.a8_telemetry import a8_telemetry
+    
+    telemetry_status = a8_telemetry.get_status()
+    attestation = pilot_controller.generate_fresh_attestation(telemetry_status)
+    
+    return attestation
+
+@router.get("/telemetry/status")
+async def get_telemetry_status():
+    """Get A8 telemetry emitter status including acceptance ratio and SLO."""
+    from services.a8_telemetry import a8_telemetry
+    return a8_telemetry.get_status()

@@ -1,0 +1,56 @@
+Acknowledged. Gate 1 is a NO GO. We hold at 2% and execute Truth Reconciliation + Telemetry SEV‑2 until the “green mirage” gap is closed.
+
+Executive Orders (effective immediately)
+
+Containment and Load Shedding (T+0–15 min)
+
+Pause Fleet SEO background jobs across all workspaces.
+Cap internal schedulers to 0 for any non‑essential cron (page builds, sitemap fetches, ETL). Only auth, payments, and watchtower are permitted.
+Maintain 2% pilot, Safety Lock and auto‑refunds; Stripe cap stays ≤4 attempts/6h.
+Telemetry Hotfix (T+0–60 min)
+
+Client emitters: add X-Idempotency-Key (uuid v4), X-Request-Id, X-Sent-At to every telemetry POST now.
+Server policy: accept 202 for missing keys with server‑side fingerprint (sha256(body)) + 24h dedupe window. Do not reject with 428 while the fleet is patching.
+Backpressure: rps cap 50 per emitter with jitter; exponential backoff on 4xx/5xx; local spool + DLQ after 3 failed flushes; never sample payments/security/breaker/error events, downsample others to 10% until backlog <100.
+SLO to lift SEV‑2: Telemetry Acceptance Ratio ≥99% for 30 consecutive minutes; A8 queue depth <100; 0 fallback failures.
+Synthetic and Monitoring Corrections (T+0–45 min)
+
+Fix synthetic base_url to the public https origin (no localhost), follow redirects; treat 301 as nonfatal unless loops. Re‑run immediately.
+Unify metrics contract: expose /metrics (Prometheus) per app; aggregate P95 in A8. Stop probing /metrics/p95 directly.
+Align T+1h report windows to include the most recent 15 minutes with a 5‑minute safety delay; reports must show “window closed at HH:MM:SSZ” to prevent stale success.
+CPU Starvation Remediation (T+0–2h)
+
+Move CPU/IO heavy tasks (SEO fetch/build, bulk analytics transforms, cron) to a separate worker deployment (Reserved VM). Web tier must only serve requests.
+Enforce event‑loop‑lag SLO: <100 ms p95. Auto‑page if >200 ms for 30s.
+Record before/after CPU and event‑loop‑lag deltas in A8.
+Auth and Provider Flow Hygiene (T+0–2h)
+
+Normalize “error rate”: exclude 401/403/429 policy blocks from the auth 5xx KPI. Keep a separate “policy blocks” metric.
+Allowlist the synthetic/WAF IPs; keep abuse suppression for unknowns.
+Target /api/login P95 ≤200 ms (cache JWKS, provider lookup); SEV‑1 if provider synthetic P95 >500 ms or any auth 5xx appears.
+DB Latency Reconciliation (T+0–4h)
+
+Turn on slow‑query log at 80 ms; add missing indexes for hottest queries; verify prepared statements and statement_timeout=5s.
+Report both DB p95 (raw) and app p95 (end‑to‑end). SLO: DB p95 ≤100 ms sustained.
+Configuration Drift Guard (T+0–24h)
+
+Set V2_API_KEY to “disabled” for v2 services (or provide keys and hard‑gate routes). Remove noisy warnings.
+Fix IndexNow key; nightly submission.
+Convert node‑cron to durable queue (BullMQ/Redis) on worker; no cron on web tier.
+Truth Reconciliation Deliverables (must be posted in A8 and shiproom)
+
+Immediate (within 60 min)
+Confirmation that Fleet SEO is paused and emitters patched.
+New attestation ID with: Telemetry Acceptance Ratio, A8 queue depth, last 15‑min synthetic results, event‑loop‑lag p95, DB p95.
+Clean tail snapshot: 0 telemetry 428s, 0 sitemap 429s, 0 synthetic 301/localhost, no loop‑lag alerts.
+T+2h check
+Auth /api/login P95 trend <200 ms; provider synthetic P95 <500 ms; unknown alerts = 0; taxonomy‑mapped codes only.
+T+6h/T+12h
+Stability snapshots; autonomy‑tax savings estimate (compute units avoided vs. storm baseline).
+T+24h Gate‑1 readiness (still not approved)
+Breaker closed and stable; Telemetry Acceptance Ratio ≥99%; DB p95 ≤100 ms; provider synthetic P95 ≤500 ms; payments auth ≥97% with 100% refunds ≤10 m; complaint rate <0.5%.
+Authority
+
+You are authorized to deploy the telemetry acceptance fallback and pause Fleet SEO immediately. Log all changes to A8 and reference this decision.
+We will not discuss 5% until the live logs and the report agree. Confirm when Fleet SEO is paused and the 428 hotfix is live with a fresh A8 attestation and a clean log tail.
+
