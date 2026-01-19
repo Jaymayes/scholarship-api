@@ -1,0 +1,41 @@
+Acknowledged. FIX-052 accepted. T+2h Trust metrics are within guardrails:
+
+FPR 2.8% (≤5% met)
+Precision 96.4% (≥90% met)
+Recall 76.0% (≥75% met)
+Confusion matrix reviewed; 142 borderline cases routed to HITL; calibration deployed.
+Executive orders — continue 24h Reliability Soak and lock in the win
+
+Freeze-and-monitor (now through T+12h)
+Keep τc=0.72 and the 0.60–0.72 HITL band in effect.
+Maintain A7 at 100 pages/day; zero tolerance for 429s.
+Alerting: page ops if FPR ≥4.5% for 15 min or Recall <0.75 for 15 min.
+2. Taper plan (only if stable at T+12h)
+
+If FPR ≤3.5% and Recall ≥0.76 sustained for the prior 2 hours:
+Reduce HITL sampling on the 0.66–0.72 sub-band from 100% to 50%.
+Keep 100% HITL for 0.60–0.65.
+If any metric breaches, immediately revert to 100% HITL on 0.60–0.72 and notify CEO channel.
+3. Controls and evidence
+
+Versioning: store calibrator parameters (temperature, timestamp, hash) and τc in A8 with RUN_ID CEOSPRINT-20260113-EXEC-ZT3G-FIX-052.
+Hourly export: confusion matrix, cohort sizes, and 95% CIs for FPR/Precision/Recall to tests/perf/reports/.
+Shadow scoring: run the legacy τ=0.60 in SHADOW ONLY for QA; no user-facing decisions.
+4. Performance guardrail
+
+Ensure P95 ≤120ms holds while HITL is elevated; if P95 >140ms for 10 min, add one more reviewer and enable response caching on verifier endpoints.
+5. Deliverables
+
+T+12h snapshot: per-app P50/P95/P99, uptime, 429 count, Trust metrics (with CIs), provider count, SEO pages/day, latest event_id and trace_id.
+T+24h final soak packet: same metrics + variance analysis and artifact checksums.
+6. B2C pilot readiness (no change to lock status during soak)
+
+Keep SAFETY_LOCK_ACTIVE=true.
+Prepare the unlock sequence (post-soak PASS):
+Set B2C_MICRO_CHARGE_ENABLED=true
+Confirm AVS+CVV, 3DS challenge, webhook signature verification, and caps ($5/user; $250 global).
+Pilot KPIs: Visitor→Signup ≥3%, Signup→Paid ≥5%, ARPU ≥$0.35, refunds/chargebacks ≤2%, purchase P95 ≤150ms.
+7. Risk log (must be updated in A8)
+
+Note the prior 12% FPR spike with root cause “threshold drift; insufficient HITL coverage on 0.60–0.72”. Add corrective actions and owners.
+This keeps us squarely aligned with the Prime Directive: data-first control of Trust metrics, no revenue exposure until reliability is proven, and SEO/CAC efficiency preserved. Proceed and report at T+12h.
