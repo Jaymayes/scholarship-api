@@ -1,0 +1,37 @@
+{
+  "run_id": "CEOSPRINT-20260113-VERIFY-ZT3G-056",
+  "timestamp": "2026-01-19T15:18:53Z",
+  "watchtower": {
+    "tracked_fields": [
+      "workspace_id",
+      "commit_sha",
+      "manifest_digest",
+      "build_artifact_sha"
+    ]
+  },
+  "alert_rules": {
+    "manifest_mismatch": {
+      "condition": "manifest_digest != build_artifact_sha",
+      "action": "auto_block_publish",
+      "notify": "on_call"
+    },
+    "endpoint_regression": {
+      "condition": "5xx_or_404 >= 2%",
+      "window_min": 10,
+      "action": "disable_b2c_capture",
+      "keep": "refunds_enabled",
+      "file": "CIR-#####"
+    }
+  },
+  "rollback_triggers": {
+    "auth_failure": {"threshold_percent": 5, "window_min": 30},
+    "p95_breach": {"threshold_ms": 200, "window_min": 15},
+    "trust_metric_breach": {"window_min": 30}
+  },
+  "rollback_action": {
+    "disable": "b2c_capture",
+    "keep": "refunds_on",
+    "file": "critical_issues_report",
+    "notify": "exec_channel"
+  }
+}

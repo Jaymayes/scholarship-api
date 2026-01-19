@@ -1,0 +1,94 @@
+Acknowledged. Executing your Conditional GO as a formal, time-boxed implementation order.
+
+Executive Implementation Order SAA-EO-2026-01-19-01
+
+Objective
+
+Activate B2B revenue immediately with verified 3% fee lineage.
+Run a tightly controlled B2C microcharge pilot to validate WTP and payments reliability.
+Eliminate External App Drift via Golden Path enforcement and Database-as-a-Service (DaaS) guarantees.
+Owners
+
+Platform/Watchtower (A8 + Orchestration): Head of Platform
+A5 Student Pilot: Product Eng Lead
+A7 Auto Page Maker: Growth Eng Lead
+B2B Provider Ops: Head of Sales/Ops
+Compliance and Trust: Trust & Safety Lead
+T0 Actions (execute now)
+
+Toggle set:
+FEATURE_FLAGS.B2C_CAPTURE = pilot_only
+FEATURE_FLAGS.MICROCHARGE_REFUND = enabled
+SAFETY_LOCK = active
+TRAFFIC_CAP_B2C_PILOT = 2%
+B2C pilot budget: $50 or 100 users max, whichever first.
+Stripe usage: Consume ≤4 live attempts first 6h; raise only if <3% auth error.
+A8 telemetry fields required on every charge/refund:
+run_id=ZT3G-056, cohort_id=B2C-PILOT-001, event_type, status, trace_id, checksum, latency_ms, refund_settled_at.
+B2B fee enforcement: Enable fee capture on AwardDisbursed event only.
+Golden Path Enforcement (A5/A7) — 8-hour deadline
+
+DaaS hard rule: No local state. All reads/writes via Core API; DATABASE_URL never embedded in A5/A7.
+Release gate:
+Manifest digest check against golden_path.yaml (hash match required).
+Smoke tests: /health 200 + functional markers; /readyz green; security headers present.
+3-of-3 confirmations logged in A8 with POST→GET checksum ≥99%.
+Success criterion to request ramp: Two consecutive 60-minute snapshots with 200 OK + markers for both A5 and A7, P95 ≤120 ms on A1–A4 and ≤200 ms on A6/A8.
+Stability Controls (Drift Sentinel)
+
+A8 Watchtower to record:
+workspace_id, commit_sha, manifest_digest, build_artifact_sha.
+Alert rules:
+Mismatch between manifest_digest and deployed build_artifact_sha → auto-block publish and page on-call.
+Any endpoint regression (>=2% 5xx or 404 for 10 min) → disable B2C capture, keep refunds enabled, open CIR-##### in A8.
+B2C Pilot Guardrails and Success Criteria
+
+Target cohort: pilot_only=true users from A7 SEO pages with intent-qualified slugs.
+Refunds: automatic immediate refund; hard SLO T+10 min settlement.
+Metrics to pass for ramp request:
+Payments: ≥97% auth success; 100% refunds settled ≤10 min.
+Trust: FPR ≤3.5% (current 2.8%), Precision ≥95%, Recall ≥75%.
+Performance: P95 ≤120 ms for A1–A4; ≤200 ms for A6/A8.
+Funnel: Visitor→Signup ≥5%; Signup→CreditPurchase ≥2%.
+Ramp path on CEO approval:
+Gate 1 (after T+24h report): 5% traffic, $1.00 charge, full refund.
+Gate 2 (T+72h): 25% traffic, partial refund test ($1.00 charge, $0.50 refund) if complaint rate <0.5%.
+Gate 3 (D+7): 100% traffic; Safety Lock narrows to targeted controls.
+B2B Activation Plan (effective immediately)
+
+Providers: onboard 10 within 30 days; then +3/week.
+Ledger events required:
+ListingCreated, LeadAccepted, ApplicationSubmitted, AwardApproved, AwardDisbursed.
+Fee capture logic:
+On AwardDisbursed: platform_fee = round(disbursed_amount * 0.03, 2); write fee_ledger entry with provider_id, student_id, scholarship_id, disbursement_id, evidence_uri, checksum.
+Net settlement schedule: monthly invoice or auto-debit if enabled.
+KPIs:
+Activation→FirstListing ≤72h; Listing→FirstLead ≤7 days; Fee capture rate ≥98%; Dispute rate ≤0.5%.
+Reporting Cadence
+
+Watchtower snapshots: T+0, T+6h, T+12h, T+24h (UTC). Each must include:
+A1–A8 latency/error charts, pilot cohort metrics, payments auth/refund stats, fee_ledger diffs, drift_sentinel digest report.
+Daily exec KPIs: B2B providers active, listings live, leads generated, fees posted; B2C funnel and ARPU proxy (pilot); Trust metrics; SLO compliance.
+Rollback Triggers (immediate, automated)
+
+Payments auth failures ≥5% over 30 minutes.
+P95 >200 ms for 15 minutes on A1–A4 core paths.
+Any Trust metric breach beyond thresholds for 30 minutes.
+Action: Disable B2C capture, keep refunds on, file Critical Issues Report from A8, notify exec channel.
+What I need next
+
+Confirm A5/A7 Golden Path redeploy completion and post the first A8 attestation ID in the shiproom with:
+Subject: CEO-OVERRIDE B2C PILOT ZT3G-056
+Body template:
+A5_commit: <sha>, A7_commit: <sha>
+manifest_digest: <hash>, build_artifact_sha: <hash>
+a8_attestation_id: <evt_xxx>
+60-min snapshot window (UTC): <start>–<end>
+P95 core/aux latencies, 3-of-3 confirmations, checksum parity
+Upon receipt and validation, I will authorize the ramp to 5% traffic per the plan.
+Strategic reminders
+
+B2B remains the primary path to $10M ARR; B2C is a qualification engine to raise “First Upload” and surface high-intent students to providers.
+Trust is the product: Glass Box, RL + HITL, and DaaS remain non-negotiable.
+Keep CAC low by prioritizing A7 SEO scale and provider activation; paid acquisition remains paused until organic conversion stabilizes.
+Proceed.

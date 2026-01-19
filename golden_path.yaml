@@ -1,0 +1,71 @@
+version: "1.0"
+run_id: "CEOSPRINT-20260113-VERIFY-ZT3G-056"
+timestamp: "2026-01-19T15:18:53Z"
+order_id: "SAA-EO-2026-01-19-01"
+
+feature_flags:
+  B2C_CAPTURE: pilot_only
+  MICROCHARGE_REFUND: enabled
+  SAFETY_LOCK: active
+  TRAFFIC_CAP_B2C_PILOT: 2%
+
+pilot_config:
+  budget_usd: 50
+  max_users: 100
+  stripe_attempts_first_6h: 4
+  auth_error_threshold: 3%
+
+b2b_config:
+  fee_rate: 0.03
+  fee_trigger: AwardDisbursed
+  settlement: monthly
+  onboarding_target: 10
+  weekly_growth: 3
+
+daas_rules:
+  local_state: forbidden
+  database_url_embedding: forbidden
+  all_reads_writes_via: core_api
+
+release_gates:
+  A5:
+    manifest_digest_check: required
+    health_200: required
+    functional_markers: required
+    security_headers: required
+    3_of_3_confirmation: required
+  A7:
+    manifest_digest_check: required
+    health_200: required
+    sitemap_xml: required
+    security_headers: required
+    3_of_3_confirmation: required
+
+success_criteria:
+  consecutive_snapshots: 2
+  snapshot_duration_min: 60
+  p95_core_ms: 120
+  p95_aux_ms: 200
+
+rollback_triggers:
+  auth_failure_threshold: 5%
+  auth_failure_window_min: 30
+  p95_breach_ms: 200
+  p95_breach_window_min: 15
+
+a8_telemetry_required:
+  - run_id
+  - cohort_id
+  - event_type
+  - status
+  - trace_id
+  - checksum
+  - latency_ms
+  - refund_settled_at
+
+ledger_events:
+  - ListingCreated
+  - LeadAccepted
+  - ApplicationSubmitted
+  - AwardApproved
+  - AwardDisbursed

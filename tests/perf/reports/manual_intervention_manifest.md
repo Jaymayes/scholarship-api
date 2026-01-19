@@ -1,104 +1,140 @@
 # Manual Intervention Manifest (Golden Path)
-**FIX Run**: CEOSPRINT-20260113-EXEC-ZT3G-FIX-055
-**VERIFY Run**: CEOSPRINT-20260113-VERIFY-ZT3G-056
-**Timestamp**: 2026-01-19T08:30:41Z
+**Order ID**: SAA-EO-2026-01-19-01
+**Run ID**: CEOSPRINT-20260113-VERIFY-ZT3G-056
+**Timestamp**: 2026-01-19T15:18:53Z
+**Deadline**: 8 hours (2026-01-19T23:18:53Z)
 
 ---
 
-## A0 — Global Port Binding
+## DaaS Hard Rules (ALL APPS)
 
-```javascript
-app.listen(process.env.PORT || 3000, "0.0.0.0");
 ```
-
-```python
-uvicorn.run(app, host="0.0.0.0", port=int(os.environ.get("PORT", 8000)))
-```
-
----
-
-## A1 — scholar-auth
-```javascript
-app.set('trust proxy', 1);
-app.get("/health", (_, res) => res.json({service: "scholar-auth", status: "healthy", version: process.env.VERSION}));
-// Cookies: { secure: true, sameSite: "none", httpOnly: true }
+NO LOCAL STATE
+ALL READS/WRITES VIA CORE API
+DATABASE_URL NEVER EMBEDDED IN A5/A7
 ```
 
 ---
 
-## A3 — scholarship-agent
+## A5 — student-pilot (Golden Path)
+
+### Required Changes:
 ```javascript
-app.get("/health", (_, res) => res.json({service: "scholarship-agent", status: "healthy"}));
-app.get("/readyz", (_, res) => res.json({service: "scholarship-agent", status: "healthy", ready: true}));
-```
+// 1. Remove any local DB connections
+// FORBIDDEN: const db = new Database(process.env.DATABASE_URL);
+// REQUIRED: All data via Core API
 
----
+// 2. Health endpoint
+app.get("/health", (_, res) => res.json({
+  service: "student-pilot",
+  status: "healthy",
+  version: process.env.VERSION
+}));
 
-## A4 — scholarship-sage
-```javascript
-app.get("/health", (_, res) => res.json({service: "scholarship-sage", status: "healthy", version: process.env.VERSION}));
-```
+// 3. Readyz endpoint
+app.get("/readyz", (_, res) => res.json({
+  service: "student-pilot",
+  ready: true
+}));
 
----
+// 4. Security headers middleware
+app.use((req, res, next) => {
+  res.set('Strict-Transport-Security', 'max-age=15552000; includeSubDomains');
+  res.set('X-Content-Type-Options', 'nosniff');
+  res.set('X-Frame-Options', 'DENY');
+  next();
+});
 
-## A5 — student-pilot (Stripe Guardrail)
-```javascript
-const fs = require("fs");
-app.post("/create-checkout-session", (req, res) => {
-  const key = process.env.STRIPE_PUBLISHABLE_KEY || "";
-  const live = key.startsWith("pk_live_");
-  const override = fs.existsSync("tests/perf/reports/hitl_approvals.log");
-  if (live && !override) return res.status(403).json({error: "SAFETY_LOCK_ACTIVE"});
+// 5. B2C Pilot Checkout (with safety lock)
+app.post("/create-checkout-session", async (req, res) => {
+  const cohort_id = "B2C-PILOT-001";
+  const run_id = "CEOSPRINT-20260113-VERIFY-ZT3G-056";
+  
+  // Safety check
+  if (process.env.SAFETY_LOCK === "active" && !process.env.CEO_OVERRIDE) {
+    return res.status(403).json({error: "SAFETY_LOCK_ACTIVE"});
+  }
+  
+  // Log to A8
+  await fetch(A8_URL + "/api/events", {
+    method: "POST",
+    headers: {"Content-Type": "application/json", "X-Trace-Id": `${run_id}.checkout`},
+    body: JSON.stringify({run_id, cohort_id, event_type: "charge", status: "pending"})
+  });
 });
 ```
 
----
-
-## A6 — provider-register
-```javascript
-app.get("/api/providers", (_, res) => {
-  res.setHeader('Content-Type', 'application/json');
-  res.json([]);
-});
-```
+### Release Gate Checklist:
+- [ ] Manifest digest matches `golden_path.yaml`
+- [ ] `/health` returns 200 + functional markers
+- [ ] `/readyz` returns green
+- [ ] Security headers present
+- [ ] 3-of-3 confirmation logged in A8
 
 ---
 
-## A7 — auto-page-maker
+## A7 — auto-page-maker (Golden Path)
+
+### Required Changes:
 ```javascript
-app.get("/sitemap.xml", (_, res) => {
+// 1. Remove any local DB connections
+// FORBIDDEN: Any DATABASE_URL usage
+// REQUIRED: All scholarship data via A2 Core API
+
+// 2. Health endpoint
+app.get("/health", (_, res) => res.json({
+  service: "auto-page-maker",
+  status: "healthy"
+}));
+
+// 3. Sitemap endpoint
+app.get("/sitemap.xml", async (_, res) => {
   res.set('Content-Type', 'application/xml');
-  res.send('<?xml version="1.0"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"></urlset>');
+  // Fetch pages from Core API, not local DB
+  res.send('<?xml version="1.0"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">...</urlset>');
 });
-app.get("/health", (_, res) => res.json({service: "auto-page-maker", status: "healthy"}));
+
+// 4. Security headers middleware
+app.use((req, res, next) => {
+  res.set('Strict-Transport-Security', 'max-age=15552000; includeSubDomains');
+  res.set('X-Content-Type-Options', 'nosniff');
+  res.set('X-Frame-Options', 'DENY');
+  next();
+});
+```
+
+### Release Gate Checklist:
+- [ ] Manifest digest matches `golden_path.yaml`
+- [ ] `/health` returns 200 + functional markers
+- [ ] `/sitemap.xml` returns valid XML
+- [ ] Security headers present
+- [ ] 3-of-3 confirmation logged in A8
+
+---
+
+## A8 Attestation Template
+
+After A5/A7 redeploy, post to shiproom:
+
+```
+Subject: CEO-OVERRIDE B2C PILOT ZT3G-056
+
+A5_commit: <sha>
+A7_commit: <sha>
+manifest_digest: <hash>
+build_artifact_sha: <hash>
+a8_attestation_id: <evt_xxx>
+60-min snapshot window (UTC): <start>–<end>
+P95 core: <ms> / aux: <ms>
+3-of-3 confirmations: A5 ✓ A7 ✓
+checksum parity: ✓
 ```
 
 ---
 
-## A8 — auto-com-center (JSON Contract)
-```javascript
-app.post("/api/events", (req, res) => {
-  res.setHeader('Content-Type', 'application/json');
-  res.json({success: true, event_id: Date.now(), trace_id: req.headers["x-trace-id"] || "no-trace"});
-});
-// Error handler - always JSON
-app.use((err, req, res, next) => {
-  res.setHeader('Content-Type', 'application/json');
-  res.status(500).json({error: err.message});
-});
-```
+## Success Criteria for Ramp Request
 
----
-
-## Summary
-
-| App | Status | Critical Fix |
-|-----|--------|--------------|
-| A2 | **VERIFIED** | None |
-| A1 | BLOCKED | trust proxy + cookies |
-| A3 | BLOCKED | /health + /readyz |
-| A4 | BLOCKED | /health |
-| A5 | BLOCKED | Stripe guardrail |
-| A6 | BLOCKED | /api/providers JSON |
-| A7 | BLOCKED | /sitemap.xml |
-| A8 | BLOCKED | JSON contract |
+Two consecutive 60-minute snapshots with:
+- A5/A7: 200 OK + functional markers
+- P95 ≤120ms on A1-A4
+- P95 ≤200ms on A6/A8
