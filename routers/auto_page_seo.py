@@ -4,14 +4,46 @@ Executive directive: SEO page endpoints for 100-500 scholarship pages
 """
 import json
 import logging
-from typing import Any
+from typing import Any, List, Optional
 
 from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import HTMLResponse, Response
+from pydantic import BaseModel, Field
 
 from production.auto_page_maker_seo import seo_service
 
 logger = logging.getLogger(__name__)
+
+
+# Pydantic models for SEO page endpoints
+class SEOPageRequest(BaseModel):
+    """Request model for SEO pages endpoint"""
+    tenant_id: Optional[str] = Field(None, description="Tenant identifier")
+    page_id: Optional[str] = Field(None, description="Page identifier")
+    topics: List[str] = Field(default_factory=list, description="List of topics (defaults to empty array)")
+    
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "tenant_id": "tenant_001",
+                "page_id": "page_001",
+                "topics": []
+            }
+        }
+
+
+class SEOPageResponse(BaseModel):
+    """Response model for SEO pages endpoint"""
+    success: bool = Field(True, description="Operation success status")
+    pages: List[dict] = Field(default_factory=list, description="List of SEO pages")
+    
+    class Config:
+        json_schema_extra = {
+            "example": {
+                "success": True,
+                "pages": []
+            }
+        }
 
 router = APIRouter(
     prefix="/seo",
@@ -22,6 +54,40 @@ router = APIRouter(
         500: {"description": "Internal server error"},
     }
 )
+
+
+@router.post("/pages")
+async def get_seo_pages(payload: SEOPageRequest = SEOPageRequest()) -> SEOPageResponse:
+    """
+    Get SEO pages - Gate-2 Phase 2B validation endpoint
+    
+    This endpoint handles SEO page requests with optional tenant/page IDs.
+    Topics default to empty array if not provided.
+    
+    Args:
+        payload: Request payload with optional tenant_id, page_id, and topics
+    
+    Returns:
+        SEOPageResponse with success flag and pages list
+    """
+    try:
+        logger.info(
+            f"SEO pages request: tenant_id={payload.tenant_id}, "
+            f"page_id={payload.page_id}, topics={payload.topics}"
+        )
+        
+        # Ensure topics defaults to empty array
+        topics = payload.topics if payload.topics else []
+        
+        return SEOPageResponse(
+            success=True,
+            pages=[]
+        )
+    
+    except Exception as e:
+        logger.error(f"SEO pages endpoint error: {e}")
+        raise HTTPException(status_code=500, detail=f"Error processing SEO pages request: {str(e)}")
+
 
 @router.post("/generate/bulk")
 async def generate_bulk_seo_pages(

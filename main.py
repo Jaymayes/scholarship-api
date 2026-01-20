@@ -844,7 +844,8 @@ app.include_router(operations_framework_router, tags=["Operations Framework"])
 # CRITICAL SECURITY: API Commercialization & Billing System
 app.include_router(commercialization_router, tags=["API Commercialization"])
 app.include_router(devrel_router, tags=["Developer Relations"])
-app.include_router(auto_seo_router, tags=["Auto SEO Pages"])
+app.include_router(auto_seo_router, prefix="/api", tags=["Auto SEO Pages"])
+app.include_router(auto_seo_router, prefix="/api/v1", tags=["Auto SEO Pages v1"])
 app.include_router(scholarship_pages_router, tags=["Canonical Scholarship Pages"])
 app.include_router(public_router, tags=["Public Status"])  # Status page and docs
 
