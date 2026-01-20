@@ -27,7 +27,7 @@ class P95Response(BaseModel):
     p95_ms: float
     sample_count: int
     timestamp: str
-    event_loop_ms: Optional[float] = None  # Gate-2: Event loop lag estimate
+    event_loop_estimate_ms: Optional[float] = None  # Gate-2: Event loop lag proxy (P95-based)
 
 
 @router.get("/metrics/p95", response_model=P95Response)
@@ -55,8 +55,9 @@ async def get_p95_metrics():
                 timestamp=synthetic.timestamp if synthetic.timestamp else metrics.timestamp
             )
     
-    # Gate-2 Stabilization: Estimate event loop lag from P95
-    # In Python asyncio, event loop lag is approximated by request processing latency
+    # Gate-2 Stabilization: Event loop lag proxy using P95 latency
+    # Note: Not a true histogram - asyncio has no native event loop lag metric
+    # This provides a proxy indicator using request processing time
     event_loop_estimate = metrics.p95_ms if metrics.sample_count > 0 else 0.0
     
     return P95Response(
@@ -65,5 +66,5 @@ async def get_p95_metrics():
         p95_ms=metrics.p95_ms,
         sample_count=metrics.sample_count,
         timestamp=metrics.timestamp,
-        event_loop_ms=event_loop_estimate
+        event_loop_estimate_ms=event_loop_estimate
     )
