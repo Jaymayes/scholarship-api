@@ -1,0 +1,120 @@
+# SEV-1 Raw Curl Evidence - Production
+# RUN_ID: CEOSPRINT-20260120-SEV1-HOTFIX-DEPLOY-001
+# Collected: 2026-01-20T08:36:54Z
+
+## PUBLIC BASE URL
+https://83dfcf73-98cb-4164-b6f8-418c739faf3b-00-10wl0zocrf1wy.picard.replit.dev
+
+## 4.1 Metrics P95
+GET /metrics/p95?t=1768898214913 HTTP/1.1
+Host: 83dfcf73-98cb-4164-b6f8-418c739faf3b-00-10wl0zocrf1wy.picard.replit.dev
+Cache-Control: no-cache
+X-Trace-Id: CEOSPRINT-20260120-SEV1-HOTFIX-DEPLOY-001.metrics
+
+Response: 200 OK
+{
+    "window_sec": 600,
+    "p50_ms": 0.0,
+    "p95_ms": 0.0,
+    "sample_count": 0,
+    "timestamp": "2026-01-20T08:36:54.914336+00:00"
+}
+
+## 4.2 Health Check
+GET /health?t=1768898214913 HTTP/1.1
+X-Trace-Id: CEOSPRINT-20260120-SEV1-HOTFIX-DEPLOY-001.health
+
+Response: 200 OK
+{
+    "status": "healthy",
+    "trace_id": "683da184-6625-45cb-a441-aa7ecf1796a5"
+}
+
+## 4.3 Ready Check
+GET /ready?t=1768898214913 HTTP/1.1
+X-Trace-Id: CEOSPRINT-20260120-SEV1-HOTFIX-DEPLOY-001.ready
+
+Response: 200 OK
+{
+    "status": "ready",
+    "services": {
+        "api": "ready",
+        "database": "ready",
+        "stripe": "configured"
+    }
+}
+
+## 4.4 Probe Status
+GET /api/probe/?t=1768898214913 HTTP/1.1
+X-Trace-Id: CEOSPRINT-20260120-SEV1-HOTFIX-DEPLOY-001.probe
+
+Response: 200 OK
+{
+    "status": "pass",
+    "probes": {
+        "db": {"status": "pass"},
+        "kpi": {"status": "pass"},
+        "auth": {"status": "pass"},
+        "payment": {"status": "pass"}
+    },
+    "all_pass": true,
+    "system_identity": "scholarship_api"
+}
+
+## 4.5 Containment Check
+GET /api/internal/pilot/containment/check?operation_type=background HTTP/1.1
+
+Response: 200 OK
+{
+    "operation_type": "background",
+    "allowed": false,
+    "containment_active": true,
+    "fleet_seo_paused": true,
+    "scheduler_cap": 0
+}
+
+## 5.1 Telemetry POST with _meta
+POST /api/telemetry/ingest HTTP/1.1
+Content-Type: application/json
+x-scholar-protocol: v3.3.1
+X-Trace-Id: CEOSPRINT-20260120-SEV1-HOTFIX-DEPLOY-001.telemetry
+X-Idempotency-Key: 11952c0c-0e12-4b19-a359-f219bce12179
+
+Body: {
+    "event_type": "SEV1_WAF_HOTFIX_TEST",
+    "_meta": {"run_id": "CEOSPRINT-20260120-SEV1-HOTFIX-DEPLOY-001", "phase": "5"}
+}
+
+Response: 200 OK
+{
+    "status": "ok",
+    "accepted": 1,
+    "failed": 0,
+    "event_ids": ["11952c0c-0e12-4b19-a359-f219bce12179"],
+    "protocol": "v3.3.1",
+    "sink": "A2_fallback"
+}
+
+## 5.2 Synthetic Login Test
+POST /api/internal/pilot/synthetic-login HTTP/1.1
+Content-Type: application/json
+X-Trace-Id: CEOSPRINT-20260120-SEV1-HOTFIX-DEPLOY-001.synthetic
+Body: {"iterations": 5}
+
+Response: 200 OK
+{
+    "status": "PASSED",
+    "result": {
+        "passed": true,
+        "p50_ms": 18.18,
+        "p95_ms": 32.39,
+        "p99_ms": 32.39,
+        "error_rate_pct": 0.0
+    },
+    "ready_for_activation": true
+}
+
+## Telemetry _meta Allowlist Verification
+- Request included "_meta" key in payload
+- Request was ACCEPTED (not blocked by WAF)
+- Confirms WAF_UNDERSCORE_ALLOWLIST=_meta is working

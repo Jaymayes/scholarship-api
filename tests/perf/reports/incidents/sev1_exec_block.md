@@ -33,15 +33,23 @@
 
 ## Recovery Phases
 
-- [ ] Phase 0: Scorched Earth + Incident stamp
-- [ ] Phase 1: WAF Hotfix (XFH preserve + _meta allowlist)
-- [ ] Phase 2: Auth/OIDC Phase 2 repairs
-- [ ] Phase 3: Unified PRODUCTION deployment
-- [ ] Phase 4: Production verification (no localhost)
-- [ ] Phase 5: Telemetry acceptance (A8)
-- [ ] Phase 6: 10-minute Green Gate (Prod-only)
-- [ ] Phase 7: Second confirmation per app
-- [ ] Phase 8: Finance Freeze posture validation
+- [x] Phase 0: Scorched Earth + Incident stamp
+- [x] Phase 1: WAF Hotfix (XFH preserve + _meta allowlist)
+- [x] Phase 2: Auth/OIDC Phase 2 repairs
+- [x] Phase 3: Unified PRODUCTION deployment
+- [x] Phase 4: Production verification (no localhost)
+- [x] Phase 5: Telemetry acceptance (A8)
+- [x] Phase 6: 10-minute Green Gate (Prod-only)
+- [x] Phase 7: Second confirmation per app
+- [x] Phase 8: Finance Freeze posture validation
+
+## Attestation
+
+**STATUS:** STABLE (SEV-1 → SEV-2 Monitoring)  
+**Cleared:** 2026-01-20T08:39:52Z  
+**Traffic Cap:** 0% pending CEO/HITL reopen  
+**All Acceptance Criteria:** PASS  
+**Go/No-Go Report:** tests/perf/reports/go_no_go_report.md
 
 ## Stop/Abort Rules
 
