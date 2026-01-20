@@ -38,18 +38,21 @@ Self-inflicted WAF regression that stripped the `x-forwarded-host` header, break
 
 ## Recovery Phases
 
-- [ ] Phase 0: Scorched Earth + State sanity
-- [ ] Phase 1: WAF emergency rollback + allowlist
-- [ ] Phase 2: Auth/OIDC repair
-- [ ] Phase 3: Health/synthetic monitors repair
-- [ ] Phase 4: Performance decompression
-- [ ] Phase 5: Telemetry 500 fix + BYPASS rules
-- [ ] Phase 6: SEO schema ZodError hotfix
-- [ ] Phase 7: 10-minute green gate
-- [ ] Phase 8: Second confirmation
-- [ ] Phase 9: Finance freeze validation
+- [x] Phase 0: Scorched Earth + State sanity
+- [x] Phase 1: WAF emergency rollback + allowlist
+- [x] Phase 2: Auth/OIDC repair
+- [x] Phase 3: Health/synthetic monitors repair
+- [x] Phase 4: Performance decompression
+- [x] Phase 5: Telemetry 500 fix + BYPASS rules
+- [x] Phase 6: SEO schema ZodError hotfix
+- [x] Phase 7: 10-minute green gate
+- [x] Phase 8: Second confirmation
+- [x] Phase 9: Finance freeze validation
 
 ## Attestation
 
-**Status:** UNSTABLE (SEV-1)  
-**Next Gate:** T+60 stability verification pending all phases complete
+**Status:** STABLE (SEV-1 Cleared to SEV-2 Monitoring)  
+**Cleared:** 2026-01-20T07:56:45Z  
+**Traffic Cap:** 0% pending CEO/HITL reopen  
+**All Acceptance Criteria:** PASS  
+**Go/No-Go Report:** tests/perf/reports/go_no_go_report.md
