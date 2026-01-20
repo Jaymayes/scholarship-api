@@ -48,8 +48,11 @@ EXCLUDED_PREFIXES = (
     "/.well-known/",
     "/api/v1/monitoring/",
     "/api/v1/telemetry/",
-    "/api/seo/",
-    "/api/v1/seo/",
+    # SEO: Only /pages and /sitemap.xml are public; /generate/bulk requires auth
+    "/api/seo/pages",
+    "/api/seo/sitemap",
+    "/api/v1/seo/pages",
+    "/api/v1/seo/sitemap",
     "/oca/canary/",
     "/stabilization/",
     "/canary/",
