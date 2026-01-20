@@ -385,8 +385,8 @@ class WAFProtection(BaseHTTPMiddleware):
             r"(\bor\b\s+['\"]?1['\"]?\s*=\s*['\"]?1['\"]?)",  # OR 1=1 patterns
             r"(\';?\s*(drop|delete|update|insert)\s)",  # Semicolon followed by dangerous commands
 
-            # Advanced patterns
-            r"(\x27|\x22|\\x27|\\x22)",  # Encoded quotes
+            # Advanced patterns - REMOVED overly aggressive encoded quote pattern (SEV-1 FIX 2026-01-20)
+            # Original pattern r"(\x27|\x22|\\x27|\\x22)" matched ANY JSON double quotes causing false positives
             r"(\b(waitfor|delay|benchmark|sleep)\s*\()",  # Time-based injection
             r"(\b(load_file|into\s+outfile|into\s+dumpfile)\b)",  # File operations
             r"(\b(sp_|xp_)\w+)",  # Stored procedures
