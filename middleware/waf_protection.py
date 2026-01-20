@@ -83,6 +83,23 @@ class WAFProtection(BaseHTTPMiddleware):
         self._xss_patterns = self._compile_xss_patterns()
         self._command_patterns = self._compile_command_patterns()
         self._path_traversal_patterns = self._compile_path_traversal_patterns()
+        
+        # Trust-by-Secret S2S bypass configuration (Gate-2 Stabilization)
+        self._shared_secret = os.getenv("SHARED_SECRET", "")
+        self._s2s_telemetry_paths = {
+            "/api/telemetry/ingest",
+            "/telemetry/ingest",
+            "/api/analytics/events",
+            "/api/events",
+        }
+        # Trusted S2S CIDRs: Replit infra + internal networks
+        self._s2s_trusted_cidrs = [
+            ipaddress.ip_network("35.184.0.0/13"),   # Replit
+            ipaddress.ip_network("35.192.0.0/12"),   # Replit
+            ipaddress.ip_network("10.0.0.0/8"),      # Internal
+            ipaddress.ip_network("127.0.0.0/8"),     # Localhost
+            ipaddress.ip_network("::1/128"),         # IPv6 localhost
+        ]
 
         # Protected endpoints requiring Authorization header
         # CEO WAR ROOM FIX: Removed public endpoints (/scholarships, /search) from protection
@@ -292,6 +309,21 @@ class WAFProtection(BaseHTTPMiddleware):
                 return True
         
         return False
+
+    def _is_s2s_trusted_cidr(self, client_ip: str) -> bool:
+        """
+        Check if client IP is in trusted S2S CIDR ranges for telemetry bypass
+        
+        Trusted CIDRs: 35.184.0.0/13, 35.192.0.0/12, 10.0.0.0/8, 127.0.0.0/8, ::1
+        """
+        try:
+            ip_addr = ipaddress.ip_address(client_ip)
+            for network in self._s2s_trusted_cidrs:
+                if ip_addr in network:
+                    return True
+            return False
+        except ValueError:
+            return False
 
     def _sanitize_underscore_keys(self, body: str) -> tuple[str, list[str]]:
         """
@@ -557,6 +589,21 @@ class WAFProtection(BaseHTTPMiddleware):
                         }
                     )
 
+        # GATE-2 STABILIZATION: Trust-by-Secret S2S bypass for telemetry
+        # Bypasses SQLi inspection for authenticated internal S2S requests only
+        s2s_bypass = False
+        if path in self._s2s_telemetry_paths or path.rstrip('/') in self._s2s_telemetry_paths:
+            shared_secret_header = request.headers.get("x-scholar-shared-secret", "")
+            is_s2s_trusted_cidr = self._is_s2s_trusted_cidr(client_ip)
+            
+            if self._shared_secret and shared_secret_header == self._shared_secret and is_s2s_trusted_cidr:
+                # All three conditions met: header matches, trusted CIDR, telemetry path
+                s2s_bypass = True
+                logger.info(f"[WAF] BYPASS S2S: Trusted telemetry from {client_ip} to {path}")
+            elif shared_secret_header and shared_secret_header != self._shared_secret:
+                # Wrong secret - log but continue with normal WAF
+                logger.warning(f"[WAF] S2S secret mismatch from {client_ip} to {path}")
+
         # CRITICAL FIX: Only wrap WAF-specific checks in try/except
         # Do NOT catch exceptions from call_next() - let auth exceptions propagate properly
         try:
@@ -570,8 +617,8 @@ class WAFProtection(BaseHTTPMiddleware):
                     method
                 )
 
-            # 2. SQL INJECTION DETECTION
-            if await self._detect_sql_injection(request):
+            # 2. SQL INJECTION DETECTION (skip if S2S bypass active)
+            if not s2s_bypass and await self._detect_sql_injection(request):
                 self.sql_injection_blocks += 1
                 return await self._block_request(
                     "SQL injection attempt detected",
