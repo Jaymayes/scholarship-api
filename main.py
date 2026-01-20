@@ -108,6 +108,7 @@ from routers.qa_orchestrator import router as qa_orchestrator_router
 from routers.a3_orchestrator import router as a3_orchestrator_router
 from routers.canary import router as canary_router
 from routers.pilot import router as pilot_router
+from routers.metrics_p95 import router as metrics_p95_router
 from schemas.error_responses import ERROR_RESPONSES
 from utils.logger import setup_logger
 
@@ -866,6 +867,7 @@ app.include_router(qa_orchestrator_router, tags=["QA Orchestrator"])
 app.include_router(a3_orchestrator_router, tags=["A3 Orchestrator"])
 app.include_router(canary_router, tags=["SEV-2 Canary"])
 app.include_router(pilot_router, tags=["SEV-2 Pilot Restore"])
+app.include_router(metrics_p95_router, tags=["Metrics"])
 
 # Metrics already setup above - this was the wrong location causing route shadowing
 

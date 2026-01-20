@@ -1,0 +1,124 @@
+Role
+You are the Replit Agent for Scholar AI Advisor (www.scholaraiadvisor.com) operating in Max Autonomous mode under CEO authority. We are in SEV‑1 due to a self‑inflicted WAF regression that stripped the x-forwarded-host header, breaking Auth (OIDC) and internal health checks (410 Gone). Your mission is to: (1) execute an emergency rollback of the offending WAF rule, (2) restore stable OIDC and health checks, (3) purge “localhost” synthetic targets, (4) harden and verify for 10‑minute green, (5) hold Finance Freeze and set Traffic Cap to 0%, and (6) produce artifacts proving recovery without false positives.
+
+Global controls (apply immediately)
+
+INCIDENT_MODE=SEV1
+TRAFFIC_CAP=0% (kill pilot)
+LEDGER_FREEZE=true; PROVIDER_INVOICING_PAUSED=true; FEE_POSTINGS_PAUSED=true
+ANTI-FALSE-POSITIVE: external public URLs only; add Cache-Control: no-cache and ?t=<epoch_ms>; ignore all prior .md reports
+Second Confirmation: any PASS requires 2-of-3 (HTTP+Trace, Logs, A8 round-trip); prefer 3-of-3
+Phase 0 — Scorched Earth + State sanity
+
+rm -rf tests/perf/reports/* tests/perf/evidence/*; mkdir -p tests/perf/reports tests/perf/evidence
+Write tests/perf/reports/incidents/sev1_declare.md with timestamp, decision block, and controls above.
+Ensure all synthetic monitors use PUBLIC_BASE_URL per app; forbid localhost. Create env per service: PUBLIC_BASE_URL, HEALTH_URL, READY_URL.
+Phase 1 — WAF emergency rollback + allowlist
+1.1 Roll back header‑stripping policy for x-forwarded-host
+
+Set WAF_STRIP_X_FORWARDED_HOST=false globally.
+Introduce strict allowlist instead:
+WAF_ALLOWLIST_XFH=true
+WAF_TRUSTED_INGRESS_CIDRS="35.192.0.0/12,35.224.0.0/12,34.0.0.0/8,136.0.0.0/8" (include all ingress IP ranges observed in logs; you may refine to exact list from config)
+WAF_TRUSTED_INTERNALS="127.0.0.1/32,::1/128"
+WAF_ALLOWED_HOST_SUFFIXES=".replit.app,.replit.co,.scholaraiadvisor.com"
+Policy:
+If client IP ∈ WAF_TRUSTED_* and Host/XFH endswith any suffix in WAF_ALLOWED_HOST_SUFFIXES → preserve x-forwarded-host
+Else strip or 403 per PROD rules
+Keep underscore-key block (e.g., _meta), but log and drop the property; do not 4xx the entire request on telemetry.
+Artifacts: tests/perf/reports/waf_rollback_and_allowlist.md (diff, env, policy pseudocode)
+
+Phase 2 — Auth/OIDC repair (A1) + trust proxy
+2.1 A1 service
+
+app.set('trust proxy', 1)
+Enforce secure session cookies: SameSite=None; Secure; HttpOnly; Path=/; (Domain=.scholaraiadvisor.com if cross-subdomain)
+OIDC canonical base:
+OIDC_PUBLIC_BASE_URL (env) required
+Fallback to X-Forwarded-Proto + x-forwarded-host only if allowlisted
+/oauth/token and /token must validate:
+client_id present; grant_type in allowed set; else 400 JSON RFC 6749 error with error_description
+Remove any localhost probes in auth monitors; use HEALTH_URL and READY_URL.
+Artifacts: tests/perf/reports/oidc_fix_and_cookie_policy.md (Set-Cookie capture), tests/perf/reports/oidc_input_validation.md
+
+Phase 3 — Health/synthetic monitors repair
+3.1 Replace localhost:* URLs in all synthetic checks with PUBLIC_BASE_URL; enforce https; verify TLS min TLSv1.2; fix “packet length too long” by disabling legacy/insecure transports.
+3.2 Implement /metrics/p95 endpoint (JSON) on all services; return window_sec=600; p50_ms/p95_ms/sample_count.
+3.3 De‑duplicate “probe already in progress” warnings:
+
+Add distributed mutex per target; random jitter ±20%; backoff sequence on lock held: 2s, 5s, 10s. Artifacts: tests/perf/reports/synthetics_public_urls.md, tests/perf/reports/metrics_endpoints_present.md, tests/perf/reports/probe_mutex_backoff.md
+Phase 4 — Performance decompression (stop event‑loop starvation)
+
+Cap concurrent in‑flight on hot paths; move heavy I/O off event loop; enable keep‑alive; gzip/br; index auth/profile queries; set statement_timeout; set pool sizes; add GC hints if Node (node --max-old-space-size if needed). Targets to prove:
+/api/login p95 ≤200ms (window 10m)
+DB p95 ≤100ms (window 10m)
+Event loop lag <200ms sustained (was ~2200ms) Artifacts: tests/perf/reports/perf_recovery_plan.md with before/after snapshots
+Phase 5 — Telemetry primary 500 fix + BYPASS rules under SEV‑1
+
+Telemetry ingest must never 500; if X-Trace-Id or X-Idempotency-Key missing under SEV‑1, auto‑generate and count BYPASS; outside SEV posture require both.
+Confirm ≥99% acceptance and successful POST+GET checksum round-trip. Artifacts: tests/perf/reports/telemetry_resilience_and_bypass.md
+Phase 6 — SEO schema ZodError hotfix
+
+topics: z.array(z.string()).default([]); return 400 JSON with friendly message if malformed; never crash route. Artifacts: tests/perf/reports/seo_schema_fix.md
+Phase 7 — 10-minute green gate (all external)
+
+For each app A1–A8:
+curl -vL -H "Cache-Control: no-cache" "$HEALTH_URL?t=$(date +%s)"
+PASS only if 200 + JSON {service, status:"healthy"} and NOT “Waking/Loading”
+/metrics/p95 must return 200 JSON
+OIDC flows: confirm /oauth/token errors contain correct RFC fields on bad input; and Set‑Cookie has SameSite=None; Secure; HttpOnly on auth pages
+Collect p95 time series for /, /pricing, /browse, /health (10m window) Artifacts:
+tests/perf/evidence/raw_curl_evidence.txt
+tests/perf/reports/raw_truth_summary.md
+tests/perf/reports/perf_summary.md (10m)
+Phase 8 — Second confirmation (per app)
+
+For each PASS create:
+HTTP evidence (X-Trace-Id echoed)
+Log entry with same X-Trace-Id
+A8 POST+GET artifact checksum (and ledger correlation for B2B fee lineage if touched) Artifact: tests/perf/reports/ecosystem_double_confirm.md
+Phase 9 — Finance freeze validation (stay frozen)
+
+Prove ledger writes continue; invoicing/settlement disabled by flags; heartbeat sentinel writing every 10m without stale gap >15m. Artifacts:
+tests/perf/reports/finance_freeze_validation.md
+tests/perf/reports/ledger_sentinel_status.md
+Acceptance criteria for SEV‑1 recovery (must all PASS before any traffic reopening discussion)
+
+WAF: x-forwarded-host preserved for trusted ingress; header stripping rollback complete; policy documented
+Auth: OIDC base URL resolution correct; /oauth/token validation returns proper RFC errors; Set‑Cookie has SameSite=None; Secure; HttpOnly
+Synthetics: all public URLs (no localhost); no TLS EPROTO errors; probe de‑dup active; no “already in progress” storms
+Health: 8/8 services 200 with JSON service markers (no “Waking/Loading” placeholders)
+Metrics: /metrics/p95 present and 200 JSON for all apps
+Performance: /api/login p95 ≤200ms; DB p95 ≤100ms; event loop lag <200ms; proven over 10m window
+Telemetry: ≥99% acceptance; 0×500; POST+GET checksum round-trip
+SEO: topics schema fixed; no ZodError crash
+Finance Freeze validated (no invoicing/settlement), ledger heartbeat live
+Second confirmation achieved for each PASS; artifacts posted to A8 with checksums
+Traffic policy (do NOT change automatically)
+
+Remain at TRAFFIC_CAP=0% until CEO explicitly grants HITL‑CEO override to begin a staged reopen.
+If any acceptance criterion fails, print “Attestation: UNSTABLE (SEV‑1) — See incident artifacts” and halt.
+Artifacts to produce (all with SHA256 + A8 round-trip)
+
+tests/perf/reports/incidents/sev1_declare.md
+tests/perf/reports/waf_rollback_and_allowlist.md
+tests/perf/reports/oidc_fix_and_cookie_policy.md
+tests/perf/reports/oidc_input_validation.md
+tests/perf/reports/synthetics_public_urls.md
+tests/perf/reports/metrics_endpoints_present.md
+tests/perf/reports/probe_mutex_backoff.md
+tests/perf/reports/perf_recovery_plan.md
+tests/perf/reports/telemetry_resilience_and_bypass.md
+tests/perf/reports/seo_schema_fix.md
+tests/perf/evidence/raw_curl_evidence.txt
+tests/perf/reports/raw_truth_summary.md
+tests/perf/reports/perf_summary.md
+tests/perf/reports/ecosystem_double_confirm.md
+tests/perf/reports/finance_freeze_validation.md
+tests/perf/reports/ledger_sentinel_status.md
+tests/perf/evidence/checksums.json
+tests/perf/reports/go_no_go_report.md
+Final console output
+
+If all recovery criteria PASS (10‑minute green, second confirmation, no regressions): print “Attestation: STABLE (SEV‑1 Cleared to SEV‑2 Monitoring) — TRAFFIC_CAP remains 0% pending CEO/HITL reopen”
+Else: print “Attestation: UNSTABLE (SEV‑1) — See incident artifacts; TRAFFIC_CAP=0%; Finance Freeze ACTIVE” END-REPLIT-AGENT-PROMPT

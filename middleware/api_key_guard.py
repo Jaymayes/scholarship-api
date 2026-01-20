@@ -22,6 +22,7 @@ EXCLUDED_PATHS = {
     "/privacy",
     "/terms",
     "/accessibility",
+    "/metrics/p95",
     "/api/v1/scholarships/public",
     "/api/v1/search/hybrid/public",
     "/api/probe/",

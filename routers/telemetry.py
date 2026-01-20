@@ -245,38 +245,40 @@ async def telemetry_ingest(
         ""
     )
     
-    telemetry_strict = os.environ.get("TELEMETRY_STRICT_MODE", "true").lower() == "true"
-    require_idempotency = os.environ.get("TELEMETRY_REQUIRE_IDEMPOTENCY", "true").lower() == "true"
+    incident_mode = os.environ.get("INCIDENT_MODE", "").upper()
+    is_sev1_mode = incident_mode == "SEV1"
+    
+    bypass_count = 0
     
     raw_body = await request.body()
     
     if not idempotency_key:
-        if telemetry_strict and require_idempotency:
-            logger.warning(f"REPORT: app=scholarship_api | env=prod | v3.5.1 INGEST: Rejected - Missing X-Idempotency-Key (HTTP 428)")
-            return JSONResponse(status_code=428, content={
-                "error": "Precondition Required",
-                "detail": "X-Idempotency-Key or x-event-id header is required for mutable operations",
-                "accepted_headers": ["X-Idempotency-Key", "x-event-id"],
-                "directive": "AGENT3_HANDSHAKE_v27"
-            })
+        if is_sev1_mode:
+            idempotency_key = f"idem-{uuid.uuid4()}"
+            bypass_count += 1
+            logger.info(f"SEV-1 BYPASS: Missing X-Idempotency-Key, auto-generated: {idempotency_key}")
         else:
-            import hashlib as _hashlib
-            body_hash = _hashlib.sha256(raw_body).hexdigest()[:16]
-            idempotency_key = f"sha256:{body_hash}"
-            logger.info(f"SEV-1 BYPASS: Missing X-Idempotency-Key, generated from body hash: {idempotency_key}")
+            logger.warning(f"REPORT: app=scholarship_api | env=prod | v3.5.1 INGEST: Rejected - Missing X-Idempotency-Key (HTTP 400)")
+            return JSONResponse(status_code=400, content={
+                "error": "Bad Request",
+                "detail": "X-Idempotency-Key or x-event-id header is required",
+                "accepted_headers": ["X-Idempotency-Key", "x-event-id"],
+                "hint": "Set INCIDENT_MODE=SEV1 to enable auto-generation bypass"
+            })
     
     if not trace_id:
-        if telemetry_strict:
-            logger.warning(f"REPORT: app=scholarship_api | env=prod | v3.5.1 INGEST: Rejected - Missing X-Trace-Id (HTTP 428)")
-            return JSONResponse(status_code=428, content={
-                "error": "Precondition Required",
-                "detail": "X-Trace-Id or X-Request-Id header is required for mutable operations",
-                "accepted_headers": ["X-Trace-Id", "X-Request-Id"],
-                "directive": "AGENT3_HANDSHAKE_v27"
-            })
+        if is_sev1_mode:
+            trace_id = f"trace-{uuid.uuid4()}"
+            bypass_count += 1
+            logger.info(f"SEV-1 BYPASS: Missing X-Trace-Id, auto-generated: {trace_id}")
         else:
-            trace_id = f"sev1-{uuid.uuid4().hex[:12]}"
-            logger.info(f"SEV-1 BYPASS: Missing X-Trace-Id, generated: {trace_id}")
+            logger.warning(f"REPORT: app=scholarship_api | env=prod | v3.5.1 INGEST: Rejected - Missing X-Trace-Id (HTTP 400)")
+            return JSONResponse(status_code=400, content={
+                "error": "Bad Request",
+                "detail": "X-Trace-Id or X-Request-Id header is required",
+                "accepted_headers": ["X-Trace-Id", "X-Request-Id"],
+                "hint": "Set INCIDENT_MODE=SEV1 to enable auto-generation bypass"
+            })
     
     try:
         body_str = raw_body.decode('utf-8')
@@ -398,8 +400,17 @@ async def telemetry_ingest(
         })
         
     except Exception as e:
-        logger.error(f"REPORT: app=scholarship_api | v3.3.1 INGEST FATAL: {e}")
-        return JSONResponse(status_code=500, content={"error": str(e)})
+        logger.error(f"REPORT: app=scholarship_api | v3.3.1 INGEST FATAL (returning 202 per contract): {e}")
+        return JSONResponse(status_code=202, content={
+            "status": "accepted_with_error",
+            "accepted": 0,
+            "failed": 1,
+            "error": str(e),
+            "error_type": type(e).__name__,
+            "message": "Telemetry ingest accepts all events; error logged for investigation",
+            "protocol": "v3.3.1",
+            "sink": "A2_fallback"
+        })
 
 
 @router.post("/analytics/events/raw", tags=["Telemetry"])
@@ -433,34 +444,38 @@ async def write_events_raw(
         ""
     )
     
-    telemetry_strict = os.environ.get("TELEMETRY_STRICT_MODE", "true").lower() == "true"
-    require_idempotency = os.environ.get("TELEMETRY_REQUIRE_IDEMPOTENCY", "true").lower() == "true"
+    incident_mode = os.environ.get("INCIDENT_MODE", "").upper()
+    is_sev1_mode = incident_mode == "SEV1"
+    
+    bypass_count = 0
     
     if not idempotency_key:
-        if telemetry_strict and require_idempotency:
-            logger.warning(f"REPORT: app=scholarship_api | v3.5.1 RAW: Rejected - Missing X-Idempotency-Key (HTTP 428)")
-            return JSONResponse(status_code=428, content={
-                "error": "Precondition Required",
-                "detail": "X-Idempotency-Key header is required for mutable operations",
-                "accepted_headers": ["X-Idempotency-Key", "x-event-id"],
-                "directive": "AGENT3_HANDSHAKE_v27"
-            })
+        if is_sev1_mode:
+            idempotency_key = f"idem-{uuid.uuid4()}"
+            bypass_count += 1
+            logger.info(f"SEV-1 BYPASS: RAW missing X-Idempotency-Key, auto-generated: {idempotency_key}")
         else:
-            idempotency_key = f"sev1-raw-{uuid.uuid4().hex[:12]}"
-            logger.info(f"SEV-1 BYPASS: RAW missing X-Idempotency-Key, generated: {idempotency_key}")
+            logger.warning(f"REPORT: app=scholarship_api | v3.5.1 RAW: Rejected - Missing X-Idempotency-Key (HTTP 400)")
+            return JSONResponse(status_code=400, content={
+                "error": "Bad Request",
+                "detail": "X-Idempotency-Key header is required",
+                "accepted_headers": ["X-Idempotency-Key", "x-event-id"],
+                "hint": "Set INCIDENT_MODE=SEV1 to enable auto-generation bypass"
+            })
     
     if not trace_id:
-        if telemetry_strict:
-            logger.warning(f"REPORT: app=scholarship_api | v3.5.1 RAW: Rejected - Missing X-Trace-Id (HTTP 428)")
-            return JSONResponse(status_code=428, content={
-                "error": "Precondition Required",
-                "detail": "X-Trace-Id or X-Request-Id header is required for mutable operations",
-                "accepted_headers": ["X-Trace-Id", "X-Request-Id"],
-                "directive": "AGENT3_HANDSHAKE_v27"
-            })
+        if is_sev1_mode:
+            trace_id = f"trace-{uuid.uuid4()}"
+            bypass_count += 1
+            logger.info(f"SEV-1 BYPASS: RAW missing X-Trace-Id, auto-generated: {trace_id}")
         else:
-            trace_id = f"sev1-{uuid.uuid4().hex[:12]}"
-            logger.info(f"SEV-1 BYPASS: RAW missing X-Trace-Id, generated: {trace_id}")
+            logger.warning(f"REPORT: app=scholarship_api | v3.5.1 RAW: Rejected - Missing X-Trace-Id (HTTP 400)")
+            return JSONResponse(status_code=400, content={
+                "error": "Bad Request",
+                "detail": "X-Trace-Id or X-Request-Id header is required",
+                "accepted_headers": ["X-Trace-Id", "X-Request-Id"],
+                "hint": "Set INCIDENT_MODE=SEV1 to enable auto-generation bypass"
+            })
     
     try:
         raw_body = await request.body()
@@ -550,10 +565,17 @@ async def write_events_raw(
         }
         
     except Exception as e:
-        logger.error(f"💥 RAW TELEMETRY ERROR: {e}")
+        logger.error(f"💥 RAW TELEMETRY ERROR (returning 202 per contract): {e}")
         return JSONResponse(
-            status_code=500,
-            content={"error": str(e)}
+            status_code=202,
+            content={
+                "status": "accepted_with_error",
+                "accepted": 0,
+                "failed": 1,
+                "error": str(e),
+                "error_type": type(e).__name__,
+                "message": "Telemetry ingest accepts all events; error logged for investigation"
+            }
         )
 
 
@@ -599,101 +621,117 @@ async def write_events(
         ""
     )
     
-    telemetry_strict = os.environ.get("TELEMETRY_STRICT_MODE", "true").lower() == "true"
-    require_idempotency = os.environ.get("TELEMETRY_REQUIRE_IDEMPOTENCY", "true").lower() == "true"
+    incident_mode = os.environ.get("INCIDENT_MODE", "").upper()
+    is_sev1_mode = incident_mode == "SEV1"
+    
+    bypass_count = 0
     
     if not idempotency_key:
-        if telemetry_strict and require_idempotency:
-            logger.warning(f"REPORT: app=scholarship_api | v3.5.1 EVENTS: Rejected - Missing X-Idempotency-Key (HTTP 428)")
-            return JSONResponse(status_code=428, content={
-                "error": "Precondition Required",
-                "detail": "X-Idempotency-Key header is required for mutable operations",
-                "accepted_headers": ["X-Idempotency-Key", "x-event-id"],
-                "directive": "AGENT3_HANDSHAKE_v27"
-            })
+        if is_sev1_mode:
+            idempotency_key = f"idem-{uuid.uuid4()}"
+            bypass_count += 1
+            logger.info(f"SEV-1 BYPASS: EVENTS missing X-Idempotency-Key, auto-generated: {idempotency_key}")
         else:
-            idempotency_key = f"sev1-events-{uuid.uuid4().hex[:12]}"
-            logger.info(f"SEV-1 BYPASS: EVENTS missing X-Idempotency-Key, generated: {idempotency_key}")
+            logger.warning(f"REPORT: app=scholarship_api | v3.5.1 EVENTS: Rejected - Missing X-Idempotency-Key (HTTP 400)")
+            return JSONResponse(status_code=400, content={
+                "error": "Bad Request",
+                "detail": "X-Idempotency-Key header is required",
+                "accepted_headers": ["X-Idempotency-Key", "x-event-id"],
+                "hint": "Set INCIDENT_MODE=SEV1 to enable auto-generation bypass"
+            })
     
     if not trace_id:
-        if telemetry_strict:
-            logger.warning(f"REPORT: app=scholarship_api | v3.5.1 EVENTS: Rejected - Missing X-Trace-Id (HTTP 428)")
-            return JSONResponse(status_code=428, content={
-                "error": "Precondition Required",
-                "detail": "X-Trace-Id or X-Request-Id header is required for mutable operations",
-                "accepted_headers": ["X-Trace-Id", "X-Request-Id"],
-                "directive": "AGENT3_HANDSHAKE_v27"
-            })
+        if is_sev1_mode:
+            trace_id = f"trace-{uuid.uuid4()}"
+            bypass_count += 1
+            logger.info(f"SEV-1 BYPASS: EVENTS missing X-Trace-Id, auto-generated: {trace_id}")
         else:
-            trace_id = f"sev1-{uuid.uuid4().hex[:12]}"
-            logger.info(f"SEV-1 BYPASS: EVENTS missing X-Trace-Id, generated: {trace_id}")
-    
-    accepted = 0
-    failed = 0
-    duplicates = 0
-    event_ids = []
-    missing_base_url = 0
-    
-    for event in batch.events:
-        try:
-            import json
-            
-            if not event.app_base_url and not event.properties.get("app_base_url"):
-                missing_base_url += 1
-                logger.warning(f"REPORT: app=scholarship_api | app_base_url=https://scholarship-api-jamarrlmayes.replit.app | env=prod | VALIDATION: Event {event.event_id} from {event.app_id} missing app_base_url")
-            
-            props = event.properties.copy() if event.properties else {}
-            if event.app_base_url:
-                props["app_base_url"] = event.app_base_url
-            
-            validated_event_id = event.event_id
-            try:
-                uuid.UUID(validated_event_id)
-            except (ValueError, TypeError):
-                validated_event_id = str(uuid.uuid4())
-                logger.debug(f"REPORT: app=scholarship_api | Converted non-UUID event_id to UUID: {validated_event_id}")
-            
-            query = text("""
-                INSERT INTO business_events 
-                (request_id, app, env, event_name, ts, actor_type, actor_id, session_id, org_id, properties)
-                VALUES 
-                (CAST(:request_id AS uuid), :app, :env, :event_name, :ts, :actor_type, :actor_id, :session_id, :org_id, CAST(:properties AS jsonb))
-                ON CONFLICT (request_id) DO NOTHING
-            """)
-            
-            result = db.execute(query, {
-                "request_id": validated_event_id,
-                "app": event.app_id,
-                "env": event.env,
-                "event_name": event.event_type,
-                "ts": event.ts_utc,
-                "actor_type": event.actor_type or "system",
-                "actor_id": event.user_id_hash,
-                "session_id": event.session_id,
-                "org_id": event.account_id,
-                "properties": json.dumps(props)
+            logger.warning(f"REPORT: app=scholarship_api | v3.5.1 EVENTS: Rejected - Missing X-Trace-Id (HTTP 400)")
+            return JSONResponse(status_code=400, content={
+                "error": "Bad Request",
+                "detail": "X-Trace-Id or X-Request-Id header is required",
+                "accepted_headers": ["X-Trace-Id", "X-Request-Id"],
+                "hint": "Set INCIDENT_MODE=SEV1 to enable auto-generation bypass"
             })
-            
-            if result.rowcount > 0:
-                accepted += 1
-                event_ids.append(event.event_id)
-            else:
-                duplicates += 1
-            
-        except Exception as e:
-            logger.error(f"REPORT: app=scholarship_api | app_base_url=https://scholarship-api-jamarrlmayes.replit.app | env=prod | Failed to write event {event.event_id}: {e}")
-            failed += 1
     
-    if accepted > 0:
-        db.commit()
+    try:
+        accepted = 0
+        failed = 0
+        duplicates = 0
+        event_ids = []
+        missing_base_url = 0
+        
+        for event in batch.events:
+            try:
+                import json
+                
+                if not event.app_base_url and not event.properties.get("app_base_url"):
+                    missing_base_url += 1
+                    logger.warning(f"REPORT: app=scholarship_api | app_base_url=https://scholarship-api-jamarrlmayes.replit.app | env=prod | VALIDATION: Event {event.event_id} from {event.app_id} missing app_base_url")
+                
+                props = event.properties.copy() if event.properties else {}
+                if event.app_base_url:
+                    props["app_base_url"] = event.app_base_url
+                
+                validated_event_id = event.event_id
+                try:
+                    uuid.UUID(validated_event_id)
+                except (ValueError, TypeError):
+                    validated_event_id = str(uuid.uuid4())
+                    logger.debug(f"REPORT: app=scholarship_api | Converted non-UUID event_id to UUID: {validated_event_id}")
+                
+                query = text("""
+                    INSERT INTO business_events 
+                    (request_id, app, env, event_name, ts, actor_type, actor_id, session_id, org_id, properties)
+                    VALUES 
+                    (CAST(:request_id AS uuid), :app, :env, :event_name, :ts, :actor_type, :actor_id, :session_id, :org_id, CAST(:properties AS jsonb))
+                    ON CONFLICT (request_id) DO NOTHING
+                """)
+                
+                result = db.execute(query, {
+                    "request_id": validated_event_id,
+                    "app": event.app_id,
+                    "env": event.env,
+                    "event_name": event.event_type,
+                    "ts": event.ts_utc,
+                    "actor_type": event.actor_type or "system",
+                    "actor_id": event.user_id_hash,
+                    "session_id": event.session_id,
+                    "org_id": event.account_id,
+                    "properties": json.dumps(props)
+                })
+                
+                if result.rowcount > 0:
+                    accepted += 1
+                    event_ids.append(event.event_id)
+                else:
+                    duplicates += 1
+                
+            except Exception as e:
+                logger.error(f"REPORT: app=scholarship_api | app_base_url=https://scholarship-api-jamarrlmayes.replit.app | env=prod | Failed to write event {event.event_id}: {e}")
+                failed += 1
+        
+        if accepted > 0:
+            db.commit()
+        
+        logger.info(f"REPORT: app=scholarship_api | app_base_url=https://scholarship-api-jamarrlmayes.replit.app | env=prod | Telemetry batch: accepted={accepted}, failed={failed}, duplicates={duplicates}, missing_base_url={missing_base_url}")
+        
+        return EventWriteResponse(
+            accepted=accepted,
+            failed=failed,
+            event_ids=event_ids
+        )
     
-    logger.info(f"REPORT: app=scholarship_api | app_base_url=https://scholarship-api-jamarrlmayes.replit.app | env=prod | Telemetry batch: accepted={accepted}, failed={failed}, duplicates={duplicates}, missing_base_url={missing_base_url}")
-    
-    return EventWriteResponse(
-        accepted=accepted,
-        failed=failed,
-        event_ids=event_ids
-    )
+    except Exception as e:
+        logger.error(f"REPORT: app=scholarship_api | EVENTS FATAL (returning 202 per contract): {e}")
+        return JSONResponse(status_code=202, content={
+            "status": "accepted_with_error",
+            "accepted": 0,
+            "failed": 1,
+            "error": str(e),
+            "error_type": type(e).__name__,
+            "message": "Telemetry ingest accepts all events; error logged for investigation"
+        })
 
 
 @router.post("/events/single", tags=["Telemetry"])

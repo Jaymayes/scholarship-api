@@ -40,6 +40,7 @@ class SearchRequest(BaseModel):
     deadline_before: datetime | None = None
     limit: int = 20
     offset: int = 0
+    topics: list[str] = []
 
 async def execute_search(
     keyword: str | None = None,
@@ -235,6 +236,7 @@ class HybridSearchRequest(BaseModel):
     scholarship_types: list[ScholarshipType] = []
     limit: int = 20
     offset: int = 0
+    topics: list[str] = []
 
 
 @router.post("/search/hybrid")

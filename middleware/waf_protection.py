@@ -7,22 +7,31 @@ Provides edge-level protection against common web application attacks including:
 - Command injection
 - Path traversal attacks
 - Malicious request patterns
+- X-Forwarded-Host header validation and allowlisting
 
 This middleware implements OWASP security controls and enforces
 Authorization header requirements on protected endpoints.
+
+Emergency Rollback Features (Phase 1):
+- Trusted ingress CIDR allowlisting via WAF_TRUSTED_INGRESS_CIDRS
+- Internal network allowlisting via WAF_TRUSTED_INTERNALS
+- Host suffix validation via WAF_ALLOWED_HOST_SUFFIXES
+- X-Forwarded-Host preservation for trusted sources
 """
 
+import ipaddress
+import json
+import os
 import re
 import time
 from re import Pattern
+from typing import Optional
 
 from fastapi import Request, status
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import JSONResponse
 
 from utils.logger import get_logger
-
-# Rate limiter import removed for WAF focus
 
 logger = get_logger(__name__)
 
@@ -46,6 +55,22 @@ class WAFProtection(BaseHTTPMiddleware):
         self.sql_injection_blocks = 0
         self.xss_blocks = 0
         self.auth_enforcement_blocks = 0
+        self.xfh_stripped_count = 0
+        self.xfh_preserved_count = 0
+        self.underscore_key_dropped_count = 0
+
+        # Emergency Rollback: X-Forwarded-Host allowlist configuration
+        # WAF_STRIP_X_FORWARDED_HOST: "true" (default) strips header, "false" preserves for trusted sources
+        self._strip_xfh = os.getenv("WAF_STRIP_X_FORWARDED_HOST", "true").lower() == "true"
+        
+        # WAF_TRUSTED_INGRESS_CIDRS: Comma-separated list of trusted ingress CIDRs (e.g., "10.0.0.0/8,172.16.0.0/12")
+        self._trusted_ingress_cidrs = self._parse_cidrs(os.getenv("WAF_TRUSTED_INGRESS_CIDRS", ""))
+        
+        # WAF_TRUSTED_INTERNALS: Comma-separated list of trusted internal IPs/CIDRs
+        self._trusted_internals = self._parse_cidrs(os.getenv("WAF_TRUSTED_INTERNALS", "127.0.0.1,::1"))
+        
+        # WAF_ALLOWED_HOST_SUFFIXES: Comma-separated list of allowed host suffixes (e.g., ".replit.app,.scholaraiadvisor.com")
+        self._allowed_host_suffixes = self._parse_host_suffixes(os.getenv("WAF_ALLOWED_HOST_SUFFIXES", ""))
 
         # Compile security patterns for performance
         self._sql_patterns = self._compile_sql_patterns()
@@ -140,7 +165,168 @@ class WAFProtection(BaseHTTPMiddleware):
             re.compile(r'^/oca/canary/day2/test-suites/[^/]+/run$'),  # QA Orchestrator test suite execution
         ]
 
-        logger.info(f"WAF Protection initialized - Block mode: {self.block_mode}")
+        logger.info(f"WAF Protection initialized - Block mode: {self.block_mode}, Strip X-Forwarded-Host: {self._strip_xfh}")
+        logger.info(f"WAF Trusted CIDRs: {len(self._trusted_ingress_cidrs)} ingress, {len(self._trusted_internals)} internal")
+        logger.info(f"WAF Allowed Host Suffixes: {self._allowed_host_suffixes}")
+
+    def _parse_cidrs(self, cidr_string: str) -> list[ipaddress.IPv4Network | ipaddress.IPv6Network]:
+        """Parse comma-separated CIDR notation into network objects"""
+        networks = []
+        if not cidr_string.strip():
+            return networks
+        
+        for cidr in cidr_string.split(","):
+            cidr = cidr.strip()
+            if not cidr:
+                continue
+            try:
+                # Handle single IPs by converting to /32 or /128
+                if "/" not in cidr:
+                    try:
+                        addr = ipaddress.ip_address(cidr)
+                        if isinstance(addr, ipaddress.IPv4Address):
+                            cidr = f"{cidr}/32"
+                        else:
+                            cidr = f"{cidr}/128"
+                    except ValueError:
+                        logger.warning(f"WAF: Invalid IP address format: {cidr}")
+                        continue
+                
+                network = ipaddress.ip_network(cidr, strict=False)
+                networks.append(network)
+            except ValueError as e:
+                logger.warning(f"WAF: Invalid CIDR format '{cidr}': {e}")
+        
+        return networks
+
+    def _parse_host_suffixes(self, suffix_string: str) -> list[str]:
+        """Parse comma-separated host suffixes into a list"""
+        if not suffix_string.strip():
+            return []
+        
+        suffixes = []
+        for suffix in suffix_string.split(","):
+            suffix = suffix.strip().lower()
+            if suffix:
+                # Ensure suffix starts with a dot for proper suffix matching
+                if not suffix.startswith("."):
+                    suffix = "." + suffix
+                suffixes.append(suffix)
+        
+        return suffixes
+
+    def is_client_trusted(self, client_ip: str) -> bool:
+        """
+        Check if client IP is in WAF_TRUSTED_INGRESS_CIDRS or WAF_TRUSTED_INTERNALS
+        
+        Returns True if the IP is from a trusted source (internal or allowed ingress)
+        """
+        if not client_ip:
+            return False
+        
+        try:
+            ip_addr = ipaddress.ip_address(client_ip)
+        except ValueError:
+            logger.warning(f"WAF: Invalid client IP format: {client_ip}")
+            return False
+        
+        # Check trusted internals (localhost, internal networks)
+        for network in self._trusted_internals:
+            if ip_addr in network:
+                logger.debug(f"WAF: Client IP {client_ip} is trusted internal")
+                return True
+        
+        # Check trusted ingress CIDRs (load balancers, proxies)
+        for network in self._trusted_ingress_cidrs:
+            if ip_addr in network:
+                logger.debug(f"WAF: Client IP {client_ip} is trusted ingress")
+                return True
+        
+        return False
+
+    def is_host_suffix_allowed(self, host: str) -> bool:
+        """
+        Check if Host or X-Forwarded-Host ends with any suffix in WAF_ALLOWED_HOST_SUFFIXES
+        
+        Returns True if the host matches an allowed suffix, or if no suffixes are configured
+        """
+        if not host:
+            return False
+        
+        # If no suffixes configured, allow all hosts (permissive mode)
+        if not self._allowed_host_suffixes:
+            return True
+        
+        host_lower = host.lower().split(":")[0]  # Remove port if present
+        
+        for suffix in self._allowed_host_suffixes:
+            if host_lower.endswith(suffix) or host_lower == suffix.lstrip("."):
+                logger.debug(f"WAF: Host '{host}' matches allowed suffix '{suffix}'")
+                return True
+        
+        return False
+
+    def _sanitize_underscore_keys(self, body: str) -> tuple[str, list[str]]:
+        """
+        Sanitize JSON body by removing underscore-prefixed keys (like _meta)
+        
+        Returns: (sanitized_body, list of dropped keys)
+        Logs dropped keys but does NOT block the request
+        """
+        dropped_keys = []
+        
+        if not body:
+            return body, dropped_keys
+        
+        try:
+            data = json.loads(body)
+            if isinstance(data, dict):
+                sanitized, dropped = self._remove_underscore_keys(data)
+                if dropped:
+                    dropped_keys.extend(dropped)
+                    self.underscore_key_dropped_count += len(dropped)
+                    logger.warning(f"WAF: Dropped underscore-prefixed keys from request: {dropped}")
+                return json.dumps(sanitized), dropped_keys
+        except (json.JSONDecodeError, TypeError):
+            # Not valid JSON, return as-is
+            pass
+        
+        return body, dropped_keys
+
+    def _remove_underscore_keys(self, obj: dict, prefix: str = "") -> tuple[dict, list[str]]:
+        """
+        Recursively remove keys starting with underscore from a dictionary
+        
+        Returns: (sanitized dict, list of dropped key paths)
+        """
+        sanitized = {}
+        dropped = []
+        
+        for key, value in obj.items():
+            key_path = f"{prefix}.{key}" if prefix else key
+            
+            if key.startswith("_"):
+                dropped.append(key_path)
+                continue
+            
+            if isinstance(value, dict):
+                sanitized_value, nested_dropped = self._remove_underscore_keys(value, key_path)
+                sanitized[key] = sanitized_value
+                dropped.extend(nested_dropped)
+            elif isinstance(value, list):
+                sanitized[key] = [
+                    self._remove_underscore_keys(item, f"{key_path}[{i}]")[0] if isinstance(item, dict) else item
+                    for i, item in enumerate(value)
+                ]
+                # Collect dropped keys from list items
+                for i, item in enumerate(value):
+                    if isinstance(item, dict):
+                        _, nested_dropped = self._remove_underscore_keys(item, f"{key_path}[{i}]")
+                        dropped.extend(nested_dropped)
+            else:
+                sanitized[key] = value
+        
+        return sanitized, dropped
 
     def _compile_sql_patterns(self) -> list[Pattern]:
         """Compile SQL injection detection patterns - tuned to avoid false positives"""
@@ -256,6 +442,76 @@ class WAFProtection(BaseHTTPMiddleware):
                     "X-Block-Layer": "waf"
                 }
             )
+
+        # PHASE 1: Emergency Rollback - X-Forwarded-Host allowlist logic
+        x_forwarded_host = request.headers.get("x-forwarded-host", "")
+        host_header = request.headers.get("host", "")
+        
+        if x_forwarded_host:
+            # Determine if we should preserve or strip the X-Forwarded-Host header
+            is_trusted = self.is_client_trusted(client_ip)
+            is_host_allowed = self.is_host_suffix_allowed(x_forwarded_host)
+            
+            if not self._strip_xfh and is_trusted and is_host_allowed:
+                # WAF_STRIP_X_FORWARDED_HOST=false AND client is trusted AND host suffix is allowed
+                # Preserve x-forwarded-host header (do nothing)
+                self.xfh_preserved_count += 1
+                logger.debug(
+                    f"WAF: Preserving X-Forwarded-Host '{x_forwarded_host}' - "
+                    f"Trusted: {is_trusted}, Host allowed: {is_host_allowed}"
+                )
+            else:
+                # Either strip mode is enabled OR client is not trusted OR host is not allowed
+                if self._strip_xfh:
+                    # Strip mode: just log and continue (header stripping handled by proxy)
+                    self.xfh_stripped_count += 1
+                    logger.debug(
+                        f"WAF: X-Forwarded-Host '{x_forwarded_host}' would be stripped (strip mode enabled)"
+                    )
+                elif not is_trusted:
+                    # Untrusted client with X-Forwarded-Host - block with 403 (PROD rules)
+                    self.blocked_requests += 1
+                    logger.warning(
+                        f"WAF: Blocking untrusted X-Forwarded-Host - "
+                        f"IP: {client_ip}, XFH: {x_forwarded_host}, Path: {path}"
+                    )
+                    return JSONResponse(
+                        status_code=403,
+                        content={
+                            "error": "Forbidden",
+                            "code": "WAF_XFH_UNTRUSTED",
+                            "message": "X-Forwarded-Host from untrusted source",
+                            "status": 403,
+                            "timestamp": int(time.time()),
+                            "trace_id": f"waf-xfh-{int(time.time())}"
+                        },
+                        headers={
+                            "X-WAF-Action": "blocked",
+                            "X-WAF-Rule": "WAF_XFH_UNTRUSTED"
+                        }
+                    )
+                elif not is_host_allowed:
+                    # Host suffix not in allowlist - block with 403 (PROD rules)
+                    self.blocked_requests += 1
+                    logger.warning(
+                        f"WAF: Blocking disallowed X-Forwarded-Host suffix - "
+                        f"IP: {client_ip}, XFH: {x_forwarded_host}, Path: {path}"
+                    )
+                    return JSONResponse(
+                        status_code=403,
+                        content={
+                            "error": "Forbidden",
+                            "code": "WAF_XFH_DISALLOWED",
+                            "message": "X-Forwarded-Host not in allowlist",
+                            "status": 403,
+                            "timestamp": int(time.time()),
+                            "trace_id": f"waf-xfh-{int(time.time())}"
+                        },
+                        headers={
+                            "X-WAF-Action": "blocked",
+                            "X-WAF-Rule": "WAF_XFH_DISALLOWED"
+                        }
+                    )
 
         # CRITICAL FIX: Only wrap WAF-specific checks in try/except
         # Do NOT catch exceptions from call_next() - let auth exceptions propagate properly
@@ -576,7 +832,10 @@ class WAFProtection(BaseHTTPMiddleware):
             "total_blocked": self.blocked_requests,
             "sql_injection_blocks": self.sql_injection_blocks,
             "xss_blocks": self.xss_blocks,
-            "auth_enforcement_blocks": self.auth_enforcement_blocks
+            "auth_enforcement_blocks": self.auth_enforcement_blocks,
+            "xfh_stripped_count": self.xfh_stripped_count,
+            "xfh_preserved_count": self.xfh_preserved_count,
+            "underscore_key_dropped_count": self.underscore_key_dropped_count
         }
 
 # Global WAF instance
