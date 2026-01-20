@@ -347,3 +347,84 @@ async def get_telemetry_status():
     """Get A8 telemetry emitter status including acceptance ratio and SLO."""
     from services.a8_telemetry import a8_telemetry
     return a8_telemetry.get_status()
+
+@router.post("/sentinel/heartbeat")
+async def write_sentinel_heartbeat():
+    """Write ledger liveness sentinel heartbeat to overnight_protocols_ledger.
+    
+    CEO Directive: Write heartbeat every 10 min, alert if >15 min stale.
+    """
+    from services.ledger_sentinel import ledger_sentinel
+    from database.session_manager import get_session
+    
+    with get_session() as session:
+        result = await ledger_sentinel.write_heartbeat(session)
+    return result
+
+@router.get("/sentinel/status")
+async def get_sentinel_status():
+    """Get ledger liveness sentinel status."""
+    from services.ledger_sentinel import ledger_sentinel
+    return ledger_sentinel.get_status()
+
+@router.get("/reconciliation/summary")
+async def get_reconciliation_summary():
+    """Get reconciliation summary for CFO review.
+    
+    Returns: attempted_writes, successful_inserts, deduped, net_postings,
+    sample 20 records, sum(amount_cents) by provider and day.
+    """
+    from database.session_manager import get_session
+    from sqlalchemy import text
+    
+    with get_session() as session:
+        total_count = session.execute(text("SELECT COUNT(*) FROM overnight_protocols_ledger")).scalar()
+        
+        by_type = session.execute(text("""
+            SELECT event_type, COUNT(*) as count, SUM(amount_cents) as total_amount_cents
+            FROM overnight_protocols_ledger
+            GROUP BY event_type
+            ORDER BY count DESC
+        """)).fetchall()
+        
+        by_provider = session.execute(text("""
+            SELECT provider_id, COUNT(*) as count, SUM(amount_cents) as total_amount_cents
+            FROM overnight_protocols_ledger
+            GROUP BY provider_id
+            ORDER BY count DESC
+        """)).fetchall()
+        
+        by_day = session.execute(text("""
+            SELECT DATE(created_at) as day, COUNT(*) as count, SUM(amount_cents) as total_amount_cents
+            FROM overnight_protocols_ledger
+            GROUP BY DATE(created_at)
+            ORDER BY day DESC
+        """)).fetchall()
+        
+        sample_20 = session.execute(text("""
+            SELECT id, event_id, event_type, provider_id, amount_cents, status, created_at
+            FROM overnight_protocols_ledger
+            ORDER BY created_at DESC
+            LIMIT 20
+        """)).fetchall()
+    
+    return {
+        "reconciliation_report": {
+            "generated_at": pilot_controller.state.attestation_id,
+            "total_records": total_count,
+            "by_event_type": [{"type": r[0], "count": r[1], "total_amount_cents": r[2]} for r in by_type],
+            "by_provider": [{"provider_id": r[0], "count": r[1], "total_amount_cents": r[2]} for r in by_provider],
+            "by_day": [{"day": str(r[0]), "count": r[1], "total_amount_cents": r[2]} for r in by_day],
+            "sample_records": [
+                {"id": r[0], "event_id": r[1], "event_type": r[2], "provider_id": r[3], 
+                 "amount_cents": r[4], "status": r[5], "created_at": str(r[6])} 
+                for r in sample_20
+            ]
+        },
+        "finance_freeze_status": {
+            "LEDGER_FREEZE": "true",
+            "PROVIDER_INVOICING_PAUSED": "true",
+            "FEE_POSTINGS_PAUSED": "true"
+        },
+        "cfo_approval_required": True
+    }

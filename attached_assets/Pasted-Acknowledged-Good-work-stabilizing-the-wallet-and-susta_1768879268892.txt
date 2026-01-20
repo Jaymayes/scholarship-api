@@ -1,0 +1,53 @@
+Acknowledged. Good work stabilizing the wallet and sustaining a clean 60‑minute window.
+
+CEO decisions
+
+2% B2C pilot: APPROVED to remain live under existing defensive controls.
+Finance thaw: NOT APPROVED. Re‑enable LEDGER_FREEZE immediately. Record all ledger entries (write to overnight_protocols_ledger) but do not invoice, transfer, or settle until reconciliation + CFO sign‑off are complete.
+SEV status: Downgraded to SEV‑2 (monitoring) for 24h Gate‑1. Gate‑1 (5%) remains NO GO.
+Why
+
+You met the 60‑min stability criteria for telemetry, wallet writes, and DB SLOs. However, per prior directive, finance operations require a reconciliation packet and CFO approval before any billing resumes.
+Mandatory actions (effective now)
+
+Reinstate finance freeze
+Set LEDGER_FREEZE=true, PROVIDER_INVOICING_PAUSED=true, FEE_POSTINGS_PAUSED=true.
+Continue persisting ledger events; no downstream invoicing/settlement.
+2. Reconciliation and CFO sign‑off (due before thaw)
+
+Produce a backfill and integrity report covering the SEV‑1 window:
+attempted_writes, successful_inserts, deduped, net_postings
+sample 20 records with hash/fingerprint provenance
+sum(amount_cents), sum(fee_cents) by provider and by day
+Map overnight_protocols_ledger row growth to traffic volume (2% pilot) with ±2% tolerance.
+Deliver for CFO review and attach CFO approval in A8 before unfreezing.
+3. Canonical schema contract (prevent recurrence)
+
+Canonical table: overnight_protocols_ledger (OPL).
+Create updatable compatibility views + INSTEAD OF triggers for any legacy references (ledger, financial_ledger, fee_ledger_entries) pointing to OPL.
+Post write/read round‑trip proof for each alias.
+Add CI guardrail: fail build if any code references non‑canonical table names or bypasses the data service.
+4. Keep defensive posture for 24h Gate‑1
+
+Maintain:
+API gateway telemetry override (200/202 + x‑fingerprint),
+command‑center spool‑first (no multi‑retry),
+WAF sitemap block,
+probe suppression (no /metrics/p95, no localhost).
+SLOs to hold for 24h:
+Telemetry Acceptance ≥99%, queue <100 and flat, 0×428
+Provider P95 ≤500 ms; /api/login P95 ≤200 ms; auth 5xx=0
+DB P95 ≤100 ms; 0 statement timeouts
+0 sitemap 429; 0 /metrics/p95 404; 0 localhost probes
+Ledger liveness sentinel: write a heartbeat row every 10 minutes; alert if last_written_at >15 minutes.
+5. Reporting cadence
+
+T+6h and T+12h snapshots: telemetry acceptance, auth/DB SLOs, probe suppression, ledger row growth vs traffic.
+T+24h Gate‑1 packet: all SLOs green for 24h + reconciliation report + CFO sign‑off → request consideration to lift finance freeze and start Gate‑1 (5%) traffic review.
+Rollback triggers (auto)
+
+Any LEDGER_PERSIST failure or schema error
+Telemetry Acceptance <95% for 5 minutes
+Provider P95 >500 ms or any auth 5xx
+DB P95 >120 ms for 10 minutes Action: immediately set TRAFFIC_CAP_B2C_PILOT=0, keep refunds ON, append to CIR with evidence.
+Proceed: keep 2% pilot, re‑engage LEDGER_FREEZE now, and deliver T+6h with the reconciliation work in progress.
