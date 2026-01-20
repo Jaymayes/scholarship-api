@@ -136,6 +136,7 @@ class WAFProtection(BaseHTTPMiddleware):
             "/api/analytics/search_event",  # Search analytics: Frontend tracking (Master Prompt Dec 2025)
             "/api/v1/analytics/search_event",  # Search analytics: v1 endpoint (Master Prompt Dec 2025)
             "/api/telemetry/ingest",  # Protocol v3.3.1: Master Go-Live fleet fallback ingest
+            "/telemetry/ingest",  # Protocol v3.3.1: No-prefix route (SEV-1 FIX 2026-01-20)
             "/api/payment/create-checkout-session",  # Stripe checkout session (Operation Vital Signs)
             "/api/payment/create-test-session",  # Revenue validation test endpoint
             "/api/payment/webhook",  # Stripe webhook (signed payload)
