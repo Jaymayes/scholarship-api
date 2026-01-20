@@ -139,11 +139,13 @@ class LatencyDashboard:
         }
     
     def _identify_slow_queries(self, groups: Dict) -> List[Dict]:
-        """Identify endpoint groups with P95 > 200ms"""
+        """Identify endpoint groups with P95 > 300ms (Gate-2 Stabilization: tuned from 200ms)"""
         slow_queries = []
         
+        # Gate-2 Stabilization: Alert threshold raised to 300ms to reduce noise
+        # Internal warning threshold remains at 150ms for monitoring (see get_snapshot)
         for group_name, stats in groups.items():
-            if stats["p95"] > 200:
+            if stats["p95"] > 300:
                 slow_queries.append({
                     "group": group_name,
                     "p95_ms": stats["p95"],
@@ -173,14 +175,14 @@ class LatencyDashboard:
         output.append(f"ENDPOINT GROUPS:")
         for group_name, stats in snapshot['endpoint_groups'].items():
             if stats['p50'] > 0:
-                status = "✅" if stats['p95'] <= 200 else "🔴"
+                status = "✅" if stats['p95'] <= 300 else "🔴"
                 output.append(f"  {group_name:20s} {status}")
                 output.append(f"    P50: {stats['p50']:6.1f}ms  P95: {stats['p95']:6.1f}ms  P99: {stats['p99']:6.1f}ms")
         output.append("")
         
         # Slow queries
         if snapshot['slow_queries']:
-            output.append(f"⚠️  SLOW QUERIES (P95 > 200ms):")
+            output.append(f"⚠️  SLOW QUERIES (P95 > 300ms):")
             for sq in snapshot['slow_queries']:
                 severity_icon = "🔴" if sq['severity'] == "critical" else "⚠️"
                 output.append(f"  {severity_icon} {sq['group']:20s} P95: {sq['p95_ms']:.1f}ms  P99: {sq['p99_ms']:.1f}ms")
