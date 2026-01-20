@@ -1,0 +1,95 @@
+Approved to proceed to Gate‑1 (10%) with strict guardrails.
+
+HITL-CEO Authorization
+
+ID: HITL-CEO-20260120-OPEN-TRAFFIC-G1
+Scope: Raise TRAFFIC_CAP from 0% → 10% for B2C/B2B web traffic only; keep finance freeze
+Validity: 2 hours from now; single use; re-authorization required for further ramps
+Finance: LEDGER_FREEZE=true; PROVIDER_INVOICING_PAUSED=true; FEE_POSTINGS_PAUSED=true; LIVE_STRIPE_CHARGES=BLOCKED
+Operational Runbook (Agent)
+
+Preconditions (must be re-checked in prod)
+
+Last attestation: CEOSPRINT-20260120-SEV1-FINAL-1768903903 = STABLE (SEV‑1 → SEV‑2 monitoring)
+Artifacts present with checksums (middleware order, WAF/sanitizer unified, XFH trust, telemetry bypass, metrics, probe mutex, config audit, perf plan, deploy manifest)
+Public metrics available: /metrics/p95 on A1 and A8 return 200 JSON (window_sec=600)
+Apply Gate‑1
+
+Set TRAFFIC_CAP=10
+Do NOT change finance flags or Stripe settings
+Emit HITL event to A8 with X-Trace-Id = HITL-CEO-20260120-OPEN-TRAFFIC-G1
+Observe for 15 minutes (prod‑only)
+Guarded KPIs (all must stay green):
+
+Auth: /api/login p95 ≤200ms (soft ceiling ≤250ms if external IdP RTT dominates); Auth 5xx = 0
+DB: p95 ≤100ms; statement timeouts = 0
+Event loop lag: <200ms sustained; zero spikes >500ms
+Telemetry: ≥99% acceptance; no 500s; A8 checksum round‑trip OK
+WAF: _meta blocks = 0; XFH preserved for trusted CIDRs; proto/constructor/prototype blocks only
+Probes: zero “Skipping … probe already in progress” storms
+/metrics/p95: 200 JSON on A1/A8 throughout window
+Error budget: 5xx rate <0.5% total; per‑route spike <1% over any 60s slice
+Abort/rollback (any single breach)
+
+Immediately set TRAFFIC_CAP=0
+Preserve raw logs and emit A8 incident event with failing metric + X-Trace-Id
+Produce tests/perf/reports/reopen_gate1_abort.md
+Success criteria for Gate‑1
+
+All KPIs hold for full 15m window
+Produce tests/perf/reports/reopen_gate1_report.md with:
+Time series for login p95 / DB p95 / loop lag / telemetry acceptance
+WAF decision logs (sampled) confirming _meta allowed and trusted XFH preserved
+A8 checksum confirmations
+Second confirmation matrix updates for gate window
+Keep TRAFFIC_CAP at 10% pending CEO/HITL approval for Gate‑2
+Minimal prompt you can paste to Replit Agent (staged reopen Gate‑1)
+BEGIN-REPLIT-AGENT-PROMPT
+Role
+You are the Replit Agent for Scholar AI Advisor. Execute Gate‑1 staged reopen with strict guardrails.
+
+Inputs
+
+HITL_ID=HITL-CEO-20260120-OPEN-TRAFFIC-G1
+PRIOR_ATTESTATION=CEOSPRINT-20260120-SEV1-FINAL-1768903903 (STABLE)
+FINANCE FREEZE FLAGS must remain ACTIVE
+Steps
+
+Re‑verify prod readiness:
+
+A1 and A8 /metrics/p95 return 200 JSON (window_sec=600)
+Last artifacts present with checksums (middleware_order_audit, waf_and_json_sanitizer_unified, xfh_trust_validation, telemetry_bypass_fix, metrics_endpoints_present_prod, probe_mutex_backoff_prod, config_env_audit, perf_recovery_plan_prod, deploy_manifest_prod)
+Raise traffic:
+
+Set TRAFFIC_CAP=10
+Post HITL_ID event to A8 with X-Trace-Id=HITL_ID
+Monitor for 15 minutes (prod only; external URLs):
+
+/api/login p95 ≤200ms (soft limit ≤250ms); Auth 5xx=0
+DB p95 ≤100ms; statement timeouts=0
+Event loop lag <200ms sustained; no spikes ≥500ms
+Telemetry ≥99% acceptance; A8 checksum OK; no 500s
+WAF: _meta blocks=0; preserve XFH for trusted CIDRs; only proto/constructor/prototype blocked
+Probes: no “Skipping … already in progress” storms
+/metrics/p95 on A1/A8 remain 200 JSON
+Abort if any breach:
+
+Set TRAFFIC_CAP=0 immediately
+Emit A8 incident with failing metric + X-Trace-Id=HITL_ID.fail
+Write tests/perf/reports/reopen_gate1_abort.md and post to A8 with checksum
+If stable (all green for 15m):
+
+Keep TRAFFIC_CAP=10
+Write tests/perf/reports/reopen_gate1_report.md (include time series, WAF decision samples, A8 checksum confirmations, updated 2‑of‑3 matrix)
+Post artifacts to A8; verify GET + checksums
+Finance
+
+Keep LEDGER_FREEZE=true; PROVIDER_INVOICING_PAUSED=true; FEE_POSTINGS_PAUSED=true; LIVE_STRIPE_CHARGES=BLOCKED
+Final output (print one)
+
+If PASS: “Gate‑1 PASSED — TRAFFIC_CAP=10%; Finance Freeze ACTIVE; awaiting CEO/HITL for Gate‑2”
+If FAIL: “Gate‑1 FAILED — Rolled back to TRAFFIC_CAP=0%; see reopen_gate1_abort.md” END-REPLIT-AGENT-PROMPT
+Notes
+
+Do not alter finance freeze without CFO authorization.
+When Gate‑1 is stable and artifacts posted, request HITL approval for Gate‑2 (25%).
