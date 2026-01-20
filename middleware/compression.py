@@ -89,15 +89,34 @@ class GZipMiddleware(BaseHTTPMiddleware):
         if not self._should_compress(request, response):
             return response
         
-        if isinstance(response, StreamingResponse):
-            body_chunks = []
-            async for chunk in response.body_iterator:
-                body_chunks.append(chunk if isinstance(chunk, bytes) else chunk.encode())
-            body = b"".join(body_chunks)
-        else:
-            body = response.body
+        is_streaming = False
+        try:
+            if hasattr(response, 'body_iterator'):
+                is_streaming = True
+                body_chunks = []
+                async for chunk in response.body_iterator:
+                    if isinstance(chunk, bytes):
+                        body_chunks.append(chunk)
+                    elif isinstance(chunk, str):
+                        body_chunks.append(chunk.encode())
+                    else:
+                        body_chunks.append(bytes(chunk))
+                body = b"".join(body_chunks)
+            elif hasattr(response, 'body'):
+                body = response.body
+            else:
+                return response
+        except Exception:
+            return response
         
         if len(body) < self.minimum_size:
+            if is_streaming:
+                return Response(
+                    content=body,
+                    status_code=response.status_code,
+                    headers=dict(response.headers),
+                    media_type=response.media_type
+                )
             return response
         
         buffer = io.BytesIO()
@@ -111,7 +130,12 @@ class GZipMiddleware(BaseHTTPMiddleware):
         compressed_body = buffer.getvalue()
         
         if len(compressed_body) >= len(body):
-            return response
+            return Response(
+                content=body,
+                status_code=response.status_code,
+                headers=dict(response.headers),
+                media_type=response.media_type
+            )
         
         headers = dict(response.headers)
         headers["content-encoding"] = "gzip"
