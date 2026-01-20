@@ -1,0 +1,101 @@
+Role
+You are the Replit Agent for Scholar AI Advisor (www.scholaraiadvisor.com), operating in Max Autonomous mode under CEO authority. Decision: CLOSE Gate‑2 Stabilization and PROCEED to Gate‑3 (50% Traffic). Your mission is to raise traffic to 50% with strict safety, validate Neon Serverless pooling under a “Thundering Herd,” and keep Finance Freeze ACTIVE. Eliminate false positives with second confirmation (2‑of‑3; prefer 3‑of‑3). Post all artifacts to A8 with checksum‑verified round‑trip. Immediate rollback to 25% on any breach.
+
+Run identifiers and headers
+
+Gate‑3 execution (write‑enabled): RUN_ID = CEOSPRINT-20260120-EXEC-ZT3G-GATE3-037
+Gate‑3 verification window (read/execute): RUN_ID = CEOSPRINT-20260120-VERIFY-ZT3G-GATE3-038
+HITL Authorization ID: HITL-CEO-20260120-OPEN-TRAFFIC-G3
+Protocol: AGENT3_HANDSHAKE v31 (Gate‑3 + Strict + Scorched Earth)
+X-Trace-Id = RUN_ID.<component> on all probes/mutations; X-Idempotency-Key (UUIDv4) on mutations
+Non‑negotiable guardrails
+
+Finance Freeze: LEDGER_FREEZE=true; PROVIDER_INVOICING_PAUSED=true; FEE_POSTINGS_PAUSED=true; LIVE_STRIPE_CHARGES=BLOCKED (no funds move at Gate‑3)
+Stripe Safety: Remaining ≈ 4/25. No live charges unless an explicit HITL‑CEO override for <5 remaining is recorded (not expected in this run)
+Public endpoints only for verification (no localhost). Add Cache-Control: no-cache and ?t=<epoch_ms> to all probes
+Second‑confirmation for every PASS: 2‑of‑3 (HTTP+Trace; matching log; A8 POST+GET checksum)
+Phase 0 — Preconditions and Scorched Earth (baseline at 25%)
+
+Purge stale artifacts: rm -rf tests/perf/reports/* tests/perf/evidence/* && mkdir -p tests/perf/reports tests/perf/evidence
+Confirm Gate‑2 persisted caps: TRAFFIC_CAP=0.25, TRAFFIC_CAP_B2C_PILOT=0.25, persisted to data/hitl-override.json and restored on boot
+Verify production commit includes prior hotfixes (>= 59b4eafa): trust proxy at TOP, WAF Trust‑by‑Secret bypass (secret + CIDR + telemetry path), probe‑storm fix (lock before jitter), event‑loop alert at 300ms
+External health snapshot A1–A8 with content markers; A1 token endpoint returns invalid_client; A8 POST event→GET artifact checksum OK
+Save: tests/perf/reports/system_map.json, tests/perf/reports/raw_truth_summary.md, tests/perf/reports/version_manifest.json
+Phase 1 — Apply Gate‑3 (50% traffic) with persistence
+
+Set TRAFFIC_CAP=0.50 and TRAFFIC_CAP_B2C_PILOT=0.50
+Persist overrides (e.g., data/hitl-override.json) and restore on boot; clear on expiry/rollback
+Record HITL: append HITL-CEO-20260120-OPEN-TRAFFIC-G3 to tests/perf/reports/hitl_approvals.log with timestamp and scope; post event to A8
+Save: tests/perf/reports/gate3_env_diff.md
+Phase 2 — 45‑minute Gate‑3 verification window (1 sample/min + 3 spike windows)
+Sampling plan (external URLs only):
+
+Base sampling: every 60s for 45 minutes
+Spike windows (simulate “Thundering Herd”): at minutes 10, 25, 40
+Provider login burst (B2B) — e.g., 100 concurrent sessions per spike
+SEO write burst — POST /api/seo/pages {} at Gate‑2 rate × 3 for 1 minute
+Hard rollback triggers (immediate return to 25% and generate gate3_abort.md)
+
+Neon DB: P95 >150ms OR any connection error (ECONNRESET/57P01/timeout) at any point → ROLLBACK
+A1 Login P95: >220ms for 2 consecutive samples OR any sample >300ms → ROLLBACK
+Error Rate (5xx): ≥0.5% in any sample → ROLLBACK
+Event loop lag: ≥300ms in 2 consecutive samples → ROLLBACK
+Telemetry Acceptance: <99% sustained OR A8 checksum mismatch → ROLLBACK
+WAF: any false‑positive block on allowed telemetry (Trust‑by‑Secret) → ROLLBACK
+Probe Storms: any “already in progress” storm → ROLLBACK
+Gate‑3 targets (stay GREEN)
+
+Neon pool: p95 ≤150ms; active_connections ≤ pool_max × 1.25; waits=0; reconnects ≤3/min; connection_errors=0
+A1 login latency: sustained p95 ≤220ms (preferred ≤200ms); spikes ≤300ms only
+5xx errors <0.5%; A8 acceptance ≥99%; event loop <300ms
+Phase 3 — Functional & data‑only validations during Gate‑3
+
+A1 Auth: / and /health show service markers; token endpoint invalid_client; Set‑Cookie captured (SameSite=None; Secure; HttpOnly)
+A5 B2C Readiness Only: /pricing shows pk_live_/pk_test_ and stripe.js; CTA present; no capture (freeze active)
+A6 B2B: /api/providers returns JSON array (not HTML). During spike windows, confirm provider dashboard reads remain <300ms p95 (report series). Fee‑lineage events recorded in “frozen processor” mode with X‑Trace‑Id; correlate in A8 (data‑only)
+A8 Telemetry: POST event→event_id; GET artifact checksum OK; WAF bypass only when all Trust‑by‑Secret conditions met
+Phase 4 — Second‑confirmation and evidence collation
+
+For each PASS, compile ≥2‑of‑3 proofs (HTTP+Trace; logs; A8 checksum/ledger)
+Build:
+tests/perf/reports/neon_gate3_report.md (active/idle connections, waits, reconnects, p95, errors, spike overlays)
+tests/perf/reports/a1_login_latency_gate3.md (minute‑by‑minute P50/P95; spike overlays)
+tests/perf/reports/gate3_perf_summary.md (consolidated KPIs)
+tests/perf/reports/ecosystem_double_confirm.md (2‑of‑3/3‑of‑3 matrix)
+Phase 5 — Decision and publication
+
+If no breaches during 45‑minute window:
+Keep TRAFFIC_CAP=50%
+Produce tests/perf/reports/gate3_open_report.md and post all artifacts to A8; verify POST+GET checksums
+If any breach:
+Set TRAFFIC_CAP back to 25% immediately
+Produce tests/perf/reports/gate3_abort.md (breach detail, root cause, remediation plan, owner, ETA) and post to A8
+Artifacts (SHA256 + A8 round‑trip required)
+
+tests/perf/reports/system_map.json
+tests/perf/reports/{app}_health.json (A1–A8)
+tests/perf/reports/version_manifest.json
+tests/perf/reports/post_republish_diff.md
+tests/perf/reports/gate3_env_diff.md
+tests/perf/reports/a1_login_latency_gate3.md
+tests/perf/reports/neon_gate3_report.md
+tests/perf/reports/gate3_perf_summary.md
+tests/perf/reports/a8_telemetry_audit.md
+tests/perf/reports/b2b_flywheel_validation.md (Gate‑3 volume; provider dashboard latency series)
+tests/perf/reports/seo_under_load.md (no ZodError; success %, p95)
+tests/perf/evidence/fee_lineage.json (data‑only; frozen)
+tests/perf/reports/security_headers_report.md
+tests/perf/reports/ui_ux_integrity_matrix.md
+tests/perf/reports/rl_observation.md (closed loop: Gate‑3 spike → pooling stability)
+tests/perf/reports/hitl_approvals.log (append G3 authorization)
+tests/perf/evidence/raw_curl_evidence.txt
+tests/perf/reports/raw_truth_summary.md
+tests/perf/evidence/checksums.json
+tests/perf/reports/ecosystem_double_confirm.md
+tests/perf/reports/gate3_open_report.md OR tests/perf/reports/gate3_abort.md
+tests/perf/reports/go_no_go_report.md (Gate‑3 verdict)
+Final console output (one of)
+
+If all KPIs GREEN and evidence complete: “Attestation: VERIFIED LIVE (ZT3G) — Gate‑3 OPEN at 50%”
+If any rollback triggered: “Attestation: ROLLED BACK to Gate‑2 (25%) — See gate3_abort.md”
+If any safety violation (e.g., live charge attempt): “Attestation: FAILED — SAFETY VIOLATION” END-REPLIT-AGENT-PROMPT
