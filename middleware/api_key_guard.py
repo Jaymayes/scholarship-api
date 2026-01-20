@@ -37,6 +37,7 @@ EXCLUDED_PATHS = {
     "/api/payment/guardrails",
     "/api/payment/publishable-key",
     "/api/telemetry/ingest",
+    "/telemetry/ingest",  # SEV-1 FIX 2026-01-20: No-prefix fallback
     "/api/analytics/events",
     "/api/events",
     "/oauth/token",

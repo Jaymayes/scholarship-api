@@ -864,6 +864,8 @@ app.include_router(legal_pages_router, tags=["Legal"])
 # TELEMETRY CONTRACT v1.1: Command Center Integration (2025-11-30)
 from routers.telemetry import router as telemetry_router, executive_router
 app.include_router(telemetry_router, prefix="/api", tags=["Telemetry"])
+# SEV-1 FIX 2026-01-20: No-prefix route for /telemetry/ingest (fleet fallback)
+app.include_router(telemetry_router, tags=["Telemetry Fallback"])
 
 # PROTOCOL ONE TRUTH: Executive Dashboard for Command Center (2025-12-01)
 app.include_router(executive_router, tags=["Executive Dashboard"])

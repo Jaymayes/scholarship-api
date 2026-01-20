@@ -106,3 +106,23 @@ All phases completed successfully with architect approval.
 **Protocol Version**: CEOSPRINT-20260120-v1  
 **Timestamp**: 2026-01-20T19:08:00Z  
 **Checksum**: a9429f6570fe0983
+
+---
+
+## Post-Completion Fix (2026-01-20T19:55:00Z)
+
+**Issue**: `/telemetry/ingest` returning 404 (fleet fallback route missing)
+
+**Root Cause**: Telemetry router was mounted only with `/api` prefix
+
+**Fix Applied**:
+1. Added no-prefix mount in `main.py`:
+   ```python
+   app.include_router(telemetry_router, tags=["Telemetry Fallback"])
+   ```
+
+2. Added `/telemetry/ingest` to API key guard exclusions
+
+**Result**: Both routes now return 200 OK
+- `POST /api/telemetry/ingest` ✅
+- `POST /telemetry/ingest` ✅
