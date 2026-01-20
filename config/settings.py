@@ -114,6 +114,25 @@ class Settings(BaseSettings):
         "https://scholar-auth-jamarrlmayes.replit.app/oidc",
         alias="SCHOLAR_AUTH_ISSUER"
     )
+    # Phase 2 Auth/OIDC Repair: Canonical public base URL for OIDC redirect URIs
+    oidc_public_base_url: str = Field(
+        "https://scholarship-api-jamarrlmayes.replit.app",
+        alias="OIDC_PUBLIC_BASE_URL",
+        description="Canonical base URL for OIDC redirect URIs (must match issuer expectations)"
+    )
+    # Trust proxy configuration for Replit environment
+    trust_proxy: bool = Field(True, alias="TRUST_PROXY", description="Trust X-Forwarded-* headers from proxy")
+    # Health/Ready URLs for synthetic monitors (Phase 2: remove localhost)
+    health_url: str = Field(
+        "https://scholarship-api-jamarrlmayes.replit.app/health",
+        alias="HEALTH_URL",
+        description="Health check URL for synthetic monitors"
+    )
+    ready_url: str = Field(
+        "https://scholarship-api-jamarrlmayes.replit.app/readiness",
+        alias="READY_URL",
+        description="Readiness check URL for synthetic monitors"
+    )
     jwks_cache_ttl_seconds: int = Field(300, alias="JWKS_CACHE_TTL_SECONDS", gt=0)  # 5 min fresh
     jwks_cache_max_age: int = Field(3600, alias="JWKS_CACHE_MAX_AGE", gt=0)  # 1 hour stale-while-revalidate
     jwks_fetch_timeout_seconds: int = Field(5, alias="JWKS_FETCH_TIMEOUT_SECONDS", gt=0)

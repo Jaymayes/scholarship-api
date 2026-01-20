@@ -33,7 +33,8 @@ if DATABASE_URL:
     # SSL/TLS hardening configuration
     connect_args = {
         "connect_timeout": 10,
-        "application_name": "scholarship_api"
+        "application_name": "scholarship_api",
+        "options": "-c statement_timeout=5000"  # Phase 4: 5 second query timeout
     }
     
     # Production SSL hardening - ALWAYS enforce certificate verification

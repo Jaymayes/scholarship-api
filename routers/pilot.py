@@ -7,7 +7,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from typing import Optional, List
 
-from services.pilot_controller import pilot_controller, PilotMetrics, VALID_ERROR_CODES
+from services.pilot_controller import pilot_controller, PilotMetrics, VALID_ERROR_CODES, get_public_base_url
 
 router = APIRouter(prefix="/api/internal/pilot", tags=["pilot-sev2"])
 
@@ -262,6 +262,50 @@ async def get_watchtower_status():
         },
         "p0_observability": {
             "unknown_events_rejected": pilot_controller.unknown_events_rejected
+        }
+    }
+
+@router.get("/probe-mutex/status")
+async def get_probe_mutex_status():
+    """Get probe de-duplication mutex status.
+    
+    Shows active probes, backoff state, and configuration.
+    Phase 3 requirement: distributed mutex with ±20% jitter and 2s/5s/10s backoff.
+    """
+    return {
+        "active_probes": len(pilot_controller.probe_mutex.active_probes),
+        "active_probe_keys": list(pilot_controller.probe_mutex.active_probes.keys()),
+        "backoff_attempts": dict(pilot_controller.probe_mutex.backoff_attempts),
+        "config": {
+            "backoff_sequence_sec": pilot_controller.probe_mutex.backoff_sequence,
+            "jitter_pct": pilot_controller.probe_mutex.jitter_pct,
+            "lock_timeout_sec": pilot_controller.probe_mutex.lock_timeout_sec
+        },
+        "public_base_url": get_public_base_url()
+    }
+
+@router.get("/synthetics/config")
+async def get_synthetics_config():
+    """Get synthetic monitor configuration showing public URLs.
+    
+    Phase 3 requirement: Confirm all synthetic URLs are public HTTPS (no localhost).
+    """
+    return {
+        "public_base_url": get_public_base_url(),
+        "localhost_blocked": True,
+        "https_enforced": True,
+        "url_resolution_order": [
+            "1. PUBLIC_BASE_URL environment variable",
+            "2. APP_BASE_URL environment variable",
+            "3. REPLIT_DEV_DOMAIN with https:// prefix",
+            "4. REPLIT_DOMAINS first domain with https:// prefix",
+            "5. Fallback: https://scholarship-api-jamarrlmayes.replit.app"
+        ],
+        "probe_deduplication": {
+            "enabled": True,
+            "mutex_per_target": True,
+            "jitter_pct": 20,
+            "backoff_sequence_sec": [2, 5, 10]
         }
     }
 

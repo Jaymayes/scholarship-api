@@ -277,4 +277,11 @@ class SyntheticMonitoringService:
         logger.info("🛑 Stopped synthetic monitoring")
 
 
-monitoring_service = SyntheticMonitoringService("http://localhost:5000")
+# Phase 2 Auth/OIDC Repair: Use HEALTH_URL env var instead of localhost
+import os
+_monitor_base_url = os.environ.get(
+    "HEALTH_URL", 
+    "https://scholarship-api-jamarrlmayes.replit.app"
+).rstrip("/health").rstrip("/readiness").rstrip("/")  # Extract base URL
+
+monitoring_service = SyntheticMonitoringService(_monitor_base_url)

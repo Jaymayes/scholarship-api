@@ -57,6 +57,7 @@ from routers.auth import router as auth_router
 from routers.auto_page_seo import router as auto_seo_router
 from routers.b2b_commercial import router as b2b_commercial_router
 from routers.b2b_partner import router as b2b_partner_api_router
+from routers.oauth_token import router as oauth_token_router
 from routers.b2b_partner_portal import b2b_router
 from routers.b2b_partner_portal import router as b2b_partner_router
 from routers.ceo_marketing_dashboard import router as ceo_dashboard_router
@@ -650,6 +651,7 @@ setup_metrics(app)
 # Order: CEO Pre-Filter → Security & Host Protection → CORS → Request Processing → Rate Limiting → Routing
 from middleware.body_limit import BodySizeLimitMiddleware
 from middleware.database_session import DatabaseSessionMiddleware
+from middleware.secure_cookies import SecureCookieMiddleware
 from middleware.security_headers import SecurityHeadersMiddleware
 from middleware.trusted_host import TrustedHostMiddleware
 from middleware.url_length import URLLengthMiddleware
@@ -661,6 +663,7 @@ app.add_middleware(DebugPathBlockerMiddleware)
 
 # 1. Security and host protection middleware (outermost - first line of defense)
 # DAY 0 CEO DIRECTIVE: WAF AFTER AUTH (DEF-003 fix - auth middleware must execute before WAF for authenticated routes)
+app.add_middleware(SecureCookieMiddleware)     # Phase 2 Auth/OIDC: Secure cookies (SameSite=None; Secure; HttpOnly; Path=/)
 app.add_middleware(SecurityHeadersMiddleware)  # Security headers (must be first)
 # CRITICAL FIX: ForwardedHeadersMiddleware breaks route matching on Replit - corrupts ASGI scope paths
 app.add_middleware(TrustedHostMiddleware)      # Validate Host header against whitelist
@@ -711,6 +714,16 @@ app.add_middleware(APIKeyGuardMiddleware)
 from middleware.request_timeout import RequestTimeoutMiddleware
 app.add_middleware(RequestTimeoutMiddleware, timeout=5.0)
 
+# 4.2 Phase 4: Performance Decompression - Concurrency Limiter
+# Limits in-flight requests on hot paths (login, search) per CIR-20260119-001
+from middleware.concurrency_limiter import ConcurrencyLimiterMiddleware
+app.add_middleware(ConcurrencyLimiterMiddleware, enabled=True)
+
+# 4.3 Phase 4: GZip Compression for responses
+# Reduces payload sizes for JSON responses per CIR-20260119-001
+from middleware.compression import GZipMiddleware
+app.add_middleware(GZipMiddleware, minimum_size=500, compression_level=6, enabled=True)
+
 # 4.5 CRITICAL SECURITY: API Rate Limiting Enforcement
 app.add_middleware(APIRateLimitMiddleware)  # Global API rate limiting enforcement
 
@@ -745,6 +758,8 @@ async def handle_rate_limit_error(request: Request, exc: RateLimitExceeded):
 # Include routers
 # V2.2 Note: /canary endpoint moved to health router for proper organization
 app.include_router(auth_router)
+# Phase 2 Auth/OIDC Repair: RFC 6749 compliant token endpoints
+app.include_router(oauth_token_router, tags=["OAuth2"])
 # Agent3 V1 compliance endpoints (prioritized for revenue readiness)
 app.include_router(agent3_v1_router, tags=["Agent3 V1"])
 # Master Prompt compliance endpoints (standard /api endpoints)

@@ -595,7 +595,9 @@ class WAFProtection(BaseHTTPMiddleware):
             '/replit-health', '/_debug/routes', '/_debug/startup', '/_debug/scholarships', '/internal/metrics',
             # CEO WAR ROOM: Public discovery endpoints for student browsing
             '/api/v1/scholarships', '/api/v1/search', '/api/v1/credits/packages', '/api/v1/credits/pricing',
-            '/api/v1/auth/login', '/api/v1/auth/login-simple', '/api/v1/auth/check'
+            '/api/v1/auth/login', '/api/v1/auth/login-simple', '/api/v1/auth/check',
+            # Phase 2 Auth/OIDC Repair: RFC 6749 OAuth2 token endpoints (must be public)
+            '/oauth/token', '/token'
         }
         # Also allow all GET requests to scholarship-related endpoints (read-only discovery)
         is_public = (

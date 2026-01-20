@@ -39,6 +39,8 @@ EXCLUDED_PATHS = {
     "/api/telemetry/ingest",
     "/api/analytics/events",
     "/api/events",
+    "/oauth/token",
+    "/token",
 }
 
 EXCLUDED_PREFIXES = (

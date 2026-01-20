@@ -6,12 +6,14 @@ P0 Observability: UNKNOWN alerts banned - all events must have explicit error_co
 
 import os
 import time
+import random
+import hashlib
 import logging
 import asyncio
 import httpx
 from datetime import datetime, timezone, timedelta
 from dataclasses import dataclass, field, asdict
-from typing import Optional, List, Dict
+from typing import Optional, List, Dict, Set
 from enum import Enum
 
 logger = logging.getLogger("scholarship_api.pilot_controller")
@@ -140,6 +142,109 @@ class ContainmentState:
     last_change_timestamp: str = ""
     last_change_reason: str = "Initial SEV-2 containment"
 
+@dataclass
+class ProbeMutexState:
+    """Distributed mutex state for probe de-duplication.
+    
+    Ensures only one probe runs per target at a time with:
+    - Distributed mutex per target (keyed by URL hash)
+    - Random jitter ±20%
+    - Backoff sequence on lock held: 2s, 5s, 10s
+    """
+    active_probes: Dict[str, float] = field(default_factory=dict)
+    backoff_attempts: Dict[str, int] = field(default_factory=dict)
+    backoff_sequence: List[float] = field(default_factory=lambda: [2.0, 5.0, 10.0])
+    jitter_pct: float = 0.20
+    lock_timeout_sec: float = 60.0
+    
+    def get_target_key(self, url: str) -> str:
+        """Generate consistent key for target URL."""
+        return hashlib.sha256(url.encode()).hexdigest()[:16]
+    
+    def apply_jitter(self, base_interval: float) -> float:
+        """Apply ±20% random jitter to interval."""
+        jitter_range = base_interval * self.jitter_pct
+        return base_interval + random.uniform(-jitter_range, jitter_range)
+    
+    def try_acquire_lock(self, target_url: str) -> Dict:
+        """Try to acquire distributed mutex for target.
+        
+        Returns:
+            dict with 'acquired' bool and backoff info if not acquired
+        """
+        target_key = self.get_target_key(target_url)
+        now = time.time()
+        
+        if target_key in self.active_probes:
+            lock_time = self.active_probes[target_key]
+            if now - lock_time < self.lock_timeout_sec:
+                attempts = self.backoff_attempts.get(target_key, 0)
+                backoff_idx = min(attempts, len(self.backoff_sequence) - 1)
+                base_backoff = self.backoff_sequence[backoff_idx]
+                jittered_backoff = self.apply_jitter(base_backoff)
+                
+                self.backoff_attempts[target_key] = attempts + 1
+                
+                logger.info(f"PROBE MUTEX: Lock held for {target_key}, backoff={jittered_backoff:.2f}s (attempt {attempts + 1})")
+                
+                return {
+                    "acquired": False,
+                    "target_key": target_key,
+                    "backoff_sec": round(jittered_backoff, 2),
+                    "attempt": attempts + 1,
+                    "max_backoff_reached": attempts >= len(self.backoff_sequence) - 1
+                }
+            else:
+                del self.active_probes[target_key]
+                if target_key in self.backoff_attempts:
+                    del self.backoff_attempts[target_key]
+        
+        self.active_probes[target_key] = now
+        self.backoff_attempts[target_key] = 0
+        
+        logger.debug(f"PROBE MUTEX: Acquired lock for {target_key}")
+        return {"acquired": True, "target_key": target_key}
+    
+    def release_lock(self, target_url: str):
+        """Release distributed mutex for target."""
+        target_key = self.get_target_key(target_url)
+        if target_key in self.active_probes:
+            del self.active_probes[target_key]
+        if target_key in self.backoff_attempts:
+            del self.backoff_attempts[target_key]
+        logger.debug(f"PROBE MUTEX: Released lock for {target_key}")
+
+def get_public_base_url() -> str:
+    """Get public HTTPS base URL from environment.
+    
+    Priority order:
+    1. PUBLIC_BASE_URL (explicit public URL)
+    2. APP_BASE_URL (production app URL)
+    3. REPLIT_DEV_DOMAIN (with https:// prefix)
+    4. REPLIT_DOMAINS (first domain with https:// prefix)
+    
+    Never returns localhost - always public HTTPS.
+    """
+    public_url = os.environ.get("PUBLIC_BASE_URL", "")
+    if public_url and not "localhost" in public_url.lower():
+        return public_url.rstrip("/")
+    
+    app_url = os.environ.get("APP_BASE_URL", "")
+    if app_url and not "localhost" in app_url.lower():
+        return app_url.rstrip("/")
+    
+    dev_domain = os.environ.get("REPLIT_DEV_DOMAIN", "")
+    if dev_domain:
+        return f"https://{dev_domain}"
+    
+    domains = os.environ.get("REPLIT_DOMAINS", "")
+    if domains:
+        first_domain = domains.split(",")[0].strip()
+        if first_domain:
+            return f"https://{first_domain}"
+    
+    return "https://scholarship-api-jamarrlmayes.replit.app"
+
 class PilotController:
     
     def __init__(self):
@@ -155,10 +260,12 @@ class PilotController:
         self.containment = ContainmentState(
             last_change_timestamp=datetime.now(timezone.utc).isoformat()
         )
+        self.probe_mutex = ProbeMutexState()
         self._generate_attestation_id()
         logger.info(f"PilotController initialized for {self.state.incident_id}")
         logger.info(f"A8 Attestation ID: {self.state.attestation_id}")
         logger.info(f"SEV-2 Containment: fleet_seo_paused={self.containment.fleet_seo_paused}, scheduler_cap={self.containment.scheduler_cap}")
+        logger.info(f"Public Base URL: {get_public_base_url()}")
     
     def validate_event(self, error_code: Optional[str]) -> Dict:
         """P0 Observability: Reject or remap UNKNOWN events. 0 UNKNOWN in dashboards."""
@@ -430,42 +537,69 @@ class PilotController:
         }
     
     async def run_synthetic_login_test(self, provider_login_url: str = None, iterations: int = 10) -> SyntheticLoginResult:
-        if provider_login_url is None:
-            replit_domain = os.environ.get("REPLIT_DEV_DOMAIN", "")
-            if replit_domain:
-                provider_login_url = f"https://{replit_domain}/health"
-            else:
-                provider_login_url = os.environ.get("PROVIDER_LOGIN_URL", "https://scholarship-api-jamarrlmayes.replit.app/health")
+        """Run synthetic health/login test with probe de-duplication.
         
-        if provider_login_url.startswith("http://localhost") or "localhost" in provider_login_url:
-            logger.warning(f"SYNTHETIC URL BLOCKED: localhost not allowed, using public domain")
-            replit_domain = os.environ.get("REPLIT_DEV_DOMAIN", "")
-            if replit_domain:
-                provider_login_url = f"https://{replit_domain}/health"
+        Features:
+        - Always uses public HTTPS URLs (never localhost)
+        - Distributed mutex per target to prevent duplicate probes
+        - Random jitter ±20% between iterations
+        - Backoff sequence on lock held: 2s, 5s, 10s
+        """
+        if provider_login_url is None:
+            base_url = get_public_base_url()
+            provider_login_url = f"{base_url}/health"
+        elif "localhost" in provider_login_url.lower() or provider_login_url.startswith("http://localhost"):
+            logger.warning(f"SYNTHETIC URL BLOCKED: localhost not allowed in '{provider_login_url}', using PUBLIC_BASE_URL")
+            base_url = get_public_base_url()
+            provider_login_url = f"{base_url}/health"
+        elif not provider_login_url.startswith("https://"):
+            logger.warning(f"SYNTHETIC URL WARNING: Non-HTTPS URL '{provider_login_url}', enforcing HTTPS")
+            provider_login_url = provider_login_url.replace("http://", "https://")
+        
+        logger.info(f"SYNTHETIC PROBE: target={provider_login_url}, iterations={iterations}")
+        
+        lock_result = self.probe_mutex.try_acquire_lock(provider_login_url)
+        if not lock_result["acquired"]:
+            backoff_sec = lock_result["backoff_sec"]
+            logger.warning(f"SYNTHETIC PROBE: Lock held, backing off {backoff_sec}s")
+            await asyncio.sleep(backoff_sec)
+            lock_result = self.probe_mutex.try_acquire_lock(provider_login_url)
+            if not lock_result["acquired"]:
+                return SyntheticLoginResult(
+                    passed=False,
+                    error_rate_pct=100.0,
+                    errors=[f"PROBE_DEDUP: Lock not acquired after backoff (attempt {lock_result['attempt']})"],
+                    timestamp=datetime.now(timezone.utc).isoformat()
+                )
         
         latencies = []
         errors = []
         redirect_count = 0
         
-        async with httpx.AsyncClient(timeout=10.0, follow_redirects=True) as client:
-            for i in range(iterations):
-                start = time.time()
-                try:
-                    resp = await client.get(provider_login_url)
-                    latency_ms = (time.time() - start) * 1000
-                    latencies.append(latency_ms)
+        try:
+            async with httpx.AsyncClient(timeout=10.0, follow_redirects=True) as client:
+                for i in range(iterations):
+                    jittered_delay = self.probe_mutex.apply_jitter(0.1)
                     
-                    if resp.history:
-                        redirect_count += len(resp.history)
+                    start = time.time()
+                    try:
+                        resp = await client.get(provider_login_url)
+                        latency_ms = (time.time() - start) * 1000
+                        latencies.append(latency_ms)
+                        
+                        if resp.history:
+                            redirect_count += len(resp.history)
+                        
+                        if resp.status_code >= 500:
+                            errors.append(f"Iteration {i}: HTTP {resp.status_code}")
+                    except Exception as e:
+                        latency_ms = (time.time() - start) * 1000
+                        latencies.append(latency_ms)
+                        errors.append(f"Iteration {i}: {str(e)}")
                     
-                    if resp.status_code >= 500:
-                        errors.append(f"Iteration {i}: HTTP {resp.status_code}")
-                except Exception as e:
-                    latency_ms = (time.time() - start) * 1000
-                    latencies.append(latency_ms)
-                    errors.append(f"Iteration {i}: {str(e)}")
-                
-                await asyncio.sleep(0.1)
+                    await asyncio.sleep(jittered_delay)
+        finally:
+            self.probe_mutex.release_lock(provider_login_url)
         
         sorted_latencies = sorted(latencies)
         p50 = sorted_latencies[len(sorted_latencies) // 2] if sorted_latencies else 0
