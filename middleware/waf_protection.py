@@ -71,6 +71,12 @@ class WAFProtection(BaseHTTPMiddleware):
         
         # WAF_ALLOWED_HOST_SUFFIXES: Comma-separated list of allowed host suffixes (e.g., ".replit.app,.scholaraiadvisor.com")
         self._allowed_host_suffixes = self._parse_host_suffixes(os.getenv("WAF_ALLOWED_HOST_SUFFIXES", ""))
+        
+        # WAF_UNDERSCORE_ALLOWLIST: Comma-separated list of allowed underscore-prefixed keys (e.g., "_meta")
+        # These keys are PRESERVED in request bodies (used for infra signals)
+        # Default blocks all underscore keys; "__proto__", "constructor", "__prototype__" are ALWAYS blocked
+        self._underscore_allowlist = self._parse_underscore_allowlist(os.getenv("WAF_UNDERSCORE_ALLOWLIST", ""))
+        self._proto_pollution_blocklist = {"__proto__", "constructor", "__prototype__", "prototype"}
 
         # Compile security patterns for performance
         self._sql_patterns = self._compile_sql_patterns()
@@ -244,6 +250,26 @@ class WAFProtection(BaseHTTPMiddleware):
         
         return False
 
+    def _parse_underscore_allowlist(self, allowlist_str: str) -> set:
+        """
+        Parse WAF_UNDERSCORE_ALLOWLIST environment variable into a set of allowed underscore keys
+        
+        Example: "_meta,_internal" -> {"_meta", "_internal"}
+        """
+        if not allowlist_str:
+            return set()
+        
+        allowed = set()
+        for key in allowlist_str.split(","):
+            key = key.strip()
+            if key and key.startswith("_"):
+                allowed.add(key)
+        
+        if allowed:
+            logger.info(f"WAF: Underscore allowlist configured: {allowed}")
+        
+        return allowed
+
     def is_host_suffix_allowed(self, host: str) -> bool:
         """
         Check if Host or X-Forwarded-Host ends with any suffix in WAF_ALLOWED_HOST_SUFFIXES
@@ -297,6 +323,9 @@ class WAFProtection(BaseHTTPMiddleware):
         """
         Recursively remove keys starting with underscore from a dictionary
         
+        Respects WAF_UNDERSCORE_ALLOWLIST for allowed keys (e.g., _meta)
+        ALWAYS blocks prototype pollution vectors: __proto__, constructor, __prototype__, prototype
+        
         Returns: (sanitized dict, list of dropped key paths)
         """
         sanitized = {}
@@ -305,9 +334,23 @@ class WAFProtection(BaseHTTPMiddleware):
         for key, value in obj.items():
             key_path = f"{prefix}.{key}" if prefix else key
             
-            if key.startswith("_"):
-                dropped.append(key_path)
+            # SECURITY: Always block prototype pollution vectors regardless of allowlist
+            if key.lower() in self._proto_pollution_blocklist:
+                dropped.append(f"{key_path} [PROTO_POLLUTION_BLOCKED]")
+                logger.critical(f"WAF: BLOCKED prototype pollution attempt: {key_path}")
                 continue
+            
+            # Check underscore keys against allowlist
+            if key.startswith("_"):
+                # If key is in allowlist, preserve it
+                if key in self._underscore_allowlist:
+                    logger.debug(f"WAF: Preserved allowlisted underscore key: {key_path}")
+                    sanitized[key] = value
+                    continue
+                else:
+                    # Drop non-allowlisted underscore keys
+                    dropped.append(key_path)
+                    continue
             
             if isinstance(value, dict):
                 sanitized_value, nested_dropped = self._remove_underscore_keys(value, key_path)

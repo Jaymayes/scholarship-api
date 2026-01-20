@@ -1,0 +1,135 @@
+Role
+You are the Replit Agent for Scholar AI Advisor (www.scholaraiadvisor.com), operating in Max Autonomous mode under CEO authority. We are in SEV‑1 due to Production WAF regression and broken Auth/OIDC. Your job is to hotfix WAF, complete OIDC Phase 2, deploy the unified release to PRODUCTION (not localhost), verify Command Center recovery (no “Skipping probe”), and produce verifiable artifacts. Finance remains frozen. Traffic Cap remains 0% until CEO/HITL approval.
+
+Run identifiers and headers
+
+FIX+DEPLOY run: RUN_ID = CEOSPRINT-20260120-SEV1-HOTFIX-DEPLOY-001
+Protocol: AGENT3_HANDSHAKE v30 (Prod‑First + Scorched Earth + 2-of-3)
+Add X-Trace-Id = RUN_ID.<component> to all probes
+Add X-Idempotency-Key (UUIDv4) on all mutable requests
+Hard safety controls
+
+TRAFFIC_CAP=0 (do not raise)
+LEDGER_FREEZE=true; PROVIDER_INVOICING_PAUSED=true; FEE_POSTINGS_PAUSED=true
+ABSOLUTELY NO LIVE STRIPE CHARGES
+External public URLs only (no localhost). Add Cache-Control: no-cache and ?t=<epoch_ms> to probes.
+Any PASS requires 2-of-3: HTTP+Trace, matching logs, A8 POST+GET checksum (prefer 3-of-3)
+Phase 0 — Scorched Earth + Incident stamp
+
+rm -rf tests/perf/reports/* tests/perf/evidence/* && mkdir -p tests/perf/reports tests/perf/evidence tests/perf/reports/incidents
+Write tests/perf/reports/incidents/sev1_exec_block.md with the CEO directive: HOTFIX WAF (_meta) → OIDC Phase 2 → Unified PRODUCTION Deploy; Traffic=0; Finance Freeze ACTIVE.
+Phase 1 — WAF Hotfix (PRODUCTION scope)
+Observed: Command Center WAF strips x-forwarded-host and blocks internal _meta metadata → probe deadlocks (“Skipping … already in progress”) and auth breakage.
+1.1 X-Forwarded-Host policy (do NOT rely on localhost)
+
+Set WAF_STRIP_X_FORWARDED_HOST=false
+Implement allowlist:
+WAF_ALLOWLIST_XFH=true
+WAF_TRUSTED_INGRESS_CIDRS="35.192.0.0/12,35.224.0.0/12,34.0.0.0/8,136.0.0.0/8,127.0.0.1/32,::1/128"
+WAF_ALLOWED_HOST_SUFFIXES=".replit.app,.replit.co,.scholaraiadvisor.com"
+If (src IP ∈ TRUSTED && host/xfh endswith ALLOWED_SUFFIX) → PRESERVE x-forwarded-host; else strip/403.
+1.2 Underscore allowlist (scope‑limited)
+
+WAF_UNDERSCORE_ALLOWLIST=["_meta"]
+Continue blocking ["proto","constructor","prototype"] and any nested path attempting prototype pollution.
+For non‑allowlisted underscore keys: drop the property, do not 4xx; log redacted.
+Artifacts: tests/perf/reports/waf_hotfix_prod.md (diff + env + sample logs confirming preserve/allow)
+
+Phase 2 — Auth/OIDC Phase 2 repairs (PRODUCTION)
+Observed: client_id/grant_type undefined; discovery/jwks fetch fails; warning “already parsed request body”.
+2.1 Trust Proxy + Secure Cookies (A1)
+
+app.set('trust proxy', 1)
+Session cookies: SameSite=None; Secure; HttpOnly; Path=/; (Domain=.scholaraiadvisor.com if cross‑subdomain)
+Ensure one body parser; remove duplicate upstream parsers before OIDC provider.
+2.2 Issuer resolution
+
+OIDC_PUBLIC_BASE_URL required (primary). Fallback to X-Forwarded-Proto + x-forwarded-host only if allowlisted by Phase 1.
+2.3 RFC 6749 compliant /oauth/token
+
+Require client_id and grant_type. On missing: 400 JSON: { "error": "invalid_request", "error_description": "client_id and grant_type are required" }
+Log pre‑route invalid client with trace id (no stack).
+Artifacts: tests/perf/reports/oidc_phase2_fix_prod.md (Set‑Cookie capture from public URL; token error samples; discovery/jwks public fetch proofs)
+
+Phase 3 — Unified PRODUCTION deployment (bundle)
+Bundle and republish together:
+
+WAF hotfix (XFH preserve + _meta allowlist)
+/metrics/p95 public JSON (registered early in server pipeline/bypass handler)
+OIDC Phase 2 (trust proxy + cookie + validation + single parser)
+Probe scheduler mutex (to eliminate “already in progress” storms) with jitter ±20% and lock TTL
+Deployment evidence:
+
+Record commit SHAs, build timestamps, and publish IDs for A1 Auth and A8 Command Center (and any other modified apps). Artifacts: tests/perf/reports/deploy_manifest_prod.md (apps, SHAs, timestamps)
+Phase 4 — Production verification (no localhost)
+4.1 Public metrics endpoint
+
+curl -vL -H "Cache-Control: no-cache" "$A8_PUBLIC_BASE_URL/metrics/p95?t=$(date +%s)" (and for A1)
+PASS: 200 JSON {p50_ms, p95_ms, window_sec, sample_count, ts}
+4.2 Command Center stability
+
+Confirm logs show NO repeated “[Scheduled Probing] Skipping … probe already in progress” for 10 minutes after deployment.
+Confirm no “[SECURITY] Blocked underscore property: _meta” for internal telemetry.
+4.3 Auth/OIDC
+
+Fetch discovery: $A1_PUBLIC_BASE_URL/.well-known/openid-configuration → 200; jwks_uri reachable.
+Live login attempt (browser‑grade, without capture): Set‑Cookie contains SameSite=None; Secure; HttpOnly; callback resolves; token endpoint returns RFC errors for bad input (client_id missing) and success for valid test client (if configured).
+No 410 Gone on health/ready.
+Artifacts: tests/perf/evidence/raw_curl_evidence.txt (public URLs), tests/perf/reports/command_center_stability.md, tests/perf/reports/auth_flow_verification.md
+
+Phase 5 — Telemetry acceptance (A8)
+
+POST with X-Trace-Id; GET confirmation; verify ≥99% acceptance; checksum round‑trip.
+BYPASS counters = 0 in normal path (SEV1 may still allow auto‑generate; keep counted). Artifacts: tests/perf/reports/a8_telemetry_verification.md
+Phase 6 — 10‑minute “Green Gate” (Prod‑only)
+
+Sample p95 for /, /pricing, /browse, /health across apps for ≥10 minutes; targets:
+/api/login p95 ≤200ms
+DB p95 ≤100ms
+Event loop lag <200ms
+Accept only if all above hold on the PUBLIC URLs (no localhost). Artifacts: tests/perf/reports/perf_summary_prod.md
+Phase 7 — Second confirmation per app
+
+For each PASSing app:
+HTTP+Trace: 200 with X-Trace-Id artefacts
+Logs: matching X-Trace-Id
+A8: POST+GET checksum Artifacts: tests/perf/reports/ecosystem_double_confirm_prod.md
+Phase 8 — Finance Freeze posture (unchanged)
+
+Prove ledger heartbeat live; invoicing/settlement blocked; schema views/INSTEAD OF triggers intact; reconcile sample. Artifacts: tests/perf/reports/finance_freeze_validation.md, tests/perf/reports/ledger_heartbeat_status.md
+Acceptance criteria (must all PASS to declare STABLE under SEV‑2)
+
+WAF: XFH preserved for trusted ingress; _meta allowed for infra signals; underscore scrub blocks prototype‑pollution vectors; Command Center logs show no underscore‑blocks for internal telemetry
+OIDC: discovery & jwks fetch succeed on PUBLIC URL; token endpoint RFC‑compliant; secure cookie policy verified; no “already parsed body” warnings
+/metrics/p95: 200 JSON on A1 and A8 public endpoints (and others if implemented)
+Scheduler: no “Skipping … already in progress” storms for ≥10 minutes
+Performance: login p95 ≤200ms; DB p95 ≤100ms; event loop lag <200ms (Prod window 10m)
+Telemetry: ≥99% acceptance; checksum round‑trip; minimal/no BYPASS under SEV‑1 posture
+Finance: Freeze validated; no invoicing/settlement activity; heartbeat healthy
+Second Confirmation: 2‑of‑3 (prefer 3‑of‑3) for each PASS; all artifacts posted to A8 with SHA256 checksums
+Stop/abort rules
+
+If public verification fails for WAF/metrics/auth or Command Center still shows “Skipping … in progress” storms after patch:
+Print: “Attestation: UNSTABLE (SEV‑1) — Prod verification failed; Traffic=0; Finance Freeze ACTIVE” and STOP (no further changes)
+If telemetry ingestion <98% or checksum mismatch: STOP and mark UNSTABLE
+Final console output (print one)
+
+If all criteria PASS: “Attestation: STABLE (SEV‑1 → SEV‑2 Monitoring). Traffic remains 0% pending CEO/HITL staged reopen.”
+Else: “Attestation: UNSTABLE (SEV‑1) — See incident artifacts. Traffic=0; Finance Freeze ACTIVE.”
+Artifacts to produce (mandatory; post to A8 and verify via GET + checksums)
+
+tests/perf/reports/incidents/sev1_exec_block.md
+tests/perf/reports/waf_hotfix_prod.md
+tests/perf/reports/oidc_phase2_fix_prod.md
+tests/perf/reports/oidc_input_validation.md
+tests/perf/reports/deploy_manifest_prod.md
+tests/perf/evidence/raw_curl_evidence.txt
+tests/perf/reports/command_center_stability.md
+tests/perf/reports/auth_flow_verification.md
+tests/perf/reports/a8_telemetry_verification.md
+tests/perf/reports/perf_summary_prod.md
+tests/perf/reports/ecosystem_double_confirm_prod.md
+tests/perf/reports/finance_freeze_validation.md
+tests/perf/reports/ledger_heartbeat_status.md
+tests/perf/evidence/checksums.json
+tests/perf/reports/go_no_go_report.md END-REPLIT-AGENT-PROMPT
