@@ -1,0 +1,56 @@
+Acknowledged. Your assessment is correct: we cannot restore traffic with a broken wallet. Execute the direct schema realignment now and treat this as T+0.
+
+Immediate order (execute now, Postgres-safe)
+
+Goal: Make the running code’s target table name “overnight_protocols_ledger” resolve to the actual ledger table.
+Preconditions:
+Confirm overnight_protocols_ledger does NOT exist.
+Confirm financial_ledger DOES exist.
+SQL (single transactional patch)
+BEGIN;
+LOCK TABLE financial_ledger IN ACCESS EXCLUSIVE MODE;
+
+-- Rename table to match application expectation
+ALTER TABLE IF EXISTS financial_ledger RENAME TO overnight_protocols_ledger;
+
+-- Keep index names consistent (harmless if they don’t exist)
+ALTER INDEX IF EXISTS financial_ledger_pkey RENAME TO overnight_protocols_ledger_pkey;
+ALTER INDEX IF EXISTS financial_ledger_event_id_key RENAME TO overnight_protocols_ledger_event_id_key;
+ALTER INDEX IF EXISTS idx_ledger_provider_id RENAME TO idx_opl_provider_id;
+ALTER INDEX IF EXISTS idx_ledger_event_type RENAME TO idx_opl_event_type;
+ALTER INDEX IF EXISTS idx_ledger_status RENAME TO idx_opl_status;
+ALTER INDEX IF EXISTS idx_ledger_created_at RENAME TO idx_opl_created_at;
+ALTER INDEX IF EXISTS idx_ledger_scholarship_id RENAME TO idx_opl_scholarship_id;
+
+-- If a serial/identity sequence exists, rename for consistency (dependency will update automatically)
+ALTER SEQUENCE IF EXISTS financial_ledger_id_seq RENAME TO overnight_protocols_ledger_id_seq;
+
+COMMIT;
+
+Verification (log-level, not dashboards)
+
+App write test: Trigger one real ledger write (or the heartbeat path).
+Required evidence back to me:
+A8 log snippet: LEDGER_PERSIST_SUCCESS with table=overnight_protocols_ledger and the new row’s id/event_id.
+Database proof: SELECT COUNT(*) and a SELECT … ORDER BY created_at DESC LIMIT 1 from overnight_protocols_ledger showing the new record.
+Absence of error lines: relation "overnight_protocols_ledger" does not exist.
+Controls and gates (unchanged)
+
+Traffic cap stays 0%.
+Safety Lock and refunds remain ON.
+Telemetry accept-and-spool and probe suppression stay active.
+Finance freeze remains ON (no invoicing/fee postings) until:
+60-minute clean run starts AFTER the first LEDGER_PERSIST_SUCCESS, and completes with:
+Telemetry Acceptance ≥99%, queue <100, 0×428
+Provider P95 ≤500ms; /api/login P95 ≤200ms; auth 5xx=0
+DB P95 ≤100ms; 0 statement timeouts
+0 sitemap 429; 0 /metrics/p95 404; 0 localhost probes
+Reconciliation packet is produced for any missed ledger events
+CFO sign-off received
+Noise handling
+
+Ignore [SECURITY] Blocked underscore property: _meta for now. Do not spend cycles on it until wallet is green.
+Timer reset
+
+The prior “green” window is void. The 60-minute stability timer will start only after you post the first LEDGER_PERSIST_SUCCESS with the proof above.
+Proceed and report back with the two log artifacts (success write + DB select) immediately after the rename completes.
