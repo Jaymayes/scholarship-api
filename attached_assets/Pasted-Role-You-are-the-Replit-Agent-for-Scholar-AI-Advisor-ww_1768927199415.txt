@@ -1,0 +1,131 @@
+Role
+You are the Replit Agent for Scholar AI Advisor (www.scholaraiadvisor.com), operating in Max Autonomous mode under CEO authority. Pivot from Stabilization to Validation. Execute Gate-2 (25% traffic) with strict guardrails, validate B2B Flywheel (Institutional Onboarding) and the SEO Schema Fix under load, and prove Neon DB pooling stability against a thundering herd. Maintain Finance Freeze. Eliminate false positives via second confirmation (2-of-3; prefer 3-of-3) and publish all artifacts to A8 with checksum-verified round-trip.
+
+Run identifiers and headers
+
+Gate-2 execution: RUN_ID = CEOSPRINT-20260120-EXEC-ZT3G-GATE2-029
+Observation window verification: RUN_ID = CEOSPRINT-20260120-VERIFY-ZT3G-GATE2-030
+HITL Authorization ID: HITL-CEO-20260120-OPEN-TRAFFIC-G2
+Protocol: AGENT3_HANDSHAKE v30 (Functional Deep-Dive + Strict + Scorched Earth + Gate-2)
+Add X-Trace-Id = RUN_ID.<component> to all probes and state-changing requests
+Add X-Idempotency-Key (UUIDv4) on all mutations
+Non‑negotiable safety and anti–false-positive guardrails
+
+Finance Freeze: KEEP ACTIVE (LEDGER_FREEZE=true; PROVIDER_INVOICING_PAUSED=true; FEE_POSTINGS_PAUSED=true; LIVE_STRIPE_CHARGES=BLOCKED). No funds can move at Gate-2.
+Stripe Safety: Remaining ≈4/25. FORBIDDEN to execute live B2C charges unless a new HITL-CEO override is recorded AND the <5 threshold is explicitly approved in tests/perf/reports/hitl_approvals.log. Otherwise keep B2C “CONDITIONAL” and verify readiness only (no capture).
+Scorched Earth Freshness: Before Gate-2, purge stale artifacts and recreate directories:
+rm -rf tests/perf/reports/* tests/perf/evidence/* && mkdir -p tests/perf/reports tests/perf/evidence
+External URL Enforcement: Validate using public URLs only (no localhost). Add Cache-Control: no-cache and cache-busting (?t=<epoch_ms>) to all probes.
+Content & Functional Verification: HTTP 200 ≠ proof. Require service markers or functional data:
+Health JSON with {service, version, uptime_s, status:"healthy"}; functional endpoints must return correct JSON/HTML (reject “Waking/Loading” placeholders or tiny responses <50B).
+Second-Confirmation Rule (2-of-3 per PASS; prefer 3-of-3):
+HTTP 200 with X-Trace-Id in payload/header
+Matching X-Trace-Id in service logs
+A8 POST+GET artifact checksum and/or ledger correlation (for B2B fee lineage events; no Stripe capture at Gate-2)
+Probe Storm Prevention: Global mutex/TryLock for health/metrics/telemetry probes; if in-progress, skip with 429 and exponential backoff (2s → 5s → 10s; 20% jitter). No overlapping probe storms.
+Phase 0 — Preconditions (close incident review; confirm prod code)
+
+Confirm incident logs are historical (SEV-1 at ~04:00 UTC) and current prod is stable:
+A1/A8 public health OK (200 + markers), A1 token endpoint returns invalid_client (not missing client_id), A8 POST+GET telemetry round-trip ≥99%
+Confirm the two hotfixes are in production (verify Git SHA != 579db3da and includes latest commits):
+Underscore allowlist: server/middleware/json-sanitization.ts respects WAF_UNDERSCORE_ALLOWLIST; WAF + sanitizer synchronized; logs show “[SECURITY] Request body sanitized successfully” (no “Blocked underscore property: _meta” on allowed fields)
+SEO ZodError fix: topics: z.array(z.string().min(1)).max(50).default([]); POST /api/seo/pages {} returns {"success":true,"pages":[]}
+Confirm Neon DB pool is configured (single shared Pool, keepAlive=true, idleTimeoutMillis≈15000, connectionTimeoutMillis≈10000, max=5–10) and backoff/circuit-breaker exists for connection resets.
+Phase 1 — Execute Gate-2 (raise traffic to 25%) with strict guardrails
+
+Apply Gate-2 traffic:
+Set TRAFFIC_CAP=0.25 and TRAFFIC_CAP_B2C_PILOT=0.25
+Record HITL event: HITL-CEO-20260120-OPEN-TRAFFIC-G2 (scope: Gate-2=25%, Finance Freeze ON)
+Persist environment diff to tests/perf/reports/gate2_env_diff.md
+Observation Window: 30 minutes minimum (sample every 60s; include 3 “spike windows” at minutes 10, 20, 30 for focused provider-login bursts)
+Monitor KPIs continuously (abort on breach):
+A1 Login P95 ≤200ms (hard gate). If >200ms sustained for 2 consecutive samples or >250ms any sample → rollback.
+Error Rate (HTTP 5xx) <0.5% (hard gate). If ≥0.5% any sample → rollback.
+Neon DB P95 ≤100ms; Neon active connections < pool_max + 50% burst. Reconnects should auto-recover under backoff; if repeated >3/min → rollback.
+Event Loop Lag <200ms (0 alerts). If >200ms sustained 2 consecutive samples → rollback.
+Telemetry Acceptance ≥99% A8 POST+GET with checksum match.
+WAF blocks on _meta = 0 (hard gate). Any occurrence → rollback.
+Probe Storms = 0 (mutex in effect). Any “already in progress” storm → rollback.
+If any breach occurs, immediately set TRAFFIC_CAP back to 0.10, emit incident event to A8 with trace, and produce tests/perf/reports/gate2_abort.md (root causes + next steps).
+Phase 2 — Load scenarios to validate B2B Flywheel and SEO Schema under Gate-2
+A. B2B Flywheel (Institutional Onboarding & Bulk Ops)
+
+Concurrency profile: 3× Provider logins bursts (e.g., N=50 concurrent sessions per spike window) using authenticated flows (no payments). Respect rate limits and idempotency keys.
+Validate onboarding/listing workflows end-to-end (data-only) and write fee-lineage events (3% + 4x) to ledger in “frozen processor” mode (no real money movement).
+Required proofs (2-of-3; prefer 3-of-3):
+A6: /api/providers returns JSON arrays under load (not HTML errors)
+Fee lineage events recorded with X-Trace-Id, correlated in A8 (POST+GET artifact)
+A1 login P95 remains ≤200ms during spikes, Neon pool within bounds
+Artifacts: tests/perf/reports/b2b_flywheel_validation.md; tests/perf/evidence/fee_lineage.json; A6 provider-list snapshot; A1 login latency series; Neon pool usage series.
+B. SEO Schema Fix Under Load
+
+Concurrency profile: POST /api/seo/pages {} with randomized tenant/page IDs at 3× Gate-1 RPS for 3 spike windows; confirm no ZodError under load.
+Required proofs (2-of-3; prefer 3-of-3):
+HTTP 200 responses with {"success":true,"pages":[]} for empty payloads
+Logs showing successful schema defaulting (topics=[]), no crashes
+A8 telemetry events for each batch with checksum-verified round-trip
+Artifacts: tests/perf/reports/seo_under_load.md; raw series of success counts, error counts, P95; crash_count=0 assertion
+Phase 3 — Functional Deep-Dive spot checks during Gate-2 (external URLs only)
+
+A1 (Auth): / and /health (markers), token endpoint returns invalid_client (not missing client_id); Set-Cookie includes SameSite=None; Secure; HttpOnly (browser-grade capture)
+A5 (B2C Readiness Only): /pricing shows pk_… key and stripe.js; CTA present (id="checkout" or data-role="checkout"); no charge execution
+A6 (B2B): /api/providers returns JSON; bulk provider ops read-only verified (no funds)
+A8 (Telemetry): POST event returns {"success":true,"event_id":...}; GET artifact by id returns checksum match
+WAF: Verify telemetry bypass entries exist (/api/telemetry/ingest and /telemetry/ingest) and no SQL pattern falsely triggers on encoded quotes; confirm CIDRs include 35.184.0.0/13 and 10.0.0.0/8
+Phase 4 — Second confirmation per PASS and evidence collation
+
+Build tests/perf/reports/ecosystem_double_confirm.md:
+For each PASS claim, show at least 2-of-3 proofs (HTTP+Trace, Logs, A8 checksum/ledger)
+Build capacity and stability reports:
+tests/perf/reports/neon_pooling_report.md: active connections/time, reconnects, p95; backoff events
+tests/perf/reports/a1_login_latency_gate2.md: minute-by-minute P50/P95; spikes vs thresholds
+tests/perf/reports/gate2_perf_summary.md: consolidated P95 across core routes, error rates, lag metrics
+Phase 5 — Gate-2 decision & artifacts publication
+
+If all KPIs remain GREEN for the full observation window:
+Keep TRAFFIC_CAP=25%
+Produce tests/perf/reports/gate2_open_report.md (window start/end; KPI tables; spike results; fee-lineage evidence; SEO success series)
+Post artifacts to A8; verify POST+GET checksum match; record event IDs
+If any KPI breach occurs:
+Rollback to TRAFFIC_CAP=10%
+Produce tests/perf/reports/gate2_abort.md (breach metrics, logs, root cause, remediation plan, owner, ETA)
+Post to A8 with checksum verification
+KPIs and rollback thresholds (hard gates unless noted)
+
+A1 Login P95 ≤200ms (sustained breach or any >250ms sample → rollback)
+Error Rate (5xx) <0.5% (any ≥0.5% → rollback)
+Neon DB P95 ≤100ms; active connections < pool_max + 50% burst; repeated reconnects >3/min → rollback
+Event Loop Lag <200ms (two consecutive >200ms samples → rollback)
+Telemetry Acceptance ≥99% (sustained <99% → rollback)
+WAF _meta blocks = 0 (any occurrence → rollback)
+Probe Storms = 0 (any storm → rollback)
+Soft watch: /metrics/p95 endpoints must respond 200 during window; transient 404s during deploy must be explained and not recurring
+Artifacts (SHA256 + A8 round-trip required)
+
+tests/perf/reports/system_map.json
+tests/perf/reports/{app}_health.json (A1–A8)
+tests/perf/reports/version_manifest.json
+tests/perf/reports/post_republish_diff.md
+tests/perf/reports/a1_cookie_validation.md
+tests/perf/reports/a1_login_latency_gate2.md
+tests/perf/reports/neon_pooling_report.md
+tests/perf/reports/gate2_perf_summary.md
+tests/perf/reports/a8_telemetry_audit.md
+tests/perf/reports/b2b_flywheel_validation.md
+tests/perf/reports/seo_under_load.md
+tests/perf/evidence/fee_lineage.json
+tests/perf/reports/ui_ux_integrity_matrix.md
+tests/perf/reports/security_headers_report.md
+tests/perf/reports/rl_observation.md (closed loop proof)
+tests/perf/reports/hitl_approvals.log (append Gate-2 authorization)
+tests/perf/evidence/raw_curl_evidence.txt
+tests/perf/reports/raw_truth_summary.md
+tests/perf/evidence/checksums.json
+tests/perf/reports/ecosystem_double_confirm.md
+tests/perf/reports/gate2_open_report.md OR tests/perf/reports/gate2_abort.md
+tests/perf/reports/go_no_go_report.md (Gate-2 verdict)
+Final console output (one of)
+
+If all KPIs pass and evidence is complete: “Attestation: VERIFIED LIVE (ZT3G) — Gate-2 OPEN at 25%”
+If rollback triggered: “Attestation: ROLLED BACK to Gate-1 (10%) — See gate2_abort.md”
+If any safety violation (e.g., live charge without override): “Attestation: FAILED — SAFETY VIOLATION” END-REPLIT-AGENT-PROMPT
