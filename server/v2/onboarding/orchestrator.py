@@ -63,8 +63,12 @@ class OnboardingOrchestrator:
     MAX_RETRY_ATTEMPTS = 3
     BASE_BACKOFF_SECONDS = 0.5
     
-    def __init__(self, base_url: str = "https://scholarship-api-jamarrlmayes.replit.app"):
-        self.base_url = base_url
+    def __init__(self, base_url: Optional[str] = None):
+        import os
+        self.base_url = base_url or os.getenv(
+            "A8_TELEMETRY_BASE_URL",
+            os.getenv("PUBLIC_BASE_URL", "http://localhost:5000")
+        )
         self.flows: Dict[str, OnboardingFlow] = {}
         self._http_client: Optional[httpx.AsyncClient] = None
     

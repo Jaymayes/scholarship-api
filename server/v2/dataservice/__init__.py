@@ -63,12 +63,22 @@ def create_dataservice_app() -> FastAPI:
         openapi_url="/openapi.json",
     )
     
+    allowed_origins = os.getenv("CORS_ALLOWED_ORIGINS", "").split(",")
+    if not allowed_origins or allowed_origins == [""]:
+        allowed_origins = [
+            "https://scholaraiadvisor.com",
+            "https://www.scholaraiadvisor.com",
+            "https://scholarship-api-jamarrlmayes.replit.app",
+            "https://scholar-auth-jamarrlmayes.replit.app",
+            "https://provider-register-jamarrlmayes.replit.app",
+        ]
+    
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"],
+        allow_origins=allowed_origins,
         allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
+        allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+        allow_headers=["Authorization", "Content-Type", "X-Idempotency-Key", "X-Trace-Id", "X-User-Role", "X-API-Key"],
     )
     
     app.include_router(users_router, prefix="/api/v1")

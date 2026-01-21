@@ -65,6 +65,8 @@ EXCLUDED_PREFIXES = (
     "/api/internal/canary/",
     "/api/internal/pilot/",
     "/api/v2/onboarding/",
+    "/v2/dataservice/health",
+    "/v2/dataservice/readyz",
 )
 
 
