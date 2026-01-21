@@ -1,55 +1,36 @@
-# Gate-6 GO-LIVE Raw Truth Summary
+# Raw Truth Summary
 
-**RUN_ID**: CEOSPRINT-20260121-EXEC-ZT3G-GATE6-GO-LIVE-052  
-**Protocol**: AGENT3_HANDSHAKE v37 (GO-LIVE + Strict + Scorched Earth)  
-**Timestamp**: 2026-01-21T07:47:12Z
+**Run ID**: CEOSPRINT-20260121-EXEC-ZT3G-V2S2-FIX-027  
+**Protocol**: AGENT3_HANDSHAKE v30  
+**Generated**: 2026-01-21T22:52:00Z
 
-## Phase 0: Baseline Snapshot
+---
 
-### Scorched Earth
-- [x] Purged `tests/perf/reports/*`
-- [x] Purged `tests/perf/evidence/*`
-- [x] Fresh directories created
+## Truth Table
 
-### Ecosystem Health (A1-A8)
+| App | Expected | Actual | Delta |
+|-----|----------|--------|-------|
+| A0 | 200 + markers | 200 + markers | ✅ Match |
+| A1 | 200 + OIDC | 000 timeout | ❌ Blocked |
+| A2 | 200 + status | 000 timeout | ❌ Blocked |
+| A3 | 200 + agent | 000 timeout | ❌ Blocked |
+| A4 | 200 + sage | 000 timeout | ❌ Blocked |
+| A5 | 200 + Stripe | 200, no Stripe | ⚠ Missing markers |
+| A6 | 200 + JSON | 000 timeout | ❌ Blocked |
+| A7 | 200 + sitemap | 000 timeout | ❌ Blocked |
+| A8 | 200 + events | 200 + rate limit error | ⚠ Degraded |
 
-| Service | Status | Latency |
-|---------|--------|---------|
-| A2 scholarship_api | ✅ 200 | 178ms |
-| A8 auto_com_center | ✅ 200 | 39ms |
-| A6 provider_register | ✅ 200 | 52ms |
+---
 
-### Local Service Health
+## Root Causes
 
-| Component | Status |
-|-----------|--------|
-| Stripe Mode | LIVE |
-| Stripe Configured | ✅ |
-| Webhook Secret | ✅ |
-| WAF Block Mode | ✅ |
-| Trust-by-Secret | ✅ |
+1. **A1-A4, A6-A7**: Apps in sleeping state or DNS misconfigured
+2. **A5**: Landing page missing Stripe integration
+3. **A8**: Upstash Redis rate limited
 
-### Baseline Metrics
+---
 
-| Metric | Value | Threshold |
-|--------|-------|-----------|
-| P95 Latency | 0.0ms | <150ms |
-| Event Loop | 0.0ms | <300ms |
-| Error Rate | 0.0% | <0.5% |
+## No Fabrication Confirmation
 
-### Pre-Flight Checks
-- [x] Production commit verified
-- [x] WAF Trust-by-Secret active
-- [x] Probe storms = 0
-- [x] A8 acceptance ready
-
-## Authorizations
-
-| Authority | Token | Status |
-|-----------|-------|--------|
-| CEO | HITL-CEO-20260121-GATE6-GO-LIVE | PENDING |
-| CFO | HITL-CFO-20260121-UNFREEZE-G6-GO-LIVE | PENDING |
-
-## Phase 0 Result: ✅ PASS
-
-Ready to proceed to Phase 1 (Finance Unfreeze).
+All results above are from actual curl probes. No PASS was fabricated.
+See tests/perf/evidence/raw_curl_evidence.txt for full probe output.
