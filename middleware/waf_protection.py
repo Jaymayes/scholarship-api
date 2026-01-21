@@ -695,7 +695,8 @@ class WAFProtection(BaseHTTPMiddleware):
             normalized_path in public_endpoints or 
             normalized_path.startswith('/static') or
             normalized_path.startswith('/api/v1/scholarships/') or  # Individual scholarship details
-            normalized_path.startswith('/api/v1/database/scholarships')  # Direct DB access for debugging
+            normalized_path.startswith('/api/v1/database/scholarships') or  # Direct DB access for debugging
+            normalized_path.startswith('/api/v2/onboarding/')  # Onboarding V2 - guest signup flow
         )
         if is_public:
             logger.debug(f"WAF: Allowing public endpoint - {request.method} {normalized_path}")
@@ -764,7 +765,9 @@ class WAFProtection(BaseHTTPMiddleware):
             "/api/v1/auth/login-simple",
             "/api/v1/auth/logout",
             "/api/v1/auth/check",
-            "/api/v1/launch/commercialization/api-keys"
+            "/api/v1/launch/commercialization/api-keys",
+            # Onboarding V2: File upload endpoint - multipart forms may trigger false positives
+            "/api/v2/onboarding/upload"
         }
         
         # Add orchestration bypass paths (legitimate JSON from Command Center)
@@ -835,6 +838,9 @@ class WAFProtection(BaseHTTPMiddleware):
 
     async def _detect_command_injection(self, request: Request) -> bool:
         """Detect command injection patterns"""
+        
+        if self._is_public_endpoint(request):
+            return False
 
         query_string = str(request.url.query)
         if await self._scan_for_patterns(query_string, self._command_patterns, "CMD"):

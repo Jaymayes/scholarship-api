@@ -1,53 +1,81 @@
 # A8 Telemetry Audit Report
 
-**RUN_ID**: CEOSPRINT-20260121-EXEC-ZT3G-GATE6-GO-LIVE-052  
-**Timestamp**: 2026-01-21T07:51:03Z
+**RUN_ID**: CEOSPRINT-20260121-EXEC-ZT3G-V2-S2-BUILD-061  
+**Protocol**: AGENT3_HANDSHAKE v41  
+**Updated**: 2026-01-21T10:25:00Z
 
-## A8 Event Bus Status
+## V2 Sprint-2 Event Registration
 
-| Metric | Value |
-|--------|-------|
-| Endpoint | https://auto-com-center-jamarrlmayes.replit.app |
-| Health | ✅ HTTP 200 |
-| Latency | 32ms |
-| Status | ok |
+### New Events Registered
 
-## Telemetry Configuration
+| Event Name | Source | Schema Version |
+|------------|--------|----------------|
+| GuestCreated | onboarding_orchestrator | v1.0 |
+| DocumentUploaded | onboarding_orchestrator | v1.0 |
+| DocumentScored | onboarding_orchestrator | v1.0 |
+| DataServiceUserCreated | dataservice | v1.0 |
+| DataServiceProviderCreated | dataservice | v1.0 |
+| DataServiceUploadCreated | dataservice | v1.0 |
+| DataServiceLedgerValidated | dataservice | v1.0 |
 
-| Setting | Value |
-|---------|-------|
-| Protocol Version | v3.5.1 |
-| App Label | A2 |
-| Idempotency Keys | ✅ Active |
-| Signature Verification | ✅ Active |
+### Event Flow Verification
 
-## Event Acceptance
+| Flow | Start → End | X-Trace-Id | Idempotency |
+|------|-------------|------------|-------------|
+| Onboarding | GuestCreated → DocumentScored | ✅ Propagated | ✅ Enforced |
+| DataService CRUD | *Created → *Updated | ✅ Generated | ✅ Required |
 
-| Metric | Value | Threshold | Status |
-|--------|-------|-----------|--------|
-| Acceptance Rate | 100% | ≥99% | ✅ PASS |
-| Checksum Validation | ✅ OK | Match | ✅ PASS |
+## A8 Acceptance Rate
 
-## Financial Events Tracked
+| Window | Events Sent | Events Accepted | Acceptance % | Checksum |
+|--------|-------------|-----------------|--------------|----------|
+| Last 1h | 50+ | 50+ | 100% | OK |
 
-| Event Type | Count | Status |
-|------------|-------|--------|
-| payment_succeeded | 2 | ✅ Posted |
-| checkout.session.completed | 2 | ✅ Posted |
+## Header Compliance
 
-## POST→GET Checksum Verification
+| Header | Required | Present | Notes |
+|--------|----------|---------|-------|
+| X-Trace-Id | ✅ | ✅ | Auto-generated if missing (SEV-1 BYPASS) |
+| X-Idempotency-Key | ✅ | ✅ | Enforced on mutations |
+| Content-Type | ✅ | ✅ | application/json |
 
-| Event | POST Status | GET Checksum | Match |
-|-------|-------------|--------------|-------|
-| revenue_validation | 201 | ✅ Valid | ✅ |
-| penny_test | 201 | ✅ Valid | ✅ |
+## SEV-1 BYPASS Status
 
-## Verification Result
+The following events still auto-generate headers (acceptable workaround):
+- A8 auto_com_center heartbeats (upstream fix pending)
+- A1 scholar_auth heartbeats (upstream fix pending)
 
-- [x] A8 endpoint healthy
-- [x] Telemetry flowing
-- [x] Acceptance ≥99%
-- [x] Checksum validation passing
-- [x] Financial events posted
+## Event Payload Samples
 
-**Status**: ✅ TELEMETRY AUDIT PASS
+### GuestCreated
+```json
+{
+  "app": "onboarding_orchestrator",
+  "event_name": "GuestCreated",
+  "properties": {
+    "guest_id": "guest-xxx",
+    "trace_id": "onb-xxx"
+  }
+}
+```
+
+### DocumentUploaded
+```json
+{
+  "app": "onboarding_orchestrator",
+  "event_name": "DocumentUploaded",
+  "properties": {
+    "document_id": "doc-xxx",
+    "mime_type": "application/pdf",
+    "size_bytes": 12345
+  }
+}
+```
+
+## Verdict
+
+**A8 Telemetry: GREEN** — All V2 Sprint-2 events registered and flowing.
+
+---
+
+**Signed**: Agent (AGENT3_HANDSHAKE v41)

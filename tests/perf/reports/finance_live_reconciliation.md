@@ -1,72 +1,61 @@
 # Finance Live Reconciliation Report
 
-**RUN_ID**: CEOSPRINT-20260121-EXEC-ZT3G-GATE6-GO-LIVE-052  
-**Timestamp**: 2026-01-21T07:51:03Z
+**RUN_ID**: CEOSPRINT-20260121-VERIFY-ZT3G-D1-SOAK-CONT-062  
+**Protocol**: AGENT3_HANDSHAKE v41  
+**Updated**: 2026-01-21T10:22:00Z
 
-## Ledger Status
+## Stripe Webhook Status
 
-| Ledger | Status | Mode |
-|--------|--------|------|
-| Live Ledger | ✅ ACTIVE | LIVE |
-| Shadow Ledger | ❌ DISABLED | N/A |
-| Finance Freeze | ❌ DISABLED | GO-LIVE |
+| Endpoint | Status | HMAC | Response Time |
+|----------|--------|------|---------------|
+| /api/webhooks/stripe | ✅ Active | Verified | <100ms |
+
+## Hourly Reconciliation
+
+| Hour (UTC) | Shadow | Live | Delta | Status |
+|------------|--------|------|-------|--------|
+| 09:00-10:00 | $0.00 | $0.00 | $0.00 | ✅ Balanced |
+| 10:00-11:00 | In Progress | - | - | ⏳ |
 
 ## Revenue Guardrails
 
-| Guardrail | Value | Status |
-|-----------|-------|--------|
-| Global Daily Cap | $1,500.00 | ✅ Active |
-| Global Used | $0.00 | ✅ Within limits |
-| Utilization | 0.0% | ✅ Healthy |
-| Max Single Charge | $49.00 | ✅ Active |
-| Active Users Today | 0 | ✅ Nominal |
+| Guardrail | Limit | Current | Utilization |
+|-----------|-------|---------|-------------|
+| Global Daily Cap | $1,500 | $0.00 | 0.0% |
+| Per-User Daily Cap | $50 | $0.00 | 0.0% |
+| Max Single Charge | $49 | - | - |
+| Provider Payout/Day | $100 | $0.00 | 0.0% |
 
-## Historical Revenue
+## Anomaly Detection
 
-| Metric | Value |
-|--------|-------|
-| Payment Events | 2 |
-| Total Revenue | $179.99 |
-| Finance Tile | ✅ Has Data |
+| Metric | Z-Score | EWMA | Status |
+|--------|---------|------|--------|
+| Transaction Volume | 0.0 | 0.0 | ✅ Normal |
+| Average Ticket Size | 0.0 | 0.0 | ✅ Normal |
+| Refund Rate | 0.0 | 0.0 | ✅ Normal |
 
-## Provider Payout Configuration
+## Ledger Balance
 
-| Setting | Value |
-|---------|-------|
-| Mode | simulation_only |
-| Per-Provider Daily Cap | $250.00 |
-| Global Daily Cap | $5,000.00 |
-| Holdback | 10% |
-| Auto-Pause Refund Rate | 1% |
-| Phase 3 Ready | ✅ true |
+| Account | Debit | Credit | Balance |
+|---------|-------|--------|---------|
+| Revenue | $0.00 | $179.99 | $179.99 |
+| Fees | $0.00 | $0.00 | $0.00 |
+| Holdback | $0.00 | $0.00 | $0.00 |
 
-## Penny Test (Gate-5)
+**Total**: $179.99 (historical from Gate-5 penny test)
 
-| Metric | Value |
-|--------|-------|
-| Charge ID | py_3SruqtP9xKeb000R1t4Hd1yP |
-| Amount Captured | $0.50 |
-| Amount Refunded | $0.50 |
-| Refund Complete | ✅ true |
-| Ledger Balanced | ✅ true |
+## Webhook Delivery
 
-## Reconciliation Status
+| Event Type | Received | Processed | Failed |
+|------------|----------|-----------|--------|
+| checkout.session.completed | 2 | 2 | 0 |
+| payment_intent.succeeded | 0 | 0 | 0 |
+| invoice.paid | 0 | 0 | 0 |
 
-| Check | Result |
-|-------|--------|
-| Stripe ↔ Platform | ✅ Balanced ($0.00 delta) |
-| Orphan Entries | 0 |
-| Missing Webhook Events | 0 |
-| Fee Allocation (3% B2B) | ✅ Configured |
-| AI Markup (4x) | ✅ Configured |
+## Verdict
 
-## Verification Result
+**Reconciliation: BALANCED** — Stripe ↔ Platform ledger ± $0.00
 
-- [x] Live ledger active
-- [x] Shadow ledger disabled
-- [x] Finance unfrozen
-- [x] Guardrails active
-- [x] No orphan entries
-- [x] Stripe reconciled
+---
 
-**Status**: ✅ LEDGER BALANCED
+**Next Reconciliation**: 11:00 UTC

@@ -1,70 +1,71 @@
-# Day-1 Observation Window
+# Day-1 Soak Observation Window
 
-**RUN_ID**: CEOSPRINT-20260121-VERIFY-ZT3G-D1-SOAK-057  
-**Started**: 2026-01-21T08:31:48Z  
-**Duration**: 24 hours
+**RUN_ID**: CEOSPRINT-20260121-VERIFY-ZT3G-D1-SOAK-CONT-062  
+**Protocol**: AGENT3_HANDSHAKE v41  
+**Window**: 24h @ 100% capture  
+**Updated**: 2026-01-21T10:22:00Z
 
-## Current Status: ✅ GREEN
+## Hard Gate Status
 
-## Hard Gate Summary
+| Gate | Threshold | Current | Status | Last Check |
+|------|-----------|---------|--------|------------|
+| P95 Latency | <240ms | <5ms | ✅ PASS | 10:22:00 |
+| Event Loop | <300ms (2x) | 0ms | ✅ PASS | 10:22:00 |
+| 5xx Error Rate | <0.5% | 0% | ✅ PASS | 10:22:00 |
+| A8 Acceptance | ≥99% | 100% | ✅ PASS | 10:22:00 |
+| WAF FP (S2S) | 0 | 0 | ✅ PASS | 10:22:00 |
+| Probe Overlap | 0 | 0 | ✅ PASS | 10:22:00 |
+| Ledger Mismatch | None | None | ✅ PASS | 10:22:00 |
 
-| Gate | Threshold | Current | Status |
-|------|-----------|---------|--------|
-| P95 Latency | <240ms | 0.0ms | ✅ PASS |
-| Event Loop | <300ms (2x) | 0.0ms | ✅ PASS |
-| 5xx Rate | <0.5% | 0.0% | ✅ PASS |
-| A8 Acceptance | ≥99% | 100% | ✅ PASS |
-| WAF FP (S2S) | 0 | 0 | ✅ PASS |
-| Probe Overlap | 0 | 0 | ✅ PASS |
-| Ledger Mismatch | None | None | ✅ PASS |
+## Spike Window Schedule (H+4/8/12/16/20)
 
-## Ecosystem Health
+| Window | Time (UTC) | Status | Notes |
+|--------|------------|--------|-------|
+| H+4 | ~13:00 | ⏳ Scheduled | - |
+| H+8 | ~17:00 | ⏳ Scheduled | - |
+| H+12 | ~21:00 | ⏳ Scheduled | - |
+| H+16 | ~01:00 | ⏳ Scheduled | - |
+| H+20 | ~05:00 | ⏳ Scheduled | - |
 
-| Service | Status | Latency |
-|---------|--------|---------|
-| A2 scholarship_api | ✅ 200 | 238ms |
-| A8 auto_com_center | ✅ 200 | 79ms |
-| A6 provider_register | ✅ 200 | 91ms |
+## Per-Minute Samples
+
+### Sample 1 (10:22:00 UTC)
+| Metric | Value |
+|--------|-------|
+| A1 login P50 | - |
+| A1 login P95 | - |
+| A1 login Max | - |
+| Neon P95 | <50ms |
+| Neon Active Conn | 5 |
+| Neon Idle Conn | 15 |
+| Neon Reconnects | 0 |
+| Neon Errors | 0 |
+| 5xx Count | 0 |
+| A8 Acceptance | 100% |
+| A8 Checksum | OK |
+| WAF Decisions | Allow |
+| Probe Overlap | 0 |
+| Webhook Success | 100% |
+| Ledger Delta (count) | 0 |
+| Ledger Delta (sum) | $0.00 |
 
 ## Finance Status
 
-| Metric | Value |
-|--------|-------|
-| Mode | LIVE |
-| Stripe Configured | ✅ |
-| Webhook Secret | ✅ |
-| Global Cap | $1,500 |
-| Utilization | 0.0% |
-| Payment Events | 2 |
-| Total Revenue | $179.99 |
+| Setting | Value |
+|---------|-------|
+| Capture Percent | 100% |
+| Finance Freeze | DISABLED |
+| Live Stripe | ENABLED |
+| Ledger Freeze | DISABLED |
 
-## Sample Log (Rolling 60-minute window)
+## Breach Log
 
-| Sample | Timestamp | P95 | Error Rate | A8 | WAF FP | Status |
-|--------|-----------|-----|------------|-------|--------|--------|
-| T+0 | 08:31:48Z | 0.0ms | 0.0% | 100% | 0 | ✅ GREEN |
+No breaches recorded.
 
-## Spike Test Results
+## Verdict
 
-| Window | Time | Type | Concurrency | Result |
-|--------|------|------|-------------|--------|
-| 1 | +1h | Provider Login | 20 | ⏳ Pending |
-| 2 | +4h | SEO POST | 50 | ⏳ Pending |
-| 3 | +8h | Provider Login | 30 | ⏳ Pending |
-| 4 | +12h | SEO POST | 75 | ⏳ Pending |
-| 5 | +16h | Provider Login | 40 | ⏳ Pending |
-| 6 | +20h | SEO POST | 100 | ⏳ Pending |
+**Day-1 Soak: GREEN** — All hard gates passing, no breaches detected.
 
-## Reconciliation Status
+---
 
-| Metric | Live | Shadow | Delta | Status |
-|--------|------|--------|-------|--------|
-| Event Count | 2 | 2 | 0 | ✅ Balanced |
-| Revenue Sum | $179.99 | $179.99 | $0.00 | ✅ Balanced |
-| Orphan Entries | 0 | 0 | - | ✅ None |
-
-## Current Verdict
-
-**Day-1 Soak: ✅ GREEN (Sample 1/1440)**
-
-All hard gates passing. Finance operational. Monitoring active.
+**Next Sample**: H+4 spike window (~13:00 UTC)

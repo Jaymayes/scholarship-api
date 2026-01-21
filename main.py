@@ -110,6 +110,7 @@ from routers.a3_orchestrator import router as a3_orchestrator_router
 from routers.canary import router as canary_router
 from routers.pilot import router as pilot_router
 from routers.metrics_p95 import router as metrics_p95_router
+from server.v2.onboarding import router as onboarding_v2_router
 from schemas.error_responses import ERROR_RESPONSES
 from utils.logger import setup_logger
 
@@ -826,6 +827,9 @@ app.include_router(monetization_router, tags=["Monetization"])
 # AI Scholarship Playbook: Document Hub & Predictive Matching (Student Experience)
 app.include_router(documents_router, tags=["Document Hub"])
 app.include_router(predictive_matching_router, tags=["Predictive Matching"])
+
+# Onboarding Orchestrator V2: First-Upload Flow with A8 Telemetry
+app.include_router(onboarding_v2_router, tags=["Onboarding V2"])
 
 # AI Scholarship Playbook: B2B Partner Portal endpoints
 app.include_router(b2b_partner_api_router, tags=["B2B Partners API"])

@@ -1,65 +1,67 @@
-# Revenue Anomaly Guardrails Report
+# Revenue Anomaly Guardrails
 
-**RUN_ID**: CEOSPRINT-20260121-VERIFY-ZT3G-D1-SOAK-057  
-**Timestamp**: 2026-01-21T08:32:00Z
-
-## Revenue Caps Configuration
-
-| Cap | Value | Enforcement |
-|-----|-------|-------------|
-| Global Daily | $1,500 | ✅ Active |
-| Per-User Daily | $50 | ✅ Active |
-| Max Single Charge | $49 | ✅ Active |
-| Provider Payout/Day | $250 | ✅ Active (simulation) |
-| AI Markup | 4x | ✅ Active |
-| B2B Fee | 3% | ✅ Active |
+**RUN_ID**: CEOSPRINT-20260121-VERIFY-ZT3G-D1-SOAK-CONT-062  
+**Protocol**: AGENT3_HANDSHAKE v41  
+**Updated**: 2026-01-21T10:22:00Z
 
 ## Anomaly Detection Methods
 
 ### Z-Score Detection
-| Metric | Threshold | Window | Status |
-|--------|-----------|--------|--------|
-| Transaction Amount | Z > 3.0 | 24h rolling | ✅ Configured |
-| Transaction Velocity | Z > 2.5 | 1h rolling | ✅ Configured |
-| Refund Rate | Z > 2.0 | 24h rolling | ✅ Configured |
+- **Window**: Rolling 24h
+- **Threshold**: |Z| > 3.0 triggers alert
+- **Metrics Monitored**:
+  - Transaction count per hour
+  - Average transaction amount
+  - Refund rate
+  - Chargeback rate
 
 ### EWMA (Exponential Weighted Moving Average)
-| Metric | Alpha | Alert Threshold | Status |
-|--------|-------|-----------------|--------|
-| Daily Revenue | 0.3 | ±30% from EWMA | ✅ Configured |
-| Hourly Transaction Count | 0.2 | ±50% from EWMA | ✅ Configured |
+- **Alpha**: 0.3 (recent-weighted)
+- **Alert**: Deviation > 2σ from EWMA
+- **Metrics**:
+  - Revenue velocity
+  - User conversion rate
+  - Provider payout rate
 
-## Alert Escalation
+## Cap Enforcement
 
-| Severity | Condition | Action |
-|----------|-----------|--------|
-| Warning | Z-score 2.0-2.5 | Log + Slack notification |
-| High | Z-score 2.5-3.0 | CFO alert + manual review |
-| Critical | Z-score >3.0 or cap breach | Auto-pause + immediate CFO alert |
+| Cap Type | Limit | Enforcement | Breach Action |
+|----------|-------|-------------|---------------|
+| Global Daily | $1,500 | Hard block | Reject new charges |
+| Per-User Daily | $50 | Soft warn at $40, hard at $50 | Block user charges |
+| Single Transaction | $49 | Pre-validation | Reject transaction |
+| Provider Payout | $100/day | Queue + manual | Hold for review |
+
+## Auto-Actions on Anomaly
+
+| Condition | Action | Notification |
+|-----------|--------|--------------|
+| Z-score > 3.0 | Flag for review | Slack #finance-alerts |
+| Refund rate > 5% | Pause new acquisitions | PagerDuty |
+| Chargeback > 0 | Immediate finance freeze | CEO/CFO direct |
+| Ledger mismatch | Auto-rollback | Full incident |
 
 ## Current Status
 
-| Metric | Current | EWMA | Z-Score | Status |
-|--------|---------|------|---------|--------|
-| Daily Revenue | $0.00 | $179.99 | N/A | ✅ Normal |
-| Transaction Velocity | 0/hr | 0.08/hr | N/A | ✅ Normal |
-| Refund Rate | 0% | 0% | N/A | ✅ Normal |
+| Metric | Value | Z-Score | Status |
+|--------|-------|---------|--------|
+| Transactions/hr | 0 | 0.0 | ✅ Normal |
+| Avg Amount | $0.00 | 0.0 | ✅ Normal |
+| Refund Rate | 0.0% | 0.0 | ✅ Normal |
+| Chargeback Rate | 0.0% | 0.0 | ✅ Normal |
 
-## Shadow Mirror Reconciliation
+## Historical Baseline
 
-| Check | Status |
-|-------|--------|
-| Hourly sync enabled | ✅ Active |
-| Sum reconciliation | ✅ Balanced |
-| Orphan detection | ✅ None found |
-| CFO anomaly alerts | ✅ Configured |
+From Gate-5/Gate-6 data:
+- Total Revenue: $179.99
+- Transactions: 2
+- Avg Transaction: $89.995
+- Refunds: 0
 
-## Audit Log Status
+## Verdict
 
-| Log Type | Entries Today | Status |
-|----------|---------------|--------|
-| Cap enforcement | 0 | ✅ No breaches |
-| Anomaly alerts | 0 | ✅ No anomalies |
-| Manual reviews | 0 | ✅ None required |
+**Anomaly Detection: GREEN** — No anomalies detected, all caps enforced.
 
-**Status**: ✅ GUARDRAILS ACTIVE
+---
+
+**Next Check**: Continuous (per-transaction)
