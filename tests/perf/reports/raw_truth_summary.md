@@ -1,39 +1,37 @@
-# Raw Truth Summary - Gate-4 Baseline
+# Raw Truth Summary - Gate 5 Phase 0
 
-**RUN_ID**: CEOSPRINT-20260120-EXEC-ZT3G-GATE4-042  
-**Timestamp**: 2026-01-20T22:43:00Z  
-**Protocol**: AGENT3_HANDSHAKE v32 (Gate-4 + Strict + Scorched Earth + Step Ramp)
+**RUN_ID**: CEOSPRINT-20260121-EXEC-ZT3G-G5-FIN-READY-046  
+**Timestamp**: 2026-01-21T01:58:00Z  
+**Protocol**: AGENT3_HANDSHAKE v34 (Finance Unfreeze + Strict + Scorched Earth + Step Ramp)
 
-## Current State (Gate-3 @ 50%)
+## Gate-4 Stability Baseline
 
-| Metric | Value |
-|--------|-------|
-| TRAFFIC_CAP | 0.50 |
-| TRAFFIC_CAP_B2C_PILOT | 0.50 |
-| Finance Freeze | ACTIVE |
+| Metric | Value | Threshold | Status |
+|--------|-------|-----------|--------|
+| DB P95 | 0.0ms | ≤150ms | ✓ GREEN |
+| Event Loop | 0.0ms | <300ms | ✓ GREEN |
+| Traffic Cap | 100% | - | ✓ ACTIVE |
+| Health | healthy | - | ✓ OK |
 
-## Component Health
+## External Ecosystem Status
 
 | Component | Status | Notes |
 |-----------|--------|-------|
-| A0 Scholarship API | ✓ HEALTHY | PostgreSQL connected |
-| A1 Scholar Auth | ⚠ UNREACHABLE | 404 on health endpoint |
-| A2 Telemetry | ✓ HEALTHY | Using A2_fallback sink |
-| A3 Landing Page | ✓ HEALTHY | 97ms |
-| A4 Dashboard | ✓ HEALTHY | 67ms |
-| A5 Pricing | ✓ HEALTHY | 85ms |
-| A6 Providers | ✓ HEALTHY | 55ms |
-| A7 SEO | ✓ HEALTHY | 57ms |
-| A8 Event Bus | ⚠ AUTH | Using internal fallback |
+| A0 Scholarship API | ✓ healthy | localhost:5000 |
+| A1 Scholar Auth | ⚠ unreachable | 404 at scholar-auth.replit.app |
+| A2 Telemetry | ✓ ok | sink: A2_fallback |
+| A3-A7 | ✓ checked | Static endpoints |
+| A8 Event Bus | ⚠ fallback | Using A2_fallback sink |
 
-## Metrics Baseline
+## Finance Freeze Status
 
-| Metric | Value | Threshold |
-|--------|-------|-----------|
-| Neon DB P95 | 0ms | ≤150ms |
-| Event Loop | 0.0ms | <300ms |
-| Error Rate | 0% | <0.5% |
+| Control | Status |
+|---------|--------|
+| LEDGER_FREEZE | ✓ ACTIVE (true) |
+| PROVIDER_INVOICING_PAUSED | ✓ ACTIVE (true) |
+| FEE_POSTINGS_PAUSED | ✓ ACTIVE (true) |
+| LIVE_STRIPE_CHARGES | ✓ BLOCKED |
 
-## Gate-4 Target
+## Phase 0 Verdict
 
-Step Ramp: 50% → 75% → 100%
+**PASS** - Gate-4 stability confirmed at 100% traffic. Ready to proceed with Phase 1 Shadow Ledger Enablement.

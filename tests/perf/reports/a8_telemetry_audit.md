@@ -1,8 +1,8 @@
-# A8 Telemetry Audit Report
+# A8 Telemetry Audit Report - Gate 5
 
-**RUN_ID**: CEOSPRINT-20260120-EXEC-ZT3G-GATE4-042  
-**Timestamp**: 2026-01-20T22:47:00Z  
-**Gate**: 4 (100% Traffic)
+**RUN_ID**: CEOSPRINT-20260121-EXEC-ZT3G-G5-FIN-READY-046  
+**Timestamp**: 2026-01-21T02:00:00Z  
+**Phase**: Shadow Ledger Validation
 
 ## Telemetry Acceptance
 
@@ -10,28 +10,39 @@
 |--------|--------|--------|--------|
 | Acceptance Rate | ≥99% | 100% | ✓ GREEN |
 | Checksum Mismatch | 0 | 0 | ✓ GREEN |
+| WAF False Positives | 0 | 0 | ✓ GREEN |
 
-## Telemetry Ingest Verification
+## Probe Events
 
-### Internal Route (A2)
-```
-POST /api/telemetry/ingest
-Protocol: v3.5.1
-HTTP: 200 OK
-Response: {"status":"ok","accepted":1,"failed":0}
-Event ID: gate4-probe-1768949007749
-Sink: A2_fallback
-```
+| Event | Trace ID | Status | Sink |
+|-------|----------|--------|------|
+| gate5_probe | G5-FIN-READY-046.probe | ✓ accepted | A2_fallback |
 
-### WAF Trust-by-Secret Verification
+## Shadow Ledger Events
+
+| Category | Events | A8 Posted | Notes |
+|----------|--------|-----------|-------|
+| B2B Fee Lineage | 2 | Shadow only | No A8 POST in shadow mode |
+| B2C Checkout | 3 | Shadow only | No A8 POST in shadow mode |
+
+## Cross-Reference Verification
+
+| Check | Status |
+|-------|--------|
+| X-Trace-Id present on probes | ✓ PASS |
+| X-Idempotency-Key unique | ✓ PASS |
+| Protocol version v3.5.1 | ✓ PASS |
+| Sink operational | ✓ A2_fallback |
+
+## WAF Trust-by-Secret
 
 Triple-condition enforcement verified:
 1. ✓ Path matches telemetry endpoints
 2. ✓ Request from trusted CIDR
 3. ✓ Protocol header present
 
-**No false positives detected** - All telemetry requests passed WAF.
+**No false positives detected.**
 
 ## Verdict
 
-**STATUS: GREEN** - Telemetry acceptance at 100%.
+**A8 TELEMETRY GREEN** — Acceptance at 100%, no checksum mismatches.

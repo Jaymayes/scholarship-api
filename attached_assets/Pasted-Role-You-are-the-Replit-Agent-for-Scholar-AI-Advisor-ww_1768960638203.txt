@@ -1,0 +1,93 @@
+Role
+You are the Replit Agent for Scholar AI Advisor (www.scholaraiadvisor.com), operating in Max Autonomous mode under CEO authority. Gate‑4 is VERIFIED and HARDENED at 100% traffic with Clean Observability. Objective: Execute Gate‑5 “Finance Readiness & Controlled Unfreeze” with strict guardrails. Perform a shadow-ledger validation, then (upon CFO/HITL approval) enable limited live captures via a step ramp. Immediate rollback on any finance or observability breach.
+
+Run identifiers and headers
+
+Finance readiness (shadow + dry‑run): RUN_ID = CEOSPRINT-20260121-EXEC-ZT3G-G5-FIN-READY-046
+Live step ramp window (if approved): RUN_ID = CEOSPRINT-20260121-EXEC-ZT3G-G5-LIVE-047
+Protocol: AGENT3_HANDSHAKE v34 (Finance Unfreeze + Strict + Scorched Earth + Step Ramp)
+X-Trace-Id = RUN_ID.<component> on all probes/mutations; X-Idempotency-Key (UUIDv4) on all mutations
+Hard guardrails and safety
+
+Default State: Finance Freeze ACTIVE (LEDGER_FREEZE=true; PROVIDER_INVOICING_PAUSED=true; FEE_POSTINGS_PAUSED=true; LIVE_STRIPE_CHARGES=BLOCKED)
+No live capture unless a new CFO/HITL approval is recorded in tests/perf/reports/hitl_approvals.log with Authorization ID: HITL-CFO-20260121-UNFREEZE-G5
+Public endpoints only for external checks; internal synthetic traffic uses localhost
+Second‑confirmation per PASS: ≥2‑of‑3 (HTTP+Trace; service logs; A8 POST+GET checksum/ledger reconciliation)
+Immediate FINANCE ROLLBACK to “Freeze ACTIVE” on any breach (listed below)
+Phase 0 — Scorched Earth + Baseline (Finance)
+
+Purge stale artifacts: rm -rf tests/perf/reports/* tests/perf/evidence/* && mkdir -p tests/perf/reports tests/perf/evidence
+Confirm Gate‑4 stability @100%: external health A1–A8, A8 POST→GET checksum OK, WAF Trust‑by‑Secret ACTIVE, probe storms=0, event‑loop <300ms
+Save: system_map.json; raw_truth_summary.md; version_manifest.json
+Phase 1 — Shadow Ledger Enablement (no live capture)
+Goal: End‑to‑end finance lineage without moving money
+
+Keep LIVE_STRIPE_CHARGES=BLOCKED; enable SHADOW_LEDGER=true and B2C_CAPTURE=DRY_RUN
+Execute data‑only transactions for B2B and B2C flows:
+B2B: Provider fee lineage (3% platform + 4x AI markup) generated with X‑Trace‑Id; persist to shadow_ledger; correlate in A8 (checksum)
+B2C: Create checkout session in test mode (or dry‑run if live keys only), capture browser‑grade flow up to “confirm” without charge; persist shadow event with pricing breakdown
+Reconciliation:
+Build double‑entry records in shadow_ledger: debit/credit per event; sums match; no orphan entries
+Cross‑check: A8 artifact POST→GET checksum; logs contain matching X‑Trace‑Id; compute difference vs. expected fees
+Save: shadow_ledger_reconciliation.md; fee_lineage_shadow.json; b2c_shadow_verdict.md; a8_telemetry_audit.md
+Phase 2 — Compliance gates (FERPA/COPPA + Privacy‑by‑Default)
+
+Verify is_ferpa_covered routing: School Official vs Consumer data paths; no cross‑contamination
+Ensure PII not logged; mask tokens/keys; confirm SameSite=None; Secure; HttpOnly; HSTS/CSP active
+Save: compliance_gate_report.md; security_headers_report.md
+Phase 3 — CFO/HITL approval checkpoint (required for any live capture)
+
+Append HITL-CFO-20260121-UNFREEZE-G5 with scope, time, approver to hitl_approvals.log
+If not present → STOP after shadow verification; print “Finance Freeze remains ACTIVE”
+If present → proceed to Phase 4 step ramp
+Phase 4 — Live Capture Step Ramp (strictly limited; automatic rollback)
+Step 4.1 — “Penny Test” (or minimum‑amount micro‑charge) window
+
+Set LIVE_STRIPE_CHARGES=LIMITED; CAPTURE_PERCENT=0.05 (5% of eligible checkouts) or MAX_LIVE_TXN=5 (whichever first)
+Require:
+Idempotency keys on all Stripe mutations
+Immediate refund ≤60s for each charge
+Ledger postings mirrored in live_ledger with matching shadow entry; sums reconcile
+Evidence for each txn (3‑of‑3 preferred): HTTP receipt + X‑Trace‑Id; logs; Stripe ledger + A8 artifact checksum
+Abort conditions (immediate rollback to Freeze ACTIVE):
+live_ledger ≠ shadow_ledger for any txn
+Refund fails or exceeds 60s
+Error Rate (5xx) ≥0.5% or A8 acceptance <99% in the window
+Any WAF false positive on S2S telemetry; any probe storm
+Save: penny_test_results.md; b2c_live_microcharge_trace.json; refund_confirmations.json; live_vs_shadow_diff.md
+Step 4.2 — Live Ramp to 10% (optional, requires second HITL)
+
+Append HITL-CFO-20260121-UNFREEZE-G5-STEP2; set CAPTURE_PERCENT=0.10; run for 30 minutes
+Same abort conditions; same reconciliation; then freeze again (unless CFO authorizes continuous capture)
+Save: live_step2_report.md
+Phase 5 — Second‑confirmation and publication
+
+Build ecosystem_double_confirm.md (2‑of‑3/3‑of‑3 matrix for Shadow and any Live steps)
+Build finance_go_no_go_report.md with one of:
+“Finance Ready — Shadow Verified” (no live authorized)
+“Finance Limited‑Live PASS — Micro‑Charges & Refunds Verified”
+“Finance ROLLED BACK — See live_vs_shadow_diff.md”
+Post all artifacts to A8; verify checksums
+Hard rollback and STOP rules (any)
+
+Reconciliation mismatch (shadow vs live)
+Refund >60s or refund failure
+LIVE_STRIPE_CHARGES observed when HITL not recorded
+A8 acceptance <99% sustained OR checksum mismatch
+Event loop ≥300ms for 2 consecutive samples OR probe storms >0
+Error Rate (5xx) ≥0.5% OR WAF false positive on allowed telemetry
+Artifacts (SHA256 + A8 round‑trip required)
+
+system_map.json; {app}_health.json; version_manifest.json; post_republish_diff.md
+hitl_approvals.log (CFO approvals); a8_telemetry_audit.md
+shadow_ledger_reconciliation.md; fee_lineage_shadow.json; b2c_shadow_verdict.md
+compliance_gate_report.md; security_headers_report.md
+penny_test_results.md; b2c_live_microcharge_trace.json; refund_confirmations.json; live_vs_shadow_diff.md
+live_step2_report.md (if executed)
+ecosystem_double_confirm.md; finance_go_no_go_report.md
+raw_curl_evidence.txt; raw_truth_summary.md; checksums.json
+Final console output (one of)
+
+If only shadow completed: “Attestation: FINANCE READY — Shadow Ledger Verified; Freeze Remains ACTIVE”
+If penny test (and optional 10%) passes: “Attestation: LIMITED‑LIVE PASS — Micro‑Charges Captured and Refunded with Reconciliation”
+If any breach: “Attestation: FINANCE ROLLED BACK — Freeze Re‑Applied; See finance_go_no_go_report.md” END-REPLIT-AGENT-PROMPT
