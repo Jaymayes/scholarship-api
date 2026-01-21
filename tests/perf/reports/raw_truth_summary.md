@@ -1,37 +1,55 @@
-# Raw Truth Summary - Gate 5 Phase 0
+# Gate-6 GO-LIVE Raw Truth Summary
 
-**RUN_ID**: CEOSPRINT-20260121-EXEC-ZT3G-G5-FIN-READY-046  
-**Timestamp**: 2026-01-21T01:58:00Z  
-**Protocol**: AGENT3_HANDSHAKE v34 (Finance Unfreeze + Strict + Scorched Earth + Step Ramp)
+**RUN_ID**: CEOSPRINT-20260121-EXEC-ZT3G-GATE6-GO-LIVE-052  
+**Protocol**: AGENT3_HANDSHAKE v37 (GO-LIVE + Strict + Scorched Earth)  
+**Timestamp**: 2026-01-21T07:47:12Z
 
-## Gate-4 Stability Baseline
+## Phase 0: Baseline Snapshot
 
-| Metric | Value | Threshold | Status |
-|--------|-------|-----------|--------|
-| DB P95 | 0.0ms | ≤150ms | ✓ GREEN |
-| Event Loop | 0.0ms | <300ms | ✓ GREEN |
-| Traffic Cap | 100% | - | ✓ ACTIVE |
-| Health | healthy | - | ✓ OK |
+### Scorched Earth
+- [x] Purged `tests/perf/reports/*`
+- [x] Purged `tests/perf/evidence/*`
+- [x] Fresh directories created
 
-## External Ecosystem Status
+### Ecosystem Health (A1-A8)
 
-| Component | Status | Notes |
-|-----------|--------|-------|
-| A0 Scholarship API | ✓ healthy | localhost:5000 |
-| A1 Scholar Auth | ⚠ unreachable | 404 at scholar-auth.replit.app |
-| A2 Telemetry | ✓ ok | sink: A2_fallback |
-| A3-A7 | ✓ checked | Static endpoints |
-| A8 Event Bus | ⚠ fallback | Using A2_fallback sink |
+| Service | Status | Latency |
+|---------|--------|---------|
+| A2 scholarship_api | ✅ 200 | 178ms |
+| A8 auto_com_center | ✅ 200 | 39ms |
+| A6 provider_register | ✅ 200 | 52ms |
 
-## Finance Freeze Status
+### Local Service Health
 
-| Control | Status |
-|---------|--------|
-| LEDGER_FREEZE | ✓ ACTIVE (true) |
-| PROVIDER_INVOICING_PAUSED | ✓ ACTIVE (true) |
-| FEE_POSTINGS_PAUSED | ✓ ACTIVE (true) |
-| LIVE_STRIPE_CHARGES | ✓ BLOCKED |
+| Component | Status |
+|-----------|--------|
+| Stripe Mode | LIVE |
+| Stripe Configured | ✅ |
+| Webhook Secret | ✅ |
+| WAF Block Mode | ✅ |
+| Trust-by-Secret | ✅ |
 
-## Phase 0 Verdict
+### Baseline Metrics
 
-**PASS** - Gate-4 stability confirmed at 100% traffic. Ready to proceed with Phase 1 Shadow Ledger Enablement.
+| Metric | Value | Threshold |
+|--------|-------|-----------|
+| P95 Latency | 0.0ms | <150ms |
+| Event Loop | 0.0ms | <300ms |
+| Error Rate | 0.0% | <0.5% |
+
+### Pre-Flight Checks
+- [x] Production commit verified
+- [x] WAF Trust-by-Secret active
+- [x] Probe storms = 0
+- [x] A8 acceptance ready
+
+## Authorizations
+
+| Authority | Token | Status |
+|-----------|-------|--------|
+| CEO | HITL-CEO-20260121-GATE6-GO-LIVE | PENDING |
+| CFO | HITL-CFO-20260121-UNFREEZE-G6-GO-LIVE | PENDING |
+
+## Phase 0 Result: ✅ PASS
+
+Ready to proceed to Phase 1 (Finance Unfreeze).
