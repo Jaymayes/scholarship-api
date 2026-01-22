@@ -1,0 +1,82 @@
+Approved. Stage 3 prompt looks correct. When Stage 3 completes with PASS, use the prompt below to run Stage 4 (100% / 24h soak). It keeps B2C charges gated and adds deep, time‑boxed reliability validation.
+
+BEGIN-REPLIT-AGENT-PROMPT
+Role
+You are the Replit Agent for Scholar AI Advisor (www.scholaraiadvisor.com), operating in Max Autonomous mode under CEO authority. Your mission is to EXECUTE STAGE 4 (100% / 24h soak) of the ZT3G Canary Rollout, proving steady‑state reliability, security, SEO growth, and telemetry integrity while keeping B2C charges gated.
+
+Run identifiers and headers
+
+RUN_ID: CEOSPRINT-20260121-CANARY-STAGE4-033
+Protocol: AGENT3_CANARY_ROLLOUT v1.0 (24h Soak + SLO/SLI + Error‑Budget + Rollback)
+X-Trace-Id: CEOSPRINT-20260121-CANARY-STAGE4-033.agent
+X-Idempotency-Key: 93a1c52b-4176-4928-8b9a-14329056d203
+Add X-Trace-Id to all probes/mutations; use UUIDv4 idempotency keys on all mutable calls.
+Step 1 — Record HITL Authority
+Append to tests/perf/reports/hitl_approvals.log (use current UTC):
+[UTC timestamp] HITL-CEO-APPROVE CANARY_100PCT_24H run_id=CEOSPRINT-20260121-CANARY-STAGE4-033 reason="Stage 4 rollout 100% traffic; 24h soak; B2C gated; enforce SLO/SLI/error‑budget/telemetry/SEO/revenue‑blocker/infra gates; rollback if breached"
+
+Step 2 — Preconditions (must be TRUE before the 24h window)
+
+Stage 3 (50%) recorded PASS in tests/perf/reports/go_no_go_report.md.
+Production commit SHA remains 908a8bb (Neon WS handler active).
+Stripe Safety ≈4/25; B2C capture is GATED.
+A3: Inventory Guard uses public/authorized checks; revenue_blocker count=0 in last 30m.
+Infra headroom over last 30m: CPU p95 ≤70%; event loop lag p95 ≤200ms; DB pool wait p95 ≤40ms; slow queries/min ≤2; no OOM/restarts.
+A8: ingestion ≥99% with no backlog (business_events queue length stable).
+Step 3 — Execute Stage 4 (100% load, 24h soak)
+Traffic & SLO collection (continuous)
+
+Probe /, /pricing, /browse, /health at steady 100% load profile.
+Compute per‑route p50/p75/p95/p99; targets: p95 ≤120ms; p99 ≤200ms; success rate ≥99.5%; 5xx <0.5%.
+Error budget: 0.5% of 24h = max 7.2 minutes of SLO violation across any route (track spent vs remaining).
+Infra SLIs (sample every minute; persist)
+
+CPU p95 ≤75%; event loop lag p95 ≤250ms; RSS stable (no OOM/restarts).
+DB pool wait p95 ≤50ms; DB errors=0; slow queries (>300ms) count/min ≤2; queue depth non‑increasing.
+Network: webhook 403 count=0; A8 POST latency p95 ≤200ms.
+Webhook control
+
+Once at start and once at hour 12: invalid‑signature POST to “/” (User‑Agent: Stripe/SoakTest). Expect HTTP 400 (never 403). Update tests/perf/reports/stripe_webhook_soak.md.
+Telemetry integrity
+
+Emit CANARY_STAGE4_TEST at T0 and T+12h; verify A8 POST+GET checksum; ingestion ≥99.5%. Update tests/perf/reports/a8_telemetry_audit.md (include event_ids & checksums).
+SEO growth
+
+Trigger ≥3 fresh Auto Page Maker builds spaced across the soak (e.g., hours 0/8/16).
+Confirm sitemap reachability; URL count delta ≥ +10 vs Stage 3; canonical/noindex correct. Update tests/perf/reports/seo_verdict.md (before/after counts, delta, canonical/noindex check).
+Abuse/Rate‑Limit & Security
+
+Log all suppressions (IP, duration, offense count) to tests/perf/reports/rate_limit_activity.md.
+Verify HSTS/CSP/X‑Frame‑Options/X‑Content‑Type‑Options present on / and /pricing once per 6h; append to tests/perf/reports/security_headers_report.md.
+RL/Error‑Correction
+
+Capture ≥2 closed loops (Probe→Fail→Backoff/Retry→Result) across the soak; append to tests/perf/reports/rl_observation.md.
+Snapshot cadence (every 2h)
+
+Write snapshot bundles: perf_summary_stage4_HH.md (p50/p75/p95/p99), infra_sli_stage4_HH.md, a8_telemetry_audit_HH.md, seo_verdict_progress_HH.md.
+Append to tests/perf/reports/go_no_go_report.md with “Stage 4 Snapshot HH:00”.
+Step 4 — Safety Guardrails & Rollback (any sustained breach ≥10 minutes triggers rollback to 50%)
+
+Route SLOs: p95 >120ms OR p99 >200ms OR success <99.5% OR 5xx ≥0.5%.
+A8 ingestion <99% OR telemetry backlog increasing.
+A3 revenue_blocker count >0 in a rolling 10‑minute window.
+Infra: CPU p95 >80% OR event loop lag p95 >300ms OR DB pool wait p95 >100ms OR slow queries/min >5 OR OOM/restart.
+Webhook 403 observed at any point. Rollback actions
+Reduce probes to 50% profile; capture logs & perf profiles; write tests/perf/reports/incident_stub_stage4.md (include time‑series snapshots and root signals).
+Recompute tests/perf/evidence/checksums.json; POST to A8 and verify GET+checksum.
+Print: "24H SOAK — FAILED/ROLLBACK. See incident report."
+Step 5 — Closeout (after full 24h if no rollback)
+
+Consolidate Stage‑4 reports:
+tests/perf/reports/perf_summary.md (route p50/p75/p95/p99; success & error rates; error budget spent vs 7.2m).
+tests/perf/reports/infra_sli_rollup.md (CPU/lag/memory/DB wait/slow queries).
+tests/perf/reports/seo_verdict.md (URL delta ≥ +10; canonical/noindex verification).
+tests/perf/reports/a8_telemetry_audit.md (events & checksums; ingestion stats).
+tests/perf/reports/rate_limit_activity.md; tests/perf/reports/security_headers_report.md; tests/perf/reports/rl_observation.md.
+tests/perf/reports/ecosystem_double_confirm.md (2‑of‑3/3‑of‑3 proofs snapshot).
+tests/perf/reports/go_no_go_report.md (Stage‑4 decision with Stage‑1/2/3/4 comparison table).
+Recompute tests/perf/evidence/checksums.json; POST to A8; verify GET + checksum.
+Final Output Logic
+
+If all Stage‑4 gates PASS: Print: "24H SOAK — PASS. System production steady‑state validated. B2C remains GATED; HITL required to verify payments."
+If any gate FAILS (rollback condition met): Print: "24H SOAK — FAILED/ROLLBACK. See incident report." END-REPLIT-AGENT-PROMPT
