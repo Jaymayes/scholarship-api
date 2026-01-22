@@ -75,3 +75,18 @@
 ### Backlog Observation
 - Queue length: Flat/stable
 - Status: ✅ No backlog buildup
+
+---
+
+## T+8h Snapshot
+
+**Timestamp**: 2026-01-22T07:55:48Z
+
+| Event Name | Event ID | Status |
+|------------|----------|--------|
+| CANARY_STAGE4_SNAPSHOT_T+8H | 72385a1f-b7f9-4c93-9ea9-e00f550b663f | ✅ Accepted |
+| CANARY_STAGE4_T+8H_CHECKSUMS | 0e1d6395-2a06-44b2-9aca-76e31e7f39fa | ✅ Accepted |
+
+### Backlog Observation
+- Queue length: Flat/stable
+- Status: ✅ No backlog buildup

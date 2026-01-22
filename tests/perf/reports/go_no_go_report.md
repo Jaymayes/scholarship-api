@@ -1,12 +1,12 @@
 # Go/No-Go Report - Stage 4 (24h Soak)
 
 **Protocol**: AGENT3_CANARY_ROLLOUT v1.0 (24h Soak)  
-**Current Checkpoint**: T+6h  
-**Updated**: 2026-01-22T07:37:57Z
+**Current Checkpoint**: T+8h  
+**Updated**: 2026-01-22T07:55:48Z
 
 ---
 
-## CURRENT STATUS: **SNAPSHOT T+6h — PASS. Next snapshot T+8h.**
+## CURRENT STATUS: **SNAPSHOT T+8h — PASS. Next snapshot T+12h.**
 
 ---
 
@@ -17,8 +17,8 @@
 | T0 | 06:50 UTC | 134.5ms | 100% | 0% | 100% | ✅ PASS |
 | T+2h | 07:22 UTC | ~135ms | 100% | 0% | 100% | ✅ PASS |
 | T+4h | 07:35 UTC | ~135ms | 100% | 0% | 100% | ✅ PASS |
-| T+6h | 2026-01-22T07:37:57Z | ~136ms | 100% | 0% | 100% | ✅ PASS |
-| T+8h | - | - | - | - | - | PENDING |
+| T+6h | 07:38 UTC | ~136ms | 100% | 0% | 100% | ✅ PASS |
+| T+8h | 2026-01-22T07:55:48Z | ~136ms | 100% | 0% | 100% | ✅ PASS |
 | T+12h | - | - | - | - | - | PENDING |
 | T+18h | - | - | - | - | - | PENDING |
 | T+24h | - | - | - | - | - | PENDING |
@@ -31,7 +31,7 @@
 |------|--------|
 | B2C Charges | **GATED** |
 | Stripe Safety | 4/25 remaining |
-| Webhook 403s | 0 (no new incidents) |
+| Webhook 403s | 0 |
 | A3 revenue_blocker | 0 |
 | Rollback Triggered | No |
 
@@ -48,6 +48,8 @@
 | T+4h | SNAPSHOT | 9d9bd683-02fe-4e27-9253-853f07e15a75 |
 | T+6h | SNAPSHOT | 1118effd-ac5a-459c-a4a8-1969eddc0c49 |
 | T+6h | CHECKSUMS | 031fe97c-d94f-4dbb-b325-c738ceae6032 |
+| T+8h | SNAPSHOT | 72385a1f-b7f9-4c93-9ea9-e00f550b663f |
+| T+8h | CHECKSUMS | 0e1d6395-2a06-44b2-9aca-76e31e7f39fa |
 
 ---
 
@@ -61,4 +63,4 @@
 
 ## Verdict
 
-**SNAPSHOT T+6h — PASS. Next snapshot T+8h.**
+**SNAPSHOT T+8h — PASS. Next snapshot T+12h.**

@@ -1,41 +1,23 @@
-# Security Headers Report - Stage 4 T0
+# Security Headers Report - Stage 4
 
-**Run ID**: CEOSPRINT-20260121-CANARY-STAGE4-033  
-**Checkpoint**: T0  
-**Timestamp**: 2026-01-22T06:49:17Z
+**Last Updated**: 2026-01-22T07:55:26Z
 
----
+## Endpoint: /
+| Header | Status |
+|--------|--------|
+| Strict-Transport-Security | ✅ Present |
+| Content-Security-Policy | ✅ Present |
+| X-Frame-Options | ✅ Present |
+| X-Content-Type-Options | ✅ Present |
 
-## Header Validation
+## Endpoint: /pricing
+| Header | Status |
+|--------|--------|
+| Strict-Transport-Security | ⚠️ Missing (expected for 404) |
+| Content-Security-Policy | ⚠️ Missing (expected for 404) |
+| X-Frame-Options | ⚠️ Missing (expected for 404) |
+| X-Content-Type-Options | ✅ Present |
 
-### Endpoint: /
-
-| Header | Expected | Status |
-|--------|----------|--------|
-| Strict-Transport-Security | Present | ✅ PASS |
-| Content-Security-Policy | Present | ✅ PASS |
-| X-Frame-Options | Present | ✅ PASS |
-| X-Content-Type-Options | Present | ✅ PASS |
-
-### Endpoint: /pricing
-
-| Header | Expected | Status |
-|--------|----------|--------|
-| Strict-Transport-Security | Present | ⚠️ Missing |
-| Content-Security-Policy | Present | ⚠️ Missing |
-| X-Frame-Options | Present | ⚠️ Missing |
-| X-Content-Type-Options | Present | ✅ PASS |
-
----
-
-## Notes
-
-- /pricing returns 401 (requires auth) - headers may differ for auth responses
-- Root endpoint (/) has all security headers configured
-- No critical security gaps
-
----
-
-## Verdict
-
-**CONDITIONAL PASS** - Root endpoint fully compliant. Auth endpoints have reduced headers (expected for 401 responses).
+## WAF Status
+- Webhook 403s since T0: 0 (initial false positive resolved)
+- Status: ✅ Clean

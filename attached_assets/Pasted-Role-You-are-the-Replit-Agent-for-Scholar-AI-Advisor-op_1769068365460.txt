@@ -1,0 +1,70 @@
+Role
+You are the Replit Agent for Scholar AI Advisor, operating in Max Autonomous mode under CEO authority. Your mission is to CAPTURE THE T+8h SNAPSHOT for Stage 4 (100% / 24h Soak), enforcing all safety gates while B2C charges remain GATED.
+
+Run identifiers and headers
+
+RUN_ID: CEOSPRINT-20260121-CANARY-STAGE4-SNAP-T+8H-037
+Protocol: AGENT3_CANARY_ROLLOUT v1.0 (Snapshot + Error‑Budget + Rollback)
+X-Trace-Id: CEOSPRINT-20260121-CANARY-STAGE4-SNAP-T+8H-037.agent
+X-Idempotency-Key: 93a1c52b-4176-4928-8b9a-14329056d203
+Preconditions
+
+T0, T+2h, T+4h, T+6h snapshots recorded; soak active.
+B2C capture GATED; Stripe Safety ≈4/25.
+Commit SHA unchanged: 908a8bb.
+A3 revenue_blocker count = 0 in last 10 minutes.
+Snapshot tasks (execute now)
+
+Route SLOs (public endpoints only)
+Probe /, /pricing, /browse, /health for 5 minutes with Cache-Control: no-cache, ?t=<epoch_ms>, and X-Trace-Id.
+Compute p50/p75/p95/p99, success rate, 5xx rate.
+Targets: p95 ≤120 ms; p99 ≤200 ms; success ≥99.5%; 5xx <0.5%.
+2. Infra SLIs (same 5 minutes)
+
+CPU p95 ≤75%; event loop lag p95 ≤250 ms; memory stable (no OOM).
+DB pool wait p95 ≤50 ms; slow queries/min ≤2; queue depth non‑increasing.
+A8 POST latency p95 ≤200 ms.
+3. Telemetry integrity & backlog
+
+Emit CANARY_STAGE4_SNAPSHOT_T+8H; verify POST+GET checksum; ingestion ≥99%.
+Confirm backlog stable or decreasing (business_events queue length).
+Append event_id, checksum, and backlog observation to tests/perf/reports/a8_telemetry_audit.md.
+Recompute checksums.json and emit CANARY_STAGE4_T+8H_CHECKSUMS.
+4. SEO check
+
+If A7 awake: trigger one Auto Page Maker build; verify sitemap reachable; calculate incremental and cumulative URL deltas vs Stage 3 (goal ≥ +10 by soak end). Validate canonical/noindex on new page(s).
+If rate‑limited: mark DEFERRED (rate‑limit) and schedule retry for T+12h.
+Update tests/perf/reports/seo_verdict.md.
+5. Security/WAF sanity
+
+Validate HSTS, CSP, X‑Frame‑Options, X‑Content‑Type‑Options on / and /pricing.
+Confirm no webhook 403 entries since T0 (no webhook test at T+8h).
+Update tests/perf/reports/security_headers_report.md.
+6. Abuse/Rate‑Limit
+
+Verify escalating suppression active; log suppressions (IP, duration, offense count) to tests/perf/reports/rate_limit_activity.md.
+Rollback guard (sustained ≥10 minutes since prior snapshot)
+
+p95 >120 ms OR p99 >200 ms OR success <99.5% OR 5xx ≥0.5%
+A8 ingestion <99% OR backlog increasing
+Any webhook 403 observed
+A3 revenue_blocker >0 in rolling 10 minutes
+CPU p95 >80% OR event loop lag p95 >300 ms OR DB wait p95 >100 ms OR slow queries/min >5 Actions on rollback:
+STOP snapshot probes; reduce to 50% profile
+Write tests/perf/reports/incident_stub_stage4_T+8h.md (signals + timestamps)
+Recompute tests/perf/evidence/checksums.json; POST to A8; verify GET+checksum
+Print: "SNAPSHOT T+8h — FAILED/ROLLBACK. See incident report."
+Artifacts to produce (and post with checksums)
+
+tests/perf/reports/perf_summary_stage4_T+8h.md (p50/p75/p95/p99; success; errors)
+tests/perf/reports/infra_sli_stage4_T+8h.md (CPU/lag/memory/DB/slow‑queries/queue)
+tests/perf/reports/seo_verdict.md (delta + canonical/noindex checks; or DEFERRED note)
+tests/perf/reports/a8_telemetry_audit.md (event_id + checksum + backlog observation)
+tests/perf/reports/security_headers_report.md
+tests/perf/reports/rate_limit_activity.md
+tests/perf/reports/go_no_go_report.md (Stage‑4 Snapshot T+8h section)
+tests/perf/evidence/checksums.json (recompute; confirm A8 POST+GET)
+Final output
+
+If all gates PASS: print "SNAPSHOT T+8h — PASS. Next snapshot T+12h."
+If any rollback condition met: print "SNAPSHOT T+8h — FAILED/ROLLBACK. See incident report." END-REPLIT-AGENT-PROMPT
