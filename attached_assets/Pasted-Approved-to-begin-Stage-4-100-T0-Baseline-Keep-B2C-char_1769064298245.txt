@@ -1,0 +1,39 @@
+Approved to begin Stage 4 (100%) — T0 Baseline. Keep B2C charges gated. Your prompt is correct and ready to run as-is. Add the two minor tightenings below before execution:
+
+Event naming for traceability: Use these exact event types in A8
+CANARY_STAGE4_T0_BASELINE (at start)
+CANARY_STAGE4_T0_WEBHOOK (invalid signature result)
+CANARY_STAGE4_T0_SEO (page build + sitemap delta)
+Revenue‑blocker guard: During T0, fail fast if A3 emits any revenue_blocker events (rolling window ≥5 minutes)
+Execution checklist (quick)
+
+HITL: Append to hitl_approvals.log using the UTC timestamp you computed
+Preconditions: Stage 3 PASS recorded; commit SHA 908a8bb in production; Stripe Safety ≈4/25; B2C GATED; A3 revenue_blocker count 0; CPU p95 ≤70%, DB wait p95 ≤50 ms
+T0 probes: /, /pricing, /browse, /health at 100% load profile with cache‑bust and X‑Trace‑Id
+Webhook: Invalid signature → expect 400 (never 403)
+Telemetry: Emit CANARY_STAGE4_T0_BASELINE; verify A8 POST+GET checksum; ingestion ≥99.5%
+SEO: Trigger ≥1 new Auto Page Maker build; verify canonical/noindex + sitemap; target URL delta ≥ +10 vs Stage 3
+Security headers: Validate HSTS, CSP, X‑Frame‑Options, X‑Content-Type-Options on / and /pricing
+Abuse control: Confirm escalating suppression active; log any suppressions
+Rollback (immediate if any breach): Route p95>120 ms or p99>200 ms or 5xx≥0.5% or A8<99.5% or webhook 403 or A3 revenue_blocker>0 or CPU p95>80% or lag p95>300 ms or DB wait p95>100 ms
+T0 artifacts to produce (and post to A8 with checksums)
+
+perf_summary.md (T0 p50/p75/p95/p99; success/error rates)
+infra_sli_rollup.md (CPU, lag, memory, DB wait, slow queries, queue depth)
+a8_telemetry_audit.md (event_ids, checksums, ingestion stats)
+stripe_webhook_soak.md (T0 result = 400)
+seo_verdict.md (URL count delta and canonical/noindex checks)
+rate_limit_activity.md (any suppressions)
+security_headers_report.md (headers verified)
+go_no_go_report.md (T0 decision + Stage 1–3 comparison)
+checksums.json (recompute; POST+GET round‑trip to A8)
+Final output expected from the agent
+
+If PASS: “24H SOAK — IN PROGRESS. T0 Baseline Established. Monitoring active.”
+If FAIL/rollback: “24H SOAK — FAILED/ROLLBACK. See incident report.”
+Once T0 PASS is printed, continue the soak per the Stage 4 prompt (2‑hour snapshots, error‑budget tracking). Send me:
+
+The A8 event IDs for T0 baseline and webhook tests
+p95/p99 and infra SLI rollups from perf_summary.md and infra_sli_rollup.md
+The sitemap delta and canonical/noindex checks from seo_verdict.md
+Proceed.

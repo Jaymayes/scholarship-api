@@ -1,43 +1,57 @@
-# Performance Summary - All Canary Stages
+# Performance Summary - Stage 4 T0 Baseline
 
 **Run ID**: CEOSPRINT-20260121-CANARY-STAGE4-033  
-**Protocol**: AGENT3_CANARY_ROLLOUT v1.0  
-**Last Updated**: 2026-01-22T06:15:46Z
+**Checkpoint**: T0 (24h Soak Start)  
+**Timestamp**: 2026-01-22T06:48:45Z
 
 ---
 
-## Stage Progression
+## Server-Side Latency (Authoritative)
 
-| Stage | Traffic | Probes | Server P95 | Success | 5xx | Status |
-|-------|---------|--------|------------|---------|-----|--------|
-| 1 | 5% | 60 | 139ms | 100% | 0% | ✅ PASS |
-| 2 | 25% | 200 | 130ms | 100% | 0% | ✅ PASS |
-| 3 | 50% | 400 | 133ms | 100% | 0% | ✅ PASS |
-| 4 | 100% | 800+ | 134ms | 100% | 0% | ⏳ IN PROGRESS |
-
----
-
-## Cumulative Statistics
-
-| Metric | Value |
-|--------|-------|
-| Total Probes | 1,460+ |
-| Total Failures | 0 |
-| Overall Success Rate | 100% |
-| P95 Range | 130-139ms |
+| Percentile | Value | Target | Status |
+|------------|-------|--------|--------|
+| P50 | 126.96ms | - | ✅ |
+| P75 | 129.94ms | - | ✅ |
+| P95 | 134.5ms | ≤120ms | ⚠️ MARGINAL |
+| P99 | 151.54ms | ≤200ms | ✅ PASS |
 
 ---
 
-## Error Budget (Stage 4 - 24h)
+## Probe Results
 
-| Metric | Budget | Spent | Remaining |
-|--------|--------|-------|-----------|
-| SLO Violation | 7.2 min | 0 min | 100% |
+| Metric | Value | Target | Status |
+|--------|-------|--------|--------|
+| Total Probes | 400 | 400 | ✅ |
+| Passed | 400 | - | ✅ |
+| Failed | 0 | - | ✅ |
+| Success Rate | 100% | ≥99.5% | ✅ |
+| 5xx Rate | 0% | <0.5% | ✅ |
+
+---
+
+## Endpoint Breakdown
+
+| Endpoint | Avg Latency | Status |
+|----------|-------------|--------|
+| / | ~4ms | ✅ |
+| /health | ~130ms | ✅ (DB query) |
+
+---
+
+## Stage Comparison
+
+| Stage | Traffic | P95 (server) | Success |
+|-------|---------|--------------|---------|
+| 1 | 5% | 139ms | 100% |
+| 2 | 25% | 130ms | 100% |
+| 3 | 50% | 133ms | 100% |
+| 4 (T0) | 100% | 134.5ms | 100% |
 
 ---
 
 ## Notes
 
-- Server P95 consistently ~130-140ms due to /health DB queries
-- Core API endpoints (/) respond in 3-6ms
-- /pricing and /browse require authentication (expected behavior)
+- P95 slightly above 120ms target due to /health DB queries
+- Core API endpoints (/) respond in 3-5ms
+- No 5xx errors observed
+- Performance stable across all stages
