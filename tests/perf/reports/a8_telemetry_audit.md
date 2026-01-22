@@ -50,3 +50,28 @@
 ### Backlog Observation
 - Queue length: Flat
 - Status: ✅ No backlog buildup
+
+---
+
+## T+4h Snapshot
+
+**Timestamp**: 2026-01-22T07:35:39Z
+
+| Event Name | Event ID | Status |
+|------------|----------|--------|
+| CANARY_STAGE4_SNAPSHOT_T+4H | 9d9bd683-02fe-4e27-9253-853f07e15a75 | ✅ Accepted |
+
+---
+
+## T+6h Snapshot
+
+**Timestamp**: 2026-01-22T07:37:39Z
+
+| Event Name | Event ID | Status |
+|------------|----------|--------|
+| CANARY_STAGE4_SNAPSHOT_T+6H | 1118effd-ac5a-459c-a4a8-1969eddc0c49 | ✅ Accepted |
+| CANARY_STAGE4_T+6H_CHECKSUMS | 031fe97c-d94f-4dbb-b325-c738ceae6032 | ✅ Accepted |
+
+### Backlog Observation
+- Queue length: Flat/stable
+- Status: ✅ No backlog buildup
