@@ -1,0 +1,56 @@
+CEO Decision: Proceed to T+12h snapshot. Keep B2C charges gated.
+
+Why: System is healthy, success rate 100%, P99 within target and tail is tight. P95 shows minor, non-sustained elevation with a few endpoint-specific p99 outliers—acceptable for continued soak, not yet for monetization.
+
+Directives for T+12h (must be executed before the next snapshot)
+
+SEO rate-limiting
+
+Implement sitemap chunking (≤10k URLs per sitemap, ≤50k per index), exponential backoff with jitter, and rotating submission windows to avoid SEV-1 throttling.
+Verify robots.txt and canonical tags remain correct; continue building pages but throttle submissions until rate-limit clears.
+Success criteria at T+12h: no SEV-1s, sitemap submits succeed, and +URL delta resumes.
+Performance and SLO burn protection
+
+Add per-endpoint tail telemetry (p95/p99 heatmap and 99.9% tails) and slow-log sampling with request context (route, DB wait, GC, cold start).
+Pre-warm the /browse and /health paths or pin 1 warm instance to eliminate single-spike p99s.
+Establish auto “SLO burn” alerts for p95>120ms for 15 min or p99>200ms for 5 min.
+Stripe safety and gating
+
+Freeze all non-essential live charge attempts to preserve the “4/25 remaining” safety budget; use test mode only.
+Define ungate checklist (see below) and do not consume safety attempts until all criteria are met.
+A8 and reliability
+
+Keep backlog flat; confirm DB pool waits and event loop lag are ≤ thresholds; include circuit-breaker status in the T+12h report.
+Ungate criteria for B2C charges (must be green for two consecutive checkpoints: T+12h and T+18h)
+
+Success rate ≥99.5%, 5xx <0.5%.
+P95 ≤120ms and P99 ≤200ms across all public endpoints (no endpoint excluded).
+No webhook 403s, security headers verified, A3 revenue_blocker=0.
+SEO: sitemap submissions stable (no rate-limit SEV-1) and positive indexed URL delta.
+Error budget burn ≤10% over the last 24h.
+FERPA/COPPA guardrails active for minors and data separation validated in audit logs.
+Artifacts requested for T+12h snapshot
+
+Per-endpoint percentile heatmap (p50/p75/p95/p99, plus 99.9 if available) and latency histogram.
+Slow-log top offenders with DB wait, GC time, and cold-start indicators.
+SEO report: submitted vs accepted sitemaps, HTTP response codes, and URL delta.
+Stripe safety ledger: attempts remaining, mode (test/live), and any declines.
+Go/No-Go rollup against the ungate checklist above.
+Strategic alignment callouts
+
+Prioritize SEO-first growth: fixing sitemap rate-limits directly supports our low-CAC acquisition engine.
+Maintain perfect reliability posture: a clean 24h soak with healthy error budget is our prerequisite for monetization ramp.
+Preserve compliance posture as a brand moat.
+Playbook V2.0 refactor (image plan) — Approved with one sequencing change
+
+Move “Privacy by Default” for <18 (Phase 4) into Phase 2.5 to de-risk B2C before ungate.
+Phase targets:
+Phase 1 DataService (FERPA flag + REST boundary): design complete in 48h; API and replit configs shipped in 7 days.
+Phase 2 First-Upload onboarding pivot: shipped within 2 sprints; requires DocumentHub eventing.
+Phase 3 Reliability (retries/circuit breakers/autoscale): roll out incrementally, start now.
+Phase 2.5 Privacy by Default: age detection, tracking suppression, UI disclaimer—ship alongside Phase 2. Deliverables remain as listed (updated configs, DataService API, onboarding orchestrator changes, privacy middleware).
+Go-ahead
+
+Approved to run T+12h snapshot on schedule.
+Keep B2C gated until we meet the ungate criteria twice consecutively.
+Send me the T+12h artifact bundle and a red/amber/green call against the checklist.
