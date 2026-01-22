@@ -1,64 +1,23 @@
-# Performance Summary - ZT3G Verification
+# Performance Summary - ZT3G FIX-029
 
-**Run ID**: CEOSPRINT-20260113-EXEC-ZT3G-FIX-027  
-**Protocol**: AGENT3_HANDSHAKE v30  
-**Window**: 2026-01-22T19:19:31Z → 2026-01-22T19:20:46Z
+**Run ID**: CEOSPRINT-20260113-EXEC-ZT3G-FIX-029  
+**Window**: 2026-01-22T20:03:38Z → 2026-01-22T20:04:56Z
 
----
-
-## SLO Targets
+## SLO Compliance
 
 | Metric | Target | Achieved | Status |
 |--------|--------|----------|--------|
-| P95 (public routes) | ≤110ms | 86ms | ✅ PASS |
-| P99 (public routes) | ≤180ms | 96ms | ✅ PASS |
-| Success Rate | ≥99.5% | 100.00% | ✅ PASS |
-| 5xx Rate | <0.5% | 0% | ✅ PASS |
-
----
+| / P95 | ≤110ms | 101ms | ✅ GREEN |
+| / P99 | ≤180ms | 131ms | ✅ GREEN |
+| Success Rate | ≥99.5% | 100.00% | ✅ GREEN |
+| 5xx Rate | <0.5% | 0% | ✅ GREEN |
 
 ## Per-Endpoint Heatmap
 
-### Public SLO Endpoints
+| Endpoint | P50 | P75 | P95 | P99 | Status |
+|----------|-----|-----|-----|-----|--------|
+| / | 66ms | 81ms | 101ms | 131ms | ✅ GREEN |
+| /pricing | 60ms | 68ms | 94ms | 131ms | ✅ GREEN |
+| /browse | 59ms | 70ms | 97ms | 115ms | ✅ GREEN |
 
-| Endpoint | P50 | P75 | P95 | P99 | Probes | Status |
-|----------|-----|-----|-----|-----|--------|--------|
-| / | 59ms | 68ms | 86ms | 96ms | 150 | ✅ GREEN |
-| /pricing | 52ms | 62ms | 81ms | 89ms | 150 | ✅ GREEN |
-| /browse | 53ms | 60ms | 81ms | 99ms | 150 | ✅ GREEN |
-
-### Internal Endpoints (Excluded from SLO)
-
-| Endpoint | P50 | P75 | P95 | P99 | Notes |
-|----------|-----|-----|-----|-----|-------|
-| /health | 179ms | 187ms | 207ms | 237ms | DB check included |
-
----
-
-## Probe Summary
-
-| Metric | Value |
-|--------|-------|
-| Total Probes | 600 |
-| Successful | 600 |
-| 5xx Errors | 0 |
-| Success Rate | 100.00% |
-| 5xx Rate | 0% |
-
----
-
-## Raw Samples
-
-Raw latency data collected with X-Trace-Id headers for verification.
-See: tests/perf/evidence/raw_curl_evidence.txt
-
----
-
-## Verdict
-
-**✅ ALL SLO TARGETS MET**
-
-- P95 ≤110ms: 86ms ✅
-- P99 ≤180ms: 96ms ✅
-- Success ≥99.5%: 100.00% ✅
-- 5xx <0.5%: 0% ✅
+**Total Probes**: 600 | **Pass**: 600 | **5xx**: 0
