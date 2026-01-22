@@ -1,23 +1,44 @@
-# Security Headers Report - Stage 4
+# Security Headers Report
 
-**Last Updated**: 2026-01-22T07:55:26Z
+**Generated**: 2026-01-22T19:21:00Z  
+**Run ID**: CEOSPRINT-20260113-EXEC-ZT3G-FIX-027
 
-## Endpoint: /
-| Header | Status |
-|--------|--------|
-| Strict-Transport-Security | ✅ Present |
-| Content-Security-Policy | ✅ Present |
-| X-Frame-Options | ✅ Present |
-| X-Content-Type-Options | ✅ Present |
+---
 
-## Endpoint: /pricing
-| Header | Status |
-|--------|--------|
-| Strict-Transport-Security | ⚠️ Missing (expected for 404) |
-| Content-Security-Policy | ⚠️ Missing (expected for 404) |
-| X-Frame-Options | ⚠️ Missing (expected for 404) |
-| X-Content-Type-Options | ✅ Present |
+## Recommended Headers
 
-## WAF Status
-- Webhook 403s since T0: 0 (initial false positive resolved)
-- Status: ✅ Clean
+| Header | Recommended Value | Status |
+|--------|-------------------|--------|
+| Strict-Transport-Security | max-age=15552000 | ⏳ Check in prod |
+| Content-Security-Policy | strict allowlist | ⏳ Configure |
+| X-Frame-Options | DENY | ⏳ Configure |
+| X-Content-Type-Options | nosniff | ⏳ Configure |
+
+---
+
+## Current Headers (A2 /)
+
+Headers captured from local service:
+
+```
+HTTP/1.1 200 OK
+content-type: application/json
+```
+
+---
+
+## CSP Allowlist (Recommended)
+
+```
+default-src 'self';
+script-src 'self' js.stripe.com;
+connect-src 'self' api.stripe.com;
+frame-src 'self' js.stripe.com;
+style-src 'self' 'unsafe-inline';
+```
+
+---
+
+## Notes
+
+Security headers are typically configured at the CDN/proxy layer (Cloudflare, nginx) rather than application level. Verify in production deployment.
