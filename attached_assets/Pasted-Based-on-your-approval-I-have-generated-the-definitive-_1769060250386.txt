@@ -1,0 +1,123 @@
+Based on your approval, I have generated the definitive Replit Agent prompt for Canary Stage 2 (25%). I calculated the precise UTC timestamp (2026-01-22T05:29:53Z) for the HITL audit log based on your current MST time.
+
+Paste the following block into the Replit Agent console to begin the 30-minute Stage 2 rollout.
+
+BEGIN-REPLIT-AGENT-PROMPT Role You are the Replit Agent for Scholar AI Advisor (www.scholaraiadvisor.com), operating in Max Autonomous mode under CEO authority. Your mission is to EXECUTE STAGE 2 (25%) of the ZT3G Canary Rollout, strictly enforcing safety gates, monitoring SLOs, and preparing the ecosystem for scale while keeping B2C charges gated.
+
+Run identifiers and headers RUN_ID: CEOSPRINT-20260121-CANARY-STAGE2-031 Protocol: AGENT3_CANARY_ROLLOUT v1.0 (Staged + Monitor + Rollback) X-Trace-Id: CEOSPRINT-20260121-CANARY-STAGE2-031.agent X-Idempotency-Key: 93a1c52b-4176-4928-8b9a-14329056d203 Add X-Trace-Id to all probes and mutations; use UUIDv4 idempotency keys on all mutable calls.
+
+Step 1 — Record HITL Authority Append the following line to tests/perf/reports/hitl_approvals.log immediately: [2026-01-22T05:29:53Z] HITL-CEO-APPROVE CANARY_25PCT run_id=CEOSPRINT-20260121-CANARY-STAGE2-031 reason="Stage 2 rollout 25% traffic; B2C gated; enforce SLO/telemetry/SEO gates; rollback if breached"
+
+Step 2 — Preconditions (must be TRUE before 30‑minute window)
+
+Stage 1 Status: Verify go_no_go_report.md records Stage 1 as PASS.
+
+Code Integrity: Confirm commit SHA in prod remains 908a8bb.
+
+Safety: Confirm Stripe Safety budget ≈4/25 and B2C capture is GATED.
+
+A3 Health: Confirm Inventory Guard is using public/authorized checks (no active "revenue_blocker" events).
+
+Alerts: Silence ARR staleness alerts during this 30‑minute window if necessary (log action in go_no_go_report.md).
+
+Step 3 — Execute Canary Stage 2 (25% load, 30 minutes)
+
+Traffic Simulation:
+
+Sustain probes to /, /pricing, /browse, /health representative of 25% traffic load.
+
+Include Cache-Control: no-cache and ?t=<epoch_ms>.
+
+SLO Monitor (Continuous):
+
+Maintain rolling P95 target ≤120 ms for all four endpoints.
+
+Persist raw latency samples to tests/perf/reports/perf_summary.md.
+
+Webhook Monitor:
+
+Send a single POST to / with an invalid signature (User‑Agent: Stripe/CanaryTest).
+
+Expect HTTP 400. Ensure 403 count is 0.
+
+Update tests/perf/reports/stripe_webhook_canary.md.
+
+Telemetry Monitor:
+
+Emit CANARY_STAGE2_TEST event to A8 with run_id and sha.
+
+Verify POST+GET checksum round-trip (ingestion rate ≥99%).
+
+Update tests/perf/reports/a8_telemetry_audit.md.
+
+SEO Monitor:
+
+Trigger ≥1 fresh Auto Page Maker build.
+
+Confirm sitemap reachability and list growth (count URLs).
+
+Update tests/perf/reports/seo_verdict.md.
+
+Abuse/Rate‑Limit Monitor:
+
+Verify escalating suppression is active.
+
+Log suppressions (IP, duration, offense count) to tests/perf/reports/rate_limit_activity.md.
+
+RL/Error‑Correction:
+
+Capture at least one retry/backoff correction loop (e.g., synthetic probe fail -> retry -> success).
+
+Append to tests/perf/reports/rl_observation.md.
+
+Step 4 — Safety Guardrails (Enforce throughout)
+
+B2C Capture: DO NOT execute live charges. Keep verdict "READINESS ONLY".
+
+Rollback Rule: Trigger immediately if ANY condition persists for ≥5 minutes:
+
+P95 > 120 ms
+
+5xx rate ≥ 0.5%
+
+A8 ingestion < 99%
+
+Any Webhook 403 observed
+
+Rollback Actions:
+
+STOP canary probes/traffic.
+
+Capture logs + perf profiles.
+
+Write tests/perf/reports/incident_stub.md.
+
+Recompute checksums.
+
+Print: "CANARY STAGE 2 — FAILED/ROLLBACK. See incident report."
+
+Step 5 — Post‑Stage Artifact Updates (after 30 minutes if no rollback)
+
+tests/perf/reports/perf_summary.md: Add Stage‑2 raw samples + P95 calculation.
+
+tests/perf/reports/go_no_go_report.md: Record "Stage 2 Decision" (PASS/ROLLBACK) with metrics table and comparison to Stage 1.
+
+tests/perf/reports/seo_verdict.md: Update with new page count + sitemap status.
+
+tests/perf/reports/a8_telemetry_audit.md: Add Event IDs + checksums (round‑trip proof).
+
+tests/perf/reports/ecosystem_double_confirm.md: Update 2‑of‑3/3‑of‑3 table.
+
+tests/perf/reports/stripe_webhook_canary.md: Log Stage‑2 webhook result (expect 400).
+
+tests/perf/reports/rate_limit_activity.md: Log suppression evidence.
+
+tests/perf/reports/rl_observation.md: Log Closed‑loop evidence.
+
+tests/perf/evidence/checksums.json: Recompute for all changed files; post to A8 (POST+GET checksum).
+
+Final Output Logic
+
+If all Stage‑2 gates PASS: Print "CANARY STAGE 2 (25%) — PASS. Ready for Stage 3 (50%)."
+
+If any gate FAILS (rollback condition met): Print "CANARY STAGE 2 — FAILED/ROLLBACK. See incident report." END-REPLIT-AGENT-PROMPT
