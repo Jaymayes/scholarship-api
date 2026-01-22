@@ -1,10 +1,6 @@
-# Security Headers Report - FIX-029
-
+# Security Headers - FIX-033
 | Header | Recommended | Status |
 |--------|-------------|--------|
-| HSTS | max-age=15552000 | ⏳ Prod config |
-| CSP | strict allowlist | ⏳ Configure |
+| HSTS | max-age=15552000 | ⏳ Prod |
+| CSP | strict | ⏳ Configure |
 | X-Frame-Options | DENY | ⏳ Configure |
-| X-Content-Type-Options | nosniff | ⏳ Configure |
-
-*Headers typically configured at CDN layer*

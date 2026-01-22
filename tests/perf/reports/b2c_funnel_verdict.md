@@ -1,22 +1,11 @@
-# B2C Funnel Verdict - FIX-029
+# B2C Funnel Verdict - FIX-033
+**Status**: CONDITIONAL
 
-**Status**: CONDITIONAL (Readiness Only)
-
-## Stripe Readiness (A2 Backend)
 | Check | Status |
 |-------|--------|
-| STRIPE_SECRET_KEY | ✅ Available |
-| STRIPE_WEBHOOK_SECRET | ✅ Available |
-| Webhook verification | ✅ Configured |
+| STRIPE_SECRET_KEY | ✅ |
+| STRIPE_WEBHOOK_SECRET | ✅ |
+| Safety Budget | 4/25 FROZEN |
+| Live Attempts | 0 |
 
-## A5 Frontend Checks (BLOCKED)
-Requires manual verification in separate workspace.
-
-## Safety Budget
-| Metric | Value |
-|--------|-------|
-| Remaining | **4/25** |
-| Mode | **FROZEN** |
-| Live Attempts | **0** |
-
-**Verdict**: CONDITIONAL - Backend ready, frontend blocked
+**Verdict**: CONDITIONAL - Backend ready, A5 blocked

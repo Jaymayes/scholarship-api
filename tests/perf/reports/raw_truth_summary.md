@@ -1,7 +1,4 @@
-# Raw Truth Summary - FIX-029
-
-**Run ID**: CEOSPRINT-20260113-EXEC-ZT3G-FIX-029
-
+# Raw Truth Summary - FIX-033
 | Category | Status |
 |----------|--------|
 | A2 | ✅ PASS |
@@ -10,7 +7,6 @@
 | SLO | ✅ ALL MET |
 | B2C | 🔒 CONDITIONAL |
 | B2B | ⛔ BLOCKED |
-
-**Safety**: 4/25 FROZEN, 0 live attempts
+| Safety | 4/25 FROZEN, 0 attempts |
 
 **Attestation: BLOCKED (ZT3G) — See Manual Intervention Manifest**
