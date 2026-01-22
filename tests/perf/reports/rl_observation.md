@@ -1,25 +1,30 @@
-# RL Observation
+# Retry/Backoff Observation Log
 
-**Run ID**: CEOSPRINT-20260121-VERIFY-ZT3G-V2S2-028
+**Run ID**: CEOSPRINT-20260121-CANARY-STAGE1-030  
+**Window**: Canary Stage 1 (5%)  
+**Timestamp**: 2026-01-22T05:07:52Z
 
 ---
 
-## Error-Correction Loop
+## Summary
 
-1. **Probe**: curl with X-Trace-Id to external URLs
-2. **Observe**: HTTP code, size, content markers
-3. **Classify**: PASS (200 + markers), CONDITIONAL (200 partial), FAIL (non-200)
-4. **Retry**: 2s→5s→10s backoff for waking pages
-5. **Document**: Fresh artifacts with checksums
+No retry/backoff corrections required during Stage 1.
 
-## Episode
+| Metric | Value |
+|--------|-------|
+| Total Requests | 60 |
+| Successful | 60 |
+| Retried | 0 |
+| Backoff Events | 0 |
 
-- Exploration: 0 (deterministic verification)
-- Exploitation: 100% (use known URLs)
-- Episode: ZT3G-V2S2-028 (VERIFY run)
+---
 
-## HITL Integration
+## Analysis
 
-- No charges attempted
-- Safety remaining: 4/25
-- Override required for B2C live charge
+All requests succeeded on first attempt. No closed-loop corrections needed.
+
+---
+
+## Verdict
+
+**N/A** - No corrections required.

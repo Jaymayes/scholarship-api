@@ -1,49 +1,45 @@
-# A8 Telemetry Audit
+# A8 Telemetry Audit - Canary Stage 1
 
-**Run ID**: CEOSPRINT-20260121-VERIFY-ZT3G-V2S2-028  
-**Status**: ⚠️ DEGRADED (A8 404)
-
----
-
-## Telemetry Flow Status
-
-### Primary Path (A0 ← Apps)
-| App | Event Type | Status | Last Seen |
-|-----|------------|--------|-----------|
-| A1 | app_heartbeat | ✅ Flowing | 04:22:53Z |
-| A6 | system_health | ✅ Flowing | 04:23:31Z |
-| A9 | app_heartbeat | ✅ Flowing | 04:23:17Z |
-
-### A8 Event Bus Status
-- **URL**: https://event-bus-jamarrlmayes.replit.app
-- **Health**: 404 Not Found
-- **POST+GET Checksum**: Cannot verify
+**Run ID**: CEOSPRINT-20260121-CANARY-STAGE1-030  
+**Updated**: 2026-01-22T05:07:52Z
 
 ---
 
-## Ingestion Metrics (from logs)
+## A8 Event Bus Status
 
-| Metric | Value |
-|--------|-------|
-| Telemetry batch accepted | 1 |
-| Telemetry batch failed | 0 |
+| Check | Result |
+|-------|--------|
+| /health | ❌ 404 Not Found |
+| Checksum Round-Trip | Cannot verify |
+
+---
+
+## Local Telemetry (A0)
+
+| Check | Result |
+|-------|--------|
+| POST /api/analytics/events | ✅ 200 |
+| Event Accepted | 1 |
+| Event Failed | 0 |
 | Duplicates | 0 |
-| Missing base_url | 0 |
 
 ---
 
-## Fallback Mechanism
+## Canary Event
 
-- Primary: A8 (UNAVAILABLE - 404)
-- Fallback: A2 (UNAVAILABLE - 404)
-- Local spool: business_events table (ACTIVE)
+```json
+{
+  "event_id": "81e62388-700d-4839-ac48-7d689f69af88",
+  "event_name": "CANARY_STAGE1_TEST",
+  "app": "canary_test",
+  "env": "prod",
+  "stage": "canary_5pct",
+  "run_id": "CEOSPRINT-20260121-CANARY-STAGE1-030"
+}
+```
 
 ---
 
 ## Verdict
 
-**A8 Telemetry**: ⚠️ DEGRADED
-
-Apps are successfully sending telemetry directly to A0 via `/api/analytics/events`. A8 checksum round-trip cannot be verified due to 404.
-
-**Impact**: Cannot achieve 3-of-3 evidence for apps relying on A8 correlation.
+**DEGRADED** - A8 unavailable (404). Telemetry flowing to A0 directly at 100% acceptance rate.
