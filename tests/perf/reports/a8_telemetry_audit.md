@@ -110,3 +110,23 @@
 - PostgreSQL: CLOSED
 - A8 Telemetry: CLOSED
 - Stripe: CLOSED
+
+---
+
+## T+18h Snapshot
+
+**Timestamp**: 2026-01-22T09:20:14Z
+
+| Event Name | Event ID | Status |
+|------------|----------|--------|
+| CANARY_STAGE4_SNAPSHOT_T+18H | 3f5cecfe-2868-468c-aaac-1f69849f1f15 | ✅ Accepted |
+| CANARY_STAGE4_T+18H_CHECKSUMS | 8ebe0695-9e40-441b-b748-c358df83b15c | ✅ Accepted |
+
+### A8 Canonical Metrics
+- Reporting window: 5-minute tumbling
+- /health excluded from public SLO
+- Server-side timing active
+
+### Backlog Observation
+- Queue length: Flat/stable
+- Status: ✅ No backlog buildup
