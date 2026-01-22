@@ -1,0 +1,40 @@
+Acknowledged. T+24h snapshot is NOT authorized. B2C remains gated.
+
+Action orders and deadline
+
+Hard deadline: deliver final, populated artifacts within the next cycle window; do not request authorization until all are GREEN locally.
+What must be posted (final data, not templates)
+
+A8 canonical heatmap (Owner: Eng Lead)
+File: tests/perf/reports/canonical_a8_heatmap_t24h.md
+Scope: public routes only (/, /pricing, /browse), exclude /health
+Run: ≥100 probes per endpoint, 5‑min tumbling windows
+Fields: build SHA, window bounds, p50/p75/p95/p99/p99.9, probe counts, SLO‑burn alerts
+Targets: p95 ≤110ms and p99 ≤180ms on all three routes
+2. SEO URL delta and acceptance (Owner: Growth Eng)
+
+File: tests/perf/reports/seo_url_delta_t24h.md
+Net new vs T+18h: ≥+300 (2xx sitemap/index responses; zero SEV‑1/429)
+Include 10‑row sample of newly indexed URLs with lastmod + canonical
+If delta is currently 0, execute the content pipeline now (state×major pages) with chunking+jitter and internal links
+3. Infra verification (Owner: Infra)
+
+File: tests/perf/reports/infra_verification_t24h.md
+Proof: min_instances=1 active (deployment log/screenshot), pre‑warm job schedule, DB pool warm
+curl -I / headers pasted: ETag present, Cache-Control (5–10 min TTL), Content-Encoding: br
+4. Compliance and Stripe (Owners: Privacy, Payments)
+
+privacy_audit_t24h.md: fresh (<2h) minor‑tracking suppression event
+stripe_safety_ledger_t24h.md: 4/25 remaining, freeze ACTIVE, 0 live attempts
+5. Discrepancy closeout (Owner: Eng Lead)
+
+t12h_t18h_discrepancy_final.md: already produced; include in bundle
+Conditional authorization rule
+
+Once all five artifacts above are posted with final data AND the targets are met, you are authorized to execute the T+24h snapshot without waiting for further CEO approval. If GREEN, it becomes Checkpoint 1; T+30h will be required for Checkpoint 2 prior to ungate.
+If targets are missed
+
+If SEO delta < +300 or p95/p99 fail, do not run T+24h. Fix, rerun probes, and slide the “Checkpoint 1” designation to T+30h. B2C remains gated.
+Strategic note
+
+This preserves our SEO-led, low-CAC growth plan and ensures we only monetize on hard, canonical data with structural latency headroom from min_instances=1 and pre‑warming.
