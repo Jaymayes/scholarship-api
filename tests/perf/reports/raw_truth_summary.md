@@ -1,36 +1,28 @@
 # Raw Truth Summary
 
-**Run ID**: CEOSPRINT-20260121-EXEC-ZT3G-V2S2-FIX-027  
-**Protocol**: AGENT3_HANDSHAKE v30  
-**Generated**: 2026-01-21T22:52:00Z
+**Run ID**: CEOSPRINT-20260121-VERIFY-ZT3G-V2S2-028  
+**Protocol**: Scorched Earth Fresh  
+**Generated**: 2026-01-22T01:54:00Z
 
 ---
 
-## Truth Table
+## Probe Results (Fresh)
 
-| App | Expected | Actual | Delta |
-|-----|----------|--------|-------|
-| A0 | 200 + markers | 200 + markers | ✅ Match |
-| A1 | 200 + OIDC | 000 timeout | ❌ Blocked |
-| A2 | 200 + status | 000 timeout | ❌ Blocked |
-| A3 | 200 + agent | 000 timeout | ❌ Blocked |
-| A4 | 200 + sage | 000 timeout | ❌ Blocked |
-| A5 | 200 + Stripe | 200, no Stripe | ⚠ Missing markers |
-| A6 | 200 + JSON | 000 timeout | ❌ Blocked |
-| A7 | 200 + sitemap | 000 timeout | ❌ Blocked |
-| A8 | 200 + events | 200 + rate limit error | ⚠ Degraded |
-
----
-
-## Root Causes
-
-1. **A1-A4, A6-A7**: Apps in sleeping state or DNS misconfigured
-2. **A5**: Landing page missing Stripe integration
-3. **A8**: Upstash Redis rate limited
+| App | URL | HTTP | Size | Status |
+|-----|-----|------|------|--------|
+| A1 | scholar-auth-jamarrlmayes.replit.app | 200 | 1220 | PASS |
+| A3 | scholarship-agent-jamarrlmayes.replit.app | 200 | 320 | PASS |
+| A4 | scholarship-sage-jamarrlmayes.replit.app | 200 | 489 | PASS |
+| A5 | www.scholaraiadvisor.com | 200 | 5278 | CONDITIONAL |
+| A6 | provider-register-jamarrlmayes.replit.app | 200 | 260 | PASS |
+| A7 | seo-jamarrlmayes.replit.app | 404 | 9 | FAIL |
+| A8 | event-bus-jamarrlmayes.replit.app | 404 | 9 | FAIL |
+| A9 | auto-com-center-jamarrlmayes.replit.app | 200 | 170 | PASS |
+| A10 | auto-page-maker-jamarrlmayes.replit.app | 200 | 113 | PASS |
 
 ---
 
-## No Fabrication Confirmation
+## Evidence Files
 
-All results above are from actual curl probes. No PASS was fabricated.
-See tests/perf/evidence/raw_curl_evidence.txt for full probe output.
+- raw_curl_evidence.txt: Raw curl output
+- fee_lineage.json: B2B fee verification

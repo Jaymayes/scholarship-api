@@ -1,56 +1,63 @@
 # B2C Funnel Verdict
 
-**Run ID**: CEOSPRINT-20260121-EXEC-ZT3G-V2S2-FIX-027  
-**Protocol**: AGENT3_HANDSHAKE v30  
-**Status**: CONDITIONAL (Readiness Only)
+**Run ID**: CEOSPRINT-20260121-VERIFY-ZT3G-V2S2-028  
+**Protocol**: AGENT3_HANDSHAKE v30 (Scorched Earth)  
+**Status**: ❌ CONDITIONAL (Readiness Only)
 
 ---
 
-## Stripe Safety Check
+## Stripe Integration Check
 
-| Metric | Value |
-|--------|-------|
-| Safety Remaining | 4/25 |
-| Live Charges | FORBIDDEN without HITL |
-| HITL Override | NOT PRESENT |
+| Element | Required | Present | Status |
+|---------|----------|---------|--------|
+| pk_live_ | Yes | ❌ No | FAIL |
+| pk_test_ | Yes | ❌ No | FAIL |
+| stripe.js | Yes | ❌ No | FAIL |
+| Checkout CTA | Yes | ❌ No | FAIL |
+
+### Evidence
+- URL: https://www.scholaraiadvisor.com
+- HTTP: 200
+- Size: 5278 bytes
+- Content: HTML page loads but no Stripe markers
 
 ---
 
-## Funnel Verification Results
+## Session Continuity
 
-### Step 1: Landing Page (A5)
-- **URL**: https://www.scholaraiadvisor.com
-- **HTTP**: 200 (via redirect)
-- **Result**: ⚠ CONDITIONAL
+| Check | Status | Notes |
+|-------|--------|-------|
+| Set-Cookie | ⚠️ Partial | Replit proxy cookie (GAESA) present |
+| SameSite=None | ❓ Unknown | Cannot verify without Stripe flow |
+| Secure | ❓ Unknown | Cannot verify without Stripe flow |
+| HttpOnly | ❓ Unknown | Cannot verify without Stripe flow |
 
-### Step 2: Stripe Integration
-- **pk_live_ or pk_test_**: ❌ NOT FOUND
-- **stripe.js loaded**: ❌ NOT FOUND
-- **Checkout CTA**: ❌ NOT FOUND
-- **Result**: ❌ FAIL
+---
 
-### Step 3: Auth Cookie (A1)
-- **Status**: BLOCKED (connection timeout)
-- **SameSite=None; Secure; HttpOnly**: CANNOT VERIFY
-- **Result**: ❌ BLOCKED
+## Live Charge Status
 
-### Step 4: Session Continuity
-- **Status**: CANNOT VERIFY (A1 blocked)
+**FORBIDDEN** - No HITL-CEO override recorded
+
+| Guardrail | Value | Status |
+|-----------|-------|--------|
+| Stripe Safety | 4/25 remaining | ⚠️ Low |
+| HITL Override | Not recorded | Required |
+| B2C Capture | DISABLED (SEV2) | Blocked |
 
 ---
 
 ## Verdict
 
-**B2C Funnel Status**: ❌ NOT READY
+**B2C Funnel**: ❌ CONDITIONAL (Readiness Only)
 
-**Reason**: The landing page (A5) does not include Stripe publishable keys or stripe.js. The authentication service (A1) is inaccessible. These are critical blockers for any B2C checkout flow.
+**Blockers**:
+1. A5 missing Stripe publishable key
+2. A5 missing stripe.js from js.stripe.com
+3. A5 missing checkout CTA
+4. SEV2 active - B2C capture disabled
 
-**Required Actions**:
-1. Add Stripe publishable key to A5 landing/pricing pages
-2. Load stripe.js from js.stripe.com
-3. Add checkout CTA with proper data attributes
-4. Wake A1 and verify cookie configuration
-
----
-
-**Live Charge Authorization**: NOT GRANTED (prerequisites not met)
+**Required for GO**:
+1. Add Stripe pk_key to A5
+2. Load stripe.js
+3. Add checkout CTA with proper attributes
+4. HITL-CEO override for live charge test

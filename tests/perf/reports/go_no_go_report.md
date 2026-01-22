@@ -1,86 +1,87 @@
 # Go/No-Go Report
 
-**Run ID**: CEOSPRINT-20260121-EXEC-ZT3G-V2S2-FIX-027  
-**Protocol**: AGENT3_HANDSHAKE v30  
-**Generated**: 2026-01-22T00:21:00Z
+**Run ID**: CEOSPRINT-20260121-VERIFY-ZT3G-V2S2-028  
+**Protocol**: AGENT3_HANDSHAKE v30 (Scorched Earth)  
+**Generated**: 2026-01-22T01:54:00Z
 
 ---
 
 ## Executive Summary
 
-**Recommendation**: CONDITIONAL GO (B2B) / NO-GO (B2C)
+**Recommendation**: BLOCKED (ZT3G) — See Manual Intervention Manifest
 
 ---
 
-## Acceptance Criteria Status
+## Acceptance Criteria Matrix
 
-| Criteria | Required | Actual | Status |
-|----------|----------|--------|--------|
-| 8/8 external URLs 200 | Yes | 5/8 | ⚠️ PARTIAL |
-| P95 ≤120ms | Yes | A0 OK | ⚠️ PARTIAL |
-| 2-of-3 evidence per PASS | Yes | 5/5 | ✅ PASS |
-| B2B: providers JSON + fee lineage | Yes | ✅ Verified | ✅ PASS |
-| B2C: Stripe + session + cookies | Yes | ❌ No Stripe | ❌ FAIL |
-| A8 telemetry ≥99% | Yes | Rate limited | ⚠️ DEGRADED |
-| RL/HITL documented | Yes | ✅ Yes | ✅ PASS |
+| # | Criteria | Required | Actual | Status |
+|---|----------|----------|--------|--------|
+| 1 | 8/8 external URLs 200 | 8/8 | 6/9 | ❌ FAIL |
+| 2 | P95 ≤120ms (10 min sample) | Yes | Not measured | ⚠️ PENDING |
+| 3 | 2-of-3 evidence per PASS | Yes | 6/6 | ✅ PASS |
+| 4 | B2B: providers JSON + fee lineage | Yes | ✅ Verified | ✅ PASS |
+| 5 | B2C: Stripe + session + cookies | Yes | ❌ No Stripe | ❌ FAIL |
+| 6 | A8 telemetry ≥99% | Yes | A8 404 | ❌ FAIL |
+| 7 | RL/HITL documented | Yes | ✅ Yes | ✅ PASS |
 
 ---
 
 ## App Status Summary
 
-| App | Service | Status | Notes |
-|-----|---------|--------|-------|
-| A0 | Scholarship API | ✅ PASS | Local, all services ready |
-| A1 | Scholar Auth | ✅ PASS | OIDC functional, SEV2 active |
-| A2 | API Status | ❌ NOT FOUND | URL unknown |
-| A3 | Scholarship Agent | ✅ PASS | DB connected, pool healthy |
-| A4 | Scholarship Sage | ✅ PASS | OpenAI configured, circuit OK |
-| A5 | Landing Page | ⚠️ CONDITIONAL | No Stripe integration |
-| A6 | Provider Register | ✅ PASS | 3 providers, Stripe Connect OK |
-| A7 | SEO | ❌ 404 | /health not implemented |
-| A8 | Event Bus | ⚠️ DEGRADED | Rate limited |
+| App | Service | HTTP | Status | Notes |
+|-----|---------|------|--------|-------|
+| A1 | Scholar Auth | 200 | ✅ PASS | OIDC functional |
+| A3 | Scholarship Agent | 200 | ✅ PASS | DB connected |
+| A4 | Scholarship Sage | 200 | ✅ PASS | OpenAI configured |
+| A5 | Landing Page | 200 | ⚠️ CONDITIONAL | No Stripe |
+| A6 | Provider Register | 200 | ✅ PASS | 3 providers |
+| A7 | SEO/Sitemap | 404 | ❌ FAIL | /health missing |
+| A8 | Event Bus | 404 | ❌ FAIL | /health missing |
+| A9 | Auto Com Center | 200 | ✅ PASS | Comm Hub |
+| A10 | Auto Page Maker | 200 | ✅ PASS | Onboarding v2 |
 
 ---
 
-## B2B Funnel: ✅ GO
+## Blocking Issues
 
-- Provider API: Returns JSON array (3 providers)
-- Stripe Connect: Healthy
-- Fee lineage: 3% + 4x configured
-- Telemetry: Flowing to A0
+### Critical (Must Fix for GO)
+1. **A7**: /health returns 404
+2. **A8**: /health returns 404, telemetry round-trip blocked
+3. **A5**: No Stripe integration (pk_key, stripe.js missing)
 
-## B2C Funnel: ❌ NO-GO
-
-- Landing page: Loads but no Stripe
-- pk_key: ❌ Missing
-- stripe.js: ❌ Missing
-- Checkout CTA: ❌ Missing
-- Auth cookies: Cannot verify without Stripe flow
+### High (Should Fix)
+4. SEV2 active - B2C capture disabled
+5. A8 checksum round-trip cannot be verified
 
 ---
 
-## Recommendations
+## Funnel Status
 
-### Immediate (for B2C GO)
-1. Add Stripe publishable key to A5
-2. Load stripe.js from js.stripe.com
-3. Add checkout CTA with proper attributes
-
-### Short-term
-1. Implement /health on A7 (SEO)
-2. Resolve A8 Upstash rate limit
-3. Identify A2 URL
+| Funnel | Status | Notes |
+|--------|--------|-------|
+| B2B | ✅ PASS | Providers API, fee lineage OK |
+| B2C | ❌ BLOCKED | No Stripe, SEV2 active |
 
 ---
 
 ## Safety Compliance
 
-- Stripe charges: ✅ NONE ATTEMPTED
-- HITL override: ✅ NOT REQUIRED (no charges)
-- Remaining safety: 4/25
+| Check | Status |
+|-------|--------|
+| Stripe charges attempted | 0 |
+| Safety remaining | 4/25 |
+| HITL violation | None |
 
 ---
 
-**Final Recommendation**: 
-- B2B: CONDITIONAL GO
-- B2C: NO-GO (pending Stripe integration)
+## Verdict
+
+**BLOCKED (ZT3G)** — Cannot achieve Definitive GO
+
+### Blockers:
+- A7 and A8 return 404 (not 8/8 200)
+- A5 missing Stripe integration
+- A8 telemetry round-trip blocked
+
+### See:
+- `manual_intervention_manifest.md` for required fixes

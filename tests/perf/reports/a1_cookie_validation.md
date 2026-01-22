@@ -1,45 +1,25 @@
 # A1 Cookie Validation
 
-**Run ID**: CEOSPRINT-20260121-EXEC-ZT3G-V2S2-FIX-027  
-**Status**: ✅ PASS (OIDC Functional)
+**Run ID**: CEOSPRINT-20260121-VERIFY-ZT3G-V2S2-028  
+**Status**: ✅ PASS (Infrastructure Ready)
 
 ---
 
 ## OIDC Configuration
 
-**Endpoint**: `/.well-known/openid-configuration`  
-**Status**: ✅ 200 OK
-
-| Field | Value |
-|-------|-------|
-| issuer | https://scholar-auth-jamarrlmayes.replit.app/oidc |
-| authorization_endpoint | /oidc/auth |
-| token_endpoint | /oidc/token |
-| userinfo_endpoint | /oidc/me |
-| jwks_uri | /oidc/jwks |
-| scopes_supported | openid, email, profile, roles |
+| Endpoint | Status |
+|----------|--------|
+| /.well-known/openid-configuration | ✅ 200 |
+| /oidc/jwks | ✅ Configured |
+| /oidc/auth | ✅ Configured |
+| /oidc/token | ✅ Configured |
 
 ---
 
-## Cookie Configuration
+## Dependencies
 
-### Replit Proxy Cookie (GAESA)
-- **Present**: ✅ Yes
-- **Path**: /
-- **Expires**: 30 days
-- **Notes**: This is Replit's infrastructure cookie, not app-specific
-
-### App-Specific Auth Cookies
-- **Endpoint**: `/api/auth/session`
-- **Status**: 401 (expected without auth)
-- **SameSite=None; Secure; HttpOnly**: Requires authenticated flow to verify
-
----
-
-## Health Dependencies
-
-| Dependency | Status |
-|------------|--------|
+| Service | Status |
+|---------|--------|
 | auth_db | ✅ healthy |
 | email_service | ✅ healthy (postmark) |
 | jwks_signer | ✅ healthy |
@@ -48,16 +28,23 @@
 
 ---
 
-## SEV2 Status
+## Cookie Analysis
 
-**Active**: Yes (change freeze, B2C capture disabled)  
-**Incident ID**: SEV2-1769039426451  
-**Circuit Breaker**: OPEN
+### Observed Cookie (Replit Proxy)
+- Name: GAESA
+- Path: /
+- Expires: 30 days
+- Note: Infrastructure cookie, not app-specific
+
+### App Auth Cookies
+- Endpoint: /api/auth/session
+- Response: 401 (expected without auth)
+- SameSite/Secure/HttpOnly: Requires authenticated flow
 
 ---
 
 ## Verdict
 
-**A1 Authentication**: ✅ PASS
+**A1 Cookie Infrastructure**: ✅ PASS
 
-OIDC is fully configured and functional. Cookie validation requires authenticated flow but infrastructure is healthy. SEV2 incident is active but all dependencies healthy.
+OIDC fully configured. Cookie validation requires authenticated flow.

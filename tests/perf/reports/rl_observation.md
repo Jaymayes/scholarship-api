@@ -1,55 +1,25 @@
-# RL / Error-Correction Observation
+# RL Observation
 
-**Run ID**: CEOSPRINT-20260121-EXEC-ZT3G-V2S2-FIX-027  
-**Protocol**: AGENT3_HANDSHAKE v30  
-
----
-
-## Closed Loop Example: External URL Probing
-
-### Episode 1: Initial Probe Batch
-```
-Probe A1-A8 → All FAIL (HTTP 000 or 301)
-Action: Increment backoff, retry with -L flag
-```
-
-### Episode 2: Retry with Redirect Following
-```
-Probe A5 with -L → PASS (200 with HTML)
-Action: Deep-dive A5 for Stripe markers
-Result: No Stripe markers found
-```
-
-### Episode 3: A8 via Environment Variable
-```
-Probe A8 using EVENT_BUS_URL → 200 but error body
-Action: Log degraded state, document fallback chain
-Result: Rate limit requires external resolution
-```
+**Run ID**: CEOSPRINT-20260121-VERIFY-ZT3G-V2S2-028
 
 ---
 
 ## Error-Correction Loop
 
-1. **Initial Strategy**: Probe public subdomain URLs
-2. **Failure Observed**: All subdomains timeout (HTTP 000)
-3. **Adaptation**: Use redirect following (-L flag)
-4. **Partial Success**: A5 accessible via redirect
-5. **Further Adaptation**: Use ENV variable for A8
-6. **Partial Success**: A8 reachable but rate limited
+1. **Probe**: curl with X-Trace-Id to external URLs
+2. **Observe**: HTTP code, size, content markers
+3. **Classify**: PASS (200 + markers), CONDITIONAL (200 partial), FAIL (non-200)
+4. **Retry**: 2s→5s→10s backoff for waking pages
+5. **Document**: Fresh artifacts with checksums
 
----
+## Episode
 
-## Exploration Parameter
-
-| Metric | Value |
-|--------|-------|
-| Exploration Rate | 0.0 (deterministic probing) |
-| Episodes Completed | 3 |
-| Successful Adaptations | 2 |
-
----
+- Exploration: 0 (deterministic verification)
+- Exploitation: 100% (use known URLs)
+- Episode: ZT3G-V2S2-028 (VERIFY run)
 
 ## HITL Integration
 
-No HITL overrides were invoked during this run. Stripe safety gate remains at 4/25 with live charges FORBIDDEN.
+- No charges attempted
+- Safety remaining: 4/25
+- Override required for B2C live charge
