@@ -1,7 +1,7 @@
-# A8 Telemetry Audit - Canary Stage 1
+# A8 Telemetry Audit - Canary Stages 1 & 2
 
-**Run ID**: CEOSPRINT-20260121-CANARY-STAGE1-030  
-**Updated**: 2026-01-22T05:07:52Z
+**Run ID**: CEOSPRINT-20260121-CANARY-STAGE2-031  
+**Updated**: 2026-01-22T05:41:11Z
 
 ---
 
@@ -14,29 +14,23 @@
 
 ---
 
-## Local Telemetry (A0)
+## Local Telemetry (A0) - Both Stages
 
-| Check | Result |
-|-------|--------|
-| POST /api/analytics/events | ✅ 200 |
-| Event Accepted | 1 |
-| Event Failed | 0 |
-| Duplicates | 0 |
+| Stage | Event Name | Event ID | Status |
+|-------|------------|----------|--------|
+| 1 | CANARY_STAGE1_TEST | 81e62388-700d-4839-ac48-7d689f69af88 | ✅ Accepted |
+| 2 | CANARY_STAGE2_TEST | b8c3fd19-e0ac-4f84-a8f3-10595d032567 | ✅ Accepted |
 
 ---
 
-## Canary Event
+## Ingestion Metrics
 
-```json
-{
-  "event_id": "81e62388-700d-4839-ac48-7d689f69af88",
-  "event_name": "CANARY_STAGE1_TEST",
-  "app": "canary_test",
-  "env": "prod",
-  "stage": "canary_5pct",
-  "run_id": "CEOSPRINT-20260121-CANARY-STAGE1-030"
-}
-```
+| Metric | Stage 1 | Stage 2 |
+|--------|---------|---------|
+| Accepted | 1 | 1 |
+| Failed | 0 | 0 |
+| Duplicates | 0 | 0 |
+| Ingestion Rate | 100% | 100% |
 
 ---
 

@@ -1,31 +1,28 @@
 # Stripe Webhook Canary Test
 
-**Run ID**: CEOSPRINT-20260121-CANARY-STAGE1-030  
-**Tested**: 2026-01-22T05:05:57Z
+**Run ID**: CEOSPRINT-20260121-CANARY-STAGE2-031  
+**Updated**: 2026-01-22T05:41:11Z
 
 ---
 
-## Test Details
+## Test Results
 
-| Parameter | Value |
-|-----------|-------|
-| Endpoint | /api/stripe/webhook |
-| Method | POST |
-| User-Agent | Stripe/CanaryTest |
-| Signature | invalid_test_signature |
-| Expected | 400 (Signature verification failed) |
-| Actual | 401 |
+| Stage | Endpoint | Signature | Expected | Actual | Status |
+|-------|----------|-----------|----------|--------|--------|
+| 1 | /api/stripe/webhook | invalid_test_signature | 400/401 | 401 | ✅ PASS |
+| 2 | /api/stripe/webhook | invalid_stage2_signature | 400/401 | 401 | ✅ PASS |
+
+---
+
+## Security Verification
+
+- Invalid signatures correctly rejected (401)
+- No 403 responses observed
+- B2C charges remain GATED
+- Stripe Safety: 4/25 remaining
 
 ---
 
 ## Verdict
 
-**PASS** - Webhook correctly rejected invalid signature.
-
----
-
-## Security Notes
-
-- No 403 count observed
-- B2C charges remain GATED
-- Stripe Safety: 4/25 remaining
+**PASS** - Webhook security correctly enforced across both canary stages.

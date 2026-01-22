@@ -1,19 +1,17 @@
 # Rate Limit Activity Report
 
-**Run ID**: CEOSPRINT-20260121-CANARY-STAGE1-030  
-**Window**: Canary Stage 1 (5%)  
-**Timestamp**: 2026-01-22T05:07:52Z
+**Run ID**: CEOSPRINT-20260121-CANARY-STAGE2-031  
+**Window**: Canary Stages 1 & 2  
+**Updated**: 2026-01-22T05:41:11Z
 
 ---
 
 ## Summary
 
-| Metric | Value |
-|--------|-------|
-| Requests Allowed | 60 |
-| Requests Suppressed | 0 |
-| Rate Limit Backend | memory |
-| Escalating Suppression | Active |
+| Stage | Requests Allowed | Requests Suppressed | Suppressions |
+|-------|------------------|---------------------|--------------|
+| 1 (5%) | 60 | 0 | 0 |
+| 2 (25%) | 200 | 0 | 0 |
 
 ---
 
@@ -21,24 +19,11 @@
 
 - All canary requests allowed (rate_limit_state: "allow")
 - No IP suppressions triggered
-- No chronic abuse patterns detected
-- Memory-based rate limiting active
-
----
-
-## Evidence
-
-```json
-{
-  "rate_limit_state": "allow",
-  "rate_limit_key": null,
-  "tokens_remaining": null,
-  "rl_backend": "memory"
-}
-```
+- Escalating suppression: Active
+- Rate limit backend: memory
 
 ---
 
 ## Verdict
 
-**PASS** - No rate limiting violations during Stage 1.
+**PASS** - No rate limiting violations during canary stages.
