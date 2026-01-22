@@ -31,3 +31,22 @@
 ## Verdict
 
 **PASS** - All telemetry events accepted. 100% ingestion rate.
+
+---
+
+## T+2h Snapshot
+
+**Timestamp**: 2026-01-22T07:21:45Z
+
+| Event Name | Event ID | Status |
+|------------|----------|--------|
+| CANARY_STAGE4_SNAPSHOT_T+2H | 1a532c30-acd5-4a4e-933c-c4eb5d71329d | ✅ Accepted |
+
+### Ingestion Stats
+- Events Sent: 1
+- Accepted: 1 (100%)
+- Failed: 0
+
+### Backlog Observation
+- Queue length: Flat
+- Status: ✅ No backlog buildup
