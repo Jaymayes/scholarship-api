@@ -1,4 +1,4 @@
-# B2B Funnel Verdict - FIX-033
+# B2B Funnel Verdict - T+30h (FIX-035)
 **Status**: BLOCKED (A6 inaccessible)
 
 | Fee | Rate |

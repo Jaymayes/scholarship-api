@@ -1,4 +1,4 @@
-# Stripe Safety Ledger - T+24h (FINAL)
+# Stripe Safety Ledger - T+30h (FINAL)
 | Metric | Value |
 |--------|-------|
 | Remaining | **4/25** |

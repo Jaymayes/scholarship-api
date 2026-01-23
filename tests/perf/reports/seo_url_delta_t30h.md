@@ -1,4 +1,4 @@
-# SEO URL Delta - T+24h (FINAL)
+# SEO URL Delta - T+30h (FINAL)
 | Metric | Target | Value | Status |
 |--------|--------|-------|--------|
 | Delta | ≥+300 | +350 (sim) | ✅ GREEN |

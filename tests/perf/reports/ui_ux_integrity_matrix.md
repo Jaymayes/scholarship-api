@@ -1,4 +1,4 @@
-# UI/UX Matrix - FIX-033
+# UI/UX Matrix - T+30h (FIX-035)
 | Endpoint | Type | Status |
 |----------|------|--------|
 | / | JSON | ✅ |

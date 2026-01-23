@@ -1,4 +1,4 @@
-# B2C Funnel Verdict - FIX-033
+# B2C Funnel Verdict - T+30h (FIX-035)
 **Status**: CONDITIONAL
 
 | Check | Status |
