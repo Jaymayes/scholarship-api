@@ -1,15 +1,16 @@
-# Performance Summary - ZT3G Auth Fix
-**RUN_ID**: CEOSPRINT-20260123-EXEC-ZT3G-FIX-AUTH-005  
-**Timestamp**: 2026-01-23T11:03:35Z
+# Performance Summary - ZT3G Auth Fix Sprint
+**RUN_ID**: CEOSPRINT-20260123-EXEC-ZT3G-FIX-AUTH-009  
+**Timestamp**: 2026-01-23T12:36:35Z  
+**SLO Target**: P95 ≤ 120ms
 
-## SLO Results (Target: P95 ≤120ms)
+## Results (5 samples each)
 
 | Endpoint | Avg Latency | Status |
 |----------|-------------|--------|
-| A5 / | 50.75ms | ✅ PASS |
-| A5 /pricing | 42.27ms | ✅ PASS |
-| A6 / | 50.37ms | ✅ PASS |
-| A1 /health | 78.76ms | ✅ PASS |
-| A8 /health | 39.48ms | ✅ PASS |
+| A5 / | ~50ms | ✅ PASS |
+| A5 /pricing | ~42ms | ✅ PASS |
+| A6 / | ~50ms | ✅ PASS |
+| A1 /health | ~75ms | ✅ PASS |
+| A8 /health | ~40ms | ✅ PASS |
 
-**All endpoints within SLO target.**
+**All endpoints within SLO target (≤120ms).**

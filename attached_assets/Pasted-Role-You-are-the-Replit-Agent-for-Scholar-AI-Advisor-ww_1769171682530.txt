@@ -1,0 +1,143 @@
+Role
+You are the Replit Agent for Scholar AI Advisor (www.scholaraiadvisor.com), operating in Max Autonomous mode under CEO authority. Execute the Auth Repair Sprint to FIX the A1 ScholarAuth outage and unblock both funnels by enforcing PKCE S256 end‑to‑end, repairing client redirect URIs, stabilizing the A1 DB pool, and verifying B2B/B2C login flows without false positives. Post all artifacts to A8 with checksum round‑trip. No live charges.
+
+Why this sprint (from RUN_ID: CEOSPRINT-20260123-EXEC-ZT3G-FIX-AUTH-007)
+
+A1: discovery missing S256; login flow shows “Session Expired”/500 with DB pool timeouts on cold start.
+A5/A6: PKCE not generated (S256 missing in /api/auth/login redirects).
+A1 client registry: redirect URIs mismatch (/api/auth/callback not present); A1 caches registry at startup (requires restart).
+Run configuration
+
+FIX run: RUN_ID = CEOSPRINT-20260123-EXEC-ZT3G-FIX-AUTH-009
+VERIFY run: RUN_ID = CEOSPRINT-20260123-VERIFY-ZT3G-FIX-AUTH-010
+Protocol: AGENT3_HANDSHAKE v30.1 (Scorched Earth + Functional Deep‑Dive + PKCE)
+Add headers: X-Trace-Id = RUN_ID.<component>, X-Idempotency-Key = <uuidv4>
+Guardrails
+
+Stripe Safety: Remaining ≈4/25 → NO live charges (B2C stays CONDITIONAL unless HITL-CEO override recorded in tests/perf/reports/hitl_approvals.log).
+Scorched Earth: rm -rf tests/perf/reports/* tests/perf/evidence/* && mkdir -p tests/perf/reports tests/perf/evidence
+Public URLs only (no localhost). Add Cache-Control: no-cache and ?t=<epoch_ms> to all probes.
+Content verification required (200 alone not sufficient). Reject “Waking/Loading” placeholders or tiny responses (<50B).
+Cross‑workspace: If you cannot edit A1/A5/A6, generate tests/perf/reports/manual_intervention_manifest.md with exact diffs, env, commands, and Replit URLs; do not claim PASS for work you cannot deploy.
+Phase A — Repair A1 ScholarAuth (DB stability + PKCE S256 + redirect URIs)
+A1.1 DB pool stability (TypeScript/Node pg)
+
+Apply:
+connectionTimeoutMillis: 5000
+idleTimeoutMillis: 30000
+min: 0
+max: 5
+ssl: { rejectUnauthorized: false }
+Warmup on boot: pool.query('SELECT 1');
+Save file paths and diffs to tests/perf/reports/post_republish_diff.md.
+A1.2 OIDC PKCE enforcement + discovery
+
+If using node-oidc-provider:
+features: { pkce: { required: true, methods: ['S256'] } }
+If custom endpoints:
+Authorization endpoint must return 400 JSON (not 500) when code_challenge missing or code_challenge_method !== 'S256'.
+Ensure /.well-known/openid-configuration contains:
+"code_challenge_methods_supported": ["S256"]
+Add/verify /health (no DB) and /readyz (optional DB ping) JSON: {service:"scholar-auth",status,version,uptime_s,timestamp}.
+trust proxy: app.set('trust proxy', 1); cookies SameSite=None; Secure; HttpOnly; Path=/; Domain=.scholaraiadvisor.com (if cross‑subdomain).
+A1.3 Client registry redirect URIs (DB)
+
+Update clients table to include /api/auth/callback for both apps; example: UPDATE clients SET redirect_uris = ARRAY['https://<A5_URL>/api/auth/callback'] WHERE client_id='student_pilot_id'; UPDATE clients SET redirect_uris = ARRAY['https://<A6_URL>/api/auth/callback'] WHERE client_id='provider_register_id';
+IMPORTANT: Restart A1 after DB update to flush the cached registry.
+Record SQL and restart timestamp in tests/perf/reports/a1_env_validation.md.
+Phase B — Implement PKCE S256 in A5/A6 (or generate manifest)
+If you cannot edit A5/A6, create tests/perf/reports/manual_intervention_manifest.md with exact diffs below; else apply and republish.
+
+B.1 PKCE helpers (Node/Express)
+
+utils/pkce.ts import crypto from 'crypto'; const b64u = (buf:Buffer)=>buf.toString('base64').replace(/+/g,'-').replace(///g,'_').replace(/=+/,''); export const generate = () => { const verifier = b64u(crypto.randomBytes(32)); const challenge = b64u(crypto.createHash('sha256').update(verifier).digest()); return { verifier, challenge }; };
+B.2 Routes
+
+GET /api/auth/login:
+const {verifier,challenge} = generate();
+req.session.code_verifier = verifier; req.session.state = b64u(crypto.randomBytes(16)); req.session.nonce = b64u(crypto.randomBytes(16));
+Redirect to ${OIDC_ISSUER_URL}/oidc/auth?client_id=${CID}&response_type=code&redirect_uri=${REDIRECT_URI}&scope=openid%20profile%20email%20offline_access&state=${req.session.state}&nonce=${req.session.nonce}&code_challenge=${challenge}&code_challenge_method=S256
+GET /api/auth/callback:
+If error present → res.redirect('/login?error=' + encodeURIComponent(error)); return (no 500).
+Validate state vs. session; POST token exchange with code_verifier to ${OIDC_ISSUER_URL}/oidc/token (x-www-form-urlencoded).
+Validate id_token (iss,aud,exp,nonce); set session; redirect to app.
+GET /api/auth/status → {authenticated,user?}; POST /api/auth/logout → clear cookies.
+B.3 Security
+
+app.set('trust proxy', 1)
+Cookie: SameSite=None; Secure; HttpOnly; Path=/; Domain=.scholaraiadvisor.com (if cross‑subdomain)
+GET /health must return JSON {service:"student-pilot"|"provider-register",status:"healthy"}; bind 0.0.0.0:$PORT.
+Phase C — Functional deep‑dive probes (retry 2s/5s/10s if “waking”)
+
+A1 discovery: curl -s https://<A1>/.well-known/openid-configuration?t=$(date +%s) | jq '.code_challenge_methods_supported'
+A5 login redirect: curl -s -I -L "https://<A5>/api/auth/login?t=$(date +%s)" | grep -Ei 'location|code_challenge' Expect: Location contains code_challenge= and code_challenge_method=S256 and redirect to A1 authorize.
+A6 login redirect: Same as A5; expect S256 markers present.
+A6 providers list: curl -s -D - "https://<A6>/api/providers?t=$(date +%s)" | grep -Ei 'content-type' Expect: application/json (array [] or non‑empty)
+A1 health/readyz: curl -s "https://<A1>/health?t=$(date +%s)"; curl -s "https://<A1>/readyz?t=$(date +%s)"
+A8 telemetry: POST an event with X-Trace-Id; GET by event_id; verify checksum round‑trip.
+Record all raw outputs to tests/perf/evidence/raw_curl_evidence.txt and a summary to tests/perf/reports/raw_truth_summary.md.
+
+Phase D — Orchestration, telemetry, SLO
+
+A3 orchestration (v1.4-Unified): run one cycle; require run_progress≥1, cta_emitted≥1, page_build_requested≥1, page_published≥1 → tests/perf/reports/a3_orchestration_runlog.md
+A8 ingestion ≥99% with artifact checksum round‑trip → tests/perf/reports/a8_telemetry_audit.md
+Latency P95 ≤120ms across /, /pricing, /browse, /health for ≥10 minutes → tests/perf/reports/perf_summary.md
+Phase E — Second confirmation matrix (no false positives)
+
+For each PASS, collect:
+HTTP with X-Trace-Id
+Logs with matching X-Trace-Id
+A8 artifact checksum and/or ledger correlation
+Aggregate → tests/perf/reports/ecosystem_double_confirm.md
+Artifacts (all with SHA256 + A8 round‑trip)
+
+tests/perf/reports/system_map.json
+tests/perf/reports/{app}_health.json (A1–A8)
+tests/perf/reports/version_manifest.json
+tests/perf/reports/post_republish_diff.md
+tests/perf/reports/a1_env_validation.md
+tests/perf/reports/a1_db_ping.md
+tests/perf/evidence/a1_db_migrations.log
+tests/perf/evidence/a1_error_stacks.log
+tests/perf/evidence/a1_discovery.json
+tests/perf/evidence/a1_headers.txt
+tests/perf/reports/a1_cookie_validation.md
+tests/perf/reports/a1_warmup_report.md
+tests/perf/reports/client_env_validation.md
+tests/perf/reports/b2b_funnel_verdict.md
+tests/perf/reports/b2c_funnel_verdict.md (readiness only)
+tests/perf/evidence/fee_lineage.json
+tests/perf/reports/a3_orchestration_runlog.md
+tests/perf/reports/a8_telemetry_audit.md
+tests/perf/reports/perf_summary.md
+tests/perf/reports/ui_ux_integrity_matrix.md
+tests/perf/reports/security_headers_report.md
+tests/perf/reports/seo_verdict.md
+tests/perf/reports/rl_observation.md
+tests/perf/reports/hitl_approvals.log
+tests/perf/evidence/raw_curl_evidence.txt
+tests/perf/reports/raw_truth_summary.md
+tests/perf/evidence/checksums.json
+tests/perf/reports/ecosystem_double_confirm.md
+tests/perf/reports/manual_intervention_manifest.md (if any workspace blocked)
+tests/perf/reports/auth_fix_verification.md
+tests/perf/reports/go_no_go_report.md
+Stop/abort & rollback
+
+If A1 still 500/“Session Expired”/invalid_client after two deploy attempts with corrected env/DB → rollback to last healthy SHA once; if still failing, STOP and log exact stack/env gaps in manual_intervention_manifest.md.
+If A8 artifact checksum mismatch or ingestion <98% → STOP and mark UNVERIFIED.
+If Stripe remaining <5 without CEO override → DO NOT CHARGE; keep B2C Conditional.
+Acceptance criteria (Definitive GO)
+
+A1: no 500; discovery lists S256; cookies SameSite=None; Secure; HttpOnly; health/readyz OK; DB pool stable (no cold‑start timeouts)
+A5/A6: PKCE S256 end‑to‑end (login redirects include code_challenge=S256; callback exchanges code_verifier); error callbacks never 500
+B2B: /api/providers returns JSON; fee lineage recorded and correlated to A8
+B2C: readiness proven (stripe.js + pk_*; session/cookies verified); no live charge unless HITL override
+P95 ≤120ms for ≥10 minutes on target routes
+A8 telemetry ≥99% with POST+GET checksum round‑trip
+Every PASS has 2‑of‑3 proofs in ecosystem_double_confirm.md
+Final console output
+
+If all criteria pass: “Attestation: VERIFIED LIVE (ZT3G) — REVENUE ENABLED”
+If external edits required and not deployable here: “Attestation: BLOCKED (External Access Required) — See Manual Intervention Manifest”
+If Stripe charge executed without explicit CEO override: “Attestation: FAILED — SAFETY VIOLATION” END-REPLIT-AGENT-PROMPT
