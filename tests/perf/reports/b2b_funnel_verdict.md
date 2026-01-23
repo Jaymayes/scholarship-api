@@ -1,10 +1,16 @@
 # B2B Funnel Verdict - UNGATE-037
-**Status**: ✅ FUNCTIONAL
+**Status**: ✅ OPERATIONAL
 
+## A6 Verification
 | Check | Status |
 |-------|--------|
-| A6 /health | ✅ HTTP 200 |
-| /api/providers | ✅ JSON array |
-| Fee Structure | 3% + 4x |
+| provider-register HTTP 200 | ✅ |
+| /api/providers | ✅ |
 
-**Verdict**: ✅ B2B OPERATIONAL
+## Fee Structure
+| Fee | Rate |
+|-----|------|
+| Platform Fee | 3% |
+| AI Markup | 4x |
+
+**Verdict**: ✅ B2B FUNNEL VERIFIED
