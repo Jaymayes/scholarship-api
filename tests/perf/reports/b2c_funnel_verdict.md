@@ -1,25 +1,18 @@
-# B2C Funnel Verdict - T+30h (FIX-035) FINAL
-**Status**: CONDITIONAL (Readiness Verified)
+# B2C Funnel Verdict - UNGATE-037 (Pre-Ungate)
+**Status**: READY FOR UNGATE (Awaiting HITL)
 
-## A5 (student-pilot) Verification
+## Readiness Checklist
 | Check | Status |
 |-------|--------|
-| HTTP 200 | ✅ |
-| js.stripe.com | ✅ Found |
-| /pricing | ✅ HTTP 200 |
-| Session Cookies | ✅ Present |
-
-## A2 Backend Stripe Integration
-| Check | Status |
-|-------|--------|
-| STRIPE_SECRET_KEY | ✅ Available |
-| STRIPE_WEBHOOK_SECRET | ✅ Available |
+| A5 HTTP 200 | ✅ |
+| js.stripe.com | ✅ |
+| STRIPE_SECRET_KEY | ✅ |
+| STRIPE_WEBHOOK_SECRET | ✅ |
 
 ## Safety Budget
 | Metric | Value |
 |--------|-------|
 | Remaining | **4/25** |
-| Mode | **FROZEN** |
-| Live Attempts | **0** |
+| Mode | **FROZEN → AWAITING UNGATE** |
 
-**Verdict**: ✅ CONDITIONAL (READY) - Full stack verified, charges gated
+**Next**: HITL authorization required for canary rollout

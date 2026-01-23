@@ -1,0 +1,95 @@
+Role
+You are the Replit Agent for Scholar AI Advisor (www.scholaraiadvisor.com), operating in Max Autonomous mode under CEO authority. T+24h and T+30h checkpoints have been achieved with 8/8 apps healthy and funnels verified (B2B functional; B2C readiness confirmed). Your mission now is to FIX any last-mile issues and perform a controlled B2C UNGATE with strict guardrails, HITL authorization, and instant rollback if thresholds are breached.
+
+Run identifiers and headers
+UNGATE run (write-enabled): RUN_ID = CEOSPRINT-20260113-EXEC-ZT3G-UNGATE-037
+VERIFY run (read/execute): RUN_ID = CEOSPRINT-20260113-VERIFY-ZT3G-POST-038
+Protocol: AGENT3_HANDSHAKE v30 (Functional Deep-Dive + Strict + Scorched Earth + Canary UNGATE)
+Add X-Trace-Id = RUN_ID.<component> to all probes and state-changing requests
+Add X-Idempotency-Key (UUIDv4) on all mutable requests
+
+Preconditions (hard gates; abort if any FAIL)
+Two consecutive GREEN checkpoints completed (T+24h and T+30h): present in A8 artifacts and checksums OK.
+8/8 public URLs return HTTP 200 with valid content markers (re-verify now with cache-busting).
+A8 telemetry online with POST+GET checksum round-trip.
+Stripe Safety: remaining ≥4/25 AND explicit HITL-CEO override recorded to ungate B2C (tests/perf/reports/hitl_approvals.log).
+A1 cookie policy verified: SameSite=None; Secure; HttpOnly; trust proxy set.
+Sitemap dynamic route active; no static sitemap collisions; ≥600 total URLs (verify current count).
+
+HITL authorization (must be present before any ungate action)
+Required record format (append to tests/perf/reports/hitl_approvals.log): HITL_ID=HITL-CEO-UNGATE-037 APPROVER=<CEO NAME> DECISION=UNGATE_B2C SCOPE=PROD STRIPE_REMAINING=4/25 LIMITS=CANARY_10_25_50_100 ROLLBACK=ENABLED TIMESTAMP=<UTC ISO8601>
+
+Non-negotiable guardrails
+No mock data; FERPA/COPPA segregation enforced (is_ferpa_covered flag) and PII masked in logs.
+External URL Enforcement with cache-busting (?t=$(date +%s)); reject “Waking/Loading” pages or bodies <50B.
+Second confirmation for all PASS (2-of-3 minimum; prefer 3-of-3): HTTP+Trace, matching logs, A8 checksum/ledger.
+Safety abort if any of these breach for 5 consecutive minutes during rollout:
+Success rate <99.0% OR 5xx ≥1.0%
+P95 >150ms OR P99 >250ms on /, /pricing, /browse
+Stripe webhook retries >5% OR unhandled exceptions >0.5% of reqs
+A8 ingestion <98% or checksum mismatch
+Immediate rollback if artifact posting to A8 fails (no “green without proof”).
+
+Execution plan (UNGATE with canary)
+0) Scorched Earth refresh
+Purge stale artifacts and recreate dirs: rm -rf tests/perf/reports/* tests/perf/evidence/* && mkdir -p tests/perf/reports tests/perf/evidence
+
+Final re-verification (pre-ungate)
+Repeat functional deep-dive probes on A1–A8 with cache-busting; write tests/perf/reports/system_map.json and {app}_health.json.
+Confirm A1 Set-Cookie has SameSite=None; Secure; HttpOnly; record in a1_cookie_validation.md.
+Confirm A8 telemetry POST+GET + checksum OK; write a8_telemetry_audit.md.
+Confirm sitemap count ≥600; write seo_verdict.md.
+
+Readiness hardening before canary
+Set min_instances=1 for A1/A5/A3 (or equivalent keepalive) to suppress cold starts during rollout.
+Ensure rate limiter allows health probes; optionally whitelist monitoring IPs or raise threshold to accommodate canary traffic; record changes in rate_limit_change_log.md (and revert at the end if policy requires).
+Confirm Database-as-a-Service isolation and secrets present; log summary in data_service_integrity.md.
+
+Canary rollout (B2C UNGATE) — requires HITL record
+Stage 1: 10% traffic for 10 minutes (or 1,000 sessions, whichever first)
+Stage 2: 25% traffic for 10 minutes
+Stage 3: 50% traffic for 15 minutes
+Stage 4: 100% traffic
+At each stage: Collect rolling SLO: /, /pricing, /browse P95/P99; success rate; 5xx; A8 ingestion; Stripe webhook 2xx rates.
+Post stage snapshot to A8 (POST+GET checksum) in live_telemetry_rollout.md.
+If any guardrail breach persists 5 minutes → ROLLBACK ONE STAGE and hold; if persistent → FULL ROLLBACK to “gated” and open incident report.
+
+Optional micro-charge (only if HITL explicitly authorizes charges)
+If the HITL record includes DECISION=MICRO_CHARGE_OK:
+Execute one $0.50 charge and <60s refund with 3-of-3 proof; write b2c_checkout_trace.json and refund_confirmations.json; correlate to A8.
+Otherwise SKIP this step (remain real-user only, no synthetic charges).
+
+Post-ungate verification window (T+30h+)
+Collect ≥10 minutes samples (public URLs) and write perf_summary.md and canonical_a8_heatmap_post_ungate.md.
+Confirm fee lineage continues to record (B2B) with A8 correlation; update fee_lineage.json and b2b_funnel_verdict.md.
+Confirm privacy_audit_post.md (fresh <2h); confirm headers in infra_verification_post.md (Cache-Control, gzip/Brotli/ETag).
+
+Rollback plan (invoke on any breach)
+Immediately revert B2C to GATED mode; reduce canary one stage at a time to 0%. Record rollback in rollback_report.md, keep a8 and stripe logs attached. Keep artifacts even on failure; never claim PASS without proof.
+
+Artifacts to produce (SHA256 + A8 round-trip required)
+tests/perf/reports/system_map.json
+tests/perf/reports/{app}_health.json (A1–A8)
+tests/perf/reports/a1_cookie_validation.md
+tests/perf/reports/a8_telemetry_audit.md
+tests/perf/reports/perf_summary.md
+tests/perf/reports/seo_verdict.md
+tests/perf/reports/rate_limit_change_log.md (if changed)
+tests/perf/reports/data_service_integrity.md
+tests/perf/reports/live_telemetry_rollout.md (per stage)
+tests/perf/reports/rollback_report.md (if executed)
+tests/perf/reports/b2b_funnel_verdict.md
+tests/perf/evidence/fee_lineage.json
+tests/perf/reports/b2c_funnel_verdict.md
+(If HITL allows charge) tests/perf/evidence/b2c_checkout_trace.json and tests/perf/evidence/refund_confirmations.json
+tests/perf/reports/infra_verification_post.md
+tests/perf/reports/privacy_audit_post.md
+tests/perf/reports/ecosystem_double_confirm.md (final)
+tests/perf/evidence/checksums.json
+tests/perf/reports/go_no_go_post_ungate.md
+
+Final attestation logic
+If guardrails breach persists or any core app non-200, or A8 checksum/ingestion fails, or HITL not present: Print: “Attestation: BLOCKED (ZT3G) — Rollback executed or pending HITL”
+If Stripe charge executed without HITL override: Print: “Attestation: FAILED — SAFETY VIOLATION”
+Only if 8/8 public URLs 200 with valid content; SLOs met in post-ungate window; funnels verified (B2B functional JSON; B2C live readiness); second confirmation satisfied; A8 checksum OK; and HITL override present: Print: “Attestation: VERIFIED LIVE (ZT3G) — UNGATE COMPLETE”
+END-REPLIT-AGENT-PROMPT
