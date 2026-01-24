@@ -37,6 +37,27 @@ A1 is **fully operational**:
 
 ---
 
+## Prerequisites for A5/A6 (Neon Serverless Database)
+
+Before implementing PKCE, install the Neon serverless package with WebSocket support:
+
+```bash
+# In A5 (student-pilot) and A6 (provider-register):
+npm install @neondatabase/serverless@latest ws
+```
+
+**Configure Neon WebSocket** (add to your database config or app initialization):
+```typescript
+import { neonConfig } from '@neondatabase/serverless';
+import ws from 'ws';
+
+neonConfig.webSocketConstructor = ws;
+```
+
+This enables serverless-compatible PostgreSQL connections for Replit's environment.
+
+---
+
 ## A5 (student-pilot) - CREATE PKCE AUTH ENDPOINTS
 
 ### Problem
